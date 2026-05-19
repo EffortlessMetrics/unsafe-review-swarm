@@ -841,6 +841,76 @@ mod tests {
     }
 
     #[test]
+    fn raw_pointer_volatile_nullability_guard_is_receiver_sensitive() -> Result<(), String> {
+        for (fixture, family) in [
+            (
+                "raw_pointer_read_volatile_null_guard",
+                OperationFamily::RawPointerRead,
+            ),
+            (
+                "raw_pointer_write_volatile_null_guard",
+                OperationFamily::RawPointerWrite,
+            ),
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.operation.family, family);
+            assert_eq!(card.class, ReviewClass::GuardMissing);
+            assert!(
+                obligation_discharge_present(card, "pointer-live"),
+                "{fixture} should discharge pointer-live"
+            );
+            assert!(
+                !obligation_discharge_present(card, "alignment"),
+                "{fixture} should still require alignment evidence"
+            );
+        }
+
+        for (fixture, family) in [
+            (
+                "raw_pointer_read_volatile_null_observed_not_guard",
+                OperationFamily::RawPointerRead,
+            ),
+            (
+                "raw_pointer_read_volatile_null_other_pointer_not_guard",
+                OperationFamily::RawPointerRead,
+            ),
+            (
+                "raw_pointer_read_volatile_null_post_check_not_guard",
+                OperationFamily::RawPointerRead,
+            ),
+            (
+                "raw_pointer_write_volatile_null_observed_not_guard",
+                OperationFamily::RawPointerWrite,
+            ),
+            (
+                "raw_pointer_write_volatile_null_other_pointer_not_guard",
+                OperationFamily::RawPointerWrite,
+            ),
+            (
+                "raw_pointer_write_volatile_null_post_check_not_guard",
+                OperationFamily::RawPointerWrite,
+            ),
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.operation.family, family);
+            assert_eq!(card.class, ReviewClass::GuardMissing);
+            assert!(
+                !obligation_discharge_present(card, "pointer-live"),
+                "{fixture} should not discharge pointer-live"
+            );
+            assert!(
+                !obligation_discharge_present(card, "alignment"),
+                "{fixture} should still require alignment evidence"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn raw_pointer_write_u8_evidence_requires_target_pointer() -> Result<(), String> {
         let output = fixture_output("raw_pointer_write_other_u8_not_guard")?;
         let card = single_card("raw_pointer_write_other_u8_not_guard", &output)?;

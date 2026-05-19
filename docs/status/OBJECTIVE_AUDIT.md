@@ -123,9 +123,10 @@ These are not failures; they are the next unsupported or weakly verified areas:
   pointer bounds evidence. Method-form raw pointer writes now have fixture proof
   for same-receiver alignment guards and stale observed, closed-branch, and
   post-write alignment checks. Method-form raw pointer reads, writes,
-  `read_unaligned`, and `write_unaligned` now also require same-receiver,
-  pre-operation nullability guards for pointer-live evidence and reject observed
-  nullability, other-pointer guards, and post-use checks.
+  `read_unaligned`, `write_unaligned`, `read_volatile`, and `write_volatile`
+  now also require same-receiver, pre-operation nullability guards for
+  pointer-live evidence and reject observed nullability, other-pointer guards,
+  and post-use checks.
   These raw-pointer evidence rules still do not discharge
   pointer validity, allocation, or witness obligations.
 - Real PR-diff dogfood now recognizes `index < self.num_ctrl_bytes()` as bounds

@@ -1,0 +1,17 @@
+pub fn write_control(register: *mut u32, value: u32, other: *const u32) {
+    if other.is_null() {
+        return;
+    }
+    // SAFETY: this fixture checks a different pointer, not `register`.
+    unsafe { register.write_volatile(value) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::write_control;
+
+    #[test]
+    fn mentions_write_control() {
+        let _ = stringify!(write_control);
+    }
+}
