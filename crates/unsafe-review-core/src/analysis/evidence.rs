@@ -2362,7 +2362,26 @@ fn has_nullability_guard(site: &ScannedSite, lower: &str) -> bool {
         return has_nonnull_new_question_mark_guard(&guard_compact, &arg)
             || has_null_early_return_guard(&guard_compact, &arg);
     }
+    if raw_pointer_operation_has_receiver(site)
+        && let Some(receiver) = raw_pointer_alignment_receiver(&site.operation.expression)
+    {
+        let receiver = compact_code(&receiver.to_ascii_lowercase());
+        let guard_scope = code_before_operation(lower, &site.operation.expression)
+            .unwrap_or_else(|| lower.to_string());
+        let guard_compact = compact_code(&guard_scope);
+        return has_null_early_return_guard(&guard_compact, &receiver);
+    }
     lower.contains("is_null") || compact.contains("nonnull::new(")
+}
+
+fn raw_pointer_operation_has_receiver(site: &ScannedSite) -> bool {
+    matches!(
+        site.operation.family,
+        OperationFamily::RawPointerRead
+            | OperationFamily::RawPointerWrite
+            | OperationFamily::RawPointerReadUnaligned
+            | OperationFamily::RawPointerWriteUnaligned
+    )
 }
 
 fn has_nonnull_new_question_mark_guard(compact: &str, arg: &str) -> bool {

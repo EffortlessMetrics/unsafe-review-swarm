@@ -87,6 +87,10 @@ required_core_fixtures = [
   "raw_pointer_write_alignment_observed_not_guard",
   "raw_pointer_write_alignment_closed_branch_not_guard",
   "raw_pointer_write_alignment_post_check_not_guard",
+  "raw_pointer_write_null_guard",
+  "raw_pointer_write_null_observed_not_guard",
+  "raw_pointer_write_null_other_pointer_not_guard",
+  "raw_pointer_write_null_post_check_not_guard",
   "raw_pointer_write_bounds_observed_not_guard",
   "raw_pointer_write_bounds_closed_branch_not_guard",
   "raw_pointer_write_bounds_post_check_not_guard",
@@ -1021,6 +1025,46 @@ expected_cards = 1
 expected_class = "guard_missing"
 expected_operation_family = "raw_pointer_write"
 expected_hazard = "alignment"
+
+[[cases]]
+fixture = "raw_pointer_write_null_guard"
+kind = "positive"
+claim = "raw pointer write recognizes same-receiver nullability guard evidence"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_write_null_observed_not_guard"
+kind = "false_positive_control"
+claim = "raw pointer write does not accept a bare observed nullability predicate as pointer-live evidence"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_write_null_other_pointer_not_guard"
+kind = "false_positive_control"
+claim = "raw pointer write does not accept a nullability guard from another pointer as pointer-live evidence"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_write_null_post_check_not_guard"
+kind = "false_positive_control"
+claim = "raw pointer write does not accept a post-write nullability check as pointer-live evidence"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
 
 [[cases]]
 fixture = "raw_pointer_write_bounds_observed_not_guard"
