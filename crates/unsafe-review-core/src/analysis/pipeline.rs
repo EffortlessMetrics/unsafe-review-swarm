@@ -566,7 +566,20 @@ mod tests {
 
         assert_eq!(card.operation.family, OperationFamily::RawPointerWrite);
         assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert!(!obligation_discharge_present(card, "bounds"));
         assert!(!obligation_discharge_present(card, "initialized"));
+        Ok(())
+    }
+
+    #[test]
+    fn raw_pointer_bounds_evidence_rejects_bare_observations() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_bounds_observed_not_guard")?;
+        let card = single_card("raw_pointer_bounds_observed_not_guard", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::RawPointerRead);
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert!(!obligation_discharge_present(card, "bounds"));
+        assert!(!obligation_discharge_present(card, "alignment"));
         Ok(())
     }
 

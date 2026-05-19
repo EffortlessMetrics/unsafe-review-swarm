@@ -9,6 +9,7 @@ required_core_fixtures = [
   "raw_pointer_alignment_post_check_not_guard",
   "raw_pointer_alignment_is_aligned_guard",
   "raw_pointer_alignment_observed_not_guard",
+  "raw_pointer_bounds_observed_not_guard",
   "raw_pointer_alignment_closed_branch_not_guard",
   "raw_pointer_alignment_reassigned_pointer_not_guard",
   "raw_pointer_alignment_modulo_guard",
@@ -228,6 +229,16 @@ expected_hazard = "alignment"
 fixture = "raw_pointer_alignment_observed_not_guard"
 kind = "false_positive_control"
 claim = "observed is_aligned values do not discharge raw pointer read alignment evidence"
+support_tier = "Guard evidence mining"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+
+[[cases]]
+fixture = "raw_pointer_bounds_observed_not_guard"
+kind = "false_positive_control"
+claim = "observed length predicates do not discharge raw pointer read bounds evidence"
 support_tier = "Guard evidence mining"
 expected_cards = 1
 expected_class = "guard_missing"

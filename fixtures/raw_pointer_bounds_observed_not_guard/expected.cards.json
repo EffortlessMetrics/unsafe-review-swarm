@@ -1,20 +1,20 @@
 [
     {
-        "id":  "UR-raw-pointer-write-other-maybeuninit-not-guard-fixture-src-lib-rs-fill-tag-operation-raw_pointer_write-write-bytes-3c6249bf4467-pointer_validity-c1",
+        "id":  "UR-raw-pointer-bounds-observed-not-guard-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
         "class":  "guard_missing",
         "priority":  "high",
         "confidence":  "medium",
         "site":  {
                      "file":  "src/lib.rs",
-                     "line":  7,
+                     "line":  8,
                      "column":  5,
                      "kind":  "operation",
-                     "owner":  "fill_tag",
+                     "owner":  "read_header",
                      "visibility":  "private",
                      "public_api_surface":  false,
-                     "snippet":  "unsafe { ptr.write_bytes(byte, len) }"
+                     "snippet":  "unsafe { ptr.cast::\u003cHeader\u003e().read() }"
                  },
-        "operation_family":  "raw_pointer_write",
+        "operation_family":  "raw_pointer_read",
         "hazards":  [
                         "pointer_validity",
                         "alignment",
@@ -45,7 +45,7 @@
                                         "reach":  {
                                                       "present":  true,
                                                       "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `fill_tag`"
+                                                      "summary":  "1 related test file(s) mention owner `read_header`"
                                                   },
                                         "witness":  {
                                                         "present":  false,
@@ -69,7 +69,7 @@
                                         "reach":  {
                                                       "present":  true,
                                                       "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `fill_tag`"
+                                                      "summary":  "1 related test file(s) mention owner `read_header`"
                                                   },
                                         "witness":  {
                                                         "present":  false,
@@ -93,7 +93,7 @@
                                         "reach":  {
                                                       "present":  true,
                                                       "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `fill_tag`"
+                                                      "summary":  "1 related test file(s) mention owner `read_header`"
                                                   },
                                         "witness":  {
                                                         "present":  false,
@@ -117,7 +117,7 @@
                                         "reach":  {
                                                       "present":  true,
                                                       "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `fill_tag`"
+                                                      "summary":  "1 related test file(s) mention owner `read_header`"
                                                   },
                                         "witness":  {
                                                         "present":  false,
@@ -141,7 +141,7 @@
                                         "reach":  {
                                                       "present":  true,
                                                       "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `fill_tag`"
+                                                      "summary":  "1 related test file(s) mention owner `read_header`"
                                                   },
                                         "witness":  {
                                                         "present":  false,
@@ -152,15 +152,15 @@
                                 ],
         "contract":  "Nearby `SAFETY:` comment was detected",
         "discharge":  "No visible local guard detected",
-        "reach":  "1 related test file(s) mention owner `fill_tag`",
+        "reach":  "1 related test file(s) mention owner `read_header`",
         "witness":  "No imported witness receipt was found",
         "missing":  [
                         "Missing visible local guard for inferred safety obligations",
                         "No witness receipt imported for this card"
                     ],
         "verify_commands":  [
-                                "cargo +nightly miri test fill_tag",
-                                "cargo +nightly careful test fill_tag"
+                                "cargo +nightly miri test read_header",
+                                "cargo +nightly careful test read_header"
                             ]
     }
 ]

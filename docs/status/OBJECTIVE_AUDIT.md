@@ -14,6 +14,9 @@ indexes reassigned before the unchecked access.
 Raw pointer alignment evidence now also has fixture-backed controls for
 same-pointer `is_aligned` guards, observations, closed branches, and stale
 checked pointers.
+Raw pointer bounds evidence now rejects bare predicate observations and generic
+type angle brackets while preserving the narrow same-slice `write_bytes` length
+shape.
 Modulo alignment guards have the same fixture-backed observation, closed-branch,
 and stale-pointer controls.
 `Vec::from_raw_parts` len/cap capacity evidence now has fixture-backed controls
@@ -112,8 +115,11 @@ These are not failures; they are the next unsupported or weakly verified areas:
   `raw_pointer_write` operation family. Fixture coverage also recognizes the
   narrow `*mut u8` case as alignment and byte-pattern evidence and recognizes
   `MaybeUninit` raw-write destinations as initialized-memory evidence. Other
-  destination-type modeling remains source-level and advisory, and these rules
-  do not discharge pointer validity, bounds, allocation, or witness obligations.
+  destination-type modeling remains source-level and advisory. The narrow
+  same-slice `slice.as_mut_ptr().write_bytes(_, slice.len())` shape can
+  discharge bounds evidence, while bare length observations and generic type
+  angle brackets do not discharge bounds. These raw-write rules still do not
+  discharge pointer validity, allocation, or witness obligations.
 - Real PR-diff dogfood now recognizes `index < self.num_ctrl_bytes()` as bounds
   evidence for pointer arithmetic, and capped `memchr` repo dogfood recognizes
   the local same-slice `as_ptr()` plus `len()` end-pointer pattern, but broader

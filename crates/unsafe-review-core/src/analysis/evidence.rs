@@ -411,9 +411,10 @@ fn is_documented_private_unsafe_contract_obligation(
 }
 
 fn has_length_or_bounds_guard(lower: &str) -> bool {
-    let has_comparison = lower.contains(">=") || lower.contains('<');
-    (has_comparison && (lower.contains("len") || lower.contains("num_ctrl_bytes")))
-        || has_len_capacity_equality_guard(lower)
+    let compact = compact_code(lower);
+    has_len_capacity_equality_guard(lower)
+        || has_bounds_assertion_guard(&compact)
+        || has_bounds_open_positive_branch_guard(&compact)
 }
 
 fn has_bounds_guard(site: &ScannedSite, lower: &str) -> bool {
@@ -425,7 +426,140 @@ fn has_bounds_guard(site: &ScannedSite, lower: &str) -> bool {
             .unwrap_or_else(|| lower.to_string());
         return has_get_unchecked_bounds_guard(&guard_scope, &receiver, &index);
     }
-    has_length_or_bounds_guard(lower)
+    if site.operation.family == OperationFamily::RawPointerWrite
+        && has_raw_pointer_write_bytes_same_slice_len_evidence(&site.operation.expression)
+    {
+        return true;
+    }
+    let guard_scope = code_before_operation(lower, &site.operation.expression)
+        .unwrap_or_else(|| lower.to_string());
+    has_length_or_bounds_guard(&guard_scope)
+}
+
+fn has_raw_pointer_write_bytes_same_slice_len_evidence(expression: &str) -> bool {
+    let compact = compact_code(&expression.to_ascii_lowercase());
+    for marker in [".as_mut_ptr().write_bytes("] {
+        let Some(receiver) = receiver_before_marker(&compact, marker) else {
+            continue;
+        };
+        let Some(call_pos) = compact.find(marker) else {
+            continue;
+        };
+        let after_marker = &compact[call_pos + marker.len()..];
+        let Some(end) = matching_call_argument_end(after_marker) else {
+            continue;
+        };
+        let args = split_top_level_arguments(&after_marker[..end]);
+        if args.len() == 2 && args[1] == format!("{receiver}.len()") {
+            return true;
+        }
+    }
+    false
+}
+
+fn has_bounds_assertion_guard(compact: &str) -> bool {
+    ["assert!(", "debug_assert!("].into_iter().any(|prefix| {
+        let mut cursor = compact;
+        let mut offset = 0usize;
+        while let Some(pos) = cursor.find(prefix) {
+            let statement_start = offset + pos + prefix.len();
+            let after_prefix = &compact[statement_start..];
+            let statement_end = after_prefix.find(';').unwrap_or(after_prefix.len());
+            let statement = &after_prefix[..statement_end];
+            if has_bounds_condition(statement) {
+                return true;
+            }
+            let next = pos + prefix.len();
+            offset += next;
+            cursor = &cursor[next..];
+        }
+        false
+    })
+}
+
+fn has_bounds_open_positive_branch_guard(compact: &str) -> bool {
+    let mut cursor = compact;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find("if") {
+        let start = offset + pos;
+        let before = compact[..start].chars().next_back();
+        if before.is_some_and(is_receiver_path_char) {
+            let next = pos + 2;
+            offset += next;
+            cursor = &cursor[next..];
+            continue;
+        }
+        let after_if = &compact[start + 2..];
+        if let Some(brace_pos) = after_if.find('{') {
+            let condition = &after_if[..brace_pos];
+            let after_body_start = &after_if[brace_pos + 1..];
+            if has_bounds_condition(condition) && branch_still_open_at_operation(after_body_start) {
+                return true;
+            }
+        }
+        let next = pos + 2;
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
+}
+
+fn has_bounds_condition(compact: &str) -> bool {
+    for op in [">=", "<=", "<", ">"] {
+        let mut cursor = compact;
+        let mut offset = 0usize;
+        while let Some(pos) = cursor.find(op) {
+            let op_start = offset + pos;
+            let op_end = op_start + op.len();
+            let left = comparison_left_operand(compact, op_start);
+            let right = comparison_right_operand(compact, op_end);
+            if operand_mentions_bounds(left) || operand_mentions_bounds(right) {
+                return true;
+            }
+            let next = pos + op.len();
+            offset += next;
+            cursor = &cursor[next..];
+        }
+    }
+    false
+}
+
+fn comparison_left_operand(compact: &str, op_start: usize) -> &str {
+    let left = &compact[..op_start];
+    let start = left
+        .rfind(['{', ';', ',', '=', '!'])
+        .map_or(0, |idx| idx + 1);
+    &left[start..]
+}
+
+fn comparison_right_operand(compact: &str, op_end: usize) -> &str {
+    let right = &compact[op_end..];
+    let end = right.find(['{', '}', ';', ',', '=']).unwrap_or(right.len());
+    &right[..end]
+}
+
+fn operand_mentions_bounds(operand: &str) -> bool {
+    operand.contains(".len()")
+        || operand.contains(".capacity()")
+        || operand.contains("num_ctrl_bytes()")
+        || compact_contains_identifier(operand, "len")
+        || compact_contains_identifier(operand, "capacity")
+}
+
+fn compact_contains_identifier(text: &str, ident: &str) -> bool {
+    let mut cursor = text;
+    while let Some(pos) = cursor.find(ident) {
+        let before = cursor[..pos].chars().next_back();
+        let after = cursor[pos + ident.len()..].chars().next();
+        if before.is_none_or(|ch| !is_receiver_path_char(ch))
+            && after.is_none_or(|ch| !is_receiver_path_char(ch))
+        {
+            return true;
+        }
+        let next = pos + ident.len();
+        cursor = &cursor[next..];
+    }
+    false
 }
 
 fn code_before_operation(lower: &str, expression: &str) -> Option<String> {
@@ -2858,6 +2992,81 @@ mod tests {
         );
         assert!(
             !obligation_evidence(&mismatched_len, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+    }
+
+    #[test]
+    fn raw_pointer_bounds_evidence_requires_executable_guard() {
+        let obligations = vec![SafetyObligation::new(
+            "bounds",
+            "buffer has enough bytes for the accessed type",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let asserted = site_with_family(
+            OperationFamily::RawPointerRead,
+            vec!["assert!(bytes.len() >= core::mem::size_of::<Header>());"],
+            "unsafe { ptr.cast::<Header>().read() }",
+            vec![],
+        );
+        let open_branch = site_with_family(
+            OperationFamily::RawPointerRead,
+            vec!["if bytes.len() >= core::mem::size_of::<Header>() {"],
+            "unsafe { ptr.cast::<Header>().read() }",
+            vec![],
+        );
+        let observed = site_with_family(
+            OperationFamily::RawPointerRead,
+            vec![
+                "let enough = bytes.len() >= core::mem::size_of::<Header>();",
+                "observe(enough);",
+            ],
+            "unsafe { ptr.cast::<Header>().read() }",
+            vec![],
+        );
+        let generic_angle_brackets = site_with_family(
+            OperationFamily::RawPointerWrite,
+            vec!["let _scratch: MaybeUninit<u16> = MaybeUninit::uninit();"],
+            "unsafe { ptr.write_bytes(byte, len) }",
+            vec![],
+        );
+        let same_slice_write_bytes = site_with_family(
+            OperationFamily::RawPointerWrite,
+            vec![],
+            "unsafe { slice.as_mut_ptr().write_bytes(byte, slice.len()) }",
+            vec![],
+        );
+
+        assert!(has_length_or_bounds_guard(
+            "assert!(bytes.len() >= core::mem::size_of::<Header>());"
+        ));
+        assert!(
+            obligation_evidence(&asserted, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            obligation_evidence(&open_branch, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&observed, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&generic_angle_brackets, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            obligation_evidence(&same_slice_write_bytes, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
         );
