@@ -355,6 +355,7 @@ mod tests {
         "maybeuninit_assume_init_drop",
         "vec_set_len",
         "vec_set_len_capacity_return_guard",
+        "vec_set_len_capacity_open_branch_guard",
         "vec_set_len_initialized_loop",
         "vec_set_len_capacity_observed_not_guard",
         "vec_set_len_capacity_closed_branch_not_guard",

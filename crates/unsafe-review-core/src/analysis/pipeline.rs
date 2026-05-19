@@ -1869,7 +1869,11 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
 
     #[test]
     fn vec_set_len_capacity_guards_bound_new_len() -> Result<(), String> {
-        for fixture in ["vec_set_len", "vec_set_len_capacity_return_guard"] {
+        for fixture in [
+            "vec_set_len",
+            "vec_set_len_capacity_return_guard",
+            "vec_set_len_capacity_open_branch_guard",
+        ] {
             let output = fixture_output(fixture)?;
             let card = single_card(fixture, &output)?;
 

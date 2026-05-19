@@ -52,6 +52,7 @@ required_core_fixtures = [
   "maybeuninit_assume_init_drop",
   "vec_set_len",
   "vec_set_len_capacity_return_guard",
+  "vec_set_len_capacity_open_branch_guard",
   "vec_set_len_initialized_loop",
   "vec_set_len_capacity_observed_not_guard",
   "vec_set_len_capacity_closed_branch_not_guard",
@@ -715,6 +716,16 @@ expected_hazard = "initialized_memory"
 fixture = "vec_set_len_capacity_return_guard"
 kind = "positive"
 claim = "Vec::set_len recognizes invalid-length early returns as capacity evidence while still reporting missing initialized-range evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "vec_set_len_capacity_open_branch_guard"
+kind = "positive"
+claim = "Vec::set_len recognizes open positive capacity branches as capacity evidence while still reporting missing initialized-range evidence"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
