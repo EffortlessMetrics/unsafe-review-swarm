@@ -117,9 +117,10 @@ These are not failures; they are the next unsupported or weakly verified areas:
   `MaybeUninit` raw-write destinations as initialized-memory evidence. Other
   destination-type modeling remains source-level and advisory. The narrow
   same-slice `slice.as_mut_ptr().write_bytes(_, slice.len())` shape can
-  discharge bounds evidence, while bare length observations, closed positive
-  branches, post-use checks, and generic type angle brackets do not discharge
-  bounds. These raw-write rules still do not discharge pointer validity,
+  discharge bounds evidence, while write-side fixture coverage now proves bare
+  length observations, closed positive branches, and post-use checks do not
+  discharge bounds. Generic type angle brackets also do not discharge raw
+  pointer bounds evidence. These raw-write rules still do not discharge pointer validity,
   allocation, or witness obligations.
 - Real PR-diff dogfood now recognizes `index < self.num_ctrl_bytes()` as bounds
   evidence for pointer arithmetic, and capped `memchr` repo dogfood recognizes

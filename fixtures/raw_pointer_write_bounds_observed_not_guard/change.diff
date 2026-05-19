@@ -1,0 +1,26 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,21 @@
++pub struct Header(u32);
++
++pub fn write_header(bytes: &mut [u8], header: Header) {
++    let enough = bytes.len() >= core::mem::size_of::<Header>();
++    observe(enough);
++    let ptr = bytes.as_mut_ptr();
++    // SAFETY: this fixture intentionally observes a length predicate without enforcing it.
++    unsafe { ptr.cast::<Header>().write(header) }
++}
++
++fn observe(_enough: bool) {}
++
++#[cfg(test)]
++mod tests {
++    use super::{write_header, Header};
++
++    #[test]
++    fn mentions_write_header() {
++        let _ = stringify!(write_header);
++        let _ = Header(0);
++    }
++}

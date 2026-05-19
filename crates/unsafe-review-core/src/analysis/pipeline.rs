@@ -596,6 +596,30 @@ mod tests {
     }
 
     #[test]
+    fn raw_pointer_write_bounds_evidence_rejects_bare_observations() -> Result<(), String> {
+        for fixture in [
+            "raw_pointer_write_bounds_observed_not_guard",
+            "raw_pointer_write_bounds_closed_branch_not_guard",
+            "raw_pointer_write_bounds_post_check_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.operation.family, OperationFamily::RawPointerWrite);
+            assert_eq!(card.class, ReviewClass::GuardMissing);
+            assert!(
+                !obligation_discharge_present(card, "bounds"),
+                "{fixture} should not discharge bounds"
+            );
+            assert!(
+                !obligation_discharge_present(card, "alignment"),
+                "{fixture} should not discharge alignment"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn raw_pointer_write_u8_evidence_requires_target_pointer() -> Result<(), String> {
         let output = fixture_output("raw_pointer_write_other_u8_not_guard")?;
         let card = single_card("raw_pointer_write_other_u8_not_guard", &output)?;
