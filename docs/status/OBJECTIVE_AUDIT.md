@@ -24,8 +24,8 @@ and stale-pointer controls.
 for assertions, early returns, bare observations, closed branches, and stale
 checked cap arguments. `Vec::set_len` capacity evidence accepts direct
 same-vector capacity assertions and rejects observations, closed branches,
-stale checked lengths, unrelated comparisons, and unrelated local arguments
-merely named `cap` unless a const-capacity context is visible. Same-vector
+stale checked lengths, stale checked receivers, unrelated comparisons, and
+unrelated local arguments merely named `cap` unless a const-capacity context is visible. Same-vector
 `Vec::with_capacity(new_len)` evidence also rejects reassigned vector bindings
 and reassigned checked lengths.
 `Box::from_raw` and `ptr::drop_in_place` ownership evidence reject stale
@@ -104,7 +104,7 @@ These are not failures; they are the next unsupported or weakly verified areas:
   unrelated capacity comparisons plus local arguments merely named `cap` are
   pinned as non-evidence before `set_len`;
   `arrayvec#288` has a rerun receipt; direct capacity assertions, closed
-  capacity branches, stale checked lengths, stale `Vec::with_capacity`
+  capacity branches, stale checked lengths, stale checked receivers, stale `Vec::with_capacity`
   vector bindings, and stale `Vec::with_capacity` checked lengths now have
   fixture coverage;
   non-zero shrink and `set_len(0)` clear evidence also have fixture and

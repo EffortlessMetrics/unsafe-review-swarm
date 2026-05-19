@@ -70,8 +70,8 @@ alignment checks through `raw_pointer_alignment_modulo_guard`,
 assertions and invalid-path early returns, and rejects bare relation
 observations, closed positive branches, and reassigned checked cap arguments.
 `Vec::set_len` capacity evidence accepts direct same-vector capacity assertions
-and rejects observations, closed branches, stale checked lengths, unrelated
-comparisons, and unrelated local arguments merely named `cap` unless a
+and rejects observations, closed branches, stale checked lengths, stale checked
+receivers, unrelated comparisons, and unrelated local arguments merely named `cap` unless a
 const-capacity context is visible. Same-vector `Vec::with_capacity(new_len)`
 evidence also rejects reassigned vector bindings and reassigned checked lengths.
 `Box::from_raw` and `ptr::drop_in_place` reject `Box::into_raw` origin evidence

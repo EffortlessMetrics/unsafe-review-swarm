@@ -1296,13 +1296,13 @@ fn has_capacity_bound_guard(lower: &str) -> bool {
         format!("{receiver}.capacity()"),
         format!("{receiver}.cap()"),
     ] {
-        if has_set_len_capacity_relation(before_call, new_len, &capacity) {
+        if has_set_len_capacity_relation(before_call, new_len, &capacity, receiver) {
             return true;
         }
     }
     set_len_capacity_bindings(before_call, receiver)
         .into_iter()
-        .any(|capacity| has_set_len_capacity_relation(before_call, new_len, capacity))
+        .any(|capacity| has_set_len_capacity_relation(before_call, new_len, capacity, receiver))
 }
 
 fn set_len_capacity_bindings<'a>(before_call: &'a str, receiver: &str) -> Vec<&'a str> {
@@ -1319,18 +1319,28 @@ fn set_len_capacity_bindings<'a>(before_call: &'a str, receiver: &str) -> Vec<&'
         .collect()
 }
 
-fn has_set_len_capacity_relation(before_call: &str, new_len: &str, capacity: &str) -> bool {
+fn has_set_len_capacity_relation(
+    before_call: &str,
+    new_len: &str,
+    capacity: &str,
+    receiver: &str,
+) -> bool {
     let len_lte_cap = format!("{new_len}<={capacity}");
     let cap_gte_len = format!("{capacity}>={new_len}");
     let len_gt_cap = format!("{new_len}>{capacity}");
     let cap_lt_len = format!("{capacity}<{new_len}");
-    has_set_len_capacity_predicate_guard(before_call, &len_lte_cap, new_len)
-        || has_set_len_capacity_predicate_guard(before_call, &cap_gte_len, new_len)
-        || has_set_len_capacity_early_return(before_call, &len_gt_cap, new_len)
-        || has_set_len_capacity_early_return(before_call, &cap_lt_len, new_len)
+    has_set_len_capacity_predicate_guard(before_call, &len_lte_cap, new_len, receiver)
+        || has_set_len_capacity_predicate_guard(before_call, &cap_gte_len, new_len, receiver)
+        || has_set_len_capacity_early_return(before_call, &len_gt_cap, new_len, receiver)
+        || has_set_len_capacity_early_return(before_call, &cap_lt_len, new_len, receiver)
 }
 
-fn has_set_len_capacity_predicate_guard(before_call: &str, predicate: &str, new_len: &str) -> bool {
+fn has_set_len_capacity_predicate_guard(
+    before_call: &str,
+    predicate: &str,
+    new_len: &str,
+    receiver: &str,
+) -> bool {
     [
         format!("assert!({predicate})"),
         format!("assert!({predicate},"),
@@ -1338,11 +1348,74 @@ fn has_set_len_capacity_predicate_guard(before_call: &str, predicate: &str, new_
         format!("debug_assert!({predicate},"),
     ]
     .iter()
-    .any(|pattern| has_fresh_guard_pattern(before_call, pattern, new_len))
-        || has_open_positive_branch_guard(before_call, predicate, new_len)
+    .any(|pattern| {
+        has_fresh_set_len_capacity_guard_pattern(before_call, pattern, new_len, receiver)
+    }) || has_open_positive_set_len_capacity_branch_guard(before_call, predicate, new_len, receiver)
 }
 
-fn has_set_len_capacity_early_return(before_call: &str, predicate: &str, new_len: &str) -> bool {
+fn has_fresh_set_len_capacity_guard_pattern(
+    before_call: &str,
+    pattern: &str,
+    new_len: &str,
+    receiver: &str,
+) -> bool {
+    let mut search_from = 0;
+    while let Some(offset) = before_call[search_from..].find(pattern) {
+        let pattern_start = search_from + offset;
+        let after_pattern = &before_call[pattern_start + pattern.len()..];
+        let statement_end = after_pattern.find(';').unwrap_or(after_pattern.len());
+        let after_guard = &after_pattern[statement_end..];
+        if !has_assignment_to_identifier(after_guard, new_len)
+            && !has_assignment_to_identifier(after_guard, receiver)
+        {
+            return true;
+        }
+        search_from = pattern_start + pattern.len();
+    }
+    false
+}
+
+fn has_open_positive_set_len_capacity_branch_guard(
+    before_call: &str,
+    predicate: &str,
+    new_len: &str,
+    receiver: &str,
+) -> bool {
+    let guard = format!("if{predicate}{{");
+    let mut search_from = 0;
+    while let Some(offset) = before_call[search_from..].find(&guard) {
+        let guard_start = search_from + offset;
+        let after_guard = &before_call[guard_start + guard.len()..];
+        let mut depth = 1usize;
+        for ch in after_guard.chars() {
+            match ch {
+                '{' => depth += 1,
+                '}' => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 0 {
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        if depth > 0
+            && !has_assignment_to_identifier(after_guard, new_len)
+            && !has_assignment_to_identifier(after_guard, receiver)
+        {
+            return true;
+        }
+        search_from = guard_start + guard.len();
+    }
+    false
+}
+
+fn has_set_len_capacity_early_return(
+    before_call: &str,
+    predicate: &str,
+    new_len: &str,
+    receiver: &str,
+) -> bool {
     let guard = format!("if{predicate}{{");
     let mut search_from = 0;
     while let Some(offset) = before_call[search_from..].find(&guard) {
@@ -1351,7 +1424,10 @@ fn has_set_len_capacity_early_return(before_call: &str, predicate: &str, new_len
         let guard_end = after_guard.find('}').unwrap_or(after_guard.len());
         let guard_body = &after_guard[..guard_end];
         let after_branch = &after_guard[guard_end..];
-        if guard_body.contains("return") && !has_assignment_to_identifier(after_branch, new_len) {
+        if guard_body.contains("return")
+            && !has_assignment_to_identifier(after_branch, new_len)
+            && !has_assignment_to_identifier(after_branch, receiver)
+        {
             return true;
         }
         search_from = guard_start + guard.len();

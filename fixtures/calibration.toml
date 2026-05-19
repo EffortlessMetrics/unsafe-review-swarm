@@ -55,6 +55,7 @@ required_core_fixtures = [
   "vec_set_len_capacity_observed_not_guard",
   "vec_set_len_capacity_closed_branch_not_guard",
   "vec_set_len_capacity_reassigned_not_guard",
+  "vec_set_len_capacity_receiver_reassigned_not_guard",
   "vec_set_len_unrelated_capacity_comparison_not_guard",
   "vec_set_len_cap_argument_not_guard",
   "vec_set_len_with_capacity",
@@ -742,6 +743,16 @@ expected_hazard = "initialized_memory"
 fixture = "vec_set_len_capacity_reassigned_not_guard"
 kind = "false_positive_control"
 claim = "Vec::set_len rejects stale capacity assertions when the checked new length is reassigned before set_len"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "vec_set_len_capacity_receiver_reassigned_not_guard"
+kind = "false_positive_control"
+claim = "Vec::set_len rejects stale capacity assertions when the checked vector receiver is reassigned before set_len"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
