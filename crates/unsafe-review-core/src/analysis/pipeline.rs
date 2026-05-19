@@ -1868,15 +1868,17 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
-    fn vec_set_len_direct_capacity_assert_is_capacity_guard() -> Result<(), String> {
-        let output = fixture_output("vec_set_len")?;
-        let card = single_card("vec_set_len", &output)?;
+    fn vec_set_len_capacity_guards_bound_new_len() -> Result<(), String> {
+        for fixture in ["vec_set_len", "vec_set_len_capacity_return_guard"] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
 
-        assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
-        assert_eq!(card.operation.family, OperationFamily::VecSetLen);
-        assert_eq!(card.class, ReviewClass::GuardMissing);
-        assert!(obligation_discharge_present(card, "capacity"));
-        assert!(!obligation_discharge_present(card, "initialized"));
+            assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+            assert_eq!(card.operation.family, OperationFamily::VecSetLen);
+            assert_eq!(card.class, ReviewClass::GuardMissing);
+            assert!(obligation_discharge_present(card, "capacity"));
+            assert!(!obligation_discharge_present(card, "initialized"));
+        }
         Ok(())
     }
 
