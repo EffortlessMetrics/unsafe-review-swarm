@@ -1,8 +1,9 @@
 use serde_json::Value;
 use std::error::Error;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::{Command, Output, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
@@ -59,6 +60,37 @@ fn cargo_subcommand_alias_writes_pr_summary_artifact() -> Result<(), Box<dyn Err
     assert!(summary.contains("`guard_missing`"));
     assert!(summary.contains("`raw_pointer_read`"));
     assert!(summary.contains("## Trust boundary"));
+
+    Ok(())
+}
+
+#[test]
+fn cargo_subcommand_alias_reads_diff_from_stdin() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let diff = fs::read_to_string(fixture.join("change.diff"))?;
+    let output = checked_output_with_stdin(
+        cargo_unsafe_review()
+            .arg("check")
+            .arg("--root")
+            .arg(&fixture)
+            .arg("--diff")
+            .arg("-")
+            .arg("--format")
+            .arg("json"),
+        &diff,
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+    let value: Value = serde_json::from_str(&stdout)?;
+
+    assert_eq!(value["schema_version"], "0.1");
+    assert_eq!(value["summary"]["cards"], 1);
+    assert_eq!(value["cards"][0]["operation_family"], "raw_pointer_read");
+    assert!(
+        value["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not a proof of memory safety")
+    );
 
     Ok(())
 }
@@ -202,6 +234,30 @@ fn raw_pointer_card_id(fixture: &Path) -> Result<String, Box<dyn Error>> {
 fn json_output(command: &mut Command) -> Result<Value, Box<dyn Error>> {
     let output = checked_output(command)?;
     Ok(serde_json::from_slice(&output.stdout)?)
+}
+
+fn checked_output_with_stdin(command: &mut Command, stdin: &str) -> Result<Output, Box<dyn Error>> {
+    let mut child = command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+    child
+        .stdin
+        .as_mut()
+        .ok_or("stdin was not piped")?
+        .write_all(stdin.as_bytes())?;
+    let output = child.wait_with_output()?;
+    if output.status.success() {
+        return Ok(output);
+    }
+    Err(format!(
+        "command failed with status {:?}\nstdout:\n{}\nstderr:\n{}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    )
+    .into())
 }
 
 fn checked_output(command: &mut Command) -> Result<Output, Box<dyn Error>> {
