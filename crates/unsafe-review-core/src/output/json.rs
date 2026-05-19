@@ -361,6 +361,7 @@ mod tests {
         "vec_set_len_unrelated_capacity_comparison_not_guard",
         "vec_set_len_cap_argument_not_guard",
         "vec_set_len_with_capacity",
+        "vec_set_len_with_capacity_reassigned_not_guard",
         "vec_set_len_call_result_init",
         "vec_set_len_shrink",
         "vec_set_len_last_index_shrink",

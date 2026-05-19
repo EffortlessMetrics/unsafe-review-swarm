@@ -1372,15 +1372,29 @@ fn has_set_len_with_capacity_evidence(lower: &str) -> bool {
     let Some((receiver, new_len)) = set_len_receiver_and_argument(&compact) else {
         return false;
     };
-    compact.split(';').any(|statement| {
+    let marker = format!("{receiver}.set_len(");
+    let Some(call_pos) = compact.find(&marker) else {
+        return false;
+    };
+    let before_call = &compact[..call_pos];
+    let mut offset = 0usize;
+    for statement in before_call.split(';') {
         let Some((left, right)) = statement.split_once('=') else {
-            return false;
+            offset += statement.len() + 1;
+            continue;
         };
         let Some(binding) = let_binding_name(left) else {
-            return false;
+            offset += statement.len() + 1;
+            continue;
         };
-        binding == receiver && with_capacity_argument(right).is_some_and(|arg| arg == new_len)
-    })
+        if binding == receiver && with_capacity_argument(right).is_some_and(|arg| arg == new_len) {
+            let after_origin = &before_call[(offset + statement.len()).min(before_call.len())..];
+            return !contains_simple_assignment_to(after_origin, receiver)
+                && !contains_simple_assignment_to(after_origin, new_len);
+        }
+        offset += statement.len() + 1;
+    }
+    false
 }
 
 fn set_len_receiver_and_argument(compact: &str) -> Option<(&str, &str)> {
