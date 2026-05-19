@@ -577,6 +577,9 @@ mod tests {
             "raw_pointer_bounds_observed_not_guard",
             "raw_pointer_bounds_closed_branch_not_guard",
             "raw_pointer_bounds_post_check_not_guard",
+            "raw_pointer_read_len_capacity_other_values_not_guard",
+            "raw_pointer_read_len_capacity_observed_not_guard",
+            "raw_pointer_read_len_capacity_closed_branch_not_guard",
         ] {
             let output = fixture_output(fixture)?;
             let card = single_card(fixture, &output)?;
@@ -592,6 +595,24 @@ mod tests {
                 "{fixture} should not discharge alignment"
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn raw_pointer_read_len_capacity_bounds_evidence_requires_same_source_assertion()
+    -> Result<(), String> {
+        let output = fixture_output("raw_pointer_read_len_capacity_assert")?;
+        let card = single_card("raw_pointer_read_len_capacity_assert", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::RawPointerRead);
+        assert!(
+            obligation_discharge_present(card, "bounds"),
+            "same-source len/capacity assertion should discharge bounds"
+        );
+        assert!(
+            !obligation_discharge_present(card, "alignment"),
+            "len/capacity assertion must not discharge alignment"
+        );
         Ok(())
     }
 

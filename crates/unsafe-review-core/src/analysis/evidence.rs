@@ -409,9 +409,7 @@ fn is_documented_private_unsafe_contract_obligation(
 
 fn has_length_or_bounds_guard(lower: &str) -> bool {
     let compact = compact_code(lower);
-    has_len_capacity_equality_guard(lower)
-        || has_bounds_assertion_guard(&compact)
-        || has_bounds_open_positive_branch_guard(&compact)
+    has_bounds_assertion_guard(&compact) || has_bounds_open_positive_branch_guard(&compact)
 }
 
 fn has_bounds_guard(site: &ScannedSite, lower: &str) -> bool {
@@ -444,6 +442,11 @@ fn has_bounds_guard(site: &ScannedSite, lower: &str) -> bool {
     }
     let guard_scope = code_before_operation(lower, &site.operation.expression)
         .unwrap_or_else(|| lower.to_string());
+    if site.operation.family == OperationFamily::RawPointerRead
+        && has_raw_pointer_read_len_capacity_guard(&site.operation.expression, &guard_scope)
+    {
+        return true;
+    }
     has_length_or_bounds_guard(&guard_scope)
 }
 
@@ -761,16 +764,6 @@ fn contains_simple_assignment_to(compact: &str, name: &str) -> bool {
     false
 }
 
-fn has_len_capacity_equality_guard(lower: &str) -> bool {
-    let compact = compact_code(lower);
-    let has_equality = compact.contains("==")
-        || compact.contains("assert_eq!(")
-        || compact.contains("debug_assert_eq!(");
-    has_equality
-        && compact.contains("len")
-        && (compact.contains("capacity") || contains_word(&compact, "cap"))
-}
-
 fn pointer_arithmetic_receiver_and_argument(expression: &str) -> Option<(String, String)> {
     let compact = compact_code(&expression.to_ascii_lowercase());
     for marker in [".add(", ".offset("] {
@@ -950,6 +943,107 @@ fn has_slice_end_pointer_arithmetic_evidence(site: &ScannedSite, lower: &str) ->
             return true;
         }
     }
+    false
+}
+
+fn has_raw_pointer_read_len_capacity_guard(expression: &str, lower: &str) -> bool {
+    let compact = compact_code(lower);
+    let pointer = raw_pointer_read_pointer_operand(expression);
+    let Some(source) = pointer
+        .as_deref()
+        .and_then(|pointer| raw_pointer_source_receiver(&compact, pointer))
+    else {
+        return false;
+    };
+    has_same_source_len_capacity_assertion(&compact, &source)
+}
+
+fn raw_pointer_read_pointer_operand(expression: &str) -> Option<String> {
+    let compact = compact_code(&expression.to_ascii_lowercase());
+    if let Some(call_pos) = compact.find("ptr::read(") {
+        let argument_text = &compact[call_pos + "ptr::read(".len()..];
+        let argument_end = matching_call_argument_end(argument_text)?;
+        let argument = &argument_text[..argument_end];
+        return raw_pointer_base_operand(argument);
+    }
+    if let Some(receiver) = receiver_before_marker(&compact, ".read(") {
+        return raw_pointer_base_operand(receiver);
+    }
+    None
+}
+
+fn raw_pointer_base_operand(operand: &str) -> Option<String> {
+    let compact = compact_code(operand);
+    if let Some((base, _cast)) = compact.split_once("as*") {
+        return (!base.is_empty()).then(|| base.to_string());
+    }
+    if let Some(receiver) = receiver_before_marker(&compact, ".cast::<") {
+        return Some(receiver.to_string());
+    }
+    if let Some(receiver) = receiver_before_marker(&compact, ".cast(") {
+        return Some(receiver.to_string());
+    }
+    (!compact.is_empty()).then_some(compact)
+}
+
+fn raw_pointer_source_receiver(before_call: &str, pointer: &str) -> Option<String> {
+    let pointer = compact_code(&pointer.to_ascii_lowercase());
+    if pointer.is_empty() {
+        return None;
+    }
+    if let Some(source) = raw_pointer_source_receiver_from_expr(&pointer) {
+        return Some(source);
+    }
+    if !is_simple_identifier(&pointer) {
+        return None;
+    }
+    for statement in before_call.split(';').rev() {
+        let Some(right) = statement
+            .strip_prefix(&format!("let{pointer}="))
+            .or_else(|| statement.strip_prefix(&format!("letmut{pointer}=")))
+        else {
+            continue;
+        };
+        if let Some(source) = raw_pointer_source_receiver_from_expr(right) {
+            return Some(source);
+        }
+    }
+    None
+}
+
+fn raw_pointer_source_receiver_from_expr(expression: &str) -> Option<String> {
+    let compact = compact_code(expression);
+    receiver_before_marker(&compact, ".as_ptr(")
+        .or_else(|| receiver_before_marker(&compact, ".as_mut_ptr("))
+        .map(str::to_string)
+}
+
+fn has_same_source_len_capacity_assertion(compact: &str, source: &str) -> bool {
+    let source = compact_code(&source.to_ascii_lowercase());
+    if source.is_empty() {
+        return false;
+    }
+    let len = format!("{source}.len()");
+    let capacity = format!("{source}.capacity()");
+    let len_eq_capacity = format!("{len}=={capacity}");
+    let capacity_eq_len = format!("{capacity}=={len}");
+
+    for prefix in ["assert!(", "debug_assert!("] {
+        if compact.contains(&format!("{prefix}{len_eq_capacity}"))
+            || compact.contains(&format!("{prefix}{capacity_eq_len}"))
+        {
+            return true;
+        }
+    }
+
+    for prefix in ["assert_eq!(", "debug_assert_eq!("] {
+        if compact.contains(&format!("{prefix}{len},{capacity}"))
+            || compact.contains(&format!("{prefix}{capacity},{len}"))
+        {
+            return true;
+        }
+    }
+
     false
 }
 
@@ -2595,11 +2689,6 @@ fn nonnull_new_unchecked_argument(expression: &str) -> Option<String> {
     }
     let arg = rest[..end].trim();
     (!arg.is_empty()).then(|| arg.to_string())
-}
-
-fn contains_word(text: &str, word: &str) -> bool {
-    text.split(|ch: char| !(ch == '_' || ch.is_ascii_alphanumeric()))
-        .any(|token| token == word)
 }
 
 fn is_receiver_path_char(ch: char) -> bool {
