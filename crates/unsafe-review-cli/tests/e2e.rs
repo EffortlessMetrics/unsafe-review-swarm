@@ -63,6 +63,147 @@ fn cargo_subcommand_alias_writes_pr_summary_artifact() -> Result<(), Box<dyn Err
     Ok(())
 }
 
+#[test]
+fn cargo_subcommand_alias_covers_current_review_artifacts() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-current-artifacts-e2e")?;
+    let card_id = raw_pointer_card_id(&fixture)?;
+
+    let sarif_path = temp.path().join("cards.sarif");
+    let output = checked_output(
+        cargo_unsafe_review()
+            .arg("check")
+            .arg("--root")
+            .arg(&fixture)
+            .arg("--diff")
+            .arg(fixture.join("change.diff"))
+            .arg("--format")
+            .arg("sarif")
+            .arg("--out")
+            .arg(&sarif_path),
+    )?;
+    assert_eq!(String::from_utf8(output.stdout)?.trim(), "");
+    let sarif: Value = serde_json::from_str(&fs::read_to_string(sarif_path)?)?;
+    assert_eq!(sarif["version"], "2.1.0");
+    assert_eq!(
+        sarif["runs"][0]["results"][0]["properties"]["cardId"],
+        card_id
+    );
+    assert!(
+        sarif["runs"][0]["properties"]["trustBoundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not a proof of memory safety")
+    );
+
+    let comment_plan_path = temp.path().join("comment-plan.json");
+    let output = checked_output(
+        cargo_unsafe_review()
+            .arg("check")
+            .arg("--root")
+            .arg(&fixture)
+            .arg("--diff")
+            .arg(fixture.join("change.diff"))
+            .arg("--format")
+            .arg("comment-plan")
+            .arg("--out")
+            .arg(&comment_plan_path),
+    )?;
+    assert_eq!(String::from_utf8(output.stdout)?.trim(), "");
+    let comment_plan: Value = serde_json::from_str(&fs::read_to_string(comment_plan_path)?)?;
+    assert_eq!(comment_plan["mode"], "plan_only");
+    assert_eq!(comment_plan["comments"][0]["card_id"], card_id);
+    assert!(
+        comment_plan["comments"][0]["body"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not memory-safety proof")
+    );
+
+    let lsp_path = temp.path().join("lsp.json");
+    let output = checked_output(
+        cargo_unsafe_review()
+            .arg("check")
+            .arg("--root")
+            .arg(&fixture)
+            .arg("--diff")
+            .arg(fixture.join("change.diff"))
+            .arg("--format")
+            .arg("lsp")
+            .arg("--out")
+            .arg(&lsp_path),
+    )?;
+    assert_eq!(String::from_utf8(output.stdout)?.trim(), "");
+    let lsp: Value = serde_json::from_str(&fs::read_to_string(lsp_path)?)?;
+    assert_eq!(lsp["mode"], "read_only_projection");
+    assert_eq!(lsp["diagnostics"][0]["card_id"], card_id);
+    assert_eq!(
+        lsp["code_actions"][0]["command"],
+        "unsafe-review.copyAgentPacket"
+    );
+
+    let context = json_output(
+        cargo_unsafe_review()
+            .arg("context")
+            .arg("--root")
+            .arg(&fixture)
+            .arg("--json")
+            .arg(&card_id),
+    )?;
+    assert_eq!(context["mode"], "bounded_repair_packet");
+    assert_eq!(context["card_id"], card_id);
+    assert!(
+        context["do_not_do"]
+            .as_array()
+            .is_some_and(|rules| rules.iter().any(|rule| rule
+                .as_str()
+                .unwrap_or("")
+                .contains("do not claim Miri proof")))
+    );
+
+    let explain = json_output(
+        cargo_unsafe_review()
+            .arg("explain")
+            .arg("--root")
+            .arg(&fixture)
+            .arg("--format")
+            .arg("json")
+            .arg(&card_id),
+    )?;
+    assert_eq!(explain["source"], "review_card");
+    assert_eq!(explain["card"]["class"], "guard_missing");
+
+    Ok(())
+}
+
+fn cargo_unsafe_review() -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"));
+    command.arg("unsafe-review");
+    command
+}
+
+fn raw_pointer_card_id(fixture: &Path) -> Result<String, Box<dyn Error>> {
+    let output = json_output(
+        cargo_unsafe_review()
+            .arg("check")
+            .arg("--root")
+            .arg(fixture)
+            .arg("--diff")
+            .arg(fixture.join("change.diff"))
+            .arg("--format")
+            .arg("json"),
+    )?;
+    Ok(output["cards"][0]["id"]
+        .as_str()
+        .ok_or("card id missing from JSON output")?
+        .to_string())
+}
+
+fn json_output(command: &mut Command) -> Result<Value, Box<dyn Error>> {
+    let output = checked_output(command)?;
+    Ok(serde_json::from_slice(&output.stdout)?)
+}
+
 fn checked_output(command: &mut Command) -> Result<Output, Box<dyn Error>> {
     let output = command.output()?;
     if output.status.success() {
