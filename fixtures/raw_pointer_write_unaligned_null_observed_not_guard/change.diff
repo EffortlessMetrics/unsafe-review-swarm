@@ -1,0 +1,27 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,25 @@
++pub struct Header(u32);
++
++fn observe(_: bool) {}
++
++pub fn write_unaligned_header(bytes: &mut [u8], header: Header) {
++    assert!(bytes.len() >= core::mem::size_of::<Header>());
++    let ptr = bytes.as_mut_ptr().cast::<Header>();
++    let null = ptr.is_null();
++    observe(null);
++    // SAFETY: this fixture observes nullability but does not guard on it.
++    unsafe { ptr.write_unaligned(header) }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::{write_unaligned_header, Header};
++
++    #[test]
++    fn mentions_write_unaligned_header() {
++        let _ = stringify!(write_unaligned_header);
++        let _ = Header(0);
++    }
++}

@@ -1,0 +1,22 @@
+pub struct Header(u32);
+
+pub fn read_unaligned_header(bytes: &[u8]) -> Option<Header> {
+    assert!(bytes.len() >= core::mem::size_of::<Header>());
+    let ptr = bytes.as_ptr().cast::<Header>();
+    if ptr.is_null() {
+        return None;
+    }
+    // SAFETY: length and nullability are checked above; read_unaligned
+    // intentionally does not require alignment.
+    Some(unsafe { ptr.read_unaligned() })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::read_unaligned_header;
+
+    #[test]
+    fn mentions_read_unaligned_header() {
+        let _ = stringify!(read_unaligned_header);
+    }
+}

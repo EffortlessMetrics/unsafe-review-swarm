@@ -2328,10 +2328,16 @@ fn raw_pointer_alignment_receiver(expression: &str) -> Option<String> {
     if let Some(receiver) = receiver_before_marker(&compact, ".read(") {
         return Some(receiver.to_string());
     }
+    if let Some(receiver) = receiver_before_marker(&compact, ".read_unaligned(") {
+        return Some(receiver.to_string());
+    }
     if let Some(receiver) = receiver_before_marker(&compact, ".read_volatile(") {
         return Some(receiver.to_string());
     }
     if let Some(receiver) = receiver_before_marker(&compact, ".write(") {
+        return Some(receiver.to_string());
+    }
+    if let Some(receiver) = receiver_before_marker(&compact, ".write_unaligned(") {
         return Some(receiver.to_string());
     }
     if let Some(receiver) = receiver_before_marker(&compact, ".write_volatile(") {
