@@ -22,8 +22,10 @@ Modulo alignment guards have the same fixture-backed observation, closed-branch,
 and stale-pointer controls.
 `Vec::from_raw_parts` len/cap capacity evidence now has fixture-backed controls
 for assertions, early returns, bare observations, closed branches, and stale
-checked cap arguments. `Vec::set_len` capacity evidence rejects unrelated local
-arguments merely named `cap` unless a const-capacity context is visible.
+checked cap arguments. `Vec::set_len` capacity evidence accepts direct
+same-vector capacity assertions and rejects observations, closed branches,
+stale checked lengths, unrelated comparisons, and unrelated local arguments
+merely named `cap` unless a const-capacity context is visible.
 `Box::from_raw` and `ptr::drop_in_place` ownership evidence reject stale
 `Box::into_raw` origins when the raw pointer is reassigned before use.
 Unchecked-constructor availability evidence now has fixture-backed controls for
@@ -99,7 +101,8 @@ These are not failures; they are the next unsupported or weakly verified areas:
   `Vec::with_capacity(new_len)` capacity evidence has fixture coverage, and
   unrelated capacity comparisons plus local arguments merely named `cap` are
   pinned as non-evidence before `set_len`;
-  `arrayvec#288` has a rerun receipt;
+  `arrayvec#288` has a rerun receipt; direct capacity assertions, closed
+  capacity branches, and stale checked lengths now have fixture coverage;
   non-zero shrink and `set_len(0)` clear evidence also have fixture and
   dogfood-rerun coverage, start-bound shrink evidence has fixture and
   `rust-smallvec#277` dogfood-rerun coverage, and last-index shrink evidence

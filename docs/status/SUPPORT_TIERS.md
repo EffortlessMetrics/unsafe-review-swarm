@@ -69,8 +69,10 @@ alignment checks through `raw_pointer_alignment_modulo_guard`,
 `Vec::from_raw_parts` capacity evidence is pinned for same-call len/cap
 assertions and invalid-path early returns, and rejects bare relation
 observations, closed positive branches, and reassigned checked cap arguments.
-`Vec::set_len` capacity evidence rejects unrelated local arguments merely named
-`cap` unless a const-capacity context is visible.
+`Vec::set_len` capacity evidence accepts direct same-vector capacity assertions
+and rejects observations, closed branches, stale checked lengths, unrelated
+comparisons, and unrelated local arguments merely named `cap` unless a
+const-capacity context is visible.
 `Box::from_raw` and `ptr::drop_in_place` reject `Box::into_raw` origin evidence
 when the raw pointer is reassigned before use.
 Unchecked-constructor availability evidence is pinned for same-receiver

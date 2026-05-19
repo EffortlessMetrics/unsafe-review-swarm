@@ -1868,9 +1868,24 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn vec_set_len_direct_capacity_assert_is_capacity_guard() -> Result<(), String> {
+        let output = fixture_output("vec_set_len")?;
+        let card = single_card("vec_set_len", &output)?;
+
+        assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+        assert_eq!(card.operation.family, OperationFamily::VecSetLen);
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert!(obligation_discharge_present(card, "capacity"));
+        assert!(!obligation_discharge_present(card, "initialized"));
+        Ok(())
+    }
+
+    #[test]
     fn vec_set_len_capacity_observation_is_not_capacity_guard() -> Result<(), String> {
         for fixture in [
             "vec_set_len_capacity_observed_not_guard",
+            "vec_set_len_capacity_closed_branch_not_guard",
+            "vec_set_len_capacity_reassigned_not_guard",
             "vec_set_len_unrelated_capacity_comparison_not_guard",
             "vec_set_len_cap_argument_not_guard",
         ] {
