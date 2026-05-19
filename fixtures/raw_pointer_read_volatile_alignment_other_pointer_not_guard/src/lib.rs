@@ -1,0 +1,18 @@
+pub fn read_status(register: *const u32, other: *const u32) -> Option<u32> {
+    if !other.is_aligned() {
+        return None;
+    }
+    // SAFETY: this fixture intentionally checks a different pointer.
+    Some(unsafe { register.read_volatile() })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::read_status;
+
+    #[test]
+    fn mentions_read_status() {
+        let _ = stringify!(read_status);
+    }
+}
+

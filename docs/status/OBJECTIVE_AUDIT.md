@@ -13,7 +13,8 @@ controls for bare predicate observations, closed positive branches, and checked
 indexes reassigned before the unchecked access.
 Raw pointer alignment evidence now also has fixture-backed controls for
 same-pointer `is_aligned` guards, observations, closed branches, and stale
-checked pointers.
+checked pointers, and method-form volatile raw pointer reads/writes now pin the
+same alignment guard distinction.
 Raw pointer bounds evidence now rejects bare predicate observations, closed
 positive branches, post-use checks, and generic type angle brackets while
 preserving the narrow same-slice `write_bytes` length shape.
@@ -126,7 +127,9 @@ These are not failures; they are the next unsupported or weakly verified areas:
   `read_unaligned`, `write_unaligned`, `read_volatile`, and `write_volatile`
   now also require same-receiver, pre-operation nullability guards for
   pointer-live evidence and reject observed nullability, other-pointer guards,
-  and post-use checks.
+  and post-use checks. Volatile raw pointer reads and writes also have
+  fixture-backed same-receiver alignment guard coverage and reject observed
+  alignment, other-pointer guards, and post-use checks.
   These raw-pointer evidence rules still do not discharge
   pointer validity, allocation, or witness obligations.
 - Real PR-diff dogfood now recognizes `index < self.num_ctrl_bytes()` as bounds
