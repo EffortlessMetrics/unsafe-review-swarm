@@ -359,6 +359,7 @@ mod tests {
         "vec_set_len_capacity_closed_branch_not_guard",
         "vec_set_len_capacity_reassigned_not_guard",
         "vec_set_len_capacity_receiver_reassigned_not_guard",
+        "vec_set_len_capacity_binding_receiver_reassigned_not_guard",
         "vec_set_len_unrelated_capacity_comparison_not_guard",
         "vec_set_len_cap_argument_not_guard",
         "vec_set_len_with_capacity",

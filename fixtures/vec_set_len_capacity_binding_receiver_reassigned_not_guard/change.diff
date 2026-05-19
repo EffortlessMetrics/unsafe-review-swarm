@@ -1,0 +1,22 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,17 @@
++pub fn extend_len(mut values: Vec<u8>, new_len: usize) -> Vec<u8> {
++    let capacity = values.capacity();
++    values = Vec::new();
++    assert!(new_len <= capacity);
++    // SAFETY: this fixture invalidates the capacity binding before set_len.
++    unsafe { values.set_len(new_len) };
++    values
++}
++
++#[cfg(test)]
++mod tests {
++    use super::extend_len;
++
++    #[test]
++    fn mentions_extend_len() {
++        let _ = stringify!(extend_len);
++    }
++}

@@ -1306,17 +1306,31 @@ fn has_capacity_bound_guard(lower: &str) -> bool {
 }
 
 fn set_len_capacity_bindings<'a>(before_call: &'a str, receiver: &str) -> Vec<&'a str> {
-    before_call
-        .split(';')
-        .filter_map(|statement| {
-            let (left, right) = statement.split_once('=')?;
-            let binding = let_binding_name(left)?;
-            let right = right.trim();
-            ((right == format!("{receiver}.capacity()") || right == format!("{receiver}.cap()"))
-                && !binding.is_empty())
-            .then_some(binding)
-        })
-        .collect()
+    let mut bindings = Vec::new();
+    let mut offset = 0usize;
+    for statement in before_call.split(';') {
+        let Some((left, right)) = statement.split_once('=') else {
+            offset += statement.len() + 1;
+            continue;
+        };
+        let Some(binding) = let_binding_name(left) else {
+            offset += statement.len() + 1;
+            continue;
+        };
+        let right = right.trim();
+        if (right == format!("{receiver}.capacity()") || right == format!("{receiver}.cap()"))
+            && !binding.is_empty()
+        {
+            let after_binding = &before_call[(offset + statement.len()).min(before_call.len())..];
+            if !contains_simple_assignment_to(after_binding, receiver)
+                && !contains_simple_assignment_to(after_binding, binding)
+            {
+                bindings.push(binding);
+            }
+        }
+        offset += statement.len() + 1;
+    }
+    bindings
 }
 
 fn has_set_len_capacity_relation(
