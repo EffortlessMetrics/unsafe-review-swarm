@@ -2039,6 +2039,27 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn pointer_arithmetic_bounds_guard_must_match_operation_argument() -> Result<(), String> {
+        for fixture in [
+            "pointer_arithmetic_num_ctrl_bytes_other_index_not_guard",
+            "pointer_arithmetic_num_ctrl_bytes_observed_not_guard",
+            "pointer_arithmetic_num_ctrl_bytes_post_check_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+            assert_eq!(card.operation.family, OperationFamily::PointerArithmetic);
+            assert_eq!(card.class, ReviewClass::GuardMissing);
+            assert!(
+                !obligation_discharge_present(card, "bounds"),
+                "{fixture} should not discharge bounds"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn pointer_arithmetic_slice_end_guard_is_discharged() -> Result<(), String> {
         let output = fixture_output("pointer_arithmetic_slice_end")?;
         let card = single_card("pointer_arithmetic_slice_end", &output)?;

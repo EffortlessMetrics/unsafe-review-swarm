@@ -181,10 +181,7 @@ fn discharge_state_for(
             }
         }
         "bounds" | "valid-range" => {
-            if has_bounds_guard(site, lower)
-                || (family == &OperationFamily::PointerArithmetic
-                    && has_slice_end_pointer_arithmetic_evidence(lower))
-            {
+            if has_bounds_guard(site, lower) {
                 EvidenceState::present("Length or bounds guard code was detected")
             } else {
                 EvidenceState::missing("No length or bounds guard code was detected")
@@ -418,6 +415,20 @@ fn has_length_or_bounds_guard(lower: &str) -> bool {
 }
 
 fn has_bounds_guard(site: &ScannedSite, lower: &str) -> bool {
+    if site.operation.family == OperationFamily::PointerArithmetic {
+        let guard_scope = code_context_through_site(site).to_ascii_lowercase();
+        if has_slice_end_pointer_arithmetic_evidence(site, &guard_scope) {
+            return true;
+        }
+        if let Some((_, argument)) =
+            pointer_arithmetic_receiver_and_argument(&site.operation.expression)
+        {
+            let guard_scope = code_before_operation(lower, &site.operation.expression)
+                .unwrap_or_else(|| lower.to_string());
+            return has_pointer_arithmetic_bounds_guard(&guard_scope, &argument);
+        }
+        return false;
+    }
     if site.operation.family == OperationFamily::GetUnchecked
         && let Some((receiver, index)) =
             get_unchecked_receiver_and_index(&site.operation.expression)
@@ -760,8 +771,166 @@ fn has_len_capacity_equality_guard(lower: &str) -> bool {
         && (compact.contains("capacity") || contains_word(&compact, "cap"))
 }
 
-fn has_slice_end_pointer_arithmetic_evidence(lower: &str) -> bool {
+fn pointer_arithmetic_receiver_and_argument(expression: &str) -> Option<(String, String)> {
+    let compact = compact_code(&expression.to_ascii_lowercase());
+    for marker in [".add(", ".offset("] {
+        let Some(receiver) = receiver_before_marker(&compact, marker) else {
+            continue;
+        };
+        let call_pos = compact.find(marker)? + marker.len();
+        let argument_text = &compact[call_pos..];
+        let argument_end = matching_call_argument_end(argument_text)?;
+        let argument = &argument_text[..argument_end];
+        if !receiver.is_empty() && !argument.is_empty() {
+            return Some((receiver.to_string(), argument.to_string()));
+        }
+    }
+    None
+}
+
+fn has_pointer_arithmetic_bounds_guard(lower: &str, argument: &str) -> bool {
     let compact = compact_code(lower);
+    let argument = compact_code(&argument.to_ascii_lowercase());
+    if argument.is_empty() {
+        return false;
+    }
+    has_pointer_arithmetic_bounds_assertion(&compact, &argument)
+        || has_pointer_arithmetic_open_bounds_branch(&compact, &argument)
+        || has_pointer_arithmetic_bounds_early_return(&compact, &argument)
+}
+
+fn has_pointer_arithmetic_bounds_assertion(compact: &str, argument: &str) -> bool {
+    ["assert!(", "debug_assert!("].into_iter().any(|prefix| {
+        let mut cursor = compact;
+        let mut offset = 0usize;
+        while let Some(pos) = cursor.find(prefix) {
+            let statement_start = offset + pos + prefix.len();
+            let after_prefix = &compact[statement_start..];
+            let statement_end = after_prefix.find(';').unwrap_or(after_prefix.len());
+            let statement = &after_prefix[..statement_end];
+            if has_pointer_arithmetic_in_bounds_condition(statement, argument) {
+                return true;
+            }
+            let next = pos + prefix.len();
+            offset += next;
+            cursor = &cursor[next..];
+        }
+        false
+    })
+}
+
+fn has_pointer_arithmetic_open_bounds_branch(compact: &str, argument: &str) -> bool {
+    pointer_arithmetic_if_guards(compact).any(|guard| {
+        has_pointer_arithmetic_in_bounds_condition(guard.condition, argument)
+            && branch_still_open_at_operation(guard.after_body_start)
+    })
+}
+
+fn has_pointer_arithmetic_bounds_early_return(compact: &str, argument: &str) -> bool {
+    pointer_arithmetic_if_guards(compact).any(|guard| {
+        let (guard_body, _) = guard
+            .after_body_start
+            .split_once('}')
+            .map_or((guard.after_body_start, ""), |(guard_body, after)| {
+                (guard_body, after)
+            });
+        has_pointer_arithmetic_out_of_bounds_condition(guard.condition, argument)
+            && guard_body.contains("return")
+    })
+}
+
+struct PointerArithmeticIfGuard<'a> {
+    condition: &'a str,
+    after_body_start: &'a str,
+}
+
+fn pointer_arithmetic_if_guards(
+    compact: &str,
+) -> impl Iterator<Item = PointerArithmeticIfGuard<'_>> {
+    let mut guards = Vec::new();
+    let mut cursor = compact;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find("if") {
+        let start = offset + pos;
+        let before = compact[..start].chars().next_back();
+        if before.is_some_and(is_receiver_path_char) {
+            let next = pos + 2;
+            offset += next;
+            cursor = &cursor[next..];
+            continue;
+        }
+        let after_if = &compact[start + 2..];
+        if let Some(brace_pos) = after_if.find('{') {
+            guards.push(PointerArithmeticIfGuard {
+                condition: &after_if[..brace_pos],
+                after_body_start: &after_if[brace_pos + 1..],
+            });
+        }
+        let next = pos + 2;
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    guards.into_iter()
+}
+
+fn has_pointer_arithmetic_in_bounds_condition(condition: &str, argument: &str) -> bool {
+    for op in [">=", "<=", "<", ">"] {
+        let mut cursor = condition;
+        let mut offset = 0usize;
+        while let Some(pos) = cursor.find(op) {
+            let op_start = offset + pos;
+            let op_end = op_start + op.len();
+            let left = comparison_left_operand(condition, op_start);
+            let right = comparison_right_operand(condition, op_end);
+            if ((op == "<")
+                && compact_contains_identifier(left, argument)
+                && operand_mentions_bounds(right))
+                || ((op == ">")
+                    && compact_contains_identifier(right, argument)
+                    && operand_mentions_bounds(left))
+            {
+                return true;
+            }
+            let next = pos + op.len();
+            offset += next;
+            cursor = &cursor[next..];
+        }
+    }
+    false
+}
+
+fn has_pointer_arithmetic_out_of_bounds_condition(condition: &str, argument: &str) -> bool {
+    for op in [">=", "<="] {
+        let mut cursor = condition;
+        let mut offset = 0usize;
+        while let Some(pos) = cursor.find(op) {
+            let op_start = offset + pos;
+            let op_end = op_start + op.len();
+            let left = comparison_left_operand(condition, op_start);
+            let right = comparison_right_operand(condition, op_end);
+            if ((op == ">=")
+                && compact_contains_identifier(left, argument)
+                && operand_mentions_bounds(right))
+                || ((op == "<=")
+                    && compact_contains_identifier(right, argument)
+                    && operand_mentions_bounds(left))
+            {
+                return true;
+            }
+            let next = pos + op.len();
+            offset += next;
+            cursor = &cursor[next..];
+        }
+    }
+    false
+}
+
+fn has_slice_end_pointer_arithmetic_evidence(site: &ScannedSite, lower: &str) -> bool {
+    let Some((receiver, argument)) =
+        pointer_arithmetic_receiver_and_argument(&site.operation.expression)
+    else {
+        return false;
+    };
     for line in lower.lines() {
         let line = compact_code(line);
         let Some(after_let) = line.strip_prefix("let") else {
@@ -775,7 +944,8 @@ fn has_slice_end_pointer_arithmetic_evidence(lower: &str) -> bool {
         };
         if !binding.is_empty()
             && !slice_expr.is_empty()
-            && compact.contains(&format!("{binding}.add({slice_expr}.len())"))
+            && receiver == binding
+            && argument == format!("{slice_expr}.len()")
         {
             return true;
         }
