@@ -20,6 +20,10 @@ required_core_fixtures = [
   "raw_pointer_alignment_modulo_reassigned_pointer_not_guard",
   "raw_pointer_deref",
   "raw_pointer_read_unaligned",
+  "raw_pointer_read_null_guard",
+  "raw_pointer_read_null_observed_not_guard",
+  "raw_pointer_read_null_other_pointer_not_guard",
+  "raw_pointer_read_null_post_check_not_guard",
   "raw_pointer_write_assignment",
   "raw_pointer_write_unaligned",
   "split_raw_pointer_read_call",
@@ -356,6 +360,46 @@ support_tier = "Raw pointer card slice"
 expected_cards = 1
 expected_class = "guard_missing"
 expected_operation_family = "raw_pointer_read_unaligned"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_read_null_guard"
+kind = "positive"
+claim = "raw pointer read recognizes same-receiver nullability guard evidence"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_read_null_observed_not_guard"
+kind = "false_positive_control"
+claim = "raw pointer read does not accept a bare observed nullability predicate as pointer-live evidence"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_read_null_other_pointer_not_guard"
+kind = "false_positive_control"
+claim = "raw pointer read does not accept a nullability guard from another pointer as pointer-live evidence"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_read_null_post_check_not_guard"
+kind = "false_positive_control"
+claim = "raw pointer read does not accept a post-read nullability check as pointer-live evidence"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
 expected_hazard = "pointer_validity"
 
 [[cases]]
