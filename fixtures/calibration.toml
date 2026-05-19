@@ -83,6 +83,10 @@ required_core_fixtures = [
   "get_unchecked_mut_reassigned_index_not_guard",
   "pin_new_unchecked",
   "raw_pointer_write_bytes",
+  "raw_pointer_write_alignment_guard",
+  "raw_pointer_write_alignment_observed_not_guard",
+  "raw_pointer_write_alignment_closed_branch_not_guard",
+  "raw_pointer_write_alignment_post_check_not_guard",
   "raw_pointer_write_bounds_observed_not_guard",
   "raw_pointer_write_bounds_closed_branch_not_guard",
   "raw_pointer_write_bounds_post_check_not_guard",
@@ -977,6 +981,46 @@ expected_cards = 1
 expected_class = "guard_missing"
 expected_operation_family = "raw_pointer_write"
 expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_write_alignment_guard"
+kind = "positive"
+claim = "raw pointer write recognizes same-receiver alignment guard evidence"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "alignment"
+
+[[cases]]
+fixture = "raw_pointer_write_alignment_observed_not_guard"
+kind = "false_positive_control"
+claim = "raw pointer write does not accept a bare observed alignment predicate as guard evidence"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "alignment"
+
+[[cases]]
+fixture = "raw_pointer_write_alignment_closed_branch_not_guard"
+kind = "false_positive_control"
+claim = "raw pointer write does not accept a closed positive alignment branch before the write as guard evidence"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "alignment"
+
+[[cases]]
+fixture = "raw_pointer_write_alignment_post_check_not_guard"
+kind = "false_positive_control"
+claim = "raw pointer write does not accept a post-write alignment check as guard evidence"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "alignment"
 
 [[cases]]
 fixture = "raw_pointer_write_bounds_observed_not_guard"

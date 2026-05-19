@@ -620,6 +620,47 @@ mod tests {
     }
 
     #[test]
+    fn raw_pointer_write_alignment_guard_is_receiver_sensitive() -> Result<(), String> {
+        let guarded = fixture_output("raw_pointer_write_alignment_guard")?;
+        let guarded_card = single_card("raw_pointer_write_alignment_guard", &guarded)?;
+
+        assert_eq!(
+            guarded_card.operation.family,
+            OperationFamily::RawPointerWrite
+        );
+        assert_eq!(guarded_card.class, ReviewClass::GuardMissing);
+        assert!(
+            obligation_discharge_present(guarded_card, "bounds"),
+            "length guard should discharge bounds"
+        );
+        assert!(
+            obligation_discharge_present(guarded_card, "alignment"),
+            "same-receiver alignment guard should discharge alignment"
+        );
+
+        for fixture in [
+            "raw_pointer_write_alignment_observed_not_guard",
+            "raw_pointer_write_alignment_closed_branch_not_guard",
+            "raw_pointer_write_alignment_post_check_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.operation.family, OperationFamily::RawPointerWrite);
+            assert_eq!(card.class, ReviewClass::GuardMissing);
+            assert!(
+                obligation_discharge_present(card, "bounds"),
+                "{fixture} should keep bounds evidence"
+            );
+            assert!(
+                !obligation_discharge_present(card, "alignment"),
+                "{fixture} should not discharge alignment"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn raw_pointer_write_u8_evidence_requires_target_pointer() -> Result<(), String> {
         let output = fixture_output("raw_pointer_write_other_u8_not_guard")?;
         let card = single_card("raw_pointer_write_other_u8_not_guard", &output)?;

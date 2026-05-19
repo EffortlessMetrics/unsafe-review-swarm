@@ -120,8 +120,10 @@ These are not failures; they are the next unsupported or weakly verified areas:
   discharge bounds evidence, while write-side fixture coverage now proves bare
   length observations, closed positive branches, and post-use checks do not
   discharge bounds. Generic type angle brackets also do not discharge raw
-  pointer bounds evidence. These raw-write rules still do not discharge pointer validity,
-  allocation, or witness obligations.
+  pointer bounds evidence. Method-form raw pointer writes now have fixture proof
+  for same-receiver alignment guards and stale observed, closed-branch, and
+  post-write alignment checks. These raw-write rules still do not discharge
+  pointer validity, allocation, or witness obligations.
 - Real PR-diff dogfood now recognizes `index < self.num_ctrl_bytes()` as bounds
   evidence for pointer arithmetic, and capped `memchr` repo dogfood recognizes
   the local same-slice `as_ptr()` plus `len()` end-pointer pattern, but broader
