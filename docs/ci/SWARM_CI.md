@@ -99,11 +99,19 @@ installed workflow:
 
 manual dispatch proof:
   https://github.com/EffortlessMetrics/unsafe-review-swarm/actions/runs/26121565219
+
+docs-only quieting proof:
+  https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/3
+  https://github.com/EffortlessMetrics/unsafe-review-swarm/actions/runs/26121881049
 ```
 
 The manual dispatch succeeded through GitHub-hosted fallback and uploaded the
 `unsafe-review` artifact bundle. The normalized `Unsafe Review Rust Result`
 passed.
+
+The docs-only proof selected `router_target=none` with
+`router_reason=docs_only_no_rust_work`. All Rust implementation jobs were
+skipped and the normalized result passed without consuming a self-hosted runner.
 
 Self-hosted routing is not proven yet. The router saw `EM_RUNNER_READ_TOKEN`,
 but the repository runner API returned `HTTP 403`, so it selected
@@ -114,5 +122,5 @@ in:
 https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2
 ```
 
-Branch protection remains deferred until CX43, CX53, GitHub-hosted fallback,
-docs-only quieting, and several real PRs have all been proven.
+Branch protection remains deferred until CX43, CX53, GitHub-hosted fallback for
+the busy-runner case, and several real PRs have all been proven.
