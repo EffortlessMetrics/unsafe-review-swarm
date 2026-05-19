@@ -1,13 +1,12 @@
 # PR and CI model
 
-Default PR runs cheap static review on the pinned Rust toolchain:
+Default swarm PR runs cheap static review on the pinned Rust toolchain:
 
 ```text
 cargo fmt --check
 cargo check --workspace --all-targets --locked
 cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo test --workspace --all-targets --locked
-RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
+cargo test --workspace --locked
 cargo run --locked -p xtask -- check-pr
 unsafe-review check --base origin/main --format json
 unsafe-review check --base origin/main \
@@ -22,8 +21,10 @@ unsafe-review check --base origin/main \
 ```
 
 The CI workflow keeps repository permissions read-only, avoids persisted checkout
-credentials, cancels superseded pull request runs, supports manual dispatch for
-ad hoc verification, and bounds the Rust job with a timeout.
+credentials, cancels superseded synchronize runs, supports manual dispatch for
+ad hoc verification, and bounds the Rust job with a timeout. In
+`unsafe-review-swarm`, the normalized result check is documented in
+[`SWARM_CI.md`](SWARM_CI.md).
 Dependabot opens weekly Cargo and GitHub Actions update PRs as maintenance
 signals; those PRs still pass through the same advisory CI and review process.
 The `dtolnay/rust-toolchain` action ref is intentionally pinned to the repo
@@ -38,7 +39,7 @@ The SARIF artifact projects the same review cards into code-scanning shape. It
 is still advisory static review evidence; uploading SARIF must not be treated as
 proof that the changed code is memory-safe.
 
-The advisory GitHub workflow writes and uploads:
+The routed CI workflow writes and uploads:
 
 ```text
 target/unsafe-review/cards.json

@@ -1,17 +1,18 @@
-name: CI
+name: Unsafe Review Rust
 
 on:
   pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
   push:
-    branches: [main, master]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: unsafe-review-rust-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && github.event.action == 'synchronize' }}
 
 defaults:
   run:
@@ -22,14 +23,141 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  rust:
-    name: Rust workspace
+  route-unsafe-review-rust:
+    name: Route Unsafe Review Rust
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
+    outputs:
+      target: ${{ steps.route.outputs.target }}
+      reason: ${{ steps.route.outputs.reason }}
+      docs_only: ${{ steps.route.outputs.docs_only }}
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      RUNNER_READ_TOKEN: ${{ secrets.EM_RUNNER_READ_TOKEN }}
+    steps:
+      - name: Choose runner route
+        id: route
+        run: |
+          set -euo pipefail
+
+          target="github"
+          reason="default_github_hosted"
+          docs_only="false"
+
+          emit() {
+            {
+              echo "target=${target}"
+              echo "reason=${reason}"
+              echo "docs_only=${docs_only}"
+            } >>"${GITHUB_OUTPUT}"
+            echo "router_target=${target}"
+            echo "router_reason=${reason}"
+            echo "docs_only=${docs_only}"
+            echo "repo=${GITHUB_REPOSITORY}"
+            echo "workflow=${GITHUB_WORKFLOW}"
+            echo "run_id=${GITHUB_RUN_ID}"
+          }
+
+          is_docs_or_markdown() {
+            local path="$1"
+            [[ "${path}" == docs/* || "${path}" == *.md || "${path}" == */*.md ]]
+          }
+
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request" ]]; then
+            head_repo="$(jq -r '.pull_request.head.repo.full_name' "${GITHUB_EVENT_PATH}")"
+            base_repo="$(jq -r '.repository.full_name' "${GITHUB_EVENT_PATH}")"
+            pr_number="$(jq -r '.pull_request.number' "${GITHUB_EVENT_PATH}")"
+
+            mapfile -t changed_files < <(
+              gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${pr_number}/files" \
+                --jq '.[].filename'
+            )
+
+            if [[ "${#changed_files[@]}" -gt 0 ]]; then
+              docs_only="true"
+              for path in "${changed_files[@]}"; do
+                if ! is_docs_or_markdown "${path}"; then
+                  docs_only="false"
+                  break
+                fi
+              done
+            fi
+
+            if [[ "${docs_only}" == "true" ]]; then
+              target="none"
+              reason="docs_only_no_rust_work"
+              emit
+              exit 0
+            fi
+
+            if [[ "${head_repo}" != "${base_repo}" ]]; then
+              target="github"
+              reason="fork_pr_github_hosted"
+              emit
+              exit 0
+            fi
+          fi
+
+          if [[ -z "${RUNNER_READ_TOKEN:-}" ]]; then
+            target="github"
+            reason="runner_token_missing"
+            emit
+            exit 0
+          fi
+
+          if ! runners_json="$(GH_TOKEN="${RUNNER_READ_TOKEN}" gh api "repos/${GITHUB_REPOSITORY}/actions/runners?per_page=100")"; then
+            target="github"
+            reason="runner_api_failed"
+            emit
+            exit 0
+          fi
+
+          runner_idle() {
+            local runner_label="$1"
+            jq -e --arg runner_label "${runner_label}" '
+              (.runners // []) | any(.[]?;
+                .status == "online" and
+                (.busy | not) and
+                any(.labels[]?; .name == "em-ci") and
+                any(.labels[]?; .name == "trusted-pr") and
+                any(.labels[]?; .name == "rust-small") and
+                any(.labels[]?; .name == $runner_label)
+              )
+            ' >/dev/null <<<"${runners_json}"
+          }
+
+          if runner_idle "cx43"; then
+            target="cx43"
+            reason="cx43_idle"
+          elif runner_idle "cx53"; then
+            target="cx53"
+            reason="cx53_idle"
+          else
+            target="github"
+            reason="no_idle_runner"
+          fi
+
+          emit
+
+  unsafe-review-rust-cx43:
+    name: Unsafe Review Rust on CX43
+    needs: route-unsafe-review-rust
+    if: ${{ needs.route-unsafe-review-rust.outputs.target == 'cx43' }}
+    runs-on: [self-hosted, em-ci, cx43, rust-small, trusted-pr]
+    timeout-minutes: 45
+    env:
+      UNSAFE_REVIEW_SELF_HOSTED: "1"
+      CARGO_HOME: /mnt/ci-cache/cargo-home
+      SCCACHE_DIR: /mnt/ci-cache/sccache
+      SCCACHE_CACHE_SIZE: 60G
+      CARGO_BUILD_JOBS: "12"
+      TMPDIR: /mnt/ci-scratch/tmp/${{ github.run_id }}-${{ github.run_attempt }}-cx43
+      CARGO_TARGET_DIR: /mnt/ci-scratch/target/${{ github.run_id }}-${{ github.run_attempt }}-cx43
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Install Rust toolchain
@@ -37,22 +165,153 @@ jobs:
         with:
           components: rustfmt, clippy
 
-      - name: Check formatting
-        run: cargo fmt --check
-
-      - name: Check workspace
-        run: cargo check --workspace --all-targets --locked
-
-      - name: Lint workspace
-        run: cargo clippy --workspace --all-targets --locked -- -D warnings
-
-      - name: Test workspace
-        run: cargo test --workspace --all-targets --locked
-
-      - name: Build documentation
+      - name: Run Rust gate and advisory artifacts
         env:
-          RUSTDOCFLAGS: -D warnings
-        run: cargo doc --workspace --no-deps --locked
+          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
+        run: bash .github/scripts/unsafe-review-rust-gate.sh
 
-      - name: Run repository policy checks
-        run: cargo run --locked -p xtask -- check-pr
+      - name: Upload unsafe-review artifacts
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: unsafe-review
+          path: |
+            target/unsafe-review/cards.json
+            target/unsafe-review/pr-summary.md
+            target/unsafe-review/cards.sarif
+            target/unsafe-review/comment-plan.json
+          if-no-files-found: warn
+
+  unsafe-review-rust-cx53:
+    name: Unsafe Review Rust on CX53
+    needs: route-unsafe-review-rust
+    if: ${{ needs.route-unsafe-review-rust.outputs.target == 'cx53' }}
+    runs-on: [self-hosted, em-ci, cx53, rust-small, trusted-pr]
+    timeout-minutes: 45
+    env:
+      UNSAFE_REVIEW_SELF_HOSTED: "1"
+      CARGO_HOME: /mnt/ci-cache/cargo-home
+      SCCACHE_DIR: /mnt/ci-cache/sccache
+      SCCACHE_CACHE_SIZE: 60G
+      CARGO_BUILD_JOBS: "12"
+      TMPDIR: /mnt/ci-scratch/tmp/${{ github.run_id }}-${{ github.run_attempt }}-cx53
+      CARGO_TARGET_DIR: /mnt/ci-scratch/target/${{ github.run_id }}-${{ github.run_attempt }}-cx53
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Run Rust gate and advisory artifacts
+        env:
+          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
+        run: bash .github/scripts/unsafe-review-rust-gate.sh
+
+      - name: Upload unsafe-review artifacts
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: unsafe-review
+          path: |
+            target/unsafe-review/cards.json
+            target/unsafe-review/pr-summary.md
+            target/unsafe-review/cards.sarif
+            target/unsafe-review/comment-plan.json
+          if-no-files-found: warn
+
+  unsafe-review-rust-github:
+    name: Unsafe Review Rust on GitHub Hosted
+    needs: route-unsafe-review-rust
+    if: ${{ needs.route-unsafe-review-rust.outputs.target == 'github' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
+
+      - name: Run Rust gate and advisory artifacts
+        env:
+          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
+        run: bash .github/scripts/unsafe-review-rust-gate.sh
+
+      - name: Upload unsafe-review artifacts
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: unsafe-review
+          path: |
+            target/unsafe-review/cards.json
+            target/unsafe-review/pr-summary.md
+            target/unsafe-review/cards.sarif
+            target/unsafe-review/comment-plan.json
+          if-no-files-found: warn
+
+  unsafe-review-rust-result:
+    name: Unsafe Review Rust Result
+    needs:
+      - route-unsafe-review-rust
+      - unsafe-review-rust-cx43
+      - unsafe-review-rust-cx53
+      - unsafe-review-rust-github
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Summarize routed result
+        env:
+          ROUTER_TARGET: ${{ needs.route-unsafe-review-rust.outputs.target }}
+          ROUTER_REASON: ${{ needs.route-unsafe-review-rust.outputs.reason }}
+          DOCS_ONLY: ${{ needs.route-unsafe-review-rust.outputs.docs_only }}
+          CX43_RESULT: ${{ needs.unsafe-review-rust-cx43.result }}
+          CX53_RESULT: ${{ needs.unsafe-review-rust-cx53.result }}
+          GITHUB_RESULT: ${{ needs.unsafe-review-rust-github.result }}
+          ROUTE_RESULT: ${{ needs.route-unsafe-review-rust.result }}
+        run: |
+          set -euo pipefail
+          echo "router_target=${ROUTER_TARGET}"
+          echo "router_reason=${ROUTER_REASON}"
+          echo "docs_only=${DOCS_ONLY}"
+          echo "route_result=${ROUTE_RESULT}"
+          echo "cx43_result=${CX43_RESULT}"
+          echo "cx53_result=${CX53_RESULT}"
+          echo "github_result=${GITHUB_RESULT}"
+
+          if [[ "${ROUTE_RESULT}" != "success" ]]; then
+            echo "::error::Route Unsafe Review Rust did not succeed"
+            exit 1
+          fi
+
+          if [[ "${DOCS_ONLY}" == "true" ]]; then
+            echo "docs-only/no Rust work; normalized result succeeds without VPS runner use"
+            exit 0
+          fi
+
+          case "${ROUTER_TARGET}" in
+            cx43)
+              [[ "${CX43_RESULT}" == "success" ]] || exit 1
+              ;;
+            cx53)
+              [[ "${CX53_RESULT}" == "success" ]] || exit 1
+              ;;
+            github)
+              [[ "${GITHUB_RESULT}" == "success" ]] || exit 1
+              ;;
+            *)
+              echo "::error::Unknown router target: ${ROUTER_TARGET}"
+              exit 1
+              ;;
+          esac
