@@ -1183,6 +1183,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "public_unsafe_fn_missing_safety",
             "public_unsafe_trait_missing_safety",
             "public_unsafe_fn_safety_comment_not_docs",
+            "unsafe_fn_pointer_field_owner",
         ] {
             let output = fixture_output(fixture)?;
             let card = single_card(fixture, &output)?;
@@ -1204,6 +1205,18 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
                 "{fixture} should preserve the public API owner in the card"
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn unsafe_fn_pointer_field_preserves_owner_identity() -> Result<(), String> {
+        let output = fixture_output("unsafe_fn_pointer_field_owner")?;
+        let card = single_card("unsafe_fn_pointer_field_owner", &output)?;
+
+        assert_eq!(card.site.kind, UnsafeSiteKind::UnsafeFn);
+        assert_eq!(card.site.owner.as_deref(), Some("schedule"));
+        assert_eq!(card.operation.family, OperationFamily::Unknown);
+        assert_eq!(card.class, ReviewClass::ContractMissing);
         Ok(())
     }
 
@@ -1776,6 +1789,304 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn copy_range_evidence_rejects_unrelated_length_guards() -> Result<(), String> {
+        for fixture in [
+            "copy_nonoverlapping_other_len_not_guard",
+            "ptr_copy_other_len_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert!(
+                !obligation_discharge_present(card, "valid-range"),
+                "{fixture} should not accept an unrelated length assertion as copy range evidence"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_rejects_one_sided_slice_length_guards() -> Result<(), String> {
+        for fixture in [
+            "copy_nonoverlapping_slice_range_src_only_not_guard",
+            "copy_nonoverlapping_slice_range_dst_only_not_guard",
+            "ptr_copy_slice_range_src_only_not_guard",
+            "ptr_copy_slice_range_dst_only_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert!(
+                !obligation_discharge_present(card, "valid-range"),
+                "{fixture} should require both source and destination slice range evidence"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_rejects_closed_slice_length_branches() -> Result<(), String> {
+        for fixture in [
+            "copy_nonoverlapping_slice_range_closed_branch_not_guard",
+            "ptr_copy_slice_range_closed_branch_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert!(
+                !obligation_discharge_present(card, "valid-range"),
+                "{fixture} should not accept closed branch observations as active range evidence"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_rejects_or_slice_length_branches() -> Result<(), String> {
+        for fixture in [
+            "copy_nonoverlapping_slice_range_or_branch_not_guard",
+            "ptr_copy_slice_range_or_branch_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert!(
+                !obligation_discharge_present(card, "valid-range"),
+                "{fixture} should not accept disjunctive range branches as full range evidence"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_rejects_commented_assertions() -> Result<(), String> {
+        for fixture in [
+            "copy_nonoverlapping_slice_range_commented_assert_not_guard",
+            "ptr_copy_slice_range_commented_assert_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert!(
+                !obligation_discharge_present(card, "valid-range"),
+                "{fixture} should not accept commented assertions as copy range evidence"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_rejects_non_code_early_returns() -> Result<(), String> {
+        for fixture in [
+            "copy_nonoverlapping_slice_range_disjunctive_early_return_line_comment_not_guard",
+            "copy_nonoverlapping_slice_range_disjunctive_early_return_block_comment_not_guard",
+            "copy_nonoverlapping_slice_range_disjunctive_early_return_string_literal_not_guard",
+            "ptr_copy_slice_range_disjunctive_early_return_line_comment_not_guard",
+            "ptr_copy_slice_range_disjunctive_early_return_block_comment_not_guard",
+            "ptr_copy_slice_range_disjunctive_early_return_string_literal_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert!(
+                !obligation_discharge_present(card, "valid-range"),
+                "{fixture} should not accept comment or literal return text as copy range evidence"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_rejects_nested_early_returns() -> Result<(), String> {
+        for fixture in [
+            "copy_nonoverlapping_slice_range_disjunctive_nested_return_not_guard",
+            "ptr_copy_slice_range_disjunctive_nested_return_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert!(
+                !obligation_discharge_present(card, "valid-range"),
+                "{fixture} should not accept nested conditional returns as copy range evidence"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_accepts_slice_length_guards() -> Result<(), String> {
+        let copy_nonoverlapping = fixture_output("copy_nonoverlapping_slice_range_guard")?;
+        let copy_nonoverlapping_card = single_card(
+            "copy_nonoverlapping_slice_range_guard",
+            &copy_nonoverlapping,
+        )?;
+        assert!(obligation_discharge_present(
+            copy_nonoverlapping_card,
+            "valid-range"
+        ));
+        assert!(
+            !obligation_discharge_present(copy_nonoverlapping_card, "non-overlap"),
+            "slice range guards should not prove non-overlap"
+        );
+
+        let ptr_copy = fixture_output("ptr_copy_slice_range_guard")?;
+        let ptr_copy_card = single_card("ptr_copy_slice_range_guard", &ptr_copy)?;
+        assert!(obligation_discharge_present(ptr_copy_card, "valid-range"));
+        assert!(
+            !obligation_discharge_present(ptr_copy_card, "initialized"),
+            "range guards should not prove initialized memory"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_accepts_conjunctive_slice_length_guards() -> Result<(), String> {
+        for (fixture, missing_key) in [
+            (
+                "copy_nonoverlapping_slice_range_conjunctive_assert_guard",
+                "non-overlap",
+            ),
+            (
+                "copy_nonoverlapping_slice_range_conjunctive_open_branch_guard",
+                "non-overlap",
+            ),
+            (
+                "ptr_copy_slice_range_conjunctive_assert_guard",
+                "initialized",
+            ),
+            (
+                "ptr_copy_slice_range_conjunctive_open_branch_guard",
+                "initialized",
+            ),
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+            assert!(
+                obligation_discharge_present(card, "valid-range"),
+                "{fixture} should accept conjunctive source/destination slice range evidence"
+            );
+            assert!(
+                !obligation_discharge_present(card, missing_key),
+                "{fixture} should not prove {missing_key}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_accepts_slice_length_early_returns() -> Result<(), String> {
+        let copy_nonoverlapping =
+            fixture_output("copy_nonoverlapping_slice_range_early_return_guard")?;
+        let copy_nonoverlapping_card = single_card(
+            "copy_nonoverlapping_slice_range_early_return_guard",
+            &copy_nonoverlapping,
+        )?;
+        assert!(obligation_discharge_present(
+            copy_nonoverlapping_card,
+            "valid-range"
+        ));
+        assert!(
+            !obligation_discharge_present(copy_nonoverlapping_card, "non-overlap"),
+            "early-return range guards should not prove non-overlap"
+        );
+
+        let ptr_copy = fixture_output("ptr_copy_slice_range_early_return_guard")?;
+        let ptr_copy_card = single_card("ptr_copy_slice_range_early_return_guard", &ptr_copy)?;
+        assert!(obligation_discharge_present(ptr_copy_card, "valid-range"));
+        assert!(
+            !obligation_discharge_present(ptr_copy_card, "initialized"),
+            "early-return range guards should not prove initialized memory"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_accepts_disjunctive_slice_length_early_returns() -> Result<(), String> {
+        for (fixture, missing_key) in [
+            (
+                "copy_nonoverlapping_slice_range_disjunctive_early_return_guard",
+                "non-overlap",
+            ),
+            (
+                "copy_nonoverlapping_slice_range_disjunctive_early_return_after_block_guard",
+                "non-overlap",
+            ),
+            (
+                "ptr_copy_slice_range_disjunctive_early_return_guard",
+                "initialized",
+            ),
+            (
+                "ptr_copy_slice_range_disjunctive_early_return_after_block_guard",
+                "initialized",
+            ),
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+            assert!(
+                obligation_discharge_present(card, "valid-range"),
+                "{fixture} should accept disjunctive invalid-range early returns as range evidence"
+            );
+            assert!(
+                !obligation_discharge_present(card, missing_key),
+                "{fixture} should not prove {missing_key}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_accepts_open_slice_length_branches() -> Result<(), String> {
+        let copy_nonoverlapping =
+            fixture_output("copy_nonoverlapping_slice_range_open_branch_guard")?;
+        let copy_nonoverlapping_card = single_card(
+            "copy_nonoverlapping_slice_range_open_branch_guard",
+            &copy_nonoverlapping,
+        )?;
+        assert!(obligation_discharge_present(
+            copy_nonoverlapping_card,
+            "valid-range"
+        ));
+        assert!(
+            !obligation_discharge_present(copy_nonoverlapping_card, "non-overlap"),
+            "open-branch range guards should not prove non-overlap"
+        );
+
+        let ptr_copy = fixture_output("ptr_copy_slice_range_open_branch_guard")?;
+        let ptr_copy_card = single_card("ptr_copy_slice_range_open_branch_guard", &ptr_copy)?;
+        assert!(obligation_discharge_present(ptr_copy_card, "valid-range"));
+        assert!(
+            !obligation_discharge_present(ptr_copy_card, "initialized"),
+            "open-branch range guards should not prove initialized memory"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_rejects_stale_slice_length_guards() -> Result<(), String> {
+        for fixture in [
+            "copy_nonoverlapping_slice_range_open_branch_reassigned_count_not_guard",
+            "copy_nonoverlapping_slice_range_open_branch_reassigned_src_not_guard",
+            "copy_nonoverlapping_slice_range_disjunctive_early_return_reassigned_count_not_guard",
+            "copy_nonoverlapping_slice_range_reassigned_count_not_guard",
+            "copy_nonoverlapping_slice_range_reassigned_src_not_guard",
+            "ptr_copy_slice_range_open_branch_reassigned_count_not_guard",
+            "ptr_copy_slice_range_open_branch_reassigned_dst_not_guard",
+            "ptr_copy_slice_range_disjunctive_early_return_reassigned_count_not_guard",
+            "ptr_copy_slice_range_reassigned_count_not_guard",
+            "ptr_copy_slice_range_reassigned_dst_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert!(
+                !obligation_discharge_present(card, "valid-range"),
+                "{fixture} should not accept stale slice length evidence after reassignment"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn ptr_replace_uses_replacement_operation_family() -> Result<(), String> {
         let output = fixture_output("ptr_replace_value")?;
         let card = single_card("ptr_replace_value", &output)?;
@@ -2305,6 +2616,47 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
         assert!(
             card.reach.summary.contains("try_reserve"),
             "reach evidence should use the function owner, not the impl Trait bound"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn long_unsafe_fn_owner_inference_uses_enclosing_function_owner() -> Result<(), String> {
+        let output = fixture_output("long_unsafe_fn_owner_inference")?;
+        let card = output
+            .cards
+            .iter()
+            .find(|card| card.operation.family == OperationFamily::DropInPlace)
+            .ok_or_else(|| {
+                format!(
+                    "long_unsafe_fn_owner_inference should emit a drop_in_place card: {:#?}",
+                    output.cards
+                )
+            })?;
+
+        assert_eq!(card.operation.family, OperationFamily::DropInPlace);
+        assert_eq!(card.site.owner, Some("run".to_string()));
+        assert!(
+            card.id.0.contains("-run-operation-drop_in_place-"),
+            "card identity should include the enclosing owner: {}",
+            card.id.0
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn macro_rules_owner_inference_uses_macro_name() -> Result<(), String> {
+        let output = fixture_output("macro_rules_owner_inference")?;
+        let card = single_card("macro_rules_owner_inference", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::BoxFromRaw);
+        assert_eq!(card.site.owner, Some("spawn_unchecked".to_string()));
+        assert!(
+            card.id
+                .0
+                .contains("-spawn-unchecked-operation-box_from_raw-"),
+            "card identity should include the macro owner: {}",
+            card.id.0
         );
         Ok(())
     }

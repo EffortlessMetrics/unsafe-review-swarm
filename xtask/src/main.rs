@@ -866,6 +866,8 @@ fn check_dogfood() -> Result<(), String> {
 
     let mut ids = BTreeSet::new();
     let mut repositories = BTreeSet::new();
+    let mut snapshot_targets_by_repo = BTreeMap::<String, BTreeSet<String>>::new();
+    let mut pr_diff_targets_by_repo = BTreeMap::<String, BTreeSet<String>>::new();
     let mut artifact_status_counts = BTreeMap::new();
     let mut repo_snapshots = 0usize;
     let mut pr_diffs = 0usize;
@@ -888,6 +890,12 @@ fn check_dogfood() -> Result<(), String> {
             ));
         }
         repositories.insert(repository.to_string());
+        snapshot_targets_by_repo
+            .entry(repository.to_string())
+            .or_default();
+        pr_diff_targets_by_repo
+            .entry(repository.to_string())
+            .or_default();
         required_target_string(target, "crate", idx)?;
         let kind = required_target_string(target, "kind", idx)?;
         if !DOGFOOD_TARGET_KINDS.contains(&kind) {
@@ -950,6 +958,10 @@ fn check_dogfood() -> Result<(), String> {
         match kind {
             "repo-snapshot" => {
                 repo_snapshots += 1;
+                snapshot_targets_by_repo
+                    .entry(repository.to_string())
+                    .or_default()
+                    .insert(id.to_string());
                 let commit = required_target_string(target, "commit", idx)?;
                 if commit.len() != 40 || !commit.bytes().all(|byte| byte.is_ascii_hexdigit()) {
                     return Err(format!(
@@ -961,6 +973,10 @@ fn check_dogfood() -> Result<(), String> {
             }
             "pr-diff" => {
                 pr_diffs += 1;
+                pr_diff_targets_by_repo
+                    .entry(repository.to_string())
+                    .or_default()
+                    .insert(id.to_string());
                 let Some(pr) = target.get("pr").and_then(toml::Value::as_integer) else {
                     return Err(format!(
                         "{DOGFOOD_MANIFEST} targets[{idx}] is missing integer pr"
@@ -994,14 +1010,16 @@ fn check_dogfood() -> Result<(), String> {
             "{DOGFOOD_MANIFEST} must include repo-snapshot and pr-diff targets"
         ));
     }
-    check_dogfood_index(
-        targets.len(),
-        repositories.len(),
+    check_dogfood_index(DogfoodIndexExpected {
+        target_count: targets.len(),
+        repository_count: repositories.len(),
         repo_snapshots,
         pr_diffs,
-        &repositories,
-        &artifact_status_counts,
-    )?;
+        repositories: &repositories,
+        snapshot_targets_by_repo: &snapshot_targets_by_repo,
+        pr_diff_targets_by_repo: &pr_diff_targets_by_repo,
+        artifact_status_counts: &artifact_status_counts,
+    })?;
 
     println!(
         "check-dogfood: ok ({} targets, {} repositories)",
@@ -1011,14 +1029,18 @@ fn check_dogfood() -> Result<(), String> {
     Ok(())
 }
 
-fn check_dogfood_index(
+struct DogfoodIndexExpected<'a> {
     target_count: usize,
     repository_count: usize,
     repo_snapshots: usize,
     pr_diffs: usize,
-    repositories: &BTreeSet<String>,
-    artifact_status_counts: &BTreeMap<String, usize>,
-) -> Result<(), String> {
+    repositories: &'a BTreeSet<String>,
+    snapshot_targets_by_repo: &'a BTreeMap<String, BTreeSet<String>>,
+    pr_diff_targets_by_repo: &'a BTreeMap<String, BTreeSet<String>>,
+    artifact_status_counts: &'a BTreeMap<String, usize>,
+}
+
+fn check_dogfood_index(expected: DogfoodIndexExpected<'_>) -> Result<(), String> {
     let index = parse_json_file(&workspace_path(DOGFOOD_INDEX))?;
     require_json_str(&index, "schema_version", "0.1", DOGFOOD_INDEX)?;
     require_json_str(&index, "status", "experimental", DOGFOOD_INDEX)?;
@@ -1031,19 +1053,29 @@ fn check_dogfood_index(
     require_json_usize_at(
         &index,
         "/summary/repositories",
-        repository_count,
+        expected.repository_count,
         DOGFOOD_INDEX,
     )?;
-    require_json_usize_at(&index, "/summary/targets", target_count, DOGFOOD_INDEX)?;
+    require_json_usize_at(
+        &index,
+        "/summary/targets",
+        expected.target_count,
+        DOGFOOD_INDEX,
+    )?;
     require_json_usize_at(
         &index,
         "/summary/repo_snapshots",
-        repo_snapshots,
+        expected.repo_snapshots,
         DOGFOOD_INDEX,
     )?;
-    require_json_usize_at(&index, "/summary/pr_diffs", pr_diffs, DOGFOOD_INDEX)?;
+    require_json_usize_at(
+        &index,
+        "/summary/pr_diffs",
+        expected.pr_diffs,
+        DOGFOOD_INDEX,
+    )?;
 
-    for (status, count) in artifact_status_counts {
+    for (status, count) in expected.artifact_status_counts {
         require_json_usize_at(
             &index,
             &format!("/summary/artifact_statuses/{status}"),
@@ -1053,10 +1085,11 @@ fn check_dogfood_index(
     }
 
     let repository_rows = json_array_at(&index, "/repositories", DOGFOOD_INDEX)?;
-    if repository_rows.len() != repository_count {
+    if repository_rows.len() != expected.repository_count {
         return Err(format!(
-            "{DOGFOOD_INDEX} repositories has {}, expected {repository_count}",
-            repository_rows.len()
+            "{DOGFOOD_INDEX} repositories has {}, expected {}",
+            repository_rows.len(),
+            expected.repository_count
         ));
     }
     let mut seen = BTreeSet::new();
@@ -1066,7 +1099,7 @@ fn check_dogfood_index(
                 "{DOGFOOD_INDEX} repositories[{idx}] is missing repository"
             ));
         };
-        if !repositories.contains(repository) {
+        if !expected.repositories.contains(repository) {
             return Err(format!(
                 "{DOGFOOD_INDEX} repositories[{idx}] references unknown repository `{repository}`"
             ));
@@ -1076,8 +1109,16 @@ fn check_dogfood_index(
                 "{DOGFOOD_INDEX} repositories contains duplicate `{repository}`"
             ));
         }
-        json_array_at(row, "/snapshot_targets", DOGFOOD_INDEX)?;
-        json_array_at(row, "/pr_diff_targets", DOGFOOD_INDEX)?;
+        let expected_snapshots = expected
+            .snapshot_targets_by_repo
+            .get(repository)
+            .ok_or_else(|| format!("{DOGFOOD_MANIFEST} has no target map for `{repository}`"))?;
+        require_json_string_set_at(row, "/snapshot_targets", expected_snapshots, DOGFOOD_INDEX)?;
+        let expected_pr_diffs = expected
+            .pr_diff_targets_by_repo
+            .get(repository)
+            .ok_or_else(|| format!("{DOGFOOD_MANIFEST} has no target map for `{repository}`"))?;
+        require_json_string_set_at(row, "/pr_diff_targets", expected_pr_diffs, DOGFOOD_INDEX)?;
         let Some(summary) = row
             .get("primary_exercise")
             .and_then(serde_json::Value::as_str)
@@ -2536,6 +2577,44 @@ fn json_array_at<'a>(
         .pointer(pointer)
         .and_then(serde_json::Value::as_array)
         .ok_or_else(|| format!("{path} is missing array at `{pointer}`"))
+}
+
+fn json_string_set_at(
+    value: &serde_json::Value,
+    pointer: &str,
+    path: &str,
+) -> Result<BTreeSet<String>, String> {
+    let array = json_array_at(value, pointer, path)?;
+    let mut strings = BTreeSet::new();
+    for (idx, item) in array.iter().enumerate() {
+        let Some(item) = item.as_str() else {
+            return Err(format!(
+                "{path} array at `{pointer}` item {idx} must be a string"
+            ));
+        };
+        if !strings.insert(item.to_string()) {
+            return Err(format!(
+                "{path} array at `{pointer}` contains duplicate `{item}`"
+            ));
+        }
+    }
+    Ok(strings)
+}
+
+fn require_json_string_set_at(
+    value: &serde_json::Value,
+    pointer: &str,
+    expected: &BTreeSet<String>,
+    path: &str,
+) -> Result<(), String> {
+    let actual = json_string_set_at(value, pointer, path)?;
+    if &actual == expected {
+        Ok(())
+    } else {
+        Err(format!(
+            "{path} array at `{pointer}` is {actual:?}, expected {expected:?}"
+        ))
+    }
 }
 
 fn json_usize_at(value: &serde_json::Value, pointer: &str, path: &str) -> Result<usize, String> {
@@ -4392,6 +4471,44 @@ impl WitnessKind {
     #[test]
     fn dogfood_manifest_validates_current_corpus_contract() -> Result<(), String> {
         check_dogfood()
+    }
+
+    #[test]
+    fn dogfood_index_target_sets_reject_missing_manifest_target() -> Result<(), String> {
+        let row = serde_json::json!({
+            "snapshot_targets": ["smallvec-capped"],
+        });
+        let expected = [
+            "smallvec-capped".to_string(),
+            "async-task-capped".to_string(),
+        ]
+        .into_iter()
+        .collect();
+
+        let Err(err) =
+            require_json_string_set_at(&row, "/snapshot_targets", &expected, "dogfood-index")
+        else {
+            return Err("missing dogfood target should fail".to_string());
+        };
+
+        assert!(err.contains("async-task-capped"));
+        assert!(err.contains("expected"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_index_target_sets_reject_duplicate_index_target() -> Result<(), String> {
+        let row = serde_json::json!({
+            "pr_diff_targets": ["hashbrown-pr692", "hashbrown-pr692"],
+        });
+
+        let Err(err) = json_string_set_at(&row, "/pr_diff_targets", "dogfood-index") else {
+            return Err("duplicate dogfood target should fail".to_string());
+        };
+
+        assert!(err.contains("duplicate"));
+        assert!(err.contains("hashbrown-pr692"));
+        Ok(())
     }
 
     #[test]

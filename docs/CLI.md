@@ -65,6 +65,33 @@ location, operation family, hazards, missing evidence, witness routes, and
 matched baseline/suppression ledger provenance when present. They are policy
 posture context, not a second analyzer result.
 
+## First PR Bundle
+
+For a first local review pass, write the standard advisory artifact bundle:
+
+```bash
+unsafe-review first-pr --base origin/main
+```
+
+`review` is an alias for `first-pr`.
+
+By default this writes:
+
+```text
+target/unsafe-review/cards.json
+target/unsafe-review/pr-summary.md
+target/unsafe-review/cards.sarif
+target/unsafe-review/comment-plan.json
+target/unsafe-review/witness-plan.md
+```
+
+Use `--out-dir <dir>` to choose another artifact directory, or `--diff file|-`
+to review a supplied diff.
+
+The command analyzes once and renders every artifact from the same
+`ReviewCard`s. It stays advisory-only: it does not execute witness tools, post
+comments, edit source, or enforce blocking policy.
+
 ## Output Formats
 
 All output formats project the same `ReviewCard`s. They must not reclassify
@@ -160,8 +187,10 @@ unsafe-review outcome \
 
 Outcome comparison is read-only. It compares existing `ReviewCard` identities,
 classes, missing-evidence counts, and saved witness receipt strength from the
-supplied snapshots. It does not rerun analysis, run witnesses, post policy
-decisions, or claim repository safety.
+supplied snapshots. When saved snapshots include ReviewCard context, outcome
+card states also carry the site, operation family, and hazards so movement stays
+tied to the original unsafe seam. It does not rerun analysis, run witnesses,
+post policy decisions, or claim repository safety.
 
 ## Witness Receipts
 

@@ -87,29 +87,23 @@ install the `unsafe-review` façade crate.
 
 ```bash
 # Review the current PR against main
-unsafe-review check --base origin/main
-
-# Write the reviewer-facing summary
-unsafe-review check --base origin/main \
-  --format pr-summary \
-  --out target/unsafe-review/pr-summary.md
-
-# Write machine-readable cards
-unsafe-review check --base origin/main \
-  --format json \
-  --out target/unsafe-review/cards.json
+unsafe-review first-pr --base origin/main
 
 # Explain one card
 unsafe-review explain <card-id>
 ```
 
+`first-pr` writes `cards.json`, `pr-summary.md`, `cards.sarif`,
+`comment-plan.json`, and `witness-plan.md` under `target/unsafe-review/`. It is
+advisory-only: it does not run witnesses, post comments, edit source, or enforce
+blocking policy.
+
 Try the bundled smoke fixture:
 
 ```bash
-unsafe-review check \
+unsafe-review first-pr \
   --root fixtures/raw_pointer_alignment \
-  --diff fixtures/raw_pointer_alignment/change.diff \
-  --format pr-summary
+  --diff fixtures/raw_pointer_alignment/change.diff
 ```
 
 ## What unsafe-review produces

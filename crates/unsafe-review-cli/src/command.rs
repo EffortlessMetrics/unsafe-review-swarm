@@ -44,6 +44,21 @@ impl Default for CheckOptions {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct FirstPrOptions {
+    pub check: CheckOptions,
+    pub out_dir: PathBuf,
+}
+
+impl Default for FirstPrOptions {
+    fn default() -> Self {
+        Self {
+            check: CheckOptions::default(),
+            out_dir: PathBuf::from("target/unsafe-review"),
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ReceiptTemplateOptions {
     pub card_id: String,
@@ -89,6 +104,7 @@ pub(crate) enum Command {
     Check(CheckOptions),
     Repo(CheckOptions),
     Pilot(CheckOptions),
+    FirstPr(FirstPrOptions),
     Badges {
         root: PathBuf,
         out: PathBuf,

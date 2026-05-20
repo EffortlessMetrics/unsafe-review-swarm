@@ -60,11 +60,12 @@ cargo test --workspace --locked
 cargo run --locked -p xtask -- check-pr
 
 cargo build --locked -p unsafe-review
+unsafe_review_bin="${CARGO_TARGET_DIR:-target}/debug/unsafe-review"
 mkdir -p target/unsafe-review
-./target/debug/unsafe-review check --base "origin/${BASE_REF:-main}" --format json --out target/unsafe-review/cards.json
-./target/debug/unsafe-review check --base "origin/${BASE_REF:-main}" --format pr-summary --out target/unsafe-review/pr-summary.md
-./target/debug/unsafe-review check --base "origin/${BASE_REF:-main}" --format sarif --out target/unsafe-review/cards.sarif
-./target/debug/unsafe-review check --base "origin/${BASE_REF:-main}" --format comment-plan --out target/unsafe-review/comment-plan.json
+"${unsafe_review_bin}" check --base "origin/${BASE_REF:-main}" --format json --out target/unsafe-review/cards.json
+"${unsafe_review_bin}" check --base "origin/${BASE_REF:-main}" --format pr-summary --out target/unsafe-review/pr-summary.md
+"${unsafe_review_bin}" check --base "origin/${BASE_REF:-main}" --format sarif --out target/unsafe-review/cards.sarif
+"${unsafe_review_bin}" check --base "origin/${BASE_REF:-main}" --format comment-plan --out target/unsafe-review/comment-plan.json
 cargo run --locked -p xtask -- check-advisory-artifacts target/unsafe-review
 
 if command -v sccache >/dev/null 2>&1; then

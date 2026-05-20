@@ -1,0 +1,26 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,22 @@
++pub fn copy_overlapping_checked(src: &[u8], dst: &mut [u8], count: usize, should_return: bool) {
++    if count > src.len() || count > dst.len() {
++        if should_return {
++            return;
++        }
++    }
++    // SAFETY: fixture has only a nested conditional return inside the invalid-range branch.
++    unsafe { core::ptr::copy(src.as_ptr(), dst.as_mut_ptr(), count) }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::copy_overlapping_checked;
++
++    #[test]
++    fn copies_bytes() {
++        let src = [1_u8, 2, 3, 4];
++        let mut dst = [0_u8; 4];
++        copy_overlapping_checked(&src, &mut dst, src.len(), false);
++        assert_eq!(dst, src);
++    }
++}

@@ -43,6 +43,7 @@ required_core_fixtures = [
   "public_unsafe_fn_with_safety_docs",
   "public_unsafe_fn_safety_colon_docs",
   "documented_private_unsafe_fn",
+  "unsafe_fn_pointer_field_owner",
   "private_unsafe_helper_safety_comment",
   "local_safety_colon_comment",
   "maybeuninit_assume_init",
@@ -131,8 +132,52 @@ required_core_fixtures = [
   "raw_pointer_write_volatile_null_other_pointer_not_guard",
   "raw_pointer_write_volatile_null_post_check_not_guard",
   "ptr_copy_overlapping",
+  "ptr_copy_slice_range_guard",
+  "ptr_copy_slice_range_conjunctive_assert_guard",
+  "ptr_copy_slice_range_early_return_guard",
+  "ptr_copy_slice_range_disjunctive_early_return_guard",
+  "ptr_copy_slice_range_disjunctive_early_return_after_block_guard",
+  "ptr_copy_slice_range_open_branch_guard",
+  "ptr_copy_slice_range_conjunctive_open_branch_guard",
+  "ptr_copy_slice_range_closed_branch_not_guard",
+  "ptr_copy_slice_range_or_branch_not_guard",
+  "ptr_copy_slice_range_commented_assert_not_guard",
+  "ptr_copy_slice_range_disjunctive_early_return_line_comment_not_guard",
+  "ptr_copy_slice_range_disjunctive_early_return_block_comment_not_guard",
+  "ptr_copy_slice_range_disjunctive_early_return_string_literal_not_guard",
+  "ptr_copy_slice_range_disjunctive_nested_return_not_guard",
+  "ptr_copy_slice_range_disjunctive_early_return_reassigned_count_not_guard",
+  "ptr_copy_slice_range_open_branch_reassigned_count_not_guard",
+  "ptr_copy_slice_range_open_branch_reassigned_dst_not_guard",
+  "ptr_copy_slice_range_src_only_not_guard",
+  "ptr_copy_slice_range_dst_only_not_guard",
+  "ptr_copy_slice_range_reassigned_count_not_guard",
+  "ptr_copy_slice_range_reassigned_dst_not_guard",
+  "ptr_copy_other_len_not_guard",
   "ptr_replace_value",
   "copy_nonoverlapping",
+  "copy_nonoverlapping_slice_range_guard",
+  "copy_nonoverlapping_slice_range_conjunctive_assert_guard",
+  "copy_nonoverlapping_slice_range_early_return_guard",
+  "copy_nonoverlapping_slice_range_disjunctive_early_return_guard",
+  "copy_nonoverlapping_slice_range_disjunctive_early_return_after_block_guard",
+  "copy_nonoverlapping_slice_range_open_branch_guard",
+  "copy_nonoverlapping_slice_range_conjunctive_open_branch_guard",
+  "copy_nonoverlapping_slice_range_closed_branch_not_guard",
+  "copy_nonoverlapping_slice_range_or_branch_not_guard",
+  "copy_nonoverlapping_slice_range_commented_assert_not_guard",
+  "copy_nonoverlapping_slice_range_disjunctive_early_return_line_comment_not_guard",
+  "copy_nonoverlapping_slice_range_disjunctive_early_return_block_comment_not_guard",
+  "copy_nonoverlapping_slice_range_disjunctive_early_return_string_literal_not_guard",
+  "copy_nonoverlapping_slice_range_disjunctive_nested_return_not_guard",
+  "copy_nonoverlapping_slice_range_disjunctive_early_return_reassigned_count_not_guard",
+  "copy_nonoverlapping_slice_range_open_branch_reassigned_count_not_guard",
+  "copy_nonoverlapping_slice_range_open_branch_reassigned_src_not_guard",
+  "copy_nonoverlapping_slice_range_src_only_not_guard",
+  "copy_nonoverlapping_slice_range_dst_only_not_guard",
+  "copy_nonoverlapping_slice_range_reassigned_count_not_guard",
+  "copy_nonoverlapping_slice_range_reassigned_src_not_guard",
+  "copy_nonoverlapping_other_len_not_guard",
   "str_from_utf8_unchecked",
   "str_from_utf8_unchecked_is_ok_guard",
   "str_from_utf8_unchecked_is_err_return_guard",
@@ -225,6 +270,8 @@ required_core_fixtures = [
   "nonnull_observed_not_guard",
   "nonnull_post_check_not_guard",
   "impl_trait_bound_owner_inference",
+  "long_unsafe_fn_owner_inference",
+  "macro_rules_owner_inference",
   "nested_unsafe_operation_call_dedupe",
   "adjacent_unchanged_unsafe_fn_no_card",
   "comment_alignment_not_guard",
@@ -635,6 +682,16 @@ claim = "private unsafe function with a # Safety contract does not report a miss
 support_tier = "Contract evidence mining"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+
+[[cases]]
+fixture = "unsafe_fn_pointer_field_owner"
+kind = "positive"
+claim = "unsafe function pointer fields preserve the field name as ReviewCard owner identity"
+support_tier = "Contract evidence mining"
+expected_cards = 1
+expected_class = "contract_missing"
 expected_operation_family = "unknown"
 expected_hazard = "unknown"
 
@@ -1519,9 +1576,449 @@ expected_operation_family = "copy_nonoverlapping"
 expected_hazard = "aliasing_or_provenance"
 
 [[cases]]
+fixture = "copy_nonoverlapping_slice_range_guard"
+kind = "positive"
+claim = "copy_nonoverlapping accepts same-call source and destination slice length assertions as valid-range evidence without proving non-overlap"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_conjunctive_assert_guard"
+kind = "positive"
+claim = "copy_nonoverlapping accepts same-call conjunctive source/destination slice length assertions as valid-range evidence without proving non-overlap"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_early_return_guard"
+kind = "positive"
+claim = "copy_nonoverlapping accepts same-call source and destination early-return slice length guards as valid-range evidence without proving non-overlap"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_disjunctive_early_return_guard"
+kind = "positive"
+claim = "copy_nonoverlapping accepts same-call disjunctive invalid-range early returns as valid-range evidence without proving non-overlap"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_disjunctive_early_return_after_block_guard"
+kind = "positive"
+claim = "copy_nonoverlapping accepts same-call disjunctive invalid-range early returns after a nested block as valid-range evidence without proving non-overlap"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_open_branch_guard"
+kind = "positive"
+claim = "copy_nonoverlapping accepts same-call source and destination open-branch slice length guards as valid-range evidence without proving non-overlap"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_conjunctive_open_branch_guard"
+kind = "positive"
+claim = "copy_nonoverlapping accepts same-call conjunctive open-branch slice length guards as valid-range evidence without proving non-overlap"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_closed_branch_not_guard"
+kind = "false_positive_control"
+claim = "copy_nonoverlapping rejects closed source and destination slice length branch observations as active range evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_or_branch_not_guard"
+kind = "false_positive_control"
+claim = "copy_nonoverlapping rejects disjunctive source/destination slice length branches as full range evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_commented_assert_not_guard"
+kind = "false_positive_control"
+claim = "copy_nonoverlapping rejects commented source/destination slice length assertions as valid-range evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_disjunctive_early_return_line_comment_not_guard"
+kind = "false_positive_control"
+claim = "copy_nonoverlapping rejects line-comment return text inside a disjunctive invalid-range branch as early-return evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_disjunctive_early_return_block_comment_not_guard"
+kind = "false_positive_control"
+claim = "copy_nonoverlapping rejects commented return text inside a disjunctive invalid-range branch as early-return evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_disjunctive_early_return_string_literal_not_guard"
+kind = "false_positive_control"
+claim = "copy_nonoverlapping rejects string-literal return text inside a disjunctive invalid-range branch as early-return evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_disjunctive_nested_return_not_guard"
+kind = "false_positive_control"
+claim = "copy_nonoverlapping rejects nested conditional returns inside a disjunctive invalid-range branch as full early-return evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_disjunctive_early_return_reassigned_count_not_guard"
+kind = "false_positive_control"
+claim = "copy_nonoverlapping rejects stale disjunctive invalid-range early-return evidence after the checked count is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_open_branch_reassigned_count_not_guard"
+kind = "false_positive_control"
+claim = "copy_nonoverlapping rejects stale open-branch slice range evidence after the checked count is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_open_branch_reassigned_src_not_guard"
+kind = "false_positive_control"
+claim = "copy_nonoverlapping rejects stale open-branch source slice range evidence after the source receiver is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_src_only_not_guard"
+kind = "false_positive_control"
+claim = "copy_nonoverlapping rejects source-only slice length assertions as full source/destination range evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_dst_only_not_guard"
+kind = "false_positive_control"
+claim = "copy_nonoverlapping rejects destination-only slice length assertions as full source/destination range evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_reassigned_count_not_guard"
+kind = "false_positive_control"
+claim = "copy_nonoverlapping rejects stale slice range evidence after the checked count is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_reassigned_src_not_guard"
+kind = "false_positive_control"
+claim = "copy_nonoverlapping rejects stale source slice length evidence after the source receiver is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_other_len_not_guard"
+kind = "false_positive_control"
+claim = "copy_nonoverlapping does not accept an unrelated slice length assertion as source/destination range evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
 fixture = "ptr_copy_overlapping"
 kind = "positive"
 claim = "ptr::copy reports overlapping-copy range obligations instead of a generic unsafe function call or copy_nonoverlapping non-overlap obligation"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_guard"
+kind = "positive"
+claim = "ptr::copy accepts same-call source and destination slice length assertions as valid-range evidence without proving initialized memory"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_conjunctive_assert_guard"
+kind = "positive"
+claim = "ptr::copy accepts same-call conjunctive source/destination slice length assertions as valid-range evidence without proving initialized memory"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_early_return_guard"
+kind = "positive"
+claim = "ptr::copy accepts same-call source and destination early-return slice length guards as valid-range evidence without proving initialized memory"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_disjunctive_early_return_guard"
+kind = "positive"
+claim = "ptr::copy accepts same-call disjunctive invalid-range early returns as valid-range evidence without proving initialized memory"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_disjunctive_early_return_after_block_guard"
+kind = "positive"
+claim = "ptr::copy accepts same-call disjunctive invalid-range early returns after a nested block as valid-range evidence without proving initialized memory"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_open_branch_guard"
+kind = "positive"
+claim = "ptr::copy accepts same-call source and destination open-branch slice length guards as valid-range evidence without proving initialized memory"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_conjunctive_open_branch_guard"
+kind = "positive"
+claim = "ptr::copy accepts same-call conjunctive open-branch slice length guards as valid-range evidence without proving initialized memory"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_closed_branch_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy rejects closed source and destination slice length branch observations as active range evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_or_branch_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy rejects disjunctive source/destination slice length branches as full range evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_commented_assert_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy rejects commented source/destination slice length assertions as valid-range evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_disjunctive_early_return_line_comment_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy rejects line-comment return text inside a disjunctive invalid-range branch as early-return evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_disjunctive_early_return_block_comment_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy rejects commented return text inside a disjunctive invalid-range branch as early-return evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_disjunctive_early_return_string_literal_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy rejects string-literal return text inside a disjunctive invalid-range branch as early-return evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_disjunctive_nested_return_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy rejects nested conditional returns inside a disjunctive invalid-range branch as full early-return evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_disjunctive_early_return_reassigned_count_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy rejects stale disjunctive invalid-range early-return evidence after the checked count is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_open_branch_reassigned_count_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy rejects stale open-branch slice range evidence after the checked count is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_open_branch_reassigned_dst_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy rejects stale open-branch destination slice range evidence after the destination receiver is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_src_only_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy rejects source-only slice length assertions as full source/destination range evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_dst_only_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy rejects destination-only slice length assertions as full source/destination range evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_reassigned_count_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy rejects stale slice range evidence after the checked count is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_reassigned_dst_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy rejects stale destination slice length evidence after the destination receiver is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_other_len_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy does not accept an unrelated slice length assertion as source/destination range evidence"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -2438,6 +2935,26 @@ expected_cards = 1
 expected_class = "guard_missing"
 expected_operation_family = "unsafe_fn_call"
 expected_hazard = "unknown"
+
+[[cases]]
+fixture = "long_unsafe_fn_owner_inference"
+kind = "positive"
+claim = "operations deep inside long unsafe functions preserve the enclosing function owner"
+support_tier = "Diff unsafe site inventory"
+expected_cards = 2
+expected_class = "contract_missing"
+expected_operation_family = "drop_in_place"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "macro_rules_owner_inference"
+kind = "positive"
+claim = "unsafe operations inside macro_rules bodies preserve the macro name as owner identity"
+support_tier = "Diff unsafe site inventory"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "box_from_raw"
+expected_hazard = "pointer_validity"
 
 [[cases]]
 fixture = "nested_unsafe_operation_call_dedupe"

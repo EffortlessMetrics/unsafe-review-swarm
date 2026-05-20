@@ -31,6 +31,7 @@ jobs:
       target: ${{ steps.route.outputs.target }}
       reason: ${{ steps.route.outputs.reason }}
       docs_only: ${{ steps.route.outputs.docs_only }}
+      endpoint: ${{ steps.route.outputs.endpoint }}
     env:
       GITHUB_TOKEN: ${{ github.token }}
       RUNNER_READ_TOKEN: ${{ secrets.EM_RUNNER_READ_TOKEN }}
@@ -43,15 +44,18 @@ jobs:
           target="github"
           reason="default_github_hosted"
           docs_only="false"
+          runner_endpoint="unset"
 
           emit() {
             {
               echo "target=${target}"
               echo "reason=${reason}"
               echo "docs_only=${docs_only}"
+              echo "endpoint=${runner_endpoint}"
             } >>"${GITHUB_OUTPUT}"
             echo "router_target=${target}"
             echo "router_reason=${reason}"
+            echo "router_endpoint=${runner_endpoint}"
             echo "docs_only=${docs_only}"
             echo "repo=${GITHUB_REPOSITORY}"
             echo "workflow=${GITHUB_WORKFLOW}"
@@ -105,7 +109,9 @@ jobs:
             exit 0
           fi
 
-          if ! runners_json="$(GH_TOKEN="${RUNNER_READ_TOKEN}" gh api "repos/${GITHUB_REPOSITORY}/actions/runners?per_page=100")"; then
+          runner_endpoint="orgs/${GITHUB_REPOSITORY_OWNER}/actions/runners?per_page=100"
+
+          if ! runners_json="$(GH_TOKEN="${RUNNER_READ_TOKEN}" gh api "${runner_endpoint}")"; then
             target="github"
             reason="runner_api_failed"
             emit
@@ -143,12 +149,14 @@ jobs:
     name: Unsafe Review Rust on CX43
     needs: route-unsafe-review-rust
     if: ${{ needs.route-unsafe-review-rust.outputs.target == 'cx43' }}
-    runs-on: [self-hosted, em-ci, cx43, rust-small, trusted-pr]
+    runs-on:
+      group: em-ci-small
+      labels: [self-hosted, em-ci, cx43, rust-small, trusted-pr]
     timeout-minutes: 45
     env:
       UNSAFE_REVIEW_SELF_HOSTED: "1"
-      CARGO_HOME: /mnt/ci-cache/cargo-home
-      SCCACHE_DIR: /mnt/ci-cache/sccache
+      CARGO_HOME: /mnt/ci-cache/cargo-home/unsafe-review
+      SCCACHE_DIR: /mnt/ci-cache/sccache/unsafe-review
       SCCACHE_CACHE_SIZE: 60G
       CARGO_BUILD_JOBS: "12"
       TMPDIR: /mnt/ci-scratch/tmp/${{ github.run_id }}-${{ github.run_attempt }}-cx43
@@ -159,6 +167,11 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Prepare self-hosted cache and scratch directories
+        run: |
+          set -euo pipefail
+          mkdir -p "${CARGO_HOME}" "${SCCACHE_DIR}" "${TMPDIR}" "${CARGO_TARGET_DIR}"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.95.0
@@ -186,12 +199,14 @@ jobs:
     name: Unsafe Review Rust on CX53
     needs: route-unsafe-review-rust
     if: ${{ needs.route-unsafe-review-rust.outputs.target == 'cx53' }}
-    runs-on: [self-hosted, em-ci, cx53, rust-small, trusted-pr]
+    runs-on:
+      group: em-ci-small
+      labels: [self-hosted, em-ci, cx53, rust-small, trusted-pr]
     timeout-minutes: 45
     env:
       UNSAFE_REVIEW_SELF_HOSTED: "1"
-      CARGO_HOME: /mnt/ci-cache/cargo-home
-      SCCACHE_DIR: /mnt/ci-cache/sccache
+      CARGO_HOME: /mnt/ci-cache/cargo-home/unsafe-review
+      SCCACHE_DIR: /mnt/ci-cache/sccache/unsafe-review
       SCCACHE_CACHE_SIZE: 60G
       CARGO_BUILD_JOBS: "12"
       TMPDIR: /mnt/ci-scratch/tmp/${{ github.run_id }}-${{ github.run_attempt }}-cx53
@@ -202,6 +217,11 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Prepare self-hosted cache and scratch directories
+        run: |
+          set -euo pipefail
+          mkdir -p "${CARGO_HOME}" "${SCCACHE_DIR}" "${TMPDIR}" "${CARGO_TARGET_DIR}"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.95.0
@@ -275,6 +295,7 @@ jobs:
         env:
           ROUTER_TARGET: ${{ needs.route-unsafe-review-rust.outputs.target }}
           ROUTER_REASON: ${{ needs.route-unsafe-review-rust.outputs.reason }}
+          ROUTER_ENDPOINT: ${{ needs.route-unsafe-review-rust.outputs.endpoint }}
           DOCS_ONLY: ${{ needs.route-unsafe-review-rust.outputs.docs_only }}
           CX43_RESULT: ${{ needs.unsafe-review-rust-cx43.result }}
           CX53_RESULT: ${{ needs.unsafe-review-rust-cx53.result }}
@@ -284,6 +305,7 @@ jobs:
           set -euo pipefail
           echo "router_target=${ROUTER_TARGET}"
           echo "router_reason=${ROUTER_REASON}"
+          echo "router_endpoint=${ROUTER_ENDPOINT}"
           echo "docs_only=${DOCS_ONLY}"
           echo "route_result=${ROUTE_RESULT}"
           echo "cx43_result=${CX43_RESULT}"

@@ -1,0 +1,5 @@
+[package]
+name = "copy-nonoverlapping-slice-range-disjunctive-early-return-guard"
+version = "0.0.0"
+edition = "2024"
+publish = false

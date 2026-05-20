@@ -447,6 +447,16 @@ fn has_bounds_guard(site: &ScannedSite, lower: &str) -> bool {
     {
         return true;
     }
+    if matches!(
+        site.operation.family,
+        OperationFamily::CopyNonOverlapping | OperationFamily::PtrCopy
+    ) {
+        if has_copy_slice_range_evidence(&site.operation.expression, &guard_scope) {
+            return true;
+        }
+        // A generic length comparison does not prove both copy source and destination ranges.
+        return false;
+    }
     has_length_or_bounds_guard(&guard_scope)
 }
 
@@ -469,6 +479,400 @@ fn has_raw_pointer_write_bytes_same_slice_len_evidence(expression: &str) -> bool
         }
     }
     false
+}
+
+fn has_copy_slice_range_evidence(expression: &str, before_call: &str) -> bool {
+    let Some((src, dst, count)) = copy_call_arguments(expression) else {
+        return false;
+    };
+    let Some(src_receiver) = copy_source_slice_receiver(&src) else {
+        return false;
+    };
+    let Some(dst_receiver) = copy_destination_slice_receiver(&dst) else {
+        return false;
+    };
+
+    has_slice_count_bound_guard(before_call, &src_receiver, &count)
+        && has_slice_count_bound_guard(before_call, &dst_receiver, &count)
+}
+
+fn copy_call_arguments(expression: &str) -> Option<(String, String, String)> {
+    let compact = compact_code(&expression.to_ascii_lowercase());
+    for marker in ["copy_nonoverlapping(", "ptr::copy("] {
+        let Some(call_pos) = compact.find(marker) else {
+            continue;
+        };
+        let after_marker = &compact[call_pos + marker.len()..];
+        let Some(end) = matching_call_argument_end(after_marker) else {
+            continue;
+        };
+        let args = split_top_level_arguments(&after_marker[..end]);
+        if args.len() == 3 && args.iter().all(|arg| !arg.is_empty()) {
+            return Some((
+                args[0].to_string(),
+                args[1].to_string(),
+                args[2].to_string(),
+            ));
+        }
+    }
+    None
+}
+
+fn copy_source_slice_receiver(argument: &str) -> Option<String> {
+    receiver_before_marker(argument, ".as_ptr()").map(str::to_string)
+}
+
+fn copy_destination_slice_receiver(argument: &str) -> Option<String> {
+    receiver_before_marker(argument, ".as_mut_ptr()").map(str::to_string)
+}
+
+fn has_slice_count_bound_guard(before_call: &str, receiver: &str, count: &str) -> bool {
+    let before_call = strip_comments_and_literals(before_call);
+    let receiver = compact_code(receiver);
+    let count = compact_code(count);
+    if receiver.is_empty() || count.is_empty() {
+        return false;
+    }
+    let len = format!("{receiver}.len()");
+    let count_lte_len = format!("{count}<={len}");
+    let len_gte_count = format!("{len}>={count}");
+    let count_gt_len = format!("{count}>{len}");
+    let len_lt_count = format!("{len}<{count}");
+    has_slice_count_bound_predicate(&before_call, &count_lte_len, &receiver, &count)
+        || has_slice_count_bound_predicate(&before_call, &len_gte_count, &receiver, &count)
+        || has_slice_count_early_return(&before_call, &count_gt_len, &receiver, &count)
+        || has_slice_count_early_return(&before_call, &len_lt_count, &receiver, &count)
+}
+
+fn has_slice_count_bound_predicate(
+    before_call: &str,
+    predicate: &str,
+    receiver: &str,
+    count: &str,
+) -> bool {
+    has_slice_count_assertion_guard(before_call, predicate, receiver, count)
+        || has_open_slice_count_branch_guard(before_call, predicate, receiver, count)
+}
+
+fn has_slice_count_assertion_guard(
+    before_call: &str,
+    predicate: &str,
+    receiver: &str,
+    count: &str,
+) -> bool {
+    ["assert!(", "debug_assert!("].into_iter().any(|prefix| {
+        let mut search_from = 0;
+        while let Some(offset) = before_call[search_from..].find(prefix) {
+            let call_start = search_from + offset + prefix.len();
+            let after_prefix = &before_call[call_start..];
+            let Some(call_end) = matching_call_argument_end(after_prefix) else {
+                search_from = call_start;
+                continue;
+            };
+            let args = split_top_level_arguments(&after_prefix[..call_end]);
+            let after_call = &after_prefix[call_end..];
+            let statement_end = after_call.find(';').unwrap_or(after_call.len());
+            let after_guard = &after_call[statement_end..];
+            if args
+                .first()
+                .is_some_and(|condition| condition_has_top_level_conjunct(condition, predicate))
+                && !has_slice_count_assignment(after_guard, receiver, count)
+            {
+                return true;
+            }
+            search_from = call_start + call_end;
+        }
+        false
+    })
+}
+
+fn has_open_slice_count_branch_guard(
+    before_call: &str,
+    predicate: &str,
+    receiver: &str,
+    count: &str,
+) -> bool {
+    let mut search_from = 0;
+    while let Some(offset) = before_call[search_from..].find("if") {
+        let guard_start = search_from + offset;
+        let before = before_call[..guard_start].chars().next_back();
+        if before.is_some_and(is_receiver_path_char) {
+            search_from = guard_start + 2;
+            continue;
+        }
+        let after_if = &before_call[guard_start + 2..];
+        if let Some(brace_pos) = after_if.find('{') {
+            let condition = &after_if[..brace_pos];
+            let after_guard = &after_if[brace_pos + 1..];
+            if condition_has_top_level_conjunct(condition, predicate)
+                && branch_still_open_at_operation(after_guard)
+                && !has_slice_count_assignment(after_guard, receiver, count)
+            {
+                return true;
+            }
+        }
+        search_from = guard_start + 2;
+    }
+    false
+}
+
+fn condition_has_top_level_conjunct(condition: &str, predicate: &str) -> bool {
+    let condition = strip_balanced_outer_parens(condition.trim());
+    split_top_level_conjuncts(condition)
+        .into_iter()
+        .any(|conjunct| strip_balanced_outer_parens(conjunct.trim()) == predicate)
+}
+
+fn condition_has_top_level_disjunct(condition: &str, predicate: &str) -> bool {
+    let condition = strip_balanced_outer_parens(condition.trim());
+    split_top_level_disjuncts(condition)
+        .into_iter()
+        .any(|disjunct| strip_balanced_outer_parens(disjunct.trim()) == predicate)
+}
+
+fn split_top_level_conjuncts(condition: &str) -> Vec<&str> {
+    split_top_level_condition_operands(condition, b'&')
+}
+
+fn split_top_level_disjuncts(condition: &str) -> Vec<&str> {
+    split_top_level_condition_operands(condition, b'|')
+}
+
+fn split_top_level_condition_operands(condition: &str, operator: u8) -> Vec<&str> {
+    let mut conjuncts = Vec::new();
+    let mut start = 0usize;
+    let mut paren_depth = 0usize;
+    let mut bracket_depth = 0usize;
+    let mut brace_depth = 0usize;
+    let bytes = condition.as_bytes();
+    let mut idx = 0usize;
+    while idx < bytes.len() {
+        match bytes[idx] {
+            b'(' => paren_depth += 1,
+            b')' => paren_depth = paren_depth.saturating_sub(1),
+            b'[' => bracket_depth += 1,
+            b']' => bracket_depth = bracket_depth.saturating_sub(1),
+            b'{' => brace_depth += 1,
+            b'}' => brace_depth = brace_depth.saturating_sub(1),
+            byte if byte == operator
+                && idx + 1 < bytes.len()
+                && bytes[idx + 1] == operator
+                && paren_depth == 0
+                && bracket_depth == 0
+                && brace_depth == 0 =>
+            {
+                conjuncts.push(condition[start..idx].trim());
+                idx += 2;
+                start = idx;
+                continue;
+            }
+            _ => {}
+        }
+        idx += 1;
+    }
+    conjuncts.push(condition[start..].trim());
+    conjuncts
+}
+
+fn strip_balanced_outer_parens(mut text: &str) -> &str {
+    loop {
+        let Some(inner) = text
+            .strip_prefix('(')
+            .and_then(|inner| inner.strip_suffix(')'))
+        else {
+            return text;
+        };
+        if !outer_parens_enclose_whole_expression(text) {
+            return text;
+        }
+        text = inner.trim();
+    }
+}
+
+fn outer_parens_enclose_whole_expression(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    if bytes.first() != Some(&b'(') || bytes.last() != Some(&b')') {
+        return false;
+    }
+    let mut depth = 0usize;
+    for (idx, byte) in bytes.iter().enumerate() {
+        match byte {
+            b'(' => depth += 1,
+            b')' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 && idx != bytes.len() - 1 {
+                    return false;
+                }
+            }
+            _ => {}
+        }
+    }
+    depth == 0
+}
+
+fn has_slice_count_early_return(
+    before_call: &str,
+    predicate: &str,
+    receiver: &str,
+    count: &str,
+) -> bool {
+    let mut search_from = 0;
+    while let Some(offset) = before_call[search_from..].find("if") {
+        let guard_start = search_from + offset;
+        let before = before_call[..guard_start].chars().next_back();
+        if before.is_some_and(is_receiver_path_char) {
+            search_from = guard_start + 2;
+            continue;
+        }
+        let after_if = &before_call[guard_start + 2..];
+        if let Some(brace_pos) = after_if.find('{') {
+            let condition = &after_if[..brace_pos];
+            let after_guard = &after_if[brace_pos + 1..];
+            let (guard_body, after_guard_body) = matching_code_block_end(after_guard)
+                .map_or((after_guard, ""), |body_end| {
+                    (&after_guard[..body_end], &after_guard[body_end + 1..])
+                });
+            if condition_has_top_level_disjunct(condition, predicate)
+                && guard_body_contains_return(guard_body)
+                && !has_slice_count_assignment(after_guard_body, receiver, count)
+            {
+                return true;
+            }
+        }
+        search_from = guard_start + 2;
+    }
+    false
+}
+
+fn guard_body_contains_return(guard_body: &str) -> bool {
+    let code = strip_comments_and_literals(guard_body);
+    contains_top_level_return_statement(&code)
+}
+
+fn contains_top_level_return_statement(code: &str) -> bool {
+    let mut brace_depth = 0usize;
+    let mut paren_depth = 0usize;
+    let mut bracket_depth = 0usize;
+    let mut statement_start = true;
+
+    for (idx, ch) in code.char_indices() {
+        if ch.is_whitespace() {
+            continue;
+        }
+        match ch {
+            '{' => {
+                brace_depth += 1;
+                continue;
+            }
+            '}' => {
+                brace_depth = brace_depth.saturating_sub(1);
+                statement_start = brace_depth == 0 && paren_depth == 0 && bracket_depth == 0;
+                continue;
+            }
+            '(' => {
+                paren_depth += 1;
+                statement_start = false;
+                continue;
+            }
+            ')' => {
+                paren_depth = paren_depth.saturating_sub(1);
+                statement_start = false;
+                continue;
+            }
+            '[' => {
+                bracket_depth += 1;
+                statement_start = false;
+                continue;
+            }
+            ']' => {
+                bracket_depth = bracket_depth.saturating_sub(1);
+                statement_start = false;
+                continue;
+            }
+            ';' if brace_depth == 0 && paren_depth == 0 && bracket_depth == 0 => {
+                statement_start = true;
+                continue;
+            }
+            _ => {}
+        }
+
+        if brace_depth == 0
+            && paren_depth == 0
+            && bracket_depth == 0
+            && statement_start
+            && code[idx..].starts_with("return")
+        {
+            let after = code[idx + "return".len()..].chars().next();
+            if after.is_none_or(|ch| !is_receiver_path_char(ch)) {
+                return true;
+            }
+        }
+
+        if brace_depth == 0 && paren_depth == 0 && bracket_depth == 0 {
+            statement_start = false;
+        }
+    }
+
+    false
+}
+
+fn strip_comments_and_literals(text: &str) -> String {
+    let mut output = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '/' {
+            match chars.peek() {
+                Some('*') => {
+                    chars.next();
+                    let mut prev = '\0';
+                    for comment_ch in chars.by_ref() {
+                        if prev == '*' && comment_ch == '/' {
+                            break;
+                        }
+                        prev = comment_ch;
+                    }
+                    continue;
+                }
+                Some('/') => {
+                    chars.next();
+                    for comment_ch in chars.by_ref() {
+                        if comment_ch == '\n' {
+                            output.push('\n');
+                            break;
+                        }
+                    }
+                    continue;
+                }
+                _ => {}
+            }
+        }
+        if ch == '"' {
+            output.push('"');
+            let mut escaped = false;
+            for literal_ch in chars.by_ref() {
+                if escaped {
+                    escaped = false;
+                    continue;
+                }
+                if literal_ch == '\\' {
+                    escaped = true;
+                    continue;
+                }
+                if literal_ch == '"' {
+                    output.push('"');
+                    break;
+                }
+            }
+            continue;
+        }
+        output.push(ch);
+    }
+    output
+}
+
+fn has_slice_count_assignment(compact: &str, receiver: &str, count: &str) -> bool {
+    contains_simple_assignment_to(compact, receiver)
+        || contains_simple_assignment_to(compact, count)
 }
 
 fn has_bounds_assertion_guard(compact: &str) -> bool {
