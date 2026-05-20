@@ -1,5 +1,6 @@
 use crate::api::AnalyzeOutput;
 use crate::domain::ReviewCard;
+use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
 use crate::util::path_display;
 
 pub(crate) fn render(output: &AnalyzeOutput) -> String {
@@ -13,7 +14,12 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
     out.push_str(&format!("- Policy mode: `{}`\n\n", output.policy.as_str()));
 
     if output.cards.is_empty() {
-        out.push_str("No witness routes are recommended because no review cards were emitted.\n\n");
+        out.push_str(NO_CHANGED_GAPS_MESSAGE);
+        out.push('\n');
+        out.push_str(NO_CHANGED_GAPS_LIMITATION);
+        out.push_str(
+            "\n\nNo witness routes are recommended because no review cards were emitted.\n\n",
+        );
     } else {
         out.push_str("## Routes\n\n");
         for card in &output.cards {
@@ -95,6 +101,18 @@ mod tests {
         assert!(rendered.contains("Missing visible local guard"));
         assert!(rendered.contains("does not run Miri"));
         assert!(rendered.contains("not UB-free status"));
+        Ok(())
+    }
+
+    #[test]
+    fn witness_plan_empty_output_uses_standard_advisory_wording() -> Result<(), String> {
+        let output = fixture_output("safe_code_no_cards")?;
+        let rendered = render(&output);
+
+        assert!(rendered.contains(NO_CHANGED_GAPS_MESSAGE));
+        assert!(rendered.contains(NO_CHANGED_GAPS_LIMITATION));
+        assert!(rendered.contains("No witness routes are recommended"));
+        assert!(!rendered.contains("All clear"));
         Ok(())
     }
 

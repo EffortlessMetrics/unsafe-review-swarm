@@ -1,4 +1,4 @@
-use crate::output::markdown_table;
+use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE, markdown_table};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -147,7 +147,10 @@ pub fn render_markdown(report: &OutcomeReport) -> String {
     ));
     out.push_str("## Card outcomes\n\n");
     if report.cards.is_empty() {
-        out.push_str("No cards in either snapshot.\n\n");
+        out.push_str(NO_CHANGED_GAPS_MESSAGE);
+        out.push_str(" No ReviewCards were present in either saved snapshot.\n");
+        out.push_str(NO_CHANGED_GAPS_LIMITATION);
+        out.push_str("\n\n");
     } else {
         out.push_str("| Status | Card | Reason | Before | After |\n");
         out.push_str("|---|---|---|---|---|\n");
@@ -725,6 +728,19 @@ mod tests {
         assert!(markdown.contains("`guard\\|missing`"));
         assert!(markdown.contains("witness `ran\\|odd`"));
         assert!(!markdown.contains("`UR-pipe|card-c1`"));
+        Ok(())
+    }
+
+    #[test]
+    fn outcome_empty_markdown_uses_standard_advisory_wording() -> Result<(), String> {
+        let before = snapshot_json(&[]);
+        let after = snapshot_json(&[]);
+        let report = compare_json(&before, &after)?;
+        let markdown = render_markdown(&report);
+
+        assert!(markdown.contains(NO_CHANGED_GAPS_MESSAGE));
+        assert!(markdown.contains(NO_CHANGED_GAPS_LIMITATION));
+        assert!(!markdown.contains("All clear"));
         Ok(())
     }
 

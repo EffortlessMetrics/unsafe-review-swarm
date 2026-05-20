@@ -1,4 +1,5 @@
 use crate::api::AnalyzeOutput;
+use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
 use crate::util::path_display;
 
 pub(crate) fn render(output: &AnalyzeOutput) -> String {
@@ -20,7 +21,10 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
     ));
 
     if output.cards.is_empty() {
-        out.push_str("No unsafe-review cards found.\n");
+        out.push_str(NO_CHANGED_GAPS_MESSAGE);
+        out.push('\n');
+        out.push_str(NO_CHANGED_GAPS_LIMITATION);
+        out.push('\n');
         return out;
     }
 
@@ -110,6 +114,17 @@ mod tests {
         assert!(rendered.contains("miri: Pure-Rust UB-adjacent hazard"));
         assert!(rendered.contains("does not prove site execution"));
         assert!(rendered.contains("Trust boundary: static unsafe contract review"));
+        Ok(())
+    }
+
+    #[test]
+    fn human_empty_output_uses_standard_advisory_wording() -> Result<(), String> {
+        let output = fixture_output("safe_code_no_cards")?;
+        let rendered = render(&output);
+
+        assert!(rendered.contains(NO_CHANGED_GAPS_MESSAGE));
+        assert!(rendered.contains(NO_CHANGED_GAPS_LIMITATION));
+        assert!(!rendered.contains("All clear"));
         Ok(())
     }
 

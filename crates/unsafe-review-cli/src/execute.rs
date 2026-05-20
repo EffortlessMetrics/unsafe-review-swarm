@@ -17,6 +17,10 @@ use unsafe_review_core::{
     render_receipt_audit_markdown, render_sarif, render_witness_plan, validate_witness_receipts,
 };
 
+const NO_CHANGED_GAPS_MESSAGE: &str = "No changed unsafe-review gaps were found.";
+const NO_CHANGED_GAPS_LIMITATION: &str =
+    "This does not prove the repo safe, UB-free, Miri-clean, or that any unsafe site executed.";
+
 pub(crate) fn execute(command: Command) -> Result<(), String> {
     match command {
         Command::Help => {
@@ -117,10 +121,8 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     println!("Open:");
     println!("  {}", options.out_dir.join("pr-summary.md").display());
     if output.summary.open_actionable_gaps == 0 {
-        println!("No changed unsafe-review gaps were found.");
-        println!(
-            "This does not prove the repo safe, not UB-free status, not a Miri-clean claim, and not proof that any unsafe site executed."
-        );
+        println!("{NO_CHANGED_GAPS_MESSAGE}");
+        println!("{NO_CHANGED_GAPS_LIMITATION}");
     } else if let Some(card) = output.cards.first() {
         println!("Top card:");
         println!(

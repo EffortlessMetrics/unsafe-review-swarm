@@ -710,8 +710,9 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
     assert!(stdout.contains("pr-summary.md"));
     assert!(stdout.contains("No changed unsafe-review gaps were found."));
     assert!(stdout.contains("This does not prove the repo safe"));
-    assert!(stdout.contains("not UB-free status"));
-    assert!(stdout.contains("not a Miri-clean claim"));
+    assert!(stdout.contains("UB-free"));
+    assert!(stdout.contains("Miri-clean"));
+    assert!(stdout.contains("unsafe site executed"));
     assert!(!stdout.contains("All clear"));
 
     let cards = parse_json(&fs::read_to_string(out_dir.join("cards.json"))?)?;
@@ -725,15 +726,29 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
     );
 
     let summary = fs::read_to_string(out_dir.join("pr-summary.md"))?;
-    assert!(summary.contains("No actionable unsafe-review cards found."));
-    assert!(summary.contains("not a proof of memory safety"));
+    assert!(summary.contains("No changed unsafe-review gaps were found."));
+    assert!(summary.contains("This does not prove the repo safe"));
+    assert!(summary.contains("unsafe site executed"));
     assert!(!summary.contains("All clear"));
 
     let witness_plan = fs::read_to_string(out_dir.join("witness-plan.md"))?;
+    assert!(witness_plan.contains("No changed unsafe-review gaps were found."));
     assert!(witness_plan.contains("No witness routes are recommended"));
     assert!(witness_plan.contains("not UB-free status"));
     assert!(!witness_plan.contains("Miri passed"));
     assert!(!witness_plan.contains("site reached"));
+
+    let comment_plan = parse_json(&fs::read_to_string(out_dir.join("comment-plan.json"))?)?;
+    assert_eq!(
+        comment_plan["no_changed_gaps"]["message"],
+        "No changed unsafe-review gaps were found."
+    );
+    assert!(
+        comment_plan["no_changed_gaps"]["limitation"]
+            .as_str()
+            .unwrap_or("")
+            .contains("unsafe site executed")
+    );
 
     let lsp = parse_json(&fs::read_to_string(out_dir.join("lsp.json"))?)?;
     assert_eq!(lsp["mode"], "read_only_projection");
@@ -1075,7 +1090,9 @@ fn safe_repo_human_output_stays_quiet() -> Result<(), Box<dyn Error>> {
     let text = stdout_text(&output)?;
 
     assert!(text.contains("cards: 0, open gaps: 0"));
-    assert!(text.contains("No unsafe-review cards found."));
+    assert!(text.contains("No changed unsafe-review gaps were found."));
+    assert!(text.contains("This does not prove the repo safe"));
+    assert!(!text.contains("All clear"));
 
     Ok(())
 }

@@ -64,6 +64,11 @@ Miri failed.
 Miri passed.
 ```
 
+If no changed unsafe-review gaps are found, the terminal, PR summary, witness
+plan, and comment-plan artifact keep the same boundary: no changed gaps is not
+proof that the repo is safe, UB-free, Miri-clean, or that any unsafe site
+executed.
+
 For a deterministic smoke case, run the bundled fixture from a repo checkout:
 
 ```bash

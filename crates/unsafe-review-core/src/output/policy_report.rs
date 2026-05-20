@@ -1,6 +1,7 @@
 use crate::api::AnalyzeOutput;
 use crate::domain::ReviewClass;
-use crate::output::markdown_table;
+use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE, markdown_table};
+use crate::policy::{LedgerEntry as PolicyLedgerRecord, LedgerKind, load_ledger_entries};
 use crate::util::path_display;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -203,7 +204,10 @@ pub(crate) fn render_markdown(report: &PolicyReport) -> String {
 
     out.push_str("## Current cards\n\n");
     if report.cards.is_empty() {
-        out.push_str("No current policy-relevant cards found.\n\n");
+        out.push_str(NO_CHANGED_GAPS_MESSAGE);
+        out.push('\n');
+        out.push_str(NO_CHANGED_GAPS_LIMITATION);
+        out.push_str("\n\n");
     } else {
         out.push_str("| Status | Card | Ledger | Location | Class | Operation | Hazards | Missing evidence | Routes |\n");
         out.push_str("|---|---|---|---|---|---|---|---|---|\n");
@@ -456,6 +460,28 @@ mod tests {
         assert_eq!(report.summary.new_gaps, 1);
         assert_eq!(report.summary.baseline_known, 0);
         assert!(report.trust_boundary.contains("does not enforce blocking"));
+        Ok(())
+    }
+
+    #[test]
+    fn policy_report_empty_markdown_uses_standard_advisory_wording() -> Result<(), String> {
+        let root = fixture_path("safe_code_no_cards");
+        let output = analyze(AnalyzeInput {
+            root,
+            scope: Scope::Diff,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Draft,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: None,
+        })?;
+
+        let report = evaluate_with_date(&output, "2026-05-18")?;
+        let markdown = render_markdown(&report);
+
+        assert!(markdown.contains(NO_CHANGED_GAPS_MESSAGE));
+        assert!(markdown.contains(NO_CHANGED_GAPS_LIMITATION));
+        assert!(!markdown.contains("All clear"));
         Ok(())
     }
 

@@ -1,7 +1,7 @@
 use crate::api::AnalyzeOutput;
 use crate::api::Scope;
 use crate::domain::ReviewCard;
-use crate::output::markdown_table;
+use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE, markdown_table};
 use crate::util::path_display;
 use std::collections::BTreeMap;
 
@@ -25,7 +25,7 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
             out.push_str("\n```\n\n");
         }
     } else {
-        out.push_str("No actionable unsafe-review cards found.\n\n");
+        render_no_changed_gaps(&mut out);
     }
     out.push_str("## Cards\n\n");
     out.push_str("| ID | Class | Hazard | Missing | Route |\n");
@@ -66,6 +66,9 @@ fn render_repo_posture(output: &AnalyzeOutput) -> String {
         output.summary.miri_unsupported,
         output.summary.static_unknown
     ));
+    if output.summary.open_actionable_gaps == 0 {
+        render_no_changed_gaps(&mut out);
+    }
 
     out.push_str("## Top classes\n\n");
     render_counts_table(&mut out, "Class", class_counts(output));
@@ -192,7 +195,7 @@ pub(crate) fn render_pr_summary(output: &AnalyzeOutput) -> String {
         }
         out.push_str(&format!("- Next action: {}\n\n", card.next_action.summary));
     } else {
-        out.push_str("No actionable unsafe-review cards found.\n\n");
+        render_no_changed_gaps(&mut out);
     }
 
     out.push_str("## Card table\n\n");
@@ -255,6 +258,13 @@ pub(crate) fn render_pr_summary(output: &AnalyzeOutput) -> String {
     out.push_str("## Trust boundary\n\n");
     out.push_str("This artifact projects existing unsafe-review cards for PR review. It is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n");
     out
+}
+
+fn render_no_changed_gaps(out: &mut String) {
+    out.push_str(NO_CHANGED_GAPS_MESSAGE);
+    out.push('\n');
+    out.push_str(NO_CHANGED_GAPS_LIMITATION);
+    out.push_str("\n\n");
 }
 
 pub(crate) fn render_card_detail(card: &ReviewCard) -> String {
@@ -434,9 +444,11 @@ mod tests {
 
         assert!(rendered.contains("Review cards: 0"));
         assert!(rendered.contains("Open actionable gaps: 0"));
-        assert!(rendered.contains("No actionable unsafe-review cards found."));
+        assert!(rendered.contains(NO_CHANGED_GAPS_MESSAGE));
+        assert!(rendered.contains(NO_CHANGED_GAPS_LIMITATION));
         assert!(rendered.contains("No witness route is recommended"));
         assert!(rendered.contains("not UB-free status"));
+        assert!(!rendered.contains("All clear"));
         Ok(())
     }
 
