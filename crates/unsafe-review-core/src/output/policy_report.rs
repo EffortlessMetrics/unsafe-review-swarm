@@ -3,7 +3,7 @@ use crate::domain::ReviewClass;
 use crate::output::markdown_table;
 use crate::util::path_display;
 use serde::Serialize;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -40,6 +40,7 @@ pub struct PolicyReportCard {
     #[serde(rename = "class")]
     pub class_name: String,
     pub policy_status: String,
+    pub ledger: Option<PolicyLedgerEntry>,
     pub site: PolicyReportSite,
     pub operation_family: String,
     pub hazards: Vec<String>,
@@ -91,6 +92,8 @@ fn evaluate_with_date(output: &AnalyzeOutput, audit_date: &str) -> Result<Policy
         .iter()
         .map(|card| card.id.0.clone())
         .collect::<BTreeSet<_>>();
+    let baseline_by_id = ledger_by_id(&baseline_entries);
+    let suppression_by_id = ledger_by_id(&suppression_entries);
     let resolved_baseline = baseline_entries
         .into_iter()
         .filter(|entry| !current_ids.contains(&entry.card_id))
@@ -111,6 +114,12 @@ fn evaluate_with_date(output: &AnalyzeOutput, audit_date: &str) -> Result<Policy
             card_id: card.id.0.clone(),
             class_name: card.class.as_str().to_string(),
             policy_status: policy_status(&card.class).to_string(),
+            ledger: matched_ledger(
+                card.id.0.as_str(),
+                &card.class,
+                &baseline_by_id,
+                &suppression_by_id,
+            ),
             site: PolicyReportSite {
                 file: path_display(&card.site.location.file),
                 line: card.site.location.line,
@@ -196,13 +205,14 @@ pub(crate) fn render_markdown(report: &PolicyReport) -> String {
     if report.cards.is_empty() {
         out.push_str("No current policy-relevant cards found.\n\n");
     } else {
-        out.push_str("| Status | Card | Location | Class | Operation | Hazards | Missing evidence | Routes |\n");
-        out.push_str("|---|---|---|---|---|---|---|---|\n");
+        out.push_str("| Status | Card | Ledger | Location | Class | Operation | Hazards | Missing evidence | Routes |\n");
+        out.push_str("|---|---|---|---|---|---|---|---|---|\n");
         for card in &report.cards {
             out.push_str(&format!(
-                "| `{}` | `{}` | {} | `{}` | `{}` | {} | {} | {} |\n",
+                "| `{}` | `{}` | {} | {} | `{}` | `{}` | {} | {} | {} |\n",
                 markdown_cell(&card.policy_status),
                 markdown_cell(&card.card_id),
+                ledger_cell(card.ledger.as_ref()),
                 markdown_cell(&format!(
                     "{}:{} ({}/{})",
                     card.site.file, card.site.line, card.site.kind, card.site.owner
@@ -308,6 +318,26 @@ fn ledger_entries(path: &Path, kind: LedgerKind) -> Result<Vec<PolicyLedgerEntry
     Ok(report_entries)
 }
 
+fn ledger_by_id(entries: &[PolicyLedgerEntry]) -> BTreeMap<String, PolicyLedgerEntry> {
+    entries
+        .iter()
+        .map(|entry| (entry.card_id.clone(), entry.clone()))
+        .collect()
+}
+
+fn matched_ledger(
+    card_id: &str,
+    class: &ReviewClass,
+    baseline_by_id: &BTreeMap<String, PolicyLedgerEntry>,
+    suppression_by_id: &BTreeMap<String, PolicyLedgerEntry>,
+) -> Option<PolicyLedgerEntry> {
+    match class {
+        ReviewClass::BaselineKnown => baseline_by_id.get(card_id).cloned(),
+        ReviewClass::Suppressed => suppression_by_id.get(card_id).cloned(),
+        _ => None,
+    }
+}
+
 fn optional_string(entry: &toml::map::Map<String, toml::Value>, key: &str) -> Option<String> {
     entry
         .get(key)
@@ -330,6 +360,29 @@ fn optional_text(value: Option<&str>) -> String {
         .filter(|value| !value.is_empty())
         .map(markdown_cell)
         .unwrap_or_else(|| "-".to_string())
+}
+
+fn ledger_cell(entry: Option<&PolicyLedgerEntry>) -> String {
+    let Some(entry) = entry else {
+        return "-".to_string();
+    };
+    let mut parts = Vec::new();
+    push_part(&mut parts, "owner", entry.owner.as_deref());
+    push_part(&mut parts, "reason", entry.reason.as_deref());
+    push_part(&mut parts, "evidence", entry.evidence.as_deref());
+    push_part(&mut parts, "review_after", entry.review_after.as_deref());
+    push_part(&mut parts, "expires", entry.expires.as_deref());
+    if parts.is_empty() {
+        "-".to_string()
+    } else {
+        markdown_cell(&parts.join("; "))
+    }
+}
+
+fn push_part(parts: &mut Vec<String>, label: &str, value: Option<&str>) {
+    if let Some(value) = value.filter(|value| !value.is_empty()) {
+        parts.push(format!("{label}={value}"));
+    }
 }
 
 fn joined_cell(values: &[String]) -> String {
@@ -517,6 +570,14 @@ expires = "2026-01-01"
                 card_id: "UR-pipe|card-c1".to_string(),
                 class_name: "guard|missing".to_string(),
                 policy_status: "new|gap".to_string(),
+                ledger: Some(PolicyLedgerEntry {
+                    card_id: "UR-pipe|card-c1".to_string(),
+                    owner: Some("team|unsafe".to_string()),
+                    reason: Some("accepted|current debt".to_string()),
+                    evidence: Some("review|receipt".to_string()),
+                    review_after: Some("2026-08-01|manual".to_string()),
+                    expires: None,
+                }),
                 site: PolicyReportSite {
                     file: "src/lib.rs".to_string(),
                     line: 7,
@@ -551,6 +612,10 @@ expires = "2026-01-01"
 
         assert!(markdown.contains("`new\\|gap`"));
         assert!(markdown.contains("`UR-pipe\\|card-c1`"));
+        assert!(markdown.contains("owner=team\\|unsafe"));
+        assert!(markdown.contains("reason=accepted\\|current debt"));
+        assert!(markdown.contains("evidence=review\\|receipt"));
+        assert!(markdown.contains("review_after=2026-08-01\\|manual"));
         assert!(markdown.contains("src/lib.rs:7 (operation\\|site/owner\\|fn)"));
         assert!(markdown.contains("`guard\\|missing`"));
         assert!(markdown.contains("`raw\\|pointer\\|read`"));

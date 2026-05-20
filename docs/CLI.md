@@ -61,8 +61,9 @@ reason, evidence, and review/expiry dates when present. It does not block,
 execute witnesses, or create broad suppression authority.
 
 Current-card rows in JSON and Markdown include the ReviewCard identity,
-location, operation family, hazards, missing evidence, and witness routes. They
-are policy posture context, not a second analyzer result.
+location, operation family, hazards, missing evidence, witness routes, and
+matched baseline/suppression ledger provenance when present. They are policy
+posture context, not a second analyzer result.
 
 ## Output Formats
 

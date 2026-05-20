@@ -2083,6 +2083,13 @@ fn suppression_policy_suppresses_only_exact_review_card_identity() -> Result<(),
     assert_eq!(report["summary"]["suppressed"], 1);
     assert_eq!(report["cards"][0]["card_id"], card_id);
     assert_eq!(report["cards"][0]["policy_status"], "suppressed");
+    assert_eq!(report["cards"][0]["ledger"]["owner"], "core/policy");
+    assert_eq!(
+        report["cards"][0]["ledger"]["reason"],
+        "e2e exact suppression"
+    );
+    assert_eq!(report["cards"][0]["ledger"]["evidence"], "fixture card");
+    assert_eq!(report["cards"][0]["ledger"]["expires"], "2026-08-01");
     assert!(
         json_str(&report["trust_boundary"], "trust_boundary")?
             .contains("does not enforce blocking policy")
@@ -2100,7 +2107,12 @@ fn suppression_policy_suppresses_only_exact_review_card_identity() -> Result<(),
     ])?;
     let markdown = stdout_text(&markdown)?;
     assert!(markdown.contains("| 1 | 0 | 0 | 1 | 0 | 0 |"));
+    assert!(markdown.contains("| Status | Card | Ledger | Location | Class | Operation | Hazards | Missing evidence | Routes |"));
     assert!(markdown.contains("`suppressed`"));
+    assert!(markdown.contains("owner=core/policy"));
+    assert!(markdown.contains("reason=e2e exact suppression"));
+    assert!(markdown.contains("evidence=fixture card"));
+    assert!(markdown.contains("expires=2026-08-01"));
     assert!(markdown.contains("## Trust boundary"));
 
     Ok(())
@@ -2128,6 +2140,7 @@ fn policy_report_is_advisory_and_counts_baseline_state() -> Result<(), Box<dyn E
     assert!(card["card_id"].as_str().unwrap_or("").starts_with("UR-"));
     assert_eq!(card["class"], "guard_missing");
     assert_eq!(card["policy_status"], "new_gap");
+    assert!(card["ledger"].is_null());
     assert_eq!(card["site"]["file"], "src/lib.rs");
     assert_eq!(card["site"]["line"], 8);
     assert_eq!(card["site"]["kind"], "operation");
@@ -2186,6 +2199,16 @@ fn policy_report_is_advisory_and_counts_baseline_state() -> Result<(), Box<dyn E
     assert_eq!(baselined["cards"][0]["card_id"], card_id);
     assert_eq!(baselined["cards"][0]["class"], "baseline_known");
     assert_eq!(baselined["cards"][0]["policy_status"], "baseline_known");
+    assert_eq!(baselined["cards"][0]["ledger"]["owner"], "core/policy");
+    assert_eq!(
+        baselined["cards"][0]["ledger"]["reason"],
+        "e2e no-new-debt baseline"
+    );
+    assert_eq!(baselined["cards"][0]["ledger"]["evidence"], "fixture card");
+    assert_eq!(
+        baselined["cards"][0]["ledger"]["review_after"],
+        "2026-08-01"
+    );
     assert_eq!(
         baselined["cards"][0]["operation_family"],
         "raw_pointer_read"
@@ -2208,8 +2231,12 @@ fn policy_report_is_advisory_and_counts_baseline_state() -> Result<(), Box<dyn E
     let markdown = fs::read_to_string(markdown_path)?;
     assert!(markdown.contains("# unsafe-review policy report"));
     assert!(markdown.contains(
-        "| Status | Card | Location | Class | Operation | Hazards | Missing evidence | Routes |"
+        "| Status | Card | Ledger | Location | Class | Operation | Hazards | Missing evidence | Routes |"
     ));
+    assert!(markdown.contains("owner=core/policy"));
+    assert!(markdown.contains("reason=e2e no-new-debt baseline"));
+    assert!(markdown.contains("evidence=fixture card"));
+    assert!(markdown.contains("review_after=2026-08-01"));
     assert!(markdown.contains("src/lib.rs:8 (operation/read_header)"));
     assert!(markdown.contains("`baseline_known`"));
     assert!(markdown.contains("`raw_pointer_read`"));
