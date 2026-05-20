@@ -27,6 +27,13 @@ Route hazards to Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, Crux, or 
 - human output smoke coverage
 - policy documentation when behavior is configurable
 
+Fixture-backed route examples currently include:
+
+- raw pointer and invalid-value fixtures routed toward Miri / cargo-careful
+- `ffi_sanitizer_route` routed toward sanitizer / cargo-careful rather than Miri-first review
+- `unsafe_impl_send`, `unsafe_impl_send_generic_owner`, and `unsafe_impl_sync_generic_bound` routed toward Loom / Shuttle review
+- Pin and drop/deallocation fixtures routed to their card-specific witness recommendations
+
 ## Acceptance examples
 
 - A changed unsafe seam produces one review card with stable identity.
