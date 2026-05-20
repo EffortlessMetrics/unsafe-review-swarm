@@ -25,3 +25,14 @@ actions = [
 reason = "Manual-only self-hosted runner smoke workflow for proving em-ci-small scheduler access to CX43/CX53 before branch protection is enabled."
 created = "2026-05-20"
 review_after = "2026-06-20"
+
+[[workflow]]
+id = "workflow-0003"
+path = ".github/workflows/em-ci-runner-occupier.yml"
+permissions = "contents: read"
+actions = [
+  "actions/checkout@v6",
+]
+reason = "Manual-only self-hosted runner occupier workflow for proving CX43/CX53 busy-runner fallback before branch protection is enabled."
+created = "2026-05-20"
+review_after = "2026-06-20"

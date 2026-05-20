@@ -170,3 +170,33 @@ router_reason=no_idle_runner
 ```
 
 `router_reason=runner_api_failed` remains a blocker.
+
+As of 2026-05-20, PR #73 moved discovery to the organization runner endpoint
+and proved the old `HTTP 403` path is no longer the active failure mode:
+
+```text
+direct smoke:
+  CX43: 26144439267 / em-ci-hel2-cx43-rust-01
+  CX53: 26144440130 / em-ci-hel2-cx53-rust-01
+
+routed main:
+  CX43 full gate: 26144850143 / router_reason=cx43_idle
+  CX53 full gate: 26144683454 / router_reason=cx53_idle
+  GitHub fallback: 26144664132 / router_reason=no_idle_runner
+```
+
+The remaining proof is the forced busy-runner matrix. Use the manual
+`EM CI Runner Occupier` workflow only for that diagnostic proof:
+
+```text
+1. occupy CX43, then dispatch Unsafe Review Rust
+   expected: router_target=cx53, router_reason=cx53_idle
+
+2. occupy CX43 and CX53, then dispatch Unsafe Review Rust
+   expected: router_target=github, router_reason=no_idle_runner
+```
+
+`EM CI Runner Occupier` has only `contents: read` permission, does not use
+secrets, is not triggered by pull requests, and must not become a required
+branch-protection check. Branch protection remains deferred until the forced
+matrix and enough real PRs have passed.
