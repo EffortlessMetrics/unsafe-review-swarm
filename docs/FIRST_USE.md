@@ -144,6 +144,22 @@ The packet is copy-only. It includes missing evidence, allowed repairs,
 do-not-do rules, verify commands, stop conditions, and the trust boundary. It
 does not edit source.
 
+## Preview Editor Data
+
+The first-pr bundle also writes a saved editor projection:
+
+```text
+target/unsafe-review/lsp.json
+```
+
+That file is read-only data derived from the same `ReviewCard`s as the PR
+summary and JSON output. It shows the diagnostics, hovers, and command payloads
+a future editor adapter can consume. It is not a live LSP server, does not edit
+source, and does not run witnesses.
+
+See [Saved LSP JSON workflow](editor/saved-lsp-json.md) for the current
+editor-adjacent path.
+
 ## Check Repo Posture
 
 Generate a static repo posture report:

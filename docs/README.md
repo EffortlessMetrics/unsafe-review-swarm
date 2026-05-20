@@ -7,6 +7,7 @@
 | First-use guide | install and first useful local run from crates.io | `docs/FIRST_USE.md` |
 | CLI guide | current user-facing commands and artifact surfaces | `docs/CLI.md` |
 | Explanations | concept notes, trust boundaries, and reviewer examples | `docs/explanation/` |
+| Editor workflow | saved read-only editor projection walkthrough | `docs/editor/saved-lsp-json.md` |
 | Proposals | why a workstream exists | `docs/proposals/` |
 | Releases | release targets, readiness notes, and publication receipts | `docs/releases/` |
 | Specs | behavior contracts | `docs/specs/` |
