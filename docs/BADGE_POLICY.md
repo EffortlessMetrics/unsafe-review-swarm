@@ -34,5 +34,6 @@ They must be generated from the CLI and covered by repository checks.
 - Verify multi-card badge behavior: `cargo test -p unsafe-review --test e2e repo_badges_follow_multicard_review_card_summary --locked`
 - Run the repository gate: `cargo run --locked -p xtask -- check-pr`
 
-Until endpoint JSON exists and is covered by the validation path above,
-endpoint badges should not be added to README rows.
+Endpoint badges may appear in README rows only when `badges/unsafe-review.json`
+and `badges/unsafe-review-plus.json` are checked in and covered by the
+validation path above.

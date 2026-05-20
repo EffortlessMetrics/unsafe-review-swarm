@@ -15,6 +15,11 @@
 </p>
 
 <p align="center">
+  <a href="docs/BADGE_POLICY.md"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FEffortlessMetrics%2Funsafe-review%2Fmain%2Fbadges%2Funsafe-review.json" alt="unsafe-review open gaps" /></a>
+  <a href="docs/BADGE_POLICY.md"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FEffortlessMetrics%2Funsafe-review%2Fmain%2Fbadges%2Funsafe-review-plus.json" alt="unsafe-review contract guard witness gaps" /></a>
+</p>
+
+<p align="center">
   <a href="https://github.com/EffortlessMetrics/unsafe-review/releases"><img src="https://img.shields.io/github/v/release/EffortlessMetrics/unsafe-review?sort=semver&label=release" alt="GitHub release" /></a>
   <a href="https://crates.io/crates/unsafe-review"><img src="https://img.shields.io/crates/d/unsafe-review.svg?label=crates.io%20downloads" alt="crates.io downloads" /></a>
   <a href="https://docs.rs/unsafe-review"><img src="https://docs.rs/unsafe-review/badge.svg" alt="docs.rs" /></a>
