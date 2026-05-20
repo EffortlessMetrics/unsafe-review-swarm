@@ -817,5 +817,7 @@ fn print_help() {
     println!();
     println!("Flags may be passed as `--flag value` or `--flag=value`.");
     println!();
-    println!("Trust boundary: static review evidence, not soundness proof.");
+    println!(
+        "Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and not Miri-clean status."
+    );
 }

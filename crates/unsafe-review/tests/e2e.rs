@@ -781,6 +781,22 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
 }
 
 #[test]
+fn help_reports_first_run_trust_boundary_without_overclaims() -> Result<(), Box<dyn Error>> {
+    let output = run_success([os("--help")])?;
+    let text = stdout_text(&output)?;
+
+    assert!(text.contains("unsafe-review: cheap unsafe contract review for Rust"));
+    assert!(text.contains("Trust boundary: static unsafe contract review only"));
+    assert!(text.contains("not memory-safety proof"));
+    assert!(text.contains("not UB-free status"));
+    assert!(text.contains("not Miri-clean status"));
+    assert!(!text.contains("soundness proof"));
+    assert!(!text.contains("All clear"));
+
+    Ok(())
+}
+
+#[test]
 fn check_reports_missing_diff_file_as_cli_failure() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("safe_code_no_cards");
     let missing_diff = fixture.join("missing.diff");
