@@ -1,0 +1,239 @@
+use std::collections::BTreeSet;
+use std::error::Error;
+use std::path::{Path, PathBuf};
+
+use serde_json::{Value, json};
+use tower_lsp_server::ls_types::{
+    CodeActionOrCommand, CodeActionProviderCapability, ExecuteCommandOptions, HoverContents,
+    HoverProviderCapability, Position,
+};
+use unsafe_review_core::{
+    AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, PolicyMode, Scope, analyze,
+};
+
+use super::actions::{code_actions_for, execute_card_command};
+use super::capabilities::server_capabilities;
+use super::config::{LspConfig, parse_config, should_refresh_on_change};
+use super::diagnostics::{diagnostic_card_id, diagnostics_by_uri};
+use super::hover::hover_for;
+use super::state::clear_uris_for_failure;
+use super::uri::uri_from_path;
+use super::{CMD_PACKET, CMD_REFRESH, CMD_WITNESS_COMMAND};
+
+fn fixture_output(name: &str) -> Result<(PathBuf, AnalyzeOutput), Box<dyn Error>> {
+    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .ok_or("unsafe-review-cli should live under crates/")?
+        .to_path_buf();
+    let root = workspace_root.join("fixtures").join(name);
+    let output = analyze(AnalyzeInput {
+        root: root.clone(),
+        scope: Scope::Repo,
+        diff: DiffSource::NoneRepoScan,
+        mode: AnalysisMode::Repo,
+        policy: PolicyMode::Advisory,
+        include_unchanged_tests: true,
+        max_cards: None,
+    })?;
+    Ok((root, output))
+}
+
+#[test]
+fn initialize_returns_read_only_capabilities() -> Result<(), Box<dyn Error>> {
+    let capabilities = server_capabilities();
+    assert!(matches!(
+        capabilities.hover_provider,
+        Some(HoverProviderCapability::Simple(true))
+    ));
+    assert!(matches!(
+        capabilities.code_action_provider,
+        Some(CodeActionProviderCapability::Simple(true))
+    ));
+    let Some(ExecuteCommandOptions { commands, .. }) = capabilities.execute_command_provider else {
+        return Err("execute command provider should be present".into());
+    };
+    assert!(commands.contains(&CMD_REFRESH.to_string()));
+    assert!(commands.contains(&CMD_PACKET.to_string()));
+    assert!(commands.contains(&CMD_WITNESS_COMMAND.to_string()));
+    Ok(())
+}
+
+#[test]
+fn parse_config_defaults_to_repo_advisory() {
+    let config = parse_config(json!({}));
+    assert_eq!(config.mode, "repo");
+    assert_eq!(config.base, None);
+    assert_eq!(config.max_cards, None);
+    assert!(!config.refresh_on_open);
+    assert!(config.refresh_on_save);
+}
+
+#[test]
+fn invalid_config_falls_back_to_safe_defaults() {
+    let config = parse_config(json!({
+        "unsafeReview": {
+            "mode": "unsafe-edits",
+            "maxCards": "many",
+            "refreshOnOpen": true,
+            "refreshOnSave": false
+        }
+    }));
+    assert_eq!(config.mode, "repo");
+    assert_eq!(config.max_cards, None);
+    assert!(config.refresh_on_open);
+    assert!(!config.refresh_on_save);
+}
+
+#[test]
+fn diagnostic_for_card_carries_card_id_and_trust_boundary() -> Result<(), Box<dyn Error>> {
+    let (root, output) = fixture_output("raw_pointer_alignment")?;
+    let diagnostics = diagnostics_by_uri(&root, &output);
+    let diagnostic = diagnostics
+        .values()
+        .flatten()
+        .next()
+        .ok_or("expected diagnostic")?;
+    assert_eq!(
+        diagnostic_card_id(diagnostic),
+        Some(output.cards[0].id.0.clone())
+    );
+    assert!(
+        diagnostic
+            .data
+            .as_ref()
+            .and_then(|data| data.get("trust_boundary"))
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .contains("not UB-free status")
+    );
+    Ok(())
+}
+
+#[test]
+fn diagnostic_range_uses_utf16_width() -> Result<(), Box<dyn Error>> {
+    let (root, mut output) = fixture_output("raw_pointer_alignment")?;
+    output.cards[0].site.snippet = "a\u{1f980}".to_string();
+    let diagnostics = diagnostics_by_uri(&root, &output);
+    let diagnostic = diagnostics
+        .values()
+        .flatten()
+        .next()
+        .ok_or("expected diagnostic")?;
+    assert_eq!(
+        diagnostic.range.end.character - diagnostic.range.start.character,
+        3
+    );
+    Ok(())
+}
+
+#[test]
+fn hover_selects_card_at_cursor() -> Result<(), Box<dyn Error>> {
+    let (root, output) = fixture_output("raw_pointer_alignment")?;
+    let diagnostics = diagnostics_by_uri(&root, &output);
+    let diagnostic = diagnostics
+        .values()
+        .flatten()
+        .next()
+        .ok_or("expected diagnostic")?;
+    let hover = hover_for(
+        Some(&output),
+        std::slice::from_ref(diagnostic),
+        diagnostic.range.start,
+    )
+    .ok_or("expected hover")?;
+    let HoverContents::Markup(markup) = hover.contents else {
+        return Err("expected markdown hover".into());
+    };
+    assert!(markup.value.contains(&output.cards[0].id.0));
+    assert!(markup.value.contains("Trust boundary"));
+    Ok(())
+}
+
+#[test]
+fn hover_outside_card_returns_none_or_neutral_status() -> Result<(), Box<dyn Error>> {
+    let (root, output) = fixture_output("raw_pointer_alignment")?;
+    let diagnostics = diagnostics_by_uri(&root, &output);
+    let diagnostic = diagnostics
+        .values()
+        .flatten()
+        .next()
+        .ok_or("expected diagnostic")?;
+    let outside = Position::new(
+        diagnostic.range.end.line,
+        diagnostic.range.end.character + 10,
+    );
+    assert!(hover_for(Some(&output), std::slice::from_ref(diagnostic), outside).is_none());
+    Ok(())
+}
+
+#[test]
+fn code_actions_are_command_only() -> Result<(), Box<dyn Error>> {
+    let (root, output) = fixture_output("raw_pointer_alignment")?;
+    let diagnostics = diagnostics_by_uri(&root, &output);
+    let diagnostic = diagnostics
+        .values()
+        .flatten()
+        .next()
+        .ok_or("expected diagnostic")?;
+    let actions = code_actions_for(
+        Some(&output),
+        std::slice::from_ref(diagnostic),
+        diagnostic.range.start,
+    );
+    assert!(actions.len() >= 3);
+    assert!(
+        actions
+            .iter()
+            .all(|action| matches!(action, CodeActionOrCommand::Command(_)))
+    );
+    assert!(actions.iter().any(|action| {
+        matches!(action, CodeActionOrCommand::Command(command) if command.command == CMD_PACKET)
+    }));
+    Ok(())
+}
+
+#[test]
+fn execute_collect_agent_packet_returns_packet_for_card() -> Result<(), Box<dyn Error>> {
+    let (_root, output) = fixture_output("raw_pointer_alignment")?;
+    let card_id = output.cards[0].id.0.clone();
+    let packet = execute_card_command(CMD_PACKET, &[json!({"card_id": card_id})], &output)
+        .ok_or("expected packet")?;
+    let packet = packet
+        .as_str()
+        .ok_or("packet should be returned as a string")?;
+    assert!(packet.contains(&output.cards[0].id.0));
+    assert!(packet.contains("do_not_do"));
+    Ok(())
+}
+
+#[test]
+fn execute_unknown_command_returns_none() -> Result<(), Box<dyn Error>> {
+    let (_root, output) = fixture_output("raw_pointer_alignment")?;
+    assert!(
+        execute_card_command(
+            "unsafe-review.unknown",
+            &[json!({"card_id": output.cards[0].id.0})],
+            &output
+        )
+        .is_none()
+    );
+    Ok(())
+}
+
+#[test]
+fn refresh_failure_clears_stale_diagnostics() -> Result<(), Box<dyn Error>> {
+    let uri =
+        uri_from_path(std::env::current_dir()?.join("fixtures/raw_pointer_alignment/src/lib.rs"))
+            .ok_or("expected file uri")?;
+    let mut previous = BTreeSet::from([uri.clone()]);
+    let clear = clear_uris_for_failure(&mut previous);
+    assert_eq!(clear, vec![uri]);
+    assert!(previous.is_empty());
+    Ok(())
+}
+
+#[test]
+fn did_change_does_not_trigger_analysis_by_default() {
+    assert!(!should_refresh_on_change(&LspConfig::default()));
+}

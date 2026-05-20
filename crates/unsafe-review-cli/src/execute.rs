@@ -53,6 +53,7 @@ pub(crate) fn execute(command: Command) -> Result<(), String> {
         Command::ReceiptImportProof(options) => receipt_import_proof(options),
         Command::Outcome(options) => outcome(options),
         Command::PolicyReport(options) => policy_report(options),
+        Command::Lsp => crate::lsp::serve(),
     }
 }
 
@@ -199,7 +200,10 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     }
     println!("Trust boundary:");
     println!(
-        "  advisory static review only; did not run witnesses, post comments, edit source, or enforce blocking policy."
+        "  static unsafe contract review only; not memory-safety proof, not UB-free status, and not Miri-clean status."
+    );
+    println!(
+        "  unsafe-review did not run witnesses, post comments, edit source, or enforce blocking policy."
     );
 
     Ok(())
@@ -300,12 +304,21 @@ fn doctor(root: &Path) -> Result<(), String> {
     let git_available = tool_available("git");
     let git_repo = git_available && git_root_status(root).is_some();
     let base_ref_available = git_repo && git_ref_available(root, "origin/main");
+    let cargo_metadata_available = cargo_metadata_available(root);
+    let artifact_dir = root.join("target").join("unsafe-review");
+    let artifact_dir_writable = artifact_dir_writable(root);
 
     println!("unsafe-review doctor");
     println!("workspace root: {}", root.display());
     println!("git command: {}", yes_no(git_available));
     println!("git repository: {}", yes_no(git_repo));
     println!("base ref origin/main: {}", yes_no(base_ref_available));
+    println!("cargo metadata: {}", yes_no(cargo_metadata_available));
+    println!(
+        "artifact dir {}: {}",
+        artifact_dir.display(),
+        writable_status(artifact_dir_writable)
+    );
     println!();
     println!("Witness tool signals");
     println!("miri: {}", yes_no(cargo_subcommand_available("miri")));
@@ -329,7 +342,9 @@ fn doctor(root: &Path) -> Result<(), String> {
     println!();
     println!("policy: advisory by default");
     println!("witness execution: not run by doctor or by default");
-    println!("trust boundary: static review evidence, not soundness proof");
+    println!(
+        "trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and no witness execution"
+    );
     Ok(())
 }
 
@@ -343,6 +358,42 @@ fn cargo_subcommand_available(subcommand: &str) -> bool {
         .arg("--version")
         .output()
         .is_ok_and(|output| output.status.success())
+}
+
+fn cargo_metadata_available(root: &Path) -> bool {
+    ProcessCommand::new("cargo")
+        .arg("metadata")
+        .arg("--no-deps")
+        .arg("--format-version")
+        .arg("1")
+        .current_dir(root)
+        .output()
+        .is_ok_and(|output| output.status.success())
+}
+
+fn artifact_dir_writable(root: &Path) -> bool {
+    let target_dir = root.join("target");
+    let artifact_dir = target_dir.join("unsafe-review");
+    let target_existed = target_dir.exists();
+    let artifact_existed = artifact_dir.exists();
+    if fs::create_dir_all(&artifact_dir).is_err() {
+        return false;
+    }
+    let probe = artifact_dir.join(format!(".doctor-write-check-{}", std::process::id()));
+    let wrote = fs::write(&probe, b"ok")
+        .and_then(|_| fs::remove_file(&probe))
+        .is_ok();
+    if !artifact_existed {
+        let _ = fs::remove_dir(&artifact_dir);
+    }
+    if !target_existed {
+        let _ = fs::remove_dir(&target_dir);
+    }
+    wrote
+}
+
+fn writable_status(writable: bool) -> &'static str {
+    if writable { "writable" } else { "not writable" }
 }
 
 fn git_root_status(root: &Path) -> Option<String> {
@@ -749,5 +800,7 @@ fn print_help() {
     println!();
     println!("Flags may be passed as `--flag value` or `--flag=value`.");
     println!();
-    println!("Trust boundary: static review evidence, not soundness proof.");
+    println!(
+        "Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and not Miri-clean status."
+    );
 }

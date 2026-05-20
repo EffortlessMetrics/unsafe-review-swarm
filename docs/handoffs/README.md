@@ -5,6 +5,7 @@ what not to do next. Do not put active specs here.
 
 | Handoff | Date | Scope |
 |---|---|---|
+| [Source/swarm reconciliation](2026-05-20-source-swarm-reconciliation.md) | 2026-05-20 | reseed of swarm from source main, source-only PR absorption, swarm-only preservation, and future sync rule |
 | [Release 0.1.1 readiness](2026-05-20-release-0.1.1-readiness.md) | 2026-05-20 | current 0.1.1 package/readiness proof, expected staged dry-run limits, manual publish order, and post-publish smoke |
 | [Release 0.1.1 preparation](2026-05-19-release-0.1.1-preparation.md) | 2026-05-19 | version bumps for the three crates, advisory release framing, validation checklist, and publish order |
 | [Crates.io initial publication receipt](2026-05-18-crates-io-initial-publication.md) | 2026-05-18 | published 0.1.0 crates, publish commands, install smoke, tag, trust boundary, and next lane |

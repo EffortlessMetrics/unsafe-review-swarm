@@ -419,6 +419,10 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("witness-plan.md"));
     assert!(stdout.contains("lsp.json"));
     assert!(stdout.contains("Trust boundary:"));
+    assert!(stdout.contains("static unsafe contract review only"));
+    assert!(stdout.contains("not memory-safety proof"));
+    assert!(stdout.contains("not UB-free status"));
+    assert!(stdout.contains("not Miri-clean status"));
     assert!(stdout.contains("did not run witnesses"));
     assert!(stdout.contains("post comments"));
     assert!(stdout.contains("enforce blocking policy"));
@@ -581,6 +585,22 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
 }
 
 #[test]
+fn help_reports_first_run_trust_boundary_without_overclaims() -> Result<(), Box<dyn Error>> {
+    let output = run_success([os("--help")])?;
+    let text = stdout_text(&output)?;
+
+    assert!(text.contains("unsafe-review: cheap unsafe contract review for Rust"));
+    assert!(text.contains("Trust boundary: static unsafe contract review only"));
+    assert!(text.contains("not memory-safety proof"));
+    assert!(text.contains("not UB-free status"));
+    assert!(text.contains("not Miri-clean status"));
+    assert!(!text.contains("soundness proof"));
+    assert!(!text.contains("All clear"));
+
+    Ok(())
+}
+
+#[test]
 fn check_reports_missing_diff_file_as_cli_failure() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("safe_code_no_cards");
     let missing_diff = fixture.join("missing.diff");
@@ -626,6 +646,10 @@ fn doctor_reports_first_install_signals_without_running_witnesses() -> Result<()
     assert!(text.contains("git command:"));
     assert!(text.contains("git repository:"));
     assert!(text.contains("base ref origin/main:"));
+    assert!(text.contains("cargo metadata:"));
+    assert!(text.contains("artifact dir"));
+    assert!(text.contains("target"));
+    assert!(text.contains("unsafe-review"));
     assert!(text.contains("Witness tool signals"));
     assert!(text.contains("miri:"));
     assert!(text.contains("cargo-careful:"));
@@ -636,7 +660,9 @@ fn doctor_reports_first_install_signals_without_running_witnesses() -> Result<()
     assert!(text.contains("crux:"));
     assert!(text.contains("policy: advisory by default"));
     assert!(text.contains("witness execution: not run by doctor or by default"));
-    assert!(text.contains("trust boundary: static review evidence"));
+    assert!(text.contains("trust boundary: static unsafe contract review only"));
+    assert!(text.contains("not memory-safety proof"));
+    assert!(text.contains("not UB-free status"));
 
     Ok(())
 }
