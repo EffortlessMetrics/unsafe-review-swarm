@@ -1254,7 +1254,7 @@ fn check_advisory_artifacts(dir: &Path) -> Result<(), String> {
 fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
     let summary = check_advisory_artifact_set(dir)?;
     check_witness_plan_artifact(dir, summary.card_count)?;
-    check_lsp_artifact_if_present(dir, &summary.card_ids)?;
+    check_lsp_artifact(dir, &summary.card_ids)?;
     check_first_pr_artifact_overclaims(dir)?;
 
     println!("check-first-pr-artifacts: ok ({})", dir.display());
@@ -1416,11 +1416,8 @@ fn check_witness_plan_artifact(dir: &Path, card_count: usize) -> Result<(), Stri
     Ok(())
 }
 
-fn check_lsp_artifact_if_present(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), String> {
+fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), String> {
     let path = dir.join("lsp.json");
-    if !path.exists() {
-        return Ok(());
-    }
     let lsp = parse_json_file(&path)?;
     require_json_str(&lsp, "tool", "unsafe-review", "lsp.json")?;
     require_json_str(&lsp, "mode", "read_only_projection", "lsp.json")?;

@@ -600,6 +600,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("cards.sarif"));
     assert!(stdout.contains("comment-plan.json"));
     assert!(stdout.contains("witness-plan.md"));
+    assert!(stdout.contains("lsp.json"));
     assert!(stdout.contains("did not run witnesses"));
     assert!(stdout.contains("post comments"));
     assert!(stdout.contains("enforce blocking policy"));
@@ -662,6 +663,19 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(!witness_plan.contains("Miri passed"));
     assert!(!witness_plan.contains("site reached"));
 
+    let lsp = parse_json(&fs::read_to_string(out_dir.join("lsp.json"))?)?;
+    assert_eq!(lsp["mode"], "read_only_projection");
+    assert_eq!(lsp["policy"], "advisory");
+    assert_eq!(lsp["diagnostics"][0]["card_id"], card_id);
+    assert_eq!(lsp["hovers"][0]["card_id"], card_id);
+    assert_eq!(lsp["code_actions"][0]["card_id"], card_id);
+    assert!(
+        lsp["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not a Miri result")
+    );
+
     Ok(())
 }
 
@@ -711,6 +725,17 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
     assert!(witness_plan.contains("not UB-free status"));
     assert!(!witness_plan.contains("Miri passed"));
     assert!(!witness_plan.contains("site reached"));
+
+    let lsp = parse_json(&fs::read_to_string(out_dir.join("lsp.json"))?)?;
+    assert_eq!(lsp["mode"], "read_only_projection");
+    assert_eq!(lsp["diagnostics"].as_array().map_or(1, Vec::len), 0);
+    assert_eq!(lsp["hovers"].as_array().map_or(1, Vec::len), 0);
+    assert!(
+        lsp["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not a Miri result")
+    );
 
     Ok(())
 }

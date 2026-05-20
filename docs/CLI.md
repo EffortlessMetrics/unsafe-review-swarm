@@ -83,6 +83,7 @@ target/unsafe-review/pr-summary.md
 target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
+target/unsafe-review/lsp.json
 ```
 
 Use `--out-dir <dir>` to choose another artifact directory, or `--diff file|-`
@@ -139,8 +140,8 @@ That verifier checks parseability, advisory policy, plan-only comment mode,
 projected card identity consistency, result counts, and trust-boundary text. It
 does not prove the analyzer found every unsafe issue.
 
-For the full `first-pr` bundle, including `witness-plan.md` and saved `lsp.json`
-when present, use:
+For the full `first-pr` bundle, including `witness-plan.md` and saved
+`lsp.json`, use:
 
 ```bash
 cargo xtask check-first-pr-artifacts target/unsafe-review
