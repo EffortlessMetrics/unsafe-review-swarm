@@ -732,7 +732,7 @@ fn has_slice_count_early_return(
                     (&after_guard[..body_end], &after_guard[body_end + 1..])
                 });
             if condition_has_top_level_disjunct(condition, predicate)
-                && guard_body.contains("return")
+                && guard_body_contains_return(guard_body)
                 && !has_slice_count_assignment(after_guard_body, receiver, count)
             {
                 return true;
@@ -741,6 +741,50 @@ fn has_slice_count_early_return(
         search_from = guard_start + 2;
     }
     false
+}
+
+fn guard_body_contains_return(guard_body: &str) -> bool {
+    let code = strip_block_comments_and_literals(guard_body);
+    compact_contains_identifier(&code, "return")
+}
+
+fn strip_block_comments_and_literals(text: &str) -> String {
+    let mut output = String::with_capacity(text.len());
+    let mut chars = text.chars().peekable();
+    while let Some(ch) = chars.next() {
+        if ch == '/' && chars.peek() == Some(&'*') {
+            chars.next();
+            let mut prev = '\0';
+            for comment_ch in chars.by_ref() {
+                if prev == '*' && comment_ch == '/' {
+                    break;
+                }
+                prev = comment_ch;
+            }
+            continue;
+        }
+        if ch == '"' {
+            output.push('"');
+            let mut escaped = false;
+            for literal_ch in chars.by_ref() {
+                if escaped {
+                    escaped = false;
+                    continue;
+                }
+                if literal_ch == '\\' {
+                    escaped = true;
+                    continue;
+                }
+                if literal_ch == '"' {
+                    output.push('"');
+                    break;
+                }
+            }
+            continue;
+        }
+        output.push(ch);
+    }
+    output
 }
 
 fn has_slice_count_assignment(compact: &str, receiver: &str, count: &str) -> bool {

@@ -115,6 +115,8 @@ evidence, while
 `ptr_copy_slice_range_closed_branch_not_guard`,
 `copy_nonoverlapping_slice_range_or_branch_not_guard`,
 `ptr_copy_slice_range_or_branch_not_guard`,
+`copy_nonoverlapping_slice_range_disjunctive_early_return_block_comment_not_guard`,
+`ptr_copy_slice_range_disjunctive_early_return_block_comment_not_guard`,
 `copy_nonoverlapping_slice_range_disjunctive_early_return_reassigned_count_not_guard`,
 `ptr_copy_slice_range_disjunctive_early_return_reassigned_count_not_guard`,
 `copy_nonoverlapping_slice_range_open_branch_reassigned_count_not_guard`,
@@ -126,9 +128,9 @@ evidence, while
 `ptr_copy_slice_range_reassigned_count_not_guard`,
 `ptr_copy_slice_range_reassigned_dst_not_guard`,
 `copy_nonoverlapping_other_len_not_guard`, and `ptr_copy_other_len_not_guard`
-pin that one-sided, closed-branch, disjunctive positive-branch, stale count, stale
-receiver, stale open-branch, or unrelated slice length assertions do not
-discharge the source/destination range obligation.
+pin that one-sided, closed-branch, disjunctive positive-branch, comment-only
+early-return text, stale count, stale receiver, stale open-branch, or unrelated
+slice length assertions do not discharge the source/destination range obligation.
 
 | Capability | Tier | Surface | Proof | Known limits |
 |---|---|---|---|---|
