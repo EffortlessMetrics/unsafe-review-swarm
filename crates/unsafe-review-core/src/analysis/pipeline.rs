@@ -1991,7 +1991,15 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
                 "non-overlap",
             ),
             (
+                "copy_nonoverlapping_slice_range_disjunctive_early_return_after_block_guard",
+                "non-overlap",
+            ),
+            (
                 "ptr_copy_slice_range_disjunctive_early_return_guard",
+                "initialized",
+            ),
+            (
+                "ptr_copy_slice_range_disjunctive_early_return_after_block_guard",
                 "initialized",
             ),
         ] {

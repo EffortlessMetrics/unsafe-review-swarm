@@ -765,7 +765,7 @@ fn contains_top_level_return_statement(code: &str) -> bool {
             }
             '}' => {
                 brace_depth = brace_depth.saturating_sub(1);
-                statement_start = false;
+                statement_start = brace_depth == 0 && paren_depth == 0 && bracket_depth == 0;
                 continue;
             }
             '(' => {

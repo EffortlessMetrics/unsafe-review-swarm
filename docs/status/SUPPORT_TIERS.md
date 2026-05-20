@@ -96,12 +96,14 @@ Copy operation range evidence is intentionally conservative:
 `copy_nonoverlapping_slice_range_conjunctive_assert_guard`,
 `copy_nonoverlapping_slice_range_early_return_guard`,
 `copy_nonoverlapping_slice_range_disjunctive_early_return_guard`,
+`copy_nonoverlapping_slice_range_disjunctive_early_return_after_block_guard`,
 `copy_nonoverlapping_slice_range_open_branch_guard`,
 `copy_nonoverlapping_slice_range_conjunctive_open_branch_guard`,
 `ptr_copy_slice_range_guard`,
 `ptr_copy_slice_range_conjunctive_assert_guard`,
 `ptr_copy_slice_range_early_return_guard`,
 `ptr_copy_slice_range_disjunctive_early_return_guard`,
+`ptr_copy_slice_range_disjunctive_early_return_after_block_guard`,
 `ptr_copy_slice_range_open_branch_guard`, and
 `ptr_copy_slice_range_conjunctive_open_branch_guard` pin same-call source and
 destination slice length assertions, conjunctive assertions, early returns, or
