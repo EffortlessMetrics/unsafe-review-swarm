@@ -54,8 +54,8 @@ Before upload, the workflow runs:
 cargo run --locked -p xtask -- check-advisory-artifacts target/unsafe-review
 ```
 
-The comment plan is an artifact of candidate high-signal inline comments. It is
-not posted by the workflow.
+The comment plan is an artifact of at most three candidate high-signal inline
+comments. It is not posted by the workflow.
 
 The workflow does not run Miri, sanitizers, Loom, Kani, or other witness tools.
 It does not post comments and does not enable blocking policy.

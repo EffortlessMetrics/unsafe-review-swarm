@@ -4,6 +4,7 @@ use crate::util::path_display;
 use serde::Serialize;
 
 const TRUST_BOUNDARY: &str = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.";
+const MAX_PLANNED_COMMENTS: usize = 3;
 
 pub(crate) fn render(output: &AnalyzeOutput) -> String {
     render_pretty(&CommentPlan::from(output))
@@ -37,6 +38,7 @@ impl From<&AnalyzeOutput> for CommentPlan {
                 .cards
                 .iter()
                 .filter(|card| should_plan_comment(card))
+                .take(MAX_PLANNED_COMMENTS)
                 .map(PlannedComment::from)
                 .collect(),
             trust_boundary: TRUST_BOUNDARY,
@@ -122,6 +124,7 @@ fn missing_summary(card: &ReviewCard) -> String {
 mod tests {
     use super::*;
     use crate::api::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, analyze};
+    use crate::domain::CardId;
     use std::path::PathBuf;
 
     #[test]
@@ -155,6 +158,42 @@ mod tests {
                 .unwrap_or("")
                 .contains("not UB-free status")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn comment_plan_caps_inline_candidates() -> Result<(), String> {
+        let mut output = fixture_output("raw_pointer_alignment")?;
+        let template = output
+            .cards
+            .first()
+            .ok_or_else(|| "raw pointer fixture should emit a card".to_string())?
+            .clone();
+        output.cards = (0..(MAX_PLANNED_COMMENTS + 2))
+            .map(|index| {
+                let mut card = template.clone();
+                card.id = CardId(format!("UR-comment-plan-cap-{index}-c1"));
+                card
+            })
+            .collect();
+
+        let value = parse_json(&render(&output))?;
+        let comments = value["comments"]
+            .as_array()
+            .ok_or_else(|| "comments should be an array".to_string())?;
+
+        assert_eq!(comments.len(), MAX_PLANNED_COMMENTS);
+        assert_eq!(comments[0]["card_id"], "UR-comment-plan-cap-0-c1");
+        assert_eq!(
+            comments[MAX_PLANNED_COMMENTS - 1]["card_id"],
+            "UR-comment-plan-cap-2-c1"
+        );
+        assert!(comments.iter().all(|comment| {
+            comment["body"]
+                .as_str()
+                .unwrap_or("")
+                .contains("not memory-safety proof")
+        }));
         Ok(())
     }
 

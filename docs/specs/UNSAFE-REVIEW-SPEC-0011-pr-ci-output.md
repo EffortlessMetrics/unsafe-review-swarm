@@ -24,8 +24,8 @@ The advisory GitHub workflow uploads the JSON, Markdown summary, SARIF, and
 comment-plan artifacts. It does not run witness tools, post inline comments, or
 enable blocking policy.
 Inline comment planning is artifact-only. The plan contains candidate comments
-for actionable high-priority or high-confidence cards, but no workflow posts
-those comments by default.
+for at most three actionable high-priority or high-confidence cards, but no
+workflow posts those comments by default.
 
 ## Non-goals
 
