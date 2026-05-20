@@ -1687,6 +1687,10 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
                 "drop_in_place_reassigned_origin_not_guard",
                 OperationFamily::DropInPlace,
             ),
+            (
+                "drop_in_place_box_origin_after_not_guard",
+                OperationFamily::DropInPlace,
+            ),
         ] {
             let output = fixture_output(fixture)?;
             let card = single_card(fixture, &output)?;

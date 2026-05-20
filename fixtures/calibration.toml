@@ -75,6 +75,7 @@ required_core_fixtures = [
   "drop_in_place_deallocation",
   "drop_in_place_box_origin",
   "drop_in_place_reassigned_origin_not_guard",
+  "drop_in_place_box_origin_after_not_guard",
   "atomic_pointer_state_swap",
   "unwrap_unchecked_result",
   "unwrap_unchecked_infallible_result",
@@ -948,6 +949,16 @@ expected_hazard = "drop_or_deallocation"
 fixture = "drop_in_place_reassigned_origin_not_guard"
 kind = "false_positive_control"
 claim = "ptr::drop_in_place does not accept Box::into_raw origin evidence after the raw pointer is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "drop_in_place"
+expected_hazard = "drop_or_deallocation"
+
+[[cases]]
+fixture = "drop_in_place_box_origin_after_not_guard"
+kind = "false_positive_control"
+claim = "ptr::drop_in_place does not accept Box::into_raw origin evidence that appears only after drop"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

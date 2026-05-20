@@ -32,7 +32,8 @@ is visible. Same-vector
 `Vec::with_capacity(new_len)` evidence also rejects reassigned vector bindings
 and reassigned checked lengths.
 `Box::from_raw` and `ptr::drop_in_place` ownership evidence reject stale
-`Box::into_raw` origins when the raw pointer is reassigned before use.
+`Box::into_raw` origins when the raw pointer is reassigned before use or the
+origin appears only after the unsafe operation.
 Unchecked-constructor availability evidence now has fixture-backed controls for
 same-receiver assertions, enclosing positive branches, unavailable-path early
 returns, other receivers, bare observations, and closed branches.
@@ -120,8 +121,8 @@ These are not failures; they are the next unsupported or weakly verified areas:
 - Real PR-diff dogfood now recognizes `ptr::drop_in_place` as a
   drop/deallocation operation family, and fixture coverage recognizes the
   narrow same-pointer `Box::into_raw` origin shape as drop evidence while
-  rejecting reassigned raw pointers, but broader drop/deallocation evidence
-  modeling remains narrow.
+  rejecting reassigned raw pointers and post-use origins, but broader
+  drop/deallocation evidence modeling remains narrow.
 - `arrayvec#137` adds a raw pointer accessor soundness-fix measurement. It
   produced 15 contract-missing cards when run with a PR-head checkout and raw
   `diff --git` patch, which is useful dogfood but not calibration proof.

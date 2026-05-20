@@ -1,0 +1,21 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,17 @@
++pub fn drop_then_create_origin(ptr: *mut String, value: Box<String>) {
++    // SAFETY: this fixture intentionally creates Box::into_raw evidence only after drop.
++    unsafe {
++        core::ptr::drop_in_place(ptr);
++    }
++    let _later = Box::into_raw(value);
++}
++
++#[cfg(test)]
++mod tests {
++    use super::drop_then_create_origin;
++
++    #[test]
++    fn mentions_drop_then_create_origin() {
++        let _ = stringify!(drop_then_create_origin);
++    }
++}

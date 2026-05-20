@@ -377,6 +377,7 @@ mod tests {
         "drop_in_place_deallocation",
         "drop_in_place_box_origin",
         "drop_in_place_reassigned_origin_not_guard",
+        "drop_in_place_box_origin_after_not_guard",
         "atomic_pointer_state_swap",
         "unwrap_unchecked_result",
         "unwrap_unchecked_infallible_result",
