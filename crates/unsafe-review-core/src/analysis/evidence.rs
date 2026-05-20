@@ -622,7 +622,22 @@ fn condition_has_top_level_conjunct(condition: &str, predicate: &str) -> bool {
         .any(|conjunct| strip_balanced_outer_parens(conjunct.trim()) == predicate)
 }
 
+fn condition_has_top_level_disjunct(condition: &str, predicate: &str) -> bool {
+    let condition = strip_balanced_outer_parens(condition.trim());
+    split_top_level_disjuncts(condition)
+        .into_iter()
+        .any(|disjunct| strip_balanced_outer_parens(disjunct.trim()) == predicate)
+}
+
 fn split_top_level_conjuncts(condition: &str) -> Vec<&str> {
+    split_top_level_condition_operands(condition, b'&')
+}
+
+fn split_top_level_disjuncts(condition: &str) -> Vec<&str> {
+    split_top_level_condition_operands(condition, b'|')
+}
+
+fn split_top_level_condition_operands(condition: &str, operator: u8) -> Vec<&str> {
     let mut conjuncts = Vec::new();
     let mut start = 0usize;
     let mut paren_depth = 0usize;
@@ -638,8 +653,9 @@ fn split_top_level_conjuncts(condition: &str) -> Vec<&str> {
             b']' => bracket_depth = bracket_depth.saturating_sub(1),
             b'{' => brace_depth += 1,
             b'}' => brace_depth = brace_depth.saturating_sub(1),
-            b'&' if idx + 1 < bytes.len()
-                && bytes[idx + 1] == b'&'
+            byte if byte == operator
+                && idx + 1 < bytes.len()
+                && bytes[idx + 1] == operator
                 && paren_depth == 0
                 && bracket_depth == 0
                 && brace_depth == 0 =>
@@ -699,20 +715,30 @@ fn has_slice_count_early_return(
     receiver: &str,
     count: &str,
 ) -> bool {
-    let guard = format!("if{predicate}{{");
     let mut search_from = 0;
-    while let Some(offset) = before_call[search_from..].find(&guard) {
+    while let Some(offset) = before_call[search_from..].find("if") {
         let guard_start = search_from + offset;
-        let after_guard = &before_call[guard_start + guard.len()..];
-        let (guard_body, after_guard_body) = after_guard
-            .split_once('}')
-            .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
-        if guard_body.contains("return")
-            && !has_slice_count_assignment(after_guard_body, receiver, count)
-        {
-            return true;
+        let before = before_call[..guard_start].chars().next_back();
+        if before.is_some_and(is_receiver_path_char) {
+            search_from = guard_start + 2;
+            continue;
         }
-        search_from = guard_start + guard.len();
+        let after_if = &before_call[guard_start + 2..];
+        if let Some(brace_pos) = after_if.find('{') {
+            let condition = &after_if[..brace_pos];
+            let after_guard = &after_if[brace_pos + 1..];
+            let (guard_body, after_guard_body) = matching_code_block_end(after_guard)
+                .map_or((after_guard, ""), |body_end| {
+                    (&after_guard[..body_end], &after_guard[body_end + 1..])
+                });
+            if condition_has_top_level_disjunct(condition, predicate)
+                && guard_body.contains("return")
+                && !has_slice_count_assignment(after_guard_body, receiver, count)
+            {
+                return true;
+            }
+        }
+        search_from = guard_start + 2;
     }
     false
 }

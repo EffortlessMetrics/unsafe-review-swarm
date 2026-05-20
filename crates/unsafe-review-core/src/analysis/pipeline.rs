@@ -1946,6 +1946,32 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn copy_range_evidence_accepts_disjunctive_slice_length_early_returns() -> Result<(), String> {
+        for (fixture, missing_key) in [
+            (
+                "copy_nonoverlapping_slice_range_disjunctive_early_return_guard",
+                "non-overlap",
+            ),
+            (
+                "ptr_copy_slice_range_disjunctive_early_return_guard",
+                "initialized",
+            ),
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+            assert!(
+                obligation_discharge_present(card, "valid-range"),
+                "{fixture} should accept disjunctive invalid-range early returns as range evidence"
+            );
+            assert!(
+                !obligation_discharge_present(card, missing_key),
+                "{fixture} should not prove {missing_key}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn copy_range_evidence_accepts_open_slice_length_branches() -> Result<(), String> {
         let copy_nonoverlapping =
             fixture_output("copy_nonoverlapping_slice_range_open_branch_guard")?;
@@ -1977,10 +2003,12 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
         for fixture in [
             "copy_nonoverlapping_slice_range_open_branch_reassigned_count_not_guard",
             "copy_nonoverlapping_slice_range_open_branch_reassigned_src_not_guard",
+            "copy_nonoverlapping_slice_range_disjunctive_early_return_reassigned_count_not_guard",
             "copy_nonoverlapping_slice_range_reassigned_count_not_guard",
             "copy_nonoverlapping_slice_range_reassigned_src_not_guard",
             "ptr_copy_slice_range_open_branch_reassigned_count_not_guard",
             "ptr_copy_slice_range_open_branch_reassigned_dst_not_guard",
+            "ptr_copy_slice_range_disjunctive_early_return_reassigned_count_not_guard",
             "ptr_copy_slice_range_reassigned_count_not_guard",
             "ptr_copy_slice_range_reassigned_dst_not_guard",
         ] {
