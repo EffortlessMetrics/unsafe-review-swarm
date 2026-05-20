@@ -547,6 +547,19 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     assert!(explain.contains(
         "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation."
     ));
+    assert!(explain.contains("## What would resolve this"));
+    assert!(explain.contains(
+        "- Add or expose the local guard that discharges the `raw_pointer_read` safety obligation."
+    ));
+    assert!(explain.contains("Then attach a matching witness receipt only after running"));
+    assert!(explain.contains("## What would not resolve this"));
+    assert!(
+        explain.contains("A `SAFETY:` comment alone does not discharge missing guard evidence.")
+    );
+    assert!(
+        explain.contains("A related test mention is not proof that this unsafe site executed.")
+    );
+    assert!(explain.contains("Do not claim witness proof unless a matching receipt exists."));
     assert!(explain.contains("## Trust boundary"));
     assert!(explain.contains("not a proof of memory safety"));
     assert!(explain.contains("not a Miri result unless a witness receipt is attached"));

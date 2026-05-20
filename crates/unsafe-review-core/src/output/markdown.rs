@@ -316,9 +316,38 @@ pub(crate) fn render_card_detail(card: &ReviewCard) -> String {
     }
     out.push_str("\n## Next action\n\n");
     out.push_str(&card.next_action.summary);
-    out.push_str("\n\n## Trust boundary\n\n");
+    render_resolution_guidance(&mut out, card);
+    render_non_resolution_guidance(&mut out);
+    out.push_str("\n## Trust boundary\n\n");
     out.push_str("This is static unsafe contract review. It is not a proof of memory safety and not a Miri result unless a witness receipt is attached.\n");
     out
+}
+
+fn render_resolution_guidance(out: &mut String, card: &ReviewCard) {
+    out.push_str("\n\n## What would resolve this\n\n");
+    out.push_str(&format!("- {}\n", card.next_action.summary));
+    if card.next_action.verify_commands.is_empty() {
+        out.push_str(
+            "- Keep the static limitation explicit if no focused witness route is available.\n",
+        );
+    } else {
+        out.push_str(
+            "- Then attach a matching witness receipt only after running a focused command such as:\n",
+        );
+        for command in &card.next_action.verify_commands {
+            out.push_str("\n```bash\n");
+            out.push_str(command);
+            out.push_str("\n```\n");
+        }
+    }
+}
+
+fn render_non_resolution_guidance(out: &mut String) {
+    out.push_str("\n## What would not resolve this\n\n");
+    out.push_str("- A `SAFETY:` comment alone does not discharge missing guard evidence.\n");
+    out.push_str("- A related test mention is not proof that this unsafe site executed.\n");
+    out.push_str("- Do not claim witness proof unless a matching receipt exists.\n");
+    out.push_str("- Do not widen unsafe scope, suppress the card, or change unrelated unsafe code to silence this review item.\n");
 }
 
 fn missing_summary(card: &ReviewCard) -> String {
@@ -362,6 +391,20 @@ mod tests {
         assert!(rendered.contains("Missing visible local guard"));
         assert!(rendered.contains("## Recommended witness routes"));
         assert!(rendered.contains("Pure-Rust UB-adjacent hazard"));
+        assert!(rendered.contains("## What would resolve this"));
+        assert!(rendered.contains(
+            "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation."
+        ));
+        assert!(rendered.contains("## What would not resolve this"));
+        assert!(
+            rendered
+                .contains("A `SAFETY:` comment alone does not discharge missing guard evidence.")
+        );
+        assert!(
+            rendered
+                .contains("A related test mention is not proof that this unsafe site executed.")
+        );
+        assert!(rendered.contains("Do not claim witness proof unless a matching receipt exists."));
         assert!(rendered.contains("does not prove site execution"));
         assert!(rendered.contains("## Trust boundary"));
         Ok(())
