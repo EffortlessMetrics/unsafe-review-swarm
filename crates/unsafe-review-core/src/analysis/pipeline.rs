@@ -1885,6 +1885,40 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn copy_range_evidence_accepts_conjunctive_slice_length_guards() -> Result<(), String> {
+        for (fixture, missing_key) in [
+            (
+                "copy_nonoverlapping_slice_range_conjunctive_assert_guard",
+                "non-overlap",
+            ),
+            (
+                "copy_nonoverlapping_slice_range_conjunctive_open_branch_guard",
+                "non-overlap",
+            ),
+            (
+                "ptr_copy_slice_range_conjunctive_assert_guard",
+                "initialized",
+            ),
+            (
+                "ptr_copy_slice_range_conjunctive_open_branch_guard",
+                "initialized",
+            ),
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+            assert!(
+                obligation_discharge_present(card, "valid-range"),
+                "{fixture} should accept conjunctive source/destination slice range evidence"
+            );
+            assert!(
+                !obligation_discharge_present(card, missing_key),
+                "{fixture} should not prove {missing_key}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn copy_range_evidence_accepts_slice_length_early_returns() -> Result<(), String> {
         let copy_nonoverlapping =
             fixture_output("copy_nonoverlapping_slice_range_early_return_guard")?;
