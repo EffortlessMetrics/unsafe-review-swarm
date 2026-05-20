@@ -245,10 +245,56 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     ])?;
     let lsp = parse_json(&fs::read_to_string(&lsp_path)?)?;
     assert_eq!(lsp["mode"], "read_only_projection");
+    assert_eq!(lsp["policy"], "advisory");
+    assert_eq!(lsp["scope"], "diff");
     assert_eq!(lsp["status"]["state"], "actionable");
     assert_eq!(lsp["status"]["cards"], 1);
-    assert_eq!(lsp["diagnostics"][0]["card_id"], card_id);
-    assert_eq!(lsp["hovers"][0]["card_id"], card_id);
+    assert_eq!(lsp["status"]["open_actionable_gaps"], 1);
+    assert_eq!(lsp["status"]["high_priority_cards"], 1);
+    assert!(
+        lsp["status"]["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not UB-free status")
+    );
+    let diagnostic = &lsp["diagnostics"][0];
+    assert_eq!(diagnostic["card_id"], card_id);
+    assert_eq!(diagnostic["path"], value["cards"][0]["site"]["file"]);
+    assert_eq!(diagnostic["code"], value["cards"][0]["class"]);
+    assert_eq!(
+        diagnostic["operation_family"],
+        value["cards"][0]["operation_family"]
+    );
+    assert_eq!(diagnostic["hazards"], value["cards"][0]["hazards"]);
+    assert_eq!(diagnostic["missing_evidence"], value["cards"][0]["missing"]);
+    assert!(
+        diagnostic["message"]
+            .as_str()
+            .unwrap_or("")
+            .contains("raw_pointer_read: Add or expose the local guard")
+    );
+    assert!(
+        diagnostic["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not a proof of memory safety")
+    );
+    let hover = &lsp["hovers"][0];
+    assert_eq!(hover["card_id"], card_id);
+    assert_eq!(hover["path"], value["cards"][0]["site"]["file"]);
+    let hover_contents = hover["contents"].as_str().unwrap_or("");
+    assert!(hover_contents.contains("unsafe-review `guard_missing` for `raw_pointer_read`"));
+    assert!(hover_contents.contains("Required safety conditions"));
+    assert!(hover_contents.contains("pointer is aligned for the accessed type"));
+    assert!(hover_contents.contains("Missing visible local guard for inferred safety obligations"));
+    assert!(hover_contents.contains("Witness route: `miri` because"));
+    assert!(hover_contents.contains("not a Miri result"));
+    assert!(
+        hover["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not UB-free status")
+    );
     assert_eq!(
         lsp["code_actions"][0]["command"],
         "unsafe-review.copyAgentPacket"
@@ -258,6 +304,24 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
             .iter()
             .any(|action| action["command"] == "unsafe-review.openRelatedTest")
     }));
+    assert!(lsp["code_actions"].as_array().is_some_and(|actions| {
+        actions.iter().any(|action| {
+            action["command"] == "unsafe-review.copyWitnessCommand"
+                && action["arguments"][0]
+                    .as_str()
+                    .unwrap_or("")
+                    .contains("cargo +nightly miri test read_header")
+        })
+    }));
+    let lsp_text = serde_json::to_string(&lsp)?;
+    assert!(!lsp_text.contains("\"edit\""));
+    assert!(!lsp_text.contains("workspace/applyEdit"));
+    assert!(
+        lsp["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not a Miri result")
+    );
 
     let witness_plan_path = temp.path().join("witness-plan.md");
     run_success([
