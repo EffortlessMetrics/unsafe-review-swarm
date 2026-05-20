@@ -91,6 +91,11 @@ Raw pointer read len/capacity evidence is pinned for same-source assertions and
 rejects another container's len/capacity assertion, bare equality observations,
 and closed equality branches.
 
+Copy operation range evidence is intentionally conservative:
+`copy_nonoverlapping_other_len_not_guard` and `ptr_copy_other_len_not_guard`
+pin that an unrelated slice length assertion does not discharge the
+source/destination range obligation.
+
 | Capability | Tier | Surface | Proof | Known limits |
 |---|---|---|---|---|
 | Diff unsafe site inventory | experimental | CLI JSON/human | syntax-backed fixture goldens for unsafe blocks, split unsafe blocks, raw pointer operations, long unsafe-function owner inference, macro owner inference, and exact false-positive controls including `safe_code_no_cards`, `imports_not_unsafe_operations`, `cfg_target_feature_not_operation`, `attributed_unsafe_fn_no_duplicate`, `inline_unsafe_raw_pointer_deref_no_duplicate`, `impl_trait_bound_owner_inference`, `long_unsafe_fn_owner_inference`, `macro_rules_owner_inference`, `nested_unsafe_operation_call_dedupe`, and `adjacent_unchanged_unsafe_fn_no_card` | source-based, not MIR |

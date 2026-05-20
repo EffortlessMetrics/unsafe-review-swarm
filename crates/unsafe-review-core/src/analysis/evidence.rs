@@ -447,6 +447,13 @@ fn has_bounds_guard(site: &ScannedSite, lower: &str) -> bool {
     {
         return true;
     }
+    if matches!(
+        site.operation.family,
+        OperationFamily::CopyNonOverlapping | OperationFamily::PtrCopy
+    ) {
+        // A generic length comparison does not prove both copy source and destination ranges.
+        return false;
+    }
     has_length_or_bounds_guard(&guard_scope)
 }
 

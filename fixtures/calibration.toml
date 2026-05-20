@@ -132,8 +132,10 @@ required_core_fixtures = [
   "raw_pointer_write_volatile_null_other_pointer_not_guard",
   "raw_pointer_write_volatile_null_post_check_not_guard",
   "ptr_copy_overlapping",
+  "ptr_copy_other_len_not_guard",
   "ptr_replace_value",
   "copy_nonoverlapping",
+  "copy_nonoverlapping_other_len_not_guard",
   "str_from_utf8_unchecked",
   "str_from_utf8_unchecked_is_ok_guard",
   "str_from_utf8_unchecked_is_err_return_guard",
@@ -1532,9 +1534,29 @@ expected_operation_family = "copy_nonoverlapping"
 expected_hazard = "aliasing_or_provenance"
 
 [[cases]]
+fixture = "copy_nonoverlapping_other_len_not_guard"
+kind = "false_positive_control"
+claim = "copy_nonoverlapping does not accept an unrelated slice length assertion as source/destination range evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
 fixture = "ptr_copy_overlapping"
 kind = "positive"
 claim = "ptr::copy reports overlapping-copy range obligations instead of a generic unsafe function call or copy_nonoverlapping non-overlap obligation"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_other_len_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy does not accept an unrelated slice length assertion as source/destination range evidence"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

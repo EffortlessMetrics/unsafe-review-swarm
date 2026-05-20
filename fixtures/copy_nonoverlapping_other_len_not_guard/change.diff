@@ -1,0 +1,28 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,21 @@
++pub fn copy_bytes_with_other_len(
++    src: *const u8,
++    dst: *mut u8,
++    count: usize,
++    other: &[u8],
++) {
++    assert!(other.len() >= count);
++    // SAFETY: fixture checks that an unrelated slice length is not copy range evidence.
++    unsafe { core::ptr::copy_nonoverlapping(src, dst, count) }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::copy_bytes_with_other_len;
++
++    #[test]
++    fn copies_bytes() {
++        let src = [1_u8, 2, 3, 4];
++        let mut dst = [0_u8; 4];
++        let other = [0_u8; 4];
++        copy_bytes_with_other_len(src.as_ptr(), dst.as_mut_ptr(), src.len(), &other);
++        assert_eq!(dst, src);
++    }
++}
