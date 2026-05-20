@@ -124,8 +124,8 @@ pub fn render_markdown(report: &OutcomeReport) -> String {
             for card in cards {
                 out.push_str(&format!(
                     "| `{status}` | `{}` | {} | {} | {} |\n",
-                    card.card_id,
-                    card.reason,
+                    markdown_cell(&card.card_id),
+                    markdown_cell(&card.reason),
                     markdown_state(card.before.as_ref()),
                     markdown_state(card.after.as_ref())
                 ));
@@ -397,10 +397,21 @@ fn markdown_state(state: Option<&OutcomeCardState>) -> String {
     match state {
         Some(state) => format!(
             "`{}` / `{}` / {} missing / witness `{}`",
-            state.class_name, state.priority, state.missing_count, state.witness
+            markdown_cell(&state.class_name),
+            markdown_cell(&state.priority),
+            state.missing_count,
+            markdown_cell(&state.witness)
         ),
         None => "-".to_string(),
     }
+}
+
+fn markdown_cell(value: &str) -> String {
+    value
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .replace('|', "\\|")
 }
 
 impl From<&Snapshot> for OutcomeSnapshotSummary {
@@ -569,6 +580,27 @@ mod tests {
         assert!(markdown.contains("## Limitations"));
         assert!(markdown.contains("## Trust boundary"));
         assert!(markdown.contains("UR-new-c1"));
+        Ok(())
+    }
+
+    #[test]
+    fn outcome_markdown_escapes_table_cells() -> Result<(), String> {
+        let before = snapshot_json(&[]);
+        let after = snapshot_json(&[card_with_witness(
+            "UR-pipe|card-c1",
+            "guard|missing",
+            "high",
+            &["guard"],
+            "Imported miri receipt with `ran|odd` strength: focused fixture witness passed",
+        )]);
+        let report = compare_json(&before, &after)?;
+
+        let markdown = render_markdown(&report);
+
+        assert!(markdown.contains("`UR-pipe\\|card-c1`"));
+        assert!(markdown.contains("`guard\\|missing`"));
+        assert!(markdown.contains("witness `ran\\|odd`"));
+        assert!(!markdown.contains("`UR-pipe|card-c1`"));
         Ok(())
     }
 
