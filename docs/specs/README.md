@@ -22,6 +22,7 @@ Specs define behavior. They do not carry the PR queue.
 16. [Fixtures, calibration, support tiers](UNSAFE-REVIEW-SPEC-0016-fixtures-calibration-support.md)
 17. [Security and file policy](UNSAFE-REVIEW-SPEC-0017-security-file-policy.md)
 18. [Live LSP server](UNSAFE-REVIEW-SPEC-0018-live-lsp-server.md)
+19. [First-run cockpit (0.2.0 lane)](UNSAFE-REVIEW-SPEC-0019-first-run-cockpit.md)
 
 
 ## Appendices
