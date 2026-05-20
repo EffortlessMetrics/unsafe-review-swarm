@@ -21,6 +21,7 @@ Specs define behavior. They do not carry the PR queue.
 15. [Public API and crate surface](UNSAFE-REVIEW-SPEC-0015-public-api-crate-surface.md)
 16. [Fixtures, calibration, support tiers](UNSAFE-REVIEW-SPEC-0016-fixtures-calibration-support.md)
 17. [Security and file policy](UNSAFE-REVIEW-SPEC-0017-security-file-policy.md)
+18. [Live LSP server](UNSAFE-REVIEW-SPEC-0018-live-lsp-server.md)
 
 
 ## Appendices
