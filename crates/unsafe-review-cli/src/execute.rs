@@ -109,7 +109,12 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         "- Open actionable gaps: {}",
         output.summary.open_actionable_gaps
     );
-    if let Some(card) = output.cards.first() {
+    if output.summary.open_actionable_gaps == 0 {
+        println!("No changed unsafe-review gaps were found.");
+        println!(
+            "This does not prove the repo safe, not UB-free status, not a Miri-clean claim, and not proof that any unsafe site executed."
+        );
+    } else if let Some(card) = output.cards.first() {
         println!("Top action:");
         println!(
             "  {}:{} `{}`",

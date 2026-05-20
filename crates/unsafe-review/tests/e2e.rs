@@ -650,6 +650,56 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
 }
 
 #[test]
+fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("safe_code_no_cards");
+    let temp = TempDir::new("unsafe-review-first-pr-clean-e2e")?;
+    let out_dir = temp.path().join("unsafe-review");
+
+    let output = run_success([
+        os("first-pr"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--out-dir"),
+        out_dir.as_os_str().to_os_string(),
+    ])?;
+    let stdout = stdout_text(&output)?;
+
+    assert!(stdout.contains("unsafe-review first-pr"));
+    assert!(stdout.contains("- Review cards: 0"));
+    assert!(stdout.contains("- Open actionable gaps: 0"));
+    assert!(stdout.contains("No changed unsafe-review gaps were found."));
+    assert!(stdout.contains("This does not prove the repo safe"));
+    assert!(stdout.contains("not UB-free status"));
+    assert!(stdout.contains("not a Miri-clean claim"));
+    assert!(!stdout.contains("All clear"));
+
+    let cards = parse_json(&fs::read_to_string(out_dir.join("cards.json"))?)?;
+    assert_eq!(cards["summary"]["cards"], 0);
+    assert_eq!(cards["summary"]["open_actionable_gaps"], 0);
+    assert!(
+        cards["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not a proof of memory safety")
+    );
+
+    let summary = fs::read_to_string(out_dir.join("pr-summary.md"))?;
+    assert!(summary.contains("No actionable unsafe-review cards found."));
+    assert!(summary.contains("not a proof of memory safety"));
+    assert!(!summary.contains("All clear"));
+
+    let witness_plan = fs::read_to_string(out_dir.join("witness-plan.md"))?;
+    assert!(witness_plan.contains("No witness routes are recommended"));
+    assert!(witness_plan.contains("not UB-free status"));
+    assert!(!witness_plan.contains("Miri passed"));
+    assert!(!witness_plan.contains("site reached"));
+
+    Ok(())
+}
+
+#[test]
 fn check_reports_missing_diff_file_as_cli_failure() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("safe_code_no_cards");
     let missing_diff = fixture.join("missing.diff");
