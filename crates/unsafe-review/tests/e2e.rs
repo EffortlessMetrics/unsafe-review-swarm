@@ -940,6 +940,16 @@ fn outcome_compares_existing_json_snapshots_without_safety_claim() -> Result<(),
     assert_eq!(outcome["summary"]["new"], 1);
     assert_eq!(outcome["summary"]["resolved"], 0);
     assert!(outcome["cards"]["new"][0]["card_id"].is_string());
+    let after_state = &outcome["cards"]["new"][0]["after"];
+    assert_eq!(after_state["site"]["file"], "src/lib.rs");
+    assert_eq!(after_state["site"]["line"], 8);
+    assert_eq!(after_state["site"]["kind"], "operation");
+    assert_eq!(after_state["site"]["owner"], "read_header");
+    assert_eq!(after_state["operation_family"], "raw_pointer_read");
+    assert!(after_state["hazards"].as_array().is_some_and(|hazards| {
+        hazards.iter().any(|hazard| hazard == "pointer_validity")
+            && hazards.iter().any(|hazard| hazard == "alignment")
+    }));
     assert!(
         outcome["cards"]["new"][0]["reason"]
             .as_str()
@@ -978,6 +988,11 @@ fn outcome_compares_existing_json_snapshots_without_safety_claim() -> Result<(),
     let markdown = stdout_text(&markdown)?;
     assert!(markdown.contains("# unsafe-review outcome"));
     assert!(markdown.contains("| Status | Card | Reason | Before | After |"));
+    assert!(markdown.contains("site `src/lib.rs:8`"));
+    assert!(markdown.contains("operation `raw_pointer_read`"));
+    assert!(markdown.contains("hazards `"));
+    assert!(markdown.contains("pointer_validity"));
+    assert!(markdown.contains("alignment"));
     assert!(markdown.contains("## Limitations"));
     assert!(markdown.contains("## Trust boundary"));
     assert!(markdown.contains("| 1 | 0 | 0 | 0 | 0 |"));

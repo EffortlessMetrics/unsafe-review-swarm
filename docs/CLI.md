@@ -160,8 +160,10 @@ unsafe-review outcome \
 
 Outcome comparison is read-only. It compares existing `ReviewCard` identities,
 classes, missing-evidence counts, and saved witness receipt strength from the
-supplied snapshots. It does not rerun analysis, run witnesses, post policy
-decisions, or claim repository safety.
+supplied snapshots. When saved snapshots include ReviewCard context, outcome
+card states also carry the site, operation family, and hazards so movement stays
+tied to the original unsafe seam. It does not rerun analysis, run witnesses,
+post policy decisions, or claim repository safety.
 
 ## Witness Receipts
 

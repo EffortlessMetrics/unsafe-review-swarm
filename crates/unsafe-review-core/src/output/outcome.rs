@@ -57,9 +57,23 @@ pub struct OutcomeCardState {
     #[serde(rename = "class")]
     pub class_name: String,
     pub priority: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub site: Option<OutcomeCardSite>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operation_family: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub hazards: Vec<String>,
     pub missing_count: usize,
     pub witness: String,
     pub missing: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct OutcomeCardSite {
+    pub file: String,
+    pub line: usize,
+    pub kind: String,
+    pub owner: String,
 }
 
 #[derive(Deserialize)]
@@ -82,9 +96,25 @@ struct SnapshotCard {
     class_name: String,
     priority: String,
     #[serde(default)]
+    site: Option<SnapshotSite>,
+    #[serde(default)]
+    operation_family: Option<String>,
+    #[serde(default)]
+    hazards: Vec<String>,
+    #[serde(default)]
     witness: String,
     #[serde(default)]
     missing: Vec<String>,
+}
+
+#[derive(Clone, Deserialize)]
+struct SnapshotSite {
+    file: String,
+    line: usize,
+    #[serde(default)]
+    kind: String,
+    #[serde(default)]
+    owner: String,
 }
 
 pub fn compare_json(before_json: &str, after_json: &str) -> Result<OutcomeReport, String> {
@@ -359,6 +389,18 @@ fn snapshot_id(snapshot: &Snapshot) -> String {
         feed_hash(&mut hash, &card.id);
         feed_hash(&mut hash, &card.class_name);
         feed_hash(&mut hash, &card.priority);
+        if let Some(site) = &card.site {
+            feed_hash(&mut hash, &site.file);
+            feed_hash(&mut hash, &site.line.to_string());
+            feed_hash(&mut hash, &site.kind);
+            feed_hash(&mut hash, &site.owner);
+        }
+        if let Some(operation_family) = &card.operation_family {
+            feed_hash(&mut hash, operation_family);
+        }
+        for hazard in &card.hazards {
+            feed_hash(&mut hash, hazard);
+        }
         feed_hash(&mut hash, &card.witness);
         for missing in &card.missing {
             feed_hash(&mut hash, missing);
@@ -396,13 +438,31 @@ impl OutcomeCards {
 
 fn markdown_state(state: Option<&OutcomeCardState>) -> String {
     match state {
-        Some(state) => format!(
-            "`{}` / `{}` / {} missing / witness `{}`",
-            markdown_cell(&state.class_name),
-            markdown_cell(&state.priority),
-            state.missing_count,
-            markdown_cell(&state.witness)
-        ),
+        Some(state) => {
+            let mut parts = vec![
+                format!("`{}`", markdown_cell(&state.class_name)),
+                format!("`{}`", markdown_cell(&state.priority)),
+                format!("{} missing", state.missing_count),
+                format!("witness `{}`", markdown_cell(&state.witness)),
+            ];
+            if let Some(site) = &state.site {
+                parts.push(format!(
+                    "site `{}:{}`",
+                    markdown_cell(&site.file),
+                    site.line
+                ));
+            }
+            if let Some(operation_family) = &state.operation_family {
+                parts.push(format!("operation `{}`", markdown_cell(operation_family)));
+            }
+            if !state.hazards.is_empty() {
+                parts.push(format!(
+                    "hazards `{}`",
+                    markdown_cell(&state.hazards.join(", "))
+                ));
+            }
+            parts.join(" / ")
+        }
         None => "-".to_string(),
     }
 }
@@ -426,9 +486,23 @@ impl From<&SnapshotCard> for OutcomeCardState {
         Self {
             class_name: card.class_name.clone(),
             priority: card.priority.clone(),
+            site: card.site.as_ref().map(OutcomeCardSite::from),
+            operation_family: card.operation_family.clone(),
+            hazards: card.hazards.clone(),
             missing_count: card.missing.len(),
             witness: witness_state(card).label,
             missing: card.missing.clone(),
+        }
+    }
+}
+
+impl From<&SnapshotSite> for OutcomeCardSite {
+    fn from(site: &SnapshotSite) -> Self {
+        Self {
+            file: site.file.clone(),
+            line: site.line,
+            kind: site.kind.clone(),
+            owner: site.owner.clone(),
         }
     }
 }
@@ -581,6 +655,59 @@ mod tests {
     }
 
     #[test]
+    fn outcome_card_state_preserves_saved_review_card_context() -> Result<(), String> {
+        let before = snapshot_json(&[]);
+        let after = snapshot_json(&[card_with_context(
+            "UR-context-c1",
+            "guard_missing",
+            "high",
+            &["alignment guard", "witness"],
+            "src/lib.rs",
+            42,
+            "operation",
+            "read_header",
+            "raw_pointer_read",
+            &["pointer_validity", "alignment"],
+        )]);
+
+        let report = compare_json(&before, &after)?;
+        let state = report.cards.new[0]
+            .after
+            .as_ref()
+            .ok_or("new card should include after state")?;
+
+        let site = state
+            .site
+            .as_ref()
+            .ok_or("saved ReviewCard site should be preserved")?;
+        assert_eq!(site.file, "src/lib.rs");
+        assert_eq!(site.line, 42);
+        assert_eq!(site.kind, "operation");
+        assert_eq!(site.owner, "read_header");
+        assert_eq!(state.operation_family.as_deref(), Some("raw_pointer_read"));
+        assert_eq!(state.hazards, ["pointer_validity", "alignment"]);
+
+        let json = render_json(&report);
+        let value: serde_json::Value =
+            serde_json::from_str(&json).map_err(|err| format!("parse JSON failed: {err}"))?;
+        assert_eq!(
+            value["cards"]["new"][0]["after"]["operation_family"],
+            "raw_pointer_read"
+        );
+        assert_eq!(
+            value["cards"]["new"][0]["after"]["site"]["owner"],
+            "read_header"
+        );
+        assert_eq!(value["cards"]["new"][0]["after"]["hazards"][1], "alignment");
+
+        let markdown = render_markdown(&report);
+        assert!(markdown.contains("site `src/lib.rs:42`"));
+        assert!(markdown.contains("operation `raw_pointer_read`"));
+        assert!(markdown.contains("hazards `pointer_validity, alignment`"));
+        Ok(())
+    }
+
+    #[test]
     fn outcome_markdown_escapes_table_cells() -> Result<(), String> {
         let before = snapshot_json(&[]);
         let after = snapshot_json(&[card_with_witness(
@@ -728,6 +855,51 @@ mod tests {
 
     fn card(id: &str, class_name: &str, priority: &str, missing: &[&str]) -> String {
         card_with_witness(id, class_name, priority, missing, "")
+    }
+
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "test fixture helper keeps ReviewCard context fields explicit"
+    )]
+    fn card_with_context(
+        id: &str,
+        class_name: &str,
+        priority: &str,
+        missing: &[&str],
+        file: &str,
+        line: usize,
+        kind: &str,
+        owner: &str,
+        operation_family: &str,
+        hazards: &[&str],
+    ) -> String {
+        let missing = missing
+            .iter()
+            .map(|item| format!(r#""{item}""#))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let hazards = hazards
+            .iter()
+            .map(|item| format!(r#""{item}""#))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!(
+            r#"{{
+      "id": "{id}",
+      "class": "{class_name}",
+      "priority": "{priority}",
+      "site": {{
+        "file": "{file}",
+        "line": {line},
+        "kind": "{kind}",
+        "owner": "{owner}"
+      }},
+      "operation_family": "{operation_family}",
+      "hazards": [{hazards}],
+      "witness": "",
+      "missing": [{missing}]
+    }}"#
+        )
     }
 
     fn card_with_witness(

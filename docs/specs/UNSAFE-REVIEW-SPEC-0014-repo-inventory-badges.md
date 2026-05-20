@@ -111,6 +111,9 @@ separate policy surfaces and are not part of badge proof.
 - Each outcome card includes a reason that explains the snapshot movement, such
   as a class change, missing-evidence count change, witness receipt strength
   movement, new card, or resolved card.
+- When the saved snapshots include ReviewCard context, each outcome card state
+  preserves the card site, operation family, and hazards. Outcome comparison
+  uses that context for reporting only; it does not reclassify cards.
 - If evidence is not knowable statically, repo output and badges count the
   card state instead of overclaiming.
 
