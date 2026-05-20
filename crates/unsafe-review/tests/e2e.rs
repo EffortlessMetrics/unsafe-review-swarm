@@ -781,6 +781,123 @@ fn outcome_reports_receipt_regression_without_policy_claim() -> Result<(), Box<d
 }
 
 #[test]
+fn outcome_rejects_invalid_saved_snapshots_at_cli_boundary() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-outcome-invalid-snapshot-e2e")?;
+    let before_path = temp.path().join("before.json");
+    let after_path = temp.path().join("after.json");
+    let duplicate_path = temp.path().join("duplicate.json");
+    let count_mismatch_path = temp.path().join("count-mismatch.json");
+
+    fs::write(
+        &before_path,
+        r#"{
+  "schema_version": "0.1",
+  "summary": {
+    "cards": 0,
+    "open_actionable_gaps": 0
+  },
+  "cards": []
+}
+"#,
+    )?;
+    fs::write(
+        &after_path,
+        r#"{
+  "schema_version": "0.1",
+  "summary": {
+    "cards": 0,
+    "open_actionable_gaps": 0
+  },
+  "cards": []
+}
+"#,
+    )?;
+    fs::write(
+        &duplicate_path,
+        r#"{
+  "schema_version": "0.1",
+  "summary": {
+    "cards": 2,
+    "open_actionable_gaps": 2
+  },
+  "cards": [
+    {
+      "id": "UR-duplicate-card-c1",
+      "class": "guard_missing",
+      "priority": "high",
+      "witness": "No imported witness receipt was found",
+      "missing": ["Missing visible local guard for alignment"]
+    },
+    {
+      "id": "UR-duplicate-card-c1",
+      "class": "contract_missing",
+      "priority": "high",
+      "witness": "No imported witness receipt was found",
+      "missing": ["Missing # Safety contract"]
+    }
+  ]
+}
+"#,
+    )?;
+    fs::write(
+        &count_mismatch_path,
+        r#"{
+  "schema_version": "0.1",
+  "summary": {
+    "cards": 2,
+    "open_actionable_gaps": 1
+  },
+  "cards": [
+    {
+      "id": "UR-count-mismatch-card-c1",
+      "class": "guard_missing",
+      "priority": "high",
+      "witness": "No imported witness receipt was found",
+      "missing": ["Missing visible local guard for alignment"]
+    }
+  ]
+}
+"#,
+    )?;
+
+    let duplicate = run_failure([
+        os("outcome"),
+        os("--before"),
+        before_path.as_os_str().to_os_string(),
+        os("--after"),
+        duplicate_path.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    assert_eq!(stdout_text(&duplicate)?.trim(), "");
+    let stderr = String::from_utf8_lossy(&duplicate.stderr);
+    assert!(stderr.contains("unsafe-review:"), "stderr: {stderr}");
+    assert!(
+        stderr.contains("after snapshot contains duplicate card id"),
+        "stderr: {stderr}"
+    );
+
+    let mismatch = run_failure([
+        os("outcome"),
+        os("--before"),
+        count_mismatch_path.as_os_str().to_os_string(),
+        os("--after"),
+        after_path.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    assert_eq!(stdout_text(&mismatch)?.trim(), "");
+    let stderr = String::from_utf8_lossy(&mismatch.stderr);
+    assert!(stderr.contains("unsafe-review:"), "stderr: {stderr}");
+    assert!(
+        stderr.contains("before snapshot summary card count 2 does not match 1 card object(s)"),
+        "stderr: {stderr}"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn check_json_imports_witness_receipts_without_hiding_guard_gaps() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment_receipted");
 
