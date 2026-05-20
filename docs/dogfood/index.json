@@ -61,7 +61,7 @@
       "repository": "smol-rs/async-task",
       "snapshot_targets": ["async-task-capped"],
       "pr_diff_targets": [],
-      "primary_exercise": "RawWaker, Pin::new_unchecked, NonNull, drop/deallocation, raw pointer task state, and unsafe Send/Sync cards"
+      "primary_exercise": "RawWaker, unsafe function pointer fields, Pin::new_unchecked, NonNull, drop/deallocation, raw pointer task state, and unsafe Send/Sync cards"
     }
   ],
   "recorded_outcomes": [
