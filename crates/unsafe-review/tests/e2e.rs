@@ -504,9 +504,54 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
         OsString::from(card_id),
     ])?;
     let explain = stdout_text(&explain)?;
+    assert!(explain.contains(&format!("# unsafe-review card `{card_id}`")));
+    assert!(explain.contains("**Class:** `guard_missing`"));
+    assert!(explain.contains("**Location:** src/lib.rs:8"));
+    assert!(explain.contains("**Operation:** `unsafe { ptr.cast::<Header>().read() }`"));
     assert!(explain.contains("## Required safety conditions"));
+    assert!(explain.contains("- pointer is live and dereferenceable for the accessed type"));
+    assert!(explain.contains("- pointer is aligned for the accessed type"));
+    assert!(explain.contains("## Hazards"));
+    assert!(explain.contains("- `pointer_validity`"));
+    assert!(explain.contains("- `alignment`"));
+    assert!(explain.contains("## Evidence"));
+    assert!(explain.contains("- Contract: Nearby `SAFETY:` comment was detected"));
+    assert!(explain.contains(
+        "- Discharge: Some inferred safety obligations are missing local guard evidence"
+    ));
+    assert!(explain.contains("- Reach: 1 related test file(s) mention owner `read_header`"));
+    assert!(
+        explain.contains(
+            "- Reach note: static reach evidence only; it does not prove site execution."
+        )
+    );
+    assert!(explain.contains("- Witness: No imported witness receipt was found"));
+    assert!(explain.contains("## Obligation evidence"));
+    assert!(explain.contains(
+        "- `bounds`: contract `present`, guard `present`, reach `present`, witness `missing`"
+    ));
+    assert!(explain.contains(
+        "- `alignment`: contract `present`, guard `missing`, reach `present`, witness `missing`"
+    ));
+    assert!(explain.contains("## Missing evidence"));
+    assert!(explain.contains("- Missing visible local guard for inferred safety obligations"));
+    assert!(explain.contains("- No witness receipt imported for this card"));
     assert!(explain.contains("## Recommended witness routes"));
+    assert!(explain.contains("- `miri`: Pure-Rust UB-adjacent hazard"));
+    assert!(explain.contains("cargo +nightly miri test read_header"));
+    assert!(explain.contains(
+        "- `cargo-careful`: cargo-careful is a cheaper compatibility-oriented runtime check"
+    ));
+    assert!(explain.contains("cargo +nightly careful test read_header"));
+    assert!(explain.contains("## Next action"));
+    assert!(explain.contains(
+        "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation."
+    ));
     assert!(explain.contains("## Trust boundary"));
+    assert!(explain.contains("not a proof of memory safety"));
+    assert!(explain.contains("not a Miri result unless a witness receipt is attached"));
+    assert!(!explain.contains("Miri passed"));
+    assert!(!explain.contains("site reached"));
 
     Ok(())
 }
