@@ -340,8 +340,9 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     assert!(witness_plan.contains("- Review cards: 1"));
     assert!(witness_plan.contains("- Open actionable gaps: 1"));
     assert!(witness_plan.contains("- Policy mode: `advisory`"));
-    assert!(witness_plan.contains("## Routes"));
-    assert!(witness_plan.contains(&format!("### `{card_id}`")));
+    assert!(witness_plan.contains("## Route groups"));
+    assert!(witness_plan.contains("### Miri / cargo-careful"));
+    assert!(witness_plan.contains(&format!("#### `{card_id}`")));
     assert!(witness_plan.contains("- Class: `guard_missing`"));
     assert!(witness_plan.contains("- Location: src/lib.rs:8"));
     assert!(witness_plan.contains("- Operation: `unsafe { ptr.cast::<Header>().read() }`"));
@@ -360,6 +361,9 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
         witness_plan.contains("cargo-careful is a cheaper compatibility-oriented runtime check")
     );
     assert!(witness_plan.contains("cargo +nightly careful test read_header"));
+    assert!(witness_plan.contains("What it can show"));
+    assert!(witness_plan.contains("What it cannot prove"));
+    assert!(witness_plan.contains("unsafe-review receipt import-miri"));
     assert!(witness_plan.contains("## Trust boundary"));
     assert!(witness_plan.contains("does not run Miri"));
     assert!(
@@ -662,8 +666,11 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
 
     let witness_plan = fs::read_to_string(out_dir.join("witness-plan.md"))?;
     assert!(witness_plan.contains("# unsafe-review witness plan"));
-    assert!(witness_plan.contains(&format!("### `{card_id}`")));
+    assert!(witness_plan.contains("### Miri / cargo-careful"));
+    assert!(witness_plan.contains(&format!("#### `{card_id}`")));
     assert!(witness_plan.contains("does not run Miri"));
+    assert!(witness_plan.contains("Receipt hint"));
+    assert!(witness_plan.contains("unsafe-review receipt import-miri"));
     assert!(
         witness_plan
             .contains("does not run Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux")

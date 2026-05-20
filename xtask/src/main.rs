@@ -1440,8 +1440,11 @@ fn check_witness_plan_artifact(dir: &Path, card_count: usize) -> Result<(), Stri
     require_text_contains(&text, "not UB-free status", &path)?;
     require_text_contains(&text, "not a Miri result", &path)?;
     if card_count > 0 {
-        require_text_contains(&text, "## Routes", &path)?;
+        require_text_contains(&text, "## Route groups", &path)?;
         require_text_contains(&text, "- Route:", &path)?;
+        require_text_contains(&text, "What it can show", &path)?;
+        require_text_contains(&text, "What it cannot prove", &path)?;
+        require_text_contains(&text, "Receipt hint", &path)?;
     } else {
         require_text_contains(&text, "No changed unsafe-review gaps were found.", &path)?;
         require_text_contains(&text, "unsafe site executed", &path)?;
@@ -1565,6 +1568,7 @@ fn reject_positive_overclaims(path: &Path, text: &str) -> Result<(), String> {
             && !lower.contains("not miri-clean")
             && !lower.contains("not a miri-clean")
             && !lower.contains("not miri clean")
+            && !lower.contains("cannot prove")
             && !lower.contains("does not")
         {
             return Err(format!(
@@ -1576,6 +1580,7 @@ fn reject_positive_overclaims(path: &Path, text: &str) -> Result<(), String> {
         if lower.contains("ub-free")
             && !lower.contains("not ub-free")
             && !lower.contains("not a ub-free")
+            && !lower.contains("cannot prove")
             && !lower.contains("does not")
         {
             return Err(format!(
@@ -1584,7 +1589,11 @@ fn reject_positive_overclaims(path: &Path, text: &str) -> Result<(), String> {
                 line_no + 1
             ));
         }
-        if lower.contains("site reached") && !lower.contains("not") && !lower.contains("does not") {
+        if lower.contains("site reached")
+            && !lower.contains("not")
+            && !lower.contains("cannot prove")
+            && !lower.contains("does not")
+        {
             return Err(format!(
                 "{}:{} must not imply site execution",
                 path.display(),
@@ -4877,7 +4886,7 @@ impl WitnessKind {
         write_valid_first_pr_artifacts(&dir)?;
         fs::write(
             dir.join("witness-plan.md"),
-            "# unsafe-review witness plan\n\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Routes\n\n- Route: `miri`\n\nAll clear.\n\n## Trust boundary\n\nThis artifact is static unsafe contract review. It routes reviewers to credible witnesses but does not run Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux. It is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
+            "# unsafe-review witness plan\n\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Route groups\n\n### Miri / cargo-careful\n\n- Limit: Concrete runtime evidence is path-specific.\n\n#### `card-1`\n\n- Route: `miri`\n  - Reason: route\n  - What it can show: a focused run\n  - What it cannot prove: arbitrary callers\n  - Receipt hint: unsafe-review receipt import-miri card-1\n\nAll clear.\n\n## Trust boundary\n\nThis artifact is static unsafe contract review. It routes reviewers to credible witnesses but does not run Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux. It is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
         )
         .map_err(|err| format!("write witness plan failed: {err}"))?;
 
@@ -5436,7 +5445,7 @@ review_after = "2026-08-01"
         write_valid_artifacts(dir)?;
         fs::write(
             dir.join("witness-plan.md"),
-            "# unsafe-review witness plan\n\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Routes\n\n### `card-1`\n\n- Route: `miri`\n  - Reason: route\n  - Command:\n\n```bash\ncargo +nightly miri test card\n```\n\n## Trust boundary\n\nThis artifact is static unsafe contract review. It routes reviewers to credible witnesses but does not run Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux. It is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
+            "# unsafe-review witness plan\n\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Route groups\n\n### Miri / cargo-careful\n\n- Limit: Concrete runtime evidence is path-specific. It can support the exercised route, but it does not prove arbitrary callers, repo safety, UB-free status, or site execution unless a matching receipt records the run.\n\n#### `card-1`\n\n- Route: `miri`\n  - Reason: route\n  - What it can show: a focused run\n  - What it cannot prove: arbitrary callers\n  - Command:\n\n```bash\ncargo +nightly miri test card\n```\n  - Receipt hint: unsafe-review receipt import-miri card-1\n\n## Trust boundary\n\nThis artifact is static unsafe contract review. It routes reviewers to credible witnesses but does not run Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux. It is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
         )
         .map_err(|err| format!("write witness plan failed: {err}"))?;
         fs::write(

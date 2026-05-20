@@ -139,8 +139,11 @@ diagnostics, hovers, and command data for copying packets, copying witness
 commands, explaining routes, and opening statically related tests. There is no
 editor extension or live LSP server in this surface.
 
-`witness-plan` is a routing artifact. It lists suggested witness commands and
-limitations from existing cards, but it does not run those commands.
+`witness-plan` is a routing artifact. It groups existing `ReviewCard`s by
+witness family: Miri / `cargo-careful`, sanitizers, Loom / Shuttle, Kani /
+Crux, and human deep review / unsupported. Each route entry includes why that
+route fits, what it can show, what it cannot prove, a suggested command when one
+is available, and a receipt import hint. It does not run those commands.
 
 ## PR Artifacts
 
