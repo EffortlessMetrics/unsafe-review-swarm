@@ -822,6 +822,10 @@ fn doctor_reports_first_install_signals_without_running_witnesses() -> Result<()
     assert!(text.contains("git command:"));
     assert!(text.contains("git repository:"));
     assert!(text.contains("base ref origin/main:"));
+    assert!(text.contains("cargo metadata:"));
+    assert!(text.contains("artifact dir"));
+    assert!(text.contains("target"));
+    assert!(text.contains("unsafe-review"));
     assert!(text.contains("Witness tool signals"));
     assert!(text.contains("miri:"));
     assert!(text.contains("cargo-careful:"));
@@ -832,7 +836,9 @@ fn doctor_reports_first_install_signals_without_running_witnesses() -> Result<()
     assert!(text.contains("crux:"));
     assert!(text.contains("policy: advisory by default"));
     assert!(text.contains("witness execution: not run by doctor or by default"));
-    assert!(text.contains("trust boundary: static review evidence"));
+    assert!(text.contains("trust boundary: static unsafe contract review only"));
+    assert!(text.contains("not memory-safety proof"));
+    assert!(text.contains("not UB-free status"));
 
     Ok(())
 }

@@ -415,10 +415,11 @@ unsafe-review doctor
 ```
 
 `doctor` reports first-install signals: workspace root, Git availability,
-whether `origin/main` is visible, witness tool availability or configuration
-hints, advisory policy, and the trust boundary. Missing witness tools are
-reported, not treated as a default failure. The command does not run Miri,
-`cargo-careful`, sanitizers, Loom, Shuttle, Kani, Crux, or any witness test.
+whether `origin/main` is visible, Cargo metadata readiness, artifact directory
+writability, witness tool availability or configuration hints, advisory policy,
+and the trust boundary. Missing witness tools are reported, not treated as a
+default failure. The command does not run Miri, `cargo-careful`, sanitizers,
+Loom, Shuttle, Kani, Crux, or any witness test.
 
 ## Flag Forms
 

@@ -27,8 +27,10 @@ Check local environment signals:
 unsafe-review doctor
 ```
 
-Missing witness tools are informational. `doctor` does not run witnesses and
-does not make policy decisions.
+`doctor` checks Git/base-ref visibility, Cargo metadata readiness, artifact
+directory writability, and witness-tool hints. Missing witness tools are
+informational. `doctor` does not run witnesses and does not make policy
+decisions.
 
 Run against the current branch diff:
 
