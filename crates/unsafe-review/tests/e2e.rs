@@ -1106,6 +1106,83 @@ fn no_new_debt_policy_fails_only_for_unbaselined_actionable_gaps() -> Result<(),
 }
 
 #[test]
+fn suppression_policy_suppresses_only_exact_review_card_identity() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-suppression-e2e")?;
+    let copied = temp.path().join("fixture");
+    copy_dir_all(&fixture, &copied)?;
+
+    let advisory = run_success([
+        os("check"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--diff"),
+        copied.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let advisory = parse_json(&stdout_text(&advisory)?)?;
+    let card_id = json_str(&advisory["cards"][0]["id"], "cards[0].id")?;
+    write_suppression(&copied, card_id)?;
+
+    let passing = run_success([
+        os("check"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--diff"),
+        copied.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+        os("--policy"),
+        os("no-new-debt"),
+    ])?;
+    let passing = parse_json(&stdout_text(&passing)?)?;
+    assert_eq!(passing["policy"], "no-new-debt");
+    assert_eq!(passing["summary"]["open_actionable_gaps"], 0);
+    assert_eq!(passing["summary"]["guard_missing"], 0);
+    assert_eq!(passing["cards"][0]["id"], card_id);
+    assert_eq!(passing["cards"][0]["class"], "suppressed");
+    assert_eq!(passing["cards"][0]["priority"], "low");
+
+    let report = run_success([
+        os("policy"),
+        os("report"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--diff"),
+        copied.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let report = parse_json(&stdout_text(&report)?)?;
+    assert_eq!(report["summary"]["new_gaps"], 0);
+    assert_eq!(report["summary"]["suppressed"], 1);
+    assert_eq!(report["cards"][0]["card_id"], card_id);
+    assert_eq!(report["cards"][0]["policy_status"], "suppressed");
+    assert!(
+        json_str(&report["trust_boundary"], "trust_boundary")?
+            .contains("does not enforce blocking policy")
+    );
+
+    let markdown = run_success([
+        os("policy"),
+        os("report"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--diff"),
+        copied.join("change.diff").into_os_string(),
+        os("--format"),
+        os("markdown"),
+    ])?;
+    let markdown = stdout_text(&markdown)?;
+    assert!(markdown.contains("| 1 | 0 | 0 | 1 | 0 | 0 |"));
+    assert!(markdown.contains("`suppressed`"));
+    assert!(markdown.contains("## Trust boundary"));
+
+    Ok(())
+}
+
+#[test]
 fn policy_report_is_advisory_and_counts_baseline_state() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment");
     let report = run_success([
@@ -1308,6 +1385,27 @@ owner = "core/policy"
 reason = "e2e no-new-debt baseline"
 evidence = "fixture card"
 review_after = "2026-08-01"
+"#
+        ),
+    )?;
+    Ok(())
+}
+
+fn write_suppression(root: &Path, card_id: &str) -> Result<(), Box<dyn Error>> {
+    let policy = root.join("policy");
+    fs::create_dir_all(&policy)?;
+    fs::write(
+        policy.join("unsafe-review-suppressions.toml"),
+        format!(
+            r#"schema_version = "0.1"
+status = "active"
+
+[[entries]]
+card_id = "{card_id}"
+owner = "core/policy"
+reason = "e2e exact suppression"
+evidence = "fixture card"
+expires = "2026-08-01"
 "#
         ),
     )?;
