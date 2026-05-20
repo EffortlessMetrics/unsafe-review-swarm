@@ -681,7 +681,77 @@ fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<()
     ] {
         assert!(card.get(key).is_some(), "repo card missing `{key}`");
     }
+    assert!(card["id"].as_str().unwrap_or("").starts_with("UR-"));
+    assert_eq!(card["class"], "guard_missing");
+    assert_eq!(card["priority"], "high");
+    assert_eq!(card["confidence"], "medium");
+    assert_eq!(card["site"]["file"], "src/lib.rs");
+    assert_eq!(card["site"]["line"], 8);
+    assert_eq!(card["site"]["owner"], "read_header");
+    assert_eq!(card["site"]["kind"], "operation");
     assert_eq!(card["operation_family"], "raw_pointer_read");
+    assert_eq!(card["hazards"][0], "pointer_validity");
+    assert!(
+        card["hazards"]
+            .as_array()
+            .is_some_and(|hazards| hazards.iter().any(|hazard| hazard == "alignment"))
+    );
+    assert!(card["obligations"].as_array().is_some_and(|obligations| {
+        obligations.iter().any(|obligation| {
+            obligation
+                .as_str()
+                .unwrap_or("")
+                .contains("pointer is aligned for the accessed type")
+        })
+    }));
+    assert!(
+        card["obligation_evidence"]
+            .as_array()
+            .is_some_and(|evidence| evidence.iter().any(|item| {
+                item["key"] == "bounds" && item["discharge"]["state"] == "present"
+            }))
+    );
+    assert!(
+        card["obligation_evidence"]
+            .as_array()
+            .is_some_and(|evidence| evidence.iter().any(|item| {
+                item["key"] == "alignment" && item["discharge"]["state"] == "missing"
+            }))
+    );
+    assert!(card["contract"].as_str().unwrap_or("").contains("SAFETY"));
+    assert!(
+        card["discharge"]
+            .as_str()
+            .unwrap_or("")
+            .contains("missing local guard evidence")
+    );
+    assert!(
+        card["reach"]
+            .as_str()
+            .unwrap_or("")
+            .contains("related test file")
+    );
+    assert!(
+        card["witness"]
+            .as_str()
+            .unwrap_or("")
+            .contains("No imported witness receipt")
+    );
+    assert!(card["missing"].as_array().is_some_and(|missing| {
+        missing.iter().any(|item| {
+            item.as_str()
+                .unwrap_or("")
+                .contains("Missing visible local guard for inferred safety obligations")
+        })
+    }));
+    assert!(card["verify_commands"].as_array().is_some_and(|commands| {
+        commands.iter().any(|command| {
+            command
+                .as_str()
+                .unwrap_or("")
+                .contains("cargo +nightly miri test read_header")
+        })
+    }));
     assert!(
         repo["trust_boundary"]
             .as_str()
@@ -720,13 +790,25 @@ fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<()
     ])?;
     let repo_markdown = stdout_text(&repo_markdown)?;
     assert!(repo_markdown.contains("# unsafe-review repo posture"));
+    assert!(repo_markdown.contains("| Cards | Open gaps | Contract missing | Guard missing | Guarded unwitnessed | Requires Loom | Miri unsupported | Static unknown |"));
+    assert!(repo_markdown.contains("| 1 | 1 | 0 | 1 | 0 | 0 | 0 | 0 |"));
     assert!(repo_markdown.contains("## Top classes"));
     assert!(repo_markdown.contains("| `guard_missing` | 1 |"));
     assert!(repo_markdown.contains("## Top operation families"));
     assert!(repo_markdown.contains("| `raw_pointer_read` | 1 |"));
+    assert!(repo_markdown.contains("## Witness routes"));
+    assert!(repo_markdown.contains("| `miri` | 1 |"));
+    assert!(repo_markdown.contains("## Cards"));
+    assert!(repo_markdown.contains("| ID | Class | Operation | Missing evidence | Route |"));
+    assert!(repo_markdown.contains("| `UR-"));
+    assert!(repo_markdown.contains("| `guard_missing` | `raw_pointer_read` |"));
+    assert!(repo_markdown.contains("Missing visible local guard for inferred safety obligations"));
+    assert!(repo_markdown.contains("No witness receipt imported for this card"));
+    assert!(repo_markdown.contains("| `miri` |"));
     assert!(repo_markdown.contains("## Trust boundary"));
     assert!(repo_markdown.contains("not raw unsafe usage"));
     assert!(repo_markdown.contains("not UB-free status"));
+    assert!(repo_markdown.contains("not a Miri result unless a witness receipt is attached"));
 
     Ok(())
 }
