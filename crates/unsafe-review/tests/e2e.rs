@@ -111,6 +111,52 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     let sarif = parse_json(&fs::read_to_string(&sarif_path)?)?;
     assert_eq!(sarif["version"], "2.1.0");
     assert!(sarif["runs"][0]["results"].is_array());
+    let sarif_result = &sarif["runs"][0]["results"][0];
+    let sarif_properties = &sarif_result["properties"];
+    assert_eq!(sarif_result["ruleId"], value["cards"][0]["class"]);
+    assert_eq!(sarif_properties["cardId"], card_id);
+    assert_eq!(sarif_properties["class"], value["cards"][0]["class"]);
+    assert_eq!(
+        sarif_properties["operationFamily"],
+        value["cards"][0]["operation_family"]
+    );
+    assert_eq!(
+        sarif_properties["operation"],
+        value["cards"][0]["site"]["snippet"]
+    );
+    assert_eq!(sarif_properties["hazards"], value["cards"][0]["hazards"]);
+    assert_eq!(
+        sarif_properties["missingEvidence"],
+        value["cards"][0]["missing"]
+    );
+    assert!(
+        sarif_properties["witnessRoutes"]
+            .as_array()
+            .is_some_and(|routes| routes.iter().any(|route| {
+                route
+                    .as_str()
+                    .unwrap_or("")
+                    .contains("Miri is the strongest concrete-execution witness")
+            }))
+    );
+    assert!(
+        sarif_properties["nextAction"]
+            .as_str()
+            .unwrap_or("")
+            .contains("raw_pointer_read` safety obligation")
+    );
+    assert!(
+        sarif_properties["trustBoundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not a Miri result")
+    );
+    assert!(
+        sarif["runs"][0]["properties"]["trustBoundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not UB-free status")
+    );
 
     let comment_plan = run_success([
         os("check"),
