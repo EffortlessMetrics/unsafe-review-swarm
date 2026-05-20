@@ -114,4 +114,5 @@ pub(crate) enum Command {
     ReceiptImportProof(SavedOutputReceiptOptions),
     Outcome(OutcomeOptions),
     PolicyReport(CheckOptions),
+    Lsp,
 }

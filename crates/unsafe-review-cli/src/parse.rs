@@ -34,6 +34,7 @@ pub(crate) fn parse(args: Vec<String>) -> Result<Command, String> {
         "policy" => parse_policy_command(rest),
         "receipt" => parse_receipt(rest),
         "receipt-template" => parse_receipt_template(rest).map(Command::ReceiptTemplate),
+        "lsp" => Ok(Command::Lsp),
         other => Err(format!(
             "unknown command `{other}`. Run `unsafe-review --help`."
         )),
@@ -732,6 +733,13 @@ mod tests {
             return Err("expected check command".to_string());
         };
         assert_eq!(options.format, Format::CommentPlan);
+        Ok(())
+    }
+
+    #[test]
+    fn parses_lsp_command() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "lsp"]))?;
+        assert_eq!(command, Command::Lsp);
         Ok(())
     }
 

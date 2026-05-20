@@ -44,6 +44,7 @@ pub(crate) fn execute(command: Command) -> Result<(), String> {
         Command::ReceiptImportProof(options) => receipt_import_proof(options),
         Command::Outcome(options) => outcome(options),
         Command::PolicyReport(options) => policy_report(options),
+        Command::Lsp => crate::lsp::serve(),
     }
 }
 
