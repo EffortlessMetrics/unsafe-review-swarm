@@ -508,6 +508,8 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     assert!(explain.contains("**Class:** `guard_missing`"));
     assert!(explain.contains("**Location:** src/lib.rs:8"));
     assert!(explain.contains("**Operation:** `unsafe { ptr.cast::<Header>().read() }`"));
+    assert!(explain.contains("**Operation family:** `raw_pointer_read`"));
+    assert!(explain.contains("## Why this card exists"));
     assert!(explain.contains("## Required safety conditions"));
     assert!(explain.contains("- pointer is live and dereferenceable for the accessed type"));
     assert!(explain.contains("- pointer is aligned for the accessed type"));
@@ -536,14 +538,13 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     assert!(explain.contains("## Missing evidence"));
     assert!(explain.contains("- Missing visible local guard for inferred safety obligations"));
     assert!(explain.contains("- No witness receipt imported for this card"));
-    assert!(explain.contains("## Recommended witness routes"));
+    assert!(explain.contains("## Witness route"));
     assert!(explain.contains("- `miri`: Pure-Rust UB-adjacent hazard"));
     assert!(explain.contains("cargo +nightly miri test read_header"));
     assert!(explain.contains(
         "- `cargo-careful`: cargo-careful is a cheaper compatibility-oriented runtime check"
     ));
     assert!(explain.contains("cargo +nightly careful test read_header"));
-    assert!(explain.contains("## Next action"));
     assert!(explain.contains(
         "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation."
     ));
@@ -560,9 +561,11 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
         explain.contains("A related test mention is not proof that this unsafe site executed.")
     );
     assert!(explain.contains("Do not claim witness proof unless a matching receipt exists."));
+    assert!(explain.contains("## Witness route"));
     assert!(explain.contains("## Trust boundary"));
     assert!(explain.contains("not a proof of memory safety"));
     assert!(explain.contains("not a Miri result unless a witness receipt is attached"));
+    assert!(explain.contains("not UB-free status"));
     assert!(!explain.contains("Miri passed"));
     assert!(!explain.contains("site reached"));
 

@@ -280,22 +280,38 @@ pub(crate) fn render_card_detail(card: &ReviewCard) -> String {
         "**Operation:** `{}`\n\n",
         card.operation.expression
     ));
+    out.push_str(&format!(
+        "**Operation family:** `{}`\n\n",
+        card.operation.family.as_str()
+    ));
+
+    out.push_str("## Why this card exists\n\n");
+    out.push_str(&format!(
+        "The changed code contains a `{}` unsafe operation that unsafe-review classifies as `{}`.\n\n",
+        card.operation.family.as_str(),
+        card.class.as_str()
+    ));
+    if !card.hazards.is_empty() {
+        out.push_str("Relevant hazard families:\n\n");
+        for hazard in &card.hazards {
+            out.push_str(&format!("- `{}`\n", hazard.as_str()));
+        }
+        out.push('\n');
+    }
+
     out.push_str("## Required safety conditions\n\n");
     for obligation in &card.obligations {
         out.push_str(&format!("- {}\n", obligation.description));
     }
-    out.push_str("\n## Hazards\n\n");
-    for hazard in &card.hazards {
-        out.push_str(&format!("- `{}`\n", hazard.as_str()));
-    }
-    out.push_str("\n## Evidence\n\n");
+
+    out.push_str("\n## Evidence found\n\n");
     out.push_str(&format!("- Contract: {}\n", card.contract.summary));
-    out.push_str(&format!("- Discharge: {}\n", card.discharge.summary));
+    out.push_str(&format!("- Guard/discharge: {}\n", card.discharge.summary));
     out.push_str(&format!("- Reach: {}\n", card.reach.summary));
     out.push_str("- Reach note: static reach evidence only; it does not prove site execution.\n");
     out.push_str(&format!("- Witness: {}\n", card.witness.summary));
     if !card.obligation_evidence.is_empty() {
-        out.push_str("\n## Obligation evidence\n\n");
+        out.push_str("\nObligation evidence matrix:\n\n");
         for evidence in &card.obligation_evidence {
             out.push_str(&format!(
                 "- `{}`: contract `{}`, guard `{}`, reach `{}`, witness `{}`\n",
@@ -307,34 +323,25 @@ pub(crate) fn render_card_detail(card: &ReviewCard) -> String {
             ));
         }
     }
-    if !card.missing.is_empty() {
-        out.push_str("\n## Missing evidence\n\n");
+
+    out.push_str("\n## Evidence missing\n\n");
+    if card.missing.is_empty() {
+        out.push_str("- No missing evidence recorded for this card.\n");
+    } else {
         for missing in &card.missing {
             out.push_str(&format!("- {}\n", missing.message));
         }
     }
-    if !card.routes.is_empty() {
-        out.push_str("\n## Recommended witness routes\n\n");
-        for route in &card.routes {
-            out.push_str(&format!("- `{}`: {}\n", route.kind.as_str(), route.reason));
-            if let Some(command) = &route.command {
-                out.push_str("\n```bash\n");
-                out.push_str(command);
-                out.push_str("\n```\n");
-            }
-        }
-    }
-    out.push_str("\n## Next action\n\n");
-    out.push_str(&card.next_action.summary);
     render_resolution_guidance(&mut out, card);
     render_non_resolution_guidance(&mut out);
+    render_witness_routes(&mut out, card);
     out.push_str("\n## Trust boundary\n\n");
-    out.push_str("This is static unsafe contract review. It is not a proof of memory safety and not a Miri result unless a witness receipt is attached.\n");
+    out.push_str("This is static unsafe contract review. It is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n");
     out
 }
 
 fn render_resolution_guidance(out: &mut String, card: &ReviewCard) {
-    out.push_str("\n\n## What would resolve this\n\n");
+    out.push_str("\n## What would resolve this\n\n");
     out.push_str(&format!("- {}\n", card.next_action.summary));
     if card.next_action.verify_commands.is_empty() {
         out.push_str(
@@ -358,6 +365,22 @@ fn render_non_resolution_guidance(out: &mut String) {
     out.push_str("- A related test mention is not proof that this unsafe site executed.\n");
     out.push_str("- Do not claim witness proof unless a matching receipt exists.\n");
     out.push_str("- Do not widen unsafe scope, suppress the card, or change unrelated unsafe code to silence this review item.\n");
+}
+
+fn render_witness_routes(out: &mut String, card: &ReviewCard) {
+    out.push_str("\n## Witness route\n\n");
+    if card.routes.is_empty() {
+        out.push_str("- No focused witness route was selected; route this to human review.\n");
+        return;
+    }
+    for route in &card.routes {
+        out.push_str(&format!("- `{}`: {}\n", route.kind.as_str(), route.reason));
+        if let Some(command) = &route.command {
+            out.push_str("\n```bash\n");
+            out.push_str(command);
+            out.push_str("\n```\n\n");
+        }
+    }
 }
 
 fn missing_summary(card: &ReviewCard) -> String {
@@ -395,12 +418,18 @@ mod tests {
             .ok_or_else(|| "raw pointer fixture should emit a card".to_string())?;
         let rendered = render_card_detail(card);
 
+        assert!(rendered.contains("## Why this card exists"));
         assert!(rendered.contains("## Required safety conditions"));
         assert!(rendered.contains("pointer is aligned for the accessed type"));
-        assert!(rendered.contains("## Missing evidence"));
+        assert!(rendered.contains("## Evidence found"));
+        assert!(rendered.contains("Guard/discharge:"));
+        assert!(rendered.contains("Obligation evidence matrix:"));
+        assert!(rendered.contains("## Evidence missing"));
         assert!(rendered.contains("Missing visible local guard"));
-        assert!(rendered.contains("## Recommended witness routes"));
+        assert!(rendered.contains("## Witness route"));
         assert!(rendered.contains("Pure-Rust UB-adjacent hazard"));
+        assert!(rendered.contains("**Operation family:** `raw_pointer_read`"));
+        assert!(rendered.contains("cargo +nightly miri test read_header"));
         assert!(rendered.contains("## What would resolve this"));
         assert!(rendered.contains(
             "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation."
@@ -417,6 +446,7 @@ mod tests {
         assert!(rendered.contains("Do not claim witness proof unless a matching receipt exists."));
         assert!(rendered.contains("does not prove site execution"));
         assert!(rendered.contains("## Trust boundary"));
+        assert!(rendered.contains("not UB-free status"));
         Ok(())
     }
 

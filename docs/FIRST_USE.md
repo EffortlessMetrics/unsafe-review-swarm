@@ -121,7 +121,8 @@ artifact only; `unsafe-review` does not post comments by default.
 
 `first-pr` prints an `Inspect top card` command for the highest-priority card.
 Run that command to see why the card exists, what evidence is missing, what would
-resolve it, and what would not resolve it:
+resolve it, what would not resolve it, which witness route fits, and what
+unsafe-review is not claiming:
 
 ```bash
 unsafe-review explain <card-id>
