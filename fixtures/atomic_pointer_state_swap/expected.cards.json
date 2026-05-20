@@ -1,90 +1,106 @@
 [
-{
-    "id":  "UR-atomic-pointer-state-swap-fixture-src-lib-rs-discard-head-operation-atomic_pointer_state-swap-29e6e6285f8d-atomic_ordering-c1",
-    "class":  "requires_loom",
-    "priority":  "high",
-    "confidence":  "medium",
-    "site":  {
-                 "file":  "src/lib.rs",
-                 "line":  10,
-                 "column":  9,
-                 "kind":  "operation",
-                 "owner":  "discard_head",
-                 "visibility":  "private",
-                 "public_api_surface":  false,
-                 "snippet":  "self.head.swap(ptr::null_mut(), Ordering::AcqRel)"
-             },
-    "operation_family":  "atomic_pointer_state",
-    "hazards":  [
-                    "atomic_ordering",
-                    "drop_or_deallocation"
-                ],
-    "obligations":  [
-                        "atomic pointer state transition preserves ownership invariants",
-                        "atomic ordering is strong enough for readers and drop paths"
-                    ],
-    "obligation_evidence":  [
-                                {
-                                    "key":  "state-transition",
-                                    "description":  "atomic pointer state transition preserves ownership invariants",
-                                    "contract":  {
-                                                     "present":  false,
-                                                     "state":  "missing",
-                                                     "summary":  "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-                                                 },
-                                    "discharge":  {
-                                                      "present":  false,
-                                                      "state":  "missing",
-                                                      "summary":  "No obligation-specific guard code was detected"
-                                                  },
-                                    "reach":  {
-                                                  "present":  true,
-                                                  "state":  "present",
-                                                  "summary":  "1 related test file(s) mention owner `discard_head`"
-                                              },
-                                    "witness":  {
-                                                    "present":  false,
-                                                    "state":  "missing",
-                                                    "summary":  "No imported witness receipt was found"
-                                                }
-                                },
-                                {
-                                    "key":  "ordering",
-                                    "description":  "atomic ordering is strong enough for readers and drop paths",
-                                    "contract":  {
-                                                     "present":  false,
-                                                     "state":  "missing",
-                                                     "summary":  "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-                                                 },
-                                    "discharge":  {
-                                                      "present":  false,
-                                                      "state":  "missing",
-                                                      "summary":  "No obligation-specific guard code was detected"
-                                                  },
-                                    "reach":  {
-                                                  "present":  true,
-                                                  "state":  "present",
-                                                  "summary":  "1 related test file(s) mention owner `discard_head`"
-                                              },
-                                    "witness":  {
-                                                    "present":  false,
-                                                    "state":  "missing",
-                                                    "summary":  "No imported witness receipt was found"
-                                                }
-                                }
-                            ],
-    "contract":  "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
-    "discharge":  "No visible local guard detected",
-    "reach":  "1 related test file(s) mention owner `discard_head`",
-    "witness":  "No imported witness receipt was found",
-    "missing":  [
-                    "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
-                    "Missing visible local guard for inferred safety obligations",
-                    "No witness receipt imported for this card"
-                ],
-    "verify_commands":  [
-                            "cargo test discard_head_loom -- --nocapture",
-                            "cargo test discard_head_shuttle -- --nocapture"
-                        ]
-}
+  {
+    "id": "UR-atomic-pointer-state-swap-fixture-src-lib-rs-discard-head-operation-atomic_pointer_state-swap-29e6e6285f8d-atomic_ordering-c1",
+    "class": "requires_loom",
+    "priority": "high",
+    "confidence": "medium",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 10,
+      "column": 9,
+      "kind": "operation",
+      "owner": "discard_head",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "self.head.swap(ptr::null_mut(), Ordering::AcqRel)"
+    },
+    "operation": "self.head.swap(ptr::null_mut(), Ordering::AcqRel)",
+    "operation_family": "atomic_pointer_state",
+    "hazards": [
+      "atomic_ordering",
+      "drop_or_deallocation"
+    ],
+    "obligations": [
+      "atomic pointer state transition preserves ownership invariants",
+      "atomic ordering is strong enough for readers and drop paths"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "state-transition",
+        "description": "atomic pointer state transition preserves ownership invariants",
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `discard_head`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "ordering",
+        "description": "atomic ordering is strong enough for readers and drop paths",
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `discard_head`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+    "discharge": "No visible local guard detected",
+    "reach": "1 related test file(s) mention owner `discard_head`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "loom",
+        "reason": "Concurrency or shared-mutable-state hazard; interleaving model is a better first witness than Miri alone",
+        "command": "cargo test discard_head_loom -- --nocapture",
+        "required": false
+      },
+      {
+        "kind": "shuttle",
+        "reason": "Shuttle can explore scheduler interleavings for focused concurrency invariants",
+        "command": "cargo test discard_head_shuttle -- --nocapture",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or update a Loom/Shuttle model for the changed concurrency invariant.",
+    "verify_commands": [
+      "cargo test discard_head_loom -- --nocapture",
+      "cargo test discard_head_shuttle -- --nocapture"
+    ]
+  }
 ]

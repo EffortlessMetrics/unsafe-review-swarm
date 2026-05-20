@@ -1,5 +1,5 @@
 use crate::api::{AnalyzeOutput, Scope, Summary};
-use crate::domain::{EvidenceState, ObligationEvidence, ReviewCard};
+use crate::domain::{EvidenceState, ObligationEvidence, ReviewCard, WitnessRoute};
 use crate::util::path_display;
 use serde::Serialize;
 
@@ -88,6 +88,7 @@ struct JsonCard<'a> {
     priority: &'static str,
     confidence: &'static str,
     site: JsonSite<'a>,
+    operation: &'a str,
     operation_family: &'static str,
     hazards: Vec<&'static str>,
     obligations: Vec<&'a str>,
@@ -96,7 +97,9 @@ struct JsonCard<'a> {
     discharge: &'a str,
     reach: &'a str,
     witness: &'a str,
+    witness_routes: Vec<JsonWitnessRoute<'a>>,
     missing: Vec<&'a str>,
+    next_action: &'a str,
     verify_commands: &'a [String],
 }
 
@@ -108,6 +111,7 @@ impl<'a> From<&'a ReviewCard> for JsonCard<'a> {
             priority: card.priority.as_str(),
             confidence: card.confidence.as_str(),
             site: JsonSite::from(card),
+            operation: &card.operation.expression,
             operation_family: card.operation.family.as_str(),
             hazards: card.hazards.iter().map(|hazard| hazard.as_str()).collect(),
             obligations: card
@@ -124,12 +128,33 @@ impl<'a> From<&'a ReviewCard> for JsonCard<'a> {
             discharge: &card.discharge.summary,
             reach: &card.reach.summary,
             witness: &card.witness.summary,
+            witness_routes: card.routes.iter().map(JsonWitnessRoute::from).collect(),
             missing: card
                 .missing
                 .iter()
                 .map(|missing| missing.message.as_str())
                 .collect(),
+            next_action: &card.next_action.summary,
             verify_commands: &card.next_action.verify_commands,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct JsonWitnessRoute<'a> {
+    kind: &'static str,
+    reason: &'a str,
+    command: Option<&'a str>,
+    required: bool,
+}
+
+impl<'a> From<&'a WitnessRoute> for JsonWitnessRoute<'a> {
+    fn from(route: &'a WitnessRoute) -> Self {
+        Self {
+            kind: route.kind.as_str(),
+            reason: &route.reason,
+            command: route.command.as_deref(),
+            required: route.required,
         }
     }
 }
@@ -220,9 +245,6 @@ mod tests {
         "raw_pointer_alignment_receipted",
         "raw_pointer_alignment_is_aligned_guard",
         "raw_pointer_alignment_observed_not_guard",
-        "raw_pointer_bounds_observed_not_guard",
-        "raw_pointer_bounds_closed_branch_not_guard",
-        "raw_pointer_bounds_post_check_not_guard",
         "raw_pointer_alignment_closed_branch_not_guard",
         "raw_pointer_alignment_reassigned_pointer_not_guard",
         "raw_pointer_alignment_modulo_guard",
@@ -239,7 +261,6 @@ mod tests {
         "public_unsafe_trait_missing_safety",
         "public_unsafe_fn_safety_comment_not_docs",
         "documented_private_unsafe_fn",
-        "unsafe_fn_pointer_field_owner",
         "local_safety_colon_comment",
         "private_unsafe_helper_safety_comment",
         "split_public_unsafe_fn_missing_safety",
@@ -265,72 +286,43 @@ mod tests {
         "split_unsafe_block",
         "raw_pointer_deref",
         "raw_pointer_read_unaligned",
-        "raw_pointer_read_unaligned_null_guard",
-        "raw_pointer_read_unaligned_null_observed_not_guard",
-        "raw_pointer_read_unaligned_null_other_pointer_not_guard",
-        "raw_pointer_read_unaligned_null_post_check_not_guard",
         "raw_pointer_read_volatile",
-        "raw_pointer_read_volatile_alignment_guard",
-        "raw_pointer_read_volatile_alignment_observed_not_guard",
-        "raw_pointer_read_volatile_alignment_other_pointer_not_guard",
-        "raw_pointer_read_volatile_alignment_post_check_not_guard",
-        "raw_pointer_read_volatile_null_guard",
-        "raw_pointer_read_volatile_null_observed_not_guard",
-        "raw_pointer_read_volatile_null_other_pointer_not_guard",
-        "raw_pointer_read_volatile_null_post_check_not_guard",
         "raw_pointer_read_len_capacity_assert",
-        "raw_pointer_read_len_capacity_other_values_not_guard",
+        "raw_pointer_read_assert_shadowed_origin_not_guard",
+        "raw_pointer_read_len_capacity_assert_shadowed_origin_not_guard",
+        "raw_pointer_read_bounds_observed_not_guard",
         "raw_pointer_read_len_capacity_observed_not_guard",
-        "raw_pointer_read_len_capacity_closed_branch_not_guard",
-        "raw_pointer_read_null_guard",
-        "raw_pointer_read_null_observed_not_guard",
-        "raw_pointer_read_null_other_pointer_not_guard",
-        "raw_pointer_read_null_post_check_not_guard",
+        "raw_pointer_read_as_cast_origin_bounds_guard",
+        "raw_pointer_read_cast_origin_bounds_guard",
+        "raw_pointer_read_open_branch_bounds_guard",
+        "raw_pointer_read_open_branch_shadowed_origin_not_guard",
+        "raw_pointer_read_typed_shadowed_origin_not_guard",
+        "raw_pointer_read_other_len_not_guard",
+        "raw_pointer_read_reassigned_origin_not_guard",
         "raw_pointer_write_assignment",
         "raw_pointer_write_unaligned",
-        "raw_pointer_write_unaligned_null_guard",
-        "raw_pointer_write_unaligned_null_observed_not_guard",
-        "raw_pointer_write_unaligned_null_other_pointer_not_guard",
-        "raw_pointer_write_unaligned_null_post_check_not_guard",
         "raw_pointer_write_bytes",
-        "raw_pointer_write_alignment_guard",
-        "raw_pointer_write_alignment_observed_not_guard",
-        "raw_pointer_write_alignment_closed_branch_not_guard",
-        "raw_pointer_write_alignment_post_check_not_guard",
-        "raw_pointer_write_null_guard",
-        "raw_pointer_write_null_observed_not_guard",
-        "raw_pointer_write_null_other_pointer_not_guard",
-        "raw_pointer_write_null_post_check_not_guard",
-        "raw_pointer_write_bounds_observed_not_guard",
-        "raw_pointer_write_bounds_closed_branch_not_guard",
-        "raw_pointer_write_bounds_post_check_not_guard",
+        "raw_pointer_write_bool_bytes_guard",
+        "raw_pointer_write_bool_reassigned_byte_not_guard",
+        "raw_pointer_write_bool_closed_branch_not_guard",
+        "raw_pointer_write_previous_slice_not_guard",
+        "raw_pointer_write_previous_u8_not_guard",
+        "raw_pointer_write_previous_bool_not_guard",
+        "raw_pointer_write_previous_maybeuninit_not_guard",
         "raw_pointer_write_other_u8_not_guard",
         "raw_pointer_write_maybeuninit",
         "raw_pointer_write_other_maybeuninit_not_guard",
         "raw_pointer_write_volatile",
-        "raw_pointer_write_volatile_alignment_guard",
-        "raw_pointer_write_volatile_alignment_observed_not_guard",
-        "raw_pointer_write_volatile_alignment_other_pointer_not_guard",
-        "raw_pointer_write_volatile_alignment_post_check_not_guard",
-        "raw_pointer_write_volatile_null_guard",
-        "raw_pointer_write_volatile_null_observed_not_guard",
-        "raw_pointer_write_volatile_null_other_pointer_not_guard",
-        "raw_pointer_write_volatile_null_post_check_not_guard",
         "ptr_copy_overlapping",
         "ptr_copy_slice_range_guard",
         "ptr_copy_slice_range_conjunctive_assert_guard",
         "ptr_copy_slice_range_early_return_guard",
         "ptr_copy_slice_range_disjunctive_early_return_guard",
-        "ptr_copy_slice_range_disjunctive_early_return_after_block_guard",
         "ptr_copy_slice_range_open_branch_guard",
         "ptr_copy_slice_range_conjunctive_open_branch_guard",
         "ptr_copy_slice_range_closed_branch_not_guard",
         "ptr_copy_slice_range_or_branch_not_guard",
-        "ptr_copy_slice_range_commented_assert_not_guard",
-        "ptr_copy_slice_range_disjunctive_early_return_line_comment_not_guard",
         "ptr_copy_slice_range_disjunctive_early_return_block_comment_not_guard",
-        "ptr_copy_slice_range_disjunctive_early_return_string_literal_not_guard",
-        "ptr_copy_slice_range_disjunctive_nested_return_not_guard",
         "ptr_copy_slice_range_disjunctive_early_return_reassigned_count_not_guard",
         "ptr_copy_slice_range_open_branch_reassigned_count_not_guard",
         "ptr_copy_slice_range_open_branch_reassigned_dst_not_guard",
@@ -345,16 +337,11 @@ mod tests {
         "copy_nonoverlapping_slice_range_conjunctive_assert_guard",
         "copy_nonoverlapping_slice_range_early_return_guard",
         "copy_nonoverlapping_slice_range_disjunctive_early_return_guard",
-        "copy_nonoverlapping_slice_range_disjunctive_early_return_after_block_guard",
         "copy_nonoverlapping_slice_range_open_branch_guard",
         "copy_nonoverlapping_slice_range_conjunctive_open_branch_guard",
         "copy_nonoverlapping_slice_range_closed_branch_not_guard",
         "copy_nonoverlapping_slice_range_or_branch_not_guard",
-        "copy_nonoverlapping_slice_range_commented_assert_not_guard",
-        "copy_nonoverlapping_slice_range_disjunctive_early_return_line_comment_not_guard",
         "copy_nonoverlapping_slice_range_disjunctive_early_return_block_comment_not_guard",
-        "copy_nonoverlapping_slice_range_disjunctive_early_return_string_literal_not_guard",
-        "copy_nonoverlapping_slice_range_disjunctive_nested_return_not_guard",
         "copy_nonoverlapping_slice_range_disjunctive_early_return_reassigned_count_not_guard",
         "copy_nonoverlapping_slice_range_open_branch_reassigned_count_not_guard",
         "copy_nonoverlapping_slice_range_open_branch_reassigned_src_not_guard",
@@ -367,13 +354,6 @@ mod tests {
         "zeroed_invalid_value",
         "inline_asm_human_review",
         "pointer_arithmetic_num_ctrl_bytes_guard",
-        "pointer_arithmetic_num_ctrl_bytes_open_branch_guard",
-        "pointer_arithmetic_num_ctrl_bytes_return_guard",
-        "pointer_arithmetic_num_ctrl_bytes_closed_branch_not_guard",
-        "pointer_arithmetic_num_ctrl_bytes_invalid_branch_not_guard",
-        "pointer_arithmetic_num_ctrl_bytes_observed_not_guard",
-        "pointer_arithmetic_num_ctrl_bytes_other_index_not_guard",
-        "pointer_arithmetic_num_ctrl_bytes_post_check_not_guard",
         "pointer_arithmetic_slice_end",
         "slice_from_raw_parts_mut",
         "slice_from_raw_parts_mut_maybeuninit",
@@ -389,8 +369,6 @@ mod tests {
         "box_from_raw",
         "box_from_raw_box_origin",
         "box_from_raw_reassigned_origin_not_guard",
-        "box_from_raw_box_origin_after_not_guard",
-        "box_from_raw_other_origin_not_guard",
         "static_mut_global_state",
         "safe_reference_deref_no_cards",
         "imports_not_unsafe_operations",
@@ -403,21 +381,12 @@ mod tests {
         "maybeuninit_assume_init_mut",
         "maybeuninit_assume_init_drop",
         "vec_set_len",
-        "vec_set_len_capacity_return_guard",
-        "vec_set_len_capacity_open_branch_guard",
         "vec_set_len_initialized_loop",
         "vec_set_len_capacity_observed_not_guard",
-        "vec_set_len_capacity_closed_branch_not_guard",
-        "vec_set_len_capacity_reassigned_not_guard",
-        "vec_set_len_capacity_open_branch_reassigned_len_not_guard",
-        "vec_set_len_capacity_open_branch_reassigned_receiver_not_guard",
-        "vec_set_len_capacity_receiver_reassigned_not_guard",
-        "vec_set_len_capacity_binding_receiver_reassigned_not_guard",
         "vec_set_len_unrelated_capacity_comparison_not_guard",
         "vec_set_len_cap_argument_not_guard",
+        "vec_set_len_reassigned_receiver_not_guard",
         "vec_set_len_with_capacity",
-        "vec_set_len_with_capacity_reassigned_not_guard",
-        "vec_set_len_with_capacity_len_reassigned_not_guard",
         "vec_set_len_call_result_init",
         "vec_set_len_shrink",
         "vec_set_len_last_index_shrink",
@@ -426,8 +395,6 @@ mod tests {
         "drop_in_place_deallocation",
         "drop_in_place_box_origin",
         "drop_in_place_reassigned_origin_not_guard",
-        "drop_in_place_box_origin_after_not_guard",
-        "drop_in_place_other_origin_not_guard",
         "atomic_pointer_state_swap",
         "unwrap_unchecked_result",
         "unwrap_unchecked_infallible_result",
@@ -477,8 +444,19 @@ mod tests {
         assert_eq!(value["cards"][0]["site"]["file"], "src/lib.rs");
         assert_eq!(value["cards"][0]["site"]["visibility"], "private");
         assert_eq!(value["cards"][0]["site"]["public_api_surface"], false);
+        assert_eq!(
+            value["cards"][0]["operation"],
+            "unsafe { ptr.cast::<Header>().read() }"
+        );
         assert_eq!(value["cards"][0]["operation_family"], "raw_pointer_read");
         assert!(value["cards"][0]["obligation_evidence"].is_array());
+        assert_eq!(value["cards"][0]["witness_routes"][0]["kind"], "miri");
+        assert!(
+            value["cards"][0]["next_action"]
+                .as_str()
+                .unwrap_or("")
+                .contains("Add or expose the local guard")
+        );
         assert!(value["cards"][0]["verify_commands"].is_array());
         Ok(())
     }

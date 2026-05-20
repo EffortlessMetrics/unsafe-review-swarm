@@ -34,7 +34,7 @@ impl PolicyState {
 }
 
 #[derive(Clone, Copy)]
-enum LedgerKind {
+pub(crate) enum LedgerKind {
     Baseline,
     Suppression,
 }
@@ -48,9 +48,29 @@ impl LedgerKind {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct LedgerEntry {
+    pub(crate) card_id: String,
+    pub(crate) owner: String,
+    pub(crate) reason: String,
+    pub(crate) evidence: String,
+    pub(crate) review_after: Option<String>,
+    pub(crate) expires: Option<String>,
+}
+
 fn load_ledger_ids(path: &Path, kind: LedgerKind) -> Result<BTreeSet<String>, String> {
+    Ok(load_ledger_entries(path, kind)?
+        .into_iter()
+        .map(|entry| entry.card_id)
+        .collect())
+}
+
+pub(crate) fn load_ledger_entries(
+    path: &Path,
+    kind: LedgerKind,
+) -> Result<Vec<LedgerEntry>, String> {
     if !path.is_file() {
-        return Ok(BTreeSet::new());
+        return Ok(Vec::new());
     }
     let text =
         fs::read_to_string(path).map_err(|err| format!("read {} failed: {err}", path.display()))?;
@@ -69,7 +89,7 @@ fn load_ledger_ids(path: &Path, kind: LedgerKind) -> Result<BTreeSet<String>, St
 
     if status == "empty" {
         if entries.is_empty() {
-            return Ok(BTreeSet::new());
+            return Ok(Vec::new());
         }
         return Err(format!(
             "{} status is empty but has entries",
@@ -77,15 +97,15 @@ fn load_ledger_ids(path: &Path, kind: LedgerKind) -> Result<BTreeSet<String>, St
         ));
     }
 
-    let mut ids = BTreeSet::new();
+    let mut records = Vec::new();
     for (idx, entry) in entries.iter().enumerate() {
         let Some(entry) = entry.as_table() else {
             return Err(format!("{} entries[{idx}] must be a table", path.display()));
         };
         let card_id = required_string(entry, "card_id", path, idx)?;
-        for key in ["owner", "reason", "evidence"] {
-            required_string(entry, key, path, idx)?;
-        }
+        let owner = required_string(entry, "owner", path, idx)?;
+        let reason = required_string(entry, "reason", path, idx)?;
+        let evidence = required_string(entry, "evidence", path, idx)?;
         let has_review_after = optional_date(entry, "review_after", path, idx)?;
         let has_expires = optional_date(entry, "expires", path, idx)?;
         match kind {
@@ -110,10 +130,20 @@ fn load_ledger_ids(path: &Path, kind: LedgerKind) -> Result<BTreeSet<String>, St
                 kind.name()
             ));
         }
-        ids.insert(card_id.to_string());
+        records.push(LedgerEntry {
+            card_id: card_id.to_string(),
+            owner: owner.to_string(),
+            reason: reason.to_string(),
+            evidence: evidence.to_string(),
+            review_after: optional_string(entry, "review_after"),
+            expires: match kind {
+                LedgerKind::Baseline => None,
+                LedgerKind::Suppression => optional_string(entry, "expires"),
+            },
+        });
     }
 
-    Ok(ids)
+    Ok(records)
 }
 
 fn required_string<'a>(
@@ -160,6 +190,14 @@ fn optional_date(
         ));
     }
     Ok(true)
+}
+
+fn optional_string(entry: &toml::map::Map<String, toml::Value>, key: &str) -> Option<String> {
+    entry
+        .get(key)
+        .and_then(toml::Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .map(ToOwned::to_owned)
 }
 
 fn looks_like_iso_date(value: &str) -> bool {

@@ -1,0 +1,8 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -14,5 +14,6 @@ pub fn fill_word(ptr: *mut u16, bools: *mut bool, len: usize, byte: u8) {
+         // SAFETY: fixture checks that prior bool write_bytes evidence does not apply here.
++        unsafe { ptr.write_bytes(byte, len) }
+     }
+ }

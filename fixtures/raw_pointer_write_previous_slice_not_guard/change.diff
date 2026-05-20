@@ -1,0 +1,7 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -13,4 +13,5 @@ pub fn fill_tag(ptr: *mut u16, len: usize, byte: u8) {
+     // SAFETY: fixture checks that prior write_bytes evidence does not apply here.
++    unsafe { ptr.write_bytes(byte, len) }
+ }

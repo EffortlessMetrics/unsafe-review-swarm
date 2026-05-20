@@ -1,5 +1,0 @@
-[package]
-name = "copy-nonoverlapping-slice-range-disjunctive-early-return-line-comment-not-guard"
-version = "0.0.0"
-edition = "2024"
-publish = false

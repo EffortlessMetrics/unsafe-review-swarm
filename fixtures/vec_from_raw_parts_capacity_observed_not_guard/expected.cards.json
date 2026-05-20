@@ -1,169 +1,185 @@
 [
-    {
-        "id":  "UR-vec-from-raw-parts-capacity-observed-not-guard-src-lib-rs-rebuild-vec-operation-vec_from_raw_parts-from-raw-parts-070f49827261-pointer_validity-c1",
-        "class":  "guard_missing",
-        "priority":  "high",
-        "confidence":  "medium",
-        "site":  {
-                     "file":  "src/lib.rs",
-                     "line":  6,
-                     "column":  5,
-                     "kind":  "operation",
-                     "owner":  "rebuild_vec",
-                     "visibility":  "private",
-                     "public_api_surface":  false,
-                     "snippet":  "unsafe { Vec::from_raw_parts(buf, len, cap) }"
-                 },
-        "operation_family":  "vec_from_raw_parts",
-        "hazards":  [
-                        "pointer_validity",
-                        "alignment",
-                        "initialized_memory",
-                        "bounds",
-                        "drop_or_deallocation",
-                        "leak_or_ownership_transfer"
-                    ],
-        "obligations":  [
-                            "pointer was allocated by a compatible allocator for `capacity` elements",
-                            "pointer is aligned for the element type",
-                            "first `len` elements are initialized",
-                            "`len` is at most `capacity`",
-                            "the constructed Vec receives unique ownership and will not double-free"
-                        ],
-        "obligation_evidence":  [
-                                    {
-                                        "key":  "pointer-live",
-                                        "description":  "pointer was allocated by a compatible allocator for `capacity` elements",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `SAFETY:` comment was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  false,
-                                                          "state":  "missing",
-                                                          "summary":  "No Vec::from_raw_parts same-origin pointer/capacity evidence was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  false,
-                                                      "state":  "missing",
-                                                      "summary":  "No static test mention of owner `rebuild_vec` was found"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    },
-                                    {
-                                        "key":  "alignment",
-                                        "description":  "pointer is aligned for the element type",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `SAFETY:` comment was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  false,
-                                                          "state":  "missing",
-                                                          "summary":  "No alignment guard code was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  false,
-                                                      "state":  "missing",
-                                                      "summary":  "No static test mention of owner `rebuild_vec` was found"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    },
-                                    {
-                                        "key":  "initialized",
-                                        "description":  "first `len` elements are initialized",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `SAFETY:` comment was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  false,
-                                                          "state":  "missing",
-                                                          "summary":  "No obligation-specific guard code was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  false,
-                                                      "state":  "missing",
-                                                      "summary":  "No static test mention of owner `rebuild_vec` was found"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    },
-                                    {
-                                        "key":  "capacity",
-                                        "description":  "`len` is at most `capacity`",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `SAFETY:` comment was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  false,
-                                                          "state":  "missing",
-                                                          "summary":  "No capacity guard code was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  false,
-                                                      "state":  "missing",
-                                                      "summary":  "No static test mention of owner `rebuild_vec` was found"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    },
-                                    {
-                                        "key":  "ownership",
-                                        "description":  "the constructed Vec receives unique ownership and will not double-free",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `SAFETY:` comment was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  false,
-                                                          "state":  "missing",
-                                                          "summary":  "No obligation-specific guard code was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  false,
-                                                      "state":  "missing",
-                                                      "summary":  "No static test mention of owner `rebuild_vec` was found"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    }
-                                ],
-        "contract":  "Nearby `SAFETY:` comment was detected",
-        "discharge":  "No visible local guard detected",
-        "reach":  "No static test mention of owner `rebuild_vec` was found",
-        "witness":  "No imported witness receipt was found",
-        "missing":  [
-                        "Missing visible local guard for inferred safety obligations",
-                        "No related test path was found by static search",
-                        "No witness receipt imported for this card"
-                    ],
-        "verify_commands":  [
-                                "cargo +nightly miri test rebuild_vec",
-                                "cargo +nightly careful test rebuild_vec"
-                            ]
-    }
+  {
+    "id": "UR-vec-from-raw-parts-capacity-observed-not-guard-src-lib-rs-rebuild-vec-operation-vec_from_raw_parts-from-raw-parts-070f49827261-pointer_validity-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 6,
+      "column": 5,
+      "kind": "operation",
+      "owner": "rebuild_vec",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { Vec::from_raw_parts(buf, len, cap) }"
+    },
+    "operation": "unsafe { Vec::from_raw_parts(buf, len, cap) }",
+    "operation_family": "vec_from_raw_parts",
+    "hazards": [
+      "pointer_validity",
+      "alignment",
+      "initialized_memory",
+      "bounds",
+      "drop_or_deallocation",
+      "leak_or_ownership_transfer"
+    ],
+    "obligations": [
+      "pointer was allocated by a compatible allocator for `capacity` elements",
+      "pointer is aligned for the element type",
+      "first `len` elements are initialized",
+      "`len` is at most `capacity`",
+      "the constructed Vec receives unique ownership and will not double-free"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "pointer-live",
+        "description": "pointer was allocated by a compatible allocator for `capacity` elements",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No Vec::from_raw_parts same-origin pointer/capacity evidence was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `rebuild_vec` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "alignment",
+        "description": "pointer is aligned for the element type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No alignment guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `rebuild_vec` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "initialized",
+        "description": "first `len` elements are initialized",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `rebuild_vec` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "capacity",
+        "description": "`len` is at most `capacity`",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No capacity guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `rebuild_vec` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "ownership",
+        "description": "the constructed Vec receives unique ownership and will not double-free",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `rebuild_vec` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "No visible local guard detected",
+    "reach": "No static test mention of owner `rebuild_vec` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test rebuild_vec",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test rebuild_vec",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose the local guard that discharges the `vec_from_raw_parts` safety obligation.",
+    "verify_commands": [
+      "cargo +nightly miri test rebuild_vec",
+      "cargo +nightly careful test rebuild_vec"
+    ]
+  }
 ]

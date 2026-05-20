@@ -1,62 +1,70 @@
 [
-    {
-        "id":  "UR-unchecked-constructor-availability-closed-branch-not-guard-src-lib-rs-new-operation-unsafe_fn_call-new-unchecked-b211f8034905-unknown-c1",
-        "class":  "guard_missing",
-        "priority":  "high",
-        "confidence":  "medium",
-        "site":  {
-                     "file":  "src/lib.rs",
-                     "line":  19,
-                     "column":  9,
-                     "kind":  "operation",
-                     "owner":  "new",
-                     "visibility":  "private",
-                     "public_api_surface":  false,
-                     "snippet":  "unsafe { One::new_unchecked(needle) }"
-                 },
-        "operation_family":  "unsafe_fn_call",
-        "hazards":  [
-                        "unknown"
-                    ],
-        "obligations":  [
-                            "callee safety preconditions are satisfied"
-                        ],
-        "obligation_evidence":  [
-                                    {
-                                        "key":  "callee-contract",
-                                        "description":  "callee safety preconditions are satisfied",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `SAFETY:` comment was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  false,
-                                                          "state":  "missing",
-                                                          "summary":  "No obligation-specific guard code was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  true,
-                                                      "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `new`"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    }
-                                ],
-        "contract":  "Nearby `SAFETY:` comment was detected",
-        "discharge":  "No visible local guard detected",
-        "reach":  "1 related test file(s) mention owner `new`",
-        "witness":  "No imported witness receipt was found",
-        "missing":  [
-                        "Missing visible local guard for inferred safety obligations",
-                        "No witness receipt imported for this card"
-                    ],
-        "verify_commands":  [
-
-                            ]
-    }
+  {
+    "id": "UR-unchecked-constructor-availability-closed-branch-not-guard-src-lib-rs-new-operation-unsafe_fn_call-new-unchecked-b211f8034905-unknown-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 19,
+      "column": 9,
+      "kind": "operation",
+      "owner": "new",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { One::new_unchecked(needle) }"
+    },
+    "operation": "unsafe { One::new_unchecked(needle) }",
+    "operation_family": "unsafe_fn_call",
+    "hazards": [
+      "unknown"
+    ],
+    "obligations": [
+      "callee safety preconditions are satisfied"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "callee-contract",
+        "description": "callee safety preconditions are satisfied",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `new`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "No visible local guard detected",
+    "reach": "1 related test file(s) mention owner `new`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose the local guard that discharges the `unsafe_fn_call` safety obligation.",
+    "verify_commands": []
+  }
 ]

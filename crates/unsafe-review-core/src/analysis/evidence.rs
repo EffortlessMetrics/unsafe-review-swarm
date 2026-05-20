@@ -172,8 +172,14 @@ fn discharge_state_for(
     }
     match key {
         "alignment" => {
-            if family == &OperationFamily::RawPointerWrite && has_u8_write_bytes_context(lower) {
+            if family == &OperationFamily::RawPointerWrite
+                && has_u8_write_bytes_context(site, lower)
+            {
                 EvidenceState::present("u8 raw write alignment evidence was detected")
+            } else if family == &OperationFamily::RawPointerWrite
+                && has_bool_write_bytes_pointer_context(site, lower)
+            {
+                EvidenceState::present("bool raw write alignment evidence was detected")
             } else if has_alignment_guard(site, lower) {
                 EvidenceState::present("Alignment guard code was detected")
             } else {
@@ -181,7 +187,10 @@ fn discharge_state_for(
             }
         }
         "bounds" | "valid-range" => {
-            if has_bounds_guard(site, lower) {
+            if has_bounds_guard(site, lower)
+                || (family == &OperationFamily::PointerArithmetic
+                    && has_slice_end_pointer_arithmetic_evidence(lower))
+            {
                 EvidenceState::present("Length or bounds guard code was detected")
             } else {
                 EvidenceState::missing("No length or bounds guard code was detected")
@@ -226,13 +235,17 @@ fn discharge_state_for(
             {
                 EvidenceState::present("MaybeUninit slice element evidence was detected")
             } else if family == &OperationFamily::RawPointerWrite
-                && has_maybeuninit_raw_write_context(lower)
+                && has_maybeuninit_raw_write_context(site, lower)
             {
                 EvidenceState::present("MaybeUninit raw write target evidence was detected")
             } else if family == &OperationFamily::RawPointerWrite
-                && has_u8_write_bytes_context(lower)
+                && has_u8_write_bytes_context(site, lower)
             {
                 EvidenceState::present("u8 write_bytes target evidence was detected")
+            } else if family == &OperationFamily::RawPointerWrite
+                && has_bool_write_bytes_value_evidence(site, lower)
+            {
+                EvidenceState::present("bool write_bytes value evidence was detected")
             } else if family == &OperationFamily::VecFromRawParts
                 && has_vec_from_raw_parts_origin_initialized_evidence(
                     &site.operation.expression,
@@ -409,24 +422,12 @@ fn is_documented_private_unsafe_contract_obligation(
 
 fn has_length_or_bounds_guard(lower: &str) -> bool {
     let compact = compact_code(lower);
-    has_bounds_assertion_guard(&compact) || has_bounds_open_positive_branch_guard(&compact)
+    has_bounds_assertion_guard(&compact)
+        || has_bounds_open_positive_branch_guard(&compact)
+        || has_len_capacity_equality_guard(lower)
 }
 
 fn has_bounds_guard(site: &ScannedSite, lower: &str) -> bool {
-    if site.operation.family == OperationFamily::PointerArithmetic {
-        let guard_scope = code_context_through_site(site).to_ascii_lowercase();
-        if has_slice_end_pointer_arithmetic_evidence(site, &guard_scope) {
-            return true;
-        }
-        if let Some((_, argument)) =
-            pointer_arithmetic_receiver_and_argument(&site.operation.expression)
-        {
-            let guard_scope = code_before_operation(lower, &site.operation.expression)
-                .unwrap_or_else(|| lower.to_string());
-            return has_pointer_arithmetic_bounds_guard(&guard_scope, &argument);
-        }
-        return false;
-    }
     if site.operation.family == OperationFamily::GetUnchecked
         && let Some((receiver, index)) =
             get_unchecked_receiver_and_index(&site.operation.expression)
@@ -436,16 +437,18 @@ fn has_bounds_guard(site: &ScannedSite, lower: &str) -> bool {
         return has_get_unchecked_bounds_guard(&guard_scope, &receiver, &index);
     }
     if site.operation.family == OperationFamily::RawPointerWrite
-        && has_raw_pointer_write_bytes_same_slice_len_evidence(&site.operation.expression)
+        && site
+            .operation
+            .expression
+            .to_ascii_lowercase()
+            .contains("write_bytes")
     {
-        return true;
+        return has_write_bytes_bounds_evidence(&site.operation.expression);
     }
     let guard_scope = code_before_operation(lower, &site.operation.expression)
         .unwrap_or_else(|| lower.to_string());
-    if site.operation.family == OperationFamily::RawPointerRead
-        && has_raw_pointer_read_len_capacity_guard(&site.operation.expression, &guard_scope)
-    {
-        return true;
+    if site.operation.family == OperationFamily::RawPointerRead {
+        return has_raw_pointer_read_bounds_evidence(&site.operation.expression, &guard_scope);
     }
     if matches!(
         site.operation.family,
@@ -458,27 +461,6 @@ fn has_bounds_guard(site: &ScannedSite, lower: &str) -> bool {
         return false;
     }
     has_length_or_bounds_guard(&guard_scope)
-}
-
-fn has_raw_pointer_write_bytes_same_slice_len_evidence(expression: &str) -> bool {
-    let compact = compact_code(&expression.to_ascii_lowercase());
-    for marker in [".as_mut_ptr().write_bytes("] {
-        let Some(receiver) = receiver_before_marker(&compact, marker) else {
-            continue;
-        };
-        let Some(call_pos) = compact.find(marker) else {
-            continue;
-        };
-        let after_marker = &compact[call_pos + marker.len()..];
-        let Some(end) = matching_call_argument_end(after_marker) else {
-            continue;
-        };
-        let args = split_top_level_arguments(&after_marker[..end]);
-        if args.len() == 2 && args[1] == format!("{receiver}.len()") {
-            return true;
-        }
-    }
-    false
 }
 
 fn has_copy_slice_range_evidence(expression: &str, before_call: &str) -> bool {
@@ -527,7 +509,6 @@ fn copy_destination_slice_receiver(argument: &str) -> Option<String> {
 }
 
 fn has_slice_count_bound_guard(before_call: &str, receiver: &str, count: &str) -> bool {
-    let before_call = strip_comments_and_literals(before_call);
     let receiver = compact_code(receiver);
     let count = compact_code(count);
     if receiver.is_empty() || count.is_empty() {
@@ -538,10 +519,10 @@ fn has_slice_count_bound_guard(before_call: &str, receiver: &str, count: &str) -
     let len_gte_count = format!("{len}>={count}");
     let count_gt_len = format!("{count}>{len}");
     let len_lt_count = format!("{len}<{count}");
-    has_slice_count_bound_predicate(&before_call, &count_lte_len, &receiver, &count)
-        || has_slice_count_bound_predicate(&before_call, &len_gte_count, &receiver, &count)
-        || has_slice_count_early_return(&before_call, &count_gt_len, &receiver, &count)
-        || has_slice_count_early_return(&before_call, &len_lt_count, &receiver, &count)
+    has_slice_count_bound_predicate(before_call, &count_lte_len, &receiver, &count)
+        || has_slice_count_bound_predicate(before_call, &len_gte_count, &receiver, &count)
+        || has_slice_count_early_return(before_call, &count_gt_len, &receiver, &count)
+        || has_slice_count_early_return(before_call, &len_lt_count, &receiver, &count)
 }
 
 fn has_slice_count_bound_predicate(
@@ -745,106 +726,24 @@ fn has_slice_count_early_return(
 }
 
 fn guard_body_contains_return(guard_body: &str) -> bool {
-    let code = strip_comments_and_literals(guard_body);
-    contains_top_level_return_statement(&code)
+    let code = strip_block_comments_and_literals(guard_body);
+    compact_contains_identifier(&code, "return")
 }
 
-fn contains_top_level_return_statement(code: &str) -> bool {
-    let mut brace_depth = 0usize;
-    let mut paren_depth = 0usize;
-    let mut bracket_depth = 0usize;
-    let mut statement_start = true;
-
-    for (idx, ch) in code.char_indices() {
-        if ch.is_whitespace() {
-            continue;
-        }
-        match ch {
-            '{' => {
-                brace_depth += 1;
-                continue;
-            }
-            '}' => {
-                brace_depth = brace_depth.saturating_sub(1);
-                statement_start = brace_depth == 0 && paren_depth == 0 && bracket_depth == 0;
-                continue;
-            }
-            '(' => {
-                paren_depth += 1;
-                statement_start = false;
-                continue;
-            }
-            ')' => {
-                paren_depth = paren_depth.saturating_sub(1);
-                statement_start = false;
-                continue;
-            }
-            '[' => {
-                bracket_depth += 1;
-                statement_start = false;
-                continue;
-            }
-            ']' => {
-                bracket_depth = bracket_depth.saturating_sub(1);
-                statement_start = false;
-                continue;
-            }
-            ';' if brace_depth == 0 && paren_depth == 0 && bracket_depth == 0 => {
-                statement_start = true;
-                continue;
-            }
-            _ => {}
-        }
-
-        if brace_depth == 0
-            && paren_depth == 0
-            && bracket_depth == 0
-            && statement_start
-            && code[idx..].starts_with("return")
-        {
-            let after = code[idx + "return".len()..].chars().next();
-            if after.is_none_or(|ch| !is_receiver_path_char(ch)) {
-                return true;
-            }
-        }
-
-        if brace_depth == 0 && paren_depth == 0 && bracket_depth == 0 {
-            statement_start = false;
-        }
-    }
-
-    false
-}
-
-fn strip_comments_and_literals(text: &str) -> String {
+fn strip_block_comments_and_literals(text: &str) -> String {
     let mut output = String::with_capacity(text.len());
     let mut chars = text.chars().peekable();
     while let Some(ch) = chars.next() {
-        if ch == '/' {
-            match chars.peek() {
-                Some('*') => {
-                    chars.next();
-                    let mut prev = '\0';
-                    for comment_ch in chars.by_ref() {
-                        if prev == '*' && comment_ch == '/' {
-                            break;
-                        }
-                        prev = comment_ch;
-                    }
-                    continue;
+        if ch == '/' && chars.peek() == Some(&'*') {
+            chars.next();
+            let mut prev = '\0';
+            for comment_ch in chars.by_ref() {
+                if prev == '*' && comment_ch == '/' {
+                    break;
                 }
-                Some('/') => {
-                    chars.next();
-                    for comment_ch in chars.by_ref() {
-                        if comment_ch == '\n' {
-                            output.push('\n');
-                            break;
-                        }
-                    }
-                    continue;
-                }
-                _ => {}
+                prev = comment_ch;
             }
+            continue;
         }
         if ch == '"' {
             output.push('"');
@@ -1148,7 +1047,11 @@ fn contains_simple_assignment_to(compact: &str, name: &str) -> bool {
     if !is_simple_identifier(name) {
         return false;
     }
-    if compact.contains(&format!("let{name}=")) || compact.contains(&format!("letmut{name}=")) {
+    if compact.contains(&format!("let{name}="))
+        || compact.contains(&format!("letmut{name}="))
+        || compact.contains(&format!("let{name}:"))
+        || compact.contains(&format!("letmut{name}:"))
+    {
         return true;
     }
     let marker = format!("{name}=");
@@ -1168,35 +1071,107 @@ fn contains_simple_assignment_to(compact: &str, name: &str) -> bool {
     false
 }
 
-fn pointer_arithmetic_receiver_and_argument(expression: &str) -> Option<(String, String)> {
-    let compact = compact_code(&expression.to_ascii_lowercase());
-    for marker in [".add(", ".offset("] {
-        let Some(receiver) = receiver_before_marker(&compact, marker) else {
+fn has_len_capacity_equality_guard(lower: &str) -> bool {
+    let compact = compact_code(lower);
+    let has_equality = compact.contains("==")
+        || compact.contains("assert_eq!(")
+        || compact.contains("debug_assert_eq!(");
+    has_equality
+        && compact.contains("len")
+        && (compact.contains("capacity") || contains_word(&compact, "cap"))
+}
+
+fn has_raw_pointer_read_bounds_evidence(expression: &str, before_operation: &str) -> bool {
+    let compact_expression = compact_code(&expression.to_ascii_lowercase());
+    let Some(pointer) = raw_pointer_read_pointer_receiver(&compact_expression) else {
+        return has_length_or_bounds_guard(before_operation);
+    };
+    let before_operation = compact_code(before_operation);
+    let Some(origin) = pointer_origin_receiver_before(&before_operation, pointer) else {
+        return false;
+    };
+
+    has_origin_len_size_guard(&before_operation, &origin)
+        || has_origin_len_capacity_equality_guard(&before_operation, &origin)
+}
+
+fn raw_pointer_read_pointer_receiver(compact_expression: &str) -> Option<&str> {
+    if let Some(receiver) = receiver_before_marker(compact_expression, ".cast::<") {
+        return Some(receiver);
+    }
+    if let Some(receiver) = receiver_before_marker(compact_expression, ".read(") {
+        return Some(receiver);
+    }
+    if let Some(receiver) = receiver_before_marker(compact_expression, ".read_volatile(") {
+        return Some(receiver);
+    }
+    raw_pointer_read_function_argument(compact_expression)
+}
+
+fn raw_pointer_read_function_argument(compact_expression: &str) -> Option<&str> {
+    let marker = "ptr::read(";
+    let call_pos = compact_expression.find(marker)? + marker.len();
+    let after_marker = &compact_expression[call_pos..];
+    let argument_end = matching_call_argument_end(after_marker)?;
+    let argument = after_marker[..argument_end]
+        .split_once("as*")
+        .map_or(&after_marker[..argument_end], |(argument, _)| argument)
+        .trim();
+    (!argument.is_empty()).then_some(argument)
+}
+
+fn pointer_origin_receiver_before(before_operation: &str, pointer: &str) -> Option<String> {
+    if pointer.contains(".as_ptr()") || pointer.contains(".as_mut_ptr()") {
+        return pointer_origin_receiver(pointer).map(str::to_string);
+    }
+    let mut current_origin = None;
+    for statement in before_operation.split(';') {
+        let Some((left, right)) = statement.rsplit_once('=') else {
             continue;
         };
-        let call_pos = compact.find(marker)? + marker.len();
-        let argument_text = &compact[call_pos..];
-        let argument_end = matching_call_argument_end(argument_text)?;
-        let argument = &argument_text[..argument_end];
-        if !receiver.is_empty() && !argument.is_empty() {
-            return Some((receiver.to_string(), argument.to_string()));
+        let Some(binding) = assignment_binding_name(left) else {
+            continue;
+        };
+        if binding != pointer {
+            continue;
         }
+        current_origin = pointer_origin_receiver(right).map(str::to_string);
     }
-    None
+    current_origin
 }
 
-fn has_pointer_arithmetic_bounds_guard(lower: &str, argument: &str) -> bool {
-    let compact = compact_code(lower);
-    let argument = compact_code(&argument.to_ascii_lowercase());
-    if argument.is_empty() {
-        return false;
-    }
-    has_pointer_arithmetic_bounds_assertion(&compact, &argument)
-        || has_pointer_arithmetic_open_bounds_branch(&compact, &argument)
-        || has_pointer_arithmetic_bounds_early_return(&compact, &argument)
+fn pointer_origin_receiver(expression: &str) -> Option<&str> {
+    let expression = pointer_expression_before_type_change(expression);
+    expression
+        .strip_suffix(".as_ptr()")
+        .or_else(|| expression.strip_suffix(".as_mut_ptr()"))
+        .filter(|receiver| !receiver.is_empty())
 }
 
-fn has_pointer_arithmetic_bounds_assertion(compact: &str, argument: &str) -> bool {
+fn pointer_expression_before_type_change(expression: &str) -> &str {
+    expression
+        .find(".cast::<")
+        .or_else(|| expression.find(".cast()"))
+        .or_else(|| expression.find("as*const"))
+        .or_else(|| expression.find("as*mut"))
+        .map_or(expression, |cast_pos| &expression[..cast_pos])
+}
+
+fn assignment_binding_name(left_side: &str) -> Option<&str> {
+    if let Some(binding) = let_binding_name(left_side) {
+        return Some(binding);
+    }
+    is_simple_identifier(left_side).then_some(left_side)
+}
+
+fn has_origin_len_size_guard(compact: &str, origin: &str) -> bool {
+    let len = format!("{origin}.len()");
+    has_origin_len_size_assertion_guard(compact, &len, origin)
+        || has_origin_len_size_open_positive_branch_guard(compact, &len, origin)
+        || has_origin_len_size_early_return_guard(compact, &len, origin)
+}
+
+fn has_origin_len_size_assertion_guard(compact: &str, len: &str, origin: &str) -> bool {
     ["assert!(", "debug_assert!("].into_iter().any(|prefix| {
         let mut cursor = compact;
         let mut offset = 0usize;
@@ -1205,7 +1180,10 @@ fn has_pointer_arithmetic_bounds_assertion(compact: &str, argument: &str) -> boo
             let after_prefix = &compact[statement_start..];
             let statement_end = after_prefix.find(';').unwrap_or(after_prefix.len());
             let statement = &after_prefix[..statement_end];
-            if has_pointer_arithmetic_in_bounds_condition(statement, argument) {
+            let after_statement = &after_prefix[statement_end..];
+            if origin_len_size_condition_is_positive(statement, len)
+                && !contains_simple_assignment_to(after_statement, origin)
+            {
                 return true;
             }
             let next = pos + prefix.len();
@@ -1216,34 +1194,49 @@ fn has_pointer_arithmetic_bounds_assertion(compact: &str, argument: &str) -> boo
     })
 }
 
-fn has_pointer_arithmetic_open_bounds_branch(compact: &str, argument: &str) -> bool {
-    pointer_arithmetic_if_guards(compact).any(|guard| {
-        has_pointer_arithmetic_in_bounds_condition(guard.condition, argument)
+fn has_origin_len_size_open_positive_branch_guard(compact: &str, len: &str, origin: &str) -> bool {
+    origin_len_size_if_guards(compact).any(|guard| {
+        origin_len_size_condition_is_positive(guard.condition, len)
             && branch_still_open_at_operation(guard.after_body_start)
+            && !contains_simple_assignment_to(guard.after_body_start, origin)
     })
 }
 
-fn has_pointer_arithmetic_bounds_early_return(compact: &str, argument: &str) -> bool {
-    pointer_arithmetic_if_guards(compact).any(|guard| {
-        let (guard_body, _) = guard
+fn has_origin_len_size_early_return_guard(compact: &str, len: &str, origin: &str) -> bool {
+    origin_len_size_if_guards(compact).any(|guard| {
+        if !origin_len_size_condition_is_negative(guard.condition, len) {
+            return false;
+        }
+        let (guard_body, after_guard_body) = guard
             .after_body_start
             .split_once('}')
             .map_or((guard.after_body_start, ""), |(guard_body, after)| {
                 (guard_body, after)
             });
-        has_pointer_arithmetic_out_of_bounds_condition(guard.condition, argument)
-            && guard_body.contains("return")
+        guard_body.contains("return") && !contains_simple_assignment_to(after_guard_body, origin)
     })
 }
 
-struct PointerArithmeticIfGuard<'a> {
+fn origin_len_size_condition_is_positive(condition: &str, len: &str) -> bool {
+    condition.contains("size_of")
+        && (condition.contains(&format!("{len}>"))
+            || condition.contains(&format!("<{len}"))
+            || condition.contains(&format!("<={len}")))
+}
+
+fn origin_len_size_condition_is_negative(condition: &str, len: &str) -> bool {
+    condition.contains("size_of")
+        && (condition.contains(&format!("{len}<"))
+            || condition.contains(&format!(">{len}"))
+            || condition.contains(&format!(">={len}")))
+}
+
+struct OriginLenSizeIfGuard<'a> {
     condition: &'a str,
     after_body_start: &'a str,
 }
 
-fn pointer_arithmetic_if_guards(
-    compact: &str,
-) -> impl Iterator<Item = PointerArithmeticIfGuard<'_>> {
+fn origin_len_size_if_guards(compact: &str) -> impl Iterator<Item = OriginLenSizeIfGuard<'_>> {
     let mut guards = Vec::new();
     let mut cursor = compact;
     let mut offset = 0usize;
@@ -1258,7 +1251,7 @@ fn pointer_arithmetic_if_guards(
         }
         let after_if = &compact[start + 2..];
         if let Some(brace_pos) = after_if.find('{') {
-            guards.push(PointerArithmeticIfGuard {
+            guards.push(OriginLenSizeIfGuard {
                 condition: &after_if[..brace_pos],
                 after_body_start: &after_if[brace_pos + 1..],
             });
@@ -1270,64 +1263,79 @@ fn pointer_arithmetic_if_guards(
     guards.into_iter()
 }
 
-fn has_pointer_arithmetic_in_bounds_condition(condition: &str, argument: &str) -> bool {
-    for op in [">=", "<=", "<", ">"] {
-        let mut cursor = condition;
+fn has_origin_len_capacity_equality_guard(compact: &str, origin: &str) -> bool {
+    let len = format!("{origin}.len()");
+    let capacity = format!("{origin}.capacity()");
+    let cap = format!("{origin}.cap()");
+    has_origin_len_capacity_assertion_guard(compact, &len, &capacity, &cap, origin)
+        || has_origin_len_capacity_open_positive_branch_guard(
+            compact, &len, &capacity, &cap, origin,
+        )
+}
+
+fn has_origin_len_capacity_assertion_guard(
+    compact: &str,
+    len: &str,
+    capacity: &str,
+    cap: &str,
+    origin: &str,
+) -> bool {
+    [
+        ("assert_eq!(", false),
+        ("debug_assert_eq!(", false),
+        ("assert!(", true),
+        ("debug_assert!(", true),
+    ]
+    .into_iter()
+    .any(|(prefix, requires_operator)| {
+        let mut cursor = compact;
         let mut offset = 0usize;
-        while let Some(pos) = cursor.find(op) {
-            let op_start = offset + pos;
-            let op_end = op_start + op.len();
-            let left = comparison_left_operand(condition, op_start);
-            let right = comparison_right_operand(condition, op_end);
-            if ((op == "<")
-                && compact_contains_identifier(left, argument)
-                && operand_mentions_bounds(right))
-                || ((op == ">")
-                    && compact_contains_identifier(right, argument)
-                    && operand_mentions_bounds(left))
+        while let Some(pos) = cursor.find(prefix) {
+            let statement_start = offset + pos + prefix.len();
+            let after_prefix = &compact[statement_start..];
+            let statement_end = after_prefix.find(';').unwrap_or(after_prefix.len());
+            let statement = &after_prefix[..statement_end];
+            let after_statement = &after_prefix[statement_end..];
+            if origin_len_capacity_condition_matches(statement, len, capacity, cap)
+                && (!requires_operator || statement.contains("=="))
+                && !contains_simple_assignment_to(after_statement, origin)
             {
                 return true;
             }
-            let next = pos + op.len();
+            let next = pos + prefix.len();
             offset += next;
             cursor = &cursor[next..];
         }
-    }
-    false
+        false
+    })
 }
 
-fn has_pointer_arithmetic_out_of_bounds_condition(condition: &str, argument: &str) -> bool {
-    for op in [">=", "<="] {
-        let mut cursor = condition;
-        let mut offset = 0usize;
-        while let Some(pos) = cursor.find(op) {
-            let op_start = offset + pos;
-            let op_end = op_start + op.len();
-            let left = comparison_left_operand(condition, op_start);
-            let right = comparison_right_operand(condition, op_end);
-            if ((op == ">=")
-                && compact_contains_identifier(left, argument)
-                && operand_mentions_bounds(right))
-                || ((op == "<=")
-                    && compact_contains_identifier(right, argument)
-                    && operand_mentions_bounds(left))
-            {
-                return true;
-            }
-            let next = pos + op.len();
-            offset += next;
-            cursor = &cursor[next..];
-        }
-    }
-    false
+fn has_origin_len_capacity_open_positive_branch_guard(
+    compact: &str,
+    len: &str,
+    capacity: &str,
+    cap: &str,
+    origin: &str,
+) -> bool {
+    origin_len_size_if_guards(compact).any(|guard| {
+        origin_len_capacity_condition_matches(guard.condition, len, capacity, cap)
+            && guard.condition.contains("==")
+            && branch_still_open_at_operation(guard.after_body_start)
+            && !contains_simple_assignment_to(guard.after_body_start, origin)
+    })
 }
 
-fn has_slice_end_pointer_arithmetic_evidence(site: &ScannedSite, lower: &str) -> bool {
-    let Some((receiver, argument)) =
-        pointer_arithmetic_receiver_and_argument(&site.operation.expression)
-    else {
-        return false;
-    };
+fn origin_len_capacity_condition_matches(
+    condition: &str,
+    len: &str,
+    capacity: &str,
+    cap: &str,
+) -> bool {
+    condition.contains(len) && (condition.contains(capacity) || condition.contains(cap))
+}
+
+fn has_slice_end_pointer_arithmetic_evidence(lower: &str) -> bool {
+    let compact = compact_code(lower);
     for line in lower.lines() {
         let line = compact_code(line);
         let Some(after_let) = line.strip_prefix("let") else {
@@ -1341,113 +1349,11 @@ fn has_slice_end_pointer_arithmetic_evidence(site: &ScannedSite, lower: &str) ->
         };
         if !binding.is_empty()
             && !slice_expr.is_empty()
-            && receiver == binding
-            && argument == format!("{slice_expr}.len()")
+            && compact.contains(&format!("{binding}.add({slice_expr}.len())"))
         {
             return true;
         }
     }
-    false
-}
-
-fn has_raw_pointer_read_len_capacity_guard(expression: &str, lower: &str) -> bool {
-    let compact = compact_code(lower);
-    let pointer = raw_pointer_read_pointer_operand(expression);
-    let Some(source) = pointer
-        .as_deref()
-        .and_then(|pointer| raw_pointer_source_receiver(&compact, pointer))
-    else {
-        return false;
-    };
-    has_same_source_len_capacity_assertion(&compact, &source)
-}
-
-fn raw_pointer_read_pointer_operand(expression: &str) -> Option<String> {
-    let compact = compact_code(&expression.to_ascii_lowercase());
-    if let Some(call_pos) = compact.find("ptr::read(") {
-        let argument_text = &compact[call_pos + "ptr::read(".len()..];
-        let argument_end = matching_call_argument_end(argument_text)?;
-        let argument = &argument_text[..argument_end];
-        return raw_pointer_base_operand(argument);
-    }
-    if let Some(receiver) = receiver_before_marker(&compact, ".read(") {
-        return raw_pointer_base_operand(receiver);
-    }
-    None
-}
-
-fn raw_pointer_base_operand(operand: &str) -> Option<String> {
-    let compact = compact_code(operand);
-    if let Some((base, _cast)) = compact.split_once("as*") {
-        return (!base.is_empty()).then(|| base.to_string());
-    }
-    if let Some(receiver) = receiver_before_marker(&compact, ".cast::<") {
-        return Some(receiver.to_string());
-    }
-    if let Some(receiver) = receiver_before_marker(&compact, ".cast(") {
-        return Some(receiver.to_string());
-    }
-    (!compact.is_empty()).then_some(compact)
-}
-
-fn raw_pointer_source_receiver(before_call: &str, pointer: &str) -> Option<String> {
-    let pointer = compact_code(&pointer.to_ascii_lowercase());
-    if pointer.is_empty() {
-        return None;
-    }
-    if let Some(source) = raw_pointer_source_receiver_from_expr(&pointer) {
-        return Some(source);
-    }
-    if !is_simple_identifier(&pointer) {
-        return None;
-    }
-    for statement in before_call.split(';').rev() {
-        let Some(right) = statement
-            .strip_prefix(&format!("let{pointer}="))
-            .or_else(|| statement.strip_prefix(&format!("letmut{pointer}=")))
-        else {
-            continue;
-        };
-        if let Some(source) = raw_pointer_source_receiver_from_expr(right) {
-            return Some(source);
-        }
-    }
-    None
-}
-
-fn raw_pointer_source_receiver_from_expr(expression: &str) -> Option<String> {
-    let compact = compact_code(expression);
-    receiver_before_marker(&compact, ".as_ptr(")
-        .or_else(|| receiver_before_marker(&compact, ".as_mut_ptr("))
-        .map(str::to_string)
-}
-
-fn has_same_source_len_capacity_assertion(compact: &str, source: &str) -> bool {
-    let source = compact_code(&source.to_ascii_lowercase());
-    if source.is_empty() {
-        return false;
-    }
-    let len = format!("{source}.len()");
-    let capacity = format!("{source}.capacity()");
-    let len_eq_capacity = format!("{len}=={capacity}");
-    let capacity_eq_len = format!("{capacity}=={len}");
-
-    for prefix in ["assert!(", "debug_assert!("] {
-        if compact.contains(&format!("{prefix}{len_eq_capacity}"))
-            || compact.contains(&format!("{prefix}{capacity_eq_len}"))
-        {
-            return true;
-        }
-    }
-
-    for prefix in ["assert_eq!(", "debug_assert_eq!("] {
-        if compact.contains(&format!("{prefix}{len},{capacity}"))
-            || compact.contains(&format!("{prefix}{capacity},{len}"))
-        {
-            return true;
-        }
-    }
-
     false
 }
 
@@ -1710,31 +1616,17 @@ fn has_capacity_bound_guard(lower: &str) -> bool {
 }
 
 fn set_len_capacity_bindings<'a>(before_call: &'a str, receiver: &str) -> Vec<&'a str> {
-    let mut bindings = Vec::new();
-    let mut offset = 0usize;
-    for statement in before_call.split(';') {
-        let Some((left, right)) = statement.split_once('=') else {
-            offset += statement.len() + 1;
-            continue;
-        };
-        let Some(binding) = let_binding_name(left) else {
-            offset += statement.len() + 1;
-            continue;
-        };
-        let right = right.trim();
-        if (right == format!("{receiver}.capacity()") || right == format!("{receiver}.cap()"))
-            && !binding.is_empty()
-        {
-            let after_binding = &before_call[(offset + statement.len()).min(before_call.len())..];
-            if !contains_simple_assignment_to(after_binding, receiver)
-                && !contains_simple_assignment_to(after_binding, binding)
-            {
-                bindings.push(binding);
-            }
-        }
-        offset += statement.len() + 1;
-    }
-    bindings
+    before_call
+        .split(';')
+        .filter_map(|statement| {
+            let (left, right) = statement.split_once('=')?;
+            let binding = let_binding_name(left)?;
+            let right = right.trim();
+            ((right == format!("{receiver}.capacity()") || right == format!("{receiver}.cap()"))
+                && !binding.is_empty())
+            .then_some(binding)
+        })
+        .collect()
 }
 
 fn has_set_len_capacity_relation(
@@ -1747,18 +1639,26 @@ fn has_set_len_capacity_relation(
     let cap_gte_len = format!("{capacity}>={new_len}");
     let len_gt_cap = format!("{new_len}>{capacity}");
     let cap_lt_len = format!("{capacity}<{new_len}");
-    has_set_len_capacity_predicate_guard(before_call, &len_lte_cap, new_len, receiver)
-        || has_set_len_capacity_predicate_guard(before_call, &cap_gte_len, new_len, receiver)
-        || has_set_len_capacity_early_return(before_call, &len_gt_cap, new_len, receiver)
-        || has_set_len_capacity_early_return(before_call, &cap_lt_len, new_len, receiver)
+    has_set_len_capacity_predicate_guard(before_call, &len_lte_cap, new_len, capacity, receiver)
+        || has_set_len_capacity_predicate_guard(
+            before_call,
+            &cap_gte_len,
+            new_len,
+            capacity,
+            receiver,
+        )
+        || has_set_len_capacity_early_return(before_call, &len_gt_cap, new_len, capacity, receiver)
+        || has_set_len_capacity_early_return(before_call, &cap_lt_len, new_len, capacity, receiver)
 }
 
 fn has_set_len_capacity_predicate_guard(
     before_call: &str,
     predicate: &str,
     new_len: &str,
+    capacity: &str,
     receiver: &str,
 ) -> bool {
+    let stale_identifiers = set_len_capacity_stale_identifiers(new_len, capacity, receiver);
     [
         format!("assert!({predicate})"),
         format!("assert!({predicate},"),
@@ -1767,73 +1667,18 @@ fn has_set_len_capacity_predicate_guard(
     ]
     .iter()
     .any(|pattern| {
-        has_fresh_set_len_capacity_guard_pattern(before_call, pattern, new_len, receiver)
-    }) || has_open_positive_set_len_capacity_branch_guard(before_call, predicate, new_len, receiver)
-}
-
-fn has_fresh_set_len_capacity_guard_pattern(
-    before_call: &str,
-    pattern: &str,
-    new_len: &str,
-    receiver: &str,
-) -> bool {
-    let mut search_from = 0;
-    while let Some(offset) = before_call[search_from..].find(pattern) {
-        let pattern_start = search_from + offset;
-        let after_pattern = &before_call[pattern_start + pattern.len()..];
-        let statement_end = after_pattern.find(';').unwrap_or(after_pattern.len());
-        let after_guard = &after_pattern[statement_end..];
-        if !has_assignment_to_identifier(after_guard, new_len)
-            && !has_assignment_to_identifier(after_guard, receiver)
-        {
-            return true;
-        }
-        search_from = pattern_start + pattern.len();
-    }
-    false
-}
-
-fn has_open_positive_set_len_capacity_branch_guard(
-    before_call: &str,
-    predicate: &str,
-    new_len: &str,
-    receiver: &str,
-) -> bool {
-    let guard = format!("if{predicate}{{");
-    let mut search_from = 0;
-    while let Some(offset) = before_call[search_from..].find(&guard) {
-        let guard_start = search_from + offset;
-        let after_guard = &before_call[guard_start + guard.len()..];
-        let mut depth = 1usize;
-        for ch in after_guard.chars() {
-            match ch {
-                '{' => depth += 1,
-                '}' => {
-                    depth = depth.saturating_sub(1);
-                    if depth == 0 {
-                        break;
-                    }
-                }
-                _ => {}
-            }
-        }
-        if depth > 0
-            && !has_assignment_to_identifier(after_guard, new_len)
-            && !has_assignment_to_identifier(after_guard, receiver)
-        {
-            return true;
-        }
-        search_from = guard_start + guard.len();
-    }
-    false
+        has_fresh_guard_pattern_for_identifiers(before_call, pattern, &stale_identifiers)
+    }) || has_open_positive_branch_guard_for_identifiers(before_call, predicate, &stale_identifiers)
 }
 
 fn has_set_len_capacity_early_return(
     before_call: &str,
     predicate: &str,
     new_len: &str,
+    capacity: &str,
     receiver: &str,
 ) -> bool {
+    let stale_identifiers = set_len_capacity_stale_identifiers(new_len, capacity, receiver);
     let guard = format!("if{predicate}{{");
     let mut search_from = 0;
     while let Some(offset) = before_call[search_from..].find(&guard) {
@@ -1843,14 +1688,25 @@ fn has_set_len_capacity_early_return(
         let guard_body = &after_guard[..guard_end];
         let after_branch = &after_guard[guard_end..];
         if guard_body.contains("return")
-            && !has_assignment_to_identifier(after_branch, new_len)
-            && !has_assignment_to_identifier(after_branch, receiver)
+            && !has_assignment_to_any_identifier(after_branch, &stale_identifiers)
         {
             return true;
         }
         search_from = guard_start + guard.len();
     }
     false
+}
+
+fn set_len_capacity_stale_identifiers<'a>(
+    new_len: &'a str,
+    capacity: &'a str,
+    receiver: &'a str,
+) -> Vec<&'a str> {
+    let mut identifiers = vec![new_len, receiver];
+    if is_simple_identifier(capacity) {
+        identifiers.push(capacity);
+    }
+    identifiers
 }
 
 fn has_set_len_const_cap_evidence(lower: &str) -> bool {
@@ -1866,29 +1722,15 @@ fn has_set_len_with_capacity_evidence(lower: &str) -> bool {
     let Some((receiver, new_len)) = set_len_receiver_and_argument(&compact) else {
         return false;
     };
-    let marker = format!("{receiver}.set_len(");
-    let Some(call_pos) = compact.find(&marker) else {
-        return false;
-    };
-    let before_call = &compact[..call_pos];
-    let mut offset = 0usize;
-    for statement in before_call.split(';') {
+    compact.split(';').any(|statement| {
         let Some((left, right)) = statement.split_once('=') else {
-            offset += statement.len() + 1;
-            continue;
+            return false;
         };
         let Some(binding) = let_binding_name(left) else {
-            offset += statement.len() + 1;
-            continue;
+            return false;
         };
-        if binding == receiver && with_capacity_argument(right).is_some_and(|arg| arg == new_len) {
-            let after_origin = &before_call[(offset + statement.len()).min(before_call.len())..];
-            return !contains_simple_assignment_to(after_origin, receiver)
-                && !contains_simple_assignment_to(after_origin, new_len);
-        }
-        offset += statement.len() + 1;
-    }
-    false
+        binding == receiver && with_capacity_argument(right).is_some_and(|arg| arg == new_len)
+    })
 }
 
 fn set_len_receiver_and_argument(compact: &str) -> Option<(&str, &str)> {
@@ -2631,6 +2473,14 @@ fn has_u8_bool_value_predicate_guard(before_call: &str, predicate: &str, argumen
 }
 
 fn has_fresh_guard_pattern(before_call: &str, pattern: &str, argument: &str) -> bool {
+    has_fresh_guard_pattern_for_identifiers(before_call, pattern, &[argument])
+}
+
+fn has_fresh_guard_pattern_for_identifiers(
+    before_call: &str,
+    pattern: &str,
+    identifiers: &[&str],
+) -> bool {
     let mut search_from = 0;
     while let Some(offset) = before_call[search_from..].find(pattern) {
         let pattern_start = search_from + offset;
@@ -2641,7 +2491,7 @@ fn has_fresh_guard_pattern(before_call: &str, pattern: &str, argument: &str) -> 
             let statement_end = after_pattern.find(';').unwrap_or(after_pattern.len());
             &after_pattern[statement_end..]
         };
-        if !has_assignment_to_identifier(after_guard, argument) {
+        if !has_assignment_to_any_identifier(after_guard, identifiers) {
             return true;
         }
         search_from = pattern_start + pattern.len();
@@ -2650,6 +2500,14 @@ fn has_fresh_guard_pattern(before_call: &str, pattern: &str, argument: &str) -> 
 }
 
 fn has_open_positive_branch_guard(before_call: &str, predicate: &str, argument: &str) -> bool {
+    has_open_positive_branch_guard_for_identifiers(before_call, predicate, &[argument])
+}
+
+fn has_open_positive_branch_guard_for_identifiers(
+    before_call: &str,
+    predicate: &str,
+    identifiers: &[&str],
+) -> bool {
     let guard = format!("if{predicate}{{");
     let mut search_from = 0;
     while let Some(offset) = before_call[search_from..].find(&guard) {
@@ -2668,12 +2526,18 @@ fn has_open_positive_branch_guard(before_call: &str, predicate: &str, argument: 
                 _ => {}
             }
         }
-        if depth > 0 && !has_assignment_to_identifier(after_guard, argument) {
+        if depth > 0 && !has_assignment_to_any_identifier(after_guard, identifiers) {
             return true;
         }
         search_from = guard_start + guard.len();
     }
     false
+}
+
+fn has_assignment_to_any_identifier(compact: &str, identifiers: &[&str]) -> bool {
+    identifiers
+        .iter()
+        .any(|identifier| has_assignment_to_identifier(compact, identifier))
 }
 
 fn has_u8_bool_invalid_early_return_guard(before_call: &str, argument: &str) -> bool {
@@ -2803,30 +2667,41 @@ fn maybeuninit_slice_return_type(before_call: &str) -> bool {
         })
 }
 
-fn has_maybeuninit_raw_write_context(lower: &str) -> bool {
-    let compact = compact_code(lower);
-    has_maybeuninit_write_bytes_target_context(&compact)
-        || has_maybeuninit_ptr_write_value_context(&compact)
+fn has_maybeuninit_raw_write_context(site: &ScannedSite, lower: &str) -> bool {
+    let compact_expression = compact_code(&site.operation.expression.to_ascii_lowercase());
+    has_maybeuninit_write_bytes_target_context(site, lower, &compact_expression)
+        || has_maybeuninit_ptr_write_value_context(&compact_expression)
 }
 
-fn has_maybeuninit_write_bytes_target_context(compact: &str) -> bool {
-    let Some(write_pos) = compact.find("write_bytes(") else {
+fn has_maybeuninit_write_bytes_target_context(
+    site: &ScannedSite,
+    lower: &str,
+    compact_expression: &str,
+) -> bool {
+    if !compact_expression.contains("write_bytes(") {
         return false;
     };
-    let before_write = &compact[..write_pos];
-    if maybeuninit_slice_parameter_before_write(before_write)
-        || maybeuninit_impl_receiver_before_write(before_write)
-    {
+    let Some((_before_call, receiver, _byte, _len)) =
+        write_bytes_method_context(compact_expression)
+    else {
+        return false;
+    };
+    if receiver.contains("maybeuninit") {
         return true;
     }
-
-    let Some(receiver) = receiver_before_marker(compact, ".write_bytes(") else {
+    let Some(before_operation) = code_before_operation(lower, &site.operation.expression) else {
         return false;
     };
-    receiver.contains("maybeuninit")
+
+    if receiver == "self" || receiver.starts_with("self.") {
+        return maybeuninit_impl_receiver_before_write(&before_operation);
+    }
+    receiver
+        .strip_suffix(".as_mut_ptr()")
+        .is_some_and(|slice| maybeuninit_slice_parameter_before_write(&before_operation, slice))
 }
 
-fn maybeuninit_slice_parameter_before_write(before_write: &str) -> bool {
+fn maybeuninit_slice_parameter_before_write(before_write: &str, slice: &str) -> bool {
     let Some(fn_pos) = before_write.rfind("fn") else {
         return false;
     };
@@ -2835,7 +2710,9 @@ fn maybeuninit_slice_parameter_before_write(before_write: &str) -> bool {
         .split_once('{')
         .map_or(fn_context, |(signature, _body)| signature);
 
-    signature.contains("maybeuninit") && signature.contains('&') && signature.contains('[')
+    signature.contains("maybeuninit")
+        && (signature.contains(&format!("{slice}:&mut["))
+            || signature.contains(&format!("{slice}:&[")))
 }
 
 fn maybeuninit_impl_receiver_before_write(before_write: &str) -> bool {
@@ -2850,25 +2727,139 @@ fn maybeuninit_impl_receiver_before_write(before_write: &str) -> bool {
     header.contains("for[") && header.contains("maybeuninit")
 }
 
-fn has_maybeuninit_ptr_write_value_context(compact: &str) -> bool {
-    compact.contains("ptr::write(") && compact.contains("maybeuninit::new(")
+fn has_maybeuninit_ptr_write_value_context(compact_expression: &str) -> bool {
+    compact_expression.contains("ptr::write(") && compact_expression.contains("maybeuninit::new(")
 }
 
-fn has_u8_write_bytes_context(lower: &str) -> bool {
-    let compact = compact_code(lower);
-    let Some(receiver) = receiver_before_marker(&compact, ".write_bytes(") else {
-        return compact.contains("write_bytes(") && compact.contains(":*mutu8");
-    };
-
-    pointer_binding_has_type_before_call(&compact, receiver, "*mutu8")
-}
-
-fn pointer_binding_has_type_before_call(compact: &str, receiver: &str, pointer_type: &str) -> bool {
-    let Some(write_pos) = compact.find("write_bytes(") else {
+fn has_u8_write_bytes_context(site: &ScannedSite, lower: &str) -> bool {
+    let compact_expression = compact_code(&site.operation.expression.to_ascii_lowercase());
+    let Some((_before_call, receiver, _byte, _len)) =
+        write_bytes_method_context(&compact_expression)
+    else {
         return false;
     };
-    let before_call = &compact[..write_pos];
-    before_call.contains(&format!("{receiver}:{pointer_type}"))
+
+    pointer_binding_has_type_before_operation(lower, &site.operation.expression, receiver, "*mutu8")
+}
+
+fn has_bool_write_bytes_pointer_context(site: &ScannedSite, lower: &str) -> bool {
+    let compact_expression = compact_code(&site.operation.expression.to_ascii_lowercase());
+    let Some((_before_call, receiver, _byte, _len)) =
+        write_bytes_method_context(&compact_expression)
+    else {
+        return false;
+    };
+
+    pointer_binding_has_type_before_operation(
+        lower,
+        &site.operation.expression,
+        receiver,
+        "*mutbool",
+    )
+}
+
+fn has_bool_write_bytes_value_evidence(site: &ScannedSite, lower: &str) -> bool {
+    let compact_expression = compact_code(&site.operation.expression.to_ascii_lowercase());
+    let Some((_before_call, receiver, byte, _len)) =
+        write_bytes_method_context(&compact_expression)
+    else {
+        return false;
+    };
+    let Some(byte) = source_value_identifier(byte) else {
+        return false;
+    };
+    let Some(before_operation) = code_before_operation(lower, &site.operation.expression) else {
+        return false;
+    };
+
+    pointer_binding_has_type_before_operation(
+        lower,
+        &site.operation.expression,
+        receiver,
+        "*mutbool",
+    ) && has_u8_bool_value_guard(&before_operation, byte)
+}
+
+fn has_write_bytes_bounds_evidence(lower: &str) -> bool {
+    let compact = compact_code(lower);
+    let Some((_before_call, receiver, _byte, len)) = write_bytes_method_context(&compact) else {
+        return false;
+    };
+    let Some(slice) = receiver.strip_suffix(".as_mut_ptr()") else {
+        return false;
+    };
+
+    len == format!("{slice}.len()")
+}
+
+fn write_bytes_method_context(compact: &str) -> Option<(&str, &str, &str, &str)> {
+    let call_marker = ".write_bytes(";
+    let call_pos = compact.find(call_marker)?;
+    let before_call = &compact[..call_pos];
+    let receiver = receiver_expression_before_pos(compact, call_pos)?;
+    let after_marker = &compact[call_pos + call_marker.len()..];
+    let argument_end = matching_call_argument_end(after_marker)?;
+    let arguments = &after_marker[..argument_end];
+    let (byte, len) = split_top_level_pair(arguments)?;
+    (!byte.is_empty() && !len.is_empty()).then_some((before_call, receiver, byte, len))
+}
+
+fn receiver_expression_before_pos(compact: &str, pos: usize) -> Option<&str> {
+    let before_marker = compact.get(..pos)?;
+    if let Some(receiver) = simple_receiver_from_before_marker(before_marker) {
+        return Some(receiver);
+    }
+    call_receiver_from_before_marker(before_marker)
+}
+
+fn simple_receiver_from_before_marker(before_marker: &str) -> Option<&str> {
+    let receiver_start = before_marker
+        .char_indices()
+        .rev()
+        .find_map(|(idx, ch)| (!is_receiver_path_char(ch)).then_some(idx + ch.len_utf8()))
+        .unwrap_or(0);
+    let receiver = &before_marker[receiver_start..];
+    (!receiver.is_empty()).then_some(receiver)
+}
+
+fn call_receiver_from_before_marker(before_marker: &str) -> Option<&str> {
+    if !before_marker.ends_with(')') {
+        return None;
+    }
+    let open = matching_open_for_trailing_call(before_marker)?;
+    let before_open = &before_marker[..open];
+    let receiver_start = before_open
+        .char_indices()
+        .rev()
+        .find_map(|(idx, ch)| (!is_receiver_path_char(ch)).then_some(idx + ch.len_utf8()))
+        .unwrap_or(0);
+    let receiver = &before_marker[receiver_start..];
+    (!receiver.is_empty()).then_some(receiver)
+}
+
+fn matching_open_for_trailing_call(text: &str) -> Option<usize> {
+    let mut depth = 0usize;
+    for (idx, ch) in text.char_indices().rev() {
+        match ch {
+            ')' => depth += 1,
+            '(' if depth == 1 => return Some(idx),
+            '(' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+    None
+}
+
+fn pointer_binding_has_type_before_operation(
+    lower: &str,
+    expression: &str,
+    receiver: &str,
+    pointer_type: &str,
+) -> bool {
+    let Some(before_operation) = code_before_operation(lower, expression) else {
+        return false;
+    };
+    before_operation.contains(&format!("{receiver}:{pointer_type}"))
 }
 
 fn has_set_len_shrink_evidence(lower: &str) -> bool {
@@ -3100,16 +3091,10 @@ fn raw_pointer_alignment_receiver(expression: &str) -> Option<String> {
     if let Some(receiver) = receiver_before_marker(&compact, ".read(") {
         return Some(receiver.to_string());
     }
-    if let Some(receiver) = receiver_before_marker(&compact, ".read_unaligned(") {
-        return Some(receiver.to_string());
-    }
     if let Some(receiver) = receiver_before_marker(&compact, ".read_volatile(") {
         return Some(receiver.to_string());
     }
     if let Some(receiver) = receiver_before_marker(&compact, ".write(") {
-        return Some(receiver.to_string());
-    }
-    if let Some(receiver) = receiver_before_marker(&compact, ".write_unaligned(") {
         return Some(receiver.to_string());
     }
     if let Some(receiver) = receiver_before_marker(&compact, ".write_volatile(") {
@@ -3140,26 +3125,7 @@ fn has_nullability_guard(site: &ScannedSite, lower: &str) -> bool {
         return has_nonnull_new_question_mark_guard(&guard_compact, &arg)
             || has_null_early_return_guard(&guard_compact, &arg);
     }
-    if raw_pointer_operation_has_receiver(site)
-        && let Some(receiver) = raw_pointer_alignment_receiver(&site.operation.expression)
-    {
-        let receiver = compact_code(&receiver.to_ascii_lowercase());
-        let guard_scope = code_before_operation(lower, &site.operation.expression)
-            .unwrap_or_else(|| lower.to_string());
-        let guard_compact = compact_code(&guard_scope);
-        return has_null_early_return_guard(&guard_compact, &receiver);
-    }
     lower.contains("is_null") || compact.contains("nonnull::new(")
-}
-
-fn raw_pointer_operation_has_receiver(site: &ScannedSite) -> bool {
-    matches!(
-        site.operation.family,
-        OperationFamily::RawPointerRead
-            | OperationFamily::RawPointerWrite
-            | OperationFamily::RawPointerReadUnaligned
-            | OperationFamily::RawPointerWriteUnaligned
-    )
 }
 
 fn has_nonnull_new_question_mark_guard(compact: &str, arg: &str) -> bool {
@@ -3197,6 +3163,11 @@ fn nonnull_new_unchecked_argument(expression: &str) -> Option<String> {
     }
     let arg = rest[..end].trim();
     (!arg.is_empty()).then(|| arg.to_string())
+}
+
+fn contains_word(text: &str, word: &str) -> bool {
+    text.split(|ch: char| !(ch == '_' || ch.is_ascii_alphanumeric()))
+        .any(|token| token == word)
 }
 
 fn is_receiver_path_char(ch: char) -> bool {
@@ -3784,81 +3755,6 @@ mod tests {
         );
         assert!(
             !obligation_evidence(&mismatched_len, &obligations, &contract, &reach)[0]
-                .discharge
-                .present
-        );
-    }
-
-    #[test]
-    fn raw_pointer_bounds_evidence_requires_executable_guard() {
-        let obligations = vec![SafetyObligation::new(
-            "bounds",
-            "buffer has enough bytes for the accessed type",
-        )];
-        let contract = ContractEvidence::present("contract");
-        let reach = ReachEvidence {
-            state: "owner_reached".to_string(),
-            summary: "reached".to_string(),
-        };
-        let asserted = site_with_family(
-            OperationFamily::RawPointerRead,
-            vec!["assert!(bytes.len() >= core::mem::size_of::<Header>());"],
-            "unsafe { ptr.cast::<Header>().read() }",
-            vec![],
-        );
-        let open_branch = site_with_family(
-            OperationFamily::RawPointerRead,
-            vec!["if bytes.len() >= core::mem::size_of::<Header>() {"],
-            "unsafe { ptr.cast::<Header>().read() }",
-            vec![],
-        );
-        let observed = site_with_family(
-            OperationFamily::RawPointerRead,
-            vec![
-                "let enough = bytes.len() >= core::mem::size_of::<Header>();",
-                "observe(enough);",
-            ],
-            "unsafe { ptr.cast::<Header>().read() }",
-            vec![],
-        );
-        let generic_angle_brackets = site_with_family(
-            OperationFamily::RawPointerWrite,
-            vec!["let _scratch: MaybeUninit<u16> = MaybeUninit::uninit();"],
-            "unsafe { ptr.write_bytes(byte, len) }",
-            vec![],
-        );
-        let same_slice_write_bytes = site_with_family(
-            OperationFamily::RawPointerWrite,
-            vec![],
-            "unsafe { slice.as_mut_ptr().write_bytes(byte, slice.len()) }",
-            vec![],
-        );
-
-        assert!(has_length_or_bounds_guard(
-            "assert!(bytes.len() >= core::mem::size_of::<Header>());"
-        ));
-        assert!(
-            obligation_evidence(&asserted, &obligations, &contract, &reach)[0]
-                .discharge
-                .present
-        );
-        assert!(
-            obligation_evidence(&open_branch, &obligations, &contract, &reach)[0]
-                .discharge
-                .present
-        );
-        assert!(
-            !obligation_evidence(&observed, &obligations, &contract, &reach)[0]
-                .discharge
-                .present
-        );
-        assert!(
-            !obligation_evidence(&generic_angle_brackets, &obligations, &contract, &reach)[0]
-                .discharge
-                .present
-        );
-        assert!(
-            obligation_evidence(&same_slice_write_bytes, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
         );

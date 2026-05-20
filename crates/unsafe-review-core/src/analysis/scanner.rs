@@ -76,8 +76,7 @@ pub(crate) fn scan_file(
         if !changed && !repo_mode {
             continue;
         }
-        let owner =
-            owner_for_detected_site(&kind, &family, trimmed).or_else(|| find_owner(&lines, idx));
+        let owner = find_owner(&lines, idx);
         let visibility = visibility_for_snippet(trimmed).to_string();
         let public_api_surface = is_public_api_surface(&kind, trimmed);
         let context_before = context_before_site(&lines, idx);
@@ -621,8 +620,7 @@ fn is_parent_duplicate_operation<'a>(
 
 fn syntax_owner(site: &DetectedSyntaxSite, lines: &[&str], idx: usize) -> Option<String> {
     match site.kind {
-        UnsafeSiteKind::UnsafeFn => parse_fn_name(&site.source_snippet)
-            .or_else(|| parse_unsafe_fn_pointer_field_name(&site.source_snippet)),
+        UnsafeSiteKind::UnsafeFn => parse_fn_name(&site.source_snippet),
         UnsafeSiteKind::UnsafeTrait => parse_trait_name(&site.source_snippet),
         UnsafeSiteKind::UnsafeImpl
         | UnsafeSiteKind::UnsafeImplSend
@@ -630,18 +628,6 @@ fn syntax_owner(site: &DetectedSyntaxSite, lines: &[&str], idx: usize) -> Option
         _ => None,
     }
     .or_else(|| find_owner(lines, idx))
-}
-
-fn owner_for_detected_site(
-    kind: &UnsafeSiteKind,
-    family: &OperationFamily,
-    snippet: &str,
-) -> Option<String> {
-    if *kind == UnsafeSiteKind::UnsafeFn && *family == OperationFamily::Unknown {
-        parse_unsafe_fn_pointer_field_name(snippet)
-    } else {
-        None
-    }
 }
 
 fn syntax_site_covers_fallback(
@@ -1253,27 +1239,6 @@ fn parse_trait_name(line: &str) -> Option<String> {
 fn parse_macro_rules_name(line: &str) -> Option<String> {
     let rest = line.trim_start().strip_prefix("macro_rules!")?.trim_start();
     parse_ident(rest)
-}
-
-fn parse_unsafe_fn_pointer_field_name(line: &str) -> Option<String> {
-    let mut rest = strip_pub_visibility(line.trim_start());
-    let name = parse_ident(rest)?;
-    rest = rest.get(name.len()..)?.trim_start();
-    let after_colon = rest.strip_prefix(':')?.trim_start();
-    after_colon.starts_with("unsafe fn").then_some(name)
-}
-
-fn strip_pub_visibility(line: &str) -> &str {
-    let rest = line.trim_start();
-    if let Some(after_pub) = rest.strip_prefix("pub ") {
-        return after_pub.trim_start();
-    }
-    if let Some(after_pub) = rest.strip_prefix("pub(")
-        && let Some((_visibility, after_visibility)) = after_pub.split_once(')')
-    {
-        return after_visibility.trim_start();
-    }
-    rest
 }
 
 fn parse_ident(rest: &str) -> Option<String> {
@@ -1924,31 +1889,6 @@ mod tests {
         );
         assert_eq!(unsafe_impl.site.visibility, "private");
         assert!(!unsafe_impl.site.public_api_surface);
-        Ok(())
-    }
-
-    #[test]
-    fn scan_file_uses_field_owner_for_unsafe_fn_pointer_fields() -> Result<(), String> {
-        let root = unique_temp_dir()?;
-        fs::create_dir_all(root.join("src"))
-            .map_err(|err| format!("create temp src failed: {err}"))?;
-        fs::write(
-            root.join("src/lib.rs"),
-            "pub(crate) struct TaskVTable {\n    pub(crate) schedule: unsafe fn(*const ()),\n}\n",
-        )
-        .map_err(|err| format!("write temp source failed: {err}"))?;
-
-        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
-
-        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
-        let field = sites
-            .iter()
-            .find(|site| site.site.kind == UnsafeSiteKind::UnsafeFn)
-            .ok_or_else(|| format!("expected unsafe fn pointer field site: {sites:#?}"))?;
-        assert_eq!(field.site.owner.as_deref(), Some("schedule"));
-        assert_eq!(field.site.visibility, "public");
-        assert!(field.site.public_api_surface);
-        assert_eq!(field.operation.family, OperationFamily::Unknown);
         Ok(())
     }
 

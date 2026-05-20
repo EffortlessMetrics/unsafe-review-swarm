@@ -1,166 +1,182 @@
 [
-    {
-        "id":  "UR-raw-pointer-alignment-modulo-closed-branch-not-guard-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
-        "class":  "guard_missing",
-        "priority":  "high",
-        "confidence":  "medium",
-        "site":  {
-                     "file":  "src/lib.rs",
-                     "line":  11,
-                     "column":  5,
-                     "kind":  "operation",
-                     "owner":  "read_header",
-                     "visibility":  "private",
-                     "public_api_surface":  false,
-                     "snippet":  "unsafe { ptr.cast::\u003cHeader\u003e().read() }"
-                 },
-        "operation_family":  "raw_pointer_read",
-        "hazards":  [
-                        "pointer_validity",
-                        "alignment",
-                        "initialized_memory",
-                        "same_allocation"
-                    ],
-        "obligations":  [
-                            "pointer is live and dereferenceable for the accessed type",
-                            "buffer has enough bytes for the accessed type",
-                            "pointer is aligned for the accessed type",
-                            "memory is initialized for the accessed type",
-                            "access remains inside one live allocation"
-                        ],
-        "obligation_evidence":  [
-                                    {
-                                        "key":  "pointer-live",
-                                        "description":  "pointer is live and dereferenceable for the accessed type",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `SAFETY:` comment was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  false,
-                                                          "state":  "missing",
-                                                          "summary":  "No nullability guard code was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  true,
-                                                      "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `read_header`"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    },
-                                    {
-                                        "key":  "bounds",
-                                        "description":  "buffer has enough bytes for the accessed type",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `SAFETY:` comment was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  true,
-                                                          "state":  "present",
-                                                          "summary":  "Length or bounds guard code was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  true,
-                                                      "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `read_header`"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    },
-                                    {
-                                        "key":  "alignment",
-                                        "description":  "pointer is aligned for the accessed type",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `SAFETY:` comment was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  false,
-                                                          "state":  "missing",
-                                                          "summary":  "No alignment guard code was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  true,
-                                                      "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `read_header`"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    },
-                                    {
-                                        "key":  "initialized",
-                                        "description":  "memory is initialized for the accessed type",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `SAFETY:` comment was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  false,
-                                                          "state":  "missing",
-                                                          "summary":  "No obligation-specific guard code was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  true,
-                                                      "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `read_header`"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    },
-                                    {
-                                        "key":  "allocation",
-                                        "description":  "access remains inside one live allocation",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `SAFETY:` comment was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  false,
-                                                          "state":  "missing",
-                                                          "summary":  "No obligation-specific guard code was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  true,
-                                                      "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `read_header`"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    }
-                                ],
-        "contract":  "Nearby `SAFETY:` comment was detected",
-        "discharge":  "Some inferred safety obligations are missing local guard evidence",
-        "reach":  "1 related test file(s) mention owner `read_header`",
-        "witness":  "No imported witness receipt was found",
-        "missing":  [
-                        "Missing visible local guard for inferred safety obligations",
-                        "No witness receipt imported for this card"
-                    ],
-        "verify_commands":  [
-                                "cargo +nightly miri test read_header",
-                                "cargo +nightly careful test read_header"
-                            ]
-    }
+  {
+    "id": "UR-raw-pointer-alignment-modulo-closed-branch-not-guard-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 11,
+      "column": 5,
+      "kind": "operation",
+      "owner": "read_header",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { ptr.cast::<Header>().read() }"
+    },
+    "operation": "unsafe { ptr.cast::<Header>().read() }",
+    "operation_family": "raw_pointer_read",
+    "hazards": [
+      "pointer_validity",
+      "alignment",
+      "initialized_memory",
+      "same_allocation"
+    ],
+    "obligations": [
+      "pointer is live and dereferenceable for the accessed type",
+      "buffer has enough bytes for the accessed type",
+      "pointer is aligned for the accessed type",
+      "memory is initialized for the accessed type",
+      "access remains inside one live allocation"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "pointer-live",
+        "description": "pointer is live and dereferenceable for the accessed type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nullability guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `read_header`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "bounds",
+        "description": "buffer has enough bytes for the accessed type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Length or bounds guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `read_header`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "alignment",
+        "description": "pointer is aligned for the accessed type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No alignment guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `read_header`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "initialized",
+        "description": "memory is initialized for the accessed type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `read_header`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "allocation",
+        "description": "access remains inside one live allocation",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `read_header`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "Some inferred safety obligations are missing local guard evidence",
+    "reach": "1 related test file(s) mention owner `read_header`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test read_header",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test read_header",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.",
+    "verify_commands": [
+      "cargo +nightly miri test read_header",
+      "cargo +nightly careful test read_header"
+    ]
+  }
 ]

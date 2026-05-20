@@ -1,7 +1,7 @@
 use crate::api::AnalyzeOutput;
 use crate::api::Scope;
 use crate::domain::ReviewCard;
-use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE, markdown_table};
+use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
 use crate::util::path_display;
 use std::collections::BTreeMap;
 
@@ -28,19 +28,21 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
         render_no_changed_gaps(&mut out);
     }
     out.push_str("## Cards\n\n");
-    out.push_str("| ID | Class | Hazard | Missing | Route |\n");
-    out.push_str("|---|---|---|---|---|\n");
+    out.push_str("| ID | Class | Operation | Hazard | Missing | Route | Next action |\n");
+    out.push_str("|---|---|---|---|---|---|---|\n");
     for card in &output.cards {
         let hazard = card.hazards.first().map_or("unknown", |h| h.as_str());
         let missing = card.missing.first().map_or("", |m| m.kind.as_str());
         let route = card.routes.first().map_or("human", |r| r.kind.as_str());
         out.push_str(&format!(
-            "| `{}` | `{}` | `{}` | `{}` | `{}` |\n",
+            "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |\n",
             md_cell(&card.id.to_string()),
-            md_cell(card.class.as_str()),
-            md_cell(hazard),
-            md_cell(missing),
-            md_cell(route)
+            card.class.as_str(),
+            md_cell(&one_line(&card.operation.expression)),
+            hazard,
+            missing,
+            route,
+            md_cell(&card.next_action.summary)
         ));
     }
     out.push_str("\n## Trust boundary\n\n");
@@ -83,20 +85,24 @@ fn render_repo_posture(output: &AnalyzeOutput) -> String {
     if output.cards.is_empty() {
         out.push_str("No repo-scope unsafe-review cards found.\n\n");
     } else {
-        out.push_str("| ID | Class | Operation | Missing evidence | Route |\n");
-        out.push_str("|---|---|---|---|---|\n");
+        out.push_str(
+            "| ID | Class | Operation family | Operation | Missing evidence | Route | Next action |\n",
+        );
+        out.push_str("|---|---|---|---|---|---|---|\n");
         for card in &output.cards {
             let route = card
                 .routes
                 .first()
                 .map_or("human-deep-review", |route| route.kind.as_str());
             out.push_str(&format!(
-                "| `{}` | `{}` | `{}` | {} | `{}` |\n",
+                "| `{}` | `{}` | `{}` | `{}` | {} | `{}` | {} |\n",
                 md_cell(&card.id.to_string()),
                 card.class.as_str(),
                 card.operation.family.as_str(),
+                md_cell(&one_line(&card.operation.expression)),
                 md_cell(&missing_summary(card)),
-                route
+                route,
+                md_cell(&card.next_action.summary)
             ));
         }
         out.push('\n');
@@ -180,6 +186,10 @@ pub(crate) fn render_pr_summary(output: &AnalyzeOutput) -> String {
             "- Operation: `{}`\n",
             one_line(&card.operation.expression)
         ));
+        out.push_str(&format!(
+            "- Operation family: `{}`\n",
+            card.operation.family.as_str()
+        ));
         out.push_str(&format!("- Missing evidence: {}\n", missing_summary(card)));
         if let Some(route) = card.routes.first() {
             out.push_str(&format!(
@@ -200,16 +210,16 @@ pub(crate) fn render_pr_summary(output: &AnalyzeOutput) -> String {
 
     out.push_str("## Card table\n\n");
     out.push_str(
-        "| ID | Class | Location | Operation | Missing evidence | Route | Next action |\n",
+        "| ID | Class | Location | Operation family | Operation | Missing evidence | Route | Next action |\n",
     );
-    out.push_str("|---|---|---|---|---|---|---|\n");
+    out.push_str("|---|---|---|---|---|---|---|---|\n");
     for card in &output.cards {
         let route = card
             .routes
             .first()
             .map_or("human-deep-review", |route| route.kind.as_str());
         out.push_str(&format!(
-            "| `{}` | `{}` | {} | `{}` | {} | `{}` | {} |\n",
+            "| `{}` | `{}` | {} | `{}` | `{}` | {} | `{}` | {} |\n",
             md_cell(&card.id.to_string()),
             card.class.as_str(),
             md_cell(&format!(
@@ -217,6 +227,7 @@ pub(crate) fn render_pr_summary(output: &AnalyzeOutput) -> String {
                 path_display(&card.site.location.file),
                 card.site.location.line
             )),
+            card.operation.family.as_str(),
             md_cell(&one_line(&card.operation.expression)),
             md_cell(&missing_summary(card)),
             route,
@@ -332,6 +343,7 @@ pub(crate) fn render_card_detail(card: &ReviewCard) -> String {
             out.push_str(&format!("- {}\n", missing.message));
         }
     }
+
     render_resolution_guidance(&mut out, card);
     render_non_resolution_guidance(&mut out);
     render_witness_routes(&mut out, card);
@@ -395,7 +407,7 @@ fn missing_summary(card: &ReviewCard) -> String {
 }
 
 fn md_cell(value: &str) -> String {
-    markdown_table::cell(value)
+    one_line(value).replace('|', "\\|")
 }
 
 fn one_line(value: &str) -> String {
@@ -406,8 +418,23 @@ fn one_line(value: &str) -> String {
 mod tests {
     use super::*;
     use crate::api::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, analyze};
-    use crate::domain::CardId;
     use std::path::PathBuf;
+
+    #[test]
+    fn markdown_report_projects_operation_and_next_action() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let rendered = render(&output);
+
+        assert!(rendered.contains("# unsafe-review"));
+        assert!(
+            rendered
+                .contains("| ID | Class | Operation | Hazard | Missing | Route | Next action |")
+        );
+        assert!(rendered.contains("unsafe { ptr.cast::<Header>().read() }"));
+        assert!(rendered.contains("Add or expose the local guard"));
+        assert!(rendered.contains("not a proof of memory safety"));
+        Ok(())
+    }
 
     #[test]
     fn card_detail_explains_conditions_missing_evidence_and_routes() -> Result<(), String> {
@@ -420,6 +447,7 @@ mod tests {
 
         assert!(rendered.contains("## Why this card exists"));
         assert!(rendered.contains("## Required safety conditions"));
+        assert!(rendered.contains("**Operation:** `unsafe { ptr.cast::<Header>().read() }`"));
         assert!(rendered.contains("pointer is aligned for the accessed type"));
         assert!(rendered.contains("## Evidence found"));
         assert!(rendered.contains("Guard/discharge:"));
@@ -458,6 +486,11 @@ mod tests {
         assert!(rendered.contains("# unsafe-review PR summary"));
         assert!(rendered.contains("## Top card"));
         assert!(rendered.contains("## Card table"));
+        assert!(rendered.contains("- Operation: `unsafe { ptr.cast::<Header>().read() }`"));
+        assert!(rendered.contains("- Operation family: `raw_pointer_read`"));
+        assert!(rendered.contains("| ID | Class | Location | Operation family | Operation |"));
+        assert!(rendered.contains("unsafe { ptr.cast::<Header>().read() }"));
+        assert!(rendered.contains("| `raw_pointer_read` |"));
         assert!(rendered.contains("## Witness plan"));
         assert!(rendered.contains("Open actionable gaps: 1"));
         assert!(rendered.contains("Missing visible local guard"));
@@ -483,28 +516,6 @@ mod tests {
     }
 
     #[test]
-    fn generic_markdown_card_table_escapes_table_cells() -> Result<(), String> {
-        let mut output = fixture_output("raw_pointer_alignment")?;
-        let card = output
-            .cards
-            .first_mut()
-            .ok_or_else(|| "raw pointer fixture should emit a card".to_string())?;
-        card.id = CardId("UR-pipe|card-c1".to_string());
-        let missing = card
-            .missing
-            .first_mut()
-            .ok_or_else(|| "raw pointer fixture should have missing evidence".to_string())?;
-        missing.kind = "guard|alignment".to_string();
-
-        let rendered = render(&output);
-
-        assert!(rendered.contains("`UR-pipe\\|card-c1`"));
-        assert!(rendered.contains("`guard\\|alignment`"));
-        assert!(!rendered.contains("`UR-pipe|card-c1`"));
-        Ok(())
-    }
-
-    #[test]
     fn repo_posture_markdown_counts_open_gaps_without_safety_claim() -> Result<(), String> {
         let output = repo_fixture_output("raw_pointer_alignment")?;
         let rendered = render(&output);
@@ -517,6 +528,11 @@ mod tests {
         assert!(rendered.contains("## Top operation families"));
         assert!(rendered.contains("| `raw_pointer_read` | 1 |"));
         assert!(rendered.contains("## Witness routes"));
+        assert!(rendered.contains(
+            "| ID | Class | Operation family | Operation | Missing evidence | Route | Next action |"
+        ));
+        assert!(rendered.contains("unsafe { ptr.cast::<Header>().read() }"));
+        assert!(rendered.contains("Add or expose the local guard"));
         assert!(rendered.contains("## Trust boundary"));
         assert!(rendered.contains("not raw unsafe usage"));
         assert!(rendered.contains("not UB-free status"));

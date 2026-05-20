@@ -1,178 +1,202 @@
 [
-    {
-        "id":  "UR-long-unsafe-fn-owner-inference-src-lib-rs-run-unsafe_fn-unknown-run-87cb9a919919-unknown-c1",
-        "class":  "contract_missing",
-        "priority":  "high",
-        "confidence":  "high",
-        "site":  {
-                     "file":  "src/lib.rs",
-                     "line":  1,
-                     "column":  1,
-                     "kind":  "unsafe_fn",
-                     "owner":  "run",
-                     "visibility":  "public",
-                     "public_api_surface":  true,
-                     "snippet":  "pub unsafe fn run(ptr: *mut u8) {"
-                 },
-        "operation_family":  "unknown",
-        "hazards":  [
-                        "unknown"
-                    ],
-        "obligations":  [
-                            "unsafe contract could not be inferred from this syntax shape"
-                        ],
-        "obligation_evidence":  [
-                                    {
-                                        "key":  "unknown",
-                                        "description":  "unsafe contract could not be inferred from this syntax shape",
-                                        "contract":  {
-                                                         "present":  false,
-                                                         "state":  "missing",
-                                                         "summary":  "Public unsafe API is missing nearby `# Safety` documentation"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  true,
-                                                          "state":  "present",
-                                                          "summary":  "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration"
-                                                      },
-                                        "reach":  {
-                                                      "present":  false,
-                                                      "state":  "missing",
-                                                      "summary":  "No static test mention of owner `run` was found"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    }
-                                ],
-        "contract":  "Public unsafe API is missing nearby `# Safety` documentation",
-        "discharge":  "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration",
-        "reach":  "No static test mention of owner `run` was found",
-        "witness":  "No imported witness receipt was found",
-        "missing":  [
-                        "Missing public `# Safety` documentation for unsafe API",
-                        "No related test path was found by static search",
-                        "No witness receipt imported for this card"
-                    ],
-        "verify_commands":  [
-
-                            ]
+  {
+    "id": "UR-long-unsafe-fn-owner-inference-src-lib-rs-run-unsafe_fn-unknown-run-87cb9a919919-unknown-c1",
+    "class": "contract_missing",
+    "priority": "high",
+    "confidence": "high",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 1,
+      "column": 1,
+      "kind": "unsafe_fn",
+      "owner": "run",
+      "visibility": "public",
+      "public_api_surface": true,
+      "snippet": "pub unsafe fn run(ptr: *mut u8) {"
     },
-    {
-        "id":  "UR-long-unsafe-fn-owner-inference-src-lib-rs-run-operation-drop_in_place-drop-in-place-eba1828362b8-pointer_validity-c1",
-        "class":  "contract_missing",
-        "priority":  "high",
-        "confidence":  "high",
-        "site":  {
-                     "file":  "src/lib.rs",
-                     "line":  89,
-                     "column":  5,
-                     "kind":  "operation",
-                     "owner":  "run",
-                     "visibility":  "private",
-                     "public_api_surface":  false,
-                     "snippet":  "unsafe { ptr.drop_in_place() };"
-                 },
-        "operation_family":  "drop_in_place",
-        "hazards":  [
-                        "pointer_validity",
-                        "initialized_memory",
-                        "drop_or_deallocation"
-                    ],
-        "obligations":  [
-                            "pointer is valid for dropping one value",
-                            "pointed-to value is initialized",
-                            "value will not be dropped again or observed after drop"
-                        ],
-        "obligation_evidence":  [
-                                    {
-                                        "key":  "pointer-live",
-                                        "description":  "pointer is valid for dropping one value",
-                                        "contract":  {
-                                                         "present":  false,
-                                                         "state":  "missing",
-                                                         "summary":  "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  false,
-                                                          "state":  "missing",
-                                                          "summary":  "No nullability guard code was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  false,
-                                                      "state":  "missing",
-                                                      "summary":  "No static test mention of owner `run` was found"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    },
-                                    {
-                                        "key":  "initialized",
-                                        "description":  "pointed-to value is initialized",
-                                        "contract":  {
-                                                         "present":  false,
-                                                         "state":  "missing",
-                                                         "summary":  "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  false,
-                                                          "state":  "missing",
-                                                          "summary":  "No obligation-specific guard code was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  false,
-                                                      "state":  "missing",
-                                                      "summary":  "No static test mention of owner `run` was found"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    },
-                                    {
-                                        "key":  "ownership",
-                                        "description":  "value will not be dropped again or observed after drop",
-                                        "contract":  {
-                                                         "present":  false,
-                                                         "state":  "missing",
-                                                         "summary":  "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  false,
-                                                          "state":  "missing",
-                                                          "summary":  "No obligation-specific guard code was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  false,
-                                                      "state":  "missing",
-                                                      "summary":  "No static test mention of owner `run` was found"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    }
-                                ],
-        "contract":  "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
-        "discharge":  "No visible local guard detected",
-        "reach":  "No static test mention of owner `run` was found",
-        "witness":  "No imported witness receipt was found",
-        "missing":  [
-                        "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
-                        "Missing visible local guard for inferred safety obligations",
-                        "No related test path was found by static search",
-                        "No witness receipt imported for this card"
-                    ],
-        "verify_commands":  [
-                                "cargo +nightly miri test run",
-                                "cargo +nightly careful test run"
-                            ]
-    }
+    "operation": "pub unsafe fn run(ptr: *mut u8) {",
+    "operation_family": "unknown",
+    "hazards": [
+      "unknown"
+    ],
+    "obligations": [
+      "unsafe contract could not be inferred from this syntax shape"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "unknown",
+        "description": "unsafe contract could not be inferred from this syntax shape",
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "Public unsafe API is missing nearby `# Safety` documentation"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `run` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Public unsafe API is missing nearby `# Safety` documentation",
+    "discharge": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration",
+    "reach": "No static test mention of owner `run` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing public `# Safety` documentation for unsafe API",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+    "verify_commands": []
+  },
+  {
+    "id": "UR-long-unsafe-fn-owner-inference-src-lib-rs-run-operation-drop_in_place-drop-in-place-eba1828362b8-pointer_validity-c1",
+    "class": "contract_missing",
+    "priority": "high",
+    "confidence": "high",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 89,
+      "column": 5,
+      "kind": "operation",
+      "owner": "run",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { ptr.drop_in_place() };"
+    },
+    "operation": "unsafe { ptr.drop_in_place() };",
+    "operation_family": "drop_in_place",
+    "hazards": [
+      "pointer_validity",
+      "initialized_memory",
+      "drop_or_deallocation"
+    ],
+    "obligations": [
+      "pointer is valid for dropping one value",
+      "pointed-to value is initialized",
+      "value will not be dropped again or observed after drop"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "pointer-live",
+        "description": "pointer is valid for dropping one value",
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nullability guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `run` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "initialized",
+        "description": "pointed-to value is initialized",
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `run` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "ownership",
+        "description": "value will not be dropped again or observed after drop",
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `run` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+    "discharge": "No visible local guard detected",
+    "reach": "No static test mention of owner `run` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test run",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test run",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+      "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+    "verify_commands": [
+      "cargo +nightly miri test run",
+      "cargo +nightly careful test run"
+    ]
+  }
 ]

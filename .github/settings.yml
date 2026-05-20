@@ -1,6 +1,6 @@
 repository:
-  name: unsafe-review-swarm
-  description: Day-to-day development swarm for unsafe-review
+  name: unsafe-review
+  description: Cheap unsafe review for Rust
   has_issues: true
   has_projects: false
   has_wiki: false

@@ -37,6 +37,10 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
         ));
         out.push_str(&format!("  id: {}\n", card.id));
         out.push_str(&format!("  operation: {}\n", card.operation.expression));
+        out.push_str(&format!(
+            "  operation_family: {}\n",
+            card.operation.family.as_str()
+        ));
         out.push_str("  hazards:\n");
         for hazard in &card.hazards {
             out.push_str(&format!("    - {}\n", hazard.as_str()));
@@ -107,6 +111,8 @@ mod tests {
         let rendered = render(&output);
 
         assert!(rendered.contains("required safety conditions:"));
+        assert!(rendered.contains("operation: unsafe { ptr.cast::<Header>().read() }"));
+        assert!(rendered.contains("operation_family: raw_pointer_read"));
         assert!(rendered.contains("pointer is aligned for the accessed type"));
         assert!(rendered.contains("obligation evidence:"));
         assert!(rendered.contains("alignment: contract present, guard missing"));

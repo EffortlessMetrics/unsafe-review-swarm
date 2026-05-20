@@ -1,61 +1,69 @@
 [
-    {
-        "id":  "UR-unsafe-fn-call-encode-utf8-remaining-cap-fixture-src-lib-rs-try-push-operation-unsafe_fn_call-encode-utf8-31558b484b99-unknown-c1",
-        "class":  "guarded_unwitnessed",
-        "priority":  "medium",
-        "confidence":  "medium",
-        "site":  {
-                     "file":  "src/lib.rs",
-                     "line":  20,
-                     "column":  9,
-                     "kind":  "operation",
-                     "owner":  "try_push",
-                     "visibility":  "private",
-                     "public_api_surface":  false,
-                     "snippet":  "match unsafe { encode_utf8(c, ptr, remaining_cap) } {"
-                 },
-        "operation_family":  "unsafe_fn_call",
-        "hazards":  [
-                        "unknown"
-                    ],
-        "obligations":  [
-                            "callee safety preconditions are satisfied"
-                        ],
-        "obligation_evidence":  [
-                                    {
-                                        "key":  "callee-contract",
-                                        "description":  "callee safety preconditions are satisfied",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `SAFETY:` comment was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  true,
-                                                          "state":  "present",
-                                                          "summary":  "Unsafe call argument guard code was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  true,
-                                                      "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `try_push`"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    }
-                                ],
-        "contract":  "Nearby `SAFETY:` comment was detected",
-        "discharge":  "All inferred safety obligations have visible local discharge evidence",
-        "reach":  "1 related test file(s) mention owner `try_push`",
-        "witness":  "No imported witness receipt was found",
-        "missing":  [
-                        "No witness receipt imported for this card"
-                    ],
-        "verify_commands":  [
-
-                            ]
-    }
+  {
+    "id": "UR-unsafe-fn-call-encode-utf8-remaining-cap-fixture-src-lib-rs-try-push-operation-unsafe_fn_call-encode-utf8-31558b484b99-unknown-c1",
+    "class": "guarded_unwitnessed",
+    "priority": "medium",
+    "confidence": "medium",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 20,
+      "column": 9,
+      "kind": "operation",
+      "owner": "try_push",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "match unsafe { encode_utf8(c, ptr, remaining_cap) } {"
+    },
+    "operation": "match unsafe { encode_utf8(c, ptr, remaining_cap) } {",
+    "operation_family": "unsafe_fn_call",
+    "hazards": [
+      "unknown"
+    ],
+    "obligations": [
+      "callee safety preconditions are satisfied"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "callee-contract",
+        "description": "callee safety preconditions are satisfied",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Unsafe call argument guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `try_push`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "All inferred safety obligations have visible local discharge evidence",
+    "reach": "1 related test file(s) mention owner `try_push`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Attach a focused witness receipt or mark the static limitation explicitly.",
+    "verify_commands": []
+  }
 ]

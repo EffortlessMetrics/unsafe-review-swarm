@@ -10,21 +10,23 @@
 - human / JSON / Markdown output
 - specification and policy system
 
-## 0.2.0 — PR and CI projection
+## 0.2.0 — Public usability
 
-- GitHub summary artifact
-- SARIF artifact
-- advisory GitHub workflow
-- inline comment planning artifact
-- advisory artifact verifier
-- dogfood receipts for real PR artifacts
+- first-run `doctor` readiness check
+- one-command `first-pr` / `review` advisory bundle
+- readable PR summary, witness plan, and honest no-card states
+- reviewer-first `explain <card-id>`
+- support posture command
+- first-pr artifact bundle verifier
+- release target: [0.2.0 public usability](releases/0.2.0-public-usability.md)
 
-## 0.3.0 — LSP and agent workflow
+## 0.3.0 — Editor-adjacent and agent workflow
 
 - saved-workspace LSP diagnostics
 - hover cards
 - code actions for copying packets and witness commands
 - copy-only bounded agent packets
+- live LSP remains deferred until saved artifacts and first-run UX are solid
 
 ## 0.4.0 — Repo posture and policy
 

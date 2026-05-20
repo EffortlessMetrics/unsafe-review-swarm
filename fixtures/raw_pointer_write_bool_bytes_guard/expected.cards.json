@@ -1,0 +1,182 @@
+[
+  {
+    "id": "UR-raw-pointer-write-bool-bytes-guard-src-lib-rs-fill-bools-operation-raw_pointer_write-write-bytes-3c6249bf4467-pointer_validity-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 6,
+      "column": 5,
+      "kind": "operation",
+      "owner": "fill_bools",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { ptr.write_bytes(byte, len) }"
+    },
+    "operation": "unsafe { ptr.write_bytes(byte, len) }",
+    "operation_family": "raw_pointer_write",
+    "hazards": [
+      "pointer_validity",
+      "alignment",
+      "initialized_memory",
+      "same_allocation"
+    ],
+    "obligations": [
+      "pointer is live and dereferenceable for the accessed type",
+      "buffer has enough bytes for the accessed type",
+      "pointer is aligned for the accessed type",
+      "memory is initialized for the accessed type",
+      "access remains inside one live allocation"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "pointer-live",
+        "description": "pointer is live and dereferenceable for the accessed type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nullability guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `fill_bools`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "bounds",
+        "description": "buffer has enough bytes for the accessed type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No length or bounds guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `fill_bools`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "alignment",
+        "description": "pointer is aligned for the accessed type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "bool raw write alignment evidence was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `fill_bools`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "initialized",
+        "description": "memory is initialized for the accessed type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "bool write_bytes value evidence was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `fill_bools`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "allocation",
+        "description": "access remains inside one live allocation",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `fill_bools`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "Some inferred safety obligations are missing local guard evidence",
+    "reach": "1 related test file(s) mention owner `fill_bools`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test fill_bools",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test fill_bools",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose the local guard that discharges the `raw_pointer_write` safety obligation.",
+    "verify_commands": [
+      "cargo +nightly miri test fill_bools",
+      "cargo +nightly careful test fill_bools"
+    ]
+  }
+]

@@ -43,15 +43,12 @@ the actionable-gap count.
 `policy report` is an advisory-only policy projection. It runs analysis in
 advisory mode and reports new gaps, baseline-known cards, suppressed cards,
 resolved/unmatched baseline entries, and expired suppression entries from exact
-card identity matching. Current-card entries project ReviewCard identity,
-location, operation expression, operation family, hazards, missing evidence,
-witness routes, next action, policy status, and policy reason so policy rows
-remain reviewable without creating a separate finding truth or reclassifying the
-card. Current `baseline_known` and `suppressed` rows must also include matched
-ledger provenance when present. Resolved and expired ledger rows must preserve
-owner, reason, evidence, and review/expiry dates when present. It may render
-JSON or Markdown. It must not change exit-code policy, create broad suppression
-authority, execute witnesses, or claim safety.
+card identity matching. Current-card entries include the ReviewCard operation
+expression, operation family, next action, policy status, and policy reason so
+reviewers can see the policy status and cheapest credible follow-up without
+reclassifying the card. It may render JSON or Markdown. It must not change
+exit-code policy, create broad suppression authority, execute witnesses, or
+claim safety.
 
 The JSON report is schema-versioned and additive. A successful report includes:
 
@@ -73,13 +70,8 @@ The JSON report is schema-versioned and additive. A successful report includes:
 - `summary.invalid_ledger_entries`
 - `cards[].card_id`
 - `cards[].class`
-- `cards[].ledger`
-- `cards[].site`
 - `cards[].operation`
 - `cards[].operation_family`
-- `cards[].hazards`
-- `cards[].missing`
-- `cards[].witness_routes`
 - `cards[].policy_status`
 - `cards[].policy_reason`
 - `cards[].missing_count`
@@ -130,7 +122,8 @@ path, owner, or operation-family suppression is not supported.
 - `--policy no-new-debt` succeeds when exact baseline matches clear actionable
   gaps.
 - `policy report` succeeds in advisory mode, reports unbaselined actionable
-  gaps, and does not fail the command for those gaps.
+  gaps with operation expression, operation family, and next action, and does
+  not fail the command for those gaps.
 - `policy report` reports exact resolved baseline entries and expired
   suppressions without altering card classification.
 - `policy report` explains each current-card policy status and pins JSON fields

@@ -18,14 +18,15 @@ impl<T, const CAP: usize> ArrayVec<T, CAP> {
 }
 
 pub fn read_full_array<T: Copy, const CAP: usize>(values: &ArrayVec<T, CAP>) -> [T; CAP] {
-    let full = values.len() == values.capacity();
-    observe(full);
+    if values.len() == values.capacity() {
+        observe(values.len());
+    }
     let ptr = values.as_ptr();
-    // SAFETY: this fixture intentionally observes len/capacity without enforcing it.
+    // SAFETY: fixture checks that a closed observed len/capacity branch is not evidence.
     unsafe { core::ptr::read(ptr as *const [T; CAP]) }
 }
 
-fn observe(_full: bool) {}
+fn observe(_len: usize) {}
 
 #[cfg(test)]
 mod tests {

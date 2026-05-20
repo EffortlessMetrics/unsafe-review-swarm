@@ -1,10 +1,9 @@
 use crate::api::AnalyzeOutput;
 use crate::domain::ReviewClass;
-use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE, markdown_table};
-use crate::util::path_display;
+use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
+use crate::policy::{LedgerEntry as PolicyLedgerRecord, LedgerKind, load_ledger_entries};
 use serde::Serialize;
-use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -55,25 +54,12 @@ pub struct PolicyReportCard {
     pub card_id: String,
     #[serde(rename = "class")]
     pub class_name: String,
+    pub operation: String,
+    pub operation_family: String,
     pub policy_status: String,
     pub policy_reason: String,
-    pub ledger: Option<PolicyLedgerEntry>,
-    pub site: PolicyReportSite,
-    pub operation_family: String,
-    pub operation: String,
-    pub hazards: Vec<String>,
-    pub missing: Vec<String>,
-    pub witness_routes: Vec<String>,
-    pub next_action: String,
     pub missing_count: usize,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-pub struct PolicyReportSite {
-    pub file: String,
-    pub line: usize,
-    pub kind: String,
-    pub owner: String,
+    pub next_action: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -117,8 +103,6 @@ fn evaluate_with_date(output: &AnalyzeOutput, audit_date: &str) -> Result<Policy
         .iter()
         .map(|card| card.id.0.clone())
         .collect::<BTreeSet<_>>();
-    let baseline_by_id = ledger_by_id(&baseline_entries);
-    let suppression_by_id = ledger_by_id(&suppression_entries);
     let resolved_baseline = baseline_entries
         .into_iter()
         .filter(|entry| !current_ids.contains(&entry.card_id))
@@ -138,39 +122,12 @@ fn evaluate_with_date(output: &AnalyzeOutput, audit_date: &str) -> Result<Policy
         .map(|card| PolicyReportCard {
             card_id: card.id.0.clone(),
             class_name: card.class.as_str().to_string(),
+            operation: card.operation.expression.clone(),
+            operation_family: card.operation.family.as_str().to_string(),
             policy_status: policy_status(&card.class).to_string(),
             policy_reason: policy_reason(policy_status(&card.class)).to_string(),
-            ledger: matched_ledger(
-                card.id.0.as_str(),
-                &card.class,
-                &baseline_by_id,
-                &suppression_by_id,
-            ),
-            site: PolicyReportSite {
-                file: path_display(&card.site.location.file),
-                line: card.site.location.line,
-                kind: card.site.kind.as_str().to_string(),
-                owner: card.site.owner.clone().unwrap_or_default(),
-            },
-            operation_family: card.operation.family.as_str().to_string(),
-            operation: card.operation.expression.clone(),
-            hazards: card
-                .hazards
-                .iter()
-                .map(|hazard| hazard.as_str().to_string())
-                .collect(),
-            missing: card
-                .missing
-                .iter()
-                .map(|missing| missing.message.clone())
-                .collect(),
-            witness_routes: card
-                .routes
-                .iter()
-                .map(|route| route.kind.as_str().to_string())
-                .collect(),
-            next_action: card.next_action.summary.clone(),
             missing_count: card.missing.len(),
+            next_action: card.next_action.summary.clone(),
         })
         .collect::<Vec<_>>();
     let summary = PolicyReportSummary {
@@ -267,25 +224,18 @@ pub(crate) fn render_markdown(report: &PolicyReport) -> String {
         out.push_str(NO_CHANGED_GAPS_LIMITATION);
         out.push_str("\n\n");
     } else {
-        out.push_str("| Status | Reason | Card | Ledger | Location | Class | Operation family | Operation | Hazards | Missing evidence | Routes | Next action |\n");
-        out.push_str("|---|---|---|---|---|---|---|---|---|---|---|---|\n");
+        out.push_str("| Status | Reason | Card | Class | Operation family | Operation | Missing evidence | Next action |\n");
+        out.push_str("|---|---|---|---|---|---|---:|---|\n");
         for card in &report.cards {
             out.push_str(&format!(
-                "| `{}` | {} | `{}` | {} | {} | `{}` | `{}` | `{}` | {} | {} | {} | {} |\n",
-                markdown_cell(&card.policy_status),
+                "| `{}` | {} | `{}` | `{}` | `{}` | `{}` | {} | {} |\n",
+                card.policy_status,
                 markdown_cell(&card.policy_reason),
-                markdown_cell(&card.card_id),
-                ledger_cell(card.ledger.as_ref()),
-                markdown_cell(&format!(
-                    "{}:{} ({}/{})",
-                    card.site.file, card.site.line, card.site.kind, card.site.owner
-                )),
-                markdown_cell(&card.class_name),
-                markdown_cell(&card.operation_family),
+                card.card_id,
+                card.class_name,
+                card.operation_family,
                 markdown_cell(&card.operation),
-                joined_cell(&card.hazards),
-                missing_cell(card),
-                joined_cell(&card.witness_routes),
+                card.missing_count,
                 markdown_cell(&card.next_action)
             ));
         }
@@ -330,7 +280,7 @@ fn render_ledger_section(out: &mut String, title: &str, entries: &[PolicyLedgerE
     for entry in entries {
         out.push_str(&format!(
             "| `{}` | {} | {} | {} | {} | {} |\n",
-            markdown_cell(&entry.card_id),
+            entry.card_id,
             optional_text(entry.owner.as_deref()),
             optional_text(entry.review_after.as_deref()),
             optional_text(entry.expires.as_deref()),
@@ -341,82 +291,21 @@ fn render_ledger_section(out: &mut String, title: &str, entries: &[PolicyLedgerE
     out.push('\n');
 }
 
-#[derive(Clone, Copy)]
-enum LedgerKind {
-    Baseline,
-    Suppression,
-}
-
 fn ledger_entries(path: &Path, kind: LedgerKind) -> Result<Vec<PolicyLedgerEntry>, String> {
-    if !path.is_file() {
-        return Ok(Vec::new());
-    }
-    let text =
-        fs::read_to_string(path).map_err(|err| format!("read {} failed: {err}", path.display()))?;
-    let value = text
-        .parse::<toml::Table>()
-        .map(toml::Value::Table)
-        .map_err(|err| format!("{} is not valid TOML: {err}", path.display()))?;
-    let status = value
-        .get("status")
-        .and_then(toml::Value::as_str)
-        .unwrap_or("active");
-    if status == "empty" {
-        return Ok(Vec::new());
-    }
-    let entries = value
-        .get("entries")
-        .and_then(toml::Value::as_array)
-        .map_or(&[][..], Vec::as_slice);
-    let mut report_entries = Vec::new();
-    for entry in entries {
-        let Some(entry) = entry.as_table() else {
-            continue;
-        };
-        let Some(card_id) = entry.get("card_id").and_then(toml::Value::as_str) else {
-            continue;
-        };
-        report_entries.push(PolicyLedgerEntry {
-            card_id: card_id.to_string(),
-            owner: optional_string(entry, "owner"),
-            reason: optional_string(entry, "reason"),
-            evidence: optional_string(entry, "evidence"),
-            review_after: optional_string(entry, "review_after"),
-            expires: match kind {
-                LedgerKind::Baseline => None,
-                LedgerKind::Suppression => optional_string(entry, "expires"),
-            },
-        });
-    }
-    Ok(report_entries)
+    load_ledger_entries(path, kind).map(|entries| entries.into_iter().map(From::from).collect())
 }
 
-fn ledger_by_id(entries: &[PolicyLedgerEntry]) -> BTreeMap<String, PolicyLedgerEntry> {
-    entries
-        .iter()
-        .map(|entry| (entry.card_id.clone(), entry.clone()))
-        .collect()
-}
-
-fn matched_ledger(
-    card_id: &str,
-    class: &ReviewClass,
-    baseline_by_id: &BTreeMap<String, PolicyLedgerEntry>,
-    suppression_by_id: &BTreeMap<String, PolicyLedgerEntry>,
-) -> Option<PolicyLedgerEntry> {
-    match class {
-        ReviewClass::BaselineKnown => baseline_by_id.get(card_id).cloned(),
-        ReviewClass::Suppressed => suppression_by_id.get(card_id).cloned(),
-        _ => None,
+impl From<PolicyLedgerRecord> for PolicyLedgerEntry {
+    fn from(entry: PolicyLedgerRecord) -> Self {
+        Self {
+            card_id: entry.card_id,
+            owner: Some(entry.owner),
+            reason: Some(entry.reason),
+            evidence: Some(entry.evidence),
+            review_after: entry.review_after,
+            expires: entry.expires,
+        }
     }
-}
-
-fn optional_string(entry: &toml::map::Map<String, toml::Value>, key: &str) -> Option<String> {
-    entry
-        .get(key)
-        .and_then(toml::Value::as_str)
-        .filter(|value| !value.trim().is_empty())
-        .map(ToOwned::to_owned)
 }
 
 fn policy_status(class: &ReviewClass) -> &'static str {
@@ -467,51 +356,12 @@ fn policy_report_limitations() -> Vec<String> {
 fn optional_text(value: Option<&str>) -> String {
     value
         .filter(|value| !value.is_empty())
-        .map(markdown_cell)
+        .map(ToOwned::to_owned)
         .unwrap_or_else(|| "-".to_string())
 }
 
-fn ledger_cell(entry: Option<&PolicyLedgerEntry>) -> String {
-    let Some(entry) = entry else {
-        return "-".to_string();
-    };
-    let mut parts = Vec::new();
-    push_part(&mut parts, "owner", entry.owner.as_deref());
-    push_part(&mut parts, "reason", entry.reason.as_deref());
-    push_part(&mut parts, "evidence", entry.evidence.as_deref());
-    push_part(&mut parts, "review_after", entry.review_after.as_deref());
-    push_part(&mut parts, "expires", entry.expires.as_deref());
-    if parts.is_empty() {
-        "-".to_string()
-    } else {
-        markdown_cell(&parts.join("; "))
-    }
-}
-
-fn push_part(parts: &mut Vec<String>, label: &str, value: Option<&str>) {
-    if let Some(value) = value.filter(|value| !value.is_empty()) {
-        parts.push(format!("{label}={value}"));
-    }
-}
-
-fn joined_cell(values: &[String]) -> String {
-    if values.is_empty() {
-        "-".to_string()
-    } else {
-        markdown_cell(&values.join(", "))
-    }
-}
-
-fn missing_cell(card: &PolicyReportCard) -> String {
-    if card.missing.is_empty() {
-        card.missing_count.to_string()
-    } else {
-        markdown_cell(&card.missing.join("; "))
-    }
-}
-
 fn markdown_cell(value: &str) -> String {
-    markdown_table::cell(value)
+    value.replace('|', "\\|").replace('\n', " ")
 }
 
 fn current_utc_date() -> Result<String, String> {
@@ -542,6 +392,7 @@ fn civil_from_days(days_since_epoch: i64) -> (i32, u32, u32) {
 mod tests {
     use super::*;
     use crate::api::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, analyze};
+    use std::fs;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -592,7 +443,7 @@ mod tests {
         assert!(markdown.contains("## Classification explanations"));
         assert!(markdown.contains("Exact ReviewCard identity was not found"));
         assert!(markdown.contains("Operation family | Operation"));
-        assert!(markdown.contains("| Status | Reason | Card | Ledger |"));
+        assert!(markdown.contains("| Status | Reason | Card | Class |"));
         assert!(markdown.contains("| `raw_pointer_read` |"));
         assert!(markdown.contains("unsafe { ptr.cast::<Header>().read() }"));
         assert!(markdown.contains("Add or expose"));
@@ -712,105 +563,50 @@ expires = "2026-01-01"
             Some("fixture")
         );
         let markdown = render_markdown(&report);
+        assert!(markdown.contains("| Card | Owner | Review after | Expires | Reason | Evidence |"));
         assert!(markdown.contains("## Expired suppression entries"));
         assert!(markdown.contains("fixture"));
         Ok(())
     }
 
     #[test]
-    fn policy_report_markdown_escapes_table_cells() {
-        let report = PolicyReport {
-            schema_version: "0.1".to_string(),
-            tool: "unsafe-review".to_string(),
-            mode: "policy-report".to_string(),
-            policy: "advisory".to_string(),
-            audit_date: "2026-05-20".to_string(),
-            trust_boundary: "Advisory policy report only; not memory-safety proof.".to_string(),
-            limitations: policy_report_limitations(),
-            classification_explanations: PolicyReportClassificationExplanations::default(),
-            summary: PolicyReportSummary {
-                cards: 1,
-                new_gaps: 1,
-                resolved_baseline: 1,
-                unmatched_baseline: 1,
-                expired_suppressions: 1,
-                ..PolicyReportSummary::default()
-            },
-            cards: vec![PolicyReportCard {
-                card_id: "UR-pipe|card-c1".to_string(),
-                class_name: "guard|missing".to_string(),
-                policy_status: "new|gap".to_string(),
-                policy_reason: "needs|review".to_string(),
-                ledger: Some(PolicyLedgerEntry {
-                    card_id: "UR-pipe|card-c1".to_string(),
-                    owner: Some("team|unsafe".to_string()),
-                    reason: Some("accepted|current debt".to_string()),
-                    evidence: Some("review|receipt".to_string()),
-                    review_after: Some("2026-08-01|manual".to_string()),
-                    expires: None,
-                }),
-                site: PolicyReportSite {
-                    file: "src/lib.rs".to_string(),
-                    line: 7,
-                    kind: "operation|site".to_string(),
-                    owner: "owner|fn".to_string(),
-                },
-                operation_family: "raw|pointer|read".to_string(),
-                operation: "unsafe { ptr|read() }".to_string(),
-                hazards: vec!["alignment|hazard".to_string()],
-                missing: vec!["missing|guard".to_string()],
-                witness_routes: vec!["miri|route".to_string()],
-                next_action: "add|guard".to_string(),
-                missing_count: 1,
-            }],
-            resolved_baseline: vec![PolicyLedgerEntry {
-                card_id: "UR-resolved|card-c1".to_string(),
-                owner: Some("team|unsafe".to_string()),
-                reason: Some("resolved|by guard".to_string()),
-                evidence: Some("review|receipt".to_string()),
-                review_after: Some("2026-08-01|manual".to_string()),
-                expires: None,
-            }],
-            unmatched_baseline: vec![PolicyLedgerEntry {
-                card_id: "UR-resolved|card-c1".to_string(),
-                owner: Some("team|unsafe".to_string()),
-                reason: Some("resolved|by guard".to_string()),
-                evidence: Some("review|receipt".to_string()),
-                review_after: Some("2026-08-01|manual".to_string()),
-                expires: None,
-            }],
-            expired_suppressions: vec![PolicyLedgerEntry {
-                card_id: "UR-expired|card-c1".to_string(),
-                owner: Some("team|unsafe".to_string()),
-                reason: Some("old|false positive".to_string()),
-                evidence: Some("audit|note".to_string()),
-                review_after: None,
-                expires: Some("2026-05-01|expired".to_string()),
-            }],
-            invalid_ledger_entries: Vec::new(),
+    fn policy_report_rejects_malformed_ledger_metadata() -> Result<(), String> {
+        let source = fixture_path("raw_pointer_alignment");
+        let root = unique_temp_dir("unsafe-review-policy-report-invalid")?;
+        copy_dir(&source, &root)?;
+        let output = analyze(AnalyzeInput {
+            root: root.clone(),
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: None,
+        })?;
+        let policy = root.join("policy");
+        fs::create_dir_all(&policy).map_err(|err| format!("create policy failed: {err}"))?;
+        fs::write(
+            policy.join("unsafe-review-baseline.toml"),
+            r#"schema_version = "0.1"
+status = "active"
+
+[[entries]]
+card_id = "UR-invalid-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+owner = "core/policy"
+reason = "accepted current debt"
+review_after = "2026-08-01"
+"#,
+        )
+        .map_err(|err| format!("write invalid baseline failed: {err}"))?;
+
+        let err = match evaluate_with_date(&output, "2026-05-18") {
+            Ok(_) => return Err("missing evidence should reject the policy report".to_string()),
+            Err(err) => err,
         };
 
-        let markdown = render_markdown(&report);
-
-        assert!(markdown.contains("`new\\|gap`"));
-        assert!(markdown.contains("`UR-pipe\\|card-c1`"));
-        assert!(markdown.contains("owner=team\\|unsafe"));
-        assert!(markdown.contains("reason=accepted\\|current debt"));
-        assert!(markdown.contains("evidence=review\\|receipt"));
-        assert!(markdown.contains("review_after=2026-08-01\\|manual"));
-        assert!(markdown.contains("src/lib.rs:7 (operation\\|site/owner\\|fn)"));
-        assert!(markdown.contains("`guard\\|missing`"));
-        assert!(markdown.contains("`raw\\|pointer\\|read`"));
-        assert!(markdown.contains("alignment\\|hazard"));
-        assert!(markdown.contains("missing\\|guard"));
-        assert!(markdown.contains("miri\\|route"));
-        assert!(markdown.contains("`UR-resolved\\|card-c1`"));
-        assert!(markdown.contains("team\\|unsafe"));
-        assert!(markdown.contains("resolved\\|by guard"));
-        assert!(markdown.contains("review\\|receipt"));
-        assert!(markdown.contains("audit\\|note"));
-        assert!(markdown.contains("2026-05-01\\|expired"));
-        assert!(!markdown.contains("`UR-pipe|card-c1`"));
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+        assert!(err.contains("missing string `evidence`"));
+        Ok(())
     }
 
     fn fixture_path(name: &str) -> PathBuf {

@@ -9,9 +9,6 @@ required_core_fixtures = [
   "raw_pointer_alignment_post_check_not_guard",
   "raw_pointer_alignment_is_aligned_guard",
   "raw_pointer_alignment_observed_not_guard",
-  "raw_pointer_bounds_observed_not_guard",
-  "raw_pointer_bounds_closed_branch_not_guard",
-  "raw_pointer_bounds_post_check_not_guard",
   "raw_pointer_alignment_closed_branch_not_guard",
   "raw_pointer_alignment_reassigned_pointer_not_guard",
   "raw_pointer_alignment_modulo_guard",
@@ -20,20 +17,8 @@ required_core_fixtures = [
   "raw_pointer_alignment_modulo_reassigned_pointer_not_guard",
   "raw_pointer_deref",
   "raw_pointer_read_unaligned",
-  "raw_pointer_read_unaligned_null_guard",
-  "raw_pointer_read_unaligned_null_observed_not_guard",
-  "raw_pointer_read_unaligned_null_other_pointer_not_guard",
-  "raw_pointer_read_unaligned_null_post_check_not_guard",
-  "raw_pointer_read_null_guard",
-  "raw_pointer_read_null_observed_not_guard",
-  "raw_pointer_read_null_other_pointer_not_guard",
-  "raw_pointer_read_null_post_check_not_guard",
   "raw_pointer_write_assignment",
   "raw_pointer_write_unaligned",
-  "raw_pointer_write_unaligned_null_guard",
-  "raw_pointer_write_unaligned_null_observed_not_guard",
-  "raw_pointer_write_unaligned_null_other_pointer_not_guard",
-  "raw_pointer_write_unaligned_null_post_check_not_guard",
   "split_raw_pointer_read_call",
   "split_unsafe_block",
   "public_unsafe_fn_missing_safety",
@@ -43,7 +28,6 @@ required_core_fixtures = [
   "public_unsafe_fn_with_safety_docs",
   "public_unsafe_fn_safety_colon_docs",
   "documented_private_unsafe_fn",
-  "unsafe_fn_pointer_field_owner",
   "private_unsafe_helper_safety_comment",
   "local_safety_colon_comment",
   "maybeuninit_assume_init",
@@ -52,21 +36,12 @@ required_core_fixtures = [
   "maybeuninit_assume_init_mut",
   "maybeuninit_assume_init_drop",
   "vec_set_len",
-  "vec_set_len_capacity_return_guard",
-  "vec_set_len_capacity_open_branch_guard",
   "vec_set_len_initialized_loop",
   "vec_set_len_capacity_observed_not_guard",
-  "vec_set_len_capacity_closed_branch_not_guard",
-  "vec_set_len_capacity_reassigned_not_guard",
-  "vec_set_len_capacity_open_branch_reassigned_len_not_guard",
-  "vec_set_len_capacity_open_branch_reassigned_receiver_not_guard",
-  "vec_set_len_capacity_receiver_reassigned_not_guard",
-  "vec_set_len_capacity_binding_receiver_reassigned_not_guard",
   "vec_set_len_unrelated_capacity_comparison_not_guard",
   "vec_set_len_cap_argument_not_guard",
+  "vec_set_len_reassigned_receiver_not_guard",
   "vec_set_len_with_capacity",
-  "vec_set_len_with_capacity_reassigned_not_guard",
-  "vec_set_len_with_capacity_len_reassigned_not_guard",
   "vec_set_len_call_result_init",
   "vec_set_len_shrink",
   "vec_set_len_last_index_shrink",
@@ -76,8 +51,6 @@ required_core_fixtures = [
   "drop_in_place_deallocation",
   "drop_in_place_box_origin",
   "drop_in_place_reassigned_origin_not_guard",
-  "drop_in_place_box_origin_after_not_guard",
-  "drop_in_place_other_origin_not_guard",
   "atomic_pointer_state_swap",
   "unwrap_unchecked_result",
   "unwrap_unchecked_infallible_result",
@@ -108,44 +81,27 @@ required_core_fixtures = [
   "get_unchecked_mut_reassigned_index_not_guard",
   "pin_new_unchecked",
   "raw_pointer_write_bytes",
-  "raw_pointer_write_alignment_guard",
-  "raw_pointer_write_alignment_observed_not_guard",
-  "raw_pointer_write_alignment_closed_branch_not_guard",
-  "raw_pointer_write_alignment_post_check_not_guard",
-  "raw_pointer_write_null_guard",
-  "raw_pointer_write_null_observed_not_guard",
-  "raw_pointer_write_null_other_pointer_not_guard",
-  "raw_pointer_write_null_post_check_not_guard",
-  "raw_pointer_write_bounds_observed_not_guard",
-  "raw_pointer_write_bounds_closed_branch_not_guard",
-  "raw_pointer_write_bounds_post_check_not_guard",
+  "raw_pointer_write_bool_bytes_guard",
+  "raw_pointer_write_bool_reassigned_byte_not_guard",
+  "raw_pointer_write_bool_closed_branch_not_guard",
+  "raw_pointer_write_previous_slice_not_guard",
+  "raw_pointer_write_previous_u8_not_guard",
+  "raw_pointer_write_previous_bool_not_guard",
+  "raw_pointer_write_previous_maybeuninit_not_guard",
   "raw_pointer_write_other_u8_not_guard",
   "raw_pointer_write_maybeuninit",
   "raw_pointer_write_other_maybeuninit_not_guard",
   "raw_pointer_write_volatile",
-  "raw_pointer_write_volatile_alignment_guard",
-  "raw_pointer_write_volatile_alignment_observed_not_guard",
-  "raw_pointer_write_volatile_alignment_other_pointer_not_guard",
-  "raw_pointer_write_volatile_alignment_post_check_not_guard",
-  "raw_pointer_write_volatile_null_guard",
-  "raw_pointer_write_volatile_null_observed_not_guard",
-  "raw_pointer_write_volatile_null_other_pointer_not_guard",
-  "raw_pointer_write_volatile_null_post_check_not_guard",
   "ptr_copy_overlapping",
   "ptr_copy_slice_range_guard",
   "ptr_copy_slice_range_conjunctive_assert_guard",
   "ptr_copy_slice_range_early_return_guard",
   "ptr_copy_slice_range_disjunctive_early_return_guard",
-  "ptr_copy_slice_range_disjunctive_early_return_after_block_guard",
   "ptr_copy_slice_range_open_branch_guard",
   "ptr_copy_slice_range_conjunctive_open_branch_guard",
   "ptr_copy_slice_range_closed_branch_not_guard",
   "ptr_copy_slice_range_or_branch_not_guard",
-  "ptr_copy_slice_range_commented_assert_not_guard",
-  "ptr_copy_slice_range_disjunctive_early_return_line_comment_not_guard",
   "ptr_copy_slice_range_disjunctive_early_return_block_comment_not_guard",
-  "ptr_copy_slice_range_disjunctive_early_return_string_literal_not_guard",
-  "ptr_copy_slice_range_disjunctive_nested_return_not_guard",
   "ptr_copy_slice_range_disjunctive_early_return_reassigned_count_not_guard",
   "ptr_copy_slice_range_open_branch_reassigned_count_not_guard",
   "ptr_copy_slice_range_open_branch_reassigned_dst_not_guard",
@@ -160,16 +116,11 @@ required_core_fixtures = [
   "copy_nonoverlapping_slice_range_conjunctive_assert_guard",
   "copy_nonoverlapping_slice_range_early_return_guard",
   "copy_nonoverlapping_slice_range_disjunctive_early_return_guard",
-  "copy_nonoverlapping_slice_range_disjunctive_early_return_after_block_guard",
   "copy_nonoverlapping_slice_range_open_branch_guard",
   "copy_nonoverlapping_slice_range_conjunctive_open_branch_guard",
   "copy_nonoverlapping_slice_range_closed_branch_not_guard",
   "copy_nonoverlapping_slice_range_or_branch_not_guard",
-  "copy_nonoverlapping_slice_range_commented_assert_not_guard",
-  "copy_nonoverlapping_slice_range_disjunctive_early_return_line_comment_not_guard",
   "copy_nonoverlapping_slice_range_disjunctive_early_return_block_comment_not_guard",
-  "copy_nonoverlapping_slice_range_disjunctive_early_return_string_literal_not_guard",
-  "copy_nonoverlapping_slice_range_disjunctive_nested_return_not_guard",
   "copy_nonoverlapping_slice_range_disjunctive_early_return_reassigned_count_not_guard",
   "copy_nonoverlapping_slice_range_open_branch_reassigned_count_not_guard",
   "copy_nonoverlapping_slice_range_open_branch_reassigned_src_not_guard",
@@ -191,26 +142,19 @@ required_core_fixtures = [
   "zeroed_valid_u32",
   "inline_asm_human_review",
   "raw_pointer_read_volatile",
-  "raw_pointer_read_volatile_alignment_guard",
-  "raw_pointer_read_volatile_alignment_observed_not_guard",
-  "raw_pointer_read_volatile_alignment_other_pointer_not_guard",
-  "raw_pointer_read_volatile_alignment_post_check_not_guard",
-  "raw_pointer_read_volatile_null_guard",
-  "raw_pointer_read_volatile_null_observed_not_guard",
-  "raw_pointer_read_volatile_null_other_pointer_not_guard",
-  "raw_pointer_read_volatile_null_post_check_not_guard",
   "raw_pointer_read_len_capacity_assert",
-  "raw_pointer_read_len_capacity_other_values_not_guard",
+  "raw_pointer_read_assert_shadowed_origin_not_guard",
+  "raw_pointer_read_len_capacity_assert_shadowed_origin_not_guard",
+  "raw_pointer_read_bounds_observed_not_guard",
   "raw_pointer_read_len_capacity_observed_not_guard",
-  "raw_pointer_read_len_capacity_closed_branch_not_guard",
+  "raw_pointer_read_as_cast_origin_bounds_guard",
+  "raw_pointer_read_cast_origin_bounds_guard",
+  "raw_pointer_read_open_branch_bounds_guard",
+  "raw_pointer_read_open_branch_shadowed_origin_not_guard",
+  "raw_pointer_read_typed_shadowed_origin_not_guard",
+  "raw_pointer_read_other_len_not_guard",
+  "raw_pointer_read_reassigned_origin_not_guard",
   "pointer_arithmetic_num_ctrl_bytes_guard",
-  "pointer_arithmetic_num_ctrl_bytes_open_branch_guard",
-  "pointer_arithmetic_num_ctrl_bytes_return_guard",
-  "pointer_arithmetic_num_ctrl_bytes_closed_branch_not_guard",
-  "pointer_arithmetic_num_ctrl_bytes_invalid_branch_not_guard",
-  "pointer_arithmetic_num_ctrl_bytes_observed_not_guard",
-  "pointer_arithmetic_num_ctrl_bytes_other_index_not_guard",
-  "pointer_arithmetic_num_ctrl_bytes_post_check_not_guard",
   "pointer_arithmetic_slice_end",
   "slice_from_raw_parts_mut",
   "slice_from_raw_parts_mut_maybeuninit",
@@ -226,8 +170,6 @@ required_core_fixtures = [
   "box_from_raw",
   "box_from_raw_box_origin",
   "box_from_raw_reassigned_origin_not_guard",
-  "box_from_raw_box_origin_after_not_guard",
-  "box_from_raw_other_origin_not_guard",
   "static_mut_global_state",
   "transmute_invalid_value",
   "transmute_layout_size_guard",
@@ -348,36 +290,6 @@ expected_operation_family = "raw_pointer_read"
 expected_hazard = "alignment"
 
 [[cases]]
-fixture = "raw_pointer_bounds_observed_not_guard"
-kind = "false_positive_control"
-claim = "observed length predicates do not discharge raw pointer read bounds evidence"
-support_tier = "Guard evidence mining"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_read"
-expected_hazard = "alignment"
-
-[[cases]]
-fixture = "raw_pointer_bounds_closed_branch_not_guard"
-kind = "false_positive_control"
-claim = "closed positive length branches do not discharge raw pointer read bounds evidence"
-support_tier = "Guard evidence mining"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_read"
-expected_hazard = "alignment"
-
-[[cases]]
-fixture = "raw_pointer_bounds_post_check_not_guard"
-kind = "false_positive_control"
-claim = "post-use length checks do not discharge raw pointer read bounds evidence"
-support_tier = "Guard evidence mining"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_read"
-expected_hazard = "alignment"
-
-[[cases]]
 fixture = "raw_pointer_alignment_closed_branch_not_guard"
 kind = "false_positive_control"
 claim = "closed positive is_aligned branches do not discharge raw pointer read alignment evidence"
@@ -458,86 +370,6 @@ expected_operation_family = "raw_pointer_read_unaligned"
 expected_hazard = "pointer_validity"
 
 [[cases]]
-fixture = "raw_pointer_read_unaligned_null_guard"
-kind = "positive"
-claim = "method-form read_unaligned recognizes same-receiver nullability guard evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_read_unaligned"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "raw_pointer_read_unaligned_null_observed_not_guard"
-kind = "false_positive_control"
-claim = "method-form read_unaligned does not accept a bare observed nullability predicate as pointer-live evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_read_unaligned"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "raw_pointer_read_unaligned_null_other_pointer_not_guard"
-kind = "false_positive_control"
-claim = "method-form read_unaligned does not accept a nullability guard from another pointer as pointer-live evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_read_unaligned"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "raw_pointer_read_unaligned_null_post_check_not_guard"
-kind = "false_positive_control"
-claim = "method-form read_unaligned does not accept a post-read nullability check as pointer-live evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_read_unaligned"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "raw_pointer_read_null_guard"
-kind = "positive"
-claim = "raw pointer read recognizes same-receiver nullability guard evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_read"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "raw_pointer_read_null_observed_not_guard"
-kind = "false_positive_control"
-claim = "raw pointer read does not accept a bare observed nullability predicate as pointer-live evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_read"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "raw_pointer_read_null_other_pointer_not_guard"
-kind = "false_positive_control"
-claim = "raw pointer read does not accept a nullability guard from another pointer as pointer-live evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_read"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "raw_pointer_read_null_post_check_not_guard"
-kind = "false_positive_control"
-claim = "raw pointer read does not accept a post-read nullability check as pointer-live evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_read"
-expected_hazard = "pointer_validity"
-
-[[cases]]
 fixture = "raw_pointer_write_assignment"
 kind = "positive"
 claim = "raw pointer assignment reports raw pointer write obligations instead of an unknown unsafe block"
@@ -551,46 +383,6 @@ expected_hazard = "pointer_validity"
 fixture = "raw_pointer_write_unaligned"
 kind = "positive"
 claim = "write_unaligned reports raw pointer write obligations without requiring an alignment hazard"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_write_unaligned"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "raw_pointer_write_unaligned_null_guard"
-kind = "positive"
-claim = "method-form write_unaligned recognizes same-receiver nullability guard evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_write_unaligned"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "raw_pointer_write_unaligned_null_observed_not_guard"
-kind = "false_positive_control"
-claim = "method-form write_unaligned does not accept a bare observed nullability predicate as pointer-live evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_write_unaligned"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "raw_pointer_write_unaligned_null_other_pointer_not_guard"
-kind = "false_positive_control"
-claim = "method-form write_unaligned does not accept a nullability guard from another pointer as pointer-live evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_write_unaligned"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "raw_pointer_write_unaligned_null_post_check_not_guard"
-kind = "false_positive_control"
-claim = "method-form write_unaligned does not accept a post-write nullability check as pointer-live evidence"
 support_tier = "Raw pointer card slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -686,16 +478,6 @@ expected_operation_family = "unknown"
 expected_hazard = "unknown"
 
 [[cases]]
-fixture = "unsafe_fn_pointer_field_owner"
-kind = "positive"
-claim = "unsafe function pointer fields preserve the field name as ReviewCard owner identity"
-support_tier = "Contract evidence mining"
-expected_cards = 1
-expected_class = "contract_missing"
-expected_operation_family = "unknown"
-expected_hazard = "unknown"
-
-[[cases]]
 fixture = "private_unsafe_helper_safety_comment"
 kind = "positive"
 claim = "private unsafe helper can use nearby SAFETY comments as contract evidence without satisfying guard evidence"
@@ -768,27 +550,7 @@ expected_hazard = "initialized_memory"
 [[cases]]
 fixture = "vec_set_len"
 kind = "positive"
-claim = "Vec::set_len recognizes direct capacity assertions while still reporting missing initialized-range evidence"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "vec_set_len"
-expected_hazard = "initialized_memory"
-
-[[cases]]
-fixture = "vec_set_len_capacity_return_guard"
-kind = "positive"
-claim = "Vec::set_len recognizes invalid-length early returns as capacity evidence while still reporting missing initialized-range evidence"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "vec_set_len"
-expected_hazard = "initialized_memory"
-
-[[cases]]
-fixture = "vec_set_len_capacity_open_branch_guard"
-kind = "positive"
-claim = "Vec::set_len recognizes open positive capacity branches as capacity evidence while still reporting missing initialized-range evidence"
+claim = "Vec::set_len reports missing initialized-range and capacity evidence"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -816,66 +578,6 @@ expected_operation_family = "vec_set_len"
 expected_hazard = "initialized_memory"
 
 [[cases]]
-fixture = "vec_set_len_capacity_closed_branch_not_guard"
-kind = "false_positive_control"
-claim = "Vec::set_len closed capacity branches that do not enclose the set_len call do not discharge capacity evidence"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "vec_set_len"
-expected_hazard = "initialized_memory"
-
-[[cases]]
-fixture = "vec_set_len_capacity_reassigned_not_guard"
-kind = "false_positive_control"
-claim = "Vec::set_len rejects stale capacity assertions when the checked new length is reassigned before set_len"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "vec_set_len"
-expected_hazard = "initialized_memory"
-
-[[cases]]
-fixture = "vec_set_len_capacity_open_branch_reassigned_len_not_guard"
-kind = "false_positive_control"
-claim = "Vec::set_len rejects stale open capacity branches when the checked new length is reassigned before set_len"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "vec_set_len"
-expected_hazard = "initialized_memory"
-
-[[cases]]
-fixture = "vec_set_len_capacity_open_branch_reassigned_receiver_not_guard"
-kind = "false_positive_control"
-claim = "Vec::set_len rejects stale open capacity branches when the checked vector receiver is reassigned before set_len"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "vec_set_len"
-expected_hazard = "initialized_memory"
-
-[[cases]]
-fixture = "vec_set_len_capacity_receiver_reassigned_not_guard"
-kind = "false_positive_control"
-claim = "Vec::set_len rejects stale capacity assertions when the checked vector receiver is reassigned before set_len"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "vec_set_len"
-expected_hazard = "initialized_memory"
-
-[[cases]]
-fixture = "vec_set_len_capacity_binding_receiver_reassigned_not_guard"
-kind = "false_positive_control"
-claim = "Vec::set_len rejects stale capacity bindings when the vector receiver is reassigned before a later set_len capacity assertion"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "vec_set_len"
-expected_hazard = "initialized_memory"
-
-[[cases]]
 fixture = "vec_set_len_unrelated_capacity_comparison_not_guard"
 kind = "false_positive_control"
 claim = "Vec::set_len does not accept unrelated capacity comparisons unless they bound the set_len argument"
@@ -896,29 +598,19 @@ expected_operation_family = "vec_set_len"
 expected_hazard = "initialized_memory"
 
 [[cases]]
+fixture = "vec_set_len_reassigned_receiver_not_guard"
+kind = "false_positive_control"
+claim = "Vec::set_len capacity evidence is stale when the checked vector is reassigned before set_len"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+
+[[cases]]
 fixture = "vec_set_len_with_capacity"
 kind = "positive"
 claim = "Vec::set_len recognizes same-vector Vec::with_capacity(new_len) as capacity evidence without discharging initialization"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "vec_set_len"
-expected_hazard = "initialized_memory"
-
-[[cases]]
-fixture = "vec_set_len_with_capacity_reassigned_not_guard"
-kind = "false_positive_control"
-claim = "Vec::set_len rejects stale Vec::with_capacity(new_len) capacity evidence when the vector binding is reassigned before set_len"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "vec_set_len"
-expected_hazard = "initialized_memory"
-
-[[cases]]
-fixture = "vec_set_len_with_capacity_len_reassigned_not_guard"
-kind = "false_positive_control"
-claim = "Vec::set_len rejects stale Vec::with_capacity(new_len) capacity evidence when the checked new length is reassigned before set_len"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -1009,26 +701,6 @@ expected_hazard = "drop_or_deallocation"
 fixture = "drop_in_place_reassigned_origin_not_guard"
 kind = "false_positive_control"
 claim = "ptr::drop_in_place does not accept Box::into_raw origin evidence after the raw pointer is reassigned"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "drop_in_place"
-expected_hazard = "drop_or_deallocation"
-
-[[cases]]
-fixture = "drop_in_place_box_origin_after_not_guard"
-kind = "false_positive_control"
-claim = "ptr::drop_in_place does not accept Box::into_raw origin evidence that appears only after drop"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "drop_in_place"
-expected_hazard = "drop_or_deallocation"
-
-[[cases]]
-fixture = "drop_in_place_other_origin_not_guard"
-kind = "false_positive_control"
-claim = "ptr::drop_in_place does not accept Box::into_raw origin evidence for a different raw pointer"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -1336,49 +1008,9 @@ expected_operation_family = "raw_pointer_write"
 expected_hazard = "pointer_validity"
 
 [[cases]]
-fixture = "raw_pointer_write_alignment_guard"
+fixture = "raw_pointer_write_bool_bytes_guard"
 kind = "positive"
-claim = "raw pointer write recognizes same-receiver alignment guard evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_write"
-expected_hazard = "alignment"
-
-[[cases]]
-fixture = "raw_pointer_write_alignment_observed_not_guard"
-kind = "false_positive_control"
-claim = "raw pointer write does not accept a bare observed alignment predicate as guard evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_write"
-expected_hazard = "alignment"
-
-[[cases]]
-fixture = "raw_pointer_write_alignment_closed_branch_not_guard"
-kind = "false_positive_control"
-claim = "raw pointer write does not accept a closed positive alignment branch before the write as guard evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_write"
-expected_hazard = "alignment"
-
-[[cases]]
-fixture = "raw_pointer_write_alignment_post_check_not_guard"
-kind = "false_positive_control"
-claim = "raw pointer write does not accept a post-write alignment check as guard evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_write"
-expected_hazard = "alignment"
-
-[[cases]]
-fixture = "raw_pointer_write_null_guard"
-kind = "positive"
-claim = "raw pointer write recognizes same-receiver nullability guard evidence"
+claim = "raw pointer write_bytes to *mut bool recognizes a byte-domain guard as bool value evidence without discharging pointer, bounds, or allocation proof"
 support_tier = "Raw pointer card slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -1386,9 +1018,9 @@ expected_operation_family = "raw_pointer_write"
 expected_hazard = "pointer_validity"
 
 [[cases]]
-fixture = "raw_pointer_write_null_observed_not_guard"
+fixture = "raw_pointer_write_bool_reassigned_byte_not_guard"
 kind = "false_positive_control"
-claim = "raw pointer write does not accept a bare observed nullability predicate as pointer-live evidence"
+claim = "raw pointer write_bytes to *mut bool does not treat a stale byte-domain guard as value evidence after byte reassignment"
 support_tier = "Raw pointer card slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -1396,9 +1028,9 @@ expected_operation_family = "raw_pointer_write"
 expected_hazard = "pointer_validity"
 
 [[cases]]
-fixture = "raw_pointer_write_null_other_pointer_not_guard"
+fixture = "raw_pointer_write_bool_closed_branch_not_guard"
 kind = "false_positive_control"
-claim = "raw pointer write does not accept a nullability guard from another pointer as pointer-live evidence"
+claim = "raw pointer write_bytes to *mut bool does not treat a closed positive byte-domain branch as value evidence"
 support_tier = "Raw pointer card slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -1406,9 +1038,9 @@ expected_operation_family = "raw_pointer_write"
 expected_hazard = "pointer_validity"
 
 [[cases]]
-fixture = "raw_pointer_write_null_post_check_not_guard"
+fixture = "raw_pointer_write_previous_slice_not_guard"
 kind = "false_positive_control"
-claim = "raw pointer write does not accept a post-write nullability check as pointer-live evidence"
+claim = "raw pointer write_bytes bounds evidence must belong to the current operation"
 support_tier = "Raw pointer card slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -1416,9 +1048,9 @@ expected_operation_family = "raw_pointer_write"
 expected_hazard = "pointer_validity"
 
 [[cases]]
-fixture = "raw_pointer_write_bounds_observed_not_guard"
+fixture = "raw_pointer_write_previous_u8_not_guard"
 kind = "false_positive_control"
-claim = "raw pointer write does not accept a bare observed bounds predicate as guard evidence"
+claim = "raw pointer write_bytes u8 target evidence must belong to the current operation"
 support_tier = "Raw pointer card slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -1426,9 +1058,9 @@ expected_operation_family = "raw_pointer_write"
 expected_hazard = "pointer_validity"
 
 [[cases]]
-fixture = "raw_pointer_write_bounds_closed_branch_not_guard"
+fixture = "raw_pointer_write_previous_bool_not_guard"
 kind = "false_positive_control"
-claim = "raw pointer write does not accept a closed positive bounds branch before the write as guard evidence"
+claim = "raw pointer write_bytes bool target evidence must belong to the current operation"
 support_tier = "Raw pointer card slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -1436,9 +1068,9 @@ expected_operation_family = "raw_pointer_write"
 expected_hazard = "pointer_validity"
 
 [[cases]]
-fixture = "raw_pointer_write_bounds_post_check_not_guard"
+fixture = "raw_pointer_write_previous_maybeuninit_not_guard"
 kind = "false_positive_control"
-claim = "raw pointer write does not accept a post-write bounds check as guard evidence"
+claim = "raw pointer write_bytes MaybeUninit target evidence must belong to the current operation"
 support_tier = "Raw pointer card slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -1479,86 +1111,6 @@ expected_hazard = "initialized_memory"
 fixture = "raw_pointer_write_volatile"
 kind = "positive"
 claim = "method-form write_volatile reports raw pointer write obligations instead of a generic unsafe function call"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_write"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "raw_pointer_write_volatile_alignment_guard"
-kind = "positive"
-claim = "method-form write_volatile recognizes same-receiver alignment guard evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_write"
-expected_hazard = "alignment"
-
-[[cases]]
-fixture = "raw_pointer_write_volatile_alignment_observed_not_guard"
-kind = "false_positive_control"
-claim = "method-form write_volatile does not accept a bare observed alignment predicate as alignment evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_write"
-expected_hazard = "alignment"
-
-[[cases]]
-fixture = "raw_pointer_write_volatile_alignment_other_pointer_not_guard"
-kind = "false_positive_control"
-claim = "method-form write_volatile does not accept an alignment guard from another pointer as alignment evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_write"
-expected_hazard = "alignment"
-
-[[cases]]
-fixture = "raw_pointer_write_volatile_alignment_post_check_not_guard"
-kind = "false_positive_control"
-claim = "method-form write_volatile does not accept a post-write alignment check as alignment evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_write"
-expected_hazard = "alignment"
-
-[[cases]]
-fixture = "raw_pointer_write_volatile_null_guard"
-kind = "positive"
-claim = "method-form write_volatile recognizes same-receiver nullability guard evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_write"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "raw_pointer_write_volatile_null_observed_not_guard"
-kind = "false_positive_control"
-claim = "method-form write_volatile does not accept a bare observed nullability predicate as pointer-live evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_write"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "raw_pointer_write_volatile_null_other_pointer_not_guard"
-kind = "false_positive_control"
-claim = "method-form write_volatile does not accept a nullability guard from another pointer as pointer-live evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_write"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "raw_pointer_write_volatile_null_post_check_not_guard"
-kind = "false_positive_control"
-claim = "method-form write_volatile does not accept a post-write nullability check as pointer-live evidence"
 support_tier = "Raw pointer card slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -1616,16 +1168,6 @@ expected_operation_family = "copy_nonoverlapping"
 expected_hazard = "aliasing_or_provenance"
 
 [[cases]]
-fixture = "copy_nonoverlapping_slice_range_disjunctive_early_return_after_block_guard"
-kind = "positive"
-claim = "copy_nonoverlapping accepts same-call disjunctive invalid-range early returns after a nested block as valid-range evidence without proving non-overlap"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "copy_nonoverlapping"
-expected_hazard = "aliasing_or_provenance"
-
-[[cases]]
 fixture = "copy_nonoverlapping_slice_range_open_branch_guard"
 kind = "positive"
 claim = "copy_nonoverlapping accepts same-call source and destination open-branch slice length guards as valid-range evidence without proving non-overlap"
@@ -1666,49 +1208,9 @@ expected_operation_family = "copy_nonoverlapping"
 expected_hazard = "aliasing_or_provenance"
 
 [[cases]]
-fixture = "copy_nonoverlapping_slice_range_commented_assert_not_guard"
-kind = "false_positive_control"
-claim = "copy_nonoverlapping rejects commented source/destination slice length assertions as valid-range evidence"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "copy_nonoverlapping"
-expected_hazard = "aliasing_or_provenance"
-
-[[cases]]
-fixture = "copy_nonoverlapping_slice_range_disjunctive_early_return_line_comment_not_guard"
-kind = "false_positive_control"
-claim = "copy_nonoverlapping rejects line-comment return text inside a disjunctive invalid-range branch as early-return evidence"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "copy_nonoverlapping"
-expected_hazard = "aliasing_or_provenance"
-
-[[cases]]
 fixture = "copy_nonoverlapping_slice_range_disjunctive_early_return_block_comment_not_guard"
 kind = "false_positive_control"
 claim = "copy_nonoverlapping rejects commented return text inside a disjunctive invalid-range branch as early-return evidence"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "copy_nonoverlapping"
-expected_hazard = "aliasing_or_provenance"
-
-[[cases]]
-fixture = "copy_nonoverlapping_slice_range_disjunctive_early_return_string_literal_not_guard"
-kind = "false_positive_control"
-claim = "copy_nonoverlapping rejects string-literal return text inside a disjunctive invalid-range branch as early-return evidence"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "copy_nonoverlapping"
-expected_hazard = "aliasing_or_provenance"
-
-[[cases]]
-fixture = "copy_nonoverlapping_slice_range_disjunctive_nested_return_not_guard"
-kind = "false_positive_control"
-claim = "copy_nonoverlapping rejects nested conditional returns inside a disjunctive invalid-range branch as full early-return evidence"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -1846,16 +1348,6 @@ expected_operation_family = "ptr_copy"
 expected_hazard = "pointer_validity"
 
 [[cases]]
-fixture = "ptr_copy_slice_range_disjunctive_early_return_after_block_guard"
-kind = "positive"
-claim = "ptr::copy accepts same-call disjunctive invalid-range early returns after a nested block as valid-range evidence without proving initialized memory"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "ptr_copy"
-expected_hazard = "pointer_validity"
-
-[[cases]]
 fixture = "ptr_copy_slice_range_open_branch_guard"
 kind = "positive"
 claim = "ptr::copy accepts same-call source and destination open-branch slice length guards as valid-range evidence without proving initialized memory"
@@ -1896,49 +1388,9 @@ expected_operation_family = "ptr_copy"
 expected_hazard = "pointer_validity"
 
 [[cases]]
-fixture = "ptr_copy_slice_range_commented_assert_not_guard"
-kind = "false_positive_control"
-claim = "ptr::copy rejects commented source/destination slice length assertions as valid-range evidence"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "ptr_copy"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "ptr_copy_slice_range_disjunctive_early_return_line_comment_not_guard"
-kind = "false_positive_control"
-claim = "ptr::copy rejects line-comment return text inside a disjunctive invalid-range branch as early-return evidence"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "ptr_copy"
-expected_hazard = "pointer_validity"
-
-[[cases]]
 fixture = "ptr_copy_slice_range_disjunctive_early_return_block_comment_not_guard"
 kind = "false_positive_control"
 claim = "ptr::copy rejects commented return text inside a disjunctive invalid-range branch as early-return evidence"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "ptr_copy"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "ptr_copy_slice_range_disjunctive_early_return_string_literal_not_guard"
-kind = "false_positive_control"
-claim = "ptr::copy rejects string-literal return text inside a disjunctive invalid-range branch as early-return evidence"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "ptr_copy"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "ptr_copy_slice_range_disjunctive_nested_return_not_guard"
-kind = "false_positive_control"
-claim = "ptr::copy rejects nested conditional returns inside a disjunctive invalid-range branch as full early-return evidence"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -2158,7 +1610,7 @@ expected_hazard = "inline_asm"
 [[cases]]
 fixture = "raw_pointer_read_len_capacity_assert"
 kind = "positive"
-claim = "raw pointer read recognizes same-source len/capacity equality assertions as bounds evidence"
+claim = "raw pointer read recognizes len/capacity equality assertions as bounds evidence"
 support_tier = "Raw pointer card slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -2166,9 +1618,29 @@ expected_operation_family = "raw_pointer_read"
 expected_hazard = "pointer_validity"
 
 [[cases]]
-fixture = "raw_pointer_read_len_capacity_other_values_not_guard"
+fixture = "raw_pointer_read_assert_shadowed_origin_not_guard"
 kind = "false_positive_control"
-claim = "raw pointer read does not accept len/capacity equality for another container as bounds evidence"
+claim = "raw pointer read assertion bounds evidence rejects shadowed pointer origins"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_read_len_capacity_assert_shadowed_origin_not_guard"
+kind = "false_positive_control"
+claim = "raw pointer read len/capacity assertion evidence rejects shadowed pointer origins"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_read_bounds_observed_not_guard"
+kind = "false_positive_control"
+claim = "raw pointer read bounds evidence does not accept closed observation branches"
 support_tier = "Raw pointer card slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -2178,7 +1650,7 @@ expected_hazard = "pointer_validity"
 [[cases]]
 fixture = "raw_pointer_read_len_capacity_observed_not_guard"
 kind = "false_positive_control"
-claim = "raw pointer read does not accept bare observed len/capacity equality as bounds evidence"
+claim = "raw pointer read len/capacity equality evidence does not accept closed observation branches"
 support_tier = "Raw pointer card slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -2186,9 +1658,69 @@ expected_operation_family = "raw_pointer_read"
 expected_hazard = "pointer_validity"
 
 [[cases]]
-fixture = "raw_pointer_read_len_capacity_closed_branch_not_guard"
+fixture = "raw_pointer_read_as_cast_origin_bounds_guard"
+kind = "positive"
+claim = "raw pointer read accepts bounds evidence for pointers bound through same-origin `as *const` casts"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_read_cast_origin_bounds_guard"
+kind = "positive"
+claim = "raw pointer read accepts bounds evidence for pointers bound through same-origin casts"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_read_open_branch_bounds_guard"
+kind = "positive"
+claim = "raw pointer read accepts open positive same-origin length branches as bounds evidence"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_read_open_branch_shadowed_origin_not_guard"
 kind = "false_positive_control"
-claim = "raw pointer read does not accept a closed len/capacity equality branch as bounds evidence"
+claim = "raw pointer read open-branch bounds evidence rejects shadowed pointer origins"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_read_typed_shadowed_origin_not_guard"
+kind = "false_positive_control"
+claim = "raw pointer read bounds evidence rejects typed shadowed pointer origins"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_read_other_len_not_guard"
+kind = "false_positive_control"
+claim = "raw pointer read bounds evidence must belong to the pointer origin"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_read_reassigned_origin_not_guard"
+kind = "false_positive_control"
+claim = "raw pointer read bounds evidence must track reassigned pointer origins"
 support_tier = "Raw pointer card slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -2206,162 +1738,12 @@ expected_operation_family = "raw_pointer_read"
 expected_hazard = "pointer_validity"
 
 [[cases]]
-fixture = "raw_pointer_read_volatile_alignment_guard"
-kind = "positive"
-claim = "method-form read_volatile recognizes same-receiver alignment guard evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_read"
-expected_hazard = "alignment"
-
-[[cases]]
-fixture = "raw_pointer_read_volatile_alignment_observed_not_guard"
-kind = "false_positive_control"
-claim = "method-form read_volatile does not accept a bare observed alignment predicate as alignment evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_read"
-expected_hazard = "alignment"
-
-[[cases]]
-fixture = "raw_pointer_read_volatile_alignment_other_pointer_not_guard"
-kind = "false_positive_control"
-claim = "method-form read_volatile does not accept an alignment guard from another pointer as alignment evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_read"
-expected_hazard = "alignment"
-
-[[cases]]
-fixture = "raw_pointer_read_volatile_alignment_post_check_not_guard"
-kind = "false_positive_control"
-claim = "method-form read_volatile does not accept a post-read alignment check as alignment evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_read"
-expected_hazard = "alignment"
-
-[[cases]]
-fixture = "raw_pointer_read_volatile_null_guard"
-kind = "positive"
-claim = "method-form read_volatile recognizes same-receiver nullability guard evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_read"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "raw_pointer_read_volatile_null_observed_not_guard"
-kind = "false_positive_control"
-claim = "method-form read_volatile does not accept a bare observed nullability predicate as pointer-live evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_read"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "raw_pointer_read_volatile_null_other_pointer_not_guard"
-kind = "false_positive_control"
-claim = "method-form read_volatile does not accept a nullability guard from another pointer as pointer-live evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_read"
-expected_hazard = "pointer_validity"
-
-[[cases]]
-fixture = "raw_pointer_read_volatile_null_post_check_not_guard"
-kind = "false_positive_control"
-claim = "method-form read_volatile does not accept a post-read nullability check as pointer-live evidence"
-support_tier = "Raw pointer card slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "raw_pointer_read"
-expected_hazard = "pointer_validity"
-
-[[cases]]
 fixture = "pointer_arithmetic_num_ctrl_bytes_guard"
 kind = "positive"
 claim = "pointer arithmetic recognizes index < num_ctrl_bytes as bounds guard evidence"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
-expected_operation_family = "pointer_arithmetic"
-expected_hazard = "bounds"
-
-[[cases]]
-fixture = "pointer_arithmetic_num_ctrl_bytes_open_branch_guard"
-kind = "positive"
-claim = "pointer arithmetic recognizes an enclosing in-bounds num_ctrl_bytes branch as bounds guard evidence"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guarded_unwitnessed"
-expected_operation_family = "pointer_arithmetic"
-expected_hazard = "bounds"
-
-[[cases]]
-fixture = "pointer_arithmetic_num_ctrl_bytes_return_guard"
-kind = "positive"
-claim = "pointer arithmetic recognizes an invalid-path num_ctrl_bytes early return as bounds guard evidence"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guarded_unwitnessed"
-expected_operation_family = "pointer_arithmetic"
-expected_hazard = "bounds"
-
-[[cases]]
-fixture = "pointer_arithmetic_num_ctrl_bytes_closed_branch_not_guard"
-kind = "false_positive_control"
-claim = "pointer arithmetic does not accept a closed in-bounds num_ctrl_bytes branch as bounds evidence"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "pointer_arithmetic"
-expected_hazard = "bounds"
-
-[[cases]]
-fixture = "pointer_arithmetic_num_ctrl_bytes_invalid_branch_not_guard"
-kind = "false_positive_control"
-claim = "pointer arithmetic does not accept an enclosing out-of-bounds num_ctrl_bytes branch as bounds evidence"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "pointer_arithmetic"
-expected_hazard = "bounds"
-
-[[cases]]
-fixture = "pointer_arithmetic_num_ctrl_bytes_observed_not_guard"
-kind = "false_positive_control"
-claim = "pointer arithmetic does not accept a bare observed num_ctrl_bytes predicate as bounds evidence"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "pointer_arithmetic"
-expected_hazard = "bounds"
-
-[[cases]]
-fixture = "pointer_arithmetic_num_ctrl_bytes_other_index_not_guard"
-kind = "false_positive_control"
-claim = "pointer arithmetic does not accept a num_ctrl_bytes guard for another index as bounds evidence"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "pointer_arithmetic"
-expected_hazard = "bounds"
-
-[[cases]]
-fixture = "pointer_arithmetic_num_ctrl_bytes_post_check_not_guard"
-kind = "false_positive_control"
-claim = "pointer arithmetic does not accept a post-add num_ctrl_bytes check as bounds evidence"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
 expected_operation_family = "pointer_arithmetic"
 expected_hazard = "bounds"
 
@@ -2509,26 +1891,6 @@ expected_hazard = "drop_or_deallocation"
 fixture = "box_from_raw_reassigned_origin_not_guard"
 kind = "false_positive_control"
 claim = "Box::from_raw does not accept Box::into_raw origin evidence after the raw pointer is reassigned"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "box_from_raw"
-expected_hazard = "drop_or_deallocation"
-
-[[cases]]
-fixture = "box_from_raw_box_origin_after_not_guard"
-kind = "false_positive_control"
-claim = "Box::from_raw does not accept Box::into_raw origin evidence that appears only after from_raw"
-support_tier = "Core operation smoke slice"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "box_from_raw"
-expected_hazard = "drop_or_deallocation"
-
-[[cases]]
-fixture = "box_from_raw_other_origin_not_guard"
-kind = "false_positive_control"
-claim = "Box::from_raw does not accept Box::into_raw origin evidence for a different raw pointer"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

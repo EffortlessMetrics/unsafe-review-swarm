@@ -71,15 +71,11 @@ unsafe-review policy report \
 
 The policy report compares current `ReviewCard`s with exact baseline and
 suppression ledgers. It counts new gaps, baseline-known cards, suppressed cards,
-resolved/unmatched baseline entries, and expired suppressions. Ledger rows
-include owner, reason, evidence, and review/expiry dates when present. Current
-card rows in JSON and Markdown include the ReviewCard identity, location,
-operation expression, operation family, hazards, missing evidence, witness
-routes, policy reason, next action, and matched baseline/suppression ledger
-provenance when present. JSON reports also include schema-versioned
+resolved baseline entries, and expired suppressions. Current-card entries also
+show the operation expression, operation family, policy reason, and next action
+from the same `ReviewCard`. JSON reports include schema-versioned
 classification explanations, limitations, unmatched baseline entries, and
-invalid-ledger-entry fields. They are policy posture context, not a second
-analyzer result, and the report does not block, execute witnesses, or create
+invalid-ledger-entry fields. It does not block, execute witnesses, or create
 broad suppression authority.
 
 ## First PR Bundle
@@ -118,11 +114,11 @@ findings independently.
 | Format | Command | Use |
 |---|---|---|
 | `human` | `unsafe-review check --base origin/main` | terminal review |
-| `json` | `unsafe-review check --base origin/main --format json` | canonical machine-readable cards |
-| `markdown` | `unsafe-review check --diff change.diff --format markdown` | local report |
+| `json` | `unsafe-review check --base origin/main --format json` | canonical machine-readable cards with operation, evidence, routes, and next action |
+| `markdown` | `unsafe-review check --diff change.diff --format markdown` | local report with operation and next-action context |
 | `pr-summary` | `unsafe-review check --base origin/main --format pr-summary --out target/unsafe-review/pr-summary.md` | sparse reviewer-facing PR artifact |
 | `sarif` | `unsafe-review check --base origin/main --format sarif --out target/unsafe-review/cards.sarif` | code-scanning-compatible artifact |
-| `comment-plan` | `unsafe-review check --base origin/main --format comment-plan --out target/unsafe-review/comment-plan.json` | artifact-only inline comment candidates |
+| `comment-plan` | `unsafe-review check --base origin/main --format comment-plan --out target/unsafe-review/comment-plan.json` | artifact-only inline comment candidates with card ID, operation, routes, and verify commands |
 | `lsp` | `unsafe-review check --base origin/main --format lsp --out target/unsafe-review/lsp.json` | saved editor diagnostics and hovers |
 | `witness-plan` | `unsafe-review check --base origin/main --format witness-plan --out target/unsafe-review/witness-plan.md` | reviewer-facing witness route plan |
 
@@ -234,11 +230,10 @@ unsafe-review outcome \
 ```
 
 Outcome comparison is read-only. It compares existing `ReviewCard` identities,
-classes, missing-evidence counts, and saved witness receipt strength from the
-supplied snapshots. When saved snapshots include ReviewCard context, outcome
-card states also carry the site, operation family, and hazards so movement stays
-tied to the original unsafe seam. It does not rerun analysis, run witnesses,
-post policy decisions, or claim repository safety.
+classes, operation expressions and families, missing-evidence counts, next
+actions, and saved witness receipt strength from the supplied snapshots. It
+does not rerun analysis, run witnesses, post policy decisions, or claim
+repository safety.
 
 ## Witness Receipts
 
@@ -399,9 +394,11 @@ unsafe-review receipt audit \
 ```
 
 The audit reports matched, unmatched, stale, expired, wrong-identity,
-wrong-tool, weaker-than-required, duplicate, and invalid receipt metadata. It is
-advisory only: it does not execute witness commands, infer site reach, make
-policy decisions, or claim safety.
+wrong-tool, weaker-than-required, duplicate, and invalid receipt metadata.
+Matched receipts include current ReviewCard operation expression, operation
+family, missing-count, and next-action context so receipt evidence does not hide
+remaining gaps. It is advisory only: it does not execute witness commands, infer
+site reach, make policy decisions, or claim safety.
 
 `unsafe-review` imports receipts. It does not run Miri, `cargo-careful`,
 sanitizers, Loom, Shuttle, Kani, or Crux by default.

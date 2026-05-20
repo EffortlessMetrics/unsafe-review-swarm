@@ -1,0 +1,10 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -23,6 +23,7 @@ pub fn read_full_array<T: Copy, const CAP: usize>(
+     debug_assert_eq!(values.len(), values.capacity());
+     let values = other;
+     let ptr = values.as_ptr();
+     // SAFETY: fixture checks that len/capacity assertions over a shadowed origin are stale.
++    unsafe { core::ptr::read(ptr as *const [T; CAP]) }
+ }

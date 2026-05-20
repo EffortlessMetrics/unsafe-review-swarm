@@ -9,30 +9,20 @@ permissions = "contents: read"
 actions = [
   "actions/checkout@v6",
   "dtolnay/rust-toolchain@1.95.0",
-  "actions/upload-artifact@v7",
 ]
-reason = "Routed swarm Rust workflow with a normalized result check and advisory unsafe-review artifact uploads. It uses self-hosted runners only for same-repo trusted PRs or workflow dispatch and falls back to GitHub-hosted runners."
+reason = "Primary Rust compile, lint, test, and source-of-truth validation workflow."
 created = "2026-05-18"
 review_after = "2026-06-18"
 
 [[workflow]]
 id = "workflow-0002"
-path = ".github/workflows/em-ci-self-hosted-smoke.yml"
+path = ".github/workflows/unsafe-review.yml"
 permissions = "contents: read"
 actions = [
   "actions/checkout@v6",
+  "dtolnay/rust-toolchain@1.95.0",
+  "actions/upload-artifact@v7",
 ]
-reason = "Manual-only self-hosted runner smoke workflow for proving em-ci-small scheduler access to CX43/CX53 before branch protection is enabled."
-created = "2026-05-20"
-review_after = "2026-06-20"
-
-[[workflow]]
-id = "workflow-0003"
-path = ".github/workflows/em-ci-runner-occupier.yml"
-permissions = "contents: read"
-actions = [
-  "actions/checkout@v6",
-]
-reason = "Manual-only self-hosted runner occupier workflow for proving CX43/CX53 busy-runner fallback before branch protection is enabled."
-created = "2026-05-20"
-review_after = "2026-06-20"
+reason = "Advisory unsafe-review PR artifact workflow. It uploads cards.json, pr-summary.md, cards.sarif, and comment-plan.json without witness execution or write permissions."
+created = "2026-05-18"
+review_after = "2026-06-18"

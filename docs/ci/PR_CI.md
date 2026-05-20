@@ -1,12 +1,13 @@
 # PR and CI model
 
-Default swarm PR runs cheap static review on the pinned Rust toolchain:
+Default PR runs cheap static review on the pinned Rust toolchain:
 
 ```text
 cargo fmt --check
 cargo check --workspace --all-targets --locked
 cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo test --workspace --locked
+cargo test --workspace --all-targets --locked
+RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
 cargo run --locked -p xtask -- check-pr
 unsafe-review check --base origin/main --format json
 unsafe-review check --base origin/main \
@@ -21,10 +22,8 @@ unsafe-review check --base origin/main \
 ```
 
 The CI workflow keeps repository permissions read-only, avoids persisted checkout
-credentials, cancels superseded synchronize runs, supports manual dispatch for
-ad hoc verification, and bounds the Rust job with a timeout. In
-`unsafe-review-swarm`, the normalized result check is documented in
-[`SWARM_CI.md`](SWARM_CI.md).
+credentials, cancels superseded pull request runs, supports manual dispatch for
+ad hoc verification, and bounds the Rust job with a timeout.
 Dependabot opens weekly Cargo and GitHub Actions update PRs as maintenance
 signals; those PRs still pass through the same advisory CI and review process.
 The `dtolnay/rust-toolchain` action ref is intentionally pinned to the repo
@@ -39,7 +38,7 @@ The SARIF artifact projects the same review cards into code-scanning shape. It
 is still advisory static review evidence; uploading SARIF must not be treated as
 proof that the changed code is memory-safe.
 
-The routed CI workflow writes and uploads:
+The advisory GitHub workflow writes and uploads:
 
 ```text
 target/unsafe-review/cards.json
@@ -54,8 +53,8 @@ Before upload, the workflow runs:
 cargo run --locked -p xtask -- check-advisory-artifacts target/unsafe-review
 ```
 
-The comment plan is an artifact of at most three candidate high-signal inline
-comments. It is not posted by the workflow.
+The comment plan is an artifact of candidate high-signal inline comments. It is
+not posted by the workflow.
 
 The workflow does not run Miri, sanitizers, Loom, Kani, or other witness tools.
 It does not post comments and does not enable blocking policy.
@@ -69,12 +68,8 @@ cargo xtask check-advisory-artifacts target/unsafe-review
 
 This checks that `cards.json`, `pr-summary.md`, `cards.sarif`, and
 `comment-plan.json` exist, machine-readable artifacts parse, the policy remains
-advisory, the comment plan remains plan-only, SARIF result IDs exactly match the
-`cards.json` card set, comment-plan candidates do not duplicate card IDs,
-`cards.json` cards keep required ReviewCard fields, SARIF and comment-plan
-metadata agree with `cards.json`, the PR summary mentions every emitted card ID
-and keeps its top-card, card-table, and witness-plan sections, and the trust
-boundary is present.
+advisory, the comment plan remains plan-only, projected card IDs match
+`cards.json`, result counts stay consistent, and the trust boundary is present.
 
 Witness tools are routed, not run everywhere. Miri, sanitizers, Loom, and Kani
 belong in targeted PR, nightly, or release lanes unless repo policy says

@@ -1,0 +1,8 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -5,4 +5,5 @@ pub fn read_header(bytes: &[u8], other: &[u8]) -> Header {
+     let ptr = bytes.as_ptr();
+     // SAFETY: fixture checks that an unrelated slice length guard is not bounds evidence.
++    unsafe { ptr.cast::<Header>().read() }
+ }

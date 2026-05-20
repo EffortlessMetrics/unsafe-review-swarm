@@ -1,8 +1,0 @@
-[package]
-name = "pointer-arithmetic-num-ctrl-bytes-post-check-not-guard-fixture"
-version = "0.0.0"
-edition = "2024"
-
-[lib]
-path = "src/lib.rs"
-

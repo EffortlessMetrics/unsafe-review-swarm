@@ -1,90 +1,106 @@
 [
-{
-    "id":  "UR-copy-nonoverlapping-other-len-not-guard-src-lib-rs-copy-bytes-with-other-len-operation-copy_nonoverlapping-copy-nonoverlapping-a02b5acd2c90-pointer_validity-c1",
-    "class":  "guard_missing",
-    "priority":  "high",
-    "confidence":  "medium",
-    "site":  {
-                 "file":  "src/lib.rs",
-                 "line":  9,
-                 "column":  5,
-                 "kind":  "operation",
-                 "owner":  "copy_bytes_with_other_len",
-                 "visibility":  "private",
-                 "public_api_surface":  false,
-                 "snippet":  "unsafe { core::ptr::copy_nonoverlapping(src, dst, count) }"
-             },
-    "operation_family":  "copy_nonoverlapping",
-    "hazards":  [
-                    "pointer_validity",
-                    "bounds",
-                    "aliasing_or_provenance"
-                ],
-    "obligations":  [
-                        "source and destination do not overlap",
-                        "both ranges are valid for count elements"
-                    ],
-    "obligation_evidence":  [
-                                {
-                                    "key":  "non-overlap",
-                                    "description":  "source and destination do not overlap",
-                                    "contract":  {
-                                                     "present":  true,
-                                                     "state":  "present",
-                                                     "summary":  "Nearby `SAFETY:` comment was detected"
-                                                 },
-                                    "discharge":  {
-                                                      "present":  false,
-                                                      "state":  "missing",
-                                                      "summary":  "No obligation-specific guard code was detected"
-                                                  },
-                                    "reach":  {
-                                                  "present":  true,
-                                                  "state":  "present",
-                                                  "summary":  "1 related test file(s) mention owner `copy_bytes_with_other_len`"
-                                              },
-                                    "witness":  {
-                                                    "present":  false,
-                                                    "state":  "missing",
-                                                    "summary":  "No imported witness receipt was found"
-                                                }
-                                },
-                                {
-                                    "key":  "valid-range",
-                                    "description":  "both ranges are valid for count elements",
-                                    "contract":  {
-                                                     "present":  true,
-                                                     "state":  "present",
-                                                     "summary":  "Nearby `SAFETY:` comment was detected"
-                                                 },
-                                    "discharge":  {
-                                                      "present":  false,
-                                                      "state":  "missing",
-                                                      "summary":  "No length or bounds guard code was detected"
-                                                  },
-                                    "reach":  {
-                                                  "present":  true,
-                                                  "state":  "present",
-                                                  "summary":  "1 related test file(s) mention owner `copy_bytes_with_other_len`"
-                                              },
-                                    "witness":  {
-                                                    "present":  false,
-                                                    "state":  "missing",
-                                                    "summary":  "No imported witness receipt was found"
-                                                }
-                                }
-                            ],
-    "contract":  "Nearby `SAFETY:` comment was detected",
-    "discharge":  "No visible local guard detected",
-    "reach":  "1 related test file(s) mention owner `copy_bytes_with_other_len`",
-    "witness":  "No imported witness receipt was found",
-    "missing":  [
-                    "Missing visible local guard for inferred safety obligations",
-                    "No witness receipt imported for this card"
-                ],
-    "verify_commands":  [
-                            "cargo +nightly miri test copy_bytes_with_other_len",
-                            "cargo +nightly careful test copy_bytes_with_other_len"
-                        ]
-}
+  {
+    "id": "UR-copy-nonoverlapping-other-len-not-guard-src-lib-rs-copy-bytes-with-other-len-operation-copy_nonoverlapping-copy-nonoverlapping-a02b5acd2c90-pointer_validity-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 9,
+      "column": 5,
+      "kind": "operation",
+      "owner": "copy_bytes_with_other_len",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { core::ptr::copy_nonoverlapping(src, dst, count) }"
+    },
+    "operation": "unsafe { core::ptr::copy_nonoverlapping(src, dst, count) }",
+    "operation_family": "copy_nonoverlapping",
+    "hazards": [
+      "pointer_validity",
+      "bounds",
+      "aliasing_or_provenance"
+    ],
+    "obligations": [
+      "source and destination do not overlap",
+      "both ranges are valid for count elements"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "non-overlap",
+        "description": "source and destination do not overlap",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `copy_bytes_with_other_len`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "valid-range",
+        "description": "both ranges are valid for count elements",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No length or bounds guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `copy_bytes_with_other_len`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "No visible local guard detected",
+    "reach": "1 related test file(s) mention owner `copy_bytes_with_other_len`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test copy_bytes_with_other_len",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test copy_bytes_with_other_len",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose the local guard that discharges the `copy_nonoverlapping` safety obligation.",
+    "verify_commands": [
+      "cargo +nightly miri test copy_bytes_with_other_len",
+      "cargo +nightly careful test copy_bytes_with_other_len"
+    ]
+  }
 ]

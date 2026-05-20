@@ -14,6 +14,7 @@
       "public_api_surface": true,
       "snippet": "pub unsafe fn caller_must_uphold_contract(ptr: *const u8) -> usize {"
     },
+    "operation": "pub unsafe fn caller_must_uphold_contract(ptr: *const u8) -> usize {",
     "operation_family": "unknown",
     "hazards": [
       "unknown"
@@ -51,9 +52,18 @@
     "discharge": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration",
     "reach": "1 related test file(s) mention owner `caller_must_uphold_contract`",
     "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
     "missing": [
       "No witness receipt imported for this card"
     ],
+    "next_action": "Attach a focused witness receipt or mark the static limitation explicitly.",
     "verify_commands": []
   }
 ]

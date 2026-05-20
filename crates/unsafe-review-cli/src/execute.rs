@@ -11,8 +11,8 @@ use unsafe_review_core::{
     DiffSource, MiriReceiptInput, PolicyMode, ProofReceiptInput, SanitizerReceiptInput, Scope,
     WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze, audit_witness_receipts,
     collect_context, compare_outcome_json, evaluate_policy_report, explain_card,
-    render_comment_plan, render_human, render_json, render_lsp, render_markdown,
-    render_outcome_json, render_outcome_markdown, render_policy_report_json,
+    render_badge_jsons, render_comment_plan, render_human, render_json, render_lsp,
+    render_markdown, render_outcome_json, render_outcome_markdown, render_policy_report_json,
     render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
     render_receipt_audit_markdown, render_sarif, render_witness_plan, validate_witness_receipts,
 };
@@ -446,24 +446,7 @@ fn badges(root: &Path, out: &Path) -> Result<(), String> {
         include_unchanged_tests: true,
         max_cards: None,
     })?;
-    let color = if output.summary.open_actionable_gaps == 0 {
-        "green"
-    } else if output.summary.open_actionable_gaps < 10 {
-        "yellow"
-    } else {
-        "orange"
-    };
-    let main = format!(
-        "{{\n  \"schemaVersion\": 1,\n  \"label\": \"unsafe-review\",\n  \"message\": \"{} open gaps\",\n  \"color\": \"{}\"\n}}\n",
-        output.summary.open_actionable_gaps, color
-    );
-    let plus = format!(
-        "{{\n  \"schemaVersion\": 1,\n  \"label\": \"unsafe-review+\",\n  \"message\": \"{} contract / {} guard / {} witness\",\n  \"color\": \"{}\"\n}}\n",
-        output.summary.contract_missing,
-        output.summary.guard_missing,
-        output.summary.guarded_unwitnessed,
-        color
-    );
+    let (main, plus) = render_badge_jsons(&output);
     fs::write(out.join("unsafe-review.json"), main)
         .map_err(|err| format!("write badge failed: {err}"))?;
     fs::write(out.join("unsafe-review-plus.json"), plus)

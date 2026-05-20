@@ -14,6 +14,7 @@
       "public_api_surface": false,
       "snippet": "unsafe { encode_utf8( c, ptr, remaining_cap, ) }"
     },
+    "operation": "unsafe { encode_utf8( c, ptr, remaining_cap, ) }",
     "operation_family": "unsafe_fn_call",
     "hazards": [
       "unknown"
@@ -51,11 +52,20 @@
     "discharge": "No visible local guard detected",
     "reach": "No static test mention of owner `push_encoded` was found",
     "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
+    "next_action": "Add or expose the local guard that discharges the `unsafe_fn_call` safety obligation.",
     "verify_commands": []
   }
 ]

@@ -1,6 +1,6 @@
 # Support summary
 
-Date: 2026-05-18
+Date: 2026-05-20
 
 This is the front panel for current `unsafe-review` support posture. The full
 claim-to-proof ledger remains [`SUPPORT_TIERS.md`](SUPPORT_TIERS.md).
@@ -25,13 +25,21 @@ calibration exists and support tiers are explicitly promoted.
 | Surface | Current posture | Evidence | Not claimed |
 |---|---|---|---|
 | ReviewCard schema, identity, and core card slices | Experimental | Fixture-backed; selected analyzer rules are dogfood-backed | Stable schema compatibility, broad precision/recall, or safety |
-| PR artifacts: cards JSON, PR summary, SARIF, comment-plan | Experimental | Fixture-backed and workflow-verified; advisory artifact loop is dogfoodable | Automatic comments, branch protection, witness execution, or policy gating |
+| First-run CLI path: `doctor`, `first-pr` / `review`, `explain`, and saved artifacts | Experimental | Fixture-backed CLI e2e coverage and release-readiness proof; 0.2.0 target is public usability | Proof, policy authority, source edits, witness execution, or live editor integration |
+| PR artifacts: cards JSON, PR summary, SARIF, comment-plan, witness-plan, and saved LSP JSON | Experimental | Fixture-backed and workflow-verified; advisory artifact loop is dogfoodable | Automatic comments, branch protection, witness execution, source edits, or policy gating |
 | Saved LSP projection and agent packet | Experimental | Fixture-backed and e2e-covered read-only projections from `ReviewCard` | Live editor integration, agent execution, source edits, or repair success |
 | Witness routes and saved-output receipt import | Experimental | Fixture-backed route table plus saved-output receipt adapters | Running Miri/cargo-careful/sanitizers/Loom/Kani, site reach, or witness success beyond imported receipt scope |
-| Support posture command | Experimental | CLI e2e covers `unsafe-review support` trust-boundary output | Support summary only; not a release promise, policy gate, or proof claim |
 | Repo posture, badge JSON, outcome comparison, and policy report | Experimental | Fixture-backed; outcome comparison has limited saved-snapshot dogfood | Safety badge, release-grade dashboard, default no-new-debt, or blocking policy |
-| Real-crate dogfood measurement | Experimental | Eight capped repo snapshots and twenty-three selected PR diffs across real crates | Calibrated rates, full audits, uncapped performance guarantees, or ecosystem-wide coverage |
+| Real-crate dogfood measurement | Experimental | Seven capped repo snapshots and twenty-three selected PR diffs across real crates | Calibrated rates, full audits, uncapped performance guarantees, or ecosystem-wide coverage |
 | MIR/nightly facts and live LSP/editor integration | Deferred or planned | Requires later ADR/spec and proof | Default dependency, support promise, or v0.x gate behavior |
+
+## Current Release Target
+
+0.2.0 is public usability: install, run `doctor`, run one `first-pr` command,
+open one summary, explain one `ReviewCard`, inspect `unsafe-review support`, and
+take one concrete review action. It is not a policy gate, live LSP release,
+witness runner, or proof claim. See
+[`0.2.0 Public Usability Target`](../releases/0.2.0-public-usability.md).
 
 ## Promotion Posture
 

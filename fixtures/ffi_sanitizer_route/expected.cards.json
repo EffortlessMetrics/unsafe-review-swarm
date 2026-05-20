@@ -14,6 +14,7 @@
       "public_api_surface": false,
       "snippet": "unsafe extern \"C\" {"
     },
+    "operation": "unsafe extern \"C\" {",
     "operation_family": "ffi",
     "hazards": [
       "ffi_abi",
@@ -77,10 +78,25 @@
     "discharge": "No visible local guard detected",
     "reach": "No owner function could be inferred",
     "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "asan",
+        "reason": "FFI boundary detected; sanitizer/cargo-careful is usually more suitable than Miri for foreign calls",
+        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful can cheaply exercise Rust-side FFI boundary assumptions when a focused test exists",
+        "command": "cargo +nightly careful test",
+        "required": false
+      }
+    ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
     ],
+    "next_action": "Use sanitizer/cargo-careful or an explicit FFI boundary contract; Miri may not exercise this seam.",
     "verify_commands": [
       "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test",
       "cargo +nightly careful test"

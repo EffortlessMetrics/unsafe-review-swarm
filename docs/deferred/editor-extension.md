@@ -1,21 +1,23 @@
 # Deferred editor extension surface
 
-## Current editor surface
+This project plans a VS Code/Open VSX extension surface that consumes
+`unsafe-review` saved artifacts (especially saved LSP projections) without
+changing source files.
 
-- Saved LSP JSON projection (`lsp.json`).
+## Planned scope
 
-## Planned extension
+- Read-only diagnostics and hovers from saved `lsp.json` projection output.
+- Reviewer-first navigation for cards, contracts, guards, and witness routes.
+- Explicit trust-boundary messaging in the UI (advisory evidence, not proof).
 
-- Consume saved `lsp.json` output.
-- Show diagnostics and hovers.
-- Copy agent packet context.
-- Copy witness command routes.
-- No source edits.
-- No hidden witness execution.
-- No policy gate.
+## Non-goals (current)
+
+- No automatic code edits.
+- No witness execution.
+- No default blocking policy.
 
 ## Publication status
 
-As of May 20, 2026, there is no published VS Marketplace or Open VSX listing
+As of May 19, 2026, there is no published VS Marketplace or Open VSX listing
 for `unsafe-review`. README badges intentionally use `planned` wording until
 publication exists.
