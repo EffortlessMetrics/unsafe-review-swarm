@@ -189,9 +189,10 @@ These are not failures; they are the next unsupported or weakly verified areas:
   operation cards, and local `Fallibility::Infallible`, same-receiver
   enclosing `is_some` / `is_ok` branches, early-return, and narrow
   `if let ... as_ref()` state evidence is recognized for `unwrap_unchecked()`;
-  bare state observations and stale receiver-state evidence after reassignment
-  remain guard-missing false-positive controls. Broader option/result state
-  proof inference remains future work.
+  bare state observations, wrong-receiver `if let` evidence, post-call state
+  checks, and stale receiver-state evidence after reassignment remain
+  guard-missing false-positive controls. Broader option/result state proof
+  inference remains future work.
 - The `hashbrown#469` `unreachable_unchecked` sites are labeled as
   invalid-value operation cards, and local `Fallibility::Infallible` error-path
   evidence is recognized while other-context, post-evidence, and closed-match
