@@ -1859,17 +1859,19 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
-    fn copy_range_evidence_rejects_comment_only_early_returns() -> Result<(), String> {
+    fn copy_range_evidence_rejects_non_code_early_returns() -> Result<(), String> {
         for fixture in [
             "copy_nonoverlapping_slice_range_disjunctive_early_return_block_comment_not_guard",
+            "copy_nonoverlapping_slice_range_disjunctive_early_return_string_literal_not_guard",
             "ptr_copy_slice_range_disjunctive_early_return_block_comment_not_guard",
+            "ptr_copy_slice_range_disjunctive_early_return_string_literal_not_guard",
         ] {
             let output = fixture_output(fixture)?;
             let card = single_card(fixture, &output)?;
 
             assert!(
                 !obligation_discharge_present(card, "valid-range"),
-                "{fixture} should not accept commented return text as copy range evidence"
+                "{fixture} should not accept comment or literal return text as copy range evidence"
             );
         }
         Ok(())
