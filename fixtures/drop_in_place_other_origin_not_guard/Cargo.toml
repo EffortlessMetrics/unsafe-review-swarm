@@ -1,0 +1,7 @@
+[package]
+name = "drop-in-place-other-origin-not-guard"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "src/lib.rs"
