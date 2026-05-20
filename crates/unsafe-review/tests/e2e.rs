@@ -169,7 +169,36 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     ])?;
     let comment_plan = parse_json(&stdout_text(&comment_plan)?)?;
     assert_eq!(comment_plan["mode"], "plan_only");
+    assert_eq!(comment_plan["policy"], "advisory");
+    let planned_comment = &comment_plan["comments"][0];
     assert_eq!(comment_plan["comments"][0]["card_id"], card_id);
+    assert_eq!(planned_comment["class"], value["cards"][0]["class"]);
+    assert_eq!(planned_comment["priority"], value["cards"][0]["priority"]);
+    assert_eq!(
+        planned_comment["confidence"],
+        value["cards"][0]["confidence"]
+    );
+    assert_eq!(
+        planned_comment["operation_family"],
+        value["cards"][0]["operation_family"]
+    );
+    assert_eq!(planned_comment["path"], value["cards"][0]["site"]["file"]);
+    assert_eq!(planned_comment["line"], value["cards"][0]["site"]["line"]);
+    assert!(
+        planned_comment["selection_reason"]
+            .as_str()
+            .unwrap_or("")
+            .contains("actionable high-priority review card")
+    );
+    let planned_body = planned_comment["body"].as_str().unwrap_or("");
+    assert!(planned_body.contains("`guard_missing` for `raw_pointer_read`"));
+    assert!(planned_body.contains("Missing visible local guard for inferred safety obligations"));
+    assert!(planned_body.contains("No witness receipt imported for this card"));
+    assert!(planned_body.contains("Next action: Add or expose the local guard"));
+    assert!(planned_body.contains("Witness route: `miri` because"));
+    assert!(planned_body.contains("not memory-safety proof"));
+    assert!(!planned_body.contains("posted"));
+    assert!(!planned_body.contains("blocking"));
     assert!(
         comment_plan["trust_boundary"]
             .as_str()
