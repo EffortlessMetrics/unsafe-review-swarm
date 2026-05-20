@@ -1842,6 +1842,23 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn copy_range_evidence_rejects_or_slice_length_branches() -> Result<(), String> {
+        for fixture in [
+            "copy_nonoverlapping_slice_range_or_branch_not_guard",
+            "ptr_copy_slice_range_or_branch_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert!(
+                !obligation_discharge_present(card, "valid-range"),
+                "{fixture} should not accept disjunctive range branches as full range evidence"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn copy_range_evidence_accepts_slice_length_guards() -> Result<(), String> {
         let copy_nonoverlapping = fixture_output("copy_nonoverlapping_slice_range_guard")?;
         let copy_nonoverlapping_card = single_card(
