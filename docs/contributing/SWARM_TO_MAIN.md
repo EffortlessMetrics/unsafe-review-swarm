@@ -51,6 +51,30 @@ Source: direct-main source-only repo hygiene
 If a source PR is not swarm-originated, it must say why the work belongs in
 `unsafe-review` now.
 
+## Source sync check
+
+Before starting routine swarm development, check whether source `main` has
+drifted ahead of the workbench:
+
+```bash
+cargo run --locked -p xtask -- source-divergence
+```
+
+`check-source-sync` is an alias for the same advisory report.
+
+The report fetches `EffortlessMetrics/unsafe-review` `main` and
+`EffortlessMetrics/unsafe-review-swarm` `main`, then prints:
+
+- the fetched source and swarm heads,
+- commits source has that swarm lacks,
+- commits swarm has that source lacks,
+- a short next-action status.
+
+This command is advisory in its first version. It does not fail solely because
+the repos diverge. If `source_only` is nonzero, open a swarm sync PR before
+routine implementation work unless the source-only commits are already accounted
+for by an in-flight sync or source-public-surface exception.
+
 ## Agent state is not PR state
 
 Agent runtime state is not a repository disposition reason. A Codex session
