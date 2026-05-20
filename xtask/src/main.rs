@@ -1205,7 +1205,8 @@ fn check_advisory_artifacts(dir: &Path) -> Result<(), String> {
         .ok_or_else(|| "cards.json is missing trust_boundary".to_string())?;
     require_boundary_text(cards_boundary, "cards.json")?;
     require_cards_output_shape(&cards)?;
-    let card_ids = advisory_card_ids(&cards)?;
+    let card_facts = advisory_card_facts(&cards)?;
+    let card_ids = card_facts.keys().cloned().collect::<BTreeSet<_>>();
     let card_count = card_ids.len();
     let summary_cards = json_usize_at(&cards, "/summary/cards", "cards.json")?;
     if summary_cards != card_count {
@@ -1249,12 +1250,13 @@ fn check_advisory_artifacts(dir: &Path) -> Result<(), String> {
     for result in sarif_results {
         let card_id =
             require_non_empty_json_str_at(result, "/properties/cardId", "cards.sarif result")?;
-        if !card_ids.contains(card_id) {
+        let Some(facts) = card_facts.get(card_id) else {
             return Err(format!(
                 "cards.sarif result references unknown card id `{card_id}`"
             ));
-        }
+        };
         require_sarif_result_shape(result)?;
+        require_sarif_result_matches_card(result, facts)?;
     }
     let sarif_boundary = sarif
         .pointer("/runs/0/properties/trustBoundary")
@@ -1277,11 +1279,11 @@ fn check_advisory_artifacts(dir: &Path) -> Result<(), String> {
         let Some(card_id) = comment.get("card_id").and_then(serde_json::Value::as_str) else {
             return Err("comment-plan.json comment is missing card_id".to_string());
         };
-        if !card_ids.contains(card_id) {
+        let Some(facts) = card_facts.get(card_id) else {
             return Err(format!(
                 "comment-plan.json references unknown card id `{card_id}`"
             ));
-        }
+        };
         require_non_empty_json_str(comment, "path", "comment-plan.json comment")?;
         require_comment_line(comment)?;
         require_non_empty_json_str(comment, "class", "comment-plan.json comment")?;
@@ -1291,6 +1293,7 @@ fn check_advisory_artifacts(dir: &Path) -> Result<(), String> {
         require_non_empty_json_str(comment, "selection_reason", "comment-plan.json comment")?;
         let body = require_non_empty_json_str(comment, "body", "comment-plan.json comment")?;
         require_comment_body_boundary_text(body, "comment-plan.json comment body")?;
+        require_comment_plan_comment_matches_card(comment, facts)?;
     }
     let comment_boundary = comment_plan
         .get("trust_boundary")
@@ -2303,17 +2306,45 @@ fn parse_json_file(path: &Path) -> Result<serde_json::Value, String> {
         .map_err(|err| format!("{} is not valid JSON: {err}", path.display()))
 }
 
-fn advisory_card_ids(cards: &serde_json::Value) -> Result<BTreeSet<String>, String> {
-    let mut ids = BTreeSet::new();
+#[derive(Debug)]
+struct AdvisoryCardFacts {
+    class: String,
+    priority: String,
+    confidence: String,
+    operation_family: String,
+    file: String,
+    line: u64,
+    column: u64,
+}
+
+fn advisory_card_facts(
+    cards: &serde_json::Value,
+) -> Result<BTreeMap<String, AdvisoryCardFacts>, String> {
+    let mut facts = BTreeMap::new();
     for card in json_array_at(cards, "/cards", "cards.json")? {
         let Some(id) = card.get("id").and_then(serde_json::Value::as_str) else {
             return Err("cards.json card is missing id".to_string());
         };
-        if !ids.insert(id.to_string()) {
+        let card_facts = AdvisoryCardFacts {
+            class: require_non_empty_json_str(card, "class", "cards.json card")?.to_string(),
+            priority: require_non_empty_json_str(card, "priority", "cards.json card")?.to_string(),
+            confidence: require_non_empty_json_str(card, "confidence", "cards.json card")?
+                .to_string(),
+            operation_family: require_non_empty_json_str(
+                card,
+                "operation_family",
+                "cards.json card",
+            )?
+            .to_string(),
+            file: require_non_empty_json_str_at(card, "/site/file", "cards.json card")?.to_string(),
+            line: json_u64_at(card, "/site/line", "cards.json card")?,
+            column: json_u64_at(card, "/site/column", "cards.json card")?,
+        };
+        if facts.insert(id.to_string(), card_facts).is_some() {
             return Err(format!("cards.json contains duplicate card id `{id}`"));
         }
     }
-    Ok(ids)
+    Ok(facts)
 }
 
 fn require_cards_output_shape(cards: &serde_json::Value) -> Result<(), String> {
@@ -2448,11 +2479,16 @@ fn json_array_at<'a>(
 }
 
 fn json_usize_at(value: &serde_json::Value, pointer: &str, path: &str) -> Result<usize, String> {
+    let number = json_u64_at(value, pointer, path)?;
+    usize::try_from(number)
+        .map_err(|err| format!("{path} integer at `{pointer}` is too large: {err}"))
+}
+
+fn json_u64_at(value: &serde_json::Value, pointer: &str, path: &str) -> Result<u64, String> {
     let Some(number) = value.pointer(pointer).and_then(serde_json::Value::as_u64) else {
         return Err(format!("{path} is missing unsigned integer at `{pointer}`"));
     };
-    usize::try_from(number)
-        .map_err(|err| format!("{path} integer at `{pointer}` is too large: {err}"))
+    Ok(number)
 }
 
 fn require_json_usize_at(
@@ -2627,6 +2663,66 @@ fn require_json_str_at(
     }
 }
 
+fn require_json_str_key_matches(
+    value: &serde_json::Value,
+    key: &str,
+    expected: &str,
+    path: &str,
+) -> Result<(), String> {
+    match value.get(key).and_then(serde_json::Value::as_str) {
+        Some(actual) if actual == expected => Ok(()),
+        Some(actual) => Err(format!(
+            "{path} key `{key}` is `{actual}`, but cards.json has `{expected}`"
+        )),
+        None => Err(format!("{path} is missing string key `{key}`")),
+    }
+}
+
+fn require_json_str_at_matches(
+    value: &serde_json::Value,
+    pointer: &str,
+    expected: &str,
+    path: &str,
+) -> Result<(), String> {
+    match value.pointer(pointer).and_then(serde_json::Value::as_str) {
+        Some(actual) if actual == expected => Ok(()),
+        Some(actual) => Err(format!(
+            "{path} string at `{pointer}` is `{actual}`, but cards.json has `{expected}`"
+        )),
+        None => Err(format!("{path} is missing string at `{pointer}`")),
+    }
+}
+
+fn require_json_u64_key_matches(
+    value: &serde_json::Value,
+    key: &str,
+    expected: u64,
+    path: &str,
+) -> Result<(), String> {
+    match value.get(key).and_then(serde_json::Value::as_u64) {
+        Some(actual) if actual == expected => Ok(()),
+        Some(actual) => Err(format!(
+            "{path} key `{key}` is {actual}, but cards.json has {expected}"
+        )),
+        None => Err(format!("{path} is missing unsigned integer key `{key}`")),
+    }
+}
+
+fn require_json_u64_at_matches(
+    value: &serde_json::Value,
+    pointer: &str,
+    expected: u64,
+    path: &str,
+) -> Result<(), String> {
+    match value.pointer(pointer).and_then(serde_json::Value::as_u64) {
+        Some(actual) if actual == expected => Ok(()),
+        Some(actual) => Err(format!(
+            "{path} unsigned integer at `{pointer}` is {actual}, but cards.json has {expected}"
+        )),
+        None => Err(format!("{path} is missing unsigned integer at `{pointer}`")),
+    }
+}
+
 fn require_json_array(value: &serde_json::Value, key: &str, path: &str) -> Result<(), String> {
     if value.get(key).is_some_and(serde_json::Value::is_array) {
         Ok(())
@@ -2771,6 +2867,83 @@ fn require_sarif_result_shape(result: &serde_json::Value) -> Result<(), String> 
     let boundary =
         require_non_empty_json_str_at(result, "/properties/trustBoundary", "cards.sarif result")?;
     require_boundary_text(boundary, "cards.sarif result")?;
+    Ok(())
+}
+
+fn require_sarif_result_matches_card(
+    result: &serde_json::Value,
+    facts: &AdvisoryCardFacts,
+) -> Result<(), String> {
+    require_json_str_at_matches(
+        result,
+        "/properties/class",
+        &facts.class,
+        "cards.sarif result",
+    )?;
+    require_json_str_at_matches(
+        result,
+        "/properties/priority",
+        &facts.priority,
+        "cards.sarif result",
+    )?;
+    require_json_str_at_matches(
+        result,
+        "/properties/confidence",
+        &facts.confidence,
+        "cards.sarif result",
+    )?;
+    require_json_str_at_matches(
+        result,
+        "/properties/operationFamily",
+        &facts.operation_family,
+        "cards.sarif result",
+    )?;
+    require_json_str_at_matches(
+        result,
+        "/locations/0/physicalLocation/artifactLocation/uri",
+        &facts.file,
+        "cards.sarif result",
+    )?;
+    require_json_u64_at_matches(
+        result,
+        "/locations/0/physicalLocation/region/startLine",
+        facts.line,
+        "cards.sarif result",
+    )?;
+    require_json_u64_at_matches(
+        result,
+        "/locations/0/physicalLocation/region/startColumn",
+        facts.column,
+        "cards.sarif result",
+    )?;
+    Ok(())
+}
+
+fn require_comment_plan_comment_matches_card(
+    comment: &serde_json::Value,
+    facts: &AdvisoryCardFacts,
+) -> Result<(), String> {
+    require_json_str_key_matches(comment, "class", &facts.class, "comment-plan.json comment")?;
+    require_json_str_key_matches(
+        comment,
+        "priority",
+        &facts.priority,
+        "comment-plan.json comment",
+    )?;
+    require_json_str_key_matches(
+        comment,
+        "confidence",
+        &facts.confidence,
+        "comment-plan.json comment",
+    )?;
+    require_json_str_key_matches(
+        comment,
+        "operation_family",
+        &facts.operation_family,
+        "comment-plan.json comment",
+    )?;
+    require_json_str_key_matches(comment, "path", &facts.file, "comment-plan.json comment")?;
+    require_json_u64_key_matches(comment, "line", facts.line, "comment-plan.json comment")?;
     Ok(())
 }
 
@@ -4338,6 +4511,28 @@ impl WitnessKind {
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_sarif_card_metadata_mismatch() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-sarif-mismatch")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        write_sarif_artifact(
+            &dir,
+            r#"{"ruleId":"guard_missing","level":"warning","message":{"text":"guard_missing: add alignment evidence"},"locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":2,"startColumn":1}}}],"properties":{"cardId":"card-1","class":"guard_missing","priority":"high","confidence":"high","operationFamily":"raw_pointer_read","operation":"ptr.read()","hazards":["alignment"],"missingEvidence":["alignment guard missing"],"witnessRoutes":["miri: pointer validity"],"nextAction":"Add missing guard evidence","trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}"#,
+        )?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("cards.json has 1")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn advisory_artifact_checker_rejects_unknown_projection_card_ids() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-artifacts-unknown-id")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -4392,6 +4587,30 @@ impl WitnessKind {
                 .err()
                 .unwrap_or_default()
                 .contains("greater than zero")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn advisory_artifact_checker_rejects_comment_plan_card_metadata_mismatch() -> Result<(), String>
+    {
+        let dir = unique_temp_dir("unsafe-review-artifacts-comment-plan-mismatch")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        fs::write(
+            dir.join("comment-plan.json"),
+            r#"{"mode":"plan_only","policy":"advisory","comments":[{"card_id":"card-1","path":"src/lib.rs","line":1,"class":"contract_missing","priority":"high","confidence":"high","operation_family":"raw_pointer_read","selection_reason":"actionable high-confidence review card","body":"Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and not a Miri result unless a witness receipt is attached."}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
+        )
+        .map_err(|err| format!("write comment plan failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("cards.json has `guard_missing`")
         );
         Ok(())
     }
