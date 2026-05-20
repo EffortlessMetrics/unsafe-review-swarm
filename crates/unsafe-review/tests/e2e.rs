@@ -93,8 +93,33 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     assert_eq!(stdout_text(&summary)?.trim(), "");
     let summary_text = fs::read_to_string(&summary_path)?;
     assert!(summary_text.contains("# unsafe-review PR summary"));
+    assert!(summary_text.contains("- Scope: `diff`"));
+    assert!(summary_text.contains("- Review cards: 1"));
+    assert!(summary_text.contains("- Open actionable gaps: 1"));
+    assert!(summary_text.contains("- Policy mode: `advisory`"));
+    assert!(summary_text.contains("## Top card"));
+    assert!(summary_text.contains(&format!("- ID: `{card_id}`")));
+    assert!(summary_text.contains("- Class: `guard_missing`"));
+    assert!(summary_text.contains("- Location: src/lib.rs:8"));
+    assert!(summary_text.contains("- Operation: `unsafe { ptr.cast::<Header>().read() }`"));
+    assert!(summary_text.contains("Missing visible local guard for inferred safety obligations"));
+    assert!(summary_text.contains("No witness receipt imported for this card"));
+    assert!(summary_text.contains("- Primary route: `miri` because"));
+    assert!(summary_text.contains("cargo +nightly miri test read_header"));
+    assert!(summary_text.contains("- Next action: Add or expose the local guard"));
     assert!(summary_text.contains("## Card table"));
+    assert!(summary_text.contains(
+        "| ID | Class | Location | Operation | Missing evidence | Route | Next action |"
+    ));
+    assert!(summary_text.contains(&format!("| `{card_id}` | `guard_missing` | src/lib.rs:8 | `unsafe {{ ptr.cast::<Header>().read() }}`")));
+    assert!(summary_text.contains("## Witness plan"));
+    assert!(summary_text.contains(&format!("- `{card_id}`: `miri` because")));
     assert!(summary_text.contains("## Trust boundary"));
+    assert!(summary_text.contains("not a proof of memory safety"));
+    assert!(summary_text.contains("not UB-free status"));
+    assert!(summary_text.contains("not a Miri result unless a witness receipt is attached"));
+    assert!(!summary_text.contains("blocking policy"));
+    assert!(!summary_text.contains("posted comment"));
 
     let sarif_path = temp.path().join("cards.sarif");
     run_success([
