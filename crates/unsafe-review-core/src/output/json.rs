@@ -342,6 +342,7 @@ mod tests {
         "box_from_raw",
         "box_from_raw_box_origin",
         "box_from_raw_reassigned_origin_not_guard",
+        "box_from_raw_box_origin_after_not_guard",
         "static_mut_global_state",
         "safe_reference_deref_no_cards",
         "imports_not_unsafe_operations",

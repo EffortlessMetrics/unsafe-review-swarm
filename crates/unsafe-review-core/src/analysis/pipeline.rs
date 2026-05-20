@@ -1684,6 +1684,10 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
                 OperationFamily::BoxFromRaw,
             ),
             (
+                "box_from_raw_box_origin_after_not_guard",
+                OperationFamily::BoxFromRaw,
+            ),
+            (
                 "drop_in_place_reassigned_origin_not_guard",
                 OperationFamily::DropInPlace,
             ),
