@@ -451,6 +451,9 @@ fn has_bounds_guard(site: &ScannedSite, lower: &str) -> bool {
         site.operation.family,
         OperationFamily::CopyNonOverlapping | OperationFamily::PtrCopy
     ) {
+        if has_copy_slice_range_evidence(&site.operation.expression, &guard_scope) {
+            return true;
+        }
         // A generic length comparison does not prove both copy source and destination ranges.
         return false;
     }
@@ -476,6 +479,56 @@ fn has_raw_pointer_write_bytes_same_slice_len_evidence(expression: &str) -> bool
         }
     }
     false
+}
+
+fn has_copy_slice_range_evidence(expression: &str, before_call: &str) -> bool {
+    let Some((src, dst, count)) = copy_call_arguments(expression) else {
+        return false;
+    };
+    let Some(src_receiver) = copy_source_slice_receiver(&src) else {
+        return false;
+    };
+    let Some(dst_receiver) = copy_destination_slice_receiver(&dst) else {
+        return false;
+    };
+
+    has_slice_count_bound_guard(before_call, &src_receiver, &count)
+        && has_slice_count_bound_guard(before_call, &dst_receiver, &count)
+}
+
+fn copy_call_arguments(expression: &str) -> Option<(String, String, String)> {
+    let compact = compact_code(&expression.to_ascii_lowercase());
+    for marker in ["copy_nonoverlapping(", "ptr::copy("] {
+        let Some(call_pos) = compact.find(marker) else {
+            continue;
+        };
+        let after_marker = &compact[call_pos + marker.len()..];
+        let Some(end) = matching_call_argument_end(after_marker) else {
+            continue;
+        };
+        let args = split_top_level_arguments(&after_marker[..end]);
+        if args.len() == 3 && args.iter().all(|arg| !arg.is_empty()) {
+            return Some((
+                args[0].to_string(),
+                args[1].to_string(),
+                args[2].to_string(),
+            ));
+        }
+    }
+    None
+}
+
+fn copy_source_slice_receiver(argument: &str) -> Option<String> {
+    receiver_before_marker(argument, ".as_ptr()").map(str::to_string)
+}
+
+fn copy_destination_slice_receiver(argument: &str) -> Option<String> {
+    receiver_before_marker(argument, ".as_mut_ptr()").map(str::to_string)
+}
+
+fn has_slice_count_bound_guard(before_call: &str, receiver: &str, count: &str) -> bool {
+    let len = format!("{receiver}.len()");
+    has_len_cap_bound_guard(before_call, count, &len)
 }
 
 fn has_bounds_assertion_guard(compact: &str) -> bool {
