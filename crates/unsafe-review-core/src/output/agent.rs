@@ -245,6 +245,8 @@ mod tests {
     use crate::api::{
         AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, PolicyMode, Scope, analyze,
     };
+    use crate::domain::{EvidenceState, ReviewCard};
+    use serde_json::Value;
     use std::path::PathBuf;
 
     #[test]
@@ -317,6 +319,99 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn agent_packet_mirrors_review_card_evidence() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let Some(card) = output.cards.first() else {
+            return Err("fixture should emit one card".to_string());
+        };
+        let value = parse_json(&render(card))?;
+
+        assert_eq!(json_str(&value["task"], "task")?, card.next_action.summary);
+        assert_eq!(
+            json_str(&value["context"]["operation"], "context.operation")?,
+            card.operation.expression
+        );
+        assert_eq!(
+            json_str(&value["context"]["snippet"], "context.snippet")?,
+            card.site.snippet
+        );
+        assert_eq!(
+            string_array(&value["context"]["hazards"], "context.hazards")?,
+            card.hazards
+                .iter()
+                .map(|hazard| hazard.as_str().to_string())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            string_array(
+                &value["required_safety_conditions"],
+                "required_safety_conditions"
+            )?,
+            card.obligations
+                .iter()
+                .map(|obligation| obligation.description.clone())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            string_array(
+                &value["safety_contract"]["required_conditions"],
+                "safety_contract.required_conditions"
+            )?,
+            card.obligations
+                .iter()
+                .map(|obligation| obligation.description.clone())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            json_str(
+                &value["safety_contract"]["contract_evidence"],
+                "safety_contract.contract_evidence"
+            )?,
+            card.contract.summary
+        );
+        assert_eq!(
+            json_str(
+                &value["safety_contract"]["discharge_evidence"],
+                "safety_contract.discharge_evidence"
+            )?,
+            card.discharge.summary
+        );
+        assert_eq!(
+            json_str(
+                &value["safety_contract"]["reach_evidence"],
+                "safety_contract.reach_evidence"
+            )?,
+            card.reach.summary
+        );
+        assert_eq!(
+            json_str(
+                &value["safety_contract"]["witness_evidence"],
+                "safety_contract.witness_evidence"
+            )?,
+            card.witness.summary
+        );
+        assert_eq!(
+            string_array(&value["missing"], "missing")?,
+            card.missing
+                .iter()
+                .map(|missing| missing.message.clone())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            string_array(&value["allowed_repairs"], "allowed_repairs")?,
+            vec![card.next_action.summary.clone()]
+        );
+        assert_eq!(
+            string_array(&value["verify_commands"], "verify_commands")?,
+            card.next_action.verify_commands
+        );
+        assert_missing_evidence_matches_card(&value, card)?;
+        assert_obligation_evidence_matches_card(&value, card)?;
+        assert_witness_routes_match_card(&value, card)?;
+        Ok(())
+    }
+
     fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures")
@@ -334,5 +429,159 @@ mod tests {
 
     fn parse_json(text: &str) -> Result<serde_json::Value, String> {
         serde_json::from_str(text).map_err(|err| format!("JSON parse failed: {err}"))
+    }
+
+    fn json_array<'a>(value: &'a Value, path: &str) -> Result<&'a Vec<Value>, String> {
+        value
+            .as_array()
+            .ok_or_else(|| format!("`{path}` should be an array"))
+    }
+
+    fn json_str<'a>(value: &'a Value, path: &str) -> Result<&'a str, String> {
+        value
+            .as_str()
+            .ok_or_else(|| format!("`{path}` should be a string"))
+    }
+
+    fn json_bool(value: &Value, path: &str) -> Result<bool, String> {
+        value
+            .as_bool()
+            .ok_or_else(|| format!("`{path}` should be a boolean"))
+    }
+
+    fn string_array(value: &Value, path: &str) -> Result<Vec<String>, String> {
+        json_array(value, path)?
+            .iter()
+            .enumerate()
+            .map(|(index, item)| {
+                json_str(item, &format!("{path}[{index}]")).map(ToString::to_string)
+            })
+            .collect()
+    }
+
+    fn assert_missing_evidence_matches_card(
+        value: &Value,
+        card: &ReviewCard,
+    ) -> Result<(), String> {
+        let missing = json_array(&value["missing_evidence"], "missing_evidence")?;
+        assert_eq!(missing.len(), card.missing.len());
+        for (index, expected) in card.missing.iter().enumerate() {
+            let actual = &missing[index];
+            assert_eq!(
+                json_str(&actual["kind"], &format!("missing_evidence[{index}].kind"))?,
+                expected.kind
+            );
+            assert_eq!(
+                json_str(
+                    &actual["message"],
+                    &format!("missing_evidence[{index}].message")
+                )?,
+                expected.message
+            );
+        }
+        Ok(())
+    }
+
+    fn assert_obligation_evidence_matches_card(
+        value: &Value,
+        card: &ReviewCard,
+    ) -> Result<(), String> {
+        let obligations = json_array(&value["obligation_evidence"], "obligation_evidence")?;
+        assert_eq!(obligations.len(), card.obligation_evidence.len());
+        for (index, expected) in card.obligation_evidence.iter().enumerate() {
+            let actual = &obligations[index];
+            assert_eq!(
+                json_str(&actual["key"], &format!("obligation_evidence[{index}].key"))?,
+                expected.obligation.key
+            );
+            assert_eq!(
+                json_str(
+                    &actual["description"],
+                    &format!("obligation_evidence[{index}].description")
+                )?,
+                expected.obligation.description
+            );
+            assert_evidence_state(
+                &actual["contract"],
+                &expected.contract,
+                &format!("obligation_evidence[{index}].contract"),
+            )?;
+            assert_evidence_state(
+                &actual["discharge"],
+                &expected.discharge,
+                &format!("obligation_evidence[{index}].discharge"),
+            )?;
+            assert_evidence_state(
+                &actual["reach"],
+                &expected.reach,
+                &format!("obligation_evidence[{index}].reach"),
+            )?;
+            assert_evidence_state(
+                &actual["witness"],
+                &expected.witness,
+                &format!("obligation_evidence[{index}].witness"),
+            )?;
+        }
+        Ok(())
+    }
+
+    fn assert_evidence_state(
+        actual: &Value,
+        expected: &EvidenceState,
+        path: &str,
+    ) -> Result<(), String> {
+        assert_eq!(
+            json_bool(&actual["present"], &format!("{path}.present"))?,
+            expected.present
+        );
+        assert_eq!(
+            json_str(&actual["state"], &format!("{path}.state"))?,
+            expected.state
+        );
+        assert_eq!(
+            json_str(&actual["summary"], &format!("{path}.summary"))?,
+            expected.summary
+        );
+        Ok(())
+    }
+
+    fn assert_witness_routes_match_card(value: &Value, card: &ReviewCard) -> Result<(), String> {
+        let routes = json_array(&value["witness_routes"], "witness_routes")?;
+        assert_eq!(routes.len(), card.routes.len());
+        for (index, expected) in card.routes.iter().enumerate() {
+            let actual = &routes[index];
+            assert_eq!(
+                json_str(&actual["kind"], &format!("witness_routes[{index}].kind"))?,
+                expected.kind.as_str()
+            );
+            assert_eq!(
+                json_str(
+                    &actual["reason"],
+                    &format!("witness_routes[{index}].reason")
+                )?,
+                expected.reason
+            );
+            match expected.command.as_deref() {
+                Some(command) => assert_eq!(
+                    json_str(
+                        &actual["command"],
+                        &format!("witness_routes[{index}].command")
+                    )?,
+                    command
+                ),
+                None => assert!(
+                    actual["command"].is_null(),
+                    "witness_routes[{index}].command should be null"
+                ),
+            }
+            assert_eq!(
+                json_bool(
+                    &actual["required"],
+                    &format!("witness_routes[{index}].required")
+                )?,
+                expected.required
+            );
+        }
+        Ok(())
     }
 }
