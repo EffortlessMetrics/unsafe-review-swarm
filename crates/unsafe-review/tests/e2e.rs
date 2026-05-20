@@ -615,6 +615,10 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("witness-plan.md"));
     assert!(stdout.contains("lsp.json"));
     assert!(stdout.contains("Trust boundary:"));
+    assert!(stdout.contains("static unsafe contract review only"));
+    assert!(stdout.contains("not memory-safety proof"));
+    assert!(stdout.contains("not UB-free status"));
+    assert!(stdout.contains("not Miri-clean status"));
     assert!(stdout.contains("did not run witnesses"));
     assert!(stdout.contains("post comments"));
     assert!(stdout.contains("enforce blocking policy"));

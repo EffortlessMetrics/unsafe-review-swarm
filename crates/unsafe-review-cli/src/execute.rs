@@ -200,7 +200,10 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     }
     println!("Trust boundary:");
     println!(
-        "  advisory static review only; did not run witnesses, post comments, edit source, or enforce blocking policy."
+        "  static unsafe contract review only; not memory-safety proof, not UB-free status, and not Miri-clean status."
+    );
+    println!(
+        "  unsafe-review did not run witnesses, post comments, edit source, or enforce blocking policy."
     );
 
     Ok(())
