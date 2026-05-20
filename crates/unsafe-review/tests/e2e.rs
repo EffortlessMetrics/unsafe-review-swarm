@@ -384,6 +384,67 @@ fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<()
 }
 
 #[test]
+fn repo_badges_follow_multicard_review_card_summary() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("attributed_unsafe_fn_no_duplicate");
+    let temp = TempDir::new("unsafe-review-repo-multicard-e2e")?;
+
+    let repo = run_success([
+        os("repo"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let repo = parse_json(&stdout_text(&repo)?)?;
+    assert_eq!(repo["summary"]["cards"], 2);
+    assert_eq!(repo["summary"]["open_actionable_gaps"], 2);
+    assert_eq!(repo["summary"]["contract_missing"], 2);
+    assert_eq!(repo["summary"]["guard_missing"], 0);
+    assert_eq!(repo["summary"]["guarded_unwitnessed"], 0);
+    assert_eq!(repo["cards"][0]["class"], "contract_missing");
+    assert_eq!(repo["cards"][1]["class"], "contract_missing");
+    assert_eq!(repo["cards"][0]["operation_family"], "unknown");
+    assert_eq!(repo["cards"][1]["operation_family"], "raw_pointer_write");
+
+    let badge_dir = temp.path().join("badges");
+    let badges = run_success([
+        os("badges"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--out"),
+        badge_dir.as_os_str().to_os_string(),
+    ])?;
+    assert!(stdout_text(&badges)?.contains("wrote badges"));
+
+    let main_badge = parse_json(&fs::read_to_string(badge_dir.join("unsafe-review.json"))?)?;
+    assert_eq!(main_badge["message"], "2 open gaps");
+    assert_ne!(main_badge["message"], "safe");
+
+    let plus_badge = parse_json(&fs::read_to_string(
+        badge_dir.join("unsafe-review-plus.json"),
+    )?)?;
+    assert_eq!(plus_badge["message"], "2 contract / 0 guard / 0 witness");
+    assert_ne!(plus_badge["message"], "UB-free");
+
+    let repo_markdown = run_success([
+        os("repo"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--format"),
+        os("markdown"),
+    ])?;
+    let repo_markdown = stdout_text(&repo_markdown)?;
+    assert!(repo_markdown.contains("| 2 | 2 | 2 | 0 | 0 | 0 | 0 | 0 |"));
+    assert!(repo_markdown.contains("| `contract_missing` | 2 |"));
+    assert!(repo_markdown.contains("| `unknown` | 1 |"));
+    assert!(repo_markdown.contains("| `raw_pointer_write` | 1 |"));
+    assert!(repo_markdown.contains("not raw unsafe usage"));
+    assert!(repo_markdown.contains("not UB-free status"));
+
+    Ok(())
+}
+
+#[test]
 fn safe_repo_human_output_stays_quiet() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("safe_code_no_cards");
 
