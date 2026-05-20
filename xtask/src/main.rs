@@ -1204,6 +1204,7 @@ fn check_advisory_artifacts(dir: &Path) -> Result<(), String> {
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| "cards.json is missing trust_boundary".to_string())?;
     require_boundary_text(cards_boundary, "cards.json")?;
+    require_cards_output_shape(&cards)?;
     let card_ids = advisory_card_ids(&cards)?;
     let card_count = card_ids.len();
     let summary_cards = json_usize_at(&cards, "/summary/cards", "cards.json")?;
@@ -2314,6 +2315,92 @@ fn advisory_card_ids(cards: &serde_json::Value) -> Result<BTreeSet<String>, Stri
     Ok(ids)
 }
 
+fn require_cards_output_shape(cards: &serde_json::Value) -> Result<(), String> {
+    require_non_empty_json_str(cards, "schema_version", "cards.json")?;
+    require_non_empty_json_str(cards, "scope", "cards.json")?;
+    require_non_empty_json_str(cards, "mode", "cards.json")?;
+    require_non_empty_json_str(cards, "root", "cards.json")?;
+    for key in [
+        "rust_files",
+        "changed_rust_files",
+        "unsafe_sites",
+        "cards",
+        "open_actionable_gaps",
+        "contract_missing",
+        "guard_missing",
+        "guarded_unwitnessed",
+        "unsafe_unreached",
+        "requires_loom",
+        "miri_unsupported",
+        "static_unknown",
+    ] {
+        json_usize_at(cards, &format!("/summary/{key}"), "cards.json")?;
+    }
+    for card in json_array_at(cards, "/cards", "cards.json")? {
+        require_card_json_shape(card)?;
+    }
+    Ok(())
+}
+
+fn require_card_json_shape(card: &serde_json::Value) -> Result<(), String> {
+    require_non_empty_json_str(card, "id", "cards.json card")?;
+    require_non_empty_json_str(card, "class", "cards.json card")?;
+    require_non_empty_json_str(card, "priority", "cards.json card")?;
+    require_non_empty_json_str(card, "confidence", "cards.json card")?;
+    require_non_empty_json_str_at(card, "/site/file", "cards.json card")?;
+    require_positive_json_u64_at(card, "/site/line", "cards.json card")?;
+    require_positive_json_u64_at(card, "/site/column", "cards.json card")?;
+    require_non_empty_json_str_at(card, "/site/kind", "cards.json card")?;
+    require_non_empty_json_str_at(card, "/site/visibility", "cards.json card")?;
+    require_json_bool_at(card, "/site/public_api_surface", "cards.json card")?;
+    require_non_empty_json_str_at(card, "/site/snippet", "cards.json card")?;
+    require_non_empty_json_str(card, "operation_family", "cards.json card")?;
+    require_non_empty_json_array_at(card, "/hazards", "cards.json card")?;
+    let obligations = require_non_empty_json_array_at(card, "/obligations", "cards.json card")?;
+    let obligation_evidence =
+        require_non_empty_json_array_at(card, "/obligation_evidence", "cards.json card")?;
+    if obligation_evidence.len() != obligations.len() {
+        return Err(format!(
+            "cards.json card obligation_evidence has {} item(s), but obligations has {}",
+            obligation_evidence.len(),
+            obligations.len()
+        ));
+    }
+    for evidence in obligation_evidence {
+        require_obligation_evidence_shape(evidence)?;
+    }
+    require_non_empty_json_str(card, "contract", "cards.json card")?;
+    require_non_empty_json_str(card, "discharge", "cards.json card")?;
+    require_non_empty_json_str(card, "reach", "cards.json card")?;
+    require_non_empty_json_str(card, "witness", "cards.json card")?;
+    json_array_at(card, "/missing", "cards.json card")?;
+    json_array_at(card, "/verify_commands", "cards.json card")?;
+    Ok(())
+}
+
+fn require_obligation_evidence_shape(evidence: &serde_json::Value) -> Result<(), String> {
+    require_non_empty_json_str(evidence, "key", "cards.json obligation_evidence")?;
+    require_non_empty_json_str(evidence, "description", "cards.json obligation_evidence")?;
+    for lane in ["contract", "discharge", "reach", "witness"] {
+        require_json_bool_at(
+            evidence,
+            &format!("/{lane}/present"),
+            "cards.json obligation_evidence",
+        )?;
+        require_non_empty_json_str_at(
+            evidence,
+            &format!("/{lane}/state"),
+            "cards.json obligation_evidence",
+        )?;
+        require_non_empty_json_str_at(
+            evidence,
+            &format!("/{lane}/summary"),
+            "cards.json obligation_evidence",
+        )?;
+    }
+    Ok(())
+}
+
 fn json_array_at<'a>(
     value: &'a serde_json::Value,
     pointer: &str,
@@ -2510,6 +2597,34 @@ fn require_json_array(value: &serde_json::Value, key: &str, path: &str) -> Resul
         Ok(())
     } else {
         Err(format!("{path} is missing array key `{key}`"))
+    }
+}
+
+fn require_non_empty_json_array_at<'a>(
+    value: &'a serde_json::Value,
+    pointer: &str,
+    path: &str,
+) -> Result<&'a Vec<serde_json::Value>, String> {
+    let array = json_array_at(value, pointer, path)?;
+    if array.is_empty() {
+        Err(format!("{path} array at `{pointer}` is empty"))
+    } else {
+        Ok(array)
+    }
+}
+
+fn require_json_bool_at(
+    value: &serde_json::Value,
+    pointer: &str,
+    path: &str,
+) -> Result<(), String> {
+    if value
+        .pointer(pointer)
+        .is_some_and(serde_json::Value::is_boolean)
+    {
+        Ok(())
+    } else {
+        Err(format!("{path} is missing boolean at `{pointer}`"))
     }
 }
 
@@ -4104,6 +4219,28 @@ impl WitnessKind {
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_malformed_cards_json_card() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-malformed-card-json")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        write_cards_artifact(
+            &dir,
+            r#"{"id":"card-1","class":"guard_missing","priority":"high","confidence":"high","site":{"file":"src/lib.rs","line":1,"column":1,"kind":"unsafe_block","owner":"","visibility":"private","public_api_surface":false,"snippet":"ptr.read()"},"operation_family":"raw_pointer_read","hazards":["alignment"],"obligations":["pointer is aligned"],"obligation_evidence":[],"contract":"contract missing","discharge":"guard missing","reach":"owner reached","witness":"witness missing","missing":["alignment guard missing"],"verify_commands":[]}"#,
+        )?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("obligation_evidence")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn advisory_artifact_checker_rejects_malformed_sarif_result() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-artifacts-malformed-sarif")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -4330,11 +4467,7 @@ review_after = "2026-08-01"
     }
 
     fn write_valid_artifacts(dir: &Path) -> Result<(), String> {
-        fs::write(
-            dir.join("cards.json"),
-            r#"{"tool":"unsafe-review","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"cards":1},"cards":[{"id":"card-1"}]}"#,
-        )
-        .map_err(|err| format!("write cards failed: {err}"))?;
+        write_cards_artifact(dir, valid_card_json())?;
         fs::write(
             dir.join("pr-summary.md"),
             "- Review cards: 1\n\nThis artifact is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
@@ -4347,6 +4480,20 @@ review_after = "2026-08-01"
         )
         .map_err(|err| format!("write comment plan failed: {err}"))?;
         Ok(())
+    }
+
+    fn write_cards_artifact(dir: &Path, card: &str) -> Result<(), String> {
+        fs::write(
+            dir.join("cards.json"),
+            format!(
+                r#"{{"schema_version":"0.1","tool":"unsafe-review","scope":"diff","mode":"draft","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","root":".","summary":{{"rust_files":1,"changed_rust_files":1,"unsafe_sites":1,"cards":1,"open_actionable_gaps":1,"contract_missing":0,"guard_missing":1,"guarded_unwitnessed":0,"unsafe_unreached":0,"requires_loom":0,"miri_unsupported":0,"static_unknown":0}},"cards":[{card}]}}"#
+            ),
+        )
+        .map_err(|err| format!("write cards failed: {err}"))
+    }
+
+    fn valid_card_json() -> &'static str {
+        r#"{"id":"card-1","class":"guard_missing","priority":"high","confidence":"high","site":{"file":"src/lib.rs","line":1,"column":1,"kind":"unsafe_block","owner":"","visibility":"private","public_api_surface":false,"snippet":"ptr.read()"},"operation_family":"raw_pointer_read","hazards":["alignment"],"obligations":["pointer is aligned"],"obligation_evidence":[{"key":"alignment","description":"pointer is aligned","contract":{"present":false,"state":"missing","summary":"No contract evidence was found"},"discharge":{"present":false,"state":"missing","summary":"No alignment guard was found"},"reach":{"present":true,"state":"owner_reached","summary":"Related owner appears in changed code"},"witness":{"present":false,"state":"missing","summary":"No witness receipt was found"}}],"contract":"contract missing","discharge":"guard missing","reach":"owner reached","witness":"witness missing","missing":["alignment guard missing"],"verify_commands":[]}"#
     }
 
     fn write_sarif_artifact(dir: &Path, result: &str) -> Result<(), String> {
