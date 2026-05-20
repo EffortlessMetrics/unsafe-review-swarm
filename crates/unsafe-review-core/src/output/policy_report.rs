@@ -1,6 +1,7 @@
 use crate::api::AnalyzeOutput;
 use crate::domain::ReviewClass;
 use crate::output::markdown_table;
+use crate::util::path_display;
 use serde::Serialize;
 use std::collections::BTreeSet;
 use std::fs;
@@ -39,7 +40,20 @@ pub struct PolicyReportCard {
     #[serde(rename = "class")]
     pub class_name: String,
     pub policy_status: String,
+    pub site: PolicyReportSite,
+    pub operation_family: String,
+    pub hazards: Vec<String>,
+    pub missing: Vec<String>,
+    pub witness_routes: Vec<String>,
     pub missing_count: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct PolicyReportSite {
+    pub file: String,
+    pub line: usize,
+    pub kind: String,
+    pub owner: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -96,6 +110,28 @@ fn evaluate_with_date(output: &AnalyzeOutput, audit_date: &str) -> Result<Policy
             card_id: card.id.0.clone(),
             class_name: card.class.as_str().to_string(),
             policy_status: policy_status(&card.class).to_string(),
+            site: PolicyReportSite {
+                file: path_display(&card.site.location.file),
+                line: card.site.location.line,
+                kind: card.site.kind.as_str().to_string(),
+                owner: card.site.owner.clone().unwrap_or_default(),
+            },
+            operation_family: card.operation.family.as_str().to_string(),
+            hazards: card
+                .hazards
+                .iter()
+                .map(|hazard| hazard.as_str().to_string())
+                .collect(),
+            missing: card
+                .missing
+                .iter()
+                .map(|missing| missing.message.clone())
+                .collect(),
+            witness_routes: card
+                .routes
+                .iter()
+                .map(|route| route.kind.as_str().to_string())
+                .collect(),
             missing_count: card.missing.len(),
         })
         .collect::<Vec<_>>();
@@ -159,15 +195,22 @@ pub(crate) fn render_markdown(report: &PolicyReport) -> String {
     if report.cards.is_empty() {
         out.push_str("No current policy-relevant cards found.\n\n");
     } else {
-        out.push_str("| Status | Card | Class | Missing evidence |\n");
-        out.push_str("|---|---|---|---:|\n");
+        out.push_str("| Status | Card | Location | Class | Operation | Hazards | Missing evidence | Routes |\n");
+        out.push_str("|---|---|---|---|---|---|---|---|\n");
         for card in &report.cards {
             out.push_str(&format!(
-                "| `{}` | `{}` | `{}` | {} |\n",
+                "| `{}` | `{}` | {} | `{}` | `{}` | {} | {} | {} |\n",
                 markdown_cell(&card.policy_status),
                 markdown_cell(&card.card_id),
+                markdown_cell(&format!(
+                    "{}:{} ({}/{})",
+                    card.site.file, card.site.line, card.site.kind, card.site.owner
+                )),
                 markdown_cell(&card.class_name),
-                card.missing_count
+                markdown_cell(&card.operation_family),
+                joined_cell(&card.hazards),
+                missing_cell(card),
+                joined_cell(&card.witness_routes)
             ));
         }
         out.push('\n');
@@ -284,6 +327,22 @@ fn optional_text(value: Option<&str>) -> String {
         .filter(|value| !value.is_empty())
         .map(markdown_cell)
         .unwrap_or_else(|| "-".to_string())
+}
+
+fn joined_cell(values: &[String]) -> String {
+    if values.is_empty() {
+        "-".to_string()
+    } else {
+        markdown_cell(&values.join(", "))
+    }
+}
+
+fn missing_cell(card: &PolicyReportCard) -> String {
+    if card.missing.is_empty() {
+        card.missing_count.to_string()
+    } else {
+        markdown_cell(&card.missing.join("; "))
+    }
 }
 
 fn markdown_cell(value: &str) -> String {
@@ -445,6 +504,16 @@ expires = "2026-01-01"
                 card_id: "UR-pipe|card-c1".to_string(),
                 class_name: "guard|missing".to_string(),
                 policy_status: "new|gap".to_string(),
+                site: PolicyReportSite {
+                    file: "src/lib.rs".to_string(),
+                    line: 7,
+                    kind: "operation|site".to_string(),
+                    owner: "owner|fn".to_string(),
+                },
+                operation_family: "raw|pointer|read".to_string(),
+                hazards: vec!["alignment|hazard".to_string()],
+                missing: vec!["missing|guard".to_string()],
+                witness_routes: vec!["miri|route".to_string()],
                 missing_count: 1,
             }],
             resolved_baseline: vec![PolicyLedgerEntry {
@@ -467,7 +536,12 @@ expires = "2026-01-01"
 
         assert!(markdown.contains("`new\\|gap`"));
         assert!(markdown.contains("`UR-pipe\\|card-c1`"));
+        assert!(markdown.contains("src/lib.rs:7 (operation\\|site/owner\\|fn)"));
         assert!(markdown.contains("`guard\\|missing`"));
+        assert!(markdown.contains("`raw\\|pointer\\|read`"));
+        assert!(markdown.contains("alignment\\|hazard"));
+        assert!(markdown.contains("missing\\|guard"));
+        assert!(markdown.contains("miri\\|route"));
         assert!(markdown.contains("`UR-resolved\\|card-c1`"));
         assert!(markdown.contains("team\\|unsafe"));
         assert!(markdown.contains("resolved\\|by guard"));

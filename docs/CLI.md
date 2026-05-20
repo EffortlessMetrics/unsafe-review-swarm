@@ -59,6 +59,10 @@ suppression ledgers. It counts new gaps, baseline-known cards, suppressed cards,
 resolved baseline entries, and expired suppressions. It does not block, execute
 witnesses, or create broad suppression authority.
 
+Current-card rows in JSON and Markdown include the ReviewCard identity,
+location, operation family, hazards, missing evidence, and witness routes. They
+are policy posture context, not a second analyzer result.
+
 ## Output Formats
 
 All output formats project the same `ReviewCard`s. They must not reclassify

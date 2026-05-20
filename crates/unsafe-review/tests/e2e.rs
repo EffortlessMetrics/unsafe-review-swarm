@@ -2124,6 +2124,31 @@ fn policy_report_is_advisory_and_counts_baseline_state() -> Result<(), Box<dyn E
     assert_eq!(report["policy"], "advisory");
     assert_eq!(report["summary"]["new_gaps"], 1);
     assert_eq!(report["summary"]["baseline_known"], 0);
+    let card = &report["cards"][0];
+    assert!(card["card_id"].as_str().unwrap_or("").starts_with("UR-"));
+    assert_eq!(card["class"], "guard_missing");
+    assert_eq!(card["policy_status"], "new_gap");
+    assert_eq!(card["site"]["file"], "src/lib.rs");
+    assert_eq!(card["site"]["line"], 8);
+    assert_eq!(card["site"]["kind"], "operation");
+    assert_eq!(card["site"]["owner"], "read_header");
+    assert_eq!(card["operation_family"], "raw_pointer_read");
+    assert!(card["hazards"].as_array().is_some_and(|hazards| {
+        hazards.iter().any(|hazard| hazard == "pointer_validity")
+            && hazards.iter().any(|hazard| hazard == "alignment")
+    }));
+    assert!(card["missing"].as_array().is_some_and(|missing| {
+        missing.iter().any(|item| {
+            item.as_str()
+                .unwrap_or("")
+                .contains("Missing visible local guard for inferred safety obligations")
+        })
+    }));
+    assert!(
+        card["witness_routes"]
+            .as_array()
+            .is_some_and(|routes| routes.iter().any(|route| route == "miri"))
+    );
     assert!(
         json_str(&report["trust_boundary"], "trust_boundary")?
             .contains("does not enforce blocking policy")
@@ -2158,6 +2183,13 @@ fn policy_report_is_advisory_and_counts_baseline_state() -> Result<(), Box<dyn E
     let baselined = parse_json(&stdout_text(&baselined)?)?;
     assert_eq!(baselined["summary"]["new_gaps"], 0);
     assert_eq!(baselined["summary"]["baseline_known"], 1);
+    assert_eq!(baselined["cards"][0]["card_id"], card_id);
+    assert_eq!(baselined["cards"][0]["class"], "baseline_known");
+    assert_eq!(baselined["cards"][0]["policy_status"], "baseline_known");
+    assert_eq!(
+        baselined["cards"][0]["operation_family"],
+        "raw_pointer_read"
+    );
 
     let markdown_path = temp.path().join("policy-report.md");
     let markdown = run_success([
@@ -2175,6 +2207,15 @@ fn policy_report_is_advisory_and_counts_baseline_state() -> Result<(), Box<dyn E
     assert_eq!(stdout_text(&markdown)?.trim(), "");
     let markdown = fs::read_to_string(markdown_path)?;
     assert!(markdown.contains("# unsafe-review policy report"));
+    assert!(markdown.contains(
+        "| Status | Card | Location | Class | Operation | Hazards | Missing evidence | Routes |"
+    ));
+    assert!(markdown.contains("src/lib.rs:8 (operation/read_header)"));
+    assert!(markdown.contains("`baseline_known`"));
+    assert!(markdown.contains("`raw_pointer_read`"));
+    assert!(markdown.contains("pointer_validity, alignment"));
+    assert!(markdown.contains("Missing visible local guard for inferred safety obligations"));
+    assert!(markdown.contains("miri"));
     assert!(markdown.contains("## Trust boundary"));
 
     Ok(())
