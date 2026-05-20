@@ -557,6 +557,99 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
 }
 
 #[test]
+fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-first-pr-e2e")?;
+    let out_dir = temp.path().join("unsafe-review");
+
+    let output = run_success([
+        os("first-pr"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--out-dir"),
+        out_dir.as_os_str().to_os_string(),
+    ])?;
+    let stdout = stdout_text(&output)?;
+
+    assert!(stdout.contains("unsafe-review first-pr"));
+    assert!(stdout.contains("- Review cards: 1"));
+    assert!(stdout.contains("- Open actionable gaps: 1"));
+    assert!(stdout.contains("Top action:"));
+    assert!(stdout.contains("`raw_pointer_read`"));
+    assert!(stdout.contains("Class: `guard_missing`"));
+    assert!(stdout.contains("Route: `miri`"));
+    assert!(stdout.contains("Artifacts:"));
+    assert!(stdout.contains("cards.json"));
+    assert!(stdout.contains("pr-summary.md"));
+    assert!(stdout.contains("cards.sarif"));
+    assert!(stdout.contains("comment-plan.json"));
+    assert!(stdout.contains("witness-plan.md"));
+    assert!(stdout.contains("did not run witnesses"));
+    assert!(stdout.contains("post comments"));
+    assert!(stdout.contains("enforce blocking policy"));
+
+    let cards = parse_json(&fs::read_to_string(out_dir.join("cards.json"))?)?;
+    assert_eq!(cards["schema_version"], "0.1");
+    assert_eq!(cards["scope"], "diff");
+    assert_eq!(cards["policy"], "advisory");
+    assert_eq!(cards["summary"]["cards"], 1);
+    assert_eq!(cards["cards"][0]["class"], "guard_missing");
+    assert_eq!(cards["cards"][0]["operation_family"], "raw_pointer_read");
+    assert!(
+        cards["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not a proof of memory safety")
+    );
+    let card_id = json_str(&cards["cards"][0]["id"], "cards[0].id")?;
+
+    let summary = fs::read_to_string(out_dir.join("pr-summary.md"))?;
+    assert!(summary.contains("# unsafe-review PR summary"));
+    assert!(summary.contains(&format!("- ID: `{card_id}`")));
+    assert!(summary.contains("## Trust boundary"));
+    assert!(summary.contains("not a Miri result unless a witness receipt is attached"));
+
+    let sarif = parse_json(&fs::read_to_string(out_dir.join("cards.sarif"))?)?;
+    assert_eq!(sarif["version"], "2.1.0");
+    assert_eq!(
+        sarif["runs"][0]["results"][0]["properties"]["cardId"],
+        card_id
+    );
+    assert!(
+        sarif["runs"][0]["properties"]["trustBoundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not UB-free status")
+    );
+
+    let comment_plan = parse_json(&fs::read_to_string(out_dir.join("comment-plan.json"))?)?;
+    assert_eq!(comment_plan["mode"], "plan_only");
+    assert_eq!(comment_plan["policy"], "advisory");
+    assert_eq!(comment_plan["comments"][0]["card_id"], card_id);
+    assert!(
+        comment_plan["comments"][0]["body"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not memory-safety proof")
+    );
+
+    let witness_plan = fs::read_to_string(out_dir.join("witness-plan.md"))?;
+    assert!(witness_plan.contains("# unsafe-review witness plan"));
+    assert!(witness_plan.contains(&format!("### `{card_id}`")));
+    assert!(witness_plan.contains("does not run Miri"));
+    assert!(
+        witness_plan
+            .contains("does not run Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux")
+    );
+    assert!(!witness_plan.contains("Miri passed"));
+    assert!(!witness_plan.contains("site reached"));
+
+    Ok(())
+}
+
+#[test]
 fn check_reports_missing_diff_file_as_cli_failure() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("safe_code_no_cards");
     let missing_diff = fixture.join("missing.diff");

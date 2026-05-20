@@ -1,6 +1,6 @@
 use crate::command::{
-    CheckOptions, Command, DiffInput, Format, OutcomeOptions, ReceiptTemplateOptions,
-    SavedOutputReceiptOptions,
+    CheckOptions, Command, DiffInput, FirstPrOptions, Format, OutcomeOptions,
+    ReceiptTemplateOptions, SavedOutputReceiptOptions,
 };
 use std::path::PathBuf;
 use unsafe_review_core::PolicyMode;
@@ -22,6 +22,7 @@ pub(crate) fn parse(args: Vec<String>) -> Result<Command, String> {
         "--version" | "-V" => Ok(Command::Version),
         "doctor" => parse_doctor(rest),
         "check" => parse_check(rest).map(Command::Check),
+        "first-pr" | "review" => parse_first_pr(rest).map(Command::FirstPr),
         "repo" => parse_check(rest).map(Command::Repo),
         "pilot" => parse_check(rest).map(|mut options| {
             options.max_cards = Some(options.max_cards.unwrap_or(5));
@@ -83,6 +84,57 @@ fn parse_doctor(args: Vec<String>) -> Result<Command, String> {
         idx += 1;
     }
     Ok(Command::Doctor { root })
+}
+
+fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
+    let mut options = FirstPrOptions::default();
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--root" => {
+                idx += 1;
+                options.check.root = PathBuf::from(value(&args, idx, "--root")?);
+            }
+            arg if arg.starts_with("--root=") => {
+                options.check.root = PathBuf::from(inline_value(arg, "--root")?);
+            }
+            "--base" => {
+                idx += 1;
+                options.check.base = Some(value(&args, idx, "--base")?.to_string());
+            }
+            arg if arg.starts_with("--base=") => {
+                options.check.base = Some(inline_value(arg, "--base")?.to_string());
+            }
+            "--diff" => {
+                idx += 1;
+                options.check.diff = Some(parse_diff_input(value(&args, idx, "--diff")?));
+            }
+            arg if arg.starts_with("--diff=") => {
+                options.check.diff = Some(parse_diff_input(inline_value(arg, "--diff")?));
+            }
+            "--out-dir" => {
+                idx += 1;
+                options.out_dir = PathBuf::from(value(&args, idx, "--out-dir")?);
+            }
+            arg if arg.starts_with("--out-dir=") => {
+                options.out_dir = PathBuf::from(inline_value(arg, "--out-dir")?);
+            }
+            "--max-cards" => {
+                idx += 1;
+                options.check.max_cards = Some(parse_max_cards(value(&args, idx, "--max-cards")?)?);
+            }
+            arg if arg.starts_with("--max-cards=") => {
+                options.check.max_cards = Some(parse_max_cards(inline_value(arg, "--max-cards")?)?);
+            }
+            other => return Err(format!("unknown first-pr argument `{other}`")),
+        }
+        idx += 1;
+    }
+    if options.check.base.is_none() && options.check.diff.is_none() {
+        options.check.base = Some("origin/main".to_string());
+    }
+    validate_check_options(&options.check)?;
+    Ok(options)
 }
 
 fn parse_check(args: Vec<String>) -> Result<CheckOptions, String> {
@@ -722,6 +774,50 @@ mod tests {
             return Err("expected check command".to_string());
         };
         assert_eq!(options.format, Format::Sarif);
+        Ok(())
+    }
+
+    #[test]
+    fn parses_first_pr_bundle_defaults_to_origin_main() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "first-pr",
+            "--out-dir=target/review",
+        ]))?;
+        let Command::FirstPr(options) = command else {
+            return Err("expected first-pr command".to_string());
+        };
+        assert_eq!(options.check.root, PathBuf::from("."));
+        assert_eq!(options.check.base, Some("origin/main".to_string()));
+        assert_eq!(options.check.diff, None);
+        assert_eq!(options.check.policy, PolicyMode::Advisory);
+        assert_eq!(options.out_dir, PathBuf::from("target/review"));
+        Ok(())
+    }
+
+    #[test]
+    fn parses_review_bundle_alias_with_diff() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "review",
+            "--root=fixtures/raw_pointer_alignment",
+            "--diff=change.diff",
+            "--max-cards=3",
+        ]))?;
+        let Command::FirstPr(options) = command else {
+            return Err("expected first-pr command".to_string());
+        };
+        assert_eq!(
+            options.check.root,
+            PathBuf::from("fixtures/raw_pointer_alignment")
+        );
+        assert_eq!(
+            options.check.diff,
+            Some(DiffInput::File(PathBuf::from("change.diff")))
+        );
+        assert_eq!(options.check.base, None);
+        assert_eq!(options.check.max_cards, Some(3));
+        assert_eq!(options.out_dir, PathBuf::from("target/unsafe-review"));
         Ok(())
     }
 

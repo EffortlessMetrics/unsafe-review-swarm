@@ -1,6 +1,6 @@
 use crate::command::{
-    CheckOptions, Command, DiffInput, Format, OutcomeOptions, ReceiptTemplateOptions,
-    SavedOutputReceiptOptions,
+    CheckOptions, Command, DiffInput, FirstPrOptions, Format, OutcomeOptions,
+    ReceiptTemplateOptions, SavedOutputReceiptOptions,
 };
 use std::fs;
 use std::io::{self, Read};
@@ -31,6 +31,7 @@ pub(crate) fn execute(command: Command) -> Result<(), String> {
         Command::Check(options) => run_check(options, Scope::Diff, AnalysisMode::Draft),
         Command::Repo(options) => run_check(options, Scope::Repo, AnalysisMode::Repo),
         Command::Pilot(options) => run_check(options, Scope::Diff, AnalysisMode::Draft),
+        Command::FirstPr(options) => first_pr(options),
         Command::Badges { root, out } => badges(&root, &out),
         Command::Explain { root, id, format } => explain(&root, &id, format),
         Command::Context { root, id } => context(&root, &id),
@@ -71,6 +72,83 @@ fn run_check(options: CheckOptions, scope: Scope, mode: AnalysisMode) -> Result<
     Ok(())
 }
 
+fn first_pr(options: FirstPrOptions) -> Result<(), String> {
+    let mut check = options.check;
+    check.policy = PolicyMode::Advisory;
+    let diff = diff_source(&check)?;
+    let output = analyze(AnalyzeInput {
+        root: check.root,
+        scope: Scope::Diff,
+        diff,
+        mode: AnalysisMode::Draft,
+        policy: PolicyMode::Advisory,
+        include_unchanged_tests: true,
+        max_cards: check.max_cards,
+    })?;
+
+    fs::create_dir_all(&options.out_dir)
+        .map_err(|err| format!("create {} failed: {err}", options.out_dir.display()))?;
+    write_artifact(&options.out_dir.join("cards.json"), render_json(&output))?;
+    write_artifact(
+        &options.out_dir.join("pr-summary.md"),
+        render_pr_summary(&output),
+    )?;
+    write_artifact(&options.out_dir.join("cards.sarif"), render_sarif(&output))?;
+    write_artifact(
+        &options.out_dir.join("comment-plan.json"),
+        render_comment_plan(&output),
+    )?;
+    write_artifact(
+        &options.out_dir.join("witness-plan.md"),
+        render_witness_plan(&output),
+    )?;
+
+    println!("unsafe-review first-pr");
+    println!("- Review cards: {}", output.summary.cards);
+    println!(
+        "- Open actionable gaps: {}",
+        output.summary.open_actionable_gaps
+    );
+    if let Some(card) = output.cards.first() {
+        println!("Top action:");
+        println!(
+            "  {}:{} `{}`",
+            card.site.location.file.display(),
+            card.site.location.line,
+            card.operation.family.as_str()
+        );
+        println!("  Class: `{}`", card.class.as_str());
+        if !card.missing.is_empty() {
+            let missing = card
+                .missing
+                .iter()
+                .map(|missing| missing.kind.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            println!("  Missing: {missing}");
+        }
+        if let Some(route) = card.routes.first() {
+            println!("  Route: `{}`", route.kind.as_str());
+        }
+        println!("  Next: {}", card.next_action.summary);
+    }
+    println!("Artifacts:");
+    for name in [
+        "cards.json",
+        "pr-summary.md",
+        "cards.sarif",
+        "comment-plan.json",
+        "witness-plan.md",
+    ] {
+        println!("  {}", options.out_dir.join(name).display());
+    }
+    println!(
+        "Trust boundary: advisory static review only; did not run witnesses, post comments, edit source, or enforce blocking policy."
+    );
+
+    Ok(())
+}
+
 fn enforce_policy(output: &unsafe_review_core::AnalyzeOutput) -> Result<(), String> {
     match output.policy {
         PolicyMode::Advisory => Ok(()),
@@ -86,6 +164,11 @@ fn enforce_policy(output: &unsafe_review_core::AnalyzeOutput) -> Result<(), Stri
         }
         PolicyMode::Blocking => Err("blocking policy is not implemented".to_string()),
     }
+}
+
+fn write_artifact(path: &Path, rendered: String) -> Result<(), String> {
+    ensure_parent_dir(path)?;
+    fs::write(path, rendered).map_err(|err| format!("write {} failed: {err}", path.display()))
 }
 
 fn diff_source(options: &CheckOptions) -> Result<DiffSource, String> {
@@ -586,6 +669,10 @@ fn print_help() {
     println!(
         "  repo    [--root .] [--format human|json|markdown|pr-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file]"
     );
+    println!(
+        "  first-pr [--root .] [--base origin/main|--diff file|-] [--out-dir target/unsafe-review] [--max-cards N]"
+    );
+    println!("  review  alias for first-pr");
     println!("  pilot   [--root .] [--base origin/main] [--max-cards 5]");
     println!("  badges  [--root .] [--out badges]");
     println!("  explain [--root .] [--json|--format json] <card-id>");
