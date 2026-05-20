@@ -744,24 +744,39 @@ fn has_slice_count_early_return(
 }
 
 fn guard_body_contains_return(guard_body: &str) -> bool {
-    let code = strip_block_comments_and_literals(guard_body);
+    let code = strip_comments_and_literals(guard_body);
     compact_contains_identifier(&code, "return")
 }
 
-fn strip_block_comments_and_literals(text: &str) -> String {
+fn strip_comments_and_literals(text: &str) -> String {
     let mut output = String::with_capacity(text.len());
     let mut chars = text.chars().peekable();
     while let Some(ch) = chars.next() {
-        if ch == '/' && chars.peek() == Some(&'*') {
-            chars.next();
-            let mut prev = '\0';
-            for comment_ch in chars.by_ref() {
-                if prev == '*' && comment_ch == '/' {
-                    break;
+        if ch == '/' {
+            match chars.peek() {
+                Some('*') => {
+                    chars.next();
+                    let mut prev = '\0';
+                    for comment_ch in chars.by_ref() {
+                        if prev == '*' && comment_ch == '/' {
+                            break;
+                        }
+                        prev = comment_ch;
+                    }
+                    continue;
                 }
-                prev = comment_ch;
+                Some('/') => {
+                    chars.next();
+                    for comment_ch in chars.by_ref() {
+                        if comment_ch == '\n' {
+                            output.push('\n');
+                            break;
+                        }
+                    }
+                    continue;
+                }
+                _ => {}
             }
-            continue;
         }
         if ch == '"' {
             output.push('"');
