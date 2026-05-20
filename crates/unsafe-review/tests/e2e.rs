@@ -1256,6 +1256,90 @@ fn policy_report_is_advisory_and_counts_baseline_state() -> Result<(), Box<dyn E
     Ok(())
 }
 
+#[test]
+fn policy_report_reports_resolved_baseline_and_expired_suppression() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-policy-report-ledgers-e2e")?;
+    let copied = temp.path().join("fixture");
+    copy_dir_all(&fixture, &copied)?;
+    let policy = copied.join("policy");
+    fs::create_dir_all(&policy)?;
+    let resolved_id =
+        "UR-resolved-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+    let expired_id =
+        "UR-expired-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+    fs::write(
+        policy.join("unsafe-review-baseline.toml"),
+        format!(
+            r#"schema_version = "0.1"
+status = "active"
+
+[[entries]]
+card_id = "{resolved_id}"
+owner = "core/policy"
+reason = "resolved fixture debt"
+evidence = "e2e policy report"
+review_after = "2026-08-01"
+"#
+        ),
+    )?;
+    fs::write(
+        policy.join("unsafe-review-suppressions.toml"),
+        format!(
+            r#"schema_version = "0.1"
+status = "active"
+
+[[entries]]
+card_id = "{expired_id}"
+owner = "core/policy"
+reason = "expired false-positive review"
+evidence = "e2e policy report"
+expires = "2026-01-01"
+"#
+        ),
+    )?;
+
+    let report = run_success([
+        os("policy"),
+        os("report"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--diff"),
+        copied.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let report = parse_json(&stdout_text(&report)?)?;
+    assert_eq!(report["summary"]["new_gaps"], 1);
+    assert_eq!(report["summary"]["resolved_baseline"], 1);
+    assert_eq!(report["summary"]["expired_suppressions"], 1);
+    assert_eq!(report["resolved_baseline"][0]["card_id"], resolved_id);
+    assert_eq!(report["expired_suppressions"][0]["card_id"], expired_id);
+    assert!(
+        json_str(&report["trust_boundary"], "trust_boundary")?
+            .contains("does not enforce blocking policy")
+    );
+
+    let markdown = run_success([
+        os("policy"),
+        os("report"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--diff"),
+        copied.join("change.diff").into_os_string(),
+        os("--format"),
+        os("markdown"),
+    ])?;
+    let markdown = stdout_text(&markdown)?;
+    assert!(markdown.contains("## Resolved baseline entries"));
+    assert!(markdown.contains("## Expired suppression entries"));
+    assert!(markdown.contains(resolved_id));
+    assert!(markdown.contains(expired_id));
+    assert!(markdown.contains("## Trust boundary"));
+
+    Ok(())
+}
+
 fn run_success<I, S>(args: I) -> Result<Output, Box<dyn Error>>
 where
     I: IntoIterator<Item = S>,
