@@ -742,6 +742,158 @@ fn receipt_audit_reports_matching_saved_receipts_without_running_witnesses()
 }
 
 #[test]
+fn receipt_audit_reports_problem_statuses_without_running_witnesses() -> Result<(), Box<dyn Error>>
+{
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-receipt-audit-problems-e2e")?;
+    let copied = temp.path().join("fixture");
+    copy_dir_all(&fixture, &copied)?;
+
+    let advisory = run_success([
+        os("check"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--diff"),
+        copied.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let advisory = parse_json(&stdout_text(&advisory)?)?;
+    let card_id = json_str(&advisory["cards"][0]["id"], "cards[0].id")?;
+    let stale_id =
+        "UR-stale-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+
+    write_receipt_file(
+        &copied,
+        "matched.json",
+        card_id,
+        "miri",
+        "ran",
+        "2026-05-18T00:00:00Z",
+        "2026-08-18",
+    )?;
+    write_receipt_file(
+        &copied,
+        "wrong-tool.json",
+        card_id,
+        "loom",
+        "ran",
+        "2026-05-18T00:00:00Z",
+        "2026-08-18",
+    )?;
+    write_receipt_file(
+        &copied,
+        "weak.json",
+        card_id,
+        "miri",
+        "configured",
+        "2026-05-18T00:00:00Z",
+        "2026-08-18",
+    )?;
+    write_receipt_file(
+        &copied,
+        "expired.json",
+        card_id,
+        "miri",
+        "ran",
+        "2026-05-01T00:00:00Z",
+        "2026-05-19",
+    )?;
+    write_receipt_file(
+        &copied,
+        "stale.json",
+        stale_id,
+        "miri",
+        "ran",
+        "2026-05-18T00:00:00Z",
+        "2026-08-18",
+    )?;
+    write_receipt_file(
+        &copied,
+        "wrong-identity.json",
+        "not-counted",
+        "miri",
+        "ran",
+        "2026-05-18T00:00:00Z",
+        "2026-08-18",
+    )?;
+    write_receipt_file(
+        &copied,
+        "invalid-strength.json",
+        card_id,
+        "miri",
+        "almost",
+        "2026-05-18T00:00:00Z",
+        "2026-08-18",
+    )?;
+
+    let audit = run_success([
+        os("receipt"),
+        os("audit"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--diff"),
+        copied.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let audit = parse_json(&stdout_text(&audit)?)?;
+
+    assert_eq!(audit["summary"]["receipts"], 7);
+    assert_eq!(audit["summary"]["matched"], 5);
+    assert_eq!(audit["summary"]["unmatched"], 1);
+    assert_eq!(audit["summary"]["expired"], 1);
+    assert_eq!(audit["summary"]["stale"], 1);
+    assert_eq!(audit["summary"]["wrong_identity"], 1);
+    assert_eq!(audit["summary"]["wrong_tool"], 1);
+    assert_eq!(audit["summary"]["weaker_than_required"], 1);
+    assert_eq!(audit["summary"]["duplicate"], 5);
+    assert_eq!(audit["summary"]["invalid"], 2);
+    assert!(
+        json_str(&audit["trust_boundary"], "trust_boundary")?
+            .contains("does not execute witnesses")
+    );
+    for status in [
+        "matched",
+        "unmatched",
+        "expired",
+        "stale",
+        "wrong_identity",
+        "wrong_tool",
+        "weaker_than_required",
+        "duplicate",
+        "invalid",
+    ] {
+        assert!(
+            audit["receipts"]
+                .as_array()
+                .is_some_and(|receipts| receipts.iter().any(|receipt| receipt["statuses"]
+                    .as_array()
+                    .is_some_and(|statuses| statuses.iter().any(|item| item == status)))),
+            "missing receipt status {status}"
+        );
+    }
+
+    let markdown = run_success([
+        os("receipt"),
+        os("audit"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--diff"),
+        copied.join("change.diff").into_os_string(),
+        os("--format"),
+        os("markdown"),
+    ])?;
+    let markdown = stdout_text(&markdown)?;
+    assert!(markdown.contains("| 7 | 5 | 1 | 1 | 1 | 1 | 1 | 1 | 5 | 2 |"));
+    assert!(markdown.contains("wrong_tool"));
+    assert!(markdown.contains("weaker_than_required"));
+    assert!(markdown.contains("does not execute witnesses"));
+
+    Ok(())
+}
+
+#[test]
 fn receipt_import_miri_writes_receipt_from_saved_success_log() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment_receipted");
     let temp = TempDir::new("unsafe-review-miri-receipt-e2e")?;
@@ -1490,6 +1642,40 @@ owner = "core/policy"
 reason = "e2e exact suppression"
 evidence = "fixture card"
 expires = "2026-08-01"
+"#
+        ),
+    )?;
+    Ok(())
+}
+
+fn write_receipt_file(
+    root: &Path,
+    name: &str,
+    card_id: &str,
+    tool: &str,
+    strength: &str,
+    recorded_at: &str,
+    expires_at: &str,
+) -> Result<(), Box<dyn Error>> {
+    let receipts = root.join(".unsafe-review").join("receipts");
+    fs::create_dir_all(&receipts)?;
+    fs::write(
+        receipts.join(name),
+        format!(
+            r#"{{
+  "schema_version": "0.1",
+  "card_id": "{card_id}",
+  "tool": "{tool}",
+  "strength": "{strength}",
+  "author": "core/e2e",
+  "recorded_at": "{recorded_at}",
+  "expires_at": "{expires_at}",
+  "summary": "e2e receipt audit status fixture",
+  "command": "saved witness command",
+  "limitations": [
+    "fixture only"
+  ]
+}}
 "#
         ),
     )?;
