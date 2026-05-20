@@ -556,6 +556,120 @@ fn outcome_compares_existing_json_snapshots_without_safety_claim() -> Result<(),
 }
 
 #[test]
+fn outcome_reports_receipt_movement_without_witness_execution_claim() -> Result<(), Box<dyn Error>>
+{
+    let temp = TempDir::new("unsafe-review-outcome-receipt-e2e")?;
+    let before_path = temp.path().join("before.json");
+    let after_path = temp.path().join("after.json");
+    let card_id = "UR-receipt-movement-src-lib-rs-read-header-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+
+    fs::write(
+        &before_path,
+        format!(
+            r#"{{
+  "schema_version": "0.1",
+  "summary": {{
+    "cards": 1,
+    "open_actionable_gaps": 1
+  }},
+  "cards": [
+    {{
+      "id": "{card_id}",
+      "class": "guard_missing",
+      "priority": "high",
+      "witness": "No imported witness receipt was found",
+      "missing": [
+        "Missing visible local guard for alignment",
+        "No witness receipt imported for route `miri`"
+      ]
+    }}
+  ]
+}}
+"#
+        ),
+    )?;
+    fs::write(
+        &after_path,
+        format!(
+            r#"{{
+  "schema_version": "0.1",
+  "summary": {{
+    "cards": 1,
+    "open_actionable_gaps": 1
+  }},
+  "cards": [
+    {{
+      "id": "{card_id}",
+      "class": "guard_missing",
+      "priority": "high",
+      "witness": "Imported miri receipt with `ran` strength: saved fixture witness passed",
+      "missing": [
+        "Missing visible local guard for alignment"
+      ]
+    }}
+  ]
+}}
+"#
+        ),
+    )?;
+
+    let output = run_success([
+        os("outcome"),
+        os("--before"),
+        before_path.as_os_str().to_os_string(),
+        os("--after"),
+        after_path.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let outcome = parse_json(&stdout_text(&output)?)?;
+    assert_eq!(outcome["summary"]["improved"], 1);
+    assert_eq!(outcome["summary"]["regressed"], 0);
+    assert_eq!(outcome["cards"]["improved"][0]["card_id"], card_id);
+    assert!(
+        json_str(
+            &outcome["cards"]["improved"][0]["reason"],
+            "improved reason"
+        )?
+        .contains("witness receipt strength changed from `missing` to `ran`")
+    );
+    assert_eq!(outcome["cards"]["improved"][0]["after"]["witness"], "ran");
+    assert!(
+        outcome["cards"]["improved"][0]["after"]["missing"][0]
+            .as_str()
+            .unwrap_or("")
+            .contains("alignment")
+    );
+    assert!(
+        json_str(&outcome["trust_boundary"], "trust_boundary")?.contains("not witness execution")
+    );
+    assert!(outcome["limitations"].as_array().is_some_and(|items| {
+        items.iter().any(|item| {
+            item.as_str()
+                .unwrap_or("")
+                .contains("does not rerun analysis or execute witness tools")
+        })
+    }));
+
+    let markdown = run_success([
+        os("outcome"),
+        os("--before"),
+        before_path.as_os_str().to_os_string(),
+        os("--after"),
+        after_path.as_os_str().to_os_string(),
+        os("--format"),
+        os("markdown"),
+    ])?;
+    let markdown = stdout_text(&markdown)?;
+    assert!(markdown.contains("witness receipt strength changed from `missing` to `ran`"));
+    assert!(markdown.contains("1 missing / witness `ran`"));
+    assert!(markdown.contains("does not rerun analysis or execute witness tools"));
+    assert!(markdown.contains("not witness execution"));
+
+    Ok(())
+}
+
+#[test]
 fn check_json_imports_witness_receipts_without_hiding_guard_gaps() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment_receipted");
 
