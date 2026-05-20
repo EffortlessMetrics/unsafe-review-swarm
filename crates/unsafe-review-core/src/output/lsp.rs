@@ -302,6 +302,8 @@ fn scope_label(output: &AnalyzeOutput) -> &'static str {
 mod tests {
     use super::*;
     use crate::api::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, analyze};
+    use serde_json::Value;
+    use std::collections::BTreeSet;
     use std::path::PathBuf;
 
     #[test]
@@ -385,6 +387,51 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn lsp_projection_card_sets_match_review_cards() -> Result<(), String> {
+        let output = fixture_output("attributed_unsafe_fn_no_duplicate")?;
+        if output.cards.len() != 2 {
+            return Err(format!(
+                "fixture should emit two cards, got {}",
+                output.cards.len()
+            ));
+        }
+        let expected_card_ids: BTreeSet<String> =
+            output.cards.iter().map(|card| card.id.0.clone()).collect();
+        let value = parse_json(&render(&output))?;
+
+        assert_eq!(
+            card_id_set(json_array(&value, "diagnostics")?, "card_id")?,
+            expected_card_ids
+        );
+        assert_eq!(
+            card_id_set(json_array(&value, "hovers")?, "card_id")?,
+            expected_card_ids
+        );
+        assert_eq!(
+            card_id_membership_set(json_array(&value, "code_actions")?, "card_id")?,
+            expected_card_ids
+        );
+        assert!(json_array(&value, "diagnostics")?.iter().all(|diagnostic| {
+            diagnostic["trust_boundary"]
+                .as_str()
+                .unwrap_or("")
+                .contains("not a proof of memory safety")
+        }));
+        assert!(json_array(&value, "hovers")?.iter().all(|hover| {
+            hover["trust_boundary"]
+                .as_str()
+                .unwrap_or("")
+                .contains("not a proof of memory safety")
+        }));
+        assert!(
+            !serde_json::to_string(json_array(&value, "code_actions")?)
+                .map_err(|err| format!("render code actions failed: {err}"))?
+                .contains("\"edit\"")
+        );
+        Ok(())
+    }
+
     fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures")
@@ -402,5 +449,35 @@ mod tests {
 
     fn parse_json(text: &str) -> Result<serde_json::Value, String> {
         serde_json::from_str(text).map_err(|err| format!("JSON parse failed: {err}"))
+    }
+
+    fn json_array<'a>(value: &'a Value, key: &str) -> Result<&'a Vec<Value>, String> {
+        value[key]
+            .as_array()
+            .ok_or_else(|| format!("`{key}` should be an array"))
+    }
+
+    fn card_id_set(items: &[Value], field: &str) -> Result<BTreeSet<String>, String> {
+        let mut card_ids = BTreeSet::new();
+        for item in items {
+            let Some(card_id) = item[field].as_str() else {
+                return Err(format!("projection item missing `{field}`"));
+            };
+            if !card_ids.insert(card_id.to_string()) {
+                return Err(format!("projection item duplicates card id `{card_id}`"));
+            }
+        }
+        Ok(card_ids)
+    }
+
+    fn card_id_membership_set(items: &[Value], field: &str) -> Result<BTreeSet<String>, String> {
+        let mut card_ids = BTreeSet::new();
+        for item in items {
+            let Some(card_id) = item[field].as_str() else {
+                return Err(format!("projection item missing `{field}`"));
+            };
+            card_ids.insert(card_id.to_string());
+        }
+        Ok(card_ids)
     }
 }
