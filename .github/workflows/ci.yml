@@ -155,8 +155,8 @@ jobs:
     timeout-minutes: 45
     env:
       UNSAFE_REVIEW_SELF_HOSTED: "1"
-      CARGO_HOME: /mnt/ci-cache/cargo-home
-      SCCACHE_DIR: /mnt/ci-cache/sccache
+      CARGO_HOME: /mnt/ci-cache/cargo-home/unsafe-review
+      SCCACHE_DIR: /mnt/ci-cache/sccache/unsafe-review
       SCCACHE_CACHE_SIZE: 60G
       CARGO_BUILD_JOBS: "12"
       TMPDIR: /mnt/ci-scratch/tmp/${{ github.run_id }}-${{ github.run_attempt }}-cx43
@@ -205,8 +205,8 @@ jobs:
     timeout-minutes: 45
     env:
       UNSAFE_REVIEW_SELF_HOSTED: "1"
-      CARGO_HOME: /mnt/ci-cache/cargo-home
-      SCCACHE_DIR: /mnt/ci-cache/sccache
+      CARGO_HOME: /mnt/ci-cache/cargo-home/unsafe-review
+      SCCACHE_DIR: /mnt/ci-cache/sccache/unsafe-review
       SCCACHE_CACHE_SIZE: 60G
       CARGO_BUILD_JOBS: "12"
       TMPDIR: /mnt/ci-scratch/tmp/${{ github.run_id }}-${{ github.run_attempt }}-cx53

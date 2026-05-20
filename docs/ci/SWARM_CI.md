@@ -65,6 +65,16 @@ runs-on:
 
 GitHub-hosted fallback remains available when no matching runner is idle.
 
+Self-hosted Rust jobs use repo-specific cache subdirectories:
+
+```text
+CARGO_HOME=/mnt/ci-cache/cargo-home/unsafe-review
+SCCACHE_DIR=/mnt/ci-cache/sccache/unsafe-review
+```
+
+This avoids mutating or depending on stale root-owned entries in broader shared
+cache directories while still keeping the cache on the VPS cache volume.
+
 ## Gate
 
 Every non-docs route runs:
