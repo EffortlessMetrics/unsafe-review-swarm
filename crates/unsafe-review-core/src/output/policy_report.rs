@@ -61,6 +61,7 @@ pub struct PolicyLedgerEntry {
     pub card_id: String,
     pub owner: Option<String>,
     pub reason: Option<String>,
+    pub evidence: Option<String>,
     pub review_after: Option<String>,
     pub expires: Option<String>,
 }
@@ -241,16 +242,17 @@ fn render_ledger_section(out: &mut String, title: &str, entries: &[PolicyLedgerE
         out.push_str("None.\n\n");
         return;
     }
-    out.push_str("| Card | Owner | Review after | Expires | Reason |\n");
-    out.push_str("|---|---|---|---|---|\n");
+    out.push_str("| Card | Owner | Review after | Expires | Reason | Evidence |\n");
+    out.push_str("|---|---|---|---|---|---|\n");
     for entry in entries {
         out.push_str(&format!(
-            "| `{}` | {} | {} | {} | {} |\n",
+            "| `{}` | {} | {} | {} | {} | {} |\n",
             markdown_cell(&entry.card_id),
             optional_text(entry.owner.as_deref()),
             optional_text(entry.review_after.as_deref()),
             optional_text(entry.expires.as_deref()),
-            optional_text(entry.reason.as_deref())
+            optional_text(entry.reason.as_deref()),
+            optional_text(entry.evidence.as_deref())
         ));
     }
     out.push('\n');
@@ -295,6 +297,7 @@ fn ledger_entries(path: &Path, kind: LedgerKind) -> Result<Vec<PolicyLedgerEntry
             card_id: card_id.to_string(),
             owner: optional_string(entry, "owner"),
             reason: optional_string(entry, "reason"),
+            evidence: optional_string(entry, "evidence"),
             review_after: optional_string(entry, "review_after"),
             expires: match kind {
                 LedgerKind::Baseline => None,
@@ -480,7 +483,17 @@ expires = "2026-01-01"
         assert_eq!(report.summary.baseline_known, 1);
         assert_eq!(report.summary.resolved_baseline, 1);
         assert_eq!(report.summary.expired_suppressions, 1);
-        assert!(render_markdown(&report).contains("## Expired suppression entries"));
+        assert_eq!(
+            report.resolved_baseline[0].evidence.as_deref(),
+            Some("fixture")
+        );
+        assert_eq!(
+            report.expired_suppressions[0].evidence.as_deref(),
+            Some("fixture")
+        );
+        let markdown = render_markdown(&report);
+        assert!(markdown.contains("## Expired suppression entries"));
+        assert!(markdown.contains("fixture"));
         Ok(())
     }
 
@@ -520,6 +533,7 @@ expires = "2026-01-01"
                 card_id: "UR-resolved|card-c1".to_string(),
                 owner: Some("team|unsafe".to_string()),
                 reason: Some("resolved|by guard".to_string()),
+                evidence: Some("review|receipt".to_string()),
                 review_after: Some("2026-08-01|manual".to_string()),
                 expires: None,
             }],
@@ -527,6 +541,7 @@ expires = "2026-01-01"
                 card_id: "UR-expired|card-c1".to_string(),
                 owner: Some("team|unsafe".to_string()),
                 reason: Some("old|false positive".to_string()),
+                evidence: Some("audit|note".to_string()),
                 review_after: None,
                 expires: Some("2026-05-01|expired".to_string()),
             }],
@@ -545,6 +560,8 @@ expires = "2026-01-01"
         assert!(markdown.contains("`UR-resolved\\|card-c1`"));
         assert!(markdown.contains("team\\|unsafe"));
         assert!(markdown.contains("resolved\\|by guard"));
+        assert!(markdown.contains("review\\|receipt"));
+        assert!(markdown.contains("audit\\|note"));
         assert!(markdown.contains("2026-05-01\\|expired"));
         assert!(!markdown.contains("`UR-pipe|card-c1`"));
     }

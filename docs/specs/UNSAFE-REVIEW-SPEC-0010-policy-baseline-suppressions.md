@@ -45,9 +45,10 @@ advisory mode and reports new gaps, baseline-known cards, suppressed cards,
 resolved baseline entries, and expired suppression entries from exact card
 identity matching. Current-card entries project ReviewCard identity, location,
 operation family, hazards, missing evidence, and witness routes so policy rows
-remain reviewable without creating a separate finding truth. It may render JSON
-or Markdown. It must not change exit-code policy, create broad suppression
-authority, execute witnesses, or claim safety.
+remain reviewable without creating a separate finding truth. Resolved and
+expired ledger rows must preserve owner, reason, evidence, and review/expiry
+dates when present. It may render JSON or Markdown. It must not change exit-code
+policy, create broad suppression authority, execute witnesses, or claim safety.
 
 Blocking mode remains later policy work. Matching is exact and counted; broad
 path, owner, or operation-family suppression is not supported.

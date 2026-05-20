@@ -2279,7 +2279,27 @@ expires = "2026-01-01"
     assert_eq!(report["summary"]["resolved_baseline"], 1);
     assert_eq!(report["summary"]["expired_suppressions"], 1);
     assert_eq!(report["resolved_baseline"][0]["card_id"], resolved_id);
+    assert_eq!(report["resolved_baseline"][0]["owner"], "core/policy");
+    assert_eq!(
+        report["resolved_baseline"][0]["reason"],
+        "resolved fixture debt"
+    );
+    assert_eq!(
+        report["resolved_baseline"][0]["evidence"],
+        "e2e policy report"
+    );
+    assert_eq!(report["resolved_baseline"][0]["review_after"], "2026-08-01");
     assert_eq!(report["expired_suppressions"][0]["card_id"], expired_id);
+    assert_eq!(report["expired_suppressions"][0]["owner"], "core/policy");
+    assert_eq!(
+        report["expired_suppressions"][0]["reason"],
+        "expired false-positive review"
+    );
+    assert_eq!(
+        report["expired_suppressions"][0]["evidence"],
+        "e2e policy report"
+    );
+    assert_eq!(report["expired_suppressions"][0]["expires"], "2026-01-01");
     assert!(
         json_str(&report["trust_boundary"], "trust_boundary")?
             .contains("does not enforce blocking policy")
@@ -2298,8 +2318,12 @@ expires = "2026-01-01"
     let markdown = stdout_text(&markdown)?;
     assert!(markdown.contains("## Resolved baseline entries"));
     assert!(markdown.contains("## Expired suppression entries"));
+    assert!(markdown.contains("| Card | Owner | Review after | Expires | Reason | Evidence |"));
     assert!(markdown.contains(resolved_id));
     assert!(markdown.contains(expired_id));
+    assert!(markdown.contains("resolved fixture debt"));
+    assert!(markdown.contains("expired false-positive review"));
+    assert!(markdown.contains("e2e policy report"));
     assert!(markdown.contains("## Trust boundary"));
 
     Ok(())

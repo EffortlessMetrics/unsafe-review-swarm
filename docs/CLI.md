@@ -56,8 +56,9 @@ unsafe-review policy report \
 
 The policy report compares current `ReviewCard`s with exact baseline and
 suppression ledgers. It counts new gaps, baseline-known cards, suppressed cards,
-resolved baseline entries, and expired suppressions. It does not block, execute
-witnesses, or create broad suppression authority.
+resolved baseline entries, and expired suppressions. Ledger rows include owner,
+reason, evidence, and review/expiry dates when present. It does not block,
+execute witnesses, or create broad suppression authority.
 
 Current-card rows in JSON and Markdown include the ReviewCard identity,
 location, operation family, hazards, missing evidence, and witness routes. They
