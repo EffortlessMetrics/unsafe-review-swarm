@@ -1834,7 +1834,9 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     #[test]
     fn copy_range_evidence_rejects_stale_slice_length_guards() -> Result<(), String> {
         for fixture in [
+            "copy_nonoverlapping_slice_range_reassigned_count_not_guard",
             "copy_nonoverlapping_slice_range_reassigned_src_not_guard",
+            "ptr_copy_slice_range_reassigned_count_not_guard",
             "ptr_copy_slice_range_reassigned_dst_not_guard",
         ] {
             let output = fixture_output(fixture)?;
