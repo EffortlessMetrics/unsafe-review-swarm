@@ -42,15 +42,58 @@ the actionable-gap count.
 
 `policy report` is an advisory-only policy projection. It runs analysis in
 advisory mode and reports new gaps, baseline-known cards, suppressed cards,
-resolved baseline entries, and expired suppression entries from exact card
-identity matching. Current-card entries project ReviewCard identity, location,
-operation family, hazards, missing evidence, and witness routes so policy rows
-remain reviewable without creating a separate finding truth. Current
-`baseline_known` and `suppressed` rows must also include matched ledger
-provenance when present. Resolved and expired ledger rows must preserve owner,
-reason, evidence, and review/expiry dates when present. It may render JSON or
-Markdown. It must not change exit-code policy, create broad suppression
+resolved/unmatched baseline entries, and expired suppression entries from exact
+card identity matching. Current-card entries project ReviewCard identity,
+location, operation expression, operation family, hazards, missing evidence,
+witness routes, next action, policy status, and policy reason so policy rows
+remain reviewable without creating a separate finding truth or reclassifying the
+card. Current `baseline_known` and `suppressed` rows must also include matched
+ledger provenance when present. Resolved and expired ledger rows must preserve
+owner, reason, evidence, and review/expiry dates when present. It may render
+JSON or Markdown. It must not change exit-code policy, create broad suppression
 authority, execute witnesses, or claim safety.
+
+The JSON report is schema-versioned and additive. A successful report includes:
+
+- `schema_version`
+- `tool = "unsafe-review"`
+- `mode = "policy-report"`
+- `policy = "advisory"`
+- `audit_date`
+- `trust_boundary`
+- `limitations`
+- `classification_explanations`
+- `summary.cards`
+- `summary.new_gaps`
+- `summary.baseline_known`
+- `summary.suppressed`
+- `summary.resolved_baseline`
+- `summary.unmatched_baseline`
+- `summary.expired_suppressions`
+- `summary.invalid_ledger_entries`
+- `cards[].card_id`
+- `cards[].class`
+- `cards[].ledger`
+- `cards[].site`
+- `cards[].operation`
+- `cards[].operation_family`
+- `cards[].hazards`
+- `cards[].missing`
+- `cards[].witness_routes`
+- `cards[].policy_status`
+- `cards[].policy_reason`
+- `cards[].missing_count`
+- `cards[].next_action`
+- `resolved_baseline`
+- `unmatched_baseline`
+- `expired_suppressions`
+- `invalid_ledger_entries`
+
+`resolved_baseline` remains the historical field name for baseline ledger
+entries that no longer appear in the current ReviewCard set. `unmatched_baseline`
+is the explicit schema alias for the same entries. Malformed ledgers fail closed;
+successful reports include an empty `invalid_ledger_entries` array until a later
+recovery mode exists.
 
 Blocking mode remains later policy work. Matching is exact and counted; broad
 path, owner, or operation-family suppression is not supported.
@@ -90,6 +133,9 @@ path, owner, or operation-family suppression is not supported.
   gaps, and does not fail the command for those gaps.
 - `policy report` reports exact resolved baseline entries and expired
   suppressions without altering card classification.
+- `policy report` explains each current-card policy status and pins JSON fields
+  for classification explanations, limitations, unmatched baseline entries, and
+  invalid ledger entries.
 
 ## CI proof
 

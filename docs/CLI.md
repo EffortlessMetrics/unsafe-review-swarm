@@ -71,14 +71,16 @@ unsafe-review policy report \
 
 The policy report compares current `ReviewCard`s with exact baseline and
 suppression ledgers. It counts new gaps, baseline-known cards, suppressed cards,
-resolved baseline entries, and expired suppressions. Ledger rows include owner,
-reason, evidence, and review/expiry dates when present. It does not block,
-execute witnesses, or create broad suppression authority.
-
-Current-card rows in JSON and Markdown include the ReviewCard identity,
-location, operation family, hazards, missing evidence, witness routes, and
-matched baseline/suppression ledger provenance when present. They are policy
-posture context, not a second analyzer result.
+resolved/unmatched baseline entries, and expired suppressions. Ledger rows
+include owner, reason, evidence, and review/expiry dates when present. Current
+card rows in JSON and Markdown include the ReviewCard identity, location,
+operation expression, operation family, hazards, missing evidence, witness
+routes, policy reason, next action, and matched baseline/suppression ledger
+provenance when present. JSON reports also include schema-versioned
+classification explanations, limitations, unmatched baseline entries, and
+invalid-ledger-entry fields. They are policy posture context, not a second
+analyzer result, and the report does not block, execute witnesses, or create
+broad suppression authority.
 
 ## First PR Bundle
 
