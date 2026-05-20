@@ -139,6 +139,18 @@ That verifier checks parseability, advisory policy, plan-only comment mode,
 projected card identity consistency, result counts, and trust-boundary text. It
 does not prove the analyzer found every unsafe issue.
 
+For the full `first-pr` bundle, including `witness-plan.md` and saved `lsp.json`
+when present, use:
+
+```bash
+cargo xtask check-first-pr-artifacts target/unsafe-review
+```
+
+That verifier keeps the bundle advisory: it checks route limitations,
+comment-plan caps and renderable inline fields, card identity consistency, and
+absence of positive safety/proof wording. It does not run witnesses, post
+comments, edit source, or make a policy decision.
+
 ## Explain And Context
 
 Use `explain` for a human-readable explanation of one card:
