@@ -1,0 +1,29 @@
+schema_version = "1.0"
+
+id = "unsafe-review-source-of-truth-stack"
+title = "Unsafe Review source-of-truth stack rollout"
+status = "active"
+owner = "codex"
+created = "2026-05-20"
+
+objective = """
+Establish linked proposal/spec/ADR/plan/goal/support-tier/policy artifacts with
+machine-checkable references and clear proof boundaries.
+"""
+
+end_state = [
+  "Document artifacts are tracked in policy/doc-artifacts.toml.",
+  "Active Codex goal state is present and linked.",
+  "Support tiers map claims to proof commands.",
+  "Plan and spec layers are linked through stable IDs.",
+]
+
+[[work_item]]
+id = "docs/source-of-truth-scaffold"
+status = "active"
+proposal = "UNSAFE-REVIEW-PROP-0002"
+spec = "UNSAFE-REVIEW-SPEC-0018"
+plan = "plans/0.2.0/implementation-plan.md"
+commands = [
+  "git diff --check",
+]
