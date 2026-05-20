@@ -136,6 +136,10 @@ const FUZZ_REQUIRED_FILES: &[&str] = &[
     "fuzz/corpus/analyze/basic",
     "fuzz/fuzz_targets/analyze.rs",
 ];
+const PUBLIC_BADGE_ENDPOINTS: &[&str] = &[
+    "badges/unsafe-review.json",
+    "badges/unsafe-review-plus.json",
+];
 
 fn main() {
     if let Err(err) = run(std::env::args().collect()) {
@@ -3281,7 +3285,7 @@ fn has_windows_path(line: &str) -> bool {
 
 fn is_forbidden_generated_path(path: &str) -> bool {
     path.starts_with("target/")
-        || path.starts_with("badges/")
+        || (path.starts_with("badges/") && !PUBLIC_BADGE_ENDPOINTS.contains(&path))
         || path.ends_with(".sarif")
         || path.ends_with(".profraw")
         || path.ends_with(".profdata")
@@ -4377,7 +4381,12 @@ impl WitnessKind {
     #[test]
     fn generated_artifact_detector_is_narrow() {
         assert!(is_forbidden_generated_path("target/debug/tool.exe"));
+        assert!(is_forbidden_generated_path("badges/scratch.json"));
         assert!(is_forbidden_generated_path("reports/cards.sarif"));
+        assert!(!is_forbidden_generated_path("badges/unsafe-review.json"));
+        assert!(!is_forbidden_generated_path(
+            "badges/unsafe-review-plus.json"
+        ));
         assert!(!is_forbidden_generated_path("Cargo.lock"));
         assert!(!is_forbidden_generated_path("docs/status/SUPPORT_TIERS.md"));
     }
