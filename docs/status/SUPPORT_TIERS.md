@@ -117,6 +117,8 @@ evidence, while
 `ptr_copy_slice_range_closed_branch_not_guard`,
 `copy_nonoverlapping_slice_range_or_branch_not_guard`,
 `ptr_copy_slice_range_or_branch_not_guard`,
+`copy_nonoverlapping_slice_range_commented_assert_not_guard`,
+`ptr_copy_slice_range_commented_assert_not_guard`,
 `copy_nonoverlapping_slice_range_disjunctive_early_return_line_comment_not_guard`,
 `ptr_copy_slice_range_disjunctive_early_return_line_comment_not_guard`,
 `copy_nonoverlapping_slice_range_disjunctive_early_return_block_comment_not_guard`,

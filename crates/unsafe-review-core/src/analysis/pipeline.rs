@@ -1859,6 +1859,23 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn copy_range_evidence_rejects_commented_assertions() -> Result<(), String> {
+        for fixture in [
+            "copy_nonoverlapping_slice_range_commented_assert_not_guard",
+            "ptr_copy_slice_range_commented_assert_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert!(
+                !obligation_discharge_present(card, "valid-range"),
+                "{fixture} should not accept commented assertions as copy range evidence"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn copy_range_evidence_rejects_non_code_early_returns() -> Result<(), String> {
         for fixture in [
             "copy_nonoverlapping_slice_range_disjunctive_early_return_line_comment_not_guard",

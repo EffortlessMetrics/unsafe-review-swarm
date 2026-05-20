@@ -527,6 +527,7 @@ fn copy_destination_slice_receiver(argument: &str) -> Option<String> {
 }
 
 fn has_slice_count_bound_guard(before_call: &str, receiver: &str, count: &str) -> bool {
+    let before_call = strip_comments_and_literals(before_call);
     let receiver = compact_code(receiver);
     let count = compact_code(count);
     if receiver.is_empty() || count.is_empty() {
@@ -537,10 +538,10 @@ fn has_slice_count_bound_guard(before_call: &str, receiver: &str, count: &str) -
     let len_gte_count = format!("{len}>={count}");
     let count_gt_len = format!("{count}>{len}");
     let len_lt_count = format!("{len}<{count}");
-    has_slice_count_bound_predicate(before_call, &count_lte_len, &receiver, &count)
-        || has_slice_count_bound_predicate(before_call, &len_gte_count, &receiver, &count)
-        || has_slice_count_early_return(before_call, &count_gt_len, &receiver, &count)
-        || has_slice_count_early_return(before_call, &len_lt_count, &receiver, &count)
+    has_slice_count_bound_predicate(&before_call, &count_lte_len, &receiver, &count)
+        || has_slice_count_bound_predicate(&before_call, &len_gte_count, &receiver, &count)
+        || has_slice_count_early_return(&before_call, &count_gt_len, &receiver, &count)
+        || has_slice_count_early_return(&before_call, &len_lt_count, &receiver, &count)
 }
 
 fn has_slice_count_bound_predicate(
