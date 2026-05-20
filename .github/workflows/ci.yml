@@ -168,6 +168,11 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Prepare self-hosted cache and scratch directories
+        run: |
+          set -euo pipefail
+          mkdir -p "${CARGO_HOME}" "${SCCACHE_DIR}" "${TMPDIR}" "${CARGO_TARGET_DIR}"
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.95.0
         with:
@@ -212,6 +217,11 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+
+      - name: Prepare self-hosted cache and scratch directories
+        run: |
+          set -euo pipefail
+          mkdir -p "${CARGO_HOME}" "${SCCACHE_DIR}" "${TMPDIR}" "${CARGO_TARGET_DIR}"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.95.0
