@@ -670,6 +670,117 @@ fn outcome_reports_receipt_movement_without_witness_execution_claim() -> Result<
 }
 
 #[test]
+fn outcome_reports_receipt_regression_without_policy_claim() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-outcome-receipt-regression-e2e")?;
+    let before_path = temp.path().join("before.json");
+    let after_path = temp.path().join("after.json");
+    let card_id = "UR-receipt-regression-src-lib-rs-read-header-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+
+    fs::write(
+        &before_path,
+        format!(
+            r#"{{
+  "schema_version": "0.1",
+  "summary": {{
+    "cards": 1,
+    "open_actionable_gaps": 0
+  }},
+  "cards": [
+    {{
+      "id": "{card_id}",
+      "class": "guarded_and_witnessed",
+      "priority": "low",
+      "witness": "Imported miri receipt with `site_reached` strength: saved fixture witness reached the targeted seam",
+      "missing": []
+    }}
+  ]
+}}
+"#
+        ),
+    )?;
+    fs::write(
+        &after_path,
+        format!(
+            r#"{{
+  "schema_version": "0.1",
+  "summary": {{
+    "cards": 1,
+    "open_actionable_gaps": 0
+  }},
+  "cards": [
+    {{
+      "id": "{card_id}",
+      "class": "guarded_and_witnessed",
+      "priority": "low",
+      "witness": "Imported miri receipt with `configured` strength: receipt metadata was configured but no saved run is attached",
+      "missing": []
+    }}
+  ]
+}}
+"#
+        ),
+    )?;
+
+    let output = run_success([
+        os("outcome"),
+        os("--before"),
+        before_path.as_os_str().to_os_string(),
+        os("--after"),
+        after_path.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let outcome = parse_json(&stdout_text(&output)?)?;
+    assert_eq!(outcome["summary"]["improved"], 0);
+    assert_eq!(outcome["summary"]["regressed"], 1);
+    assert_eq!(outcome["cards"]["regressed"][0]["card_id"], card_id);
+    assert!(
+        json_str(
+            &outcome["cards"]["regressed"][0]["reason"],
+            "regressed reason"
+        )?
+        .contains("witness receipt strength changed from `site_reached` to `configured`")
+    );
+    assert_eq!(
+        outcome["cards"]["regressed"][0]["before"]["witness"],
+        "site_reached"
+    );
+    assert_eq!(
+        outcome["cards"]["regressed"][0]["after"]["witness"],
+        "configured"
+    );
+    assert!(
+        json_str(&outcome["trust_boundary"], "trust_boundary")?.contains("not witness execution")
+    );
+    assert!(outcome["limitations"].as_array().is_some_and(|items| {
+        items.iter().any(|item| {
+            item.as_str()
+                .unwrap_or("")
+                .contains("does not make policy or blocking decisions")
+        })
+    }));
+
+    let markdown = run_success([
+        os("outcome"),
+        os("--before"),
+        before_path.as_os_str().to_os_string(),
+        os("--after"),
+        after_path.as_os_str().to_os_string(),
+        os("--format"),
+        os("markdown"),
+    ])?;
+    let markdown = stdout_text(&markdown)?;
+    assert!(
+        markdown.contains("witness receipt strength changed from `site_reached` to `configured`")
+    );
+    assert!(markdown.contains("0 missing / witness `configured`"));
+    assert!(markdown.contains("does not make policy or blocking decisions"));
+    assert!(markdown.contains("not witness execution"));
+
+    Ok(())
+}
+
+#[test]
 fn check_json_imports_witness_receipts_without_hiding_guard_gaps() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment_receipted");
 
