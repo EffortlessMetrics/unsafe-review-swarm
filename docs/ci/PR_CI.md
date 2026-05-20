@@ -72,7 +72,8 @@ This checks that `cards.json`, `pr-summary.md`, `cards.sarif`, and
 advisory, the comment plan remains plan-only, projected card IDs match
 `cards.json`, result counts stay consistent, `cards.json` cards keep required
 ReviewCard fields, SARIF results keep their ReviewCard metadata and locations,
-and the trust boundary is present.
+the PR summary keeps its top-card, card-table, and witness-plan sections, and
+the trust boundary is present.
 
 Witness tools are routed, not run everywhere. Miri, sanitizers, Loom, and Kani
 belong in targeted PR, nightly, or release lanes unless repo policy says

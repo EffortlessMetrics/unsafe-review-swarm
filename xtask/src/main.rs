@@ -1233,6 +1233,7 @@ fn check_advisory_artifacts(dir: &Path) -> Result<(), String> {
     )?;
     require_text_contains(&pr_summary, "not UB-free status", &pr_summary_path)?;
     require_text_contains(&pr_summary, "not a Miri result", &pr_summary_path)?;
+    require_pr_summary_shape(&pr_summary, card_count, &card_ids, &pr_summary_path)?;
 
     let sarif = parse_json_file(&dir.join("cards.sarif"))?;
     require_json_str(&sarif, "version", "2.1.0", "cards.sarif")?;
@@ -2338,6 +2339,40 @@ fn require_cards_output_shape(cards: &serde_json::Value) -> Result<(), String> {
     }
     for card in json_array_at(cards, "/cards", "cards.json")? {
         require_card_json_shape(card)?;
+    }
+    Ok(())
+}
+
+fn require_pr_summary_shape(
+    text: &str,
+    card_count: usize,
+    card_ids: &BTreeSet<String>,
+    path: &Path,
+) -> Result<(), String> {
+    for needle in [
+        "# unsafe-review PR summary",
+        "- Scope:",
+        "- Open actionable gaps:",
+        "- Policy mode: `advisory`",
+        "## Top card",
+        "## Card table",
+        "| ID | Class | Location | Operation | Missing evidence | Route | Next action |",
+        "## Witness plan",
+        "## Trust boundary",
+    ] {
+        require_text_contains(text, needle, path)?;
+    }
+    if card_count == 0 {
+        require_text_contains(text, "No actionable unsafe-review cards found.", path)?;
+        require_text_contains(text, "No witness route is recommended", path)?;
+    } else {
+        let Some(first_id) = card_ids.iter().next() else {
+            return Err(format!(
+                "{} has review cards but no card IDs were found",
+                path.display()
+            ));
+        };
+        require_text_contains(text, first_id, path)?;
     }
     Ok(())
 }
@@ -4196,6 +4231,24 @@ impl WitnessKind {
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_malformed_pr_summary() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-malformed-pr-summary")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        fs::write(
+            dir.join("pr-summary.md"),
+            "# unsafe-review PR summary\n\n- Scope: `diff`\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Top card\n\n- ID: `card-1`\n\n## Card table\n\n| ID | Class | Location | Operation | Missing evidence | Route | Next action |\n|---|---|---|---|---|---|---|\n| `card-1` | `guard_missing` | src/lib.rs:1 | `ptr.read()` | alignment guard missing | `miri` | Add missing guard evidence |\n\n## Trust boundary\n\nThis artifact is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
+        )
+        .map_err(|err| format!("write pr summary failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(result.err().unwrap_or_default().contains("Witness plan"));
+        Ok(())
+    }
+
+    #[test]
     fn advisory_artifact_checker_rejects_cards_json_without_trust_boundary() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-artifacts-missing-cards-boundary")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -4470,7 +4523,7 @@ review_after = "2026-08-01"
         write_cards_artifact(dir, valid_card_json())?;
         fs::write(
             dir.join("pr-summary.md"),
-            "- Review cards: 1\n\nThis artifact is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
+            "# unsafe-review PR summary\n\n- Scope: `diff`\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Top card\n\n- ID: `card-1`\n- Class: `guard_missing`\n- Location: src/lib.rs:1\n- Operation: `ptr.read()`\n- Missing evidence: alignment guard missing\n- Primary route: `miri` because pointer validity\n- Next action: Add missing guard evidence\n\n## Card table\n\n| ID | Class | Location | Operation | Missing evidence | Route | Next action |\n|---|---|---|---|---|---|---|\n| `card-1` | `guard_missing` | src/lib.rs:1 | `ptr.read()` | alignment guard missing | `miri` | Add missing guard evidence |\n\n## Witness plan\n\n- `card-1`: `miri` because pointer validity\n\n## Trust boundary\n\nThis artifact projects existing unsafe-review cards for PR review. It is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
         )
         .map_err(|err| format!("write pr summary failed: {err}"))?;
         write_sarif_artifact(dir, valid_sarif_result())?;
