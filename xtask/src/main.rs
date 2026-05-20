@@ -127,6 +127,7 @@ const DOGFOOD_INDEX: &str = "docs/dogfood/index.json";
 const DOGFOOD_TARGET_KINDS: &[&str] = &["repo-snapshot", "pr-diff"];
 const DOGFOOD_TARGET_STATUSES: &[&str] = &["active", "parked", "retired"];
 const DOGFOOD_ARTIFACT_STATUSES: &[&str] = &["checked_in", "local_untracked", "remote_manual"];
+const MAX_COMMENT_PLAN_COMMENTS: usize = 3;
 const FUZZ_REQUIRED_FILES: &[&str] = &[
     "docs/FUZZING.md",
     "fuzz/.gitignore",
@@ -1265,7 +1266,14 @@ fn check_advisory_artifacts(dir: &Path) -> Result<(), String> {
     require_json_str(&comment_plan, "mode", "plan_only", "comment-plan.json")?;
     require_json_str(&comment_plan, "policy", "advisory", "comment-plan.json")?;
     require_json_array(&comment_plan, "comments", "comment-plan.json")?;
-    for comment in json_array_at(&comment_plan, "/comments", "comment-plan.json")? {
+    let comments = json_array_at(&comment_plan, "/comments", "comment-plan.json")?;
+    if comments.len() > MAX_COMMENT_PLAN_COMMENTS {
+        return Err(format!(
+            "comment-plan.json has {} planned comment(s), but advisory artifacts allow at most {MAX_COMMENT_PLAN_COMMENTS}",
+            comments.len()
+        ));
+    }
+    for comment in comments {
         let Some(card_id) = comment.get("card_id").and_then(serde_json::Value::as_str) else {
             return Err("comment-plan.json comment is missing card_id".to_string());
         };
@@ -3952,6 +3960,24 @@ impl WitnessKind {
 
         fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert!(result.err().unwrap_or_default().contains("unknown card id"));
+        Ok(())
+    }
+
+    #[test]
+    fn advisory_artifact_checker_rejects_comment_plan_over_candidate_cap() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-comment-plan-cap")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        fs::write(
+            dir.join("comment-plan.json"),
+            r#"{"mode":"plan_only","policy":"advisory","comments":[{"card_id":"card-1"},{"card_id":"card-1"},{"card_id":"card-1"},{"card_id":"card-1"}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
+        )
+        .map_err(|err| format!("write comment plan failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(result.err().unwrap_or_default().contains("allow at most 3"));
         Ok(())
     }
 
