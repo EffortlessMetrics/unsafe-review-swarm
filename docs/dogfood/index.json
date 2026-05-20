@@ -5,13 +5,13 @@
   "manifest": "docs/dogfood/corpus.toml",
   "trust_boundary": "Dogfood corpus records are static unsafe contract review evidence, not a proof of memory safety, not UB-free status, and not a Miri result unless an exact witness receipt is attached.",
   "summary": {
-    "repositories": 7,
-    "targets": 30,
-    "repo_snapshots": 7,
+    "repositories": 8,
+    "targets": 31,
+    "repo_snapshots": 8,
     "pr_diffs": 23,
     "checked_in_scan_outputs": 0,
     "artifact_statuses": {
-      "local_untracked": 30
+      "local_untracked": 31
     }
   },
   "repositories": [
@@ -56,6 +56,12 @@
       "snapshot_targets": ["mio-capped"],
       "pr_diff_targets": ["mio-pr1388"],
       "primary_exercise": "Unsafe function call contracts, Vec::set_len, zeroed values, pointer operations, socket address layout conversions, and unsafe Send/Sync route cards"
+    },
+    {
+      "repository": "smol-rs/async-task",
+      "snapshot_targets": ["async-task-capped"],
+      "pr_diff_targets": [],
+      "primary_exercise": "RawWaker, Pin::new_unchecked, NonNull, drop/deallocation, raw pointer task state, and unsafe Send/Sync cards"
     }
   ],
   "recorded_outcomes": [

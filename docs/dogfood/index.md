@@ -24,9 +24,9 @@ local artifact is needed.
 
 | Measure | Count |
 |---|---:|
-| Repositories | 7 |
-| Total targets | 30 |
-| Capped repo snapshots | 7 |
+| Repositories | 8 |
+| Total targets | 31 |
+| Capped repo snapshots | 8 |
 | PR diff targets | 23 |
 | Checked-in scan outputs | 0 |
 
@@ -41,6 +41,7 @@ local artifact is needed.
 | `tokio-rs/bytes` | 1 | 1 | `Vec::from_raw_parts`, slice construction, ownership-transfer review cards |
 | `crossbeam-rs/crossbeam` | 1 | 2 | Unsafe Send/Sync, atomics, raw pointer, ownership-transfer, strict-provenance Miri cfg cards, and atomic pointer state transitions |
 | `tokio-rs/mio` | 1 | 1 | Unsafe function call contracts, `Vec::set_len`, zeroed values, pointer operations, socket address layout conversions, and unsafe Send/Sync route cards |
+| `smol-rs/async-task` | 1 | 0 | `RawWaker`, `Pin::new_unchecked`, `NonNull`, drop/deallocation, raw pointer task state, and unsafe Send/Sync cards |
 
 ## Recorded Outcome Movement
 
@@ -59,6 +60,7 @@ local artifact is needed.
 - `bytes-capped`
 - `crossbeam-capped`
 - `mio-capped`
+- `async-task-capped`
 
 ### PR Diffs
 
