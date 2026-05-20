@@ -239,6 +239,7 @@ mod tests {
         "public_unsafe_trait_missing_safety",
         "public_unsafe_fn_safety_comment_not_docs",
         "documented_private_unsafe_fn",
+        "unsafe_fn_pointer_field_owner",
         "local_safety_colon_comment",
         "private_unsafe_helper_safety_comment",
         "split_public_unsafe_fn_missing_safety",

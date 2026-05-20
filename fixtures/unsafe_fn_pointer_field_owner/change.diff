@@ -1,0 +1,8 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,4 @@
++pub(crate) struct TaskVTable {
++    /// Schedules a raw task pointer.
++    pub(crate) schedule: unsafe fn(*const ()),
++}

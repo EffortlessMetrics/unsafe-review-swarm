@@ -1183,6 +1183,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "public_unsafe_fn_missing_safety",
             "public_unsafe_trait_missing_safety",
             "public_unsafe_fn_safety_comment_not_docs",
+            "unsafe_fn_pointer_field_owner",
         ] {
             let output = fixture_output(fixture)?;
             let card = single_card(fixture, &output)?;
@@ -1204,6 +1205,18 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
                 "{fixture} should preserve the public API owner in the card"
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn unsafe_fn_pointer_field_preserves_owner_identity() -> Result<(), String> {
+        let output = fixture_output("unsafe_fn_pointer_field_owner")?;
+        let card = single_card("unsafe_fn_pointer_field_owner", &output)?;
+
+        assert_eq!(card.site.kind, UnsafeSiteKind::UnsafeFn);
+        assert_eq!(card.site.owner.as_deref(), Some("schedule"));
+        assert_eq!(card.operation.family, OperationFamily::Unknown);
+        assert_eq!(card.class, ReviewClass::ContractMissing);
         Ok(())
     }
 

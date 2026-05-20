@@ -43,6 +43,7 @@ required_core_fixtures = [
   "public_unsafe_fn_with_safety_docs",
   "public_unsafe_fn_safety_colon_docs",
   "documented_private_unsafe_fn",
+  "unsafe_fn_pointer_field_owner",
   "private_unsafe_helper_safety_comment",
   "local_safety_colon_comment",
   "maybeuninit_assume_init",
@@ -635,6 +636,16 @@ claim = "private unsafe function with a # Safety contract does not report a miss
 support_tier = "Contract evidence mining"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+
+[[cases]]
+fixture = "unsafe_fn_pointer_field_owner"
+kind = "positive"
+claim = "unsafe function pointer fields preserve the field name as ReviewCard owner identity"
+support_tier = "Contract evidence mining"
+expected_cards = 1
+expected_class = "contract_missing"
 expected_operation_family = "unknown"
 expected_hazard = "unknown"
 
