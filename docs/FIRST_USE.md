@@ -129,7 +129,8 @@ unsafe-review explain <card-id>
 ```
 
 You can also copy any other card id from JSON, human output, or the PR summary
-and pass it to `explain`.
+and pass it to `explain`. For fixture-backed examples of common card families,
+see [Explain examples](explanation/explain-examples.md).
 
 Generate a bounded repair packet for an LLM or agent:
 

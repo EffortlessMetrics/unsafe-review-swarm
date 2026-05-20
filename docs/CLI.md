@@ -171,7 +171,9 @@ unsafe-review explain --root fixtures/raw_pointer_alignment <card-id>
 The explanation is reviewer-first: why the card exists, required safety
 conditions, evidence found, evidence missing, what would resolve it, what would
 not resolve it, the recommended witness route, and the static-review trust
-boundary. It does not execute witnesses.
+boundary. It does not execute witnesses. See
+[Explain examples](explanation/explain-examples.md) for fixture-backed examples
+of common card families.
 
 Use `context` for the bounded agent packet:
 
