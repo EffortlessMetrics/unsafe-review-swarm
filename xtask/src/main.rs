@@ -1484,8 +1484,9 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
                 "lsp.json diagnostic references unknown card id `{card_id}`"
             ));
         }
-        json_array_at(diagnostic, "/witness_routes", "lsp.json diagnostic")?;
-        json_array_at(diagnostic, "/verify_commands", "lsp.json diagnostic")?;
+        require_non_empty_json_str(diagnostic, "operation_family", "lsp.json diagnostic")?;
+        json_array_at(diagnostic, "/hazards", "lsp.json diagnostic")?;
+        json_array_at(diagnostic, "/missing_evidence", "lsp.json diagnostic")?;
         let boundary = diagnostic
             .get("trust_boundary")
             .and_then(serde_json::Value::as_str)
@@ -2737,7 +2738,7 @@ fn require_pr_summary_shape(
         require_text_contains(text, needle, path)?;
     }
     if card_count == 0 {
-        require_text_contains(text, "No actionable unsafe-review cards found.", path)?;
+        require_text_contains(text, "No changed unsafe-review gaps were found.", path)?;
         require_text_contains(text, "No witness route is recommended", path)?;
         return Ok(());
     }
@@ -5119,7 +5120,7 @@ impl WitnessKind {
         let result = check_advisory_artifacts(&dir);
 
         fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
-        assert!(result.err().unwrap_or_default().contains("missing path"));
+        assert!(result.err().unwrap_or_default().contains("key `path`"));
         Ok(())
     }
 
@@ -5130,7 +5131,7 @@ impl WitnessKind {
         write_valid_artifacts(&dir)?;
         fs::write(
             dir.join("comment-plan.json"),
-            r#"{"mode":"plan_only","policy":"advisory","comments":[{"card_id":"card-1","path":"src/lib.rs","line":1,"class":"guard_missing","priority":"high","confidence":"high","operation_family":"raw_pointer_read","selection_reason":"actionable high-confidence review card","body":"Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and not a Miri result unless a witness receipt is attached."},{"card_id":"card-1","path":"src/lib.rs","line":1,"class":"guard_missing","priority":"high","confidence":"high","operation_family":"raw_pointer_read","selection_reason":"actionable high-confidence review card","body":"Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and not a Miri result unless a witness receipt is attached."}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
+            r#"{"mode":"plan_only","policy":"advisory","comments":[{"card_id":"card-1","path":"src/lib.rs","line":1,"class":"guard_missing","priority":"high","confidence":"high","operation":"ptr.read()","operation_family":"raw_pointer_read","witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verify_commands":["cargo +nightly miri test card"],"selection_reason":"actionable high-confidence review card","body":"Plan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision.\n\nTrust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and not a Miri result unless a witness receipt is attached."},{"card_id":"card-1","path":"src/lib.rs","line":1,"class":"guard_missing","priority":"high","confidence":"high","operation":"ptr.read()","operation_family":"raw_pointer_read","witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verify_commands":["cargo +nightly miri test card"],"selection_reason":"actionable high-confidence review card","body":"Plan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision.\n\nTrust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and not a Miri result unless a witness receipt is attached."}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
         )
         .map_err(|err| format!("write comment plan failed: {err}"))?;
 
@@ -5225,7 +5226,7 @@ impl WitnessKind {
         write_valid_artifacts(&dir)?;
         fs::write(
             dir.join("comment-plan.json"),
-            r#"{"mode":"plan_only","policy":"advisory","comments":[{"card_id":"card-1","path":"src/lib.rs","line":1,"class":"guard_missing","priority":"high","confidence":"high","operation_family":"raw_pointer_read","selection_reason":"actionable high-confidence review card","body":"Please inspect this unsafe operation."}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
+            r#"{"mode":"plan_only","policy":"advisory","comments":[{"card_id":"card-1","path":"src/lib.rs","line":1,"class":"guard_missing","priority":"high","confidence":"high","operation":"ptr.read()","operation_family":"raw_pointer_read","witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verify_commands":["cargo +nightly miri test card"],"selection_reason":"actionable high-confidence review card","body":"Please inspect this unsafe operation."}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
         )
         .map_err(|err| format!("write comment plan failed: {err}"))?;
 
@@ -5450,28 +5451,20 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write witness plan failed: {err}"))?;
         fs::write(
             dir.join("lsp.json"),
-            r#"{"tool":"unsafe-review","mode":"read_only_projection","policy":"advisory","status":{"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"diagnostics":[{"card_id":"card-1","witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verify_commands":["cargo +nightly miri test card"],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}],"hovers":[{"card_id":"card-1","contents":"Trust boundary: static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}],"code_actions":[{"card_id":"card-1","command":"unsafe-review.collectAgentPacket"}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
+            r#"{"tool":"unsafe-review","mode":"read_only_projection","policy":"advisory","status":{"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"diagnostics":[{"card_id":"card-1","operation_family":"raw_pointer_read","hazards":["alignment"],"missing_evidence":["alignment guard missing"],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}],"hovers":[{"card_id":"card-1","contents":"Trust boundary: static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}],"code_actions":[{"card_id":"card-1","command":"unsafe-review.collectAgentPacket"}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
         )
         .map_err(|err| format!("write lsp failed: {err}"))?;
         Ok(())
     }
 
     fn write_valid_zero_card_first_pr_artifacts(dir: &Path) -> Result<(), String> {
-        fs::write(
-            dir.join("cards.json"),
-            r#"{"tool":"unsafe-review","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"cards":0},"cards":[]}"#,
-        )
-        .map_err(|err| format!("write cards failed: {err}"))?;
+        write_cards_artifact_with_summary(dir, "", 0)?;
         fs::write(
             dir.join("pr-summary.md"),
-            "- Review cards: 0\n\nNo changed unsafe-review gaps were found.\nThis does not prove the repo safe, UB-free, Miri-clean, or that any unsafe site executed.\n\nThis artifact is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
+            "# unsafe-review PR summary\n\n- Scope: `diff`\n- Review cards: 0\n- Open actionable gaps: 0\n- Policy mode: `advisory`\n\n## Top card\n\nNo changed unsafe-review gaps were found.\nThis does not prove the repo safe, UB-free, Miri-clean, or that any unsafe site executed.\n\n## Card table\n\n| ID | Class | Location | Operation | Missing evidence | Route | Next action |\n|---|---|---|---|---|---|---|\n\n## Witness plan\n\nNo witness route is recommended because no review cards were emitted.\n\n## Trust boundary\n\nThis artifact projects existing unsafe-review cards for PR review. It is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
         )
         .map_err(|err| format!("write pr summary failed: {err}"))?;
-        fs::write(
-            dir.join("cards.sarif"),
-            r#"{"version":"2.1.0","runs":[{"results":[],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
-        )
-        .map_err(|err| format!("write sarif failed: {err}"))?;
+        write_sarif_artifact(dir, "")?;
         fs::write(
             dir.join("comment-plan.json"),
             r#"{"mode":"plan_only","policy":"advisory","comments":[],"no_changed_gaps":{"message":"No changed unsafe-review gaps were found.","limitation":"This does not prove the repo safe, UB-free, Miri-clean, or that any unsafe site executed."},"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,

@@ -216,7 +216,9 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
             .contains("actionable high-priority review card")
     );
     let planned_body = planned_comment["body"].as_str().unwrap_or("");
-    assert!(planned_body.contains("`guard_missing` for `raw_pointer_read`"));
+    assert!(planned_body.contains(
+        "`guard_missing` for `unsafe { ptr.cast::<Header>().read() }` (`raw_pointer_read`)"
+    ));
     assert!(planned_body.contains("Missing visible local guard for inferred safety obligations"));
     assert!(planned_body.contains("No witness receipt imported for this card"));
     assert!(planned_body.contains("Next action: Add or expose the local guard"));
@@ -517,13 +519,13 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     assert!(explain.contains("## Required safety conditions"));
     assert!(explain.contains("- pointer is live and dereferenceable for the accessed type"));
     assert!(explain.contains("- pointer is aligned for the accessed type"));
-    assert!(explain.contains("## Hazards"));
+    assert!(explain.contains("Relevant hazard families:"));
     assert!(explain.contains("- `pointer_validity`"));
     assert!(explain.contains("- `alignment`"));
-    assert!(explain.contains("## Evidence"));
+    assert!(explain.contains("## Evidence found"));
     assert!(explain.contains("- Contract: Nearby `SAFETY:` comment was detected"));
     assert!(explain.contains(
-        "- Discharge: Some inferred safety obligations are missing local guard evidence"
+        "- Guard/discharge: Some inferred safety obligations are missing local guard evidence"
     ));
     assert!(explain.contains("- Reach: 1 related test file(s) mention owner `read_header`"));
     assert!(
@@ -532,14 +534,14 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
         )
     );
     assert!(explain.contains("- Witness: No imported witness receipt was found"));
-    assert!(explain.contains("## Obligation evidence"));
+    assert!(explain.contains("Obligation evidence matrix:"));
     assert!(explain.contains(
         "- `bounds`: contract `present`, guard `present`, reach `present`, witness `missing`"
     ));
     assert!(explain.contains(
         "- `alignment`: contract `present`, guard `missing`, reach `present`, witness `missing`"
     ));
-    assert!(explain.contains("## Missing evidence"));
+    assert!(explain.contains("## Evidence missing"));
     assert!(explain.contains("- Missing visible local guard for inferred safety obligations"));
     assert!(explain.contains("- No witness receipt imported for this card"));
     assert!(explain.contains("## Witness route"));
@@ -2371,7 +2373,9 @@ fn suppression_policy_suppresses_only_exact_review_card_identity() -> Result<(),
     ])?;
     let markdown = stdout_text(&markdown)?;
     assert!(markdown.contains("| 1 | 0 | 0 | 1 | 0 | 0 |"));
-    assert!(markdown.contains("| Status | Card | Ledger | Location | Class | Operation | Hazards | Missing evidence | Routes |"));
+    assert!(markdown.contains(
+        "| Status | Reason | Card | Ledger | Location | Class | Operation family | Operation | Hazards | Missing evidence | Routes | Next action |"
+    ));
     assert!(markdown.contains("`suppressed`"));
     assert!(markdown.contains("owner=core/policy"));
     assert!(markdown.contains("reason=e2e exact suppression"));
@@ -2443,13 +2447,17 @@ fn policy_report_is_advisory_and_counts_baseline_state() -> Result<(), Box<dyn E
             .is_some_and(|routes| routes.iter().any(|route| route == "miri"))
     );
     assert!(report["unmatched_baseline"].as_array().is_some());
-    assert!(report["unmatched_baseline"]
-        .as_array()
-        .is_some_and(Vec::is_empty));
+    assert!(
+        report["unmatched_baseline"]
+            .as_array()
+            .is_some_and(Vec::is_empty)
+    );
     assert!(report["invalid_ledger_entries"].as_array().is_some());
-    assert!(report["invalid_ledger_entries"]
-        .as_array()
-        .is_some_and(Vec::is_empty));
+    assert!(
+        report["invalid_ledger_entries"]
+            .as_array()
+            .is_some_and(Vec::is_empty)
+    );
     assert!(
         json_str(&report["trust_boundary"], "trust_boundary")?
             .contains("does not enforce blocking policy")
@@ -2504,12 +2512,16 @@ fn policy_report_is_advisory_and_counts_baseline_state() -> Result<(), Box<dyn E
         baselined["cards"][0]["operation_family"],
         "raw_pointer_read"
     );
-    assert!(baselined["resolved_baseline"]
-        .as_array()
-        .is_some_and(Vec::is_empty));
-    assert!(baselined["unmatched_baseline"]
-        .as_array()
-        .is_some_and(Vec::is_empty));
+    assert!(
+        baselined["resolved_baseline"]
+            .as_array()
+            .is_some_and(Vec::is_empty)
+    );
+    assert!(
+        baselined["unmatched_baseline"]
+            .as_array()
+            .is_some_and(Vec::is_empty)
+    );
 
     let markdown_path = temp.path().join("policy-report.md");
     let markdown = run_success([

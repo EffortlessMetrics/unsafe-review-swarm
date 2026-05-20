@@ -1,7 +1,6 @@
 use crate::api::AnalyzeOutput;
 use crate::domain::ReviewClass;
 use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE, markdown_table};
-use crate::policy::{LedgerEntry as PolicyLedgerRecord, LedgerKind, load_ledger_entries};
 use crate::util::path_display;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -727,10 +726,13 @@ expires = "2026-01-01"
             policy: "advisory".to_string(),
             audit_date: "2026-05-20".to_string(),
             trust_boundary: "Advisory policy report only; not memory-safety proof.".to_string(),
+            limitations: policy_report_limitations(),
+            classification_explanations: PolicyReportClassificationExplanations::default(),
             summary: PolicyReportSummary {
                 cards: 1,
                 new_gaps: 1,
                 resolved_baseline: 1,
+                unmatched_baseline: 1,
                 expired_suppressions: 1,
                 ..PolicyReportSummary::default()
             },
@@ -738,6 +740,7 @@ expires = "2026-01-01"
                 card_id: "UR-pipe|card-c1".to_string(),
                 class_name: "guard|missing".to_string(),
                 policy_status: "new|gap".to_string(),
+                policy_reason: "needs|review".to_string(),
                 ledger: Some(PolicyLedgerEntry {
                     card_id: "UR-pipe|card-c1".to_string(),
                     owner: Some("team|unsafe".to_string()),
@@ -753,12 +756,22 @@ expires = "2026-01-01"
                     owner: "owner|fn".to_string(),
                 },
                 operation_family: "raw|pointer|read".to_string(),
+                operation: "unsafe { ptr|read() }".to_string(),
                 hazards: vec!["alignment|hazard".to_string()],
                 missing: vec!["missing|guard".to_string()],
                 witness_routes: vec!["miri|route".to_string()],
+                next_action: "add|guard".to_string(),
                 missing_count: 1,
             }],
             resolved_baseline: vec![PolicyLedgerEntry {
+                card_id: "UR-resolved|card-c1".to_string(),
+                owner: Some("team|unsafe".to_string()),
+                reason: Some("resolved|by guard".to_string()),
+                evidence: Some("review|receipt".to_string()),
+                review_after: Some("2026-08-01|manual".to_string()),
+                expires: None,
+            }],
+            unmatched_baseline: vec![PolicyLedgerEntry {
                 card_id: "UR-resolved|card-c1".to_string(),
                 owner: Some("team|unsafe".to_string()),
                 reason: Some("resolved|by guard".to_string()),
@@ -774,6 +787,7 @@ expires = "2026-01-01"
                 review_after: None,
                 expires: Some("2026-05-01|expired".to_string()),
             }],
+            invalid_ledger_entries: Vec::new(),
         };
 
         let markdown = render_markdown(&report);
