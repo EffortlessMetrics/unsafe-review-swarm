@@ -745,7 +745,74 @@ fn has_slice_count_early_return(
 
 fn guard_body_contains_return(guard_body: &str) -> bool {
     let code = strip_comments_and_literals(guard_body);
-    compact_contains_identifier(&code, "return")
+    contains_top_level_return_statement(&code)
+}
+
+fn contains_top_level_return_statement(code: &str) -> bool {
+    let mut brace_depth = 0usize;
+    let mut paren_depth = 0usize;
+    let mut bracket_depth = 0usize;
+    let mut statement_start = true;
+
+    for (idx, ch) in code.char_indices() {
+        if ch.is_whitespace() {
+            continue;
+        }
+        match ch {
+            '{' => {
+                brace_depth += 1;
+                continue;
+            }
+            '}' => {
+                brace_depth = brace_depth.saturating_sub(1);
+                statement_start = false;
+                continue;
+            }
+            '(' => {
+                paren_depth += 1;
+                statement_start = false;
+                continue;
+            }
+            ')' => {
+                paren_depth = paren_depth.saturating_sub(1);
+                statement_start = false;
+                continue;
+            }
+            '[' => {
+                bracket_depth += 1;
+                statement_start = false;
+                continue;
+            }
+            ']' => {
+                bracket_depth = bracket_depth.saturating_sub(1);
+                statement_start = false;
+                continue;
+            }
+            ';' if brace_depth == 0 && paren_depth == 0 && bracket_depth == 0 => {
+                statement_start = true;
+                continue;
+            }
+            _ => {}
+        }
+
+        if brace_depth == 0
+            && paren_depth == 0
+            && bracket_depth == 0
+            && statement_start
+            && code[idx..].starts_with("return")
+        {
+            let after = code[idx + "return".len()..].chars().next();
+            if after.is_none_or(|ch| !is_receiver_path_char(ch)) {
+                return true;
+            }
+        }
+
+        if brace_depth == 0 && paren_depth == 0 && bracket_depth == 0 {
+            statement_start = false;
+        }
+    }
+
+    false
 }
 
 fn strip_comments_and_literals(text: &str) -> String {
