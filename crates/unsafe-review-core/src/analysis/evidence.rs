@@ -527,8 +527,107 @@ fn copy_destination_slice_receiver(argument: &str) -> Option<String> {
 }
 
 fn has_slice_count_bound_guard(before_call: &str, receiver: &str, count: &str) -> bool {
+    let receiver = compact_code(receiver);
+    let count = compact_code(count);
+    if receiver.is_empty() || count.is_empty() {
+        return false;
+    }
     let len = format!("{receiver}.len()");
-    has_len_cap_bound_guard(before_call, count, &len)
+    let count_lte_len = format!("{count}<={len}");
+    let len_gte_count = format!("{len}>={count}");
+    let count_gt_len = format!("{count}>{len}");
+    let len_lt_count = format!("{len}<{count}");
+    has_slice_count_bound_predicate(before_call, &count_lte_len, &receiver, &count)
+        || has_slice_count_bound_predicate(before_call, &len_gte_count, &receiver, &count)
+        || has_slice_count_early_return(before_call, &count_gt_len, &receiver, &count)
+        || has_slice_count_early_return(before_call, &len_lt_count, &receiver, &count)
+}
+
+fn has_slice_count_bound_predicate(
+    before_call: &str,
+    predicate: &str,
+    receiver: &str,
+    count: &str,
+) -> bool {
+    [
+        format!("assert!({predicate})"),
+        format!("assert!({predicate},"),
+        format!("debug_assert!({predicate})"),
+        format!("debug_assert!({predicate},"),
+    ]
+    .iter()
+    .any(|pattern| has_fresh_slice_count_guard_pattern(before_call, pattern, receiver, count))
+        || has_open_slice_count_branch_guard(before_call, predicate, receiver, count)
+}
+
+fn has_fresh_slice_count_guard_pattern(
+    before_call: &str,
+    pattern: &str,
+    receiver: &str,
+    count: &str,
+) -> bool {
+    let mut search_from = 0;
+    while let Some(offset) = before_call[search_from..].find(pattern) {
+        let pattern_start = search_from + offset;
+        let after_pattern = &before_call[pattern_start + pattern.len()..];
+        let statement_end = after_pattern.find(';').unwrap_or(after_pattern.len());
+        let after_guard = &after_pattern[statement_end..];
+        if !has_slice_count_assignment(after_guard, receiver, count) {
+            return true;
+        }
+        search_from = pattern_start + pattern.len();
+    }
+    false
+}
+
+fn has_open_slice_count_branch_guard(
+    before_call: &str,
+    predicate: &str,
+    receiver: &str,
+    count: &str,
+) -> bool {
+    let guard = format!("if{predicate}{{");
+    let mut search_from = 0;
+    while let Some(offset) = before_call[search_from..].find(&guard) {
+        let guard_start = search_from + offset;
+        let after_guard = &before_call[guard_start + guard.len()..];
+        if branch_still_open_at_operation(after_guard)
+            && !has_slice_count_assignment(after_guard, receiver, count)
+        {
+            return true;
+        }
+        search_from = guard_start + guard.len();
+    }
+    false
+}
+
+fn has_slice_count_early_return(
+    before_call: &str,
+    predicate: &str,
+    receiver: &str,
+    count: &str,
+) -> bool {
+    let guard = format!("if{predicate}{{");
+    let mut search_from = 0;
+    while let Some(offset) = before_call[search_from..].find(&guard) {
+        let guard_start = search_from + offset;
+        let after_guard = &before_call[guard_start + guard.len()..];
+        let (guard_body, after_guard_body) = after_guard
+            .split_once('}')
+            .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
+        if guard_body.contains("return")
+            && !has_slice_count_assignment(after_guard_body, receiver, count)
+        {
+            return true;
+        }
+        search_from = guard_start + guard.len();
+    }
+    false
+}
+
+fn has_slice_count_assignment(compact: &str, receiver: &str, count: &str) -> bool {
+    contains_simple_assignment_to(compact, receiver)
+        || contains_simple_assignment_to(compact, count)
 }
 
 fn has_bounds_assertion_guard(compact: &str) -> bool {
