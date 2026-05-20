@@ -136,9 +136,9 @@ const FUZZ_REQUIRED_FILES: &[&str] = &[
     "fuzz/corpus/analyze/basic",
     "fuzz/fuzz_targets/analyze.rs",
 ];
-const PUBLIC_BADGE_ENDPOINTS: &[&str] = &[
-    "badges/unsafe-review.json",
-    "badges/unsafe-review-plus.json",
+const PUBLIC_BADGE_ENDPOINTS: &[(&str, &str)] = &[
+    ("badges/unsafe-review.json", "unsafe-review"),
+    ("badges/unsafe-review-plus.json", "unsafe-review+"),
 ];
 
 fn main() {
@@ -240,6 +240,7 @@ fn check_docs() -> Result<(), String> {
     for path in FRONT_DOOR_MARKDOWN_DOCS {
         check_markdown_local_links(path)?;
     }
+    check_public_badge_endpoints()?;
     check_docs_map_paths("docs/README.md")?;
     check_index(
         Path::new("docs/specs"),
@@ -2293,6 +2294,50 @@ fn check_no_windows_paths(paths: &[&Path]) -> Result<(), String> {
     Ok(())
 }
 
+fn check_public_badge_endpoints() -> Result<(), String> {
+    let readme = read_to_string(&workspace_path("README.md"))?;
+    let endpoint_prefix = "https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FEffortlessMetrics%2Funsafe-review%2Fmain%2Fbadges%2F";
+    let endpoint_links = readme.matches(endpoint_prefix).count();
+    if endpoint_links != PUBLIC_BADGE_ENDPOINTS.len() {
+        return Err(format!(
+            "README.md has {endpoint_links} public unsafe-review badge endpoint link(s), expected {}",
+            PUBLIC_BADGE_ENDPOINTS.len()
+        ));
+    }
+
+    for (path, label) in PUBLIC_BADGE_ENDPOINTS {
+        let endpoint = public_badge_endpoint_url(path);
+        if !readme.contains(&endpoint) {
+            return Err(format!(
+                "README.md is missing public badge endpoint `{endpoint}`"
+            ));
+        }
+        let value = parse_json_file(&workspace_path(path))?;
+        let schema = json_u64_at(&value, "/schemaVersion", path)?;
+        if schema != 1 {
+            return Err(format!("{path} schemaVersion is {schema}, expected 1"));
+        }
+        require_json_str(&value, "label", label, path)?;
+        let message = require_non_empty_json_str(&value, "message", path)?;
+        for forbidden in ["safe", "sound", "ub-free", "miri-clean", "proof"] {
+            if text_contains_ignore_ascii_case(message, forbidden) {
+                return Err(format!(
+                    "{path} badge message must not imply `{forbidden}`: {message}"
+                ));
+            }
+        }
+        require_non_empty_json_str(&value, "color", path)?;
+    }
+    Ok(())
+}
+
+fn public_badge_endpoint_url(path: &str) -> String {
+    let encoded_path = path.replace('/', "%2F");
+    format!(
+        "https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FEffortlessMetrics%2Funsafe-review%2Fmain%2F{encoded_path}"
+    )
+}
+
 fn check_tracked_generated_artifacts() -> Result<(), String> {
     let output = Command::new("git")
         .args(["ls-files"])
@@ -3285,10 +3330,16 @@ fn has_windows_path(line: &str) -> bool {
 
 fn is_forbidden_generated_path(path: &str) -> bool {
     path.starts_with("target/")
-        || (path.starts_with("badges/") && !PUBLIC_BADGE_ENDPOINTS.contains(&path))
+        || (path.starts_with("badges/") && !is_public_badge_endpoint(path))
         || path.ends_with(".sarif")
         || path.ends_with(".profraw")
         || path.ends_with(".profdata")
+}
+
+fn is_public_badge_endpoint(path: &str) -> bool {
+    PUBLIC_BADGE_ENDPOINTS
+        .iter()
+        .any(|(endpoint, _label)| *endpoint == path)
 }
 
 #[cfg(test)]
@@ -4389,6 +4440,19 @@ impl WitnessKind {
         ));
         assert!(!is_forbidden_generated_path("Cargo.lock"));
         assert!(!is_forbidden_generated_path("docs/status/SUPPORT_TIERS.md"));
+    }
+
+    #[test]
+    fn public_badge_endpoints_match_readme_and_json() -> Result<(), String> {
+        check_public_badge_endpoints()
+    }
+
+    #[test]
+    fn public_badge_endpoint_url_uses_public_source_repo() {
+        assert_eq!(
+            public_badge_endpoint_url("badges/unsafe-review.json"),
+            "https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FEffortlessMetrics%2Funsafe-review%2Fmain%2Fbadges%2Funsafe-review.json"
+        );
     }
 
     #[test]
