@@ -163,7 +163,10 @@ pub(crate) fn render_markdown(report: &PolicyReport) -> String {
         for card in &report.cards {
             out.push_str(&format!(
                 "| `{}` | `{}` | `{}` | {} |\n",
-                card.policy_status, card.card_id, card.class_name, card.missing_count
+                markdown_cell(&card.policy_status),
+                markdown_cell(&card.card_id),
+                markdown_cell(&card.class_name),
+                card.missing_count
             ));
         }
         out.push('\n');
@@ -199,7 +202,7 @@ fn render_ledger_section(out: &mut String, title: &str, entries: &[PolicyLedgerE
     for entry in entries {
         out.push_str(&format!(
             "| `{}` | {} | {} | {} | {} |\n",
-            entry.card_id,
+            markdown_cell(&entry.card_id),
             optional_text(entry.owner.as_deref()),
             optional_text(entry.review_after.as_deref()),
             optional_text(entry.expires.as_deref()),
@@ -278,8 +281,16 @@ fn policy_status(class: &ReviewClass) -> &'static str {
 fn optional_text(value: Option<&str>) -> String {
     value
         .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned)
+        .map(markdown_cell)
         .unwrap_or_else(|| "-".to_string())
+}
+
+fn markdown_cell(value: &str) -> String {
+    value
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .replace('|', "\\|")
 }
 
 fn current_utc_date() -> Result<String, String> {
@@ -415,6 +426,56 @@ expires = "2026-01-01"
         assert_eq!(report.summary.expired_suppressions, 1);
         assert!(render_markdown(&report).contains("## Expired suppression entries"));
         Ok(())
+    }
+
+    #[test]
+    fn policy_report_markdown_escapes_table_cells() {
+        let report = PolicyReport {
+            schema_version: "0.1".to_string(),
+            tool: "unsafe-review".to_string(),
+            mode: "policy-report".to_string(),
+            policy: "advisory".to_string(),
+            audit_date: "2026-05-20".to_string(),
+            trust_boundary: "Advisory policy report only; not memory-safety proof.".to_string(),
+            summary: PolicyReportSummary {
+                cards: 1,
+                new_gaps: 1,
+                resolved_baseline: 1,
+                expired_suppressions: 1,
+                ..PolicyReportSummary::default()
+            },
+            cards: vec![PolicyReportCard {
+                card_id: "UR-pipe|card-c1".to_string(),
+                class_name: "guard|missing".to_string(),
+                policy_status: "new|gap".to_string(),
+                missing_count: 1,
+            }],
+            resolved_baseline: vec![PolicyLedgerEntry {
+                card_id: "UR-resolved|card-c1".to_string(),
+                owner: Some("team|unsafe".to_string()),
+                reason: Some("resolved|by guard".to_string()),
+                review_after: Some("2026-08-01|manual".to_string()),
+                expires: None,
+            }],
+            expired_suppressions: vec![PolicyLedgerEntry {
+                card_id: "UR-expired|card-c1".to_string(),
+                owner: Some("team|unsafe".to_string()),
+                reason: Some("old|false positive".to_string()),
+                review_after: None,
+                expires: Some("2026-05-01|expired".to_string()),
+            }],
+        };
+
+        let markdown = render_markdown(&report);
+
+        assert!(markdown.contains("`new\\|gap`"));
+        assert!(markdown.contains("`UR-pipe\\|card-c1`"));
+        assert!(markdown.contains("`guard\\|missing`"));
+        assert!(markdown.contains("`UR-resolved\\|card-c1`"));
+        assert!(markdown.contains("team\\|unsafe"));
+        assert!(markdown.contains("resolved\\|by guard"));
+        assert!(markdown.contains("2026-05-01\\|expired"));
+        assert!(!markdown.contains("`UR-pipe|card-c1`"));
     }
 
     fn fixture_path(name: &str) -> PathBuf {
