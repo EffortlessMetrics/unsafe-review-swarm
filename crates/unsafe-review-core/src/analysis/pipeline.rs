@@ -1851,6 +1851,33 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn copy_range_evidence_accepts_slice_length_early_returns() -> Result<(), String> {
+        let copy_nonoverlapping =
+            fixture_output("copy_nonoverlapping_slice_range_early_return_guard")?;
+        let copy_nonoverlapping_card = single_card(
+            "copy_nonoverlapping_slice_range_early_return_guard",
+            &copy_nonoverlapping,
+        )?;
+        assert!(obligation_discharge_present(
+            copy_nonoverlapping_card,
+            "valid-range"
+        ));
+        assert!(
+            !obligation_discharge_present(copy_nonoverlapping_card, "non-overlap"),
+            "early-return range guards should not prove non-overlap"
+        );
+
+        let ptr_copy = fixture_output("ptr_copy_slice_range_early_return_guard")?;
+        let ptr_copy_card = single_card("ptr_copy_slice_range_early_return_guard", &ptr_copy)?;
+        assert!(obligation_discharge_present(ptr_copy_card, "valid-range"));
+        assert!(
+            !obligation_discharge_present(ptr_copy_card, "initialized"),
+            "early-return range guards should not prove initialized memory"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn copy_range_evidence_rejects_stale_slice_length_guards() -> Result<(), String> {
         for fixture in [
             "copy_nonoverlapping_slice_range_reassigned_count_not_guard",

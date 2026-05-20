@@ -92,9 +92,12 @@ rejects another container's len/capacity assertion, bare equality observations,
 and closed equality branches.
 
 Copy operation range evidence is intentionally conservative:
-`copy_nonoverlapping_slice_range_guard` and `ptr_copy_slice_range_guard` pin
-same-call source and destination slice length guards as valid-range evidence,
-while `copy_nonoverlapping_slice_range_src_only_not_guard`,
+`copy_nonoverlapping_slice_range_guard`,
+`copy_nonoverlapping_slice_range_early_return_guard`,
+`ptr_copy_slice_range_guard`, and `ptr_copy_slice_range_early_return_guard`
+pin same-call source and destination slice length assertions or early-return
+guards as valid-range evidence, while
+`copy_nonoverlapping_slice_range_src_only_not_guard`,
 `copy_nonoverlapping_slice_range_dst_only_not_guard`,
 `ptr_copy_slice_range_src_only_not_guard`,
 `ptr_copy_slice_range_dst_only_not_guard`,
