@@ -14,3 +14,14 @@ actions = [
 reason = "Routed swarm Rust workflow with a normalized result check and advisory unsafe-review artifact uploads. It uses self-hosted runners only for same-repo trusted PRs or workflow dispatch and falls back to GitHub-hosted runners."
 created = "2026-05-18"
 review_after = "2026-06-18"
+
+[[workflow]]
+id = "workflow-0002"
+path = ".github/workflows/em-ci-self-hosted-smoke.yml"
+permissions = "contents: read"
+actions = [
+  "actions/checkout@v6",
+]
+reason = "Manual-only self-hosted runner smoke workflow for proving em-ci-small scheduler access to CX43/CX53 before branch protection is enabled."
+created = "2026-05-20"
+review_after = "2026-06-20"

@@ -43,7 +43,27 @@ This keeps public fork PRs off self-hosted machines and avoids `paths-ignore`,
 which would leave required checks missing after branch protection is enabled.
 
 The runner group is expected to be `em-ci-small` with selected repository access
-for `unsafe-review-swarm`. The router token must be scoped to this repository.
+for `unsafe-review-swarm`. The router discovers CX43/CX53 through the
+organization runner endpoint:
+
+```text
+orgs/EffortlessMetrics/actions/runners?per_page=100
+```
+
+`EM_RUNNER_READ_TOKEN` must be exposed to this repository as an Actions secret
+and must have organization `Self-hosted runners: read` permission. The route job
+logs `router_endpoint` next to `router_target` and `router_reason` so API
+authorization failures are distinguishable from clean busy-runner fallback.
+
+The implementation jobs use both the `em-ci-small` runner group and labels:
+
+```yaml
+runs-on:
+  group: em-ci-small
+  labels: [self-hosted, em-ci, cx43, rust-small, trusted-pr]
+```
+
+GitHub-hosted fallback remains available when no matching runner is idle.
 
 ## Gate
 
@@ -75,13 +95,15 @@ release, signing, crates.io publish, or blocking policy.
 Defer branch protection until these checks have passed:
 
 ```text
-1. workflow PR passes
-2. manual dispatch on main passes
-3. tiny same-repo PR passes
-4. CX43 busy -> CX53 selected
-5. CX43 and CX53 busy -> GitHub-hosted selected
-6. docs-only PR returns normalized success without VPS use
-7. 3-5 real PRs pass
+1. manual CX43 smoke workflow passes
+2. manual CX53 smoke workflow passes
+3. routed workflow PR passes
+4. manual dispatch on main passes
+5. tiny same-repo PR passes
+6. CX43 busy -> CX53 selected
+7. CX43 and CX53 busy -> GitHub-hosted selected
+8. docs-only PR returns normalized success without VPS use
+9. 3-5 real PRs pass
 ```
 
 Only then require `Unsafe Review Rust Result`.
@@ -113,10 +135,10 @@ The docs-only proof selected `router_target=none` with
 `router_reason=docs_only_no_rust_work`. All Rust implementation jobs were
 skipped and the normalized result passed without consuming a self-hosted runner.
 
-Self-hosted routing is not proven yet. The router saw `EM_RUNNER_READ_TOKEN`,
-but the repository runner API returned `HTTP 403`, so it selected
-`runner_api_failed` -> `github`. Track the org-side runner-group and token setup
-in:
+Self-hosted routing is not proven yet. The previous router saw
+`EM_RUNNER_READ_TOKEN`, but the repository runner API returned `HTTP 403`, so it
+selected `runner_api_failed` -> `github`. Track the org-side runner-group and
+token setup in:
 
 ```text
 https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2
@@ -124,3 +146,17 @@ https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2
 
 Branch protection remains deferred until CX43, CX53, GitHub-hosted fallback for
 the busy-runner case, and several real PRs have all been proven.
+
+The next proof step is to run the manual `EM CI Self Hosted Smoke` workflow for
+both CX43 and CX53. If those jobs schedule and pass, the scheduler can use the
+`em-ci-small` group for this repository and the remaining proof is router
+discovery through the organization runner endpoint. A clean busy-runner fallback
+must report:
+
+```text
+router_endpoint=orgs/EffortlessMetrics/actions/runners?per_page=100
+router_target=github
+router_reason=no_idle_runner
+```
+
+`router_reason=runner_api_failed` remains a blocker.
