@@ -2323,6 +2323,47 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn long_unsafe_fn_owner_inference_uses_enclosing_function_owner() -> Result<(), String> {
+        let output = fixture_output("long_unsafe_fn_owner_inference")?;
+        let card = output
+            .cards
+            .iter()
+            .find(|card| card.operation.family == OperationFamily::DropInPlace)
+            .ok_or_else(|| {
+                format!(
+                    "long_unsafe_fn_owner_inference should emit a drop_in_place card: {:#?}",
+                    output.cards
+                )
+            })?;
+
+        assert_eq!(card.operation.family, OperationFamily::DropInPlace);
+        assert_eq!(card.site.owner, Some("run".to_string()));
+        assert!(
+            card.id.0.contains("-run-operation-drop_in_place-"),
+            "card identity should include the enclosing owner: {}",
+            card.id.0
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn macro_rules_owner_inference_uses_macro_name() -> Result<(), String> {
+        let output = fixture_output("macro_rules_owner_inference")?;
+        let card = single_card("macro_rules_owner_inference", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::BoxFromRaw);
+        assert_eq!(card.site.owner, Some("spawn_unchecked".to_string()));
+        assert!(
+            card.id
+                .0
+                .contains("-spawn-unchecked-operation-box_from_raw-"),
+            "card identity should include the macro owner: {}",
+            card.id.0
+        );
+        Ok(())
+    }
+
+    #[test]
     fn private_unsafe_helper_can_use_local_safety_comment() -> Result<(), String> {
         let output = fixture_output("private_unsafe_helper_safety_comment")?;
         let card = single_card("private_unsafe_helper_safety_comment", &output)?;

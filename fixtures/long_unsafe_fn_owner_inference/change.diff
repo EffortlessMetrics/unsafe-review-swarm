@@ -1,0 +1,5 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -88,0 +88,1 @@
++    unsafe { ptr.drop_in_place() };

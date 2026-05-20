@@ -258,6 +258,8 @@ mod tests {
         "nonnull_other_guard_not_evidence",
         "nonnull_is_null_nonreturning_not_guard",
         "impl_trait_bound_owner_inference",
+        "long_unsafe_fn_owner_inference",
+        "macro_rules_owner_inference",
         "nested_unsafe_operation_call_dedupe",
         "adjacent_unchanged_unsafe_fn_no_card",
         "split_unsafe_block",

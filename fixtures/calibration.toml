@@ -226,6 +226,8 @@ required_core_fixtures = [
   "nonnull_observed_not_guard",
   "nonnull_post_check_not_guard",
   "impl_trait_bound_owner_inference",
+  "long_unsafe_fn_owner_inference",
+  "macro_rules_owner_inference",
   "nested_unsafe_operation_call_dedupe",
   "adjacent_unchanged_unsafe_fn_no_card",
   "comment_alignment_not_guard",
@@ -2449,6 +2451,26 @@ expected_cards = 1
 expected_class = "guard_missing"
 expected_operation_family = "unsafe_fn_call"
 expected_hazard = "unknown"
+
+[[cases]]
+fixture = "long_unsafe_fn_owner_inference"
+kind = "positive"
+claim = "operations deep inside long unsafe functions preserve the enclosing function owner"
+support_tier = "Diff unsafe site inventory"
+expected_cards = 2
+expected_class = "contract_missing"
+expected_operation_family = "drop_in_place"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "macro_rules_owner_inference"
+kind = "positive"
+claim = "unsafe operations inside macro_rules bodies preserve the macro name as owner identity"
+support_tier = "Diff unsafe site inventory"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "box_from_raw"
+expected_hazard = "pointer_validity"
 
 [[cases]]
 fixture = "nested_unsafe_operation_call_dedupe"

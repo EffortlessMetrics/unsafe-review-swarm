@@ -5,6 +5,8 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 
+const OWNER_SCAN_LIMIT: usize = 160;
+
 #[derive(Clone, Debug)]
 pub(crate) struct ScannedSite {
     pub(crate) site: UnsafeSite,
@@ -1022,21 +1024,37 @@ fn is_public_api_surface(kind: &UnsafeSiteKind, snippet: &str) -> bool {
 }
 
 fn find_owner(lines: &[&str], idx: usize) -> Option<String> {
-    for raw in lines[..=idx].iter().rev().take(80) {
+    for (line_idx, raw) in lines[..=idx]
+        .iter()
+        .enumerate()
+        .rev()
+        .take(OWNER_SCAN_LIMIT)
+    {
         let line = raw.trim();
         if is_comment_line(line) {
             continue;
         }
-        if let Some(name) = parse_fn_name(line) {
+        if let Some(name) = parse_fn_name(line)
+            && declaration_encloses_line(lines, line_idx, idx)
+        {
             return Some(name);
         }
-        if let Some(name) = parse_trait_name(line) {
+        if let Some(name) = parse_trait_name(line)
+            && declaration_encloses_line(lines, line_idx, idx)
+        {
             return Some(name);
         }
-        if let Some(name) = parse_impl_declaration_owner(line) {
+        if let Some(name) = parse_impl_declaration_owner(line)
+            && declaration_encloses_line(lines, line_idx, idx)
+        {
             return Some(name);
         }
-        if is_impl_declaration_line(line) {
+        if let Some(name) = parse_macro_rules_name(line)
+            && declaration_encloses_line(lines, line_idx, idx)
+        {
+            return Some(name);
+        }
+        if is_impl_declaration_line(line) && declaration_encloses_line(lines, line_idx, idx) {
             return Some("impl".to_string());
         }
     }
@@ -1053,19 +1071,60 @@ fn context_before_site(lines: &[&str], idx: usize) -> Vec<String> {
 
 fn find_owner_declaration_index(lines: &[&str], idx: usize) -> Option<usize> {
     let limit = idx.min(lines.len().saturating_sub(1));
-    for (line_idx, raw) in lines[..=limit].iter().enumerate().rev().take(120) {
+    for (line_idx, raw) in lines[..=limit]
+        .iter()
+        .enumerate()
+        .rev()
+        .take(OWNER_SCAN_LIMIT)
+    {
         let line = raw.trim();
         if is_comment_line(line) {
             continue;
         }
-        if parse_fn_name(line).is_some()
+        if (parse_fn_name(line).is_some()
             || parse_trait_name(line).is_some()
             || parse_impl_declaration_owner(line).is_some()
+            || parse_macro_rules_name(line).is_some())
+            && declaration_encloses_line(lines, line_idx, idx)
         {
             return Some(line_idx);
         }
     }
     None
+}
+
+fn declaration_encloses_line(lines: &[&str], decl_idx: usize, idx: usize) -> bool {
+    if decl_idx == idx {
+        return true;
+    }
+
+    let mut state = LineCommentState::default();
+    let mut depth = 0isize;
+    let mut opened = false;
+    for (line_idx, raw) in lines
+        .iter()
+        .enumerate()
+        .take(idx.saturating_add(1))
+        .skip(decl_idx)
+    {
+        let code = line_for_text_detection(raw, &mut state);
+        for ch in code.chars() {
+            match ch {
+                '{' => {
+                    depth += 1;
+                    opened = true;
+                }
+                '}' => {
+                    depth -= 1;
+                    if opened && depth <= 0 && line_idx < idx {
+                        return false;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    opened && depth > 0
 }
 
 fn is_comment_line(line: &str) -> bool {
@@ -1188,6 +1247,11 @@ fn parse_trait_name(line: &str) -> Option<String> {
     let marker = "trait ";
     let pos = line.find(marker)?;
     let rest = &line[pos + marker.len()..];
+    parse_ident(rest)
+}
+
+fn parse_macro_rules_name(line: &str) -> Option<String> {
+    let rest = line.trim_start().strip_prefix("macro_rules!")?.trim_start();
     parse_ident(rest)
 }
 
@@ -1420,6 +1484,48 @@ mod tests {
 
         assert_eq!(find_owner(&lines, 4), Some("try_reserve".to_string()));
         assert_eq!(find_owner_declaration_index(&lines, 4), Some(0));
+    }
+
+    #[test]
+    fn owner_inference_handles_long_function_bodies() {
+        let mut lines = vec!["pub unsafe fn run(ptr: *mut u8) {".to_string()];
+        lines.extend((0..120).map(|idx| format!("    let _pad_{idx} = ptr;")));
+        lines.push("    unsafe { ptr.drop_in_place() };".to_string());
+        lines.push("}".to_string());
+        let borrowed = lines.iter().map(String::as_str).collect::<Vec<_>>();
+
+        assert_eq!(find_owner(&borrowed, 121), Some("run".to_string()));
+        assert_eq!(find_owner_declaration_index(&borrowed, 121), Some(0));
+    }
+
+    #[test]
+    fn owner_inference_does_not_cross_closed_function() {
+        let mut lines = vec![
+            "pub unsafe fn previous(ptr: *mut u8) {".to_string(),
+            "    unsafe { ptr.drop_in_place() };".to_string(),
+            "}".to_string(),
+        ];
+        lines.extend((0..12).map(|idx| format!("// gap {idx}")));
+        lines.push("unsafe { core::ptr::read(0 as *const u8) };".to_string());
+        let borrowed = lines.iter().map(String::as_str).collect::<Vec<_>>();
+
+        assert_eq!(find_owner(&borrowed, 15), None);
+        assert_eq!(find_owner_declaration_index(&borrowed, 15), None);
+    }
+
+    #[test]
+    fn owner_inference_uses_macro_rules_owner() {
+        let lines = [
+            "macro_rules! spawn_unchecked {",
+            "    ($ptr:ident) => {{",
+            "        let runnable = unsafe { Runnable::from_raw($ptr) };",
+            "        runnable",
+            "    }};",
+            "}",
+        ];
+
+        assert_eq!(find_owner(&lines, 2), Some("spawn_unchecked".to_string()));
+        assert_eq!(find_owner_declaration_index(&lines, 2), Some(0));
     }
 
     #[test]
