@@ -69,11 +69,12 @@ cargo xtask check-advisory-artifacts target/unsafe-review
 
 This checks that `cards.json`, `pr-summary.md`, `cards.sarif`, and
 `comment-plan.json` exist, machine-readable artifacts parse, the policy remains
-advisory, the comment plan remains plan-only, projected card IDs match
-`cards.json`, result counts stay consistent, `cards.json` cards keep required
-ReviewCard fields, SARIF and comment-plan metadata agree with `cards.json`, the
-PR summary keeps its top-card, card-table, and witness-plan sections, and the
-trust boundary is present.
+advisory, the comment plan remains plan-only, SARIF result IDs exactly match the
+`cards.json` card set, comment-plan candidates do not duplicate card IDs,
+`cards.json` cards keep required ReviewCard fields, SARIF and comment-plan
+metadata agree with `cards.json`, the PR summary mentions every emitted card ID
+and keeps its top-card, card-table, and witness-plan sections, and the trust
+boundary is present.
 
 Witness tools are routed, not run everywhere. Miri, sanitizers, Loom, and Kani
 belong in targeted PR, nightly, or release lanes unless repo policy says
