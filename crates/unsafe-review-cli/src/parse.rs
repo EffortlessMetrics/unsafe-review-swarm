@@ -20,6 +20,7 @@ pub(crate) fn parse(args: Vec<String>) -> Result<Command, String> {
     match command.as_str() {
         "--help" | "-h" | "help" => Ok(Command::Help),
         "--version" | "-V" => Ok(Command::Version),
+        "support" => parse_support(rest),
         "doctor" => parse_doctor(rest),
         "check" => parse_check(rest).map(Command::Check),
         "first-pr" | "review" => parse_first_pr(rest).map(Command::FirstPr),
@@ -40,6 +41,13 @@ pub(crate) fn parse(args: Vec<String>) -> Result<Command, String> {
             "unknown command `{other}`. Run `unsafe-review --help`."
         )),
     }
+}
+
+fn parse_support(args: Vec<String>) -> Result<Command, String> {
+    if let Some(other) = args.first() {
+        return Err(format!("unknown support argument `{other}`"));
+    }
+    Ok(Command::Support)
 }
 
 fn parse_policy_command(args: Vec<String>) -> Result<Command, String> {
@@ -749,6 +757,16 @@ mod tests {
         assert_eq!(
             parse(args(["unsafe-review", "receipt", "audit", "-h"]))?,
             Command::Help
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parses_support_command() -> Result<(), String> {
+        assert_eq!(parse(args(["unsafe-review", "support"]))?, Command::Support);
+        assert_eq!(
+            parse(args(["unsafe-review", "support", "--root", "."])),
+            Err("unknown support argument `--root`".to_string())
         );
         Ok(())
     }

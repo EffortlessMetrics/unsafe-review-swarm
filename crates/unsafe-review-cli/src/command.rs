@@ -98,6 +98,7 @@ pub(crate) struct OutcomeOptions {
 pub(crate) enum Command {
     Help,
     Version,
+    Support,
     Doctor {
         root: PathBuf,
     },

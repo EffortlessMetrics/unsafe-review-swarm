@@ -31,6 +31,10 @@ pub(crate) fn execute(command: Command) -> Result<(), String> {
             println!("unsafe-review {}", env!("CARGO_PKG_VERSION"));
             Ok(())
         }
+        Command::Support => {
+            print_support();
+            Ok(())
+        }
         Command::Doctor { root } => doctor(&root),
         Command::Check(options) => run_check(options, Scope::Diff, AnalysisMode::Draft),
         Command::Repo(options) => run_check(options, Scope::Repo, AnalysisMode::Repo),
@@ -51,6 +55,37 @@ pub(crate) fn execute(command: Command) -> Result<(), String> {
         Command::PolicyReport(options) => policy_report(options),
         Command::Lsp => crate::lsp::serve(),
     }
+}
+
+fn print_support() {
+    println!("unsafe-review support");
+    println!();
+    println!("Current posture:");
+    println!("- ReviewCards: experimental; selected slices are fixture-backed or dogfood-backed.");
+    println!(
+        "- first-pr bundle: advisory; projects cards, summaries, SARIF, comment plans, witness plans, and saved LSP JSON from ReviewCards."
+    );
+    println!(
+        "- receipts: saved-output template/import/audit only; receipts attach external evidence to exact card identities."
+    );
+    println!("- outcome comparison: saved snapshot comparison only.");
+    println!("- policy report: advisory no-new-debt simulation only.");
+    println!("- comment posting: not default.");
+    println!("- source edits: not supported.");
+    println!("- witness execution: not default.");
+    println!("- blocking policy: not default.");
+    println!("- live LSP: deferred; saved lsp.json is the current editor-adjacent artifact.");
+    println!();
+    println!("Trust boundary:");
+    println!("- static unsafe contract review only.");
+    println!("- not memory-safety proof.");
+    println!("- not UB-free status.");
+    println!("- not Miri-clean status.");
+    println!("- not a site-execution claim unless a matching receipt says so.");
+    println!();
+    println!("Docs:");
+    println!("- docs/status/SUPPORT_SUMMARY.md");
+    println!("- docs/status/SUPPORT_TIERS.md");
 }
 
 fn run_check(options: CheckOptions, scope: Scope, mode: AnalysisMode) -> Result<(), String> {
@@ -699,6 +734,7 @@ fn print_help() {
     println!("  badges  [--root .] [--out badges]");
     println!("  explain [--root .] [--json|--format json] <card-id>");
     println!("  context [--root .] [--json|--format json] <card-id>");
+    println!("  support");
     println!(
         "  outcome --before <cards.json> --after <cards.json> [--format json|markdown] [--out file]"
     );

@@ -829,6 +829,35 @@ fn doctor_reports_first_install_signals_without_running_witnesses() -> Result<()
 }
 
 #[test]
+fn support_reports_current_posture_without_overclaims() -> Result<(), Box<dyn Error>> {
+    let output = run_success([os("support")])?;
+    let text = stdout_text(&output)?;
+
+    assert!(text.contains("unsafe-review support"));
+    assert!(text.contains("ReviewCards: experimental"));
+    assert!(text.contains("first-pr bundle: advisory"));
+    assert!(text.contains("receipts: saved-output template/import/audit only"));
+    assert!(text.contains("policy report: advisory"));
+    assert!(text.contains("comment posting: not default"));
+    assert!(text.contains("source edits: not supported"));
+    assert!(text.contains("witness execution: not default"));
+    assert!(text.contains("blocking policy: not default"));
+    assert!(text.contains("live LSP: deferred"));
+    assert!(text.contains("saved lsp.json"));
+    assert!(text.contains("static unsafe contract review only"));
+    assert!(text.contains("not memory-safety proof"));
+    assert!(text.contains("not UB-free status"));
+    assert!(text.contains("not Miri-clean status"));
+    assert!(text.contains("not a site-execution claim"));
+    assert!(text.contains("docs/status/SUPPORT_SUMMARY.md"));
+    assert!(!text.contains("safe to use"));
+    assert!(!text.contains("Miri passed"));
+    assert!(!text.contains("All clear"));
+
+    Ok(())
+}
+
+#[test]
 fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment");
     let temp = TempDir::new("unsafe-review-repo-e2e")?;

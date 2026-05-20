@@ -9,6 +9,21 @@ Every command is advisory by default. The tool does not prove memory safety, doe
 not claim UB-free status, does not run witness tools by default, and does not
 post PR comments.
 
+## Support Posture
+
+Print the current support posture and trust boundary without analyzing the repo:
+
+```bash
+unsafe-review support
+```
+
+This is the first command to run when you need to know what is experimental,
+advisory, deferred, or not default. It reports that `ReviewCard`s are the source
+of truth, `first-pr` artifacts are advisory projections, receipts import saved
+external evidence only, policy reports are advisory, witness execution is not
+default, comment posting is not default, source edits are not supported, and
+live LSP remains deferred.
+
 ## Review A Diff
 
 Review the current branch against `origin/main`:

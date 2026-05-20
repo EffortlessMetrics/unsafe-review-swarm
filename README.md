@@ -128,6 +128,7 @@ unsafe-review first-pr \
 | Review a PR | `unsafe-review check --base origin/main` | ReviewCards and PR summary |
 | Feed CI artifacts | `--format json`, `--format sarif`, `--format pr-summary` | Uploaded advisory artifacts |
 | Explain one finding | `unsafe-review explain <card-id>` | Human-readable contract gap |
+| Inspect support posture | `unsafe-review support` | Experimental / advisory / deferred boundaries |
 | Hand work to an agent | `unsafe-review context <card-id> --json` | Bounded repair packet |
 | Audit saved witness receipts | `unsafe-review receipt audit` | Matched / stale / duplicate receipt report |
 | Compare before/after posture | `unsafe-review outcome --before before.json --after after.json` | New / resolved / improved / regressed cards |

@@ -28,6 +28,7 @@ calibration exists and support tiers are explicitly promoted.
 | PR artifacts: cards JSON, PR summary, SARIF, comment-plan | Experimental | Fixture-backed and workflow-verified; advisory artifact loop is dogfoodable | Automatic comments, branch protection, witness execution, or policy gating |
 | Saved LSP projection and agent packet | Experimental | Fixture-backed and e2e-covered read-only projections from `ReviewCard` | Live editor integration, agent execution, source edits, or repair success |
 | Witness routes and saved-output receipt import | Experimental | Fixture-backed route table plus saved-output receipt adapters | Running Miri/cargo-careful/sanitizers/Loom/Kani, site reach, or witness success beyond imported receipt scope |
+| Support posture command | Experimental | CLI e2e covers `unsafe-review support` trust-boundary output | Support summary only; not a release promise, policy gate, or proof claim |
 | Repo posture, badge JSON, outcome comparison, and policy report | Experimental | Fixture-backed; outcome comparison has limited saved-snapshot dogfood | Safety badge, release-grade dashboard, default no-new-debt, or blocking policy |
 | Real-crate dogfood measurement | Experimental | Eight capped repo snapshots and twenty-three selected PR diffs across real crates | Calibrated rates, full audits, uncapped performance guarantees, or ecosystem-wide coverage |
 | MIR/nightly facts and live LSP/editor integration | Deferred or planned | Requires later ADR/spec and proof | Default dependency, support promise, or v0.x gate behavior |
