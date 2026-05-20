@@ -135,6 +135,7 @@ required_core_fixtures = [
   "ptr_copy_slice_range_guard",
   "ptr_copy_slice_range_early_return_guard",
   "ptr_copy_slice_range_open_branch_guard",
+  "ptr_copy_slice_range_open_branch_reassigned_count_not_guard",
   "ptr_copy_slice_range_src_only_not_guard",
   "ptr_copy_slice_range_dst_only_not_guard",
   "ptr_copy_slice_range_reassigned_count_not_guard",
@@ -145,6 +146,7 @@ required_core_fixtures = [
   "copy_nonoverlapping_slice_range_guard",
   "copy_nonoverlapping_slice_range_early_return_guard",
   "copy_nonoverlapping_slice_range_open_branch_guard",
+  "copy_nonoverlapping_slice_range_open_branch_reassigned_count_not_guard",
   "copy_nonoverlapping_slice_range_src_only_not_guard",
   "copy_nonoverlapping_slice_range_dst_only_not_guard",
   "copy_nonoverlapping_slice_range_reassigned_count_not_guard",
@@ -1578,6 +1580,16 @@ expected_operation_family = "copy_nonoverlapping"
 expected_hazard = "aliasing_or_provenance"
 
 [[cases]]
+fixture = "copy_nonoverlapping_slice_range_open_branch_reassigned_count_not_guard"
+kind = "false_positive_control"
+claim = "copy_nonoverlapping rejects stale open-branch slice range evidence after the checked count is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
 fixture = "copy_nonoverlapping_slice_range_src_only_not_guard"
 kind = "false_positive_control"
 claim = "copy_nonoverlapping rejects source-only slice length assertions as full source/destination range evidence"
@@ -1661,6 +1673,16 @@ expected_hazard = "pointer_validity"
 fixture = "ptr_copy_slice_range_open_branch_guard"
 kind = "positive"
 claim = "ptr::copy accepts same-call source and destination open-branch slice length guards as valid-range evidence without proving initialized memory"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_open_branch_reassigned_count_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy rejects stale open-branch slice range evidence after the checked count is reassigned"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
