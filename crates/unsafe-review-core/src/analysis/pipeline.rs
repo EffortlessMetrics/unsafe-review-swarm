@@ -1677,7 +1677,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
-    fn box_origin_evidence_rejects_reassigned_pointers() -> Result<(), String> {
+    fn box_origin_evidence_rejects_stale_or_mismatched_pointers() -> Result<(), String> {
         for (fixture, family) in [
             (
                 "box_from_raw_reassigned_origin_not_guard",
