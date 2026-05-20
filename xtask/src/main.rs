@@ -1236,6 +1236,7 @@ fn check_advisory_artifacts(dir: &Path) -> Result<(), String> {
     let sarif = parse_json_file(&dir.join("cards.sarif"))?;
     require_json_str(&sarif, "version", "2.1.0", "cards.sarif")?;
     require_json_array(&sarif, "runs", "cards.sarif")?;
+    require_sarif_run_shape(&sarif)?;
     let sarif_results = json_array_at(&sarif, "/runs/0/results", "cards.sarif")?;
     if sarif_results.len() != card_count {
         return Err(format!(
@@ -1244,17 +1245,14 @@ fn check_advisory_artifacts(dir: &Path) -> Result<(), String> {
         ));
     }
     for result in sarif_results {
-        let Some(card_id) = result
-            .pointer("/properties/cardId")
-            .and_then(serde_json::Value::as_str)
-        else {
-            return Err("cards.sarif result is missing properties.cardId".to_string());
-        };
+        let card_id =
+            require_non_empty_json_str_at(result, "/properties/cardId", "cards.sarif result")?;
         if !card_ids.contains(card_id) {
             return Err(format!(
                 "cards.sarif result references unknown card id `{card_id}`"
             ));
         }
+        require_sarif_result_shape(result)?;
     }
     let sarif_boundary = sarif
         .pointer("/runs/0/properties/trustBoundary")
@@ -2492,6 +2490,21 @@ fn require_json_str(
     }
 }
 
+fn require_json_str_at(
+    value: &serde_json::Value,
+    pointer: &str,
+    expected: &str,
+    path: &str,
+) -> Result<(), String> {
+    match value.pointer(pointer).and_then(serde_json::Value::as_str) {
+        Some(actual) if actual == expected => Ok(()),
+        Some(actual) => Err(format!(
+            "{path} string at `{pointer}` is `{actual}`, expected `{expected}`"
+        )),
+        None => Err(format!("{path} is missing string at `{pointer}`")),
+    }
+}
+
 fn require_json_array(value: &serde_json::Value, key: &str, path: &str) -> Result<(), String> {
     if value.get(key).is_some_and(serde_json::Value::is_array) {
         Ok(())
@@ -2513,6 +2526,102 @@ fn require_non_empty_json_str<'a>(
     } else {
         Ok(actual)
     }
+}
+
+fn require_non_empty_json_str_at<'a>(
+    value: &'a serde_json::Value,
+    pointer: &str,
+    path: &str,
+) -> Result<&'a str, String> {
+    let Some(actual) = value.pointer(pointer).and_then(serde_json::Value::as_str) else {
+        return Err(format!("{path} is missing string at `{pointer}`"));
+    };
+    if actual.trim().is_empty() {
+        Err(format!("{path} string at `{pointer}` is empty"))
+    } else {
+        Ok(actual)
+    }
+}
+
+fn require_positive_json_u64_at(
+    value: &serde_json::Value,
+    pointer: &str,
+    path: &str,
+) -> Result<(), String> {
+    let Some(number) = value.pointer(pointer).and_then(serde_json::Value::as_u64) else {
+        return Err(format!("{path} is missing unsigned integer at `{pointer}`"));
+    };
+    if number == 0 {
+        Err(format!(
+            "{path} unsigned integer at `{pointer}` must be greater than zero"
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn require_sarif_run_shape(sarif: &serde_json::Value) -> Result<(), String> {
+    require_json_str_at(
+        sarif,
+        "/runs/0/tool/driver/name",
+        "unsafe-review",
+        "cards.sarif",
+    )?;
+    require_non_empty_json_str_at(sarif, "/runs/0/tool/driver/semanticVersion", "cards.sarif")?;
+    require_non_empty_json_str_at(sarif, "/runs/0/tool/driver/informationUri", "cards.sarif")?;
+    json_array_at(sarif, "/runs/0/tool/driver/rules", "cards.sarif")?;
+    require_non_empty_json_str_at(sarif, "/runs/0/properties/schemaVersion", "cards.sarif")?;
+    require_non_empty_json_str_at(sarif, "/runs/0/properties/scope", "cards.sarif")?;
+    require_non_empty_json_str_at(sarif, "/runs/0/properties/mode", "cards.sarif")?;
+    require_json_str_at(
+        sarif,
+        "/runs/0/properties/policy",
+        "advisory",
+        "cards.sarif",
+    )?;
+    Ok(())
+}
+
+fn require_sarif_result_shape(result: &serde_json::Value) -> Result<(), String> {
+    let rule_id = require_non_empty_json_str_at(result, "/ruleId", "cards.sarif result")?;
+    let class = require_non_empty_json_str_at(result, "/properties/class", "cards.sarif result")?;
+    if rule_id != class {
+        return Err(format!(
+            "cards.sarif result ruleId `{rule_id}` does not match properties.class `{class}`"
+        ));
+    }
+    let level = require_non_empty_json_str_at(result, "/level", "cards.sarif result")?;
+    if !matches!(level, "warning" | "note" | "none") {
+        return Err(format!("cards.sarif result has unknown level `{level}`"));
+    }
+    require_non_empty_json_str_at(result, "/message/text", "cards.sarif result")?;
+    require_non_empty_json_str_at(
+        result,
+        "/locations/0/physicalLocation/artifactLocation/uri",
+        "cards.sarif result",
+    )?;
+    require_positive_json_u64_at(
+        result,
+        "/locations/0/physicalLocation/region/startLine",
+        "cards.sarif result",
+    )?;
+    require_positive_json_u64_at(
+        result,
+        "/locations/0/physicalLocation/region/startColumn",
+        "cards.sarif result",
+    )?;
+    require_non_empty_json_str_at(result, "/properties/priority", "cards.sarif result")?;
+    require_non_empty_json_str_at(result, "/properties/confidence", "cards.sarif result")?;
+    require_non_empty_json_str_at(result, "/properties/operationFamily", "cards.sarif result")?;
+    require_non_empty_json_str_at(result, "/properties/operation", "cards.sarif result")?;
+    json_array_at(result, "/properties/hazards", "cards.sarif result")?;
+    json_array_at(result, "/properties/missingEvidence", "cards.sarif result")?;
+    json_array_at(result, "/properties/witnessRoutes", "cards.sarif result")?;
+    require_non_empty_json_str_at(result, "/properties/nextAction", "cards.sarif result")?;
+    let boundary =
+        require_non_empty_json_str_at(result, "/properties/trustBoundary", "cards.sarif result")?;
+    require_boundary_text(boundary, "cards.sarif result")?;
+    Ok(())
 }
 
 fn require_comment_line(comment: &serde_json::Value) -> Result<(), String> {
@@ -3995,6 +4104,50 @@ impl WitnessKind {
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_malformed_sarif_result() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-malformed-sarif")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        write_sarif_artifact(
+            &dir,
+            r#"{"ruleId":"guard_missing","level":"warning","message":{"text":"guard_missing: add alignment evidence"},"locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":0,"startColumn":1}}}],"properties":{"cardId":"card-1","class":"guard_missing","priority":"high","confidence":"high","operationFamily":"raw_pointer_read","operation":"ptr.read()","hazards":["alignment"],"missingEvidence":["alignment guard missing"],"witnessRoutes":["miri: pointer validity"],"nextAction":"Add missing guard evidence","trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}"#,
+        )?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("must be greater than zero")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn advisory_artifact_checker_rejects_sarif_result_without_boundary() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-sarif-result-boundary")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        write_sarif_artifact(
+            &dir,
+            r#"{"ruleId":"guard_missing","level":"warning","message":{"text":"guard_missing: add alignment evidence"},"locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":1,"startColumn":1}}}],"properties":{"cardId":"card-1","class":"guard_missing","priority":"high","confidence":"high","operationFamily":"raw_pointer_read","operation":"ptr.read()","hazards":["alignment"],"missingEvidence":["alignment guard missing"],"witnessRoutes":["miri: pointer validity"],"nextAction":"Add missing guard evidence"}}"#,
+        )?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("/properties/trustBoundary")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn advisory_artifact_checker_rejects_unknown_projection_card_ids() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-artifacts-unknown-id")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -4187,17 +4340,27 @@ review_after = "2026-08-01"
             "- Review cards: 1\n\nThis artifact is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
         )
         .map_err(|err| format!("write pr summary failed: {err}"))?;
-        fs::write(
-            dir.join("cards.sarif"),
-            r#"{"version":"2.1.0","runs":[{"results":[{"properties":{"cardId":"card-1"}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
-        )
-        .map_err(|err| format!("write sarif failed: {err}"))?;
+        write_sarif_artifact(dir, valid_sarif_result())?;
         fs::write(
             dir.join("comment-plan.json"),
             r#"{"mode":"plan_only","policy":"advisory","comments":[{"card_id":"card-1","path":"src/lib.rs","line":1,"class":"guard_missing","priority":"high","confidence":"high","operation_family":"raw_pointer_read","selection_reason":"actionable high-confidence review card","body":"Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and not a Miri result unless a witness receipt is attached."}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
         )
         .map_err(|err| format!("write comment plan failed: {err}"))?;
         Ok(())
+    }
+
+    fn write_sarif_artifact(dir: &Path, result: &str) -> Result<(), String> {
+        fs::write(
+            dir.join("cards.sarif"),
+            format!(
+                r#"{{"version":"2.1.0","runs":[{{"tool":{{"driver":{{"name":"unsafe-review","semanticVersion":"0.1.0","informationUri":"https://github.com/EffortlessMetrics/unsafe-review","rules":[{{"id":"guard_missing"}}]}}}},"results":[{result}],"properties":{{"schemaVersion":"0.1","scope":"diff","mode":"draft","policy":"advisory","trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}}}]}}"#
+            ),
+        )
+        .map_err(|err| format!("write sarif failed: {err}"))
+    }
+
+    fn valid_sarif_result() -> &'static str {
+        r#"{"ruleId":"guard_missing","level":"warning","message":{"text":"guard_missing: add alignment evidence"},"locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":1,"startColumn":1}}}],"properties":{"cardId":"card-1","class":"guard_missing","priority":"high","confidence":"high","operationFamily":"raw_pointer_read","operation":"ptr.read()","hazards":["alignment"],"missingEvidence":["alignment guard missing"],"witnessRoutes":["miri: pointer validity"],"nextAction":"Add missing guard evidence","trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}"#
     }
 
     fn unique_temp_dir(prefix: &str) -> Result<PathBuf, String> {
