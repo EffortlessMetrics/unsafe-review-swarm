@@ -353,10 +353,118 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     assert_eq!(packet["policy"], "advisory");
     assert_eq!(packet["card_id"], card_id);
     assert_eq!(packet["card"]["id"], card_id);
+    assert_eq!(packet["card"]["class"], value["cards"][0]["class"]);
+    assert_eq!(packet["card"]["priority"], value["cards"][0]["priority"]);
+    assert_eq!(
+        packet["card"]["confidence"],
+        value["cards"][0]["confidence"]
+    );
+    assert_eq!(
+        packet["task"],
+        "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation."
+    );
+    assert_eq!(packet["context"]["file"], value["cards"][0]["site"]["file"]);
+    assert_eq!(packet["context"]["line"], value["cards"][0]["site"]["line"]);
+    assert_eq!(
+        packet["context"]["owner"],
+        value["cards"][0]["site"]["owner"]
+    );
+    assert_eq!(
+        packet["context"]["site_kind"],
+        value["cards"][0]["site"]["kind"]
+    );
     assert_eq!(packet["context"]["operation_family"], "raw_pointer_read");
-    assert!(packet["witness_routes"].is_array());
-    assert!(packet["do_not_do"].is_array());
-    assert!(packet["stop_conditions"].is_array());
+    assert_eq!(
+        packet["context"]["operation"],
+        "unsafe { ptr.cast::<Header>().read() }"
+    );
+    assert_eq!(
+        packet["context"]["snippet"],
+        value["cards"][0]["site"]["snippet"]
+    );
+    assert_eq!(packet["context"]["hazards"], value["cards"][0]["hazards"]);
+    assert_eq!(
+        packet["required_safety_conditions"],
+        value["cards"][0]["obligations"]
+    );
+    assert_eq!(packet["missing"], value["cards"][0]["missing"]);
+    assert_eq!(
+        packet["allowed_repairs"][0],
+        "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation."
+    );
+    assert_eq!(packet["repair_scope"], "this card only");
+    assert_eq!(
+        packet["verify_commands"],
+        value["cards"][0]["verify_commands"]
+    );
+    assert!(
+        packet["safety_contract"]["reach_limitation"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not proof that the unsafe site executed")
+    );
+    assert!(
+        packet["obligation_evidence"]
+            .as_array()
+            .is_some_and(|evidence| evidence.iter().any(|item| {
+                item["key"] == "alignment"
+                    && item["discharge"]["state"] == "missing"
+                    && item["contract"]["state"] == "present"
+            }))
+    );
+    assert!(
+        packet["missing_evidence"]
+            .as_array()
+            .is_some_and(|missing| missing.iter().any(|item| {
+                item["message"] == "Missing visible local guard for inferred safety obligations"
+            }))
+    );
+    assert!(packet["witness_routes"].as_array().is_some_and(|routes| {
+        routes.iter().any(|route| {
+            route["kind"] == "miri"
+                && route["required"] == false
+                && route["command"]
+                    .as_str()
+                    .unwrap_or("")
+                    .contains("cargo +nightly miri test read_header")
+        })
+    }));
+    assert!(packet["do_not_do"].as_array().is_some_and(|rules| {
+        rules.iter().any(|rule| {
+            rule.as_str()
+                .unwrap_or("")
+                .contains("do not change unrelated unsafe code")
+        })
+    }));
+    assert!(packet["do_not_do"].as_array().is_some_and(|rules| {
+        rules.iter().any(|rule| {
+            rule.as_str()
+                .unwrap_or("")
+                .contains("do not claim Miri proof unless the witness command is run")
+        })
+    }));
+    assert!(
+        packet["stop_conditions"]
+            .as_array()
+            .is_some_and(|conditions| {
+                conditions.iter().any(|condition| {
+                    condition
+                        .as_str()
+                        .unwrap_or("")
+                        .contains("ReviewCard identity still maps to the same unsafe seam")
+                })
+            })
+    );
+    assert!(
+        packet["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not a Miri result")
+    );
+    let packet_text = serde_json::to_string(&packet)?;
+    assert!(!packet_text.contains("fix this unsafe code"));
+    assert!(!packet_text.contains("automatic"));
+    assert!(!packet_text.contains("\"edit\""));
 
     let explain = run_success([
         os("explain"),
