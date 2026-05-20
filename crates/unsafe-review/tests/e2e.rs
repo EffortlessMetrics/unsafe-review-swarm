@@ -587,9 +587,13 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     let stdout = stdout_text(&output)?;
 
     assert!(stdout.contains("unsafe-review first-pr"));
+    assert!(stdout.contains("unsafe-review wrote an advisory PR bundle."));
+    assert!(stdout.contains("- Artifact directory:"));
     assert!(stdout.contains("- Review cards: 1"));
     assert!(stdout.contains("- Open actionable gaps: 1"));
-    assert!(stdout.contains("Top action:"));
+    assert!(stdout.contains("Open:"));
+    assert!(stdout.contains("pr-summary.md"));
+    assert!(stdout.contains("Top card:"));
     assert!(stdout.contains("`raw_pointer_read`"));
     assert!(stdout.contains("Class: `guard_missing`"));
     assert!(stdout.contains("Route: `miri`"));
@@ -601,6 +605,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("comment-plan.json"));
     assert!(stdout.contains("witness-plan.md"));
     assert!(stdout.contains("lsp.json"));
+    assert!(stdout.contains("Trust boundary:"));
     assert!(stdout.contains("did not run witnesses"));
     assert!(stdout.contains("post comments"));
     assert!(stdout.contains("enforce blocking policy"));
@@ -697,8 +702,12 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
     let stdout = stdout_text(&output)?;
 
     assert!(stdout.contains("unsafe-review first-pr"));
+    assert!(stdout.contains("unsafe-review wrote an advisory PR bundle."));
+    assert!(stdout.contains("- Artifact directory:"));
     assert!(stdout.contains("- Review cards: 0"));
     assert!(stdout.contains("- Open actionable gaps: 0"));
+    assert!(stdout.contains("Open:"));
+    assert!(stdout.contains("pr-summary.md"));
     assert!(stdout.contains("No changed unsafe-review gaps were found."));
     assert!(stdout.contains("This does not prove the repo safe"));
     assert!(stdout.contains("not UB-free status"));
