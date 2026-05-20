@@ -35,11 +35,11 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
         let route = card.routes.first().map_or("human", |r| r.kind.as_str());
         out.push_str(&format!(
             "| `{}` | `{}` | `{}` | `{}` | `{}` |\n",
-            card.id,
-            card.class.as_str(),
-            hazard,
-            missing,
-            route
+            md_cell(&card.id.to_string()),
+            md_cell(card.class.as_str()),
+            md_cell(hazard),
+            md_cell(missing),
+            md_cell(route)
         ));
     }
     out.push_str("\n## Trust boundary\n\n");
@@ -343,6 +343,7 @@ fn one_line(value: &str) -> String {
 mod tests {
     use super::*;
     use crate::api::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, analyze};
+    use crate::domain::CardId;
     use std::path::PathBuf;
 
     #[test]
@@ -392,6 +393,28 @@ mod tests {
         assert!(rendered.contains("No actionable unsafe-review cards found."));
         assert!(rendered.contains("No witness route is recommended"));
         assert!(rendered.contains("not UB-free status"));
+        Ok(())
+    }
+
+    #[test]
+    fn generic_markdown_card_table_escapes_table_cells() -> Result<(), String> {
+        let mut output = fixture_output("raw_pointer_alignment")?;
+        let card = output
+            .cards
+            .first_mut()
+            .ok_or_else(|| "raw pointer fixture should emit a card".to_string())?;
+        card.id = CardId("UR-pipe|card-c1".to_string());
+        let missing = card
+            .missing
+            .first_mut()
+            .ok_or_else(|| "raw pointer fixture should have missing evidence".to_string())?;
+        missing.kind = "guard|alignment".to_string();
+
+        let rendered = render(&output);
+
+        assert!(rendered.contains("`UR-pipe\\|card-c1`"));
+        assert!(rendered.contains("`guard\\|alignment`"));
+        assert!(!rendered.contains("`UR-pipe|card-c1`"));
         Ok(())
     }
 
