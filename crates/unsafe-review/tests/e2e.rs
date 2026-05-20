@@ -337,9 +337,40 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     ])?;
     let witness_plan = fs::read_to_string(&witness_plan_path)?;
     assert!(witness_plan.contains("# unsafe-review witness plan"));
+    assert!(witness_plan.contains("- Review cards: 1"));
+    assert!(witness_plan.contains("- Open actionable gaps: 1"));
+    assert!(witness_plan.contains("- Policy mode: `advisory`"));
+    assert!(witness_plan.contains("## Routes"));
+    assert!(witness_plan.contains(&format!("### `{card_id}`")));
+    assert!(witness_plan.contains("- Class: `guard_missing`"));
+    assert!(witness_plan.contains("- Location: src/lib.rs:8"));
+    assert!(witness_plan.contains("- Operation: `unsafe { ptr.cast::<Header>().read() }`"));
+    assert!(witness_plan.contains("Missing visible local guard for inferred safety obligations"));
+    assert!(witness_plan.contains("No witness receipt imported for this card"));
+    assert!(witness_plan.contains("- Witness evidence: No imported witness receipt was found"));
     assert!(witness_plan.contains("Route: `miri`"));
+    assert!(
+        witness_plan.contains(
+            "Miri is the strongest concrete-execution witness when the path is supported"
+        )
+    );
     assert!(witness_plan.contains("cargo +nightly miri test read_header"));
+    assert!(witness_plan.contains("Route: `cargo-careful`"));
+    assert!(
+        witness_plan.contains("cargo-careful is a cheaper compatibility-oriented runtime check")
+    );
+    assert!(witness_plan.contains("cargo +nightly careful test read_header"));
+    assert!(witness_plan.contains("## Trust boundary"));
     assert!(witness_plan.contains("does not run Miri"));
+    assert!(
+        witness_plan
+            .contains("does not run Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux")
+    );
+    assert!(witness_plan.contains("not a proof of memory safety"));
+    assert!(witness_plan.contains("not UB-free status"));
+    assert!(witness_plan.contains("not a Miri result unless a witness receipt is attached"));
+    assert!(!witness_plan.contains("Miri passed"));
+    assert!(!witness_plan.contains("site reached"));
 
     let context = run_success([
         os("context"),
