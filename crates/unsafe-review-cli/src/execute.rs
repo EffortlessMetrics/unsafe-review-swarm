@@ -76,6 +76,7 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     let mut check = options.check;
     check.policy = PolicyMode::Advisory;
     let diff = diff_source(&check)?;
+    let root = check.root.clone();
     let output = analyze(AnalyzeInput {
         root: check.root,
         scope: Scope::Diff,
@@ -136,6 +137,12 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
             println!("  Route: `{}`", route.kind.as_str());
         }
         println!("  Next: {}", card.next_action.summary);
+        println!("Inspect top card:");
+        println!(
+            "  unsafe-review explain --root {} {}",
+            root.display(),
+            card.id
+        );
     }
     println!("Artifacts:");
     for name in [

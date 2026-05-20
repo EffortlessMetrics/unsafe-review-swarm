@@ -113,12 +113,16 @@ artifact only; `unsafe-review` does not post comments by default.
 
 ## Inspect One Card
 
-Copy a card id from JSON, human output, or the PR summary and ask for the human
-explanation:
+`first-pr` prints an `Inspect top card` command for the highest-priority card.
+Run that command to see why the card exists, what evidence is missing, what would
+resolve it, and what would not resolve it:
 
 ```bash
 unsafe-review explain <card-id>
 ```
+
+You can also copy any other card id from JSON, human output, or the PR summary
+and pass it to `explain`.
 
 Generate a bounded repair packet for an LLM or agent:
 

@@ -593,6 +593,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("`raw_pointer_read`"));
     assert!(stdout.contains("Class: `guard_missing`"));
     assert!(stdout.contains("Route: `miri`"));
+    assert!(stdout.contains("Inspect top card:"));
     assert!(stdout.contains("Artifacts:"));
     assert!(stdout.contains("cards.json"));
     assert!(stdout.contains("pr-summary.md"));
@@ -617,6 +618,8 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             .contains("not a proof of memory safety")
     );
     let card_id = json_str(&cards["cards"][0]["id"], "cards[0].id")?;
+    assert!(stdout.contains("unsafe-review explain --root"));
+    assert!(stdout.contains(card_id));
 
     let summary = fs::read_to_string(out_dir.join("pr-summary.md"))?;
     assert!(summary.contains("# unsafe-review PR summary"));
