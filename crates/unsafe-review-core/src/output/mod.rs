@@ -4,6 +4,7 @@ pub(crate) mod human;
 pub(crate) mod json;
 pub(crate) mod lsp;
 pub(crate) mod markdown;
+pub(crate) mod markdown_table;
 pub(crate) mod outcome;
 pub(crate) mod policy_report;
 pub(crate) mod receipt_audit;

@@ -1,5 +1,6 @@
 use crate::api::AnalyzeOutput;
 use crate::domain::ReviewClass;
+use crate::output::markdown_table;
 use serde::Serialize;
 use std::collections::BTreeSet;
 use std::fs;
@@ -286,11 +287,7 @@ fn optional_text(value: Option<&str>) -> String {
 }
 
 fn markdown_cell(value: &str) -> String {
-    value
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .replace('|', "\\|")
+    markdown_table::cell(value)
 }
 
 fn current_utc_date() -> Result<String, String> {

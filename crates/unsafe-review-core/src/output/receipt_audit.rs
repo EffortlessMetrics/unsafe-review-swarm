@@ -1,4 +1,5 @@
 use crate::analysis::receipts::ReceiptAuditReport;
+use crate::output::markdown_table;
 
 pub(crate) fn render_json(report: &ReceiptAuditReport) -> String {
     match serde_json::to_string_pretty(report) {
@@ -64,11 +65,7 @@ fn optional_code(value: Option<&str>) -> String {
 }
 
 fn markdown_cell(value: &str) -> String {
-    value
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .replace('|', "\\|")
+    markdown_table::cell(value)
 }
 
 #[cfg(test)]

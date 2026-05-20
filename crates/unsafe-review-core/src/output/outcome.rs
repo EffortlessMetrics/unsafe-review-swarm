@@ -1,3 +1,4 @@
+use crate::output::markdown_table;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -407,11 +408,7 @@ fn markdown_state(state: Option<&OutcomeCardState>) -> String {
 }
 
 fn markdown_cell(value: &str) -> String {
-    value
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .replace('|', "\\|")
+    markdown_table::cell(value)
 }
 
 impl From<&Snapshot> for OutcomeSnapshotSummary {

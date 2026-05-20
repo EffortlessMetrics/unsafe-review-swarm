@@ -1,6 +1,7 @@
 use crate::api::AnalyzeOutput;
 use crate::api::Scope;
 use crate::domain::ReviewCard;
+use crate::output::markdown_table;
 use crate::util::path_display;
 use std::collections::BTreeMap;
 
@@ -332,7 +333,7 @@ fn missing_summary(card: &ReviewCard) -> String {
 }
 
 fn md_cell(value: &str) -> String {
-    one_line(value).replace('|', "\\|")
+    markdown_table::cell(value)
 }
 
 fn one_line(value: &str) -> String {
