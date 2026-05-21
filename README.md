@@ -87,29 +87,23 @@ install the `unsafe-review` façade crate.
 
 ```bash
 # Review the current PR against main
-unsafe-review check --base origin/main
-
-# Write the reviewer-facing summary
-unsafe-review check --base origin/main \
-  --format pr-summary \
-  --out target/unsafe-review/pr-summary.md
-
-# Write machine-readable cards
-unsafe-review check --base origin/main \
-  --format json \
-  --out target/unsafe-review/cards.json
+unsafe-review first-pr --base origin/main
 
 # Explain one card
 unsafe-review explain <card-id>
 ```
 
+`first-pr` writes `cards.json`, `pr-summary.md`, `cards.sarif`,
+`comment-plan.json`, and `witness-plan.md` under `target/unsafe-review/`. It is
+advisory-only: it does not run witnesses, post comments, edit source, or enforce
+blocking policy.
+
 Try the bundled smoke fixture:
 
 ```bash
-unsafe-review check \
+unsafe-review first-pr \
   --root fixtures/raw_pointer_alignment \
-  --diff fixtures/raw_pointer_alignment/change.diff \
-  --format pr-summary
+  --diff fixtures/raw_pointer_alignment/change.diff
 ```
 
 ## What unsafe-review produces
@@ -134,6 +128,7 @@ unsafe-review check \
 | Review a PR | `unsafe-review check --base origin/main` | ReviewCards and PR summary |
 | Feed CI artifacts | `--format json`, `--format sarif`, `--format pr-summary` | Uploaded advisory artifacts |
 | Explain one finding | `unsafe-review explain <card-id>` | Human-readable contract gap |
+| Inspect support posture | `unsafe-review support` | Experimental / advisory / deferred boundaries |
 | Hand work to an agent | `unsafe-review context <card-id> --json` | Bounded repair packet |
 | Audit saved witness receipts | `unsafe-review receipt audit` | Matched / stale / duplicate receipt report |
 | Compare before/after posture | `unsafe-review outcome --before before.json --after after.json` | New / resolved / improved / regressed cards |
@@ -164,6 +159,7 @@ posture live in the status docs.
 | Claim-to-proof ledger | [Support tiers](docs/status/SUPPORT_TIERS.md) |
 | First-use guide | [First-use guide](docs/FIRST_USE.md) |
 | ReviewCard trust boundary | [ReviewCard explanation](docs/explanation/review-cards-and-trust-boundary.md) |
+| Explain examples | [Reviewer examples](docs/explanation/explain-examples.md) |
 | Dogfood evidence | [Dogfood index](docs/dogfood/index.md) |
 | CLI reference | [CLI guide](docs/CLI.md) |
 
@@ -199,6 +195,7 @@ cargo run --locked -p xtask -- check-dogfood
 - [Architecture](docs/ARCHITECTURE.md)
 - [CLI guide](docs/CLI.md)
 - [ReviewCard trust boundary](docs/explanation/review-cards-and-trust-boundary.md)
+- [Explain examples](docs/explanation/explain-examples.md)
 - [Specifications](docs/specs/README.md)
 - [ADRs](docs/adr/README.md)
 - [Implementation plan](plans/0.1.0/implementation-plan.md)

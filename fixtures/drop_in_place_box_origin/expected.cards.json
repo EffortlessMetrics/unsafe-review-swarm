@@ -1,114 +1,130 @@
 [
-    {
-      "id": "UR-drop-in-place-box-origin-fixture-src-lib-rs-drop-owned-box-operation-drop_in_place-drop-in-place-c8a34da3b35a-pointer_validity-c1",
-      "class": "guarded_unwitnessed",
-      "priority": "medium",
-      "confidence": "medium",
-      "site": {
-        "file": "src/lib.rs",
-        "line": 5,
-        "column": 9,
-        "kind": "operation",
-        "owner": "drop_owned_box",
-        "visibility": "private",
-        "public_api_surface": false,
-        "snippet": "core::ptr::drop_in_place(ptr);"
-      },
-      "operation_family": "drop_in_place",
-      "hazards": [
-        "pointer_validity",
-        "initialized_memory",
-        "drop_or_deallocation"
-      ],
-      "obligations": [
-        "pointer is valid for dropping one value",
-        "pointed-to value is initialized",
-        "value will not be dropped again or observed after drop"
-      ],
-      "obligation_evidence": [
-        {
-          "key": "pointer-live",
-          "description": "pointer is valid for dropping one value",
-          "contract": {
-            "present": true,
-            "state": "present",
-            "summary": "Nearby `SAFETY:` comment was detected"
-          },
-          "discharge": {
-            "present": true,
-            "state": "present",
-            "summary": "Box::into_raw origin evidence was detected"
-          },
-          "reach": {
-            "present": true,
-            "state": "present",
-            "summary": "1 related test file(s) mention owner `drop_owned_box`"
-          },
-          "witness": {
-            "present": false,
-            "state": "missing",
-            "summary": "No imported witness receipt was found"
-          }
+  {
+    "id": "UR-drop-in-place-box-origin-fixture-src-lib-rs-drop-owned-box-operation-drop_in_place-drop-in-place-c8a34da3b35a-pointer_validity-c1",
+    "class": "guarded_unwitnessed",
+    "priority": "medium",
+    "confidence": "medium",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 5,
+      "column": 9,
+      "kind": "operation",
+      "owner": "drop_owned_box",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "core::ptr::drop_in_place(ptr);"
+    },
+    "operation": "core::ptr::drop_in_place(ptr);",
+    "operation_family": "drop_in_place",
+    "hazards": [
+      "pointer_validity",
+      "initialized_memory",
+      "drop_or_deallocation"
+    ],
+    "obligations": [
+      "pointer is valid for dropping one value",
+      "pointed-to value is initialized",
+      "value will not be dropped again or observed after drop"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "pointer-live",
+        "description": "pointer is valid for dropping one value",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
         },
-        {
-          "key": "initialized",
-          "description": "pointed-to value is initialized",
-          "contract": {
-            "present": true,
-            "state": "present",
-            "summary": "Nearby `SAFETY:` comment was detected"
-          },
-          "discharge": {
-            "present": true,
-            "state": "present",
-            "summary": "Box::into_raw origin evidence was detected"
-          },
-          "reach": {
-            "present": true,
-            "state": "present",
-            "summary": "1 related test file(s) mention owner `drop_owned_box`"
-          },
-          "witness": {
-            "present": false,
-            "state": "missing",
-            "summary": "No imported witness receipt was found"
-          }
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Box::into_raw origin evidence was detected"
         },
-        {
-          "key": "ownership",
-          "description": "value will not be dropped again or observed after drop",
-          "contract": {
-            "present": true,
-            "state": "present",
-            "summary": "Nearby `SAFETY:` comment was detected"
-          },
-          "discharge": {
-            "present": true,
-            "state": "present",
-            "summary": "Box::into_raw ownership evidence was detected"
-          },
-          "reach": {
-            "present": true,
-            "state": "present",
-            "summary": "1 related test file(s) mention owner `drop_owned_box`"
-          },
-          "witness": {
-            "present": false,
-            "state": "missing",
-            "summary": "No imported witness receipt was found"
-          }
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `drop_owned_box`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
         }
-      ],
-      "contract": "Nearby `SAFETY:` comment was detected",
-      "discharge": "All inferred safety obligations have visible local discharge evidence",
-      "reach": "1 related test file(s) mention owner `drop_owned_box`",
-      "witness": "No imported witness receipt was found",
-      "missing": [
-        "No witness receipt imported for this card"
-      ],
-      "verify_commands": [
-        "cargo +nightly miri test drop_owned_box",
-        "cargo +nightly careful test drop_owned_box"
-      ]
-    }
-  ]
+      },
+      {
+        "key": "initialized",
+        "description": "pointed-to value is initialized",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Box::into_raw origin evidence was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `drop_owned_box`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "ownership",
+        "description": "value will not be dropped again or observed after drop",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Box::into_raw ownership evidence was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `drop_owned_box`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "All inferred safety obligations have visible local discharge evidence",
+    "reach": "1 related test file(s) mention owner `drop_owned_box`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test drop_owned_box",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test drop_owned_box",
+        "required": false
+      }
+    ],
+    "missing": [
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Attach a focused witness receipt or mark the static limitation explicitly.",
+    "verify_commands": [
+      "cargo +nightly miri test drop_owned_box",
+      "cargo +nightly careful test drop_owned_box"
+    ]
+  }
+]

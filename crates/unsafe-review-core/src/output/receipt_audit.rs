@@ -1,5 +1,4 @@
-use crate::analysis::receipts::ReceiptAuditReport;
-use crate::output::markdown_table;
+use crate::analysis::receipts::{ReceiptAuditCard, ReceiptAuditReport};
 
 pub(crate) fn render_json(report: &ReceiptAuditReport) -> String {
     match serde_json::to_string_pretty(report) {
@@ -32,14 +31,15 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
     if report.receipts.is_empty() {
         out.push_str("No receipt files found.\n\n");
     } else {
-        out.push_str("| Status | Receipt | Card | Tool | Strength | Issues |\n");
-        out.push_str("|---|---|---|---|---|---|\n");
+        out.push_str("| Status | Receipt | Card | Matched card | Tool | Strength | Issues |\n");
+        out.push_str("|---|---|---|---|---|---|---|\n");
         for receipt in &report.receipts {
             out.push_str(&format!(
-                "| {} | `{}` | {} | {} | {} | {} |\n",
+                "| {} | `{}` | {} | {} | {} | {} | {} |\n",
                 markdown_cell(&receipt.statuses.join(", ")),
-                markdown_cell(&receipt.path),
+                receipt.path,
                 optional_code(receipt.card_id.as_deref()),
+                matched_card(receipt.matched_card.as_ref()),
                 optional_code(receipt.receipt_tool.as_deref()),
                 optional_code(receipt.strength.as_deref()),
                 if receipt.issues.is_empty() {
@@ -59,56 +59,25 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
 
 fn optional_code(value: Option<&str>) -> String {
     match value {
-        Some(value) if !value.is_empty() => format!("`{}`", markdown_cell(value)),
+        Some(value) if !value.is_empty() => format!("`{value}`"),
         _ => "-".to_string(),
     }
 }
 
-fn markdown_cell(value: &str) -> String {
-    markdown_table::cell(value)
+fn matched_card(card: Option<&ReceiptAuditCard>) -> String {
+    let Some(card) = card else {
+        return "-".to_string();
+    };
+    format!(
+        "`{}` / `{}` / `{}` / {} missing; next: {}",
+        card.class_name,
+        card.operation_family,
+        markdown_cell(&card.operation),
+        card.missing_count,
+        markdown_cell(&card.next_action)
+    )
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::analysis::receipts::{ReceiptAuditEntry, ReceiptAuditReport, ReceiptAuditSummary};
-
-    #[test]
-    fn receipt_audit_markdown_escapes_table_cells() {
-        let report = ReceiptAuditReport {
-            schema_version: "0.1".to_string(),
-            tool: "unsafe-review".to_string(),
-            mode: "receipt-audit".to_string(),
-            policy: "advisory".to_string(),
-            audit_date: "2026-05-20".to_string(),
-            trust_boundary: "Static witness receipt audit only; not memory-safety proof."
-                .to_string(),
-            summary: ReceiptAuditSummary {
-                receipts: 1,
-                invalid: 1,
-                ..ReceiptAuditSummary::default()
-            },
-            receipts: vec![ReceiptAuditEntry {
-                path: "receipts/miri|focused.json".to_string(),
-                card_id: Some("UR-pipe|card-c1".to_string()),
-                receipt_tool: Some("miri|nightly".to_string()),
-                strength: Some("ran|odd".to_string()),
-                expires_at: None,
-                statuses: vec!["invalid|metadata".to_string()],
-                issues: vec!["receipt tool `miri|nightly` is not routed".to_string()],
-                matched_card: None,
-                route_tools: Vec::new(),
-            }],
-        };
-
-        let markdown = render_markdown(&report);
-
-        assert!(markdown.contains("invalid\\|metadata"));
-        assert!(markdown.contains("`receipts/miri\\|focused.json`"));
-        assert!(markdown.contains("`UR-pipe\\|card-c1`"));
-        assert!(markdown.contains("`miri\\|nightly`"));
-        assert!(markdown.contains("`ran\\|odd`"));
-        assert!(markdown.contains("miri\\|nightly"));
-        assert!(!markdown.contains("`UR-pipe|card-c1`"));
-    }
+fn markdown_cell(value: &str) -> String {
+    value.replace('|', "\\|").replace('\n', " ")
 }

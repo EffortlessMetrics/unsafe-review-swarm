@@ -14,6 +14,7 @@
       "public_api_surface": false,
       "snippet": "*ptr"
     },
+    "operation": "*ptr",
     "operation_family": "raw_pointer_deref",
     "hazards": [
       "pointer_validity",
@@ -154,10 +155,25 @@
     "discharge": "No visible local guard detected",
     "reach": "1 related test file(s) mention owner `read_header`",
     "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test read_header",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test read_header",
+        "required": false
+      }
+    ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
     ],
+    "next_action": "Add or expose the local guard that discharges the `raw_pointer_deref` safety obligation.",
     "verify_commands": [
       "cargo +nightly miri test read_header",
       "cargo +nightly careful test read_header"

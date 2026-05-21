@@ -14,6 +14,7 @@
       "public_api_surface": false,
       "snippet": "#[inline] unsafe fn write_one(ptr: *mut u8, byte: u8) {"
     },
+    "operation": "#[inline] unsafe fn write_one(ptr: *mut u8, byte: u8) {",
     "operation_family": "unknown",
     "hazards": [
       "unknown"
@@ -51,12 +52,21 @@
     "discharge": "No visible local guard detected",
     "reach": "No static test mention of owner `write_one` was found",
     "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
     "missing": [
       "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
       "Missing visible local guard for inferred safety obligations",
       "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
+    "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
     "verify_commands": []
   },
   {
@@ -74,6 +84,7 @@
       "public_api_surface": false,
       "snippet": "core::ptr::write(ptr, byte);"
     },
+    "operation": "core::ptr::write(ptr, byte);",
     "operation_family": "raw_pointer_write",
     "hazards": [
       "pointer_validity",
@@ -214,12 +225,27 @@
     "discharge": "No visible local guard detected",
     "reach": "No static test mention of owner `write_one` was found",
     "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test write_one",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test write_one",
+        "required": false
+      }
+    ],
     "missing": [
       "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
       "Missing visible local guard for inferred safety obligations",
       "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
+    "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
     "verify_commands": [
       "cargo +nightly miri test write_one",
       "cargo +nightly careful test write_one"

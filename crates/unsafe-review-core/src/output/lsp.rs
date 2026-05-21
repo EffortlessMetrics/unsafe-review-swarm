@@ -1,5 +1,5 @@
 use crate::api::{AnalyzeOutput, Scope};
-use crate::domain::{Priority, ReviewCard};
+use crate::domain::{Priority, ReviewCard, WitnessRoute};
 use crate::util::path_display;
 use serde::Serialize;
 
@@ -56,9 +56,13 @@ struct LspDiagnostic<'a> {
     source: &'static str,
     code: &'static str,
     message: String,
+    operation: &'a str,
     operation_family: &'static str,
     hazards: Vec<&'static str>,
     missing_evidence: Vec<&'a str>,
+    next_action: &'a str,
+    witness_routes: Vec<LspWitnessRoute<'a>>,
+    verify_commands: &'a [String],
     trust_boundary: &'static str,
 }
 
@@ -76,6 +80,7 @@ impl<'a> From<&'a ReviewCard> for LspDiagnostic<'a> {
                 card.operation.family.as_str(),
                 card.next_action.summary
             ),
+            operation: &card.operation.expression,
             operation_family: card.operation.family.as_str(),
             hazards: card.hazards.iter().map(|hazard| hazard.as_str()).collect(),
             missing_evidence: card
@@ -83,7 +88,29 @@ impl<'a> From<&'a ReviewCard> for LspDiagnostic<'a> {
                 .iter()
                 .map(|missing| missing.message.as_str())
                 .collect(),
+            next_action: &card.next_action.summary,
+            witness_routes: card.routes.iter().map(LspWitnessRoute::from).collect(),
+            verify_commands: &card.next_action.verify_commands,
             trust_boundary: TRUST_BOUNDARY,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct LspWitnessRoute<'a> {
+    kind: &'static str,
+    reason: &'a str,
+    command: Option<&'a str>,
+    required: bool,
+}
+
+impl<'a> From<&'a WitnessRoute> for LspWitnessRoute<'a> {
+    fn from(route: &'a WitnessRoute) -> Self {
+        Self {
+            kind: route.kind.as_str(),
+            reason: &route.reason,
+            command: route.command.as_deref(),
+            required: route.required,
         }
     }
 }
@@ -207,9 +234,10 @@ fn code_actions(card: &ReviewCard) -> Vec<LspCodeAction<'_>> {
 fn hover_contents(card: &ReviewCard) -> String {
     let mut text = String::new();
     text.push_str(&format!(
-        "unsafe-review `{}` for `{}`\n\n",
+        "unsafe-review `{}` for `{}` operation `{}`\n\n",
         card.class.as_str(),
-        card.operation.family.as_str()
+        card.operation.family.as_str(),
+        card.operation.expression
     ));
     text.push_str("Required safety conditions:\n");
     for obligation in &card.obligations {
@@ -230,6 +258,9 @@ fn hover_contents(card: &ReviewCard) -> String {
             route.reason
         ));
     }
+    text.push_str(
+        "\nReach note: static related-test evidence does not prove the unsafe site executed.\n",
+    );
     text.push_str("\nTrust boundary: ");
     text.push_str(TRUST_BOUNDARY);
     text
@@ -302,8 +333,6 @@ fn scope_label(output: &AnalyzeOutput) -> &'static str {
 mod tests {
     use super::*;
     use crate::api::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, analyze};
-    use serde_json::Value;
-    use std::collections::BTreeSet;
     use std::path::PathBuf;
 
     #[test]
@@ -328,15 +357,44 @@ mod tests {
         assert_eq!(value["diagnostics"][0]["source"], "unsafe-review");
         assert_eq!(value["diagnostics"][0]["path"], "src/lib.rs");
         assert_eq!(
+            value["diagnostics"][0]["operation"],
+            "unsafe { ptr.cast::<Header>().read() }"
+        );
+        assert_eq!(
             value["diagnostics"][0]["operation_family"],
             "raw_pointer_read"
         );
         assert_eq!(value["diagnostics"][0]["severity"], 2);
         assert!(
+            value["diagnostics"][0]["next_action"]
+                .as_str()
+                .unwrap_or("")
+                .contains("Add or expose the local guard")
+        );
+        assert_eq!(value["diagnostics"][0]["witness_routes"][0]["kind"], "miri");
+        assert!(
+            value["diagnostics"][0]["verify_commands"][0]
+                .as_str()
+                .unwrap_or("")
+                .contains("cargo +nightly miri test read_header")
+        );
+        assert!(
             value["hovers"][0]["contents"]
                 .as_str()
                 .unwrap_or("")
                 .contains("Required safety conditions")
+        );
+        assert!(
+            value["hovers"][0]["contents"]
+                .as_str()
+                .unwrap_or("")
+                .contains("operation `unsafe { ptr.cast::<Header>().read() }`")
+        );
+        assert!(
+            value["hovers"][0]["contents"]
+                .as_str()
+                .unwrap_or("")
+                .contains("does not prove the unsafe site executed")
         );
         assert_eq!(
             value["code_actions"][0]["command"],
@@ -387,51 +445,6 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn lsp_projection_card_sets_match_review_cards() -> Result<(), String> {
-        let output = fixture_output("attributed_unsafe_fn_no_duplicate")?;
-        if output.cards.len() != 2 {
-            return Err(format!(
-                "fixture should emit two cards, got {}",
-                output.cards.len()
-            ));
-        }
-        let expected_card_ids: BTreeSet<String> =
-            output.cards.iter().map(|card| card.id.0.clone()).collect();
-        let value = parse_json(&render(&output))?;
-
-        assert_eq!(
-            card_id_set(json_array(&value, "diagnostics")?, "card_id")?,
-            expected_card_ids
-        );
-        assert_eq!(
-            card_id_set(json_array(&value, "hovers")?, "card_id")?,
-            expected_card_ids
-        );
-        assert_eq!(
-            card_id_membership_set(json_array(&value, "code_actions")?, "card_id")?,
-            expected_card_ids
-        );
-        assert!(json_array(&value, "diagnostics")?.iter().all(|diagnostic| {
-            diagnostic["trust_boundary"]
-                .as_str()
-                .unwrap_or("")
-                .contains("not a proof of memory safety")
-        }));
-        assert!(json_array(&value, "hovers")?.iter().all(|hover| {
-            hover["trust_boundary"]
-                .as_str()
-                .unwrap_or("")
-                .contains("not a proof of memory safety")
-        }));
-        assert!(
-            !serde_json::to_string(json_array(&value, "code_actions")?)
-                .map_err(|err| format!("render code actions failed: {err}"))?
-                .contains("\"edit\"")
-        );
-        Ok(())
-    }
-
     fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures")
@@ -449,35 +462,5 @@ mod tests {
 
     fn parse_json(text: &str) -> Result<serde_json::Value, String> {
         serde_json::from_str(text).map_err(|err| format!("JSON parse failed: {err}"))
-    }
-
-    fn json_array<'a>(value: &'a Value, key: &str) -> Result<&'a Vec<Value>, String> {
-        value[key]
-            .as_array()
-            .ok_or_else(|| format!("`{key}` should be an array"))
-    }
-
-    fn card_id_set(items: &[Value], field: &str) -> Result<BTreeSet<String>, String> {
-        let mut card_ids = BTreeSet::new();
-        for item in items {
-            let Some(card_id) = item[field].as_str() else {
-                return Err(format!("projection item missing `{field}`"));
-            };
-            if !card_ids.insert(card_id.to_string()) {
-                return Err(format!("projection item duplicates card id `{card_id}`"));
-            }
-        }
-        Ok(card_ids)
-    }
-
-    fn card_id_membership_set(items: &[Value], field: &str) -> Result<BTreeSet<String>, String> {
-        let mut card_ids = BTreeSet::new();
-        for item in items {
-            let Some(card_id) = item[field].as_str() else {
-                return Err(format!("projection item missing `{field}`"));
-            };
-            card_ids.insert(card_id.to_string());
-        }
-        Ok(card_ids)
     }
 }

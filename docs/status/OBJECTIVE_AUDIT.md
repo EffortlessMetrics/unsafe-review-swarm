@@ -13,38 +13,21 @@ controls for bare predicate observations, closed positive branches, and checked
 indexes reassigned before the unchecked access.
 Raw pointer alignment evidence now also has fixture-backed controls for
 same-pointer `is_aligned` guards, observations, closed branches, and stale
-checked pointers, and method-form volatile raw pointer reads/writes now pin the
-same alignment guard distinction.
-Raw pointer bounds evidence now rejects bare predicate observations, closed
-positive branches, post-use checks, and generic type angle brackets while
-preserving the narrow same-slice `write_bytes` length shape.
+checked pointers.
 Modulo alignment guards have the same fixture-backed observation, closed-branch,
 and stale-pointer controls.
 `Vec::from_raw_parts` len/cap capacity evidence now has fixture-backed controls
 for assertions, early returns, bare observations, closed branches, and stale
-checked cap arguments. `Vec::set_len` capacity evidence accepts direct
-same-vector capacity assertions, open positive capacity branches, and
-invalid-length early returns, and rejects observations, closed branches, stale
-checked lengths, stale checked receivers, stale capacity bindings, unrelated
-comparisons, including stale checked lengths or receivers inside open branches,
-and unrelated local arguments merely named `cap` unless a const-capacity context
-is visible. Same-vector
-`Vec::with_capacity(new_len)` evidence also rejects reassigned vector bindings
-and reassigned checked lengths.
-`Box::from_raw` and `ptr::drop_in_place` ownership evidence reject stale or
-mismatched `Box::into_raw` origins when the origin is for a different pointer,
-the raw pointer is reassigned before use, or the origin appears only after the
-unsafe operation.
+checked cap arguments. `Vec::set_len` capacity evidence rejects unrelated local
+arguments merely named `cap` unless a const-capacity context is visible.
+`Box::from_raw` and `ptr::drop_in_place` ownership evidence reject stale
+`Box::into_raw` origins when the raw pointer is reassigned before use.
 Unchecked-constructor availability evidence now has fixture-backed controls for
 same-receiver assertions, enclosing positive branches, unavailable-path early
 returns, other receivers, bare observations, and closed branches.
-Pointer-arithmetic `num_ctrl_bytes` bounds evidence now has fixture-backed
-controls for enclosing in-bounds branches and invalid-path early returns, and
-rejects other-index checks, bare predicate observations, closed branches,
-out-of-bounds operation branches, and post-use checks.
-Raw pointer read len/capacity bounds evidence now requires same-source
-assertions and rejects other-container assertions, bare equality observations,
-and closed equality branches.
+Long unsafe-function bodies and `macro_rules!` bodies now have fixture-backed
+owner identity coverage while leaving operation families and advisory
+classifications unchanged.
 
 The latest closed execution lane is recorded in
 `docs/status/DOGFOOD_CALIBRATED_EVIDENCE_LANE.md` and
@@ -63,9 +46,10 @@ witnesses by default.
 | Requirement | Current evidence | Status | Gap |
 |---|---|---|---|
 | Canonical product unit is `ReviewCard`; projections must not create parallel truth | JSON, PR summary, SARIF, comment-plan, saved LSP, agent packet, repo, badge, policy, and receipt surfaces are all listed in `SUPPORT_TIERS.md` as card projections; handoffs record lane boundaries | Experimental | Continue watching new surfaces for reclassification logic |
-| Card correctness before breadth | Fixture goldens cover raw pointer alignment/deref/read/write including method-form volatile reads/writes and `write_bytes`, raw-pointer same-source len/capacity equality bounds evidence with other-container, bare-observation, and closed-branch false-positive controls, pointer arithmetic `num_ctrl_bytes` bounds evidence with open-branch, early-return, closed-branch, invalid-branch, other-index, bare-observation, and post-use false-positive controls plus same-slice end-pointer evidence, target-feature documented declaration contract evidence, split syntax, inline unsafe operation dedupe, attributed unsafe-fn dedupe, unsafe-call wrappers including multi-line wrappers, narrow `encode_utf8` remaining-capacity argument evidence, and unchecked-constructor availability evidence, multi-line `impl Trait` owner inference, nested unsafe operation parent-call dedupe, adjacent unchanged unsafe declaration filtering, unsafe contracts including documented public and private unsafe API declarations plus public `Safety:` doc prose and local `Safety:` comments, `MaybeUninit` `assume_init` / `assume_init_read` / `assume_init_ref` / `assume_init_mut` / `assume_init_drop`, `MaybeUninit` slice evidence, `Vec::set_len`, `Vec::set_len` initialized-loop evidence, `Vec::set_len` call-result initialization evidence, `Vec::set_len` shrink evidence, `Vec::set_len` last-index shrink evidence, `Vec::set_len` start-bound shrink evidence, `Vec::set_len(0)` clear evidence, `Vec::set_len` post-call initialization false-positive control, `Vec::from_raw_parts`, `Vec::from_raw_parts` same-pointer `ManuallyDrop` pointer/capacity, ownership, initialized-range, and len/capacity evidence, `Box::from_raw`, `copy_nonoverlapping`, overlapping `ptr::copy`, `ptr::replace`, `str::from_utf8_unchecked` including same-buffer `is_ok` enclosing branches, `is_err` early-return, question-mark propagation, match-return validation, post-validation, wrong-buffer, bare-observation, and stale-buffer false-positive-control fixtures, `mem::zeroed`, `static mut`, inline asm human-review routing, `transmute` including valid-value observation, closed-positive-branch, and stale-guard false-positive controls, `transmute_copy` including valid-value observation, closed-positive-branch, and stale-guard false-positive controls, multi-line `transmute_copy`, `unwrap_unchecked`, local infallible-result evidence plus same-receiver Option/Result state and if-let evidence for `unwrap_unchecked`, `unreachable_unchecked`, local infallible-path evidence plus other-context and post-evidence false-positive controls for `unreachable_unchecked`, `get_unchecked_mut` including same-receiver and post-check false-positive controls, `NonNull::new_unchecked` including bare-constructor observation, wrong-pointer, non-returning null branch, and post-check false-positive controls, `Pin::new_unchecked`, `drop_in_place`, `slice::from_raw_parts_mut`, FFI, unsafe impl Send/Sync including generic owner inference and generic-bound trait classification, and negative safe/comment cases; `fixtures/calibration.toml` indexes the core positive, negative, and false-positive-control claims | Experimental | Fixture corpus is curated; no broad semantic proof |
+| Card correctness before breadth | Fixture goldens cover raw pointer alignment/deref/read/write including method-form volatile reads/writes and `write_bytes`, raw-pointer len/capacity equality bounds evidence, pointer arithmetic `num_ctrl_bytes` bounds evidence and same-slice end-pointer evidence, target-feature documented declaration contract evidence, split syntax, inline unsafe operation dedupe, attributed unsafe-fn dedupe, unsafe-call wrappers including multi-line wrappers, long unsafe-function owner identity, macro owner identity, narrow `encode_utf8` remaining-capacity argument evidence, and unchecked-constructor availability evidence, multi-line `impl Trait` owner inference, nested unsafe operation parent-call dedupe, adjacent unchanged unsafe declaration filtering, unsafe contracts including documented public and private unsafe API declarations plus public `Safety:` doc prose and local `Safety:` comments, `MaybeUninit` `assume_init` / `assume_init_read` / `assume_init_ref` / `assume_init_mut` / `assume_init_drop`, `MaybeUninit` slice evidence, `Vec::set_len`, `Vec::set_len` initialized-loop evidence, `Vec::set_len` call-result initialization evidence, `Vec::set_len` shrink evidence, `Vec::set_len` last-index shrink evidence, `Vec::set_len` start-bound shrink evidence, `Vec::set_len(0)` clear evidence, `Vec::set_len` post-call initialization false-positive control, `Vec::from_raw_parts`, `Vec::from_raw_parts` same-pointer `ManuallyDrop` pointer/capacity, ownership, initialized-range, and len/capacity evidence, `Box::from_raw`, `copy_nonoverlapping`, overlapping `ptr::copy`, `ptr::replace`, `str::from_utf8_unchecked` including same-buffer `is_ok` enclosing branches, `is_err` early-return, question-mark propagation, match-return validation, post-validation, wrong-buffer, bare-observation, and stale-buffer false-positive-control fixtures, `mem::zeroed`, `static mut`, inline asm human-review routing, `transmute` including valid-value observation, closed-positive-branch, and stale-guard false-positive controls, `transmute_copy` including valid-value observation, closed-positive-branch, and stale-guard false-positive controls, multi-line `transmute_copy`, `unwrap_unchecked`, local infallible-result evidence plus same-receiver Option/Result state and if-let evidence for `unwrap_unchecked`, `unreachable_unchecked`, local infallible-path evidence plus other-context and post-evidence false-positive controls for `unreachable_unchecked`, `get_unchecked_mut` including same-receiver and post-check false-positive controls, `NonNull::new_unchecked` including bare-constructor observation, wrong-pointer, non-returning null branch, and post-check false-positive controls, `Pin::new_unchecked`, `drop_in_place`, `slice::from_raw_parts_mut`, FFI, unsafe impl Send/Sync including generic owner inference and generic-bound trait classification, and negative safe/comment cases; `fixtures/calibration.toml` indexes the core positive, negative, and false-positive-control claims | Experimental | Fixture corpus is curated; no broad semantic proof |
 | Obligation-level evidence | `ReviewCard` output and fixture goldens distinguish contract, discharge, reach, and witness evidence per obligation | Experimental | Guard patterns remain sparse |
 | Length guard does not discharge alignment; comments, operation names, and post-use checks do not count as guards | Raw-pointer alignment, comment-not-guard, and `NonNull::new_unchecked` fixture expectations are listed as proof in support tiers | Experimental | More real-world guard idioms need calibration |
+| Copy range evidence stays operation-specific | `copy_nonoverlapping_slice_range_guard`, `copy_nonoverlapping_slice_range_conjunctive_assert_guard`, `copy_nonoverlapping_slice_range_early_return_guard`, `copy_nonoverlapping_slice_range_disjunctive_early_return_guard`, `copy_nonoverlapping_slice_range_open_branch_guard`, `copy_nonoverlapping_slice_range_conjunctive_open_branch_guard`, `ptr_copy_slice_range_guard`, `ptr_copy_slice_range_conjunctive_assert_guard`, `ptr_copy_slice_range_early_return_guard`, `ptr_copy_slice_range_disjunctive_early_return_guard`, `ptr_copy_slice_range_open_branch_guard`, and `ptr_copy_slice_range_conjunctive_open_branch_guard` prove same-call source/destination slice length assertions, conjunctive assertions, early returns, disjunctive invalid-range early returns, or open branches discharge only `valid-range`, while `copy_nonoverlapping_slice_range_src_only_not_guard`, `copy_nonoverlapping_slice_range_dst_only_not_guard`, `ptr_copy_slice_range_src_only_not_guard`, `ptr_copy_slice_range_dst_only_not_guard`, `copy_nonoverlapping_slice_range_closed_branch_not_guard`, `ptr_copy_slice_range_closed_branch_not_guard`, `copy_nonoverlapping_slice_range_or_branch_not_guard`, `ptr_copy_slice_range_or_branch_not_guard`, `copy_nonoverlapping_slice_range_disjunctive_early_return_block_comment_not_guard`, `ptr_copy_slice_range_disjunctive_early_return_block_comment_not_guard`, `copy_nonoverlapping_slice_range_disjunctive_early_return_reassigned_count_not_guard`, `ptr_copy_slice_range_disjunctive_early_return_reassigned_count_not_guard`, `copy_nonoverlapping_slice_range_open_branch_reassigned_count_not_guard`, `copy_nonoverlapping_slice_range_open_branch_reassigned_src_not_guard`, `ptr_copy_slice_range_open_branch_reassigned_count_not_guard`, `ptr_copy_slice_range_open_branch_reassigned_dst_not_guard`, `copy_nonoverlapping_slice_range_reassigned_count_not_guard`, `copy_nonoverlapping_slice_range_reassigned_src_not_guard`, `ptr_copy_slice_range_reassigned_count_not_guard`, `ptr_copy_slice_range_reassigned_dst_not_guard`, `copy_nonoverlapping_other_len_not_guard`, and `ptr_copy_other_len_not_guard` prove one-sided, closed-branch, disjunctive positive-branch, comment-only early-return text, stale, or unrelated slice length assertions do not discharge copy source/destination range obligations | Experimental | Copy range evidence beyond same-call slice length guards remains limited |
 | Stable-first implementation; no mandatory MIR or `rustc_private` | Workspace uses stable source parsing and `ra_ap_syntax`; support tiers mark MIR/nightly facts as deferred | Met for current lanes | Optional adapters still need ADR before promotion |
 | Advisory PR artifact loop | Handoff `2026-05-18-advisory-pr-artifacts-v0.2.md` records cards JSON, PR summary, SARIF, and comment-plan artifact proof plus in-workflow artifact verification | Experimental/dogfoodable | No automatic comments or blocking policy by design |
 | Saved IDE projection | Handoff `2026-05-18-lsp-agent-projection-v0.3.md` records `--format lsp` saved diagnostics, hovers, status data, copy-command data, and related-test open-command data | Experimental | No live LSP server or editor extension; static related-test mentions do not prove site execution |
@@ -108,12 +92,7 @@ These are not failures; they are the next unsupported or weakly verified areas:
   `Vec::with_capacity(new_len)` capacity evidence has fixture coverage, and
   unrelated capacity comparisons plus local arguments merely named `cap` are
   pinned as non-evidence before `set_len`;
-  `arrayvec#288` has a rerun receipt; direct capacity assertions, open positive
-  capacity branches, invalid-length early returns, closed capacity branches,
-  stale checked lengths including open-branch reassignments, stale checked
-  receivers including open-branch reassignments, stale capacity bindings, stale
-  `Vec::with_capacity` vector bindings, and stale `Vec::with_capacity` checked
-  lengths now have fixture coverage;
+  `arrayvec#288` has a rerun receipt;
   non-zero shrink and `set_len(0)` clear evidence also have fixture and
   dogfood-rerun coverage, start-bound shrink evidence has fixture and
   `rust-smallvec#277` dogfood-rerun coverage, and last-index shrink evidence
@@ -122,8 +101,8 @@ These are not failures; they are the next unsupported or weakly verified areas:
 - Real PR-diff dogfood now recognizes `ptr::drop_in_place` as a
   drop/deallocation operation family, and fixture coverage recognizes the
   narrow same-pointer `Box::into_raw` origin shape as drop evidence while
-  rejecting different-pointer origins, reassigned raw pointers, and post-use
-  origins, but broader drop/deallocation evidence modeling remains narrow.
+  rejecting reassigned raw pointers, but broader drop/deallocation evidence
+  modeling remains narrow.
 - `arrayvec#137` adds a raw pointer accessor soundness-fix measurement. It
   produced 15 contract-missing cards when run with a PR-head checkout and raw
   `diff --git` patch, which is useful dogfood but not calibration proof.
@@ -137,35 +116,16 @@ These are not failures; they are the next unsupported or weakly verified areas:
   `raw_pointer_write` operation family. Fixture coverage also recognizes the
   narrow `*mut u8` case as alignment and byte-pattern evidence and recognizes
   `MaybeUninit` raw-write destinations as initialized-memory evidence. Other
-  destination-type modeling remains source-level and advisory. The narrow
-  same-slice `slice.as_mut_ptr().write_bytes(_, slice.len())` shape can
-  discharge bounds evidence, while write-side fixture coverage now proves bare
-  length observations, closed positive branches, and post-use checks do not
-  discharge bounds. Generic type angle brackets also do not discharge raw
-  pointer bounds evidence. Method-form raw pointer writes now have fixture proof
-  for same-receiver alignment guards and stale observed, closed-branch, and
-  post-write alignment checks. Method-form raw pointer reads, writes,
-  `read_unaligned`, `write_unaligned`, `read_volatile`, and `write_volatile`
-  now also require same-receiver, pre-operation nullability guards for
-  pointer-live evidence and reject observed nullability, other-pointer guards,
-  and post-use checks. Volatile raw pointer reads and writes also have
-  fixture-backed same-receiver alignment guard coverage and reject observed
-  alignment, other-pointer guards, and post-use checks.
-  These raw-pointer evidence rules still do not discharge
-  pointer validity, allocation, or witness obligations.
+  destination-type modeling remains source-level and advisory, and these rules
+  do not discharge pointer validity, bounds, allocation, or witness obligations.
 - Real PR-diff dogfood now recognizes `index < self.num_ctrl_bytes()` as bounds
-  evidence for pointer arithmetic, and fixture coverage proves the narrow rule
-  accepts enclosing in-bounds branches and invalid-path early returns while
-  rejecting other-index guards, bare observations, closed branches,
-  out-of-bounds operation branches, and post-use checks. Capped `memchr` repo
-  dogfood recognizes the local same-slice `as_ptr()` plus `len()` end-pointer
-  pattern, but broader pointer-arithmetic guard naming remains uncalibrated.
+  evidence for pointer arithmetic, and capped `memchr` repo dogfood recognizes
+  the local same-slice `as_ptr()` plus `len()` end-pointer pattern, but broader
+  pointer-arithmetic guard naming remains uncalibrated.
 - Real PR-diff dogfood now recognizes `len == capacity` and `assert_eq!` /
-  `debug_assert_eq!` same-source len/capacity checks as bounds evidence for raw
-  pointer reads. Fixture coverage rejects another container's len/capacity
-  assertion, bare equality observations, and closed equality branches. It does
-  not infer alignment, initialization, or same-allocation proof from those
-  checks.
+  `debug_assert_eq!` len/capacity checks as bounds evidence for raw pointer
+  reads, but it does not infer alignment, initialization, or same-allocation
+  proof from those checks.
 - Public unsafe API declarations with recognized `# Safety` or doc-comment
   `Safety:` docs no longer ask for local declaration guards, but static reach
   remains a heuristic name search.
@@ -189,10 +149,9 @@ These are not failures; they are the next unsupported or weakly verified areas:
   operation cards, and local `Fallibility::Infallible`, same-receiver
   enclosing `is_some` / `is_ok` branches, early-return, and narrow
   `if let ... as_ref()` state evidence is recognized for `unwrap_unchecked()`;
-  bare state observations, wrong-receiver `if let` evidence, post-call state
-  checks, and stale receiver-state evidence after reassignment remain
-  guard-missing false-positive controls. Broader option/result state proof
-  inference remains future work.
+  bare state observations and stale receiver-state evidence after reassignment
+  remain guard-missing false-positive controls. Broader option/result state
+  proof inference remains future work.
 - The `hashbrown#469` `unreachable_unchecked` sites are labeled as
   invalid-value operation cards, and local `Fallibility::Infallible` error-path
   evidence is recognized while other-context, post-evidence, and closed-match
@@ -225,9 +184,8 @@ These are not failures; they are the next unsupported or weakly verified areas:
   compatibility, layout, and ownership evidence remain source-level and
   advisory.
 - `Box::from_raw` now has fixture coverage for the narrow same-pointer
-  `Box::into_raw` origin shape and rejects different-pointer origins,
-  reassigned raw pointers, and post-use origins, but broader allocator and
-  unique-ownership evidence remains source-level and advisory.
+  `Box::into_raw` origin shape and rejects reassigned raw pointers, but broader
+  allocator and unique-ownership evidence remains source-level and advisory.
 
 ## Current Gates
 

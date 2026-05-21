@@ -1,6 +1,6 @@
 use crate::command::{
-    CheckOptions, Command, DiffInput, Format, OutcomeOptions, ReceiptTemplateOptions,
-    SavedOutputReceiptOptions,
+    CheckOptions, Command, DiffInput, FirstPrOptions, Format, OutcomeOptions,
+    ReceiptTemplateOptions, SavedOutputReceiptOptions,
 };
 use std::fs;
 use std::io::{self, Read};
@@ -11,11 +11,15 @@ use unsafe_review_core::{
     DiffSource, MiriReceiptInput, PolicyMode, ProofReceiptInput, SanitizerReceiptInput, Scope,
     WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze, audit_witness_receipts,
     collect_context, compare_outcome_json, evaluate_policy_report, explain_card,
-    render_comment_plan, render_human, render_json, render_lsp, render_markdown,
-    render_outcome_json, render_outcome_markdown, render_policy_report_json,
+    render_badge_jsons, render_comment_plan, render_human, render_json, render_lsp,
+    render_markdown, render_outcome_json, render_outcome_markdown, render_policy_report_json,
     render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
     render_receipt_audit_markdown, render_sarif, render_witness_plan, validate_witness_receipts,
 };
+
+const NO_CHANGED_GAPS_MESSAGE: &str = "No changed unsafe-review gaps were found.";
+const NO_CHANGED_GAPS_LIMITATION: &str =
+    "This does not prove the repo safe, UB-free, Miri-clean, or that any unsafe site executed.";
 
 pub(crate) fn execute(command: Command) -> Result<(), String> {
     match command {
@@ -27,10 +31,15 @@ pub(crate) fn execute(command: Command) -> Result<(), String> {
             println!("unsafe-review {}", env!("CARGO_PKG_VERSION"));
             Ok(())
         }
+        Command::Support => {
+            print_support();
+            Ok(())
+        }
         Command::Doctor { root } => doctor(&root),
         Command::Check(options) => run_check(options, Scope::Diff, AnalysisMode::Draft),
         Command::Repo(options) => run_check(options, Scope::Repo, AnalysisMode::Repo),
         Command::Pilot(options) => run_check(options, Scope::Diff, AnalysisMode::Draft),
+        Command::FirstPr(options) => first_pr(options),
         Command::Badges { root, out } => badges(&root, &out),
         Command::Explain { root, id, format } => explain(&root, &id, format),
         Command::Context { root, id } => context(&root, &id),
@@ -44,7 +53,39 @@ pub(crate) fn execute(command: Command) -> Result<(), String> {
         Command::ReceiptImportProof(options) => receipt_import_proof(options),
         Command::Outcome(options) => outcome(options),
         Command::PolicyReport(options) => policy_report(options),
+        Command::Lsp => crate::lsp::serve(),
     }
+}
+
+fn print_support() {
+    println!("unsafe-review support");
+    println!();
+    println!("Current posture:");
+    println!("- ReviewCards: experimental; selected slices are fixture-backed or dogfood-backed.");
+    println!(
+        "- first-pr bundle: advisory; projects cards, summaries, SARIF, comment plans, witness plans, and saved LSP JSON from ReviewCards."
+    );
+    println!(
+        "- receipts: saved-output template/import/audit only; receipts attach external evidence to exact card identities."
+    );
+    println!("- outcome comparison: saved snapshot comparison only.");
+    println!("- policy report: advisory no-new-debt simulation only.");
+    println!("- comment posting: not default.");
+    println!("- source edits: not supported.");
+    println!("- witness execution: not default.");
+    println!("- blocking policy: not default.");
+    println!("- live LSP: deferred; saved lsp.json is the current editor-adjacent artifact.");
+    println!();
+    println!("Trust boundary:");
+    println!("- static unsafe contract review only.");
+    println!("- not memory-safety proof.");
+    println!("- not UB-free status.");
+    println!("- not Miri-clean status.");
+    println!("- not a site-execution claim unless a matching receipt says so.");
+    println!();
+    println!("Docs:");
+    println!("- docs/status/SUPPORT_SUMMARY.md");
+    println!("- docs/status/SUPPORT_TIERS.md");
 }
 
 fn run_check(options: CheckOptions, scope: Scope, mode: AnalysisMode) -> Result<(), String> {
@@ -71,6 +112,103 @@ fn run_check(options: CheckOptions, scope: Scope, mode: AnalysisMode) -> Result<
     Ok(())
 }
 
+fn first_pr(options: FirstPrOptions) -> Result<(), String> {
+    let mut check = options.check;
+    check.policy = PolicyMode::Advisory;
+    let diff = diff_source(&check)?;
+    let root = check.root.clone();
+    let output = analyze(AnalyzeInput {
+        root: check.root,
+        scope: Scope::Diff,
+        diff,
+        mode: AnalysisMode::Draft,
+        policy: PolicyMode::Advisory,
+        include_unchanged_tests: true,
+        max_cards: check.max_cards,
+    })?;
+
+    fs::create_dir_all(&options.out_dir)
+        .map_err(|err| format!("create {} failed: {err}", options.out_dir.display()))?;
+    write_artifact(&options.out_dir.join("cards.json"), render_json(&output))?;
+    write_artifact(
+        &options.out_dir.join("pr-summary.md"),
+        render_pr_summary(&output),
+    )?;
+    write_artifact(&options.out_dir.join("cards.sarif"), render_sarif(&output))?;
+    write_artifact(
+        &options.out_dir.join("comment-plan.json"),
+        render_comment_plan(&output),
+    )?;
+    write_artifact(
+        &options.out_dir.join("witness-plan.md"),
+        render_witness_plan(&output),
+    )?;
+    write_artifact(&options.out_dir.join("lsp.json"), render_lsp(&output))?;
+
+    println!("unsafe-review first-pr");
+    println!("unsafe-review wrote an advisory PR bundle.");
+    println!("- Artifact directory: {}", options.out_dir.display());
+    println!("- Review cards: {}", output.summary.cards);
+    println!(
+        "- Open actionable gaps: {}",
+        output.summary.open_actionable_gaps
+    );
+    println!("Open:");
+    println!("  {}", options.out_dir.join("pr-summary.md").display());
+    if output.summary.open_actionable_gaps == 0 {
+        println!("{NO_CHANGED_GAPS_MESSAGE}");
+        println!("{NO_CHANGED_GAPS_LIMITATION}");
+    } else if let Some(card) = output.cards.first() {
+        println!("Top card:");
+        println!(
+            "  {}:{} `{}`",
+            card.site.location.file.display(),
+            card.site.location.line,
+            card.operation.family.as_str()
+        );
+        println!("  Class: `{}`", card.class.as_str());
+        if !card.missing.is_empty() {
+            let missing = card
+                .missing
+                .iter()
+                .map(|missing| missing.kind.as_str())
+                .collect::<Vec<_>>()
+                .join(", ");
+            println!("  Missing: {missing}");
+        }
+        if let Some(route) = card.routes.first() {
+            println!("  Route: `{}`", route.kind.as_str());
+        }
+        println!("  Next: {}", card.next_action.summary);
+        println!("Inspect top card:");
+        println!(
+            "  unsafe-review explain --root {} {}",
+            root.display(),
+            card.id
+        );
+    }
+    println!("Artifacts:");
+    for name in [
+        "cards.json",
+        "pr-summary.md",
+        "cards.sarif",
+        "comment-plan.json",
+        "witness-plan.md",
+        "lsp.json",
+    ] {
+        println!("  {}", options.out_dir.join(name).display());
+    }
+    println!("Trust boundary:");
+    println!(
+        "  static unsafe contract review only; not memory-safety proof, not UB-free status, and not Miri-clean status."
+    );
+    println!(
+        "  unsafe-review did not run witnesses, post comments, edit source, or enforce blocking policy."
+    );
+
+    Ok(())
+}
+
 fn enforce_policy(output: &unsafe_review_core::AnalyzeOutput) -> Result<(), String> {
     match output.policy {
         PolicyMode::Advisory => Ok(()),
@@ -86,6 +224,11 @@ fn enforce_policy(output: &unsafe_review_core::AnalyzeOutput) -> Result<(), Stri
         }
         PolicyMode::Blocking => Err("blocking policy is not implemented".to_string()),
     }
+}
+
+fn write_artifact(path: &Path, rendered: String) -> Result<(), String> {
+    ensure_parent_dir(path)?;
+    fs::write(path, rendered).map_err(|err| format!("write {} failed: {err}", path.display()))
 }
 
 fn diff_source(options: &CheckOptions) -> Result<DiffSource, String> {
@@ -161,12 +304,21 @@ fn doctor(root: &Path) -> Result<(), String> {
     let git_available = tool_available("git");
     let git_repo = git_available && git_root_status(root).is_some();
     let base_ref_available = git_repo && git_ref_available(root, "origin/main");
+    let cargo_metadata_available = cargo_metadata_available(root);
+    let artifact_dir = root.join("target").join("unsafe-review");
+    let artifact_dir_writable = artifact_dir_writable(root);
 
     println!("unsafe-review doctor");
     println!("workspace root: {}", root.display());
     println!("git command: {}", yes_no(git_available));
     println!("git repository: {}", yes_no(git_repo));
     println!("base ref origin/main: {}", yes_no(base_ref_available));
+    println!("cargo metadata: {}", yes_no(cargo_metadata_available));
+    println!(
+        "artifact dir {}: {}",
+        artifact_dir.display(),
+        writable_status(artifact_dir_writable)
+    );
     println!();
     println!("Witness tool signals");
     println!("miri: {}", yes_no(cargo_subcommand_available("miri")));
@@ -190,7 +342,9 @@ fn doctor(root: &Path) -> Result<(), String> {
     println!();
     println!("policy: advisory by default");
     println!("witness execution: not run by doctor or by default");
-    println!("trust boundary: static review evidence, not soundness proof");
+    println!(
+        "trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and no witness execution"
+    );
     Ok(())
 }
 
@@ -204,6 +358,42 @@ fn cargo_subcommand_available(subcommand: &str) -> bool {
         .arg("--version")
         .output()
         .is_ok_and(|output| output.status.success())
+}
+
+fn cargo_metadata_available(root: &Path) -> bool {
+    ProcessCommand::new("cargo")
+        .arg("metadata")
+        .arg("--no-deps")
+        .arg("--format-version")
+        .arg("1")
+        .current_dir(root)
+        .output()
+        .is_ok_and(|output| output.status.success())
+}
+
+fn artifact_dir_writable(root: &Path) -> bool {
+    let target_dir = root.join("target");
+    let artifact_dir = target_dir.join("unsafe-review");
+    let target_existed = target_dir.exists();
+    let artifact_existed = artifact_dir.exists();
+    if fs::create_dir_all(&artifact_dir).is_err() {
+        return false;
+    }
+    let probe = artifact_dir.join(format!(".doctor-write-check-{}", std::process::id()));
+    let wrote = fs::write(&probe, b"ok")
+        .and_then(|_| fs::remove_file(&probe))
+        .is_ok();
+    if !artifact_existed {
+        let _ = fs::remove_dir(&artifact_dir);
+    }
+    if !target_existed {
+        let _ = fs::remove_dir(&target_dir);
+    }
+    wrote
+}
+
+fn writable_status(writable: bool) -> &'static str {
+    if writable { "writable" } else { "not writable" }
 }
 
 fn git_root_status(root: &Path) -> Option<String> {
@@ -256,24 +446,7 @@ fn badges(root: &Path, out: &Path) -> Result<(), String> {
         include_unchanged_tests: true,
         max_cards: None,
     })?;
-    let color = if output.summary.open_actionable_gaps == 0 {
-        "green"
-    } else if output.summary.open_actionable_gaps < 10 {
-        "yellow"
-    } else {
-        "orange"
-    };
-    let main = format!(
-        "{{\n  \"schemaVersion\": 1,\n  \"label\": \"unsafe-review\",\n  \"message\": \"{} open gaps\",\n  \"color\": \"{}\"\n}}\n",
-        output.summary.open_actionable_gaps, color
-    );
-    let plus = format!(
-        "{{\n  \"schemaVersion\": 1,\n  \"label\": \"unsafe-review+\",\n  \"message\": \"{} contract / {} guard / {} witness\",\n  \"color\": \"{}\"\n}}\n",
-        output.summary.contract_missing,
-        output.summary.guard_missing,
-        output.summary.guarded_unwitnessed,
-        color
-    );
+    let (main, plus) = render_badge_jsons(&output);
     fs::write(out.join("unsafe-review.json"), main)
         .map_err(|err| format!("write badge failed: {err}"))?;
     fs::write(out.join("unsafe-review-plus.json"), plus)
@@ -586,10 +759,15 @@ fn print_help() {
     println!(
         "  repo    [--root .] [--format human|json|markdown|pr-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file]"
     );
+    println!(
+        "  first-pr [--root .] [--base origin/main|--diff file|-] [--out-dir target/unsafe-review] [--max-cards N]"
+    );
+    println!("  review  alias for first-pr");
     println!("  pilot   [--root .] [--base origin/main] [--max-cards 5]");
     println!("  badges  [--root .] [--out badges]");
     println!("  explain [--root .] [--json|--format json] <card-id>");
     println!("  context [--root .] [--json|--format json] <card-id>");
+    println!("  support");
     println!(
         "  outcome --before <cards.json> --after <cards.json> [--format json|markdown] [--out file]"
     );
@@ -622,5 +800,7 @@ fn print_help() {
     println!();
     println!("Flags may be passed as `--flag value` or `--flag=value`.");
     println!();
-    println!("Trust boundary: static review evidence, not soundness proof.");
+    println!(
+        "Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and not Miri-clean status."
+    );
 }

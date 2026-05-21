@@ -1,141 +1,157 @@
 [
-{
-    "id":  "UR-ptr-replace-value-fixture-src-lib-rs-replace-slot-operation-ptr_replace-replace-20d9337b8528-pointer_validity-c1",
-    "class":  "guard_missing",
-    "priority":  "high",
-    "confidence":  "medium",
-    "site":  {
-                 "file":  "src/lib.rs",
-                 "line":  4,
-                 "column":  5,
-                 "kind":  "operation",
-                 "owner":  "replace_slot",
-                 "visibility":  "private",
-                 "public_api_surface":  false,
-                 "snippet":  "unsafe { core::ptr::replace(slot, value) }"
-             },
-    "operation_family":  "ptr_replace",
-    "hazards":  [
-                    "pointer_validity",
-                    "alignment",
-                    "initialized_memory",
-                    "drop_or_deallocation"
-                ],
-    "obligations":  [
-                        "destination pointer is valid for read and write",
-                        "destination pointer is aligned for the value type",
-                        "destination value is initialized before replace",
-                        "returned old value and replacement value preserve drop ownership"
-                    ],
-    "obligation_evidence":  [
-                                {
-                                    "key":  "pointer-live",
-                                    "description":  "destination pointer is valid for read and write",
-                                    "contract":  {
-                                                     "present":  true,
-                                                     "state":  "present",
-                                                     "summary":  "Nearby `SAFETY:` comment was detected"
-                                                 },
-                                    "discharge":  {
-                                                      "present":  false,
-                                                      "state":  "missing",
-                                                      "summary":  "No nullability guard code was detected"
-                                                  },
-                                    "reach":  {
-                                                  "present":  true,
-                                                  "state":  "present",
-                                                  "summary":  "1 related test file(s) mention owner `replace_slot`"
-                                              },
-                                    "witness":  {
-                                                    "present":  false,
-                                                    "state":  "missing",
-                                                    "summary":  "No imported witness receipt was found"
-                                                }
-                                },
-                                {
-                                    "key":  "alignment",
-                                    "description":  "destination pointer is aligned for the value type",
-                                    "contract":  {
-                                                     "present":  true,
-                                                     "state":  "present",
-                                                     "summary":  "Nearby `SAFETY:` comment was detected"
-                                                 },
-                                    "discharge":  {
-                                                      "present":  false,
-                                                      "state":  "missing",
-                                                      "summary":  "No alignment guard code was detected"
-                                                  },
-                                    "reach":  {
-                                                  "present":  true,
-                                                  "state":  "present",
-                                                  "summary":  "1 related test file(s) mention owner `replace_slot`"
-                                              },
-                                    "witness":  {
-                                                    "present":  false,
-                                                    "state":  "missing",
-                                                    "summary":  "No imported witness receipt was found"
-                                                }
-                                },
-                                {
-                                    "key":  "initialized",
-                                    "description":  "destination value is initialized before replace",
-                                    "contract":  {
-                                                     "present":  true,
-                                                     "state":  "present",
-                                                     "summary":  "Nearby `SAFETY:` comment was detected"
-                                                 },
-                                    "discharge":  {
-                                                      "present":  false,
-                                                      "state":  "missing",
-                                                      "summary":  "No obligation-specific guard code was detected"
-                                                  },
-                                    "reach":  {
-                                                  "present":  true,
-                                                  "state":  "present",
-                                                  "summary":  "1 related test file(s) mention owner `replace_slot`"
-                                              },
-                                    "witness":  {
-                                                    "present":  false,
-                                                    "state":  "missing",
-                                                    "summary":  "No imported witness receipt was found"
-                                                }
-                                },
-                                {
-                                    "key":  "ownership",
-                                    "description":  "returned old value and replacement value preserve drop ownership",
-                                    "contract":  {
-                                                     "present":  true,
-                                                     "state":  "present",
-                                                     "summary":  "Nearby `SAFETY:` comment was detected"
-                                                 },
-                                    "discharge":  {
-                                                      "present":  false,
-                                                      "state":  "missing",
-                                                      "summary":  "No obligation-specific guard code was detected"
-                                                  },
-                                    "reach":  {
-                                                  "present":  true,
-                                                  "state":  "present",
-                                                  "summary":  "1 related test file(s) mention owner `replace_slot`"
-                                              },
-                                    "witness":  {
-                                                    "present":  false,
-                                                    "state":  "missing",
-                                                    "summary":  "No imported witness receipt was found"
-                                                }
-                                }
-                            ],
-    "contract":  "Nearby `SAFETY:` comment was detected",
-    "discharge":  "No visible local guard detected",
-    "reach":  "1 related test file(s) mention owner `replace_slot`",
-    "witness":  "No imported witness receipt was found",
-    "missing":  [
-                    "Missing visible local guard for inferred safety obligations",
-                    "No witness receipt imported for this card"
-                ],
-    "verify_commands":  [
-                            "cargo +nightly miri test replace_slot",
-                            "cargo +nightly careful test replace_slot"
-                        ]
-}
+  {
+    "id": "UR-ptr-replace-value-fixture-src-lib-rs-replace-slot-operation-ptr_replace-replace-20d9337b8528-pointer_validity-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 4,
+      "column": 5,
+      "kind": "operation",
+      "owner": "replace_slot",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { core::ptr::replace(slot, value) }"
+    },
+    "operation": "unsafe { core::ptr::replace(slot, value) }",
+    "operation_family": "ptr_replace",
+    "hazards": [
+      "pointer_validity",
+      "alignment",
+      "initialized_memory",
+      "drop_or_deallocation"
+    ],
+    "obligations": [
+      "destination pointer is valid for read and write",
+      "destination pointer is aligned for the value type",
+      "destination value is initialized before replace",
+      "returned old value and replacement value preserve drop ownership"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "pointer-live",
+        "description": "destination pointer is valid for read and write",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nullability guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `replace_slot`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "alignment",
+        "description": "destination pointer is aligned for the value type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No alignment guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `replace_slot`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "initialized",
+        "description": "destination value is initialized before replace",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `replace_slot`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "ownership",
+        "description": "returned old value and replacement value preserve drop ownership",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `replace_slot`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "No visible local guard detected",
+    "reach": "1 related test file(s) mention owner `replace_slot`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test replace_slot",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test replace_slot",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose the local guard that discharges the `ptr_replace` safety obligation.",
+    "verify_commands": [
+      "cargo +nightly miri test replace_slot",
+      "cargo +nightly careful test replace_slot"
+    ]
+  }
 ]

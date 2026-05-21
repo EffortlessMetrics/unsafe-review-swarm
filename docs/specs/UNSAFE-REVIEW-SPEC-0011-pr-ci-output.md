@@ -15,17 +15,23 @@ Linked plan: ../../plans/0.1.0/implementation-plan.md
 PR output must be sparse: summary first, at most a few high-confidence inline comments, durable JSON/Markdown/SARIF artifacts.
 The first supported PR projection is a local Markdown summary artifact rendered
 from existing `ReviewCard`s. It includes counts, a top card, a card table, a
-witness plan, and the trust boundary. It does not post comments, run witness
-tools, or change policy mode.
+witness plan, and the trust boundary. The top card and table include the
+ReviewCard operation expression and operation family so reviewers can identify
+the exact unsafe operation and group findings without reclassifying them. It
+does not post comments, run witness tools, or change policy mode.
 SARIF output is also a projection from existing `ReviewCard`s. SARIF results
-carry card identity, operation family, hazards, missing evidence, witness route
-recommendations, and the same trust boundary in result properties.
+carry card identity, operation expression, operation family, hazards, missing
+evidence, witness route recommendations, structured route details, verify
+commands, and the same trust boundary in result properties.
 The advisory GitHub workflow uploads the JSON, Markdown summary, SARIF, and
 comment-plan artifacts. It does not run witness tools, post inline comments, or
 enable blocking policy.
 Inline comment planning is artifact-only. The plan contains candidate comments
-for at most three actionable high-priority or high-confidence cards, but no
-workflow posts those comments by default.
+for actionable high-priority or high-confidence cards, but no workflow posts
+those comments by default. Each planned comment carries the same ReviewCard
+operation expression, witness route details, and verify commands used by JSON,
+SARIF, and LSP projections so review bots and maintainers do not need to parse
+comment prose or reclassify findings.
 
 ## Non-goals
 

@@ -455,6 +455,41 @@ mod tests {
                 true,
             ),
             (
+                "raw_pointer_write_bool_bytes_guard",
+                OperationFamily::RawPointerWrite,
+                true,
+            ),
+            (
+                "raw_pointer_write_bool_reassigned_byte_not_guard",
+                OperationFamily::RawPointerWrite,
+                true,
+            ),
+            (
+                "raw_pointer_write_bool_closed_branch_not_guard",
+                OperationFamily::RawPointerWrite,
+                true,
+            ),
+            (
+                "raw_pointer_write_previous_slice_not_guard",
+                OperationFamily::RawPointerWrite,
+                true,
+            ),
+            (
+                "raw_pointer_write_previous_u8_not_guard",
+                OperationFamily::RawPointerWrite,
+                true,
+            ),
+            (
+                "raw_pointer_write_previous_bool_not_guard",
+                OperationFamily::RawPointerWrite,
+                true,
+            ),
+            (
+                "raw_pointer_write_previous_maybeuninit_not_guard",
+                OperationFamily::RawPointerWrite,
+                true,
+            ),
+            (
                 "raw_pointer_write_other_u8_not_guard",
                 OperationFamily::RawPointerWrite,
                 true,
@@ -566,438 +601,8 @@ mod tests {
 
         assert_eq!(card.operation.family, OperationFamily::RawPointerWrite);
         assert_eq!(card.class, ReviewClass::GuardMissing);
-        assert!(!obligation_discharge_present(card, "bounds"));
         assert!(!obligation_discharge_present(card, "initialized"));
-        Ok(())
-    }
-
-    #[test]
-    fn raw_pointer_bounds_evidence_rejects_bare_observations() -> Result<(), String> {
-        for fixture in [
-            "raw_pointer_bounds_observed_not_guard",
-            "raw_pointer_bounds_closed_branch_not_guard",
-            "raw_pointer_bounds_post_check_not_guard",
-            "raw_pointer_read_len_capacity_other_values_not_guard",
-            "raw_pointer_read_len_capacity_observed_not_guard",
-            "raw_pointer_read_len_capacity_closed_branch_not_guard",
-        ] {
-            let output = fixture_output(fixture)?;
-            let card = single_card(fixture, &output)?;
-
-            assert_eq!(card.operation.family, OperationFamily::RawPointerRead);
-            assert_eq!(card.class, ReviewClass::GuardMissing);
-            assert!(
-                !obligation_discharge_present(card, "bounds"),
-                "{fixture} should not discharge bounds"
-            );
-            assert!(
-                !obligation_discharge_present(card, "alignment"),
-                "{fixture} should not discharge alignment"
-            );
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn raw_pointer_read_len_capacity_bounds_evidence_requires_same_source_assertion()
-    -> Result<(), String> {
-        let output = fixture_output("raw_pointer_read_len_capacity_assert")?;
-        let card = single_card("raw_pointer_read_len_capacity_assert", &output)?;
-
-        assert_eq!(card.operation.family, OperationFamily::RawPointerRead);
-        assert!(
-            obligation_discharge_present(card, "bounds"),
-            "same-source len/capacity assertion should discharge bounds"
-        );
-        assert!(
-            !obligation_discharge_present(card, "alignment"),
-            "len/capacity assertion must not discharge alignment"
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn raw_pointer_write_bounds_evidence_rejects_bare_observations() -> Result<(), String> {
-        for fixture in [
-            "raw_pointer_write_bounds_observed_not_guard",
-            "raw_pointer_write_bounds_closed_branch_not_guard",
-            "raw_pointer_write_bounds_post_check_not_guard",
-        ] {
-            let output = fixture_output(fixture)?;
-            let card = single_card(fixture, &output)?;
-
-            assert_eq!(card.operation.family, OperationFamily::RawPointerWrite);
-            assert_eq!(card.class, ReviewClass::GuardMissing);
-            assert!(
-                !obligation_discharge_present(card, "bounds"),
-                "{fixture} should not discharge bounds"
-            );
-            assert!(
-                !obligation_discharge_present(card, "alignment"),
-                "{fixture} should not discharge alignment"
-            );
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn raw_pointer_write_alignment_guard_is_receiver_sensitive() -> Result<(), String> {
-        let guarded = fixture_output("raw_pointer_write_alignment_guard")?;
-        let guarded_card = single_card("raw_pointer_write_alignment_guard", &guarded)?;
-
-        assert_eq!(
-            guarded_card.operation.family,
-            OperationFamily::RawPointerWrite
-        );
-        assert_eq!(guarded_card.class, ReviewClass::GuardMissing);
-        assert!(
-            obligation_discharge_present(guarded_card, "bounds"),
-            "length guard should discharge bounds"
-        );
-        assert!(
-            obligation_discharge_present(guarded_card, "alignment"),
-            "same-receiver alignment guard should discharge alignment"
-        );
-
-        for fixture in [
-            "raw_pointer_write_alignment_observed_not_guard",
-            "raw_pointer_write_alignment_closed_branch_not_guard",
-            "raw_pointer_write_alignment_post_check_not_guard",
-        ] {
-            let output = fixture_output(fixture)?;
-            let card = single_card(fixture, &output)?;
-
-            assert_eq!(card.operation.family, OperationFamily::RawPointerWrite);
-            assert_eq!(card.class, ReviewClass::GuardMissing);
-            assert!(
-                obligation_discharge_present(card, "bounds"),
-                "{fixture} should keep bounds evidence"
-            );
-            assert!(
-                !obligation_discharge_present(card, "alignment"),
-                "{fixture} should not discharge alignment"
-            );
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn raw_pointer_write_nullability_guard_is_receiver_sensitive() -> Result<(), String> {
-        let guarded = fixture_output("raw_pointer_write_null_guard")?;
-        let guarded_card = single_card("raw_pointer_write_null_guard", &guarded)?;
-
-        assert_eq!(
-            guarded_card.operation.family,
-            OperationFamily::RawPointerWrite
-        );
-        assert_eq!(guarded_card.class, ReviewClass::GuardMissing);
-        assert!(
-            obligation_discharge_present(guarded_card, "pointer-live"),
-            "same-receiver null guard should discharge pointer-live"
-        );
-        assert!(
-            obligation_discharge_present(guarded_card, "bounds"),
-            "length guard should discharge bounds"
-        );
-        assert!(
-            obligation_discharge_present(guarded_card, "alignment"),
-            "alignment guard should discharge alignment"
-        );
-
-        for fixture in [
-            "raw_pointer_write_null_observed_not_guard",
-            "raw_pointer_write_null_other_pointer_not_guard",
-            "raw_pointer_write_null_post_check_not_guard",
-        ] {
-            let output = fixture_output(fixture)?;
-            let card = single_card(fixture, &output)?;
-
-            assert_eq!(card.operation.family, OperationFamily::RawPointerWrite);
-            assert_eq!(card.class, ReviewClass::GuardMissing);
-            assert!(
-                !obligation_discharge_present(card, "pointer-live"),
-                "{fixture} should not discharge pointer-live"
-            );
-            assert!(
-                obligation_discharge_present(card, "bounds"),
-                "{fixture} should keep bounds evidence"
-            );
-            assert!(
-                obligation_discharge_present(card, "alignment"),
-                "{fixture} should keep alignment evidence"
-            );
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn raw_pointer_read_nullability_guard_is_receiver_sensitive() -> Result<(), String> {
-        let guarded = fixture_output("raw_pointer_read_null_guard")?;
-        let guarded_card = single_card("raw_pointer_read_null_guard", &guarded)?;
-
-        assert_eq!(
-            guarded_card.operation.family,
-            OperationFamily::RawPointerRead
-        );
-        assert_eq!(guarded_card.class, ReviewClass::GuardMissing);
-        assert!(
-            obligation_discharge_present(guarded_card, "pointer-live"),
-            "same-receiver null guard should discharge pointer-live"
-        );
-        assert!(
-            obligation_discharge_present(guarded_card, "bounds"),
-            "length guard should discharge bounds"
-        );
-        assert!(
-            obligation_discharge_present(guarded_card, "alignment"),
-            "alignment guard should discharge alignment"
-        );
-
-        for fixture in [
-            "raw_pointer_read_null_observed_not_guard",
-            "raw_pointer_read_null_other_pointer_not_guard",
-            "raw_pointer_read_null_post_check_not_guard",
-        ] {
-            let output = fixture_output(fixture)?;
-            let card = single_card(fixture, &output)?;
-
-            assert_eq!(card.operation.family, OperationFamily::RawPointerRead);
-            assert_eq!(card.class, ReviewClass::GuardMissing);
-            assert!(
-                !obligation_discharge_present(card, "pointer-live"),
-                "{fixture} should not discharge pointer-live"
-            );
-            assert!(
-                obligation_discharge_present(card, "bounds"),
-                "{fixture} should keep bounds evidence"
-            );
-            assert!(
-                obligation_discharge_present(card, "alignment"),
-                "{fixture} should keep alignment evidence"
-            );
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn raw_pointer_unaligned_nullability_guard_is_receiver_sensitive() -> Result<(), String> {
-        for (fixture, family) in [
-            (
-                "raw_pointer_read_unaligned_null_guard",
-                OperationFamily::RawPointerReadUnaligned,
-            ),
-            (
-                "raw_pointer_write_unaligned_null_guard",
-                OperationFamily::RawPointerWriteUnaligned,
-            ),
-        ] {
-            let output = fixture_output(fixture)?;
-            let card = single_card(fixture, &output)?;
-
-            assert_eq!(card.operation.family, family);
-            assert_eq!(card.class, ReviewClass::GuardMissing);
-            assert!(
-                obligation_discharge_present(card, "pointer-live"),
-                "{fixture} should discharge pointer-live"
-            );
-            assert!(
-                obligation_discharge_present(card, "bounds"),
-                "{fixture} should keep bounds evidence"
-            );
-            assert!(
-                card.obligation_evidence
-                    .iter()
-                    .all(|evidence| evidence.obligation.key != "alignment"),
-                "{fixture} should not require alignment evidence"
-            );
-        }
-
-        for (fixture, family) in [
-            (
-                "raw_pointer_read_unaligned_null_observed_not_guard",
-                OperationFamily::RawPointerReadUnaligned,
-            ),
-            (
-                "raw_pointer_read_unaligned_null_other_pointer_not_guard",
-                OperationFamily::RawPointerReadUnaligned,
-            ),
-            (
-                "raw_pointer_read_unaligned_null_post_check_not_guard",
-                OperationFamily::RawPointerReadUnaligned,
-            ),
-            (
-                "raw_pointer_write_unaligned_null_observed_not_guard",
-                OperationFamily::RawPointerWriteUnaligned,
-            ),
-            (
-                "raw_pointer_write_unaligned_null_other_pointer_not_guard",
-                OperationFamily::RawPointerWriteUnaligned,
-            ),
-            (
-                "raw_pointer_write_unaligned_null_post_check_not_guard",
-                OperationFamily::RawPointerWriteUnaligned,
-            ),
-        ] {
-            let output = fixture_output(fixture)?;
-            let card = single_card(fixture, &output)?;
-
-            assert_eq!(card.operation.family, family);
-            assert_eq!(card.class, ReviewClass::GuardMissing);
-            assert!(
-                !obligation_discharge_present(card, "pointer-live"),
-                "{fixture} should not discharge pointer-live"
-            );
-            assert!(
-                obligation_discharge_present(card, "bounds"),
-                "{fixture} should keep bounds evidence"
-            );
-            assert!(
-                card.obligation_evidence
-                    .iter()
-                    .all(|evidence| evidence.obligation.key != "alignment"),
-                "{fixture} should not require alignment evidence"
-            );
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn raw_pointer_volatile_nullability_guard_is_receiver_sensitive() -> Result<(), String> {
-        for (fixture, family) in [
-            (
-                "raw_pointer_read_volatile_null_guard",
-                OperationFamily::RawPointerRead,
-            ),
-            (
-                "raw_pointer_write_volatile_null_guard",
-                OperationFamily::RawPointerWrite,
-            ),
-        ] {
-            let output = fixture_output(fixture)?;
-            let card = single_card(fixture, &output)?;
-
-            assert_eq!(card.operation.family, family);
-            assert_eq!(card.class, ReviewClass::GuardMissing);
-            assert!(
-                obligation_discharge_present(card, "pointer-live"),
-                "{fixture} should discharge pointer-live"
-            );
-            assert!(
-                !obligation_discharge_present(card, "alignment"),
-                "{fixture} should still require alignment evidence"
-            );
-        }
-
-        for (fixture, family) in [
-            (
-                "raw_pointer_read_volatile_null_observed_not_guard",
-                OperationFamily::RawPointerRead,
-            ),
-            (
-                "raw_pointer_read_volatile_null_other_pointer_not_guard",
-                OperationFamily::RawPointerRead,
-            ),
-            (
-                "raw_pointer_read_volatile_null_post_check_not_guard",
-                OperationFamily::RawPointerRead,
-            ),
-            (
-                "raw_pointer_write_volatile_null_observed_not_guard",
-                OperationFamily::RawPointerWrite,
-            ),
-            (
-                "raw_pointer_write_volatile_null_other_pointer_not_guard",
-                OperationFamily::RawPointerWrite,
-            ),
-            (
-                "raw_pointer_write_volatile_null_post_check_not_guard",
-                OperationFamily::RawPointerWrite,
-            ),
-        ] {
-            let output = fixture_output(fixture)?;
-            let card = single_card(fixture, &output)?;
-
-            assert_eq!(card.operation.family, family);
-            assert_eq!(card.class, ReviewClass::GuardMissing);
-            assert!(
-                !obligation_discharge_present(card, "pointer-live"),
-                "{fixture} should not discharge pointer-live"
-            );
-            assert!(
-                !obligation_discharge_present(card, "alignment"),
-                "{fixture} should still require alignment evidence"
-            );
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn raw_pointer_volatile_alignment_guard_is_receiver_sensitive() -> Result<(), String> {
-        for (fixture, family) in [
-            (
-                "raw_pointer_read_volatile_alignment_guard",
-                OperationFamily::RawPointerRead,
-            ),
-            (
-                "raw_pointer_write_volatile_alignment_guard",
-                OperationFamily::RawPointerWrite,
-            ),
-        ] {
-            let output = fixture_output(fixture)?;
-            let card = single_card(fixture, &output)?;
-
-            assert_eq!(card.operation.family, family);
-            assert_eq!(card.class, ReviewClass::GuardMissing);
-            assert!(
-                obligation_discharge_present(card, "alignment"),
-                "{fixture} should discharge alignment"
-            );
-            assert!(
-                !obligation_discharge_present(card, "pointer-live"),
-                "{fixture} should still require pointer-live evidence"
-            );
-        }
-
-        for (fixture, family) in [
-            (
-                "raw_pointer_read_volatile_alignment_observed_not_guard",
-                OperationFamily::RawPointerRead,
-            ),
-            (
-                "raw_pointer_read_volatile_alignment_other_pointer_not_guard",
-                OperationFamily::RawPointerRead,
-            ),
-            (
-                "raw_pointer_read_volatile_alignment_post_check_not_guard",
-                OperationFamily::RawPointerRead,
-            ),
-            (
-                "raw_pointer_write_volatile_alignment_observed_not_guard",
-                OperationFamily::RawPointerWrite,
-            ),
-            (
-                "raw_pointer_write_volatile_alignment_other_pointer_not_guard",
-                OperationFamily::RawPointerWrite,
-            ),
-            (
-                "raw_pointer_write_volatile_alignment_post_check_not_guard",
-                OperationFamily::RawPointerWrite,
-            ),
-        ] {
-            let output = fixture_output(fixture)?;
-            let card = single_card(fixture, &output)?;
-
-            assert_eq!(card.operation.family, family);
-            assert_eq!(card.class, ReviewClass::GuardMissing);
-            assert!(
-                !obligation_discharge_present(card, "alignment"),
-                "{fixture} should still require alignment evidence"
-            );
-            assert!(
-                !obligation_discharge_present(card, "pointer-live"),
-                "{fixture} should still require pointer-live evidence"
-            );
-        }
+        assert!(!obligation_discharge_present(card, "bounds"));
         Ok(())
     }
 
@@ -1010,6 +615,81 @@ mod tests {
         assert_eq!(card.class, ReviewClass::GuardMissing);
         assert!(!obligation_discharge_present(card, "initialized"));
         assert!(!obligation_discharge_present(card, "alignment"));
+        Ok(())
+    }
+
+    #[test]
+    fn raw_pointer_write_bool_bytes_guard_discharges_byte_obligations() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_write_bool_bytes_guard")?;
+        let card = single_card("raw_pointer_write_bool_bytes_guard", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::RawPointerWrite);
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert!(obligation_discharge_present(card, "initialized"));
+        assert!(obligation_discharge_present(card, "alignment"));
+        assert!(!obligation_discharge_present(card, "pointer-live"));
+        assert!(!obligation_discharge_present(card, "bounds"));
+        assert!(!obligation_discharge_present(card, "allocation"));
+        Ok(())
+    }
+
+    #[test]
+    fn raw_pointer_write_bool_bytes_guard_requires_fresh_byte() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_write_bool_reassigned_byte_not_guard")?;
+        let card = single_card("raw_pointer_write_bool_reassigned_byte_not_guard", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::RawPointerWrite);
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert!(obligation_discharge_present(card, "alignment"));
+        assert!(!obligation_discharge_present(card, "initialized"));
+        assert!(!obligation_discharge_present(card, "pointer-live"));
+        assert!(!obligation_discharge_present(card, "bounds"));
+        assert!(!obligation_discharge_present(card, "allocation"));
+        Ok(())
+    }
+
+    #[test]
+    fn raw_pointer_write_bool_bytes_guard_requires_open_branch() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_write_bool_closed_branch_not_guard")?;
+        let card = single_card("raw_pointer_write_bool_closed_branch_not_guard", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::RawPointerWrite);
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert!(obligation_discharge_present(card, "alignment"));
+        assert!(!obligation_discharge_present(card, "initialized"));
+        assert!(!obligation_discharge_present(card, "pointer-live"));
+        assert!(!obligation_discharge_present(card, "bounds"));
+        assert!(!obligation_discharge_present(card, "allocation"));
+        Ok(())
+    }
+
+    #[test]
+    fn raw_pointer_write_bounds_evidence_requires_current_operation() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_write_previous_slice_not_guard")?;
+        let card = single_card("raw_pointer_write_previous_slice_not_guard", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::RawPointerWrite);
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert!(!obligation_discharge_present(card, "bounds"));
+        assert!(!obligation_discharge_present(card, "initialized"));
+        Ok(())
+    }
+
+    #[test]
+    fn raw_pointer_write_target_evidence_requires_current_operation() -> Result<(), String> {
+        for fixture in [
+            "raw_pointer_write_previous_u8_not_guard",
+            "raw_pointer_write_previous_bool_not_guard",
+            "raw_pointer_write_previous_maybeuninit_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.operation.family, OperationFamily::RawPointerWrite);
+            assert_eq!(card.class, ReviewClass::GuardMissing);
+            assert!(!obligation_discharge_present(card, "alignment"));
+            assert!(!obligation_discharge_present(card, "initialized"));
+        }
         Ok(())
     }
 
@@ -1041,6 +721,66 @@ mod tests {
             );
             assert!(!card.discharge.present);
         }
+        Ok(())
+    }
+
+    #[test]
+    fn raw_pointer_read_bounds_evidence_rejects_unenforced_guards() -> Result<(), String> {
+        for fixture in [
+            "raw_pointer_read_bounds_observed_not_guard",
+            "raw_pointer_read_len_capacity_observed_not_guard",
+            "raw_pointer_read_assert_shadowed_origin_not_guard",
+            "raw_pointer_read_len_capacity_assert_shadowed_origin_not_guard",
+            "raw_pointer_read_open_branch_shadowed_origin_not_guard",
+            "raw_pointer_read_typed_shadowed_origin_not_guard",
+            "raw_pointer_read_other_len_not_guard",
+            "raw_pointer_read_reassigned_origin_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.operation.family, OperationFamily::RawPointerRead);
+            assert_eq!(card.class, ReviewClass::GuardMissing);
+            assert!(!obligation_discharge_present(card, "bounds"));
+            assert!(!obligation_discharge_present(card, "alignment"));
+            assert!(!card.discharge.present);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn raw_pointer_read_bounds_evidence_accepts_open_same_origin_branch() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_read_open_branch_bounds_guard")?;
+        let card = single_card("raw_pointer_read_open_branch_bounds_guard", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::RawPointerRead);
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert!(obligation_discharge_present(card, "bounds"));
+        assert!(!obligation_discharge_present(card, "alignment"));
+        Ok(())
+    }
+
+    #[test]
+    fn raw_pointer_read_bounds_evidence_accepts_cast_pointer_origin() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_read_cast_origin_bounds_guard")?;
+        let card = single_card("raw_pointer_read_cast_origin_bounds_guard", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::RawPointerRead);
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert!(obligation_discharge_present(card, "bounds"));
+        assert!(!obligation_discharge_present(card, "alignment"));
+        Ok(())
+    }
+
+    #[test]
+    fn raw_pointer_read_bounds_evidence_accepts_as_cast_pointer_origin() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_read_as_cast_origin_bounds_guard")?;
+        let card = single_card("raw_pointer_read_as_cast_origin_bounds_guard", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::RawPointerRead);
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert!(obligation_discharge_present(card, "bounds"));
+        assert!(!obligation_discharge_present(card, "alignment"));
         Ok(())
     }
 
@@ -1677,30 +1417,14 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
-    fn box_origin_evidence_rejects_stale_or_mismatched_pointers() -> Result<(), String> {
+    fn box_origin_evidence_rejects_reassigned_pointers() -> Result<(), String> {
         for (fixture, family) in [
             (
                 "box_from_raw_reassigned_origin_not_guard",
                 OperationFamily::BoxFromRaw,
             ),
             (
-                "box_from_raw_box_origin_after_not_guard",
-                OperationFamily::BoxFromRaw,
-            ),
-            (
-                "box_from_raw_other_origin_not_guard",
-                OperationFamily::BoxFromRaw,
-            ),
-            (
                 "drop_in_place_reassigned_origin_not_guard",
-                OperationFamily::DropInPlace,
-            ),
-            (
-                "drop_in_place_box_origin_after_not_guard",
-                OperationFamily::DropInPlace,
-            ),
-            (
-                "drop_in_place_other_origin_not_guard",
                 OperationFamily::DropInPlace,
             ),
         ] {
@@ -1772,6 +1496,258 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "ptr::copy permits overlap and should not inherit the copy_nonoverlapping obligation"
         );
         assert!(card.id.0.contains("ptr-copy"));
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_rejects_unrelated_length_guards() -> Result<(), String> {
+        for fixture in [
+            "copy_nonoverlapping_other_len_not_guard",
+            "ptr_copy_other_len_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert!(
+                !obligation_discharge_present(card, "valid-range"),
+                "{fixture} should not accept an unrelated length assertion as copy range evidence"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_rejects_one_sided_slice_length_guards() -> Result<(), String> {
+        for fixture in [
+            "copy_nonoverlapping_slice_range_src_only_not_guard",
+            "copy_nonoverlapping_slice_range_dst_only_not_guard",
+            "ptr_copy_slice_range_src_only_not_guard",
+            "ptr_copy_slice_range_dst_only_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert!(
+                !obligation_discharge_present(card, "valid-range"),
+                "{fixture} should require both source and destination slice range evidence"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_rejects_closed_slice_length_branches() -> Result<(), String> {
+        for fixture in [
+            "copy_nonoverlapping_slice_range_closed_branch_not_guard",
+            "ptr_copy_slice_range_closed_branch_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert!(
+                !obligation_discharge_present(card, "valid-range"),
+                "{fixture} should not accept closed branch observations as active range evidence"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_rejects_or_slice_length_branches() -> Result<(), String> {
+        for fixture in [
+            "copy_nonoverlapping_slice_range_or_branch_not_guard",
+            "ptr_copy_slice_range_or_branch_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert!(
+                !obligation_discharge_present(card, "valid-range"),
+                "{fixture} should not accept disjunctive range branches as full range evidence"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_rejects_comment_only_early_returns() -> Result<(), String> {
+        for fixture in [
+            "copy_nonoverlapping_slice_range_disjunctive_early_return_block_comment_not_guard",
+            "ptr_copy_slice_range_disjunctive_early_return_block_comment_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert!(
+                !obligation_discharge_present(card, "valid-range"),
+                "{fixture} should not accept commented return text as copy range evidence"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_accepts_slice_length_guards() -> Result<(), String> {
+        let copy_nonoverlapping = fixture_output("copy_nonoverlapping_slice_range_guard")?;
+        let copy_nonoverlapping_card = single_card(
+            "copy_nonoverlapping_slice_range_guard",
+            &copy_nonoverlapping,
+        )?;
+        assert!(obligation_discharge_present(
+            copy_nonoverlapping_card,
+            "valid-range"
+        ));
+        assert!(
+            !obligation_discharge_present(copy_nonoverlapping_card, "non-overlap"),
+            "slice range guards should not prove non-overlap"
+        );
+
+        let ptr_copy = fixture_output("ptr_copy_slice_range_guard")?;
+        let ptr_copy_card = single_card("ptr_copy_slice_range_guard", &ptr_copy)?;
+        assert!(obligation_discharge_present(ptr_copy_card, "valid-range"));
+        assert!(
+            !obligation_discharge_present(ptr_copy_card, "initialized"),
+            "range guards should not prove initialized memory"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_accepts_conjunctive_slice_length_guards() -> Result<(), String> {
+        for (fixture, missing_key) in [
+            (
+                "copy_nonoverlapping_slice_range_conjunctive_assert_guard",
+                "non-overlap",
+            ),
+            (
+                "copy_nonoverlapping_slice_range_conjunctive_open_branch_guard",
+                "non-overlap",
+            ),
+            (
+                "ptr_copy_slice_range_conjunctive_assert_guard",
+                "initialized",
+            ),
+            (
+                "ptr_copy_slice_range_conjunctive_open_branch_guard",
+                "initialized",
+            ),
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+            assert!(
+                obligation_discharge_present(card, "valid-range"),
+                "{fixture} should accept conjunctive source/destination slice range evidence"
+            );
+            assert!(
+                !obligation_discharge_present(card, missing_key),
+                "{fixture} should not prove {missing_key}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_accepts_slice_length_early_returns() -> Result<(), String> {
+        let copy_nonoverlapping =
+            fixture_output("copy_nonoverlapping_slice_range_early_return_guard")?;
+        let copy_nonoverlapping_card = single_card(
+            "copy_nonoverlapping_slice_range_early_return_guard",
+            &copy_nonoverlapping,
+        )?;
+        assert!(obligation_discharge_present(
+            copy_nonoverlapping_card,
+            "valid-range"
+        ));
+        assert!(
+            !obligation_discharge_present(copy_nonoverlapping_card, "non-overlap"),
+            "early-return range guards should not prove non-overlap"
+        );
+
+        let ptr_copy = fixture_output("ptr_copy_slice_range_early_return_guard")?;
+        let ptr_copy_card = single_card("ptr_copy_slice_range_early_return_guard", &ptr_copy)?;
+        assert!(obligation_discharge_present(ptr_copy_card, "valid-range"));
+        assert!(
+            !obligation_discharge_present(ptr_copy_card, "initialized"),
+            "early-return range guards should not prove initialized memory"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_accepts_disjunctive_slice_length_early_returns() -> Result<(), String> {
+        for (fixture, missing_key) in [
+            (
+                "copy_nonoverlapping_slice_range_disjunctive_early_return_guard",
+                "non-overlap",
+            ),
+            (
+                "ptr_copy_slice_range_disjunctive_early_return_guard",
+                "initialized",
+            ),
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+            assert!(
+                obligation_discharge_present(card, "valid-range"),
+                "{fixture} should accept disjunctive invalid-range early returns as range evidence"
+            );
+            assert!(
+                !obligation_discharge_present(card, missing_key),
+                "{fixture} should not prove {missing_key}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_accepts_open_slice_length_branches() -> Result<(), String> {
+        let copy_nonoverlapping =
+            fixture_output("copy_nonoverlapping_slice_range_open_branch_guard")?;
+        let copy_nonoverlapping_card = single_card(
+            "copy_nonoverlapping_slice_range_open_branch_guard",
+            &copy_nonoverlapping,
+        )?;
+        assert!(obligation_discharge_present(
+            copy_nonoverlapping_card,
+            "valid-range"
+        ));
+        assert!(
+            !obligation_discharge_present(copy_nonoverlapping_card, "non-overlap"),
+            "open-branch range guards should not prove non-overlap"
+        );
+
+        let ptr_copy = fixture_output("ptr_copy_slice_range_open_branch_guard")?;
+        let ptr_copy_card = single_card("ptr_copy_slice_range_open_branch_guard", &ptr_copy)?;
+        assert!(obligation_discharge_present(ptr_copy_card, "valid-range"));
+        assert!(
+            !obligation_discharge_present(ptr_copy_card, "initialized"),
+            "open-branch range guards should not prove initialized memory"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn copy_range_evidence_rejects_stale_slice_length_guards() -> Result<(), String> {
+        for fixture in [
+            "copy_nonoverlapping_slice_range_open_branch_reassigned_count_not_guard",
+            "copy_nonoverlapping_slice_range_open_branch_reassigned_src_not_guard",
+            "copy_nonoverlapping_slice_range_disjunctive_early_return_reassigned_count_not_guard",
+            "copy_nonoverlapping_slice_range_reassigned_count_not_guard",
+            "copy_nonoverlapping_slice_range_reassigned_src_not_guard",
+            "ptr_copy_slice_range_open_branch_reassigned_count_not_guard",
+            "ptr_copy_slice_range_open_branch_reassigned_dst_not_guard",
+            "ptr_copy_slice_range_disjunctive_early_return_reassigned_count_not_guard",
+            "ptr_copy_slice_range_reassigned_count_not_guard",
+            "ptr_copy_slice_range_reassigned_dst_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert!(
+                !obligation_discharge_present(card, "valid-range"),
+                "{fixture} should not accept stale slice length evidence after reassignment"
+            );
+        }
         Ok(())
     }
 
@@ -1884,38 +1860,12 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
-    fn vec_set_len_capacity_guards_bound_new_len() -> Result<(), String> {
-        for fixture in [
-            "vec_set_len",
-            "vec_set_len_capacity_return_guard",
-            "vec_set_len_capacity_open_branch_guard",
-        ] {
-            let output = fixture_output(fixture)?;
-            let card = single_card(fixture, &output)?;
-
-            assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
-            assert_eq!(card.operation.family, OperationFamily::VecSetLen);
-            assert_eq!(card.class, ReviewClass::GuardMissing);
-            assert!(obligation_discharge_present(card, "capacity"));
-            assert!(!obligation_discharge_present(card, "initialized"));
-        }
-        Ok(())
-    }
-
-    #[test]
     fn vec_set_len_capacity_observation_is_not_capacity_guard() -> Result<(), String> {
         for fixture in [
             "vec_set_len_capacity_observed_not_guard",
-            "vec_set_len_capacity_closed_branch_not_guard",
-            "vec_set_len_capacity_reassigned_not_guard",
-            "vec_set_len_capacity_open_branch_reassigned_len_not_guard",
-            "vec_set_len_capacity_open_branch_reassigned_receiver_not_guard",
-            "vec_set_len_capacity_receiver_reassigned_not_guard",
-            "vec_set_len_capacity_binding_receiver_reassigned_not_guard",
             "vec_set_len_unrelated_capacity_comparison_not_guard",
             "vec_set_len_cap_argument_not_guard",
-            "vec_set_len_with_capacity_reassigned_not_guard",
-            "vec_set_len_with_capacity_len_reassigned_not_guard",
+            "vec_set_len_reassigned_receiver_not_guard",
         ] {
             let output = fixture_output(fixture)?;
             let card = single_card(fixture, &output)?;
@@ -2103,49 +2053,6 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
-    fn pointer_arithmetic_bounds_guard_must_match_operation_argument() -> Result<(), String> {
-        for fixture in [
-            "pointer_arithmetic_num_ctrl_bytes_other_index_not_guard",
-            "pointer_arithmetic_num_ctrl_bytes_observed_not_guard",
-            "pointer_arithmetic_num_ctrl_bytes_post_check_not_guard",
-            "pointer_arithmetic_num_ctrl_bytes_closed_branch_not_guard",
-            "pointer_arithmetic_num_ctrl_bytes_invalid_branch_not_guard",
-        ] {
-            let output = fixture_output(fixture)?;
-            let card = single_card(fixture, &output)?;
-
-            assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
-            assert_eq!(card.operation.family, OperationFamily::PointerArithmetic);
-            assert_eq!(card.class, ReviewClass::GuardMissing);
-            assert!(
-                !obligation_discharge_present(card, "bounds"),
-                "{fixture} should not discharge bounds"
-            );
-        }
-        Ok(())
-    }
-
-    #[test]
-    fn pointer_arithmetic_branch_bounds_guards_are_directional() -> Result<(), String> {
-        for fixture in [
-            "pointer_arithmetic_num_ctrl_bytes_open_branch_guard",
-            "pointer_arithmetic_num_ctrl_bytes_return_guard",
-        ] {
-            let output = fixture_output(fixture)?;
-            let card = single_card(fixture, &output)?;
-
-            assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
-            assert_eq!(card.operation.family, OperationFamily::PointerArithmetic);
-            assert_eq!(card.class, ReviewClass::GuardedUnwitnessed);
-            assert!(
-                obligation_discharge_present(card, "bounds"),
-                "{fixture} should discharge bounds"
-            );
-        }
-        Ok(())
-    }
-
-    #[test]
     fn pointer_arithmetic_slice_end_guard_is_discharged() -> Result<(), String> {
         let output = fixture_output("pointer_arithmetic_slice_end")?;
         let card = single_card("pointer_arithmetic_slice_end", &output)?;
@@ -2310,6 +2217,47 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn long_unsafe_fn_owner_inference_uses_enclosing_function_owner() -> Result<(), String> {
+        let output = fixture_output("long_unsafe_fn_owner_inference")?;
+        let card = output
+            .cards
+            .iter()
+            .find(|card| card.operation.family == OperationFamily::DropInPlace)
+            .ok_or_else(|| {
+                format!(
+                    "long_unsafe_fn_owner_inference should emit a drop_in_place card: {:#?}",
+                    output.cards
+                )
+            })?;
+
+        assert_eq!(card.operation.family, OperationFamily::DropInPlace);
+        assert_eq!(card.site.owner, Some("run".to_string()));
+        assert!(
+            card.id.0.contains("-run-operation-drop_in_place-"),
+            "card identity should include the enclosing owner: {}",
+            card.id.0
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn macro_rules_owner_inference_uses_macro_name() -> Result<(), String> {
+        let output = fixture_output("macro_rules_owner_inference")?;
+        let card = single_card("macro_rules_owner_inference", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::BoxFromRaw);
+        assert_eq!(card.site.owner, Some("spawn_unchecked".to_string()));
+        assert!(
+            card.id
+                .0
+                .contains("-spawn-unchecked-operation-box_from_raw-"),
+            "card identity should include the macro owner: {}",
+            card.id.0
+        );
+        Ok(())
+    }
+
+    #[test]
     fn private_unsafe_helper_can_use_local_safety_comment() -> Result<(), String> {
         let output = fixture_output("private_unsafe_helper_safety_comment")?;
         let card = single_card("private_unsafe_helper_safety_comment", &output)?;
@@ -2341,6 +2289,18 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
         assert_eq!(
             original_card.id, drifted_card.id,
             "card identity should not include the line number"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn card_identity_includes_exact_policy_matching_components() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let card = single_card("raw_pointer_alignment", &output)?;
+
+        assert_eq!(
+            card.id.0,
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1"
         );
         Ok(())
     }

@@ -1,62 +1,78 @@
 [
-    {
-        "id":  "UR-unwrap-unchecked-infallible-result-fixture-src-lib-rs-reserve-operation-unwrap_unchecked-unwrap-unchecked-e87efbc55d06-invalid_value-c1",
-        "class":  "guarded_unwitnessed",
-        "priority":  "medium",
-        "confidence":  "medium",
-        "site":  {
-                     "file":  "src/lib.rs",
-                     "line":  17,
-                     "column":  5,
-                     "kind":  "operation",
-                     "owner":  "reserve",
-                     "visibility":  "private",
-                     "public_api_surface":  false,
-                     "snippet":  "unsafe { result.unwrap_unchecked() }"
-                 },
-        "operation_family":  "unwrap_unchecked",
-        "hazards":  [
-                        "invalid_value"
-                    ],
-        "obligations":  [
-                            "value is known to be `Some` or `Ok` before `unwrap_unchecked`"
-                        ],
-        "obligation_evidence":  [
-                                    {
-                                        "key":  "valid-value",
-                                        "description":  "value is known to be `Some` or `Ok` before `unwrap_unchecked`",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `SAFETY:` comment was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  true,
-                                                          "state":  "present",
-                                                          "summary":  "Infallible Result state evidence was detected before unwrap_unchecked"
-                                                      },
-                                        "reach":  {
-                                                      "present":  true,
-                                                      "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `reserve`"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    }
-                                ],
-        "contract":  "Nearby `SAFETY:` comment was detected",
-        "discharge":  "All inferred safety obligations have visible local discharge evidence",
-        "reach":  "1 related test file(s) mention owner `reserve`",
-        "witness":  "No imported witness receipt was found",
-        "missing":  [
-                        "No witness receipt imported for this card"
-                    ],
-        "verify_commands":  [
-                                "cargo +nightly miri test reserve",
-                                "cargo +nightly careful test reserve"
-                            ]
-    }
+  {
+    "id": "UR-unwrap-unchecked-infallible-result-fixture-src-lib-rs-reserve-operation-unwrap_unchecked-unwrap-unchecked-e87efbc55d06-invalid_value-c1",
+    "class": "guarded_unwitnessed",
+    "priority": "medium",
+    "confidence": "medium",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 17,
+      "column": 5,
+      "kind": "operation",
+      "owner": "reserve",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { result.unwrap_unchecked() }"
+    },
+    "operation": "unsafe { result.unwrap_unchecked() }",
+    "operation_family": "unwrap_unchecked",
+    "hazards": [
+      "invalid_value"
+    ],
+    "obligations": [
+      "value is known to be `Some` or `Ok` before `unwrap_unchecked`"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "valid-value",
+        "description": "value is known to be `Some` or `Ok` before `unwrap_unchecked`",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Infallible Result state evidence was detected before unwrap_unchecked"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `reserve`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "All inferred safety obligations have visible local discharge evidence",
+    "reach": "1 related test file(s) mention owner `reserve`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test reserve",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test reserve",
+        "required": false
+      }
+    ],
+    "missing": [
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Attach a focused witness receipt or mark the static limitation explicitly.",
+    "verify_commands": [
+      "cargo +nightly miri test reserve",
+      "cargo +nightly careful test reserve"
+    ]
+  }
 ]

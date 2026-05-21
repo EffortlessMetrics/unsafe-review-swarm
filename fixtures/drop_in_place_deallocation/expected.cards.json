@@ -14,6 +14,7 @@
       "public_api_surface": false,
       "snippet": "core::ptr::drop_in_place(ptr);"
     },
+    "operation": "core::ptr::drop_in_place(ptr);",
     "operation_family": "drop_in_place",
     "hazards": [
       "pointer_validity",
@@ -103,10 +104,25 @@
     "discharge": "Some inferred safety obligations are missing local guard evidence",
     "reach": "1 related test file(s) mention owner `drop_one`",
     "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test drop_one",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test drop_one",
+        "required": false
+      }
+    ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
     ],
+    "next_action": "Add or expose the local guard that discharges the `drop_in_place` safety obligation.",
     "verify_commands": [
       "cargo +nightly miri test drop_one",
       "cargo +nightly careful test drop_one"

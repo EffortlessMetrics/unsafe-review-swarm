@@ -16,7 +16,11 @@ LSP v1 is read-only: diagnostics, hover, status, copy agent packet, copy witness
 The first supported surface is a saved JSON projection rendered with
 `unsafe-review check --format lsp`. It is not an LSP server and it does not
 edit source. The projection derives diagnostics, hovers, and command-style
-action data from existing `ReviewCard`s.
+action data from existing `ReviewCard`s. Diagnostics carry structured next
+action, witness route details, verify commands, missing evidence, and the
+static-review trust boundary. Diagnostics also include the concrete operation
+expression from the `ReviewCard`, so editor consumers do not need to parse hover
+text or reclassify findings.
 
 ## Non-goals
 

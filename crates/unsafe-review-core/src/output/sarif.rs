@@ -1,5 +1,5 @@
 use crate::api::AnalyzeOutput;
-use crate::domain::{ReviewCard, ReviewClass};
+use crate::domain::{ReviewCard, ReviewClass, WitnessRoute};
 use crate::util::path_display;
 use serde::Serialize;
 use std::collections::BTreeSet;
@@ -187,7 +187,9 @@ struct SarifResultProperties {
     hazards: Vec<&'static str>,
     missing_evidence: Vec<String>,
     witness_routes: Vec<String>,
+    witness_route_details: Vec<SarifWitnessRoute>,
     next_action: String,
+    verify_commands: Vec<String>,
     trust_boundary: &'static str,
 }
 
@@ -211,8 +213,30 @@ impl From<&ReviewCard> for SarifResultProperties {
                 .iter()
                 .map(|route| format!("{}: {}", route.kind.as_str(), route.reason))
                 .collect(),
+            witness_route_details: card.routes.iter().map(SarifWitnessRoute::from).collect(),
             next_action: card.next_action.summary.clone(),
+            verify_commands: card.next_action.verify_commands.clone(),
             trust_boundary: TRUST_BOUNDARY,
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SarifWitnessRoute {
+    kind: &'static str,
+    reason: String,
+    command: Option<String>,
+    required: bool,
+}
+
+impl From<&WitnessRoute> for SarifWitnessRoute {
+    fn from(route: &WitnessRoute) -> Self {
+        Self {
+            kind: route.kind.as_str(),
+            reason: route.reason.clone(),
+            command: route.command.clone(),
+            required: route.required,
         }
     }
 }
@@ -285,6 +309,20 @@ mod tests {
         assert_eq!(
             value["runs"][0]["results"][0]["properties"]["operationFamily"],
             "raw_pointer_read"
+        );
+        assert_eq!(
+            value["runs"][0]["results"][0]["properties"]["operation"],
+            "unsafe { ptr.cast::<Header>().read() }"
+        );
+        assert_eq!(
+            value["runs"][0]["results"][0]["properties"]["witnessRouteDetails"][0]["kind"],
+            "miri"
+        );
+        assert!(
+            value["runs"][0]["results"][0]["properties"]["verifyCommands"][0]
+                .as_str()
+                .unwrap_or("")
+                .contains("cargo +nightly miri test read_header")
         );
         assert!(
             value["runs"][0]["results"][0]["properties"]["trustBoundary"]

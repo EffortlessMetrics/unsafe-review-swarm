@@ -1,61 +1,69 @@
 [
-    {
-        "id":  "UR-unchecked-constructor-unavailable-return-guard-src-lib-rs-new-operation-unsafe_fn_call-new-unchecked-412ef5d69fe4-unknown-c1",
-        "class":  "guarded_unwitnessed",
-        "priority":  "medium",
-        "confidence":  "medium",
-        "site":  {
-                     "file":  "src/lib.rs",
-                     "line":  19,
-                     "column":  9,
-                     "kind":  "operation",
-                     "owner":  "new",
-                     "visibility":  "private",
-                     "public_api_surface":  false,
-                     "snippet":  "Some(unsafe { One::new_unchecked(needle) })"
-                 },
-        "operation_family":  "unsafe_fn_call",
-        "hazards":  [
-                        "unknown"
-                    ],
-        "obligations":  [
-                            "callee safety preconditions are satisfied"
-                        ],
-        "obligation_evidence":  [
-                                    {
-                                        "key":  "callee-contract",
-                                        "description":  "callee safety preconditions are satisfied",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `SAFETY:` comment was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  true,
-                                                          "state":  "present",
-                                                          "summary":  "Unchecked constructor availability guard code was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  true,
-                                                      "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `new`"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    }
-                                ],
-        "contract":  "Nearby `SAFETY:` comment was detected",
-        "discharge":  "All inferred safety obligations have visible local discharge evidence",
-        "reach":  "1 related test file(s) mention owner `new`",
-        "witness":  "No imported witness receipt was found",
-        "missing":  [
-                        "No witness receipt imported for this card"
-                    ],
-        "verify_commands":  [
-
-                            ]
-    }
+  {
+    "id": "UR-unchecked-constructor-unavailable-return-guard-src-lib-rs-new-operation-unsafe_fn_call-new-unchecked-412ef5d69fe4-unknown-c1",
+    "class": "guarded_unwitnessed",
+    "priority": "medium",
+    "confidence": "medium",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 19,
+      "column": 9,
+      "kind": "operation",
+      "owner": "new",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "Some(unsafe { One::new_unchecked(needle) })"
+    },
+    "operation": "Some(unsafe { One::new_unchecked(needle) })",
+    "operation_family": "unsafe_fn_call",
+    "hazards": [
+      "unknown"
+    ],
+    "obligations": [
+      "callee safety preconditions are satisfied"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "callee-contract",
+        "description": "callee safety preconditions are satisfied",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Unchecked constructor availability guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `new`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "All inferred safety obligations have visible local discharge evidence",
+    "reach": "1 related test file(s) mention owner `new`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Attach a focused witness receipt or mark the static limitation explicitly.",
+    "verify_commands": []
+  }
 ]

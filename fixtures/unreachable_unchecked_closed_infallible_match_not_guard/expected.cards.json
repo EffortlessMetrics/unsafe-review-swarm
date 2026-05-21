@@ -1,63 +1,79 @@
 [
-    {
-        "id":  "UR-unreachable-unchecked-closed-infallible-match-not-guard-fixture-src-lib-rs-with-capacity-operation-unreachable_unchecked-unreachable-unchecked-7d4ccec12cc8-invalid_value-c1",
-        "class":  "guard_missing",
-        "priority":  "high",
-        "confidence":  "medium",
-        "site":  {
-                     "file":  "src/lib.rs",
-                     "line":  20,
-                     "column":  5,
-                     "kind":  "operation",
-                     "owner":  "with_capacity",
-                     "visibility":  "private",
-                     "public_api_surface":  false,
-                     "snippet":  "unsafe { core::hint::unreachable_unchecked() }"
-                 },
-        "operation_family":  "unreachable_unchecked",
-        "hazards":  [
-                        "invalid_value"
-                    ],
-        "obligations":  [
-                            "control flow cannot reach this path before `unreachable_unchecked`"
-                        ],
-        "obligation_evidence":  [
-                                    {
-                                        "key":  "unreachable",
-                                        "description":  "control flow cannot reach this path before `unreachable_unchecked`",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `SAFETY:` comment was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  false,
-                                                          "state":  "missing",
-                                                          "summary":  "No obligation-specific guard code was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  true,
-                                                      "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `with_capacity`"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    }
-                                ],
-        "contract":  "Nearby `SAFETY:` comment was detected",
-        "discharge":  "No visible local guard detected",
-        "reach":  "1 related test file(s) mention owner `with_capacity`",
-        "witness":  "No imported witness receipt was found",
-        "missing":  [
-                        "Missing visible local guard for inferred safety obligations",
-                        "No witness receipt imported for this card"
-                    ],
-        "verify_commands":  [
-                                "cargo +nightly miri test with_capacity",
-                                "cargo +nightly careful test with_capacity"
-                            ]
-    }
+  {
+    "id": "UR-unreachable-unchecked-closed-infallible-match-not-guard-fixture-src-lib-rs-with-capacity-operation-unreachable_unchecked-unreachable-unchecked-7d4ccec12cc8-invalid_value-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 20,
+      "column": 5,
+      "kind": "operation",
+      "owner": "with_capacity",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { core::hint::unreachable_unchecked() }"
+    },
+    "operation": "unsafe { core::hint::unreachable_unchecked() }",
+    "operation_family": "unreachable_unchecked",
+    "hazards": [
+      "invalid_value"
+    ],
+    "obligations": [
+      "control flow cannot reach this path before `unreachable_unchecked`"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "unreachable",
+        "description": "control flow cannot reach this path before `unreachable_unchecked`",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `with_capacity`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "No visible local guard detected",
+    "reach": "1 related test file(s) mention owner `with_capacity`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test with_capacity",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test with_capacity",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose the local guard that discharges the `unreachable_unchecked` safety obligation.",
+    "verify_commands": [
+      "cargo +nightly miri test with_capacity",
+      "cargo +nightly careful test with_capacity"
+    ]
+  }
 ]

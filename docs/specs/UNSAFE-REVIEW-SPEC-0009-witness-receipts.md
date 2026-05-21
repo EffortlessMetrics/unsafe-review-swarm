@@ -73,8 +73,11 @@ separate receipt truth.
 The CLI may audit receipt files against the current `ReviewCard` set. Receipt
 audit must report matched, unmatched, stale, expired, wrong-identity, wrong-tool,
 weaker-than-required, and invalid receipt metadata without running witnesses,
-inferring site reach, making policy decisions, or claiming safety. The audit is
-an advisory metadata report over saved receipts and current cards.
+inferring site reach, making policy decisions, or claiming safety. Matched
+receipt entries include current card operation, missing-count, and next-action
+context so a receipt can improve witness evidence without erasing remaining
+guard or contract gaps. The audit is an advisory metadata report over saved
+receipts and current cards.
 
 Receipt JSON fields:
 

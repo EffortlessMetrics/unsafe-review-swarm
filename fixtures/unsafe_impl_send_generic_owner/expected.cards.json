@@ -14,6 +14,7 @@
       "public_api_surface": false,
       "snippet": "unsafe impl<T: Send> Send for Sender<T> {}"
     },
+    "operation": "unsafe impl<T: Send> Send for Sender<T> {}",
     "operation_family": "unsafe_impl_send_sync",
     "hazards": [
       "send_sync_invariant",
@@ -52,14 +53,28 @@
     "discharge": "No visible local guard detected",
     "reach": "1 related test file(s) mention owner `Sender`",
     "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "loom",
+        "reason": "Concurrency or shared-mutable-state hazard; interleaving model is a better first witness than Miri alone",
+        "command": "cargo test Sender_loom -- --nocapture",
+        "required": false
+      },
+      {
+        "kind": "shuttle",
+        "reason": "Shuttle can explore scheduler interleavings for focused concurrency invariants",
+        "command": "cargo test Sender_shuttle -- --nocapture",
+        "required": false
+      }
+    ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
     ],
+    "next_action": "Add or update a Loom/Shuttle model for the changed concurrency invariant.",
     "verify_commands": [
       "cargo test Sender_loom -- --nocapture",
       "cargo test Sender_shuttle -- --nocapture"
     ]
   }
 ]
-

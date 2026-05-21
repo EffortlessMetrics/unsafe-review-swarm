@@ -1,5 +1,0 @@
-[package]
-name = "vec-set-len-capacity-closed-branch-not-guard"
-version = "0.0.0"
-edition = "2024"
-publish = false

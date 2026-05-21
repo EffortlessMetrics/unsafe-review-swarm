@@ -14,6 +14,7 @@
       "public_api_surface": false,
       "snippet": "unsafe { values.set_len(new_len) }"
     },
+    "operation": "unsafe { values.set_len(new_len) }",
     "operation_family": "vec_set_len",
     "hazards": [
       "initialized_memory",
@@ -77,10 +78,25 @@
     "discharge": "No visible local guard detected",
     "reach": "1 related test file(s) mention owner `extend_len`",
     "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test extend_len",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test extend_len",
+        "required": false
+      }
+    ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
     ],
+    "next_action": "Add or expose the local guard that discharges the `vec_set_len` safety obligation.",
     "verify_commands": [
       "cargo +nightly miri test extend_len",
       "cargo +nightly careful test extend_len"

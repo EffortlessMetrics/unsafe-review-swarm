@@ -1,0 +1,11 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -3,6 +3,7 @@ pub struct Header(u32);
+ pub fn read_header(bytes: &[u8]) -> Header {
+     assert!(bytes.len() >= core::mem::size_of::<Header>());
+     let ptr = bytes.as_ptr().cast::<Header>();
+     // SAFETY: fixture documents the cast pointer's same-origin length guard but
+     // intentionally omits the other raw-read proof obligations.
++    unsafe { ptr.read() }
+ }

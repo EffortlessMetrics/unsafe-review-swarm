@@ -27,16 +27,31 @@ Check local environment signals:
 unsafe-review doctor
 ```
 
-Missing witness tools are informational. `doctor` does not run witnesses and
-does not make policy decisions.
+`doctor` checks Git/base-ref visibility, Cargo metadata readiness, artifact
+directory writability, and witness-tool hints. Missing witness tools are
+informational. `doctor` does not run witnesses and does not make policy
+decisions.
 
 Run against the current branch diff:
 
 ```bash
-unsafe-review check --base origin/main
+unsafe-review first-pr --base origin/main
 ```
 
-The default policy is advisory. A finding means:
+This writes the standard local review bundle:
+
+```text
+target/unsafe-review/cards.json
+target/unsafe-review/pr-summary.md
+target/unsafe-review/cards.sarif
+target/unsafe-review/comment-plan.json
+target/unsafe-review/witness-plan.md
+target/unsafe-review/lsp.json
+```
+
+The default policy is advisory. The bundle is artifact-only: it does not run
+witness tools, post comments, edit source, or enforce blocking policy. A finding
+means:
 
 ```text
 This changed unsafe-adjacent seam is missing review evidence.
@@ -51,6 +66,11 @@ Miri failed.
 Miri passed.
 ```
 
+If no changed unsafe-review gaps are found, the terminal, PR summary, witness
+plan, and comment-plan artifact keep the same boundary: no changed gaps is not
+proof that the repo is safe, UB-free, Miri-clean, or that any unsafe site
+executed.
+
 For a deterministic smoke case, run the bundled fixture from a repo checkout:
 
 ```bash
@@ -63,6 +83,14 @@ unsafe-review check \
 That fixture should emit one `guard_missing` raw pointer alignment card.
 
 ## Write PR Artifacts Locally
+
+For the normal first-run path, prefer the bundle command:
+
+```bash
+unsafe-review first-pr --base origin/main
+```
+
+The lower-level `check` formats remain useful when you only need one artifact.
 
 Write the smallest reviewer-facing summary:
 
@@ -93,12 +121,18 @@ artifact only; `unsafe-review` does not post comments by default.
 
 ## Inspect One Card
 
-Copy a card id from JSON, human output, or the PR summary and ask for the human
-explanation:
+`first-pr` prints an `Inspect top card` command for the highest-priority card.
+Run that command to see why the card exists, what evidence is missing, what would
+resolve it, what would not resolve it, which witness route fits, and what
+unsafe-review is not claiming:
 
 ```bash
 unsafe-review explain <card-id>
 ```
+
+You can also copy any other card id from JSON, human output, or the PR summary
+and pass it to `explain`. For fixture-backed examples of common card families,
+see [Explain examples](explanation/explain-examples.md).
 
 Generate a bounded repair packet for an LLM or agent:
 

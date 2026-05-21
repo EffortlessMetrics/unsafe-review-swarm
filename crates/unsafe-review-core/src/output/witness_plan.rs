@@ -1,6 +1,52 @@
 use crate::api::AnalyzeOutput;
-use crate::domain::ReviewCard;
+use crate::domain::{ReviewCard, WitnessKind, WitnessRoute};
+use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
 use crate::util::path_display;
+
+struct RouteGroup {
+    heading: &'static str,
+    kinds: &'static [WitnessKind],
+    include_unrouted: bool,
+    limit: &'static str,
+}
+
+const ROUTE_GROUPS: &[RouteGroup] = &[
+    RouteGroup {
+        heading: "Miri / cargo-careful",
+        kinds: &[WitnessKind::Miri, WitnessKind::CargoCareful],
+        include_unrouted: false,
+        limit: "Concrete runtime evidence is path-specific. It can support the exercised route, but it does not prove arbitrary callers, repo safety, UB-free status, or site execution unless a matching receipt records the run.",
+    },
+    RouteGroup {
+        heading: "Sanitizers",
+        kinds: &[
+            WitnessKind::AddressSanitizer,
+            WitnessKind::MemorySanitizer,
+            WitnessKind::ThreadSanitizer,
+            WitnessKind::LeakSanitizer,
+        ],
+        include_unrouted: false,
+        limit: "Sanitizers are configured runtime diagnostics for exercised inputs and builds. They do not prove every input, platform, aliasing case, or foreign boundary safe.",
+    },
+    RouteGroup {
+        heading: "Loom / Shuttle",
+        kinds: &[WitnessKind::Loom, WitnessKind::Shuttle],
+        include_unrouted: false,
+        limit: "Concurrency witnesses explore modeled scheduler interleavings. They do not prove behavior outside the modeled harness, assumptions, or state space.",
+    },
+    RouteGroup {
+        heading: "Kani / Crux",
+        kinds: &[WitnessKind::Kani, WitnessKind::Crux],
+        include_unrouted: false,
+        limit: "Proof harnesses are scoped to encoded preconditions, bounds, and assertions. They do not prove broader callers or undocumented contracts.",
+    },
+    RouteGroup {
+        heading: "Human deep review / unsupported",
+        kinds: &[WitnessKind::HumanDeepReview, WitnessKind::Unsupported],
+        include_unrouted: true,
+        limit: "Manual review is the route when local static evidence and known witness adapters are not enough. Record assumptions and limits instead of converting uncertainty into a proof claim.",
+    },
+];
 
 pub(crate) fn render(output: &AnalyzeOutput) -> String {
     let mut out = String::new();
@@ -13,11 +59,16 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
     out.push_str(&format!("- Policy mode: `{}`\n\n", output.policy.as_str()));
 
     if output.cards.is_empty() {
-        out.push_str("No witness routes are recommended because no review cards were emitted.\n\n");
+        out.push_str(NO_CHANGED_GAPS_MESSAGE);
+        out.push('\n');
+        out.push_str(NO_CHANGED_GAPS_LIMITATION);
+        out.push_str(
+            "\n\nNo witness routes are recommended because no review cards were emitted.\n\n",
+        );
     } else {
-        out.push_str("## Routes\n\n");
-        for card in &output.cards {
-            render_card(&mut out, card);
+        out.push_str("## Route groups\n\n");
+        for group in ROUTE_GROUPS {
+            render_group(&mut out, group, &output.cards);
         }
     }
 
@@ -26,9 +77,41 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
     out
 }
 
-fn render_card(out: &mut String, card: &ReviewCard) {
+fn render_group(out: &mut String, group: &RouteGroup, cards: &[ReviewCard]) {
+    let matching = cards
+        .iter()
+        .filter_map(|card| {
+            let routes = routes_for_group(card, group);
+            if routes.is_empty() && !(group.include_unrouted && card.routes.is_empty()) {
+                None
+            } else {
+                Some((card, routes))
+            }
+        })
+        .collect::<Vec<_>>();
+
+    if matching.is_empty() {
+        return;
+    }
+
+    out.push_str(&format!("### {}\n\n", group.heading));
+    out.push_str(&format!("- Limit: {}\n\n", group.limit));
+
+    for (card, routes) in matching {
+        render_group_card(out, card, &routes);
+    }
+}
+
+fn routes_for_group<'a>(card: &'a ReviewCard, group: &RouteGroup) -> Vec<&'a WitnessRoute> {
+    card.routes
+        .iter()
+        .filter(|route| group.kinds.contains(&route.kind))
+        .collect()
+}
+
+fn render_group_card(out: &mut String, card: &ReviewCard, routes: &[&WitnessRoute]) {
     out.push_str(&format!(
-        "### `{}`\n\n- Class: `{}`\n- Location: {}:{}\n- Operation: `{}`\n- Missing evidence: {}\n- Witness evidence: {}\n\n",
+        "#### `{}`\n\n- Class: `{}`\n- Location: {}:{}\n- Operation: `{}`\n- Missing evidence: {}\n- Witness evidence: {}\n",
         card.id,
         card.class.as_str(),
         path_display(&card.site.location.file),
@@ -37,20 +120,47 @@ fn render_card(out: &mut String, card: &ReviewCard) {
         missing_summary(card),
         card.witness.summary
     ));
+    out.push_str(&format!(
+        "- Next action: {}\n",
+        one_line(&card.next_action.summary)
+    ));
+    if !card.next_action.verify_commands.is_empty() {
+        out.push_str("- Verify command");
+        if card.next_action.verify_commands.len() > 1 {
+            out.push('s');
+        }
+        out.push_str(":\n\n");
+        for command in &card.next_action.verify_commands {
+            out.push_str("```bash\n");
+            out.push_str(command);
+            out.push_str("\n```\n");
+        }
+    }
 
-    if card.routes.is_empty() {
+    if routes.is_empty() {
         out.push_str("- Route: `human-deep-review`\n");
         out.push_str("  - Reason: no automatic witness route was selected\n\n");
+        out.push_str("  - What it can show: reviewer-owned contract reasoning, assumptions, and missing context.\n");
+        out.push_str("  - What it cannot prove: memory safety, UB-free status, site execution, or witness success.\n");
+        out.push_str("  - Receipt hint: no saved-output receipt applies until an external witness run exists.\n\n");
         return;
     }
 
-    for route in &card.routes {
+    for route in routes {
         out.push_str(&format!(
             "- Route: `{}`{}\n",
             route.kind.as_str(),
             if route.required { " (required)" } else { "" }
         ));
         out.push_str(&format!("  - Reason: {}\n", route.reason));
+        out.push_str(&format!(
+            "  - What it can show: {}\n",
+            route_can_show(route.kind)
+        ));
+        out.push_str(&format!(
+            "  - What it cannot prove: {}\n",
+            route_cannot_prove(route.kind)
+        ));
         if let Some(command) = &route.command {
             out.push_str("  - Command:\n\n");
             out.push_str("```bash\n");
@@ -59,8 +169,99 @@ fn render_card(out: &mut String, card: &ReviewCard) {
         } else {
             out.push_str("  - Command: no automatic command; route to human review.\n");
         }
+        out.push_str(&format!(
+            "  - Receipt hint: {}\n",
+            receipt_hint(card, route)
+        ));
     }
     out.push('\n');
+}
+
+fn route_can_show(kind: WitnessKind) -> &'static str {
+    match kind {
+        WitnessKind::Miri => {
+            "a concrete Miri run may expose undefined behavior on the exercised pure-Rust path when that path is supported"
+        }
+        WitnessKind::CargoCareful => {
+            "a cheaper runtime check may catch several unsafe precondition violations on the exercised path"
+        }
+        WitnessKind::AddressSanitizer
+        | WitnessKind::MemorySanitizer
+        | WitnessKind::ThreadSanitizer
+        | WitnessKind::LeakSanitizer => {
+            "a configured sanitizer run may expose runtime memory or thread diagnostics on exercised inputs"
+        }
+        WitnessKind::Loom | WitnessKind::Shuttle => {
+            "a focused model may explore scheduler interleavings for the encoded concurrency invariant"
+        }
+        WitnessKind::Kani | WitnessKind::Crux => {
+            "a focused proof harness may discharge the encoded assertions under its modeled assumptions"
+        }
+        WitnessKind::HumanDeepReview | WitnessKind::Unsupported => {
+            "reviewer-owned contract reasoning, assumptions, and missing context"
+        }
+    }
+}
+
+fn route_cannot_prove(kind: WitnessKind) -> &'static str {
+    match kind {
+        WitnessKind::Miri | WitnessKind::CargoCareful => {
+            "arbitrary callers, full path coverage, repo safety, UB-free status, or site execution without a matching receipt"
+        }
+        WitnessKind::AddressSanitizer
+        | WitnessKind::MemorySanitizer
+        | WitnessKind::ThreadSanitizer
+        | WitnessKind::LeakSanitizer => {
+            "all inputs, platforms, foreign code behavior, repo safety, or UB-free status"
+        }
+        WitnessKind::Loom | WitnessKind::Shuttle => {
+            "interleavings outside the modeled harness, unsupported state, repo safety, or UB-free status"
+        }
+        WitnessKind::Kani | WitnessKind::Crux => {
+            "callers, bounds, contracts, or code paths not encoded in the harness"
+        }
+        WitnessKind::HumanDeepReview | WitnessKind::Unsupported => {
+            "memory safety, UB-free status, site execution, or witness success"
+        }
+    }
+}
+
+fn receipt_hint(card: &ReviewCard, route: &WitnessRoute) -> String {
+    let command = route.command.as_deref().unwrap_or("<command>");
+    match route.kind {
+        WitnessKind::Miri => format!(
+            "after running this outside `unsafe-review`, import saved output with `unsafe-review receipt import-miri {} --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command \"{}\"`",
+            card.id, command
+        ),
+        WitnessKind::CargoCareful => format!(
+            "after running this outside `unsafe-review`, import saved output with `unsafe-review receipt import-careful {} --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command \"{}\"`",
+            card.id, command
+        ),
+        WitnessKind::AddressSanitizer
+        | WitnessKind::MemorySanitizer
+        | WitnessKind::ThreadSanitizer
+        | WitnessKind::LeakSanitizer => format!(
+            "after running this outside `unsafe-review`, import saved output with `unsafe-review receipt import-sanitizer {} --tool {} --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command \"{}\"`",
+            card.id,
+            route.kind.as_str(),
+            command
+        ),
+        WitnessKind::Loom | WitnessKind::Shuttle => format!(
+            "after running this outside `unsafe-review`, import saved output with `unsafe-review receipt import-concurrency {} --tool {} --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command \"{}\"`",
+            card.id,
+            route.kind.as_str(),
+            command
+        ),
+        WitnessKind::Kani | WitnessKind::Crux => format!(
+            "after running this outside `unsafe-review`, import saved output with `unsafe-review receipt import-proof {} --tool {} --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command \"{}\"`",
+            card.id,
+            route.kind.as_str(),
+            command
+        ),
+        WitnessKind::HumanDeepReview | WitnessKind::Unsupported => {
+            "no saved-output receipt applies until an external witness run exists; keep review assumptions and limits explicit".to_string()
+        }
+    }
 }
 
 fn missing_summary(card: &ReviewCard) -> String {
@@ -90,11 +291,33 @@ mod tests {
         let rendered = render(&output);
 
         assert!(rendered.contains("# unsafe-review witness plan"));
+        assert!(rendered.contains("## Route groups"));
+        assert!(rendered.contains("### Miri / cargo-careful"));
+        assert!(rendered.contains("Concrete runtime evidence is path-specific"));
+        assert!(rendered.contains("Operation: `unsafe { ptr.cast::<Header>().read() }`"));
         assert!(rendered.contains("Route: `miri`"));
+        assert!(rendered.contains("What it can show"));
+        assert!(rendered.contains("What it cannot prove"));
         assert!(rendered.contains("cargo +nightly miri test read_header"));
+        assert!(rendered.contains("unsafe-review receipt import-miri"));
+        assert!(rendered.contains("unsafe-review receipt import-careful"));
+        assert!(rendered.contains("Next action: Add or expose"));
+        assert!(rendered.contains("Verify command"));
         assert!(rendered.contains("Missing visible local guard"));
         assert!(rendered.contains("does not run Miri"));
         assert!(rendered.contains("not UB-free status"));
+        Ok(())
+    }
+
+    #[test]
+    fn witness_plan_empty_output_uses_standard_advisory_wording() -> Result<(), String> {
+        let output = fixture_output("safe_code_no_cards")?;
+        let rendered = render(&output);
+
+        assert!(rendered.contains(NO_CHANGED_GAPS_MESSAGE));
+        assert!(rendered.contains(NO_CHANGED_GAPS_LIMITATION));
+        assert!(rendered.contains("No witness routes are recommended"));
+        assert!(!rendered.contains("All clear"));
         Ok(())
     }
 
@@ -106,7 +329,25 @@ mod tests {
         assert!(rendered.contains("Imported miri receipt"));
         assert!(rendered.contains("expires_at: 2026-08-18"));
         assert!(rendered.contains("Missing visible local guard"));
+        assert!(rendered.contains("Receipt hint"));
         assert!(rendered.contains("not a Miri result unless a witness receipt is attached"));
+        Ok(())
+    }
+
+    #[test]
+    fn witness_plan_groups_concurrency_routes_with_limits() -> Result<(), String> {
+        let output = fixture_output("unsafe_impl_send")?;
+        let rendered = render(&output);
+
+        assert!(rendered.contains("### Loom / Shuttle"));
+        assert!(rendered.contains("Concurrency witnesses explore modeled scheduler interleavings"));
+        assert!(rendered.contains("Route: `loom`"));
+        assert!(rendered.contains("Route: `shuttle`"));
+        assert!(rendered.contains("unsafe-review receipt import-concurrency"));
+        assert!(rendered.contains("What it cannot prove"));
+        assert!(rendered.contains("outside the modeled harness"));
+        assert!(!rendered.contains("Miri passed"));
+        assert!(!rendered.contains("All clear"));
         Ok(())
     }
 

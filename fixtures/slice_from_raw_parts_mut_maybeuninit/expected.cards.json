@@ -1,142 +1,158 @@
 [
-    {
-        "id":  "UR-slice-from-raw-parts-mut-maybeuninit-fixture-src-lib-rs-ctrl-slice-operation-slice_from_raw_parts-from-raw-parts-mut-140ca52b71c2-pointer_validity-c1",
-        "class":  "guard_missing",
-        "priority":  "high",
-        "confidence":  "medium",
-        "site":  {
-                     "file":  "src/lib.rs",
-                     "line":  12,
-                     "column":  9,
-                     "kind":  "operation",
-                     "owner":  "ctrl_slice",
-                     "visibility":  "private",
-                     "public_api_surface":  false,
-                     "snippet":  "unsafe { core::slice::from_raw_parts_mut(self.ctrl.cast(), self.len) }"
-                 },
-        "operation_family":  "slice_from_raw_parts",
-        "hazards":  [
-                        "pointer_validity",
-                        "alignment",
-                        "initialized_memory",
-                        "bounds",
-                        "same_allocation"
-                    ],
-        "obligations":  [
-                            "pointer is valid for `len` elements",
-                            "pointer is aligned for the element type",
-                            "memory range is initialized",
-                            "range fits in one allocation"
-                        ],
-        "obligation_evidence":  [
-                                    {
-                                        "key":  "pointer-live",
-                                        "description":  "pointer is valid for `len` elements",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `SAFETY:` comment was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  false,
-                                                          "state":  "missing",
-                                                          "summary":  "No nullability guard code was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  true,
-                                                      "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `ctrl_slice`"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    },
-                                    {
-                                        "key":  "alignment",
-                                        "description":  "pointer is aligned for the element type",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `SAFETY:` comment was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  false,
-                                                          "state":  "missing",
-                                                          "summary":  "No alignment guard code was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  true,
-                                                      "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `ctrl_slice`"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    },
-                                    {
-                                        "key":  "initialized",
-                                        "description":  "memory range is initialized",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `SAFETY:` comment was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  true,
-                                                          "state":  "present",
-                                                          "summary":  "MaybeUninit slice element evidence was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  true,
-                                                      "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `ctrl_slice`"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    },
-                                    {
-                                        "key":  "allocation",
-                                        "description":  "range fits in one allocation",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `SAFETY:` comment was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  false,
-                                                          "state":  "missing",
-                                                          "summary":  "No obligation-specific guard code was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  true,
-                                                      "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `ctrl_slice`"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    }
-                                ],
-        "contract":  "Nearby `SAFETY:` comment was detected",
-        "discharge":  "Some inferred safety obligations are missing local guard evidence",
-        "reach":  "1 related test file(s) mention owner `ctrl_slice`",
-        "witness":  "No imported witness receipt was found",
-        "missing":  [
-                        "Missing visible local guard for inferred safety obligations",
-                        "No witness receipt imported for this card"
-                    ],
-        "verify_commands":  [
-                                "cargo +nightly miri test ctrl_slice",
-                                "cargo +nightly careful test ctrl_slice"
-                            ]
-    }
+  {
+    "id": "UR-slice-from-raw-parts-mut-maybeuninit-fixture-src-lib-rs-ctrl-slice-operation-slice_from_raw_parts-from-raw-parts-mut-140ca52b71c2-pointer_validity-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 12,
+      "column": 9,
+      "kind": "operation",
+      "owner": "ctrl_slice",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { core::slice::from_raw_parts_mut(self.ctrl.cast(), self.len) }"
+    },
+    "operation": "unsafe { core::slice::from_raw_parts_mut(self.ctrl.cast(), self.len) }",
+    "operation_family": "slice_from_raw_parts",
+    "hazards": [
+      "pointer_validity",
+      "alignment",
+      "initialized_memory",
+      "bounds",
+      "same_allocation"
+    ],
+    "obligations": [
+      "pointer is valid for `len` elements",
+      "pointer is aligned for the element type",
+      "memory range is initialized",
+      "range fits in one allocation"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "pointer-live",
+        "description": "pointer is valid for `len` elements",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nullability guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `ctrl_slice`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "alignment",
+        "description": "pointer is aligned for the element type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No alignment guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `ctrl_slice`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "initialized",
+        "description": "memory range is initialized",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "MaybeUninit slice element evidence was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `ctrl_slice`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "allocation",
+        "description": "range fits in one allocation",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `ctrl_slice`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "Some inferred safety obligations are missing local guard evidence",
+    "reach": "1 related test file(s) mention owner `ctrl_slice`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test ctrl_slice",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test ctrl_slice",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose the local guard that discharges the `slice_from_raw_parts` safety obligation.",
+    "verify_commands": [
+      "cargo +nightly miri test ctrl_slice",
+      "cargo +nightly careful test ctrl_slice"
+    ]
+  }
 ]

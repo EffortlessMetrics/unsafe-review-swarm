@@ -27,11 +27,13 @@
 
 Badge endpoints are repo-scoped static evidence projections from ReviewCards.
 They are not safety badges.
-They must be generated from the CLI and covered by repository checks.
+They must be generated from the CLI through the core serde-backed badge
+renderer and covered by repository checks.
 
 - Generate endpoint JSON: `cargo run --locked -p unsafe-review -- badges --out badges/`
-- Verify single-card badge behavior: `cargo test -p unsafe-review --test e2e repo_inventory_and_badges_count_open_gaps_without_safety_claim --locked`
-- Verify multi-card badge behavior: `cargo test -p unsafe-review --test e2e repo_badges_follow_multicard_review_card_summary --locked`
+- Verify core badge rendering: `cargo test -p unsafe-review-core badge_json --locked`
+- Verify badge behavior: `cargo test -p unsafe-review --test e2e repo_inventory_and_badges_count_open_gaps_without_safety_claim --locked`
+- Verify public endpoint allowlist: `cargo test -p xtask generated_artifact_detector_is_narrow --locked`
 - Run the repository gate: `cargo run --locked -p xtask -- check-pr`
 
 Endpoint badges may appear in README rows only when `badges/unsafe-review.json`

@@ -26,7 +26,8 @@ source of analyzer truth. It carries:
 - `source = review_card`
 - `policy = advisory`
 - the card identity, class, priority, and confidence
-- the unsafe site context, operation family, snippet, and hazards
+- the unsafe site context, concrete operation expression, operation family,
+  snippet, and hazards
 - required safety conditions and obligation-level evidence
 - missing evidence
 - allowed repairs scoped to the current card
@@ -64,6 +65,8 @@ claim that the packet resolves the card.
 
 - A card context command returns `mode = bounded_repair_packet`.
 - The packet names `source = review_card` and repeats the card identity.
+- The packet carries the exact ReviewCard operation expression and operation
+  family, so repair work is scoped to one unsafe operation.
 - The packet includes obligation-level evidence, missing evidence, witness
   routes, do-not-do rules, stop conditions, and the trust boundary.
 - If evidence is not knowable statically, the packet names the limitation

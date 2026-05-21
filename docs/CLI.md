@@ -9,6 +9,21 @@ Every command is advisory by default. The tool does not prove memory safety, doe
 not claim UB-free status, does not run witness tools by default, and does not
 post PR comments.
 
+## Support Posture
+
+Print the current support posture and trust boundary without analyzing the repo:
+
+```bash
+unsafe-review support
+```
+
+This is the first command to run when you need to know what is experimental,
+advisory, deferred, or not default. It reports that `ReviewCard`s are the source
+of truth, `first-pr` artifacts are advisory projections, receipts import saved
+external evidence only, policy reports are advisory, witness execution is not
+default, comment posting is not default, source edits are not supported, and
+live LSP remains deferred.
+
 ## Review A Diff
 
 Review the current branch against `origin/main`:
@@ -56,8 +71,40 @@ unsafe-review policy report \
 
 The policy report compares current `ReviewCard`s with exact baseline and
 suppression ledgers. It counts new gaps, baseline-known cards, suppressed cards,
-resolved baseline entries, and expired suppressions. It does not block, execute
-witnesses, or create broad suppression authority.
+resolved baseline entries, and expired suppressions. Current-card entries also
+show the operation expression, operation family, policy reason, and next action
+from the same `ReviewCard`. JSON reports include schema-versioned
+classification explanations, limitations, unmatched baseline entries, and
+invalid-ledger-entry fields. It does not block, execute witnesses, or create
+broad suppression authority.
+
+## First PR Bundle
+
+For a first local review pass, write the standard advisory artifact bundle:
+
+```bash
+unsafe-review first-pr --base origin/main
+```
+
+`review` is an alias for `first-pr`.
+
+By default this writes:
+
+```text
+target/unsafe-review/cards.json
+target/unsafe-review/pr-summary.md
+target/unsafe-review/cards.sarif
+target/unsafe-review/comment-plan.json
+target/unsafe-review/witness-plan.md
+target/unsafe-review/lsp.json
+```
+
+Use `--out-dir <dir>` to choose another artifact directory, or `--diff file|-`
+to review a supplied diff.
+
+The command analyzes once and renders every artifact from the same
+`ReviewCard`s. It stays advisory-only: it does not execute witness tools, post
+comments, edit source, or enforce blocking policy.
 
 ## Output Formats
 
@@ -67,23 +114,34 @@ findings independently.
 | Format | Command | Use |
 |---|---|---|
 | `human` | `unsafe-review check --base origin/main` | terminal review |
-| `json` | `unsafe-review check --base origin/main --format json` | canonical machine-readable cards |
-| `markdown` | `unsafe-review check --diff change.diff --format markdown` | local report |
+| `json` | `unsafe-review check --base origin/main --format json` | canonical machine-readable cards with operation, evidence, routes, and next action |
+| `markdown` | `unsafe-review check --diff change.diff --format markdown` | local report with operation and next-action context |
 | `pr-summary` | `unsafe-review check --base origin/main --format pr-summary --out target/unsafe-review/pr-summary.md` | sparse reviewer-facing PR artifact |
 | `sarif` | `unsafe-review check --base origin/main --format sarif --out target/unsafe-review/cards.sarif` | code-scanning-compatible artifact |
-| `comment-plan` | `unsafe-review check --base origin/main --format comment-plan --out target/unsafe-review/comment-plan.json` | artifact-only inline comment candidates |
+| `comment-plan` | `unsafe-review check --base origin/main --format comment-plan --out target/unsafe-review/comment-plan.json` | artifact-only inline comment candidates with card ID, operation, routes, and verify commands |
 | `lsp` | `unsafe-review check --base origin/main --format lsp --out target/unsafe-review/lsp.json` | saved editor diagnostics and hovers |
 | `witness-plan` | `unsafe-review check --base origin/main --format witness-plan --out target/unsafe-review/witness-plan.md` | reviewer-facing witness route plan |
 
-`comment-plan` is plan-only. It does not post comments.
+The default human output is for terminal review. It names the card identity,
+operation family, operation expression, obligation evidence, witness route, next
+action, verify commands, and trust boundary without executing witnesses.
+
+`comment-plan` is plan-only. It carries the concrete ReviewCard operation
+expression for each planned comment and does not post comments. When no changed
+unsafe-review gaps are found, `comments` is empty and the artifact includes a
+`no_changed_gaps` message with the same no-proof limitation used by the terminal
+and Markdown surfaces.
 
 `lsp` writes saved JSON only. It includes a read-only status object,
 diagnostics, hovers, and command data for copying packets, copying witness
 commands, explaining routes, and opening statically related tests. There is no
 editor extension or live LSP server in this surface.
 
-`witness-plan` is a routing artifact. It lists suggested witness commands and
-limitations from existing cards, but it does not run those commands.
+`witness-plan` is a routing artifact. It groups existing `ReviewCard`s by
+witness family: Miri / `cargo-careful`, sanitizers, Loom / Shuttle, Kani /
+Crux, and human deep review / unsupported. Each route entry includes why that
+route fits, what it can show, what it cannot prove, a suggested command when one
+is available, and a receipt import hint. It does not run those commands.
 
 ## PR Artifacts
 
@@ -106,6 +164,18 @@ That verifier checks parseability, advisory policy, plan-only comment mode,
 projected card identity consistency, result counts, and trust-boundary text. It
 does not prove the analyzer found every unsafe issue.
 
+For the full `first-pr` bundle, including `witness-plan.md` and saved
+`lsp.json`, use:
+
+```bash
+cargo xtask check-first-pr-artifacts target/unsafe-review
+```
+
+That verifier keeps the bundle advisory: it checks route limitations,
+comment-plan caps and renderable inline fields, zero-gap wording, card identity
+consistency, and absence of positive safety/proof wording. It does not run
+witnesses, post comments, edit source, or make a policy decision.
+
 ## Explain And Context
 
 Use `explain` for a human-readable explanation of one card:
@@ -113,6 +183,13 @@ Use `explain` for a human-readable explanation of one card:
 ```bash
 unsafe-review explain --root fixtures/raw_pointer_alignment <card-id>
 ```
+
+The explanation is reviewer-first: why the card exists, required safety
+conditions, evidence found, evidence missing, what would resolve it, what would
+not resolve it, the recommended witness route, and the static-review trust
+boundary. It does not execute witnesses. See
+[Explain examples](explanation/explain-examples.md) for fixture-backed examples
+of common card families.
 
 Use `context` for the bounded agent packet:
 
@@ -153,9 +230,10 @@ unsafe-review outcome \
 ```
 
 Outcome comparison is read-only. It compares existing `ReviewCard` identities,
-classes, missing-evidence counts, and saved witness receipt strength from the
-supplied snapshots. It does not rerun analysis, run witnesses, post policy
-decisions, or claim repository safety.
+classes, operation expressions and families, missing-evidence counts, next
+actions, and saved witness receipt strength from the supplied snapshots. It
+does not rerun analysis, run witnesses, post policy decisions, or claim
+repository safety.
 
 ## Witness Receipts
 
@@ -316,9 +394,11 @@ unsafe-review receipt audit \
 ```
 
 The audit reports matched, unmatched, stale, expired, wrong-identity,
-wrong-tool, weaker-than-required, duplicate, and invalid receipt metadata. It is
-advisory only: it does not execute witness commands, infer site reach, make
-policy decisions, or claim safety.
+wrong-tool, weaker-than-required, duplicate, and invalid receipt metadata.
+Matched receipts include current ReviewCard operation expression, operation
+family, missing-count, and next-action context so receipt evidence does not hide
+remaining gaps. It is advisory only: it does not execute witness commands, infer
+site reach, make policy decisions, or claim safety.
 
 `unsafe-review` imports receipts. It does not run Miri, `cargo-careful`,
 sanitizers, Loom, Shuttle, Kani, or Crux by default.
@@ -332,10 +412,11 @@ unsafe-review doctor
 ```
 
 `doctor` reports first-install signals: workspace root, Git availability,
-whether `origin/main` is visible, witness tool availability or configuration
-hints, advisory policy, and the trust boundary. Missing witness tools are
-reported, not treated as a default failure. The command does not run Miri,
-`cargo-careful`, sanitizers, Loom, Shuttle, Kani, Crux, or any witness test.
+whether `origin/main` is visible, Cargo metadata readiness, artifact directory
+writability, witness tool availability or configuration hints, advisory policy,
+and the trust boundary. Missing witness tools are reported, not treated as a
+default failure. The command does not run Miri, `cargo-careful`, sanitizers,
+Loom, Shuttle, Kani, Crux, or any witness test.
 
 ## Flag Forms
 

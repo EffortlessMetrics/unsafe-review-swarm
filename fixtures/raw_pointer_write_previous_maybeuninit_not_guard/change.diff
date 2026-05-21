@@ -1,0 +1,7 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -12,4 +12,5 @@ pub fn fill_word(ptr: *mut u16, scratch: &mut [MaybeUninit<u8>], len: usize, by
+     // SAFETY: fixture checks that prior MaybeUninit write evidence does not apply here.
++    unsafe { ptr.write_bytes(byte, len) }
+ }

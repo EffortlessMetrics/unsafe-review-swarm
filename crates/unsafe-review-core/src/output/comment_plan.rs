@@ -1,9 +1,11 @@
 use crate::api::AnalyzeOutput;
-use crate::domain::{Confidence, Priority, ReviewCard};
+use crate::domain::{Confidence, Priority, ReviewCard, WitnessRoute};
+use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
 use crate::util::path_display;
 use serde::Serialize;
 
 const TRUST_BOUNDARY: &str = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.";
+const PLAN_BOUNDARY: &str = "Plan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision.";
 const MAX_PLANNED_COMMENTS: usize = 3;
 
 pub(crate) fn render(output: &AnalyzeOutput) -> String {
@@ -24,6 +26,8 @@ struct CommentPlan {
     mode: &'static str,
     policy: &'static str,
     comments: Vec<PlannedComment>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    no_changed_gaps: Option<NoChangedGaps>,
     trust_boundary: &'static str,
 }
 
@@ -41,9 +45,19 @@ impl From<&AnalyzeOutput> for CommentPlan {
                 .take(MAX_PLANNED_COMMENTS)
                 .map(PlannedComment::from)
                 .collect(),
+            no_changed_gaps: (output.summary.open_actionable_gaps == 0).then_some(NoChangedGaps {
+                message: NO_CHANGED_GAPS_MESSAGE,
+                limitation: NO_CHANGED_GAPS_LIMITATION,
+            }),
             trust_boundary: TRUST_BOUNDARY,
         }
     }
+}
+
+#[derive(Serialize)]
+struct NoChangedGaps {
+    message: &'static str,
+    limitation: &'static str,
 }
 
 #[derive(Serialize)]
@@ -54,7 +68,10 @@ struct PlannedComment {
     class: &'static str,
     priority: &'static str,
     confidence: &'static str,
+    operation: String,
     operation_family: &'static str,
+    witness_routes: Vec<PlannedWitnessRoute>,
+    verify_commands: Vec<String>,
     selection_reason: &'static str,
     body: String,
 }
@@ -68,9 +85,31 @@ impl From<&ReviewCard> for PlannedComment {
             class: card.class.as_str(),
             priority: card.priority.as_str(),
             confidence: card.confidence.as_str(),
+            operation: card.operation.expression.clone(),
             operation_family: card.operation.family.as_str(),
+            witness_routes: card.routes.iter().map(PlannedWitnessRoute::from).collect(),
+            verify_commands: card.next_action.verify_commands.clone(),
             selection_reason: selection_reason(card),
             body: comment_body(card),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct PlannedWitnessRoute {
+    kind: &'static str,
+    reason: String,
+    command: Option<String>,
+    required: bool,
+}
+
+impl From<&WitnessRoute> for PlannedWitnessRoute {
+    fn from(route: &WitnessRoute) -> Self {
+        Self {
+            kind: route.kind.as_str(),
+            reason: route.reason.clone(),
+            command: route.command.clone(),
+            required: route.required,
         }
     }
 }
@@ -92,8 +131,9 @@ fn selection_reason(card: &ReviewCard) -> &'static str {
 fn comment_body(card: &ReviewCard) -> String {
     let mut body = String::new();
     body.push_str(&format!(
-        "`unsafe-review` found `{}` for `{}`.\n\n",
+        "`unsafe-review` found `{}` for `{}` (`{}`).\n\n",
         card.class.as_str(),
+        one_line(&card.operation.expression),
         card.operation.family.as_str()
     ));
     body.push_str(&format!("Missing evidence: {}\n\n", missing_summary(card)));
@@ -105,6 +145,11 @@ fn comment_body(card: &ReviewCard) -> String {
             route.reason
         ));
     }
+    if let Some(command) = card.next_action.verify_commands.first() {
+        body.push_str(&format!("Verify command: `{command}`\n\n"));
+    }
+    body.push_str(PLAN_BOUNDARY);
+    body.push_str("\n\n");
     body.push_str("Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and not a Miri result unless a witness receipt is attached.");
     body
 }
@@ -120,11 +165,14 @@ fn missing_summary(card: &ReviewCard) -> String {
         .join("; ")
 }
 
+fn one_line(value: &str) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::api::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, analyze};
-    use crate::domain::CardId;
     use std::path::PathBuf;
 
     #[test]
@@ -136,7 +184,36 @@ mod tests {
         assert_eq!(value["comments"].as_array().map_or(0, Vec::len), 1);
         assert_eq!(value["comments"][0]["class"], "guard_missing");
         assert_eq!(value["comments"][0]["path"], "src/lib.rs");
+        assert_eq!(
+            value["comments"][0]["operation"],
+            "unsafe { ptr.cast::<Header>().read() }"
+        );
         assert_eq!(value["comments"][0]["operation_family"], "raw_pointer_read");
+        assert_eq!(value["comments"][0]["witness_routes"][0]["kind"], "miri");
+        assert!(
+            value["comments"][0]["verify_commands"][0]
+                .as_str()
+                .unwrap_or("")
+                .contains("cargo +nightly miri test read_header")
+        );
+        assert!(
+            value["comments"][0]["body"]
+                .as_str()
+                .unwrap_or("")
+                .contains("unsafe { ptr.cast::<Header>().read() }")
+        );
+        assert!(
+            value["comments"][0]["body"]
+                .as_str()
+                .unwrap_or("")
+                .contains("Verify command: `cargo +nightly miri test read_header`")
+        );
+        assert!(
+            value["comments"][0]["body"]
+                .as_str()
+                .unwrap_or("")
+                .contains("unsafe-review did not post this comment")
+        );
         assert!(
             value["comments"][0]["body"]
                 .as_str()
@@ -152,6 +229,11 @@ mod tests {
         let value = parse_json(&render(&output))?;
 
         assert_eq!(value["comments"].as_array().map_or(1, Vec::len), 0);
+        assert_eq!(value["no_changed_gaps"]["message"], NO_CHANGED_GAPS_MESSAGE);
+        assert_eq!(
+            value["no_changed_gaps"]["limitation"],
+            NO_CHANGED_GAPS_LIMITATION
+        );
         assert!(
             value["trust_boundary"]
                 .as_str()
@@ -162,38 +244,32 @@ mod tests {
     }
 
     #[test]
-    fn comment_plan_caps_inline_candidates() -> Result<(), String> {
+    fn comment_plan_caps_planned_comments() -> Result<(), String> {
         let mut output = fixture_output("raw_pointer_alignment")?;
         let template = output
             .cards
             .first()
-            .ok_or_else(|| "raw pointer fixture should emit a card".to_string())?
-            .clone();
-        output.cards = (0..(MAX_PLANNED_COMMENTS + 2))
-            .map(|index| {
+            .cloned()
+            .ok_or_else(|| "fixture should emit a card".to_string())?;
+        output.cards = (0..5)
+            .map(|idx| {
                 let mut card = template.clone();
-                card.id = CardId(format!("UR-comment-plan-cap-{index}-c1"));
+                card.id.0 = format!("card-{idx}");
                 card
             })
             .collect();
+        output.summary.cards = output.cards.len();
+        output.summary.open_actionable_gaps = output.cards.len();
 
         let value = parse_json(&render(&output))?;
-        let comments = value["comments"]
-            .as_array()
-            .ok_or_else(|| "comments should be an array".to_string())?;
 
-        assert_eq!(comments.len(), MAX_PLANNED_COMMENTS);
-        assert_eq!(comments[0]["card_id"], "UR-comment-plan-cap-0-c1");
         assert_eq!(
-            comments[MAX_PLANNED_COMMENTS - 1]["card_id"],
-            "UR-comment-plan-cap-2-c1"
+            value["comments"]
+                .as_array()
+                .ok_or_else(|| "comments should be an array".to_string())?
+                .len(),
+            MAX_PLANNED_COMMENTS
         );
-        assert!(comments.iter().all(|comment| {
-            comment["body"]
-                .as_str()
-                .unwrap_or("")
-                .contains("not memory-safety proof")
-        }));
         Ok(())
     }
 

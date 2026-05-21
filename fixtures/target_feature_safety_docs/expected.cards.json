@@ -1,61 +1,69 @@
 [
-    {
-        "id":  "UR-target-feature-safety-docs-src-lib-rs-unknown-operation-target_feature-target-feature-88dd4a92b072-target_feature-c1",
-        "class":  "guarded_unwitnessed",
-        "priority":  "medium",
-        "confidence":  "medium",
-        "site":  {
-                     "file":  "src/lib.rs",
-                     "line":  6,
-                     "column":  1,
-                     "kind":  "operation",
-                     "owner":  "",
-                     "visibility":  "private",
-                     "public_api_surface":  false,
-                     "snippet":  "#[target_feature(enable = \"sse2\")]"
-                 },
-        "operation_family":  "target_feature",
-        "hazards":  [
-                        "target_feature"
-                    ],
-        "obligations":  [
-                            "callers only execute this path on supported hardware"
-                        ],
-        "obligation_evidence":  [
-                                    {
-                                        "key":  "target-feature",
-                                        "description":  "callers only execute this path on supported hardware",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `# Safety` documentation was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  true,
-                                                          "state":  "present",
-                                                          "summary":  "Documented target-feature declaration is a caller-contract site; local guard evidence is not expected at the attribute"
-                                                      },
-                                        "reach":  {
-                                                      "present":  false,
-                                                      "state":  "missing",
-                                                      "summary":  "No owner function could be inferred"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    }
-                                ],
-        "contract":  "Nearby `# Safety` documentation was detected",
-        "discharge":  "All inferred safety obligations have visible local discharge evidence",
-        "reach":  "No owner function could be inferred",
-        "witness":  "No imported witness receipt was found",
-        "missing":  [
-                        "No witness receipt imported for this card"
-                    ],
-        "verify_commands":  [
-
-                            ]
-    }
+  {
+    "id": "UR-target-feature-safety-docs-src-lib-rs-unknown-operation-target_feature-target-feature-88dd4a92b072-target_feature-c1",
+    "class": "guarded_unwitnessed",
+    "priority": "medium",
+    "confidence": "medium",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 6,
+      "column": 1,
+      "kind": "operation",
+      "owner": "",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "#[target_feature(enable = \"sse2\")]"
+    },
+    "operation": "#[target_feature(enable = \"sse2\")]",
+    "operation_family": "target_feature",
+    "hazards": [
+      "target_feature"
+    ],
+    "obligations": [
+      "callers only execute this path on supported hardware"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "target-feature",
+        "description": "callers only execute this path on supported hardware",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `# Safety` documentation was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Documented target-feature declaration is a caller-contract site; local guard evidence is not expected at the attribute"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No owner function could be inferred"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `# Safety` documentation was detected",
+    "discharge": "All inferred safety obligations have visible local discharge evidence",
+    "reach": "No owner function could be inferred",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Attach a focused witness receipt or mark the static limitation explicitly.",
+    "verify_commands": []
+  }
 ]

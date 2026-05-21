@@ -1,0 +1,11 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -4,6 +4,7 @@ pub fn read_header(bytes: &[u8]) -> Header {
+         let ptr = bytes.as_ptr();
+         // SAFETY: fixture documents the in-branch length precondition but
+         // intentionally omits the other raw-read proof obligations.
++        let header = unsafe { ptr.cast::<Header>().read() };
+     }
+     Header(0)
+ }

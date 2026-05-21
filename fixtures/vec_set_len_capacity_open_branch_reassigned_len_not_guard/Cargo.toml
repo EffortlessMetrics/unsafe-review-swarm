@@ -1,7 +1,0 @@
-[package]
-name = "vec-set-len-capacity-open-branch-reassigned-len-not-guard"
-version = "0.1.0"
-edition = "2024"
-
-[lib]
-path = "src/lib.rs"

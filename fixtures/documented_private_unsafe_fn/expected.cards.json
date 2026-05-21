@@ -1,61 +1,69 @@
 [
-    {
-        "id":  "UR-documented-private-unsafe-fn-fixture-src-lib-rs-private-ctrl-unsafe_fn-unknown-private-ctrl-4f79c7b2ab4a-unknown-c1",
-        "class":  "guarded_unwitnessed",
-        "priority":  "medium",
-        "confidence":  "medium",
-        "site":  {
-                     "file":  "src/lib.rs",
-                     "line":  6,
-                     "column":  1,
-                     "kind":  "unsafe_fn",
-                     "owner":  "private_ctrl",
-                     "visibility":  "private",
-                     "public_api_surface":  false,
-                     "snippet":  "unsafe fn private_ctrl(base: *const u8, index: usize) -\u003e *const u8 {"
-                 },
-        "operation_family":  "unknown",
-        "hazards":  [
-                        "unknown"
-                    ],
-        "obligations":  [
-                            "unsafe contract could not be inferred from this syntax shape"
-                        ],
-        "obligation_evidence":  [
-                                    {
-                                        "key":  "unknown",
-                                        "description":  "unsafe contract could not be inferred from this syntax shape",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `# Safety` documentation was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  true,
-                                                          "state":  "present",
-                                                          "summary":  "Documented private unsafe declaration is a caller-contract site; local guard evidence is not expected at the declaration"
-                                                      },
-                                        "reach":  {
-                                                      "present":  true,
-                                                      "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `private_ctrl`"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    }
-                                ],
-        "contract":  "Nearby `# Safety` documentation was detected",
-        "discharge":  "Documented private unsafe declaration is a caller-contract site; local guard evidence is not expected at the declaration",
-        "reach":  "1 related test file(s) mention owner `private_ctrl`",
-        "witness":  "No imported witness receipt was found",
-        "missing":  [
-                        "No witness receipt imported for this card"
-                    ],
-        "verify_commands":  [
-
-                            ]
-    }
+  {
+    "id": "UR-documented-private-unsafe-fn-fixture-src-lib-rs-private-ctrl-unsafe_fn-unknown-private-ctrl-4f79c7b2ab4a-unknown-c1",
+    "class": "guarded_unwitnessed",
+    "priority": "medium",
+    "confidence": "medium",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 6,
+      "column": 1,
+      "kind": "unsafe_fn",
+      "owner": "private_ctrl",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe fn private_ctrl(base: *const u8, index: usize) -> *const u8 {"
+    },
+    "operation": "unsafe fn private_ctrl(base: *const u8, index: usize) -> *const u8 {",
+    "operation_family": "unknown",
+    "hazards": [
+      "unknown"
+    ],
+    "obligations": [
+      "unsafe contract could not be inferred from this syntax shape"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "unknown",
+        "description": "unsafe contract could not be inferred from this syntax shape",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `# Safety` documentation was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Documented private unsafe declaration is a caller-contract site; local guard evidence is not expected at the declaration"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `private_ctrl`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `# Safety` documentation was detected",
+    "discharge": "Documented private unsafe declaration is a caller-contract site; local guard evidence is not expected at the declaration",
+    "reach": "1 related test file(s) mention owner `private_ctrl`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Attach a focused witness receipt or mark the static limitation explicitly.",
+    "verify_commands": []
+  }
 ]
