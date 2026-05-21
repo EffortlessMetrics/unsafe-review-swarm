@@ -345,7 +345,41 @@ fn check_policy() -> Result<(), String> {
     check_goals()?;
     check_package_boundary()?;
     check_ci_lanes()?;
+    check_ci_routing_contract()?;
     println!("check-policy: ok");
+    Ok(())
+}
+
+fn check_ci_routing_contract() -> Result<(), String> {
+    let path = ".github/workflows/ci.yml";
+    let text =
+        std::fs::read_to_string(path).map_err(|err| format!("failed to read {path}: {err}"))?;
+    if text.contains("repos/${") && text.contains("/actions/runners") {
+        return Err(format!(
+            "{path} must use organization runner discovery, not repository runner discovery"
+        ));
+    }
+    for needle in [
+        "gh api \"orgs/${ORG}/actions/runners?per_page=100\"",
+        "EM_RUNNER_READ_TOKEN",
+        "router_target=",
+        "router_reason=",
+        "Rust Small on CPX42",
+        "labels: [self-hosted, linux, x64, em-ci, cpx42, rust-16gb, rust-medium, trusted-pr]",
+        "Prepare CPX42 scratch",
+        "dtolnay/rust-toolchain@v1",
+        "toolchain: 1.95.0",
+        "Rust Small on CX43",
+        "Rust Small on CX53",
+        "Rust Small on GitHub Hosted",
+        "Unsafe Review Rust Small Result",
+    ] {
+        if !text.contains(needle) {
+            return Err(format!(
+                "{path} missing required routed CI contract marker: {needle}"
+            ));
+        }
+    }
     Ok(())
 }
 
