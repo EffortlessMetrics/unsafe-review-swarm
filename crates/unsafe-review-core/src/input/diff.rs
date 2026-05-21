@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct DiffIndex {
@@ -82,11 +82,11 @@ impl DiffParserState {
         true
     }
 
-    fn consume_content_line(&mut self, path: &PathBuf, raw: &str) {
+    fn consume_content_line(&mut self, path: &Path, raw: &str) {
         if raw.starts_with('+') {
             self.index
                 .changed_lines
-                .entry(path.clone())
+                .entry(path.to_path_buf())
                 .or_default()
                 .insert(self.new_line);
             self.new_line = self.new_line.saturating_add(1);
