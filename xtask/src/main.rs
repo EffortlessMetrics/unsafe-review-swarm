@@ -2524,15 +2524,15 @@ fn operation_family_registry_witness_routes_from_text(
 }
 
 fn hazard_tokens(text: &str) -> BTreeSet<String> {
-    text.split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '_'))
-        .map(str::trim)
-        .filter(|token| token.chars().any(|ch| ch.is_ascii_alphanumeric()))
-        .map(ToString::to_string)
-        .collect()
+    token_set_by_delimiter(text, |ch| ch.is_ascii_alphanumeric() || ch == '_')
 }
 
 fn witness_route_tokens(text: &str) -> BTreeSet<String> {
-    text.split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '-'))
+    token_set_by_delimiter(text, |ch| ch.is_ascii_alphanumeric() || ch == '-')
+}
+
+fn token_set_by_delimiter(text: &str, allow: impl Fn(char) -> bool) -> BTreeSet<String> {
+    text.split(|ch: char| !allow(ch))
         .map(str::trim)
         .filter(|token| token.chars().any(|ch| ch.is_ascii_alphanumeric()))
         .map(ToString::to_string)
