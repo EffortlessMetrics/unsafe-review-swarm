@@ -7,14 +7,14 @@ use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
 use unsafe_review_core::{
-    AnalysisMode, AnalyzeInput, CardId, CargoCarefulReceiptInput, ConcurrencyReceiptInput,
-    DiffSource, MiriReceiptInput, PolicyMode, ProofReceiptInput, SanitizerReceiptInput, Scope,
-    WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze, audit_witness_receipts,
-    compare_outcome_json, evaluate_policy_report, render_badge_jsons, render_comment_plan,
-    render_human, render_json, render_lsp, render_markdown, render_outcome_json,
-    render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
-    render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown, render_sarif,
-    render_witness_plan, validate_witness_receipts,
+    AnalysisMode, AnalyzeInput, AnalyzeOutput, CardId, CargoCarefulReceiptInput,
+    ConcurrencyReceiptInput, DiffSource, MiriReceiptInput, PolicyMode, ProofReceiptInput,
+    SanitizerReceiptInput, Scope, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze,
+    audit_witness_receipts, compare_outcome_json, evaluate_policy_report, render_badge_jsons,
+    render_comment_plan, render_human, render_json, render_lsp, render_markdown,
+    render_outcome_json, render_outcome_markdown, render_policy_report_json,
+    render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
+    render_receipt_audit_markdown, render_sarif, render_witness_plan, validate_witness_receipts,
 };
 
 mod card_lookup;
@@ -22,6 +22,16 @@ mod card_lookup;
 const NO_CHANGED_GAPS_MESSAGE: &str = "No changed unsafe-review gaps were found.";
 const NO_CHANGED_GAPS_LIMITATION: &str =
     "This does not prove the repo safe, UB-free, Miri-clean, or that any unsafe site executed.";
+type FirstPrRenderer = fn(&AnalyzeOutput) -> String;
+
+const FIRST_PR_ARTIFACTS: [(&str, FirstPrRenderer); 6] = [
+    ("cards.json", render_json),
+    ("pr-summary.md", render_pr_summary),
+    ("cards.sarif", render_sarif),
+    ("comment-plan.json", render_comment_plan),
+    ("witness-plan.md", render_witness_plan),
+    ("lsp.json", render_lsp),
+];
 
 pub(crate) fn execute(command: Command) -> Result<(), String> {
     match command {
@@ -131,21 +141,9 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
 
     fs::create_dir_all(&options.out_dir)
         .map_err(|err| format!("create {} failed: {err}", options.out_dir.display()))?;
-    write_artifact(&options.out_dir.join("cards.json"), render_json(&output))?;
-    write_artifact(
-        &options.out_dir.join("pr-summary.md"),
-        render_pr_summary(&output),
-    )?;
-    write_artifact(&options.out_dir.join("cards.sarif"), render_sarif(&output))?;
-    write_artifact(
-        &options.out_dir.join("comment-plan.json"),
-        render_comment_plan(&output),
-    )?;
-    write_artifact(
-        &options.out_dir.join("witness-plan.md"),
-        render_witness_plan(&output),
-    )?;
-    write_artifact(&options.out_dir.join("lsp.json"), render_lsp(&output))?;
+    for (name, renderer) in FIRST_PR_ARTIFACTS {
+        write_artifact(&options.out_dir.join(name), renderer(&output))?;
+    }
 
     println!("unsafe-review first-pr");
     println!("unsafe-review wrote an advisory PR bundle.");
@@ -190,14 +188,7 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         );
     }
     println!("Artifacts:");
-    for name in [
-        "cards.json",
-        "pr-summary.md",
-        "cards.sarif",
-        "comment-plan.json",
-        "witness-plan.md",
-        "lsp.json",
-    ] {
+    for (name, _) in FIRST_PR_ARTIFACTS {
         println!("  {}", options.out_dir.join(name).display());
     }
     println!("Trust boundary:");
