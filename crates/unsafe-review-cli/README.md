@@ -1,14 +1,15 @@
 # unsafe-review-cli
 
-CLI adapter crate for `unsafe-review`.
+CLI implementation crate for `unsafe-review`.
 
-Most users should install the product facade:
+Most users should not depend on or install this crate directly. Install the
+product façade instead:
 
 ```bash
-cargo install unsafe-review
+cargo install unsafe-review --locked
 ```
 
-This crate owns command parsing, process-facing output, and the
+This crate owns command parsing, terminal output, artifact rendering, and the
 `cargo-unsafe-review` integration binary. It depends on `unsafe-review-core` for
 the ReviewCard engine and does not define an independent analyzer truth.
 

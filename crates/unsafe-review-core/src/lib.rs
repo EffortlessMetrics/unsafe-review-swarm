@@ -1,6 +1,16 @@
 #![forbid(unsafe_code)]
 //! Core SDK and analysis engine for `unsafe-review`.
 //!
+//! This crate is the programmatic SDK. Most command-line users should install
+//! `unsafe-review` instead.
+//!
+//! The engine emits `ReviewCard`s. Downstream renderers should project from
+//! those cards rather than reclassifying findings independently.
+//!
+//! The analysis is advisory static review evidence. It is not a memory-safety
+//! proof, not a UB-free claim, and not a Miri result unless a matching witness
+//! receipt is attached.
+//!
 //! The public API is intentionally small: build an [`AnalyzeInput`], call
 //! [`analyze`], and render or consume the returned [`AnalyzeOutput`].
 

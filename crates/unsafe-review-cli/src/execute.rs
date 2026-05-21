@@ -750,7 +750,14 @@ fn receipt_import_proof(options: SavedOutputReceiptOptions) -> Result<(), String
 }
 
 fn print_help() {
-    println!("unsafe-review: cheap unsafe contract review for Rust");
+    println!("unsafe-review: advisory unsafe-contract review for Rust PRs");
+    println!();
+    println!(
+        "Start:
+  unsafe-review doctor
+  unsafe-review first-pr --base origin/main
+  unsafe-review explain <card-id>"
+    );
     println!();
     println!("Commands:");
     println!(

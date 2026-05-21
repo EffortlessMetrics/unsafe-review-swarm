@@ -707,7 +707,10 @@ fn help_reports_first_run_trust_boundary_without_overclaims() -> Result<(), Box<
     let output = run_success([os("--help")])?;
     let text = stdout_text(&output)?;
 
-    assert!(text.contains("unsafe-review: cheap unsafe contract review for Rust"));
+    assert!(text.contains("unsafe-review: advisory unsafe-contract review for Rust PRs"));
+    assert!(text.contains("Start:"));
+    assert!(text.contains("unsafe-review doctor"));
+    assert!(text.contains("unsafe-review first-pr --base origin/main"));
     assert!(text.contains("Trust boundary: static unsafe contract review only"));
     assert!(text.contains("not memory-safety proof"));
     assert!(text.contains("not UB-free status"));
