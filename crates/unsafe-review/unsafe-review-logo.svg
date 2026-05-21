@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">unsafe-review warning mark</title>
+  <desc id="desc">A transparent warning triangle outline with a red exclamation mark inside.</desc>
+  <path
+    d="M512 48 L976 976 L48 976 Z"
+    fill="none"
+    stroke="#ff2d55"
+    stroke-width="72"
+    stroke-linejoin="round"
+    stroke-linecap="round"
+  />
+  <path
+    d="M512 344 L512 646"
+    fill="none"
+    stroke="#ff2d55"
+    stroke-width="88"
+    stroke-linecap="round"
+  />
+  <circle cx="512" cy="788" r="52" fill="#ff2d55" />
+</svg>
