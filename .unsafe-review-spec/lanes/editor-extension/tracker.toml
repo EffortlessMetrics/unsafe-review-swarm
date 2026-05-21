@@ -1,0 +1,81 @@
+schema_version = "1.0"
+
+id = "editor-extension"
+name = "VS Code and Open VSX editor adapter"
+status = "active"
+owner = "editor/extension"
+
+objective = """
+Ship a read-only VS Code/Open VSX adapter over `unsafe-review lsp` that makes
+ReviewCard evidence visible in editors without creating a second analyzer,
+running witnesses, editing source, or claiming safety.
+"""
+
+end_state = [
+  "VS Code users can install a VSIX or Marketplace extension.",
+  "Open VSX-compatible editors can install the same extension package.",
+  "The extension starts `unsafe-review lsp` or uses a configured binary path.",
+  "Diagnostics, hovers, and commands come from ReviewCards through LSP.",
+  "Marketplace README and package metadata preserve the advisory trust boundary.",
+  "Release workflows can package VSIX and publish only after explicit manual approval.",
+]
+
+[[work_item]]
+id = "editor-spec-and-adr"
+status = "ready"
+spec = "UNSAFE-REVIEW-SPEC-0021"
+adr = "UNSAFE-REVIEW-ADR-0007"
+proof = [
+  "cargo run --locked -p xtask -- check-docs",
+  "cargo run --locked -p xtask -- check-pr",
+  "git diff --check",
+]
+
+[[work_item]]
+id = "live-lsp-hardening-gate"
+status = "blocked"
+blocked_by = ["editor-spec-and-adr"]
+proof = [
+  "cargo test -p unsafe-review-cli lsp --locked",
+  "cargo run --locked -p xtask -- lsp-smoke",
+  "cargo run --locked -p xtask -- check-pr",
+]
+
+[[work_item]]
+id = "extension-scaffold"
+status = "blocked"
+blocked_by = ["editor-spec-and-adr"]
+proof = [
+  "npm ci",
+  "npm run compile",
+  "npm test",
+  "npx @vscode/vsce package --out target/unsafe-review-vscode.vsix",
+]
+
+[[work_item]]
+id = "extension-lsp-client"
+status = "blocked"
+blocked_by = ["extension-scaffold", "live-lsp-hardening-gate"]
+proof = [
+  "npm test",
+  "cargo run --locked -p unsafe-review -- lsp --help",
+  "cargo test -p unsafe-review-cli lsp --locked",
+]
+
+[[work_item]]
+id = "marketplace-package-smoke"
+status = "blocked"
+blocked_by = ["extension-lsp-client"]
+proof = [
+  "npx @vscode/vsce package --out target/unsafe-review-vscode.vsix",
+  "npx ovsx package --out target/unsafe-review-openvsx.vsix",
+]
+
+[[work_item]]
+id = "publication-workflows"
+status = "blocked"
+blocked_by = ["marketplace-package-smoke"]
+proof = [
+  "cargo run --locked -p xtask -- check-editor-extension",
+  "git diff --check",
+]

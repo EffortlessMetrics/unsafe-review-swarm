@@ -29,8 +29,9 @@ Specs define behavior. They do not carry the PR queue.
 18. [Live LSP server](UNSAFE-REVIEW-SPEC-0018-live-lsp-server.md)
 19. [First-run cockpit (0.2.0 lane)](UNSAFE-REVIEW-SPEC-0019-first-run-cockpit.md)
 20. [Source-of-truth stack](UNSAFE-REVIEW-SPEC-0020-source-of-truth-stack.md)
-21. [PR commenting experience](UNSAFE-REVIEW-SPEC-0022-pr-commenting-experience.md)
-22. [CI design](UNSAFE-REVIEW-SPEC-0024-ci-design.md)
+21. [VS Code and Open VSX editor extension](UNSAFE-REVIEW-SPEC-0021-vscode-openvsx-extension.md)
+22. [PR commenting experience](UNSAFE-REVIEW-SPEC-0022-pr-commenting-experience.md)
+23. [CI design](UNSAFE-REVIEW-SPEC-0024-ci-design.md)
 
 
 ## Appendices

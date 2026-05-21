@@ -37,9 +37,31 @@ path = "docs/specs/UNSAFE-REVIEW-SPEC-0024-ci-design.md"
 status = "draft"
 owner = "repo-infra"
 
+[[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0021"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0021-vscode-openvsx-extension.md"
+status = "proposed"
+owner = "editor/extension"
+
+[[artifact]]
+id = "UNSAFE-REVIEW-ADR-0007"
+kind = "adr"
+path = "docs/adr/UNSAFE-REVIEW-ADR-0007-editor-extension-is-thin-adapter.md"
+status = "proposed"
+owner = "editor/extension"
+linked_spec = "UNSAFE-REVIEW-SPEC-0021"
+
 [[lane]]
 id = "docs/source-of-truth-scaffold"
 name = "source-of-truth scaffold"
 path = ".unsafe-review-spec/goals/active.toml"
 status = "active"
 owner = "repo-infra"
+
+[[lane]]
+id = "editor-extension"
+name = "VS Code and Open VSX editor adapter"
+path = ".unsafe-review-spec/lanes/editor-extension/tracker.toml"
+status = "active"
+owner = "editor/extension"
