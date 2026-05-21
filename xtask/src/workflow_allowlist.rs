@@ -2,18 +2,21 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use crate::{
-    looks_like_iso_date, parse_toml_file, read_to_string, required_toml_string, workspace_path,
-    WORKFLOW_ALLOWLIST, WORKFLOW_DIR,
+    WORKFLOW_ALLOWLIST, WORKFLOW_DIR, looks_like_iso_date, parse_toml_file, read_to_string,
+    required_toml_string, workspace_path,
 };
 
 #[derive(Debug)]
-struct WorkflowPolicyEntry {
-    path: String,
-    permissions: String,
-    actions: BTreeSet<String>,
+pub(crate) struct WorkflowPolicyEntry {
+    pub(crate) path: String,
+    pub(crate) permissions: String,
+    pub(crate) actions: BTreeSet<String>,
 }
 
-pub(crate) fn check_workflow_allowlist(allowlist: &Path, workflow_dir: &Path) -> Result<(), String> {
+pub(crate) fn check_workflow_allowlist(
+    allowlist: &Path,
+    workflow_dir: &Path,
+) -> Result<(), String> {
     let policies = workflow_policy_entries(allowlist)?;
     let mut by_path = BTreeMap::new();
     for entry in policies {
@@ -119,7 +122,7 @@ fn workflow_policy_entries(allowlist: &Path) -> Result<Vec<WorkflowPolicyEntry>,
     Ok(out)
 }
 
-fn check_workflow_text_against_policy(
+pub(crate) fn check_workflow_text_against_policy(
     path: &str,
     text: &str,
     policy: &WorkflowPolicyEntry,
@@ -154,7 +157,7 @@ fn workflow_declares_permission(text: &str, permission: &str) -> bool {
         && text.lines().any(|line| line.trim() == permission)
 }
 
-fn workflow_used_actions(text: &str) -> BTreeSet<String> {
+pub(crate) fn workflow_used_actions(text: &str) -> BTreeSet<String> {
     let mut actions = BTreeSet::new();
     for line in text.lines() {
         let trimmed = line.trim();

@@ -7,6 +7,11 @@ use std::process::Command;
 
 mod workflow_allowlist;
 
+#[cfg(test)]
+use workflow_allowlist::{
+    WorkflowPolicyEntry, check_workflow_text_against_policy, workflow_used_actions,
+};
+
 const REQUIRED_DOCS: &[&str] = &[
     "README.md",
     "docs/MISSION.md",
@@ -323,7 +328,10 @@ fn check_policy() -> Result<(), String> {
         let value = parse_toml_file(Path::new(path))?;
         require_toml_string(&value, "schema_version", path)?;
     }
-    workflow_allowlist::check_workflow_allowlist(Path::new(WORKFLOW_ALLOWLIST), Path::new(WORKFLOW_DIR))?;
+    workflow_allowlist::check_workflow_allowlist(
+        Path::new(WORKFLOW_ALLOWLIST),
+        Path::new(WORKFLOW_DIR),
+    )?;
     check_unsafe_review_ledger(
         Path::new("policy/unsafe-review-baseline.toml"),
         LedgerKind::Baseline,
@@ -550,8 +558,6 @@ fn check_ci_lanes() -> Result<(), String> {
     println!("check-ci-lanes: ok ({} lanes)", ids.len());
     Ok(())
 }
-
-
 
 #[derive(Clone, Copy)]
 enum LedgerKind {
