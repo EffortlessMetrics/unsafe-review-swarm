@@ -784,3 +784,40 @@ fn print_help() {
         "Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and not Miri-clean status."
     );
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{resolve_diff_path, writable_status, yes_no};
+    use std::path::{Path, PathBuf};
+
+    #[test]
+    fn resolve_diff_path_joins_relative_path_to_root() {
+        let root = Path::new("/workspace/project");
+        let diff = Path::new("fixtures/example.diff");
+
+        let resolved = resolve_diff_path(root, diff);
+
+        assert_eq!(
+            resolved,
+            PathBuf::from("/workspace/project/fixtures/example.diff")
+        );
+    }
+
+    #[test]
+    fn resolve_diff_path_preserves_absolute_paths() {
+        let root = Path::new("/workspace/project");
+        let diff = Path::new("/tmp/patch.diff");
+
+        let resolved = resolve_diff_path(root, diff);
+
+        assert_eq!(resolved, PathBuf::from("/tmp/patch.diff"));
+    }
+
+    #[test]
+    fn yes_no_and_writable_status_report_expected_labels() {
+        assert_eq!(yes_no(true), "yes");
+        assert_eq!(yes_no(false), "no");
+        assert_eq!(writable_status(true), "writable");
+        assert_eq!(writable_status(false), "not writable");
+    }
+}
