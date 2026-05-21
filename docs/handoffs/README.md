@@ -5,6 +5,7 @@ what not to do next. Do not put active specs here.
 
 | Handoff | Date | Scope |
 |---|---|---|
+| [Source promotion 0.2 sync checkpoint](2026-05-21-source-promotion-0.2-sync.md) | 2026-05-21 | acknowledges source #487 as a swarm-originated 0.2 public-usability promotion and updates the source-sync checkpoint |
 | [Source/swarm reconciliation](2026-05-20-source-swarm-reconciliation.md) | 2026-05-20 | reseed of swarm from source main, source-only PR absorption, swarm-only preservation, and future sync rule |
 | [Release 0.1.1 readiness](2026-05-20-release-0.1.1-readiness.md) | 2026-05-20 | current 0.1.1 package/readiness proof, expected staged dry-run limits, manual publish order, and post-publish smoke |
 | [Release 0.1.1 preparation](2026-05-19-release-0.1.1-preparation.md) | 2026-05-19 | version bumps for the three crates, advisory release framing, validation checklist, and publish order |
