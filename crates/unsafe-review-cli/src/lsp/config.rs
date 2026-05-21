@@ -32,9 +32,7 @@ pub(super) fn parse_config(v: Value) -> LspConfig {
         if let Some(base) = u.get("base").and_then(Value::as_str) {
             cfg.base = Some(base.to_string());
         }
-        if let Some(m) = u.get("maxCards").and_then(Value::as_u64) {
-            cfg.max_cards = Some(m as usize);
-        }
+        cfg.max_cards = parse_max_cards(u);
         if let Some(b) = u.get("refreshOnOpen").and_then(Value::as_bool) {
             cfg.refresh_on_open = b;
         }
@@ -43,6 +41,13 @@ pub(super) fn parse_config(v: Value) -> LspConfig {
         }
     }
     cfg
+}
+
+fn parse_max_cards(config: &Value) -> Option<usize> {
+    config
+        .get("maxCards")
+        .and_then(Value::as_u64)
+        .and_then(|raw| usize::try_from(raw).ok())
 }
 
 pub(super) fn should_refresh_on_change(_cfg: &LspConfig) -> bool {
