@@ -65,15 +65,26 @@ Use the repo source-of-truth stack:
 7. Run the proof commands listed in the plan item.
 8. Do not invent missing claims. If proof is missing, keep the claim advisory/experimental.
 9. Do not use `.jules`, `.codex`, or product runtime output directories as unsafe-review source-of-truth state.
-10. Do not stop at “human merge required” unless the repo has that policy in a current source-of-truth file.
+10. Do not stop at "human merge required" unless the repo has that policy in a current source-of-truth file.
 
 If a specific command, lint, API, feature flag, crate name, or workflow name is mentioned, verify it exists before building a PR around it.
 
 Spec rails are meant to make routine progress easier, not ceremonial. If a PR or
 agent task references a not-yet-existing rail and the rail belongs in the repo,
 add or align it in `.unsafe-review-spec` or the corresponding `docs/specs/`
-contract. Do not put durable repo operating state in `.codex`; keep agent-local
-state there only if a local tool requires it.
+contract. Prefer the smallest useful rail: a plan item, spec clause, template,
+or verifier hook that keeps future PRs pointed at the same truth without adding
+fake enforcement.
+
+Do not reject a useful generated PR just because it references missing but
+well-designed scaffolding. Decide whether the missing rail should exist. If yes,
+add or align it in the same PR when the scope stays small, or leave an explicit
+follow-up when it would turn the PR into a mixed-scope change.
+
+Do not put durable repo operating state in `.codex`; keep agent-local state
+there only if a local tool requires it. Durable unsafe-review repo state belongs
+under `.unsafe-review-spec`, `docs/specs`, or the documented handoff/status
+surfaces.
 
 ## PR queue discipline
 
