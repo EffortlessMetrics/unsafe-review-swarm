@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+mod summary;
+
 pub const WITNESS_RECEIPT_SCHEMA_VERSION: &str = "0.1";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -97,41 +99,7 @@ impl WitnessReceipt {
     }
 
     pub fn evidence_summary(&self) -> String {
-        let mut summary = format!(
-            "Imported {} receipt with `{}` strength",
-            self.tool, self.strength
-        );
-        if let Some(detail) = self.summary.as_deref().filter(|value| !value.is_empty()) {
-            summary.push_str(": ");
-            summary.push_str(detail);
-        }
-        if let Some(author) = self.author.as_deref().filter(|value| !value.is_empty()) {
-            summary.push_str("; author: ");
-            summary.push_str(author);
-        }
-        if let Some(recorded_at) = self
-            .recorded_at
-            .as_deref()
-            .filter(|value| !value.is_empty())
-        {
-            summary.push_str("; recorded_at: ");
-            summary.push_str(recorded_at);
-        }
-        if let Some(expires_at) = self.expires_at.as_deref().filter(|value| !value.is_empty()) {
-            summary.push_str("; expires_at: ");
-            summary.push_str(expires_at);
-        }
-        if let Some(command) = self.command.as_deref().filter(|value| !value.is_empty()) {
-            summary.push_str("; command: ");
-            summary.push_str(command);
-        }
-        if let Some(limitations) = &self.limitations
-            && !limitations.is_empty()
-        {
-            summary.push_str("; limitations: ");
-            summary.push_str(&limitations.join("; "));
-        }
-        summary
+        summary::evidence_summary(self)
     }
 
     pub fn to_pretty_json(&self) -> Result<String, String> {
