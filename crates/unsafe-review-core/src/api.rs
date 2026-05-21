@@ -155,6 +155,10 @@ pub fn render_lsp(output: &AnalyzeOutput) -> String {
     lsp::render(output)
 }
 
+pub fn project_editor(output: &AnalyzeOutput) -> lsp::EditorProjection {
+    lsp::project_editor(output)
+}
+
 pub fn render_witness_plan(output: &AnalyzeOutput) -> String {
     witness_plan::render(output)
 }

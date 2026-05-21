@@ -1,12 +1,75 @@
 use crate::api::{AnalyzeOutput, Scope};
 use crate::domain::{EvidenceState, ObligationEvidence, Priority, ReviewCard, WitnessRoute};
 use crate::util::path_display;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 const TRUST_BOUNDARY: &str = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.";
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EditorProjection {
+    pub schema_version: String,
+    pub tool: String,
+    pub mode: String,
+    pub policy: String,
+    pub scope: String,
+    pub status: EditorStatus,
+    pub diagnostics: Vec<EditorDiagnostic>,
+    pub hovers: Vec<EditorHover>,
+    pub code_actions: Vec<EditorCodeAction>,
+    pub trust_boundary: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EditorStatus {
+    pub state: String,
+    pub cards: usize,
+    pub open_actionable_gaps: usize,
+    pub high_priority_cards: usize,
+    pub message: String,
+    pub trust_boundary: String,
+}
+
+pub type EditorDiagnostic = serde_json::Value;
+pub type EditorHover = serde_json::Value;
+pub type EditorCodeAction = serde_json::Value;
+
+pub fn project_editor(output: &AnalyzeOutput) -> EditorProjection {
+    let projection = LspProjection::from(output);
+    EditorProjection {
+        schema_version: projection.schema_version.to_string(),
+        tool: projection.tool.to_string(),
+        mode: projection.mode.to_string(),
+        policy: projection.policy.to_string(),
+        scope: projection.scope.to_string(),
+        status: EditorStatus {
+            state: projection.status.state.to_string(),
+            cards: projection.status.cards,
+            open_actionable_gaps: projection.status.open_actionable_gaps,
+            high_priority_cards: projection.status.high_priority_cards,
+            message: projection.status.message,
+            trust_boundary: projection.status.trust_boundary.to_string(),
+        },
+        diagnostics: projection
+            .diagnostics
+            .iter()
+            .map(|item| serde_json::to_value(item).unwrap_or(serde_json::Value::Null))
+            .collect(),
+        hovers: projection
+            .hovers
+            .iter()
+            .map(|item| serde_json::to_value(item).unwrap_or(serde_json::Value::Null))
+            .collect(),
+        code_actions: projection
+            .code_actions
+            .iter()
+            .map(|item| serde_json::to_value(item).unwrap_or(serde_json::Value::Null))
+            .collect(),
+        trust_boundary: projection.trust_boundary.to_string(),
+    }
+}
+
 pub(crate) fn render(output: &AnalyzeOutput) -> String {
-    render_pretty(&LspProjection::from(output))
+    render_pretty(&project_editor(output))
 }
 
 fn render_pretty(value: &impl Serialize) -> String {

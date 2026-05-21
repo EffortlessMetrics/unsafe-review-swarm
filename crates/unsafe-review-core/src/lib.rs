@@ -15,7 +15,7 @@ mod util;
 pub use api::{
     AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, OutcomeReport, PolicyMode, PolicyReport,
     ReceiptAuditReport, Scope, analyze, audit_witness_receipts, collect_context,
-    compare_outcome_json, evaluate_policy_report, explain_card, render_badge_jsons,
+    compare_outcome_json, evaluate_policy_report, explain_card, project_editor, render_badge_jsons,
     render_comment_plan, render_human, render_json, render_lsp, render_markdown,
     render_outcome_json, render_outcome_markdown, render_policy_report_json,
     render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
