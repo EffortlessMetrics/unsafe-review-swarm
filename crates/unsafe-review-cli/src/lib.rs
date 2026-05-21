@@ -5,6 +5,6 @@ mod lsp;
 mod parse;
 
 pub fn run(args: impl IntoIterator<Item = String>) -> Result<(), String> {
-    let command = parse::parse(args.into_iter().collect())?;
+    let command = parse::parse(args)?;
     execute::execute(command)
 }

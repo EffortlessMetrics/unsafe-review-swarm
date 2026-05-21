@@ -7,8 +7,10 @@ use unsafe_review_core::PolicyMode;
 
 mod policy;
 
-pub(crate) fn parse(args: Vec<String>) -> Result<Command, String> {
-    let mut rest = args.into_iter().skip(1).collect::<Vec<_>>();
+pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, String> {
+    let mut rest = args.into_iter();
+    let _binary = rest.next();
+    let mut rest = rest.collect::<Vec<_>>();
     if rest.is_empty() {
         return Ok(Command::Help);
     }
@@ -784,6 +786,15 @@ fn format_name(format: &Format) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parse_accepts_non_vec_iterators() {
+        let args = ["unsafe-review", "--version"]
+            .into_iter()
+            .map(str::to_string);
+        let command = parse(args);
+        assert_eq!(command, Ok(Command::Version));
+    }
 
     #[test]
     fn parses_pr_summary_format_for_check() -> Result<(), String> {
