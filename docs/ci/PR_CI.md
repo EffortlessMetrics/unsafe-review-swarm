@@ -95,3 +95,20 @@ adds that command intentionally.
 Witness tools are routed, not run everywhere. Miri, sanitizers, Loom, and Kani
 belong in targeted PR, nightly, or release lanes unless repo policy says
 otherwise.
+
+
+## Copy-paste first-pr workflow
+
+For a drop-in advisory PR lane, copy `.github/examples/unsafe-review-first-pr.yml`.
+It runs one `first-pr` command, verifies the full artifact bundle contract, uploads
+all first-run artifacts, and writes a GitHub job summary.
+
+Default behavior of the example workflow:
+
+- runs `unsafe-review first-pr --base origin/<base>`;
+- verifies with `cargo xtask check-first-pr-artifacts target/unsafe-review`;
+- uploads `cards.json`, `pr-summary.md`, `cards.sarif`, `comment-plan.json`,
+  `witness-plan.md`, and `lsp.json`;
+- does not post comments;
+- does not run witnesses;
+- does not block on findings (only on artifact/tooling contract failures).
