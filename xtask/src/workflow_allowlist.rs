@@ -153,8 +153,29 @@ pub(crate) fn check_workflow_text_against_policy(
 }
 
 fn workflow_declares_permission(text: &str, permission: &str) -> bool {
-    text.lines().any(|line| line.trim() == "permissions:")
-        && text.lines().any(|line| line.trim() == permission)
+    let mut in_permissions_block = false;
+
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+
+        if trimmed == "permissions:" {
+            in_permissions_block = true;
+            continue;
+        }
+
+        if !line.starts_with(' ') && !line.starts_with('\t') {
+            in_permissions_block = false;
+        }
+
+        if in_permissions_block && trimmed == permission {
+            return true;
+        }
+    }
+
+    false
 }
 
 pub(crate) fn workflow_used_actions(text: &str) -> BTreeSet<String> {
@@ -201,4 +222,26 @@ fn workflow_files(workflow_dir: &Path) -> Result<BTreeSet<String>, String> {
         return Err(format!("{} contains no workflow files", dir.display()));
     }
     Ok(files)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn workflow_permission_parser_ignores_permission_text_outside_permissions_block() {
+        let text = r#"
+permissions:
+  id-token: write
+jobs:
+  note:
+    runs-on: ubuntu-latest
+    env:
+      contents: read
+    steps:
+      - run: echo "note"
+"#;
+
+        assert!(!workflow_declares_permission(text, "contents: read"));
+    }
 }
