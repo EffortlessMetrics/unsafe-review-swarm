@@ -212,7 +212,9 @@ mod markdown_sections {
 
     pub(super) fn render_heading(out: &mut String) {
         out.push_str("# unsafe-review policy report\n\n");
-        out.push_str("Advisory no-new-debt policy report from current ReviewCards and ledgers.\n\n");
+        out.push_str(
+            "Advisory no-new-debt policy report from current ReviewCards and ledgers.\n\n",
+        );
     }
 
     pub(super) fn render_summary(out: &mut String, report: &PolicyReport) {
