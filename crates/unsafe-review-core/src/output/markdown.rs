@@ -111,32 +111,27 @@ fn render_repo_posture(output: &AnalyzeOutput) -> String {
     out
 }
 
-fn class_counts(output: &AnalyzeOutput) -> BTreeMap<String, usize> {
+fn count_by<F>(output: &AnalyzeOutput, mut value_for_card: F) -> BTreeMap<String, usize>
+where
+    F: FnMut(&ReviewCard) -> String,
+{
     let mut counts = BTreeMap::new();
     for card in &output.cards {
-        *counts.entry(card.class.as_str().to_string()).or_default() += 1;
+        *counts.entry(value_for_card(card)).or_default() += 1;
     }
     counts
+}
+
+fn class_counts(output: &AnalyzeOutput) -> BTreeMap<String, usize> {
+    count_by(output, |card| card.class.as_str().to_string())
 }
 
 fn operation_counts(output: &AnalyzeOutput) -> BTreeMap<String, usize> {
-    let mut counts = BTreeMap::new();
-    for card in &output.cards {
-        *counts
-            .entry(card.operation.family.as_str().to_string())
-            .or_default() += 1;
-    }
-    counts
+    count_by(output, |card| card.operation.family.as_str().to_string())
 }
 
 fn route_counts(output: &AnalyzeOutput) -> BTreeMap<String, usize> {
-    let mut counts = BTreeMap::new();
-    for card in &output.cards {
-        *counts
-            .entry(repo_primary_route(card).to_string())
-            .or_default() += 1;
-    }
-    counts
+    count_by(output, |card| repo_primary_route(card).to_string())
 }
 
 fn diff_primary_route(card: &ReviewCard) -> &str {
@@ -458,6 +453,16 @@ mod tests {
         assert!(rendered.contains("unsafe { ptr.cast::<Header>().read() }"));
         assert!(rendered.contains("Add or expose the local guard"));
         assert!(rendered.contains("not a proof of memory safety"));
+        Ok(())
+    }
+
+    #[test]
+    fn count_by_builds_expected_frequency_map() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let counts = count_by(&output, |card| card.class.as_str().to_string());
+
+        assert_eq!(counts.values().sum::<usize>(), output.cards.len());
+        assert!(counts.values().all(|count| *count > 0));
         Ok(())
     }
 
