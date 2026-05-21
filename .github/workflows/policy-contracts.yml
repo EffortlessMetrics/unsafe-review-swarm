@@ -1,0 +1,24 @@
+name: Policy Contracts
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  policy-contracts:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - name: Check doc artifacts
+        run: cargo run --locked -p xtask -- check-doc-artifacts
+      - name: Check active goals
+        run: cargo run --locked -p xtask -- check-goals
+      - name: Check package boundary
+        run: cargo run --locked -p xtask -- check-package-boundary
+      - name: Check CI lane ledger
+        run: cargo run --locked -p xtask -- check-ci-lanes

@@ -1,0 +1,40 @@
+schema_version = "1.0"
+
+[[artifact]]
+id = "UNSAFE-REVIEW-PROP-0002"
+kind = "proposal"
+path = "docs/proposals/UNSAFE-REVIEW-PROP-0002-source-of-truth-stack.md"
+status = "proposed"
+owner = "repo-infra"
+milestone = "0.2.0"
+
+[[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0020"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0020-source-of-truth-stack.md"
+status = "accepted"
+owner = "repo-infra"
+linked_proposal = "UNSAFE-REVIEW-PROP-0002"
+policy_impact = [
+  "policy/doc-artifacts.toml",
+  "policy/ci-lane-whitelist.toml",
+  "policy/package-boundary.toml",
+]
+
+[[artifact]]
+id = "UNSAFE-REVIEW-PLAN-0002"
+kind = "plan"
+path = "plans/0.2.0/implementation-plan.md"
+status = "active"
+owner = "repo-infra"
+linked_proposal = "UNSAFE-REVIEW-PROP-0002"
+linked_spec = "UNSAFE-REVIEW-SPEC-0020"
+
+[[artifact]]
+id = "UNSAFE-REVIEW-GOAL-0002"
+kind = "goal"
+path = ".unsafe-review/goals/active.toml"
+status = "active"
+owner = "repo-infra"
+linked_proposal = "UNSAFE-REVIEW-PROP-0002"
+linked_spec = "UNSAFE-REVIEW-SPEC-0020"
