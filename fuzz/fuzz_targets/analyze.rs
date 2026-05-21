@@ -14,7 +14,8 @@ const MAX_DIFF_BYTES: usize = 16 * 1024;
 const SPLIT_MARKER: &str = "\n---DIFF---\n";
 
 fuzz_target!(|data: &[u8]| {
-    let input = String::from_utf8_lossy(data);
+    let (config, body) = parse_config(data);
+    let input = String::from_utf8_lossy(body);
     let (source, diff_tail) = split_input(&input);
     let source = clamp(source, MAX_SOURCE_BYTES);
     let diff_tail = clamp(diff_tail, MAX_DIFF_BYTES);
@@ -24,15 +25,15 @@ fuzz_target!(|data: &[u8]| {
         return;
     }
 
-    let diff = changed_lib_diff(source, diff_tail);
+    let diff = changed_lib_diff(source, diff_tail, config.emit_empty_hunk);
     let result = analyze(AnalyzeInput {
         root: root.clone(),
-        scope: Scope::Diff,
+        scope: config.scope,
         diff: DiffSource::Text(diff),
-        mode: AnalysisMode::Draft,
+        mode: config.mode,
         policy: PolicyMode::Advisory,
         include_unchanged_tests: true,
-        max_cards: Some(64),
+        max_cards: config.max_cards,
     });
 
     if let Ok(output) = result {
@@ -43,6 +44,57 @@ fuzz_target!(|data: &[u8]| {
 
     let _ = fs::remove_dir_all(root);
 });
+
+#[derive(Copy, Clone)]
+struct FuzzConfig {
+    scope: Scope,
+    mode: AnalysisMode,
+    max_cards: Option<usize>,
+    emit_empty_hunk: bool,
+}
+
+fn parse_config(data: &[u8]) -> (FuzzConfig, &[u8]) {
+    if data.len() < 2 {
+        return (
+            FuzzConfig {
+                scope: Scope::Diff,
+                mode: AnalysisMode::Draft,
+                max_cards: Some(64),
+                emit_empty_hunk: false,
+            },
+            data,
+        );
+    }
+
+    let header = data[0];
+    let max_cards_seed = data[1];
+    let scope = if header & 1 == 0 {
+        Scope::Diff
+    } else {
+        Scope::Full
+    };
+    let mode = if header & 2 == 0 {
+        AnalysisMode::Draft
+    } else {
+        AnalysisMode::Normal
+    };
+    let emit_empty_hunk = header & 4 != 0;
+    let max_cards = if header & 8 == 0 {
+        Some((max_cards_seed as usize % 128).max(1))
+    } else {
+        None
+    };
+
+    (
+        FuzzConfig {
+            scope,
+            mode,
+            max_cards,
+            emit_empty_hunk,
+        },
+        &data[2..],
+    )
+}
 
 fn split_input(input: &str) -> (&str, &str) {
     input
@@ -79,7 +131,13 @@ fn write_fixture(root: &Path, source: &str) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-fn changed_lib_diff(source: &str, diff_tail: &str) -> String {
+fn changed_lib_diff(source: &str, diff_tail: &str, emit_empty_hunk: bool) -> String {
+    if emit_empty_hunk {
+        return format!(
+            "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n{diff_tail}"
+        );
+    }
+
     let added_lines = source.lines().count().max(1);
     let mut diff = format!(
         "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -0,0 +1,{added_lines} @@\n"
