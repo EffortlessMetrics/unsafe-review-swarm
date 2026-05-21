@@ -57,7 +57,9 @@ unsafe-review check \
 Open `target/unsafe-review/lsp.json` and look for:
 
 - `status`: advisory mode and trust-boundary text,
-- `diagnostics`: one entry per ReviewCard site,
+- `diagnostics`: one entry per ReviewCard site with operation, missing
+  evidence, required safety conditions, obligation-level evidence, witness
+  routes, and verify commands,
 - `hovers`: compact card explanations with required conditions, evidence
   summaries, missing evidence, next action, witness route, and trust boundary,
 - `code_actions`: command-shaped copy/open actions with stable object

@@ -17,12 +17,13 @@ The first supported surface is a saved JSON projection rendered with
 `unsafe-review check --format lsp`. It is not an LSP server and it does not
 edit source. The projection derives diagnostics, hovers, and command-style
 action data from existing `ReviewCard`s. Diagnostics carry structured next
-action, witness route details, verify commands, missing evidence, and the
-static-review trust boundary. Diagnostics also include the concrete operation
-expression from the `ReviewCard`, so editor consumers do not need to parse hover
-text or reclassify findings. Hover text is a compact reviewer view: card
-identity, required safety conditions, ReviewCard evidence summaries, missing
-evidence, next action, verify commands when available, witness route, and the
+action, witness route details, verify commands, missing evidence, required
+safety conditions, obligation-level evidence states, and the static-review
+trust boundary. Diagnostics also include the concrete operation expression from
+the `ReviewCard`, so editor consumers do not need to parse hover text or
+reclassify findings. Hover text is a compact reviewer view: card identity,
+required safety conditions, ReviewCard evidence summaries, missing evidence,
+next action, verify commands when available, witness route, and the
 static-review trust boundary. Code actions include stable object `payload`
 fields with `card_id` plus action-specific details so editor adapters do not
 need to parse positional legacy arguments.

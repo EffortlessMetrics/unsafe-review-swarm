@@ -172,10 +172,10 @@ cargo xtask check-first-pr-artifacts target/unsafe-review
 ```
 
 That verifier keeps the bundle advisory: it checks route limitations,
-comment-plan caps and renderable inline fields, saved LSP action payloads,
-zero-gap wording, card identity consistency, and absence of positive
-safety/proof wording. It does not run witnesses, post comments, edit source, or
-make a policy decision.
+comment-plan caps and renderable inline fields, saved LSP diagnostic evidence
+and action payloads, zero-gap wording, card identity consistency, and absence
+of positive safety/proof wording. It does not run witnesses, post comments,
+edit source, or make a policy decision.
 
 ## Explain And Context
 

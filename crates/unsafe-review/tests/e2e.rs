@@ -235,6 +235,41 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
         lsp["diagnostics"][0]["operation"],
         "unsafe { ptr.cast::<Header>().read() }"
     );
+    assert_eq!(
+        lsp["diagnostics"][0]["required_safety_conditions"][0]["key"],
+        "pointer-live"
+    );
+    assert!(
+        lsp["diagnostics"][0]["required_safety_conditions"][0]["description"]
+            .as_str()
+            .unwrap_or("")
+            .contains("pointer is live")
+    );
+    assert_eq!(
+        lsp["diagnostics"][0]["evidence_summary"]["contract"]["state"],
+        "present"
+    );
+    assert_eq!(
+        lsp["diagnostics"][0]["evidence_summary"]["discharge"]["state"],
+        "missing"
+    );
+    assert!(
+        lsp["diagnostics"][0]["evidence_summary"]["reach_limitation"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not proof")
+    );
+    assert!(
+        lsp["diagnostics"][0]["obligation_evidence"]
+            .as_array()
+            .is_some_and(|items| {
+                items.iter().any(|item| {
+                    item["key"] == "alignment"
+                        && item["discharge"]["state"] == "missing"
+                        && item["witness"]["state"] == "missing"
+                })
+            })
+    );
     assert!(
         lsp["diagnostics"][0]["next_action"]
             .as_str()

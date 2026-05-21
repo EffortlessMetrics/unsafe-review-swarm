@@ -1,5 +1,5 @@
 use crate::api::{AnalyzeOutput, Scope};
-use crate::domain::{Priority, ReviewCard, WitnessRoute};
+use crate::domain::{EvidenceState, ObligationEvidence, Priority, ReviewCard, WitnessRoute};
 use crate::util::path_display;
 use serde::Serialize;
 
@@ -59,6 +59,9 @@ struct LspDiagnostic<'a> {
     operation: &'a str,
     operation_family: &'static str,
     hazards: Vec<&'static str>,
+    required_safety_conditions: Vec<LspSafetyCondition<'a>>,
+    evidence_summary: LspEvidenceSummary<'a>,
+    obligation_evidence: Vec<LspObligationEvidence<'a>>,
     missing_evidence: Vec<&'a str>,
     next_action: &'a str,
     witness_routes: Vec<LspWitnessRoute<'a>>,
@@ -83,6 +86,20 @@ impl<'a> From<&'a ReviewCard> for LspDiagnostic<'a> {
             operation: &card.operation.expression,
             operation_family: card.operation.family.as_str(),
             hazards: card.hazards.iter().map(|hazard| hazard.as_str()).collect(),
+            required_safety_conditions: card
+                .obligations
+                .iter()
+                .map(|obligation| LspSafetyCondition {
+                    key: &obligation.key,
+                    description: &obligation.description,
+                })
+                .collect(),
+            evidence_summary: LspEvidenceSummary::from(card),
+            obligation_evidence: card
+                .obligation_evidence
+                .iter()
+                .map(LspObligationEvidence::from)
+                .collect(),
             missing_evidence: card
                 .missing
                 .iter()
@@ -92,6 +109,101 @@ impl<'a> From<&'a ReviewCard> for LspDiagnostic<'a> {
             witness_routes: card.routes.iter().map(LspWitnessRoute::from).collect(),
             verify_commands: &card.next_action.verify_commands,
             trust_boundary: TRUST_BOUNDARY,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct LspSafetyCondition<'a> {
+    key: &'a str,
+    description: &'a str,
+}
+
+#[derive(Serialize)]
+struct LspEvidenceSummary<'a> {
+    contract: LspSimpleEvidence<'a>,
+    discharge: LspSimpleEvidence<'a>,
+    reach: LspReachEvidence<'a>,
+    witness: LspSimpleEvidence<'a>,
+    reach_limitation: &'static str,
+}
+
+impl<'a> From<&'a ReviewCard> for LspEvidenceSummary<'a> {
+    fn from(card: &'a ReviewCard) -> Self {
+        Self {
+            contract: LspSimpleEvidence {
+                present: card.contract.present,
+                state: present_label(card.contract.present),
+                summary: &card.contract.summary,
+            },
+            discharge: LspSimpleEvidence {
+                present: card.discharge.present,
+                state: present_label(card.discharge.present),
+                summary: &card.discharge.summary,
+            },
+            reach: LspReachEvidence {
+                state: &card.reach.state,
+                summary: &card.reach.summary,
+            },
+            witness: LspSimpleEvidence {
+                present: card.witness.present,
+                state: present_label(card.witness.present),
+                summary: &card.witness.summary,
+            },
+            reach_limitation: "static reach evidence is not proof that the unsafe site executed",
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct LspSimpleEvidence<'a> {
+    present: bool,
+    state: &'static str,
+    summary: &'a str,
+}
+
+#[derive(Serialize)]
+struct LspReachEvidence<'a> {
+    state: &'a str,
+    summary: &'a str,
+}
+
+#[derive(Serialize)]
+struct LspObligationEvidence<'a> {
+    key: &'a str,
+    description: &'a str,
+    contract: LspEvidenceState<'a>,
+    discharge: LspEvidenceState<'a>,
+    reach: LspEvidenceState<'a>,
+    witness: LspEvidenceState<'a>,
+}
+
+impl<'a> From<&'a ObligationEvidence> for LspObligationEvidence<'a> {
+    fn from(evidence: &'a ObligationEvidence) -> Self {
+        Self {
+            key: &evidence.obligation.key,
+            description: &evidence.obligation.description,
+            contract: LspEvidenceState::from(&evidence.contract),
+            discharge: LspEvidenceState::from(&evidence.discharge),
+            reach: LspEvidenceState::from(&evidence.reach),
+            witness: LspEvidenceState::from(&evidence.witness),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct LspEvidenceState<'a> {
+    present: bool,
+    state: &'a str,
+    summary: &'a str,
+}
+
+impl<'a> From<&'a EvidenceState> for LspEvidenceState<'a> {
+    fn from(state: &'a EvidenceState) -> Self {
+        Self {
+            present: state.present,
+            state: &state.state,
+            summary: &state.summary,
         }
     }
 }
@@ -453,6 +565,51 @@ mod tests {
         assert_eq!(
             value["diagnostics"][0]["operation_family"],
             "raw_pointer_read"
+        );
+        assert_eq!(
+            value["diagnostics"][0]["required_safety_conditions"][0]["key"],
+            "pointer-live"
+        );
+        assert!(
+            value["diagnostics"][0]["required_safety_conditions"][0]["description"]
+                .as_str()
+                .unwrap_or("")
+                .contains("pointer is live")
+        );
+        assert_eq!(
+            value["diagnostics"][0]["evidence_summary"]["contract"]["state"],
+            "present"
+        );
+        assert!(
+            value["diagnostics"][0]["evidence_summary"]["contract"]["summary"]
+                .as_str()
+                .unwrap_or("")
+                .contains("SAFETY")
+        );
+        assert_eq!(
+            value["diagnostics"][0]["evidence_summary"]["discharge"]["state"],
+            "missing"
+        );
+        assert!(
+            value["diagnostics"][0]["evidence_summary"]["reach_limitation"]
+                .as_str()
+                .unwrap_or("")
+                .contains("not proof")
+        );
+        assert_eq!(
+            value["diagnostics"][0]["obligation_evidence"][0]["key"],
+            "pointer-live"
+        );
+        assert!(
+            value["diagnostics"][0]["obligation_evidence"]
+                .as_array()
+                .is_some_and(|items| {
+                    items.iter().any(|item| {
+                        item["key"] == "alignment"
+                            && item["discharge"]["state"] == "missing"
+                            && item["witness"]["state"] == "missing"
+                    })
+                })
         );
         assert_eq!(value["diagnostics"][0]["severity"], 2);
         assert!(
