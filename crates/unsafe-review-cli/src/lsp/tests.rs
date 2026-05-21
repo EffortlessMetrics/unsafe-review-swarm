@@ -86,6 +86,25 @@ fn invalid_config_falls_back_to_safe_defaults() {
 }
 
 #[test]
+fn parse_config_reads_supported_fields() {
+    let config = parse_config(json!({
+        "unsafeReview": {
+            "mode": "diff",
+            "base": "origin/main",
+            "maxCards": 15,
+            "refreshOnOpen": true,
+            "refreshOnSave": false
+        }
+    }));
+
+    assert_eq!(config.mode, "diff");
+    assert_eq!(config.base.as_deref(), Some("origin/main"));
+    assert_eq!(config.max_cards, Some(15));
+    assert!(config.refresh_on_open);
+    assert!(!config.refresh_on_save);
+}
+
+#[test]
 fn oversized_max_cards_is_ignored() {
     let config = parse_config(json!({
         "unsafeReview": {

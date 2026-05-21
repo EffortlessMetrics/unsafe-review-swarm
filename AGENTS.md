@@ -44,6 +44,12 @@ maintainability refactors, and source-of-truth spec alignment. Do not treat the
 absence of a new direction as a reason to pause if the work clearly advances one
 of those rails.
 
+Assume the repository has an active multi-day improvement runway. New Codex Web
+PR batches on `unsafe-review-swarm` are expected input, not a reason to change
+direction. Keep burning down generated PRs, tightening rails, and improving the
+codebase inside the current advisory ReviewCard-centered lane unless the owner
+explicitly changes the lane.
+
 Before routine swarm implementation, run the source sync guard:
 
 ```bash
@@ -75,6 +81,10 @@ add or align it in `.unsafe-review-spec` or the corresponding `docs/specs/`
 contract. Prefer the smallest useful rail: a plan item, spec clause, template,
 or verifier hook that keeps future PRs pointed at the same truth without adding
 fake enforcement.
+
+Use the rails as forward drive. A well-designed missing rail is usually a repo
+alignment task, not a blocker. Add it when it keeps future work convergent and
+does not turn the current PR into a broad process rewrite.
 
 Do not reject a useful generated PR just because it references missing but
 well-designed scaffolding. Decide whether the missing rail should exist. If yes,

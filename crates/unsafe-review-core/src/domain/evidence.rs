@@ -120,3 +120,54 @@ impl MissingEvidence {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn contract_evidence_constructors_set_expected_defaults() {
+        let missing = ContractEvidence::missing();
+        assert!(!missing.present);
+        assert_eq!(
+            missing.summary,
+            "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        );
+
+        let missing_with = ContractEvidence::missing_with("custom missing");
+        assert!(!missing_with.present);
+        assert_eq!(missing_with.summary, "custom missing");
+
+        let present = ContractEvidence::present("documented contract");
+        assert!(present.present);
+        assert_eq!(present.summary, "documented contract");
+    }
+
+    #[test]
+    fn discharge_and_evidence_state_constructors_preserve_state_and_summary() {
+        let discharge_missing = DischargeEvidence::missing();
+        assert!(!discharge_missing.present);
+        assert_eq!(discharge_missing.summary, "No visible local guard detected");
+
+        let discharge_present = DischargeEvidence::present("checked bounds");
+        assert!(discharge_present.present);
+        assert_eq!(discharge_present.summary, "checked bounds");
+
+        let state_missing = EvidenceState::missing("guard absent");
+        assert!(!state_missing.present);
+        assert_eq!(state_missing.state, "missing");
+        assert_eq!(state_missing.summary, "guard absent");
+
+        let state_present = EvidenceState::present("guard proven");
+        assert!(state_present.present);
+        assert_eq!(state_present.state, "present");
+        assert_eq!(state_present.summary, "guard proven");
+    }
+
+    #[test]
+    fn missing_evidence_new_sets_kind_and_message() {
+        let missing = MissingEvidence::new("witness", "no receipt found");
+        assert_eq!(missing.kind, "witness");
+        assert_eq!(missing.message, "no receipt found");
+    }
+}

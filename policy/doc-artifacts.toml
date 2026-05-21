@@ -38,3 +38,30 @@ status = "active"
 owner = "repo-infra"
 linked_proposal = "UNSAFE-REVIEW-PROP-0002"
 linked_spec = "UNSAFE-REVIEW-SPEC-0020"
+
+
+[[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0025"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0025-docs-automation.md"
+status = "proposed"
+owner = "repo-infra"
+linked_proposal = "UNSAFE-REVIEW-PROP-0002"
+linked_spec = "UNSAFE-REVIEW-SPEC-0020"
+policy_impact = [
+  "policy/doc-artifacts.toml",
+  "policy/docs-automation.toml",
+]
+
+[[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0026"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0026-accuracy-validation-and-calibration.md"
+status = "proposed"
+owner = "calibration"
+linked_proposal = "UNSAFE-REVIEW-PROP-0002"
+linked_spec = "UNSAFE-REVIEW-SPEC-0020"
+policy_impact = [
+  "policy/accuracy-calibration.toml",
+  "policy/public-surfaces.toml",
+]
