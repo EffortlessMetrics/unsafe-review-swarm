@@ -26,3 +26,14 @@ actions = [
 reason = "Advisory unsafe-review PR artifact workflow. It uploads cards.json, pr-summary.md, cards.sarif, and comment-plan.json without witness execution or write permissions."
 created = "2026-05-18"
 review_after = "2026-06-18"
+
+[[workflow]]
+id = "workflow-0003"
+path = ".github/workflows/policy-contracts.yml"
+permissions = "contents: read"
+actions = [
+  "actions/checkout@v6",
+]
+reason = "Source-of-truth scaffold workflow. It validates document, goal, package-boundary, and CI-lane ledgers without publishing, witness execution, source edits, or policy blocking."
+created = "2026-05-20"
+review_after = "2026-07-01"
