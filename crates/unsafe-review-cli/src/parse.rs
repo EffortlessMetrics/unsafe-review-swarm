@@ -417,67 +417,16 @@ fn parse_saved_output_receipt(
     let mut id: Option<String> = None;
     let mut idx = 0usize;
     while idx < args.len() {
-        match args[idx].as_str() {
-            "--tool" if allow_tool => {
-                idx += 1;
-                options.tool = Some(value(&args, idx, "--tool")?.to_string());
-            }
-            arg if allow_tool && arg.starts_with("--tool=") => {
-                options.tool = Some(inline_value(arg, "--tool")?.to_string());
-            }
-            "--log" => {
-                idx += 1;
-                options.log = PathBuf::from(value(&args, idx, "--log")?);
-            }
-            arg if arg.starts_with("--log=") => {
-                options.log = PathBuf::from(inline_value(arg, "--log")?);
-            }
-            "--author" => {
-                idx += 1;
-                options.author = value(&args, idx, "--author")?.to_string();
-            }
-            arg if arg.starts_with("--author=") => {
-                options.author = inline_value(arg, "--author")?.to_string();
-            }
-            "--recorded-at" => {
-                idx += 1;
-                options.recorded_at = value(&args, idx, "--recorded-at")?.to_string();
-            }
-            arg if arg.starts_with("--recorded-at=") => {
-                options.recorded_at = inline_value(arg, "--recorded-at")?.to_string();
-            }
-            "--expires-at" => {
-                idx += 1;
-                options.expires_at = value(&args, idx, "--expires-at")?.to_string();
-            }
-            arg if arg.starts_with("--expires-at=") => {
-                options.expires_at = inline_value(arg, "--expires-at")?.to_string();
-            }
-            "--command" => {
-                idx += 1;
-                options.command = value(&args, idx, "--command")?.to_string();
-            }
-            arg if arg.starts_with("--command=") => {
-                options.command = inline_value(arg, "--command")?.to_string();
-            }
-            "--limitation" => {
-                idx += 1;
-                options
-                    .limitations
-                    .push(value(&args, idx, "--limitation")?.to_string());
-            }
-            arg if arg.starts_with("--limitation=") => {
-                options
-                    .limitations
-                    .push(inline_value(arg, "--limitation")?.to_string());
-            }
-            "--out" => {
-                idx += 1;
-                options.out = Some(PathBuf::from(value(&args, idx, "--out")?));
-            }
-            arg if arg.starts_with("--out=") => {
-                options.out = Some(PathBuf::from(inline_value(arg, "--out")?));
-            }
+        let arg = args[idx].as_str();
+        if parse_saved_output_receipt_tool(&args, &mut idx, arg, &mut options, allow_tool)? {
+            idx += 1;
+            continue;
+        }
+        if parse_saved_output_receipt_common(&args, &mut idx, arg, &mut options)? {
+            idx += 1;
+            continue;
+        }
+        match arg {
             value if value.starts_with('-') => {
                 return Err(format!("unknown receipt {command_name} argument `{value}`"));
             }
@@ -497,6 +446,105 @@ fn parse_saved_output_receipt(
         return Err("missing value for --tool".to_string());
     }
     Ok(options)
+}
+
+fn parse_saved_output_receipt_tool(
+    args: &[String],
+    idx: &mut usize,
+    arg: &str,
+    options: &mut SavedOutputReceiptOptions,
+    allow_tool: bool,
+) -> Result<bool, String> {
+    match arg {
+        "--tool" if allow_tool => {
+            *idx += 1;
+            options.tool = Some(value(args, *idx, "--tool")?.to_string());
+            Ok(true)
+        }
+        _ if allow_tool && arg.starts_with("--tool=") => {
+            options.tool = Some(inline_value(arg, "--tool")?.to_string());
+            Ok(true)
+        }
+        _ => Ok(false),
+    }
+}
+
+fn parse_saved_output_receipt_common(
+    args: &[String],
+    idx: &mut usize,
+    arg: &str,
+    options: &mut SavedOutputReceiptOptions,
+) -> Result<bool, String> {
+    match arg {
+        "--log" => {
+            *idx += 1;
+            options.log = PathBuf::from(value(args, *idx, "--log")?);
+            Ok(true)
+        }
+        _ if arg.starts_with("--log=") => {
+            options.log = PathBuf::from(inline_value(arg, "--log")?);
+            Ok(true)
+        }
+        "--author" => {
+            *idx += 1;
+            options.author = value(args, *idx, "--author")?.to_string();
+            Ok(true)
+        }
+        _ if arg.starts_with("--author=") => {
+            options.author = inline_value(arg, "--author")?.to_string();
+            Ok(true)
+        }
+        "--recorded-at" => {
+            *idx += 1;
+            options.recorded_at = value(args, *idx, "--recorded-at")?.to_string();
+            Ok(true)
+        }
+        _ if arg.starts_with("--recorded-at=") => {
+            options.recorded_at = inline_value(arg, "--recorded-at")?.to_string();
+            Ok(true)
+        }
+        "--expires-at" => {
+            *idx += 1;
+            options.expires_at = value(args, *idx, "--expires-at")?.to_string();
+            Ok(true)
+        }
+        _ if arg.starts_with("--expires-at=") => {
+            options.expires_at = inline_value(arg, "--expires-at")?.to_string();
+            Ok(true)
+        }
+        "--command" => {
+            *idx += 1;
+            options.command = value(args, *idx, "--command")?.to_string();
+            Ok(true)
+        }
+        _ if arg.starts_with("--command=") => {
+            options.command = inline_value(arg, "--command")?.to_string();
+            Ok(true)
+        }
+        "--limitation" => {
+            *idx += 1;
+            options
+                .limitations
+                .push(value(args, *idx, "--limitation")?.to_string());
+            Ok(true)
+        }
+        _ if arg.starts_with("--limitation=") => {
+            options
+                .limitations
+                .push(inline_value(arg, "--limitation")?.to_string());
+            Ok(true)
+        }
+        "--out" => {
+            *idx += 1;
+            options.out = Some(PathBuf::from(value(args, *idx, "--out")?));
+            Ok(true)
+        }
+        _ if arg.starts_with("--out=") => {
+            options.out = Some(PathBuf::from(inline_value(arg, "--out")?));
+            Ok(true)
+        }
+        _ => Ok(false),
+    }
 }
 
 fn parse_receipt_template(args: Vec<String>) -> Result<ReceiptTemplateOptions, String> {
