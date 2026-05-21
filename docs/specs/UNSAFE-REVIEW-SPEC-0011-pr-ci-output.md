@@ -5,6 +5,7 @@ Owner: core/spec
 Created: 2026-05-17
 Linked proposal: ../proposals/UNSAFE-REVIEW-PROP-0001-product-contract.md
 Linked plan: ../../plans/0.1.0/implementation-plan.md
+See also: [UNSAFE-REVIEW-SPEC-0024: CI design](UNSAFE-REVIEW-SPEC-0024-ci-design.md)
 
 ## PR gate experience contract
 

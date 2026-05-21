@@ -30,6 +30,13 @@ status = "accepted"
 owner = "repo-infra"
 linked_proposal = "UNSAFE-REVIEW-PROP-0002"
 
+[[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0024"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0024-ci-design.md"
+status = "draft"
+owner = "repo-infra"
+
 [[lane]]
 id = "docs/source-of-truth-scaffold"
 name = "source-of-truth scaffold"
