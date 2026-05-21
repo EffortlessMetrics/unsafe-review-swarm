@@ -5,6 +5,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+mod markdown;
 mod workflow_allowlist;
 
 #[cfg(test)]
@@ -2631,7 +2632,7 @@ fn check_handoff_index(dir: &Path, readme: &Path) -> Result<(), String> {
 fn check_docs_map_paths(path: &str) -> Result<(), String> {
     let text = read_to_string(Path::new(path))?;
     let mut checked = 0usize;
-    for span in markdown_code_spans(&text) {
+    for span in markdown::code_spans(&text) {
         let candidate = span.trim();
         if !looks_like_repo_path(candidate) {
             continue;
@@ -2650,88 +2651,16 @@ fn check_docs_map_paths(path: &str) -> Result<(), String> {
 fn check_markdown_local_links(path: &str) -> Result<(), String> {
     let source = workspace_path(path);
     let text = read_to_string(&source)?;
-    for target in markdown_link_targets(&text) {
-        let Some(local) = local_markdown_link_target(&target) else {
+    for target in markdown::link_targets(&text) {
+        let Some(local) = markdown::local_link_target(&target) else {
             continue;
         };
-        let resolved = markdown_link_path(&source, local);
+        let resolved = markdown::link_path(&source, local);
         if !resolved.exists() {
             return Err(format!("{path} references missing local link `{target}`"));
         }
     }
     Ok(())
-}
-
-fn markdown_link_targets(text: &str) -> Vec<String> {
-    let mut targets = Vec::new();
-    let mut rest = text;
-    while let Some(label_start) = rest.find('[') {
-        rest = &rest[label_start + 1..];
-        let Some(label_end) = rest.find(']') else {
-            break;
-        };
-        let after_label = &rest[label_end + 1..];
-        let Some(after_open) = after_label.strip_prefix('(') else {
-            rest = after_label;
-            continue;
-        };
-        let Some(target_end) = after_open.find(')') else {
-            break;
-        };
-        let target = after_open[..target_end].trim();
-        if !target.is_empty() {
-            targets.push(target.to_string());
-        }
-        rest = &after_open[target_end + 1..];
-    }
-    targets
-}
-
-fn local_markdown_link_target(target: &str) -> Option<&str> {
-    let target = target
-        .split_once('#')
-        .map_or(target, |(path, _)| path)
-        .trim();
-    if target.is_empty()
-        || target.starts_with('#')
-        || target.starts_with("http://")
-        || target.starts_with("https://")
-        || target.starts_with("mailto:")
-        || target.starts_with("file:")
-        || target.starts_with("sandbox:")
-    {
-        return None;
-    }
-    Some(target)
-}
-
-fn markdown_link_path(source: &Path, target: &str) -> PathBuf {
-    let target_path = Path::new(target);
-    if target_path.is_absolute() {
-        return target_path.to_path_buf();
-    }
-    source.parent().map_or_else(
-        || target_path.to_path_buf(),
-        |parent| parent.join(target_path),
-    )
-}
-
-fn markdown_code_spans(text: &str) -> Vec<String> {
-    let mut spans = Vec::new();
-    let mut current = String::new();
-    let mut in_code = false;
-    for ch in text.chars() {
-        if ch == '`' {
-            if in_code {
-                spans.push(current.clone());
-                current.clear();
-            }
-            in_code = !in_code;
-        } else if in_code {
-            current.push(ch);
-        }
-    }
-    spans
 }
 
 fn looks_like_repo_path(value: &str) -> bool {
@@ -4465,7 +4394,7 @@ OperationFamily::RawPointerRead => vec![
 
     #[test]
     fn markdown_link_target_parser_finds_plain_local_links() {
-        let targets = markdown_link_targets(
+        let targets = markdown::link_targets(
             "[First use](docs/FIRST_USE.md) [external](https://example.com) [anchor](#trust)",
         );
 
@@ -4473,16 +4402,16 @@ OperationFamily::RawPointerRead => vec![
         assert!(targets.contains(&"https://example.com".to_string()));
         assert!(targets.contains(&"#trust".to_string()));
         assert_eq!(
-            local_markdown_link_target("docs/FIRST_USE.md#install"),
+            markdown::local_link_target("docs/FIRST_USE.md#install"),
             Some("docs/FIRST_USE.md")
         );
-        assert_eq!(local_markdown_link_target("https://example.com"), None);
-        assert_eq!(local_markdown_link_target("#trust"), None);
+        assert_eq!(markdown::local_link_target("https://example.com"), None);
+        assert_eq!(markdown::local_link_target("#trust"), None);
     }
 
     #[test]
     fn markdown_code_span_parser_extracts_backticked_paths() {
-        let spans = markdown_code_spans(
+        let spans = markdown::code_spans(
             "| Layer | Path |\n|---|---|\n| Docs | `docs/README.md`, `policy/` |\n",
         );
 
