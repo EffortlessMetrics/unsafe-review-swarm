@@ -177,70 +177,10 @@ pub(crate) fn render_json(report: &PolicyReport) -> String {
 
 pub(crate) fn render_markdown(report: &PolicyReport) -> String {
     let mut out = String::new();
-    out.push_str("# unsafe-review policy report\n\n");
-    out.push_str("Advisory no-new-debt policy report from current ReviewCards and ledgers.\n\n");
-    out.push_str("## Summary\n\n");
-    out.push_str("| Cards | New gaps | Baseline known | Suppressed | Resolved baseline | Expired suppressions |\n");
-    out.push_str("|---:|---:|---:|---:|---:|---:|\n");
-    out.push_str(&format!(
-        "| {} | {} | {} | {} | {} | {} |\n\n",
-        report.summary.cards,
-        report.summary.new_gaps,
-        report.summary.baseline_known,
-        report.summary.suppressed,
-        report.summary.resolved_baseline,
-        report.summary.expired_suppressions
-    ));
-
-    out.push_str("## Classification explanations\n\n");
-    out.push_str("| Classification | Meaning |\n");
-    out.push_str("|---|---|\n");
-    out.push_str(&format!(
-        "| `new_gap` | {} |\n",
-        markdown_cell(&report.classification_explanations.new_gap)
-    ));
-    out.push_str(&format!(
-        "| `baseline_known` | {} |\n",
-        markdown_cell(&report.classification_explanations.baseline_known)
-    ));
-    out.push_str(&format!(
-        "| `suppressed` | {} |\n",
-        markdown_cell(&report.classification_explanations.suppressed)
-    ));
-    out.push_str(&format!(
-        "| `resolved_baseline` | {} |\n",
-        markdown_cell(&report.classification_explanations.resolved_baseline)
-    ));
-    out.push_str(&format!(
-        "| `expired_suppression` | {} |\n",
-        markdown_cell(&report.classification_explanations.expired_suppression)
-    ));
-    out.push('\n');
-
-    out.push_str("## Current cards\n\n");
-    if report.cards.is_empty() {
-        out.push_str(NO_CHANGED_GAPS_MESSAGE);
-        out.push('\n');
-        out.push_str(NO_CHANGED_GAPS_LIMITATION);
-        out.push_str("\n\n");
-    } else {
-        out.push_str("| Status | Reason | Card | Class | Operation family | Operation | Missing evidence | Next action |\n");
-        out.push_str("|---|---|---|---|---|---|---:|---|\n");
-        for card in &report.cards {
-            out.push_str(&format!(
-                "| `{}` | {} | `{}` | `{}` | `{}` | `{}` | {} | {} |\n",
-                card.policy_status,
-                markdown_cell(&card.policy_reason),
-                card.card_id,
-                card.class_name,
-                card.operation_family,
-                markdown_cell(&card.operation),
-                card.missing_count,
-                markdown_cell(&card.next_action)
-            ));
-        }
-        out.push('\n');
-    }
+    markdown_sections::render_heading(&mut out);
+    markdown_sections::render_summary(&mut out, report);
+    markdown_sections::render_classification_explanations(&mut out, report);
+    markdown_sections::render_current_cards(&mut out, report);
 
     render_ledger_section(
         &mut out,
@@ -265,6 +205,85 @@ pub(crate) fn render_markdown(report: &PolicyReport) -> String {
     out.push_str(&report.trust_boundary);
     out.push('\n');
     out
+}
+
+mod markdown_sections {
+    use super::*;
+
+    pub(super) fn render_heading(out: &mut String) {
+        out.push_str("# unsafe-review policy report\n\n");
+        out.push_str("Advisory no-new-debt policy report from current ReviewCards and ledgers.\n\n");
+    }
+
+    pub(super) fn render_summary(out: &mut String, report: &PolicyReport) {
+        out.push_str("## Summary\n\n");
+        out.push_str("| Cards | New gaps | Baseline known | Suppressed | Resolved baseline | Expired suppressions |\n");
+        out.push_str("|---:|---:|---:|---:|---:|---:|\n");
+        out.push_str(&format!(
+            "| {} | {} | {} | {} | {} | {} |\n\n",
+            report.summary.cards,
+            report.summary.new_gaps,
+            report.summary.baseline_known,
+            report.summary.suppressed,
+            report.summary.resolved_baseline,
+            report.summary.expired_suppressions
+        ));
+    }
+
+    pub(super) fn render_classification_explanations(out: &mut String, report: &PolicyReport) {
+        out.push_str("## Classification explanations\n\n");
+        out.push_str("| Classification | Meaning |\n");
+        out.push_str("|---|---|\n");
+        out.push_str(&format!(
+            "| `new_gap` | {} |\n",
+            markdown_cell(&report.classification_explanations.new_gap)
+        ));
+        out.push_str(&format!(
+            "| `baseline_known` | {} |\n",
+            markdown_cell(&report.classification_explanations.baseline_known)
+        ));
+        out.push_str(&format!(
+            "| `suppressed` | {} |\n",
+            markdown_cell(&report.classification_explanations.suppressed)
+        ));
+        out.push_str(&format!(
+            "| `resolved_baseline` | {} |\n",
+            markdown_cell(&report.classification_explanations.resolved_baseline)
+        ));
+        out.push_str(&format!(
+            "| `expired_suppression` | {} |\n",
+            markdown_cell(&report.classification_explanations.expired_suppression)
+        ));
+        out.push('\n');
+    }
+
+    pub(super) fn render_current_cards(out: &mut String, report: &PolicyReport) {
+        out.push_str("## Current cards\n\n");
+        if report.cards.is_empty() {
+            out.push_str(NO_CHANGED_GAPS_MESSAGE);
+            out.push('\n');
+            out.push_str(NO_CHANGED_GAPS_LIMITATION);
+            out.push_str("\n\n");
+            return;
+        }
+
+        out.push_str("| Status | Reason | Card | Class | Operation family | Operation | Missing evidence | Next action |\n");
+        out.push_str("|---|---|---|---|---|---|---:|---|\n");
+        for card in &report.cards {
+            out.push_str(&format!(
+                "| `{}` | {} | `{}` | `{}` | `{}` | `{}` | {} | {} |\n",
+                card.policy_status,
+                markdown_cell(&card.policy_reason),
+                card.card_id,
+                card.class_name,
+                card.operation_family,
+                markdown_cell(&card.operation),
+                card.missing_count,
+                markdown_cell(&card.next_action)
+            ));
+        }
+        out.push('\n');
+    }
 }
 
 fn render_ledger_section(out: &mut String, title: &str, entries: &[PolicyLedgerEntry]) {
