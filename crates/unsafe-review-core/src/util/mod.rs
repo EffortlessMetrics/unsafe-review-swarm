@@ -4,13 +4,18 @@ pub(crate) fn path_display(path: &std::path::Path) -> String {
 
 pub(crate) fn slug(value: &str) -> String {
     let mut out = String::new();
+    let mut trailing_dash = false;
+
     for ch in value.chars() {
         if ch.is_ascii_alphanumeric() {
             out.push(ch.to_ascii_lowercase());
-        } else if !out.ends_with('-') {
+            trailing_dash = false;
+        } else if !trailing_dash {
             out.push('-');
+            trailing_dash = true;
         }
     }
+
     out.trim_matches('-').to_string()
 }
 
@@ -41,6 +46,14 @@ mod tests {
         assert_eq!(slug("  Hello,   WORLD!!!  "), "hello-world");
         assert_eq!(slug("___Rust__Unsafe__Review___"), "rust-unsafe-review");
         assert_eq!(slug("***"), "");
+    }
+
+    #[test]
+    fn slug_collapses_non_ascii_and_separators() {
+        assert_eq!(
+            slug("  \u{041f}\u{0440}\u{0438}\u{0432}\u{0435}\u{0442}, Rust---World!  "),
+            "rust-world"
+        );
     }
 
     proptest! {
