@@ -426,6 +426,10 @@ selection_reason
 
 Automatic posting is a later trusted-workflow feature, not this gate.
 
+Detailed PR-comment experience rules for selection quality, actionability,
+dedupe, noise budget, and the future posting model are defined in
+[UNSAFE-REVIEW-SPEC-0022](UNSAFE-REVIEW-SPEC-0022-pr-commenting-experience.md).
+
 ### 6. GitHub job summary contract
 
 The PR workflow should write a job summary.
