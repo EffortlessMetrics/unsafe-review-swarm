@@ -5,6 +5,15 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use calibration_constants::{
+    CALIBRATION_CASE_FIELDS, CALIBRATION_REQUIRED_KINDS, HAZARD_KIND_SOURCE,
+    OPERATION_FAMILY_REGISTRY, OPERATION_FAMILY_REGISTRY_COLUMNS, OPERATION_FAMILY_REGISTRY_HEADER,
+    OPERATION_FAMILY_REGISTRY_OBLIGATION_KEYS_COLUMN,
+    OPERATION_FAMILY_REGISTRY_REQUIRED_TEXT_COLUMNS, OPERATION_FAMILY_SOURCE,
+    SAFETY_OBLIGATION_SOURCE, WITNESS_KIND_SOURCE, ZERO_CARD_EXPECTATION_FIELDS,
+};
+
+mod calibration_constants;
 mod command_args;
 mod markdown;
 mod workflow_allowlist;
@@ -87,48 +96,6 @@ const FIXTURE_EXPECTED_CARDS_EXCEPTIONS: &[&str] = &[
 
 const FIXTURE_PACKAGE_PREFIX_EXCEPTIONS: &[(&str, &str)] =
     &[("raw_pointer_alignment_line_drift", "raw-pointer-alignment")];
-
-const CALIBRATION_REQUIRED_KINDS: &[&str] = &["positive", "negative", "false_positive_control"];
-const CALIBRATION_CASE_FIELDS: &[&str] = &[
-    "fixture",
-    "kind",
-    "claim",
-    "support_tier",
-    "expected_cards",
-    "expected_class",
-    "expected_operation_family",
-    "expected_hazard",
-];
-const OPERATION_FAMILY_REGISTRY: &str =
-    "docs/specs/appendices/UNSAFE-REVIEW-SPEC-0005-appendix-operation-family-registry.md";
-const OPERATION_FAMILY_REGISTRY_COLUMNS: usize = 9;
-const OPERATION_FAMILY_REGISTRY_HEADER: &[&str] = &[
-    "operation_family",
-    "detected syntax shapes",
-    "hazards",
-    "not hazards",
-    "obligation / evidence keys",
-    "witness route",
-    "fixture proof",
-    "known false-positive controls",
-    "known limits",
-];
-const OPERATION_FAMILY_REGISTRY_REQUIRED_TEXT_COLUMNS: &[(usize, &str)] = &[
-    (1, "detected syntax shapes"),
-    (7, "known false-positive controls"),
-    (8, "known limits"),
-];
-const OPERATION_FAMILY_REGISTRY_OBLIGATION_KEYS_COLUMN: (usize, &str) =
-    (4, "obligation / evidence keys");
-const OPERATION_FAMILY_SOURCE: &str = "crates/unsafe-review-core/src/domain/operation.rs";
-const SAFETY_OBLIGATION_SOURCE: &str = "crates/unsafe-review-core/src/analysis/obligations.rs";
-const HAZARD_KIND_SOURCE: &str = "crates/unsafe-review-core/src/domain/hazard.rs";
-const WITNESS_KIND_SOURCE: &str = "crates/unsafe-review-core/src/domain/witness.rs";
-const ZERO_CARD_EXPECTATION_FIELDS: &[&str] = &[
-    "expected_class",
-    "expected_operation_family",
-    "expected_hazard",
-];
 
 const SUPPORT_TIERS_DOC: &str = "docs/status/SUPPORT_TIERS.md";
 const SUPPORT_SUMMARY_DOC: &str = "docs/status/SUPPORT_SUMMARY.md";
