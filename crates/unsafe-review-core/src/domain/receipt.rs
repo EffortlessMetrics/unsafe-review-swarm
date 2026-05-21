@@ -558,6 +558,22 @@ mod tests {
     }
 
     #[test]
+    fn evidence_summary_omits_whitespace_only_optional_fields() {
+        let mut receipt = fixture_receipt();
+        receipt.summary = Some(" ".to_string());
+        receipt.author = Some("\t".to_string());
+        receipt.recorded_at = Some("\n".to_string());
+        receipt.expires_at = Some("   ".to_string());
+        receipt.command = Some("\r\n".to_string());
+        receipt.limitations = Some(vec!["fixture only".to_string()]);
+
+        assert_eq!(
+            receipt.evidence_summary(),
+            "Imported miri receipt with `ran` strength; limitations: fixture only"
+        );
+    }
+
+    #[test]
     fn witness_receipt_validation_rejects_unknown_tool() {
         let mut receipt = fixture_receipt();
         receipt.tool = "proof-bot".to_string();

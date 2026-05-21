@@ -23,7 +23,7 @@ pub(super) fn evidence_summary(receipt: &WitnessReceipt) -> String {
 }
 
 fn append_optional(summary: &mut String, prefix: &str, value: Option<&str>) {
-    if let Some(value) = value.filter(|value| !value.is_empty()) {
+    if let Some(value) = value.filter(|value| !value.trim().is_empty()) {
         summary.push_str(prefix);
         summary.push_str(value);
     }
