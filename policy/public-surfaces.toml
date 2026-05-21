@@ -1,0 +1,17 @@
+schema_version = "1.0"
+status = "experimental"
+
+trust_boundary = """
+Public-surface wording for unsafe-review must remain advisory and claim-scoped.
+No wording may imply memory-safety proof, UB-free status, Miri-clean status, or
+global calibrated precision/recall without explicitly linked calibration proof.
+"""
+
+forbidden_terms = [
+  "memory-safety proof",
+  "UB-free",
+  "Miri-clean",
+  "global precision",
+  "global recall",
+  "policy-ready by default",
+]
