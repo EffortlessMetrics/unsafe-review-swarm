@@ -2,7 +2,7 @@
   "name": "unsafe-review",
   "displayName": "unsafe-review",
   "publisher": "effortlessmetrics",
-  "description": "Static unsafe exposure analysis for Rust PRs.",
+  "description": "Packaging scaffold for the future read-only unsafe-review editor adapter.",
   "version": "0.0.1",
   "license": "MIT OR Apache-2.0",
   "repository": {
@@ -13,7 +13,8 @@
     "vscode": "^1.92.0"
   },
   "categories": ["Linters", "Programming Languages", "Other"],
-  "keywords": ["rust", "unsafe", "static-analysis", "review", "miri"],
+  "keywords": ["rust", "unsafe", "static-analysis", "review"],
+  "preview": true,
   "activationEvents": [],
   "main": "./out/extension.js",
   "contributes": {},

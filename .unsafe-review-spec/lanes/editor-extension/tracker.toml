@@ -22,7 +22,7 @@ end_state = [
 
 [[work_item]]
 id = "editor-spec-and-adr"
-status = "ready"
+status = "done"
 spec = "UNSAFE-REVIEW-SPEC-0021"
 adr = "UNSAFE-REVIEW-ADR-0007"
 proof = [
@@ -33,8 +33,7 @@ proof = [
 
 [[work_item]]
 id = "live-lsp-hardening-gate"
-status = "blocked"
-blocked_by = ["editor-spec-and-adr"]
+status = "ready"
 proof = [
   "cargo test -p unsafe-review-cli lsp --locked",
   "cargo run --locked -p xtask -- lsp-smoke",
@@ -43,8 +42,7 @@ proof = [
 
 [[work_item]]
 id = "extension-scaffold"
-status = "blocked"
-blocked_by = ["editor-spec-and-adr"]
+status = "done"
 proof = [
   "npm ci",
   "npm run compile",

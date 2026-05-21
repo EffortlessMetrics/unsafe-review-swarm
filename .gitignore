@@ -1,4 +1,6 @@
 /target/
+/editors/vscode/node_modules/
+/editors/vscode/out/
 /.idea/
 /.vscode/.ropeproject/
 *.swp

@@ -1,5 +1,5 @@
 export function activate(): void {
-  // Read-only extension scaffold for future ReviewCard projections.
+  // Packaging-only scaffold. Runtime LSP wiring lands in a later lane.
 }
 
 export function deactivate(): void {
