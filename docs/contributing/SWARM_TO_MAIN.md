@@ -66,14 +66,19 @@ The report fetches `EffortlessMetrics/unsafe-review` `main` and
 `EffortlessMetrics/unsafe-review-swarm` `main`, then prints:
 
 - the fetched source and swarm heads,
-- commits source has that swarm lacks,
-- commits swarm has that source lacks,
+- the acknowledged source sync point from `policy/source-sync.toml`,
+- new source commits after that sync point,
+- raw ancestry-only source/swarm divergence counts,
+- swarm-only workbench commits not yet promoted to source,
 - a short next-action status.
 
 This command is advisory in its first version. It does not fail solely because
-the repos diverge. If `source_only` is nonzero, open a swarm sync PR before
-routine implementation work unless the source-only commits are already accounted
-for by an in-flight sync or source-public-surface exception.
+the repos diverge. If `new_source_commits` is nonzero, open a swarm sync PR
+before routine implementation work unless the source-only commits are already
+accounted for by an in-flight sync or source-public-surface exception. Raw
+ancestry divergence can remain nonzero after a reseed-style repair; the sync
+checkpoint is the source of truth for whether source has moved since the last
+acknowledged absorption.
 
 ## Agent state is not PR state
 

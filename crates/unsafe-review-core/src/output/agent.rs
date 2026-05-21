@@ -47,7 +47,7 @@ struct AgentPacket<'a> {
 impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
     fn from(card: &'a ReviewCard) -> Self {
         let allowed_repairs = allowed_repairs(card);
-        let agent_readiness = agent_readiness(card, &allowed_repairs);
+        let agent_readiness = agent_readiness(card, allowed_repairs.has_card_scoped_repairs);
         Self {
             schema_version: "0.1",
             tool: "unsafe-review",
@@ -83,7 +83,7 @@ impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
                     message: &missing.message,
                 })
                 .collect(),
-            allowed_repairs,
+            allowed_repairs: allowed_repairs.repairs,
             agent_readiness,
             repair_scope: "this card only",
             witness_routes: card.routes.iter().map(AgentWitnessRoute::from).collect(),
@@ -105,7 +105,7 @@ impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
     }
 }
 
-fn agent_readiness(card: &ReviewCard, allowed_repairs: &[String]) -> AgentReadiness {
+fn agent_readiness(card: &ReviewCard, has_card_scoped_repairs: bool) -> AgentReadiness {
     let mut reasons = Vec::new();
 
     if !card.class.is_actionable() {
@@ -159,7 +159,7 @@ fn agent_readiness(card: &ReviewCard, allowed_repairs: &[String]) -> AgentReadin
         ));
     }
 
-    if allowed_repairs.is_empty() {
+    if !has_card_scoped_repairs {
         reasons.push("no card-scoped allowed repair is available".to_string());
     }
 
@@ -183,7 +183,12 @@ fn agent_readiness(card: &ReviewCard, allowed_repairs: &[String]) -> AgentReadin
     }
 }
 
-fn allowed_repairs(card: &ReviewCard) -> Vec<String> {
+struct AllowedRepairs {
+    repairs: Vec<String>,
+    has_card_scoped_repairs: bool,
+}
+
+fn allowed_repairs(card: &ReviewCard) -> AllowedRepairs {
     let mut repairs = Vec::new();
 
     match card.operation.family {
@@ -284,10 +289,14 @@ fn allowed_repairs(card: &ReviewCard) -> Vec<String> {
         );
     }
 
-    if repairs.is_empty() {
+    let has_card_scoped_repairs = !repairs.is_empty();
+    if !has_card_scoped_repairs {
         repairs.push(card.next_action.summary.clone());
     }
-    dedupe_preserve_order(repairs)
+    AllowedRepairs {
+        repairs: dedupe_preserve_order(repairs),
+        has_card_scoped_repairs,
+    }
 }
 
 fn add_raw_pointer_repairs(card: &ReviewCard, repairs: &mut Vec<String>, alignment_required: bool) {

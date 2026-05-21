@@ -1,0 +1,11 @@
+name: Spec
+about: Define required behavior and proof
+body:
+  - type: input
+    id: proposal
+    attributes:
+      label: Linked proposal ID
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Required behavior
