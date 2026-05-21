@@ -5,6 +5,8 @@ use crate::command::{
 use std::path::PathBuf;
 use unsafe_review_core::PolicyMode;
 
+mod policy;
+
 pub(crate) fn parse(args: Vec<String>) -> Result<Command, String> {
     let mut rest = args.into_iter().skip(1).collect::<Vec<_>>();
     if rest.is_empty() {
@@ -33,7 +35,7 @@ pub(crate) fn parse(args: Vec<String>) -> Result<Command, String> {
         "explain" => parse_explain(rest),
         "context" => parse_context(rest),
         "outcome" => parse_outcome(rest).map(Command::Outcome),
-        "policy" => parse_policy_command(rest),
+        "policy" => policy::parse_policy_command(rest),
         "receipt" => parse_receipt(rest),
         "receipt-template" => parse_receipt_template(rest).map(Command::ReceiptTemplate),
         "lsp" => Ok(Command::Lsp),
@@ -48,32 +50,6 @@ fn parse_support(args: Vec<String>) -> Result<Command, String> {
         return Err(format!("unknown support argument `{other}`"));
     }
     Ok(Command::Support)
-}
-
-fn parse_policy_command(args: Vec<String>) -> Result<Command, String> {
-    let mut rest = args;
-    let Some(subcommand) = rest.first() else {
-        return Err("missing policy subcommand `report`".to_string());
-    };
-    let subcommand = subcommand.clone();
-    rest.remove(0);
-    match subcommand.as_str() {
-        "report" => parse_policy_report(rest).map(Command::PolicyReport),
-        other => Err(format!("unknown policy subcommand `{other}`")),
-    }
-}
-
-fn parse_policy_report(args: Vec<String>) -> Result<CheckOptions, String> {
-    let mut options = parse_check(args)?;
-    if !matches!(options.format, Format::Human) {
-        options.format = parse_policy_report_format(format_name(&options.format))?;
-    } else {
-        options.format = Format::Json;
-    }
-    if options.policy != PolicyMode::Advisory {
-        return Err("policy report is advisory-only".to_string());
-    }
-    Ok(options)
 }
 
 fn parse_doctor(args: Vec<String>) -> Result<Command, String> {
@@ -681,17 +657,6 @@ fn parse_receipt_audit_format(raw: &str) -> Result<Format, String> {
         Format::Markdown => Ok(Format::Markdown),
         other => Err(format!(
             "receipt audit only supports json or markdown output, got `{}`",
-            format_name(&other)
-        )),
-    }
-}
-
-fn parse_policy_report_format(raw: &str) -> Result<Format, String> {
-    match parse_format(raw)? {
-        Format::Json => Ok(Format::Json),
-        Format::Markdown => Ok(Format::Markdown),
-        other => Err(format!(
-            "policy report only supports json or markdown output, got `{}`",
             format_name(&other)
         )),
     }
