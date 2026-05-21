@@ -5,8 +5,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+mod command_args;
 mod markdown;
 mod workflow_allowlist;
+
+#[cfg(test)]
+use command_args::{require_max_args, require_no_extra_args};
 
 #[cfg(test)]
 use workflow_allowlist::{
@@ -185,7 +189,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
             Ok(())
         }
         Some("check-pr") => {
-            require_no_extra_args(&args, "check-pr")?;
+            command_args::require_no_extra_args(&args, "check-pr")?;
             check_docs()?;
             check_policy()?;
             check_support_tiers()?;
@@ -198,65 +202,59 @@ fn run(args: Vec<String>) -> Result<(), String> {
             Ok(())
         }
         Some("check-docs") => {
-            require_no_extra_args(&args, "check-docs")?;
+            command_args::require_no_extra_args(&args, "check-docs")?;
             check_docs()
         }
         Some("check-policy") => {
-            require_no_extra_args(&args, "check-policy")?;
+            command_args::require_no_extra_args(&args, "check-policy")?;
             check_policy()
         }
         Some("check-doc-artifacts") => {
-            require_no_extra_args(&args, "check-doc-artifacts")?;
+            command_args::require_no_extra_args(&args, "check-doc-artifacts")?;
             check_doc_artifacts()
         }
         Some("check-goals") => {
-            require_no_extra_args(&args, "check-goals")?;
+            command_args::require_no_extra_args(&args, "check-goals")?;
             check_goals()
         }
         Some("check-package-boundary") => {
-            require_no_extra_args(&args, "check-package-boundary")?;
+            command_args::require_no_extra_args(&args, "check-package-boundary")?;
             check_package_boundary()
         }
         Some("check-ci-lanes") => {
-            require_no_extra_args(&args, "check-ci-lanes")?;
+            command_args::require_no_extra_args(&args, "check-ci-lanes")?;
             check_ci_lanes()
         }
         Some("check-support-tiers") => {
-            require_no_extra_args(&args, "check-support-tiers")?;
+            command_args::require_no_extra_args(&args, "check-support-tiers")?;
             check_support_tiers()
         }
         Some("check-fixtures") => {
-            require_no_extra_args(&args, "check-fixtures")?;
+            command_args::require_no_extra_args(&args, "check-fixtures")?;
             check_fixtures()
         }
         Some("check-calibration") => {
-            require_no_extra_args(&args, "check-calibration")?;
+            command_args::require_no_extra_args(&args, "check-calibration")?;
             check_calibration()
         }
         Some("check-dogfood") => {
-            require_no_extra_args(&args, "check-dogfood")?;
+            command_args::require_no_extra_args(&args, "check-dogfood")?;
             check_dogfood()
         }
         Some("check-fuzz") => {
-            require_no_extra_args(&args, "check-fuzz")?;
+            command_args::require_no_extra_args(&args, "check-fuzz")?;
             check_manual_fuzz_harness()
         }
         Some("check-advisory-artifacts") => {
-            let Some(dir) = args.get(2) else {
-                return Err("usage: cargo xtask check-advisory-artifacts <dir>".to_string());
-            };
-            require_max_args(&args, "check-advisory-artifacts", 3)?;
-            check_advisory_artifacts(Path::new(dir))
+            let dir = command_args::require_subcommand_dir_arg(&args, "check-advisory-artifacts")?;
+            check_advisory_artifacts(&dir)
         }
         Some("check-first-pr-artifacts") => {
-            let Some(dir) = args.get(2) else {
-                return Err("usage: cargo xtask check-first-pr-artifacts <dir>".to_string());
-            };
-            require_max_args(&args, "check-first-pr-artifacts", 3)?;
-            check_first_pr_artifacts(Path::new(dir))
+            let dir = command_args::require_subcommand_dir_arg(&args, "check-first-pr-artifacts")?;
+            check_first_pr_artifacts(&dir)
         }
         Some("source-divergence") | Some("check-source-sync") => {
-            require_no_extra_args(&args, "source-divergence")?;
+            command_args::require_no_extra_args(&args, "source-divergence")?;
             report_source_divergence()
         }
         Some(other) => Err(format!("unknown xtask command `{other}`")),
@@ -268,20 +266,6 @@ fn workspace_root() -> Result<PathBuf, String> {
         .parent()
         .map(Path::to_path_buf)
         .ok_or_else(|| "failed to resolve workspace root from xtask manifest path".to_string())
-}
-
-fn require_no_extra_args(args: &[String], command: &str) -> Result<(), String> {
-    require_max_args(args, command, 2)
-}
-
-fn require_max_args(args: &[String], command: &str, max_len: usize) -> Result<(), String> {
-    if args.len() <= max_len {
-        return Ok(());
-    }
-    Err(format!(
-        "`{command}` does not accept extra arguments: {}",
-        args[max_len..].join(" ")
-    ))
 }
 
 fn check_docs() -> Result<(), String> {
