@@ -2,6 +2,21 @@ use crate::api::AnalyzeOutput;
 use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
 use crate::util::path_display;
 
+fn push_section_lines<T, F>(out: &mut String, header: &str, items: &[T], mut line: F)
+where
+    F: FnMut(&T) -> String,
+{
+    if items.is_empty() {
+        return;
+    }
+    out.push_str(header);
+    for item in items {
+        out.push_str("    - ");
+        out.push_str(&line(item));
+        out.push('\n');
+    }
+}
+
 pub(crate) fn render(output: &AnalyzeOutput) -> String {
     let mut out = String::new();
     out.push_str("unsafe-review\n");
@@ -41,14 +56,15 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
             "  operation_family: {}\n",
             card.operation.family.as_str()
         ));
-        out.push_str("  hazards:\n");
-        for hazard in &card.hazards {
-            out.push_str(&format!("    - {}\n", hazard.as_str()));
-        }
-        out.push_str("  required safety conditions:\n");
-        for obligation in &card.obligations {
-            out.push_str(&format!("    - {}\n", obligation.description));
-        }
+        push_section_lines(&mut out, "  hazards:\n", &card.hazards, |hazard| {
+            hazard.as_str().to_string()
+        });
+        push_section_lines(
+            &mut out,
+            "  required safety conditions:\n",
+            &card.obligations,
+            |obligation| obligation.description.clone(),
+        );
         out.push_str(&format!("  contract: {}\n", card.contract.summary));
         out.push_str(&format!("  discharge: {}\n", card.discharge.summary));
         out.push_str(&format!("  reach: {}\n", card.reach.summary));
@@ -68,10 +84,9 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
                 ));
             }
         }
-        out.push_str("  missing:\n");
-        for missing in &card.missing {
-            out.push_str(&format!("    - {}\n", missing.message));
-        }
+        push_section_lines(&mut out, "  missing:\n", &card.missing, |missing| {
+            missing.message.clone()
+        });
         if !card.routes.is_empty() {
             out.push_str("  witness routes:\n");
             for route in &card.routes {
@@ -102,7 +117,7 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, analyze};
+    use crate::api::{analyze, AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope};
     use std::path::PathBuf;
 
     #[test]
