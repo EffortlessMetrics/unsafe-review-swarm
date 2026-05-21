@@ -16,6 +16,7 @@ pub struct OutcomeReport {
     pub before: OutcomeSnapshotSummary,
     pub after: OutcomeSnapshotSummary,
     pub summary: OutcomeSummary,
+    pub reviewer_delta: OutcomeReviewerDelta,
     pub cards: OutcomeCards,
 }
 
@@ -33,6 +34,36 @@ pub struct OutcomeSummary {
     pub improved: usize,
     pub regressed: usize,
     pub unchanged: usize,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct OutcomeReviewerDelta {
+    pub new_cards: usize,
+    pub resolved_cards: usize,
+    pub improved_cards: usize,
+    pub regressed_cards: usize,
+    pub unchanged_cards: usize,
+    pub receipt_movement: OutcomeReceiptMovement,
+    pub top_remaining_gaps: Vec<OutcomeRemainingGap>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+pub struct OutcomeReceiptMovement {
+    pub improved: usize,
+    pub regressed: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct OutcomeRemainingGap {
+    pub card_id: String,
+    #[serde(rename = "class")]
+    pub class_name: String,
+    pub priority: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub operation_family: Option<String>,
+    pub missing_count: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_action: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
@@ -127,6 +158,47 @@ pub fn render_markdown(report: &OutcomeReport) -> String {
         report.summary.regressed,
         report.summary.unchanged
     ));
+    out.push_str("## Reviewer delta\n\n");
+    out.push_str(&format!(
+        "- New cards: {}\n",
+        report.reviewer_delta.new_cards
+    ));
+    out.push_str(&format!(
+        "- Resolved cards: {}\n",
+        report.reviewer_delta.resolved_cards
+    ));
+    out.push_str(&format!(
+        "- Improved cards: {}\n",
+        report.reviewer_delta.improved_cards
+    ));
+    out.push_str(&format!(
+        "- Regressed cards: {}\n",
+        report.reviewer_delta.regressed_cards
+    ));
+    out.push_str(&format!(
+        "- Receipt movement: {} improved, {} regressed\n",
+        report.reviewer_delta.receipt_movement.improved,
+        report.reviewer_delta.receipt_movement.regressed
+    ));
+    if report.reviewer_delta.top_remaining_gaps.is_empty() {
+        out.push_str("- Top remaining gaps: none in the after snapshot\n\n");
+    } else {
+        out.push_str("\nTop remaining gaps:\n\n");
+        out.push_str("| Card | Class | Priority | Operation family | Missing | Next action |\n");
+        out.push_str("|---|---|---|---|---:|---|\n");
+        for gap in &report.reviewer_delta.top_remaining_gaps {
+            out.push_str(&format!(
+                "| `{}` | `{}` | `{}` | `{}` | {} | {} |\n",
+                gap.card_id,
+                gap.class_name,
+                gap.priority,
+                markdown_cell(gap.operation_family.as_deref().unwrap_or("unknown")),
+                gap.missing_count,
+                markdown_cell(gap.next_action.as_deref().unwrap_or(""))
+            ));
+        }
+        out.push('\n');
+    }
     out.push_str("## Card outcomes\n\n");
     if report.cards.is_empty() {
         out.push_str(NO_CHANGED_GAPS_MESSAGE);
@@ -226,6 +298,7 @@ fn compare_snapshots(before: Snapshot, after: Snapshot) -> Result<OutcomeReport,
             }
         }
     }
+    let reviewer_delta = OutcomeReviewerDelta::from_outcome(&summary, &cards);
     Ok(OutcomeReport {
         schema_version: "0.1".to_string(),
         tool: "unsafe-review".to_string(),
@@ -241,6 +314,7 @@ fn compare_snapshots(before: Snapshot, after: Snapshot) -> Result<OutcomeReport,
         before: before_summary,
         after: after_summary,
         summary,
+        reviewer_delta,
         cards,
     })
 }
@@ -412,6 +486,87 @@ impl OutcomeCards {
     }
 }
 
+impl OutcomeReviewerDelta {
+    fn from_outcome(summary: &OutcomeSummary, cards: &OutcomeCards) -> Self {
+        let mut delta = Self {
+            new_cards: summary.new,
+            resolved_cards: summary.resolved,
+            improved_cards: summary.improved,
+            regressed_cards: summary.regressed,
+            unchanged_cards: summary.unchanged,
+            receipt_movement: receipt_movement(cards),
+            top_remaining_gaps: top_remaining_gaps(cards),
+        };
+        delta.top_remaining_gaps.truncate(5);
+        delta
+    }
+}
+
+fn receipt_movement(cards: &OutcomeCards) -> OutcomeReceiptMovement {
+    let mut movement = OutcomeReceiptMovement::default();
+    for card in cards
+        .improved
+        .iter()
+        .chain(cards.regressed.iter())
+        .chain(cards.unchanged.iter())
+    {
+        let Some(before) = card.before.as_ref() else {
+            continue;
+        };
+        let Some(after) = card.after.as_ref() else {
+            continue;
+        };
+        let before_rank = witness_rank(&before.witness);
+        let after_rank = witness_rank(&after.witness);
+        if after_rank > before_rank {
+            movement.improved += 1;
+        } else if after_rank < before_rank {
+            movement.regressed += 1;
+        }
+    }
+    movement
+}
+
+fn top_remaining_gaps(cards: &OutcomeCards) -> Vec<OutcomeRemainingGap> {
+    let mut gaps = cards
+        .new
+        .iter()
+        .chain(cards.improved.iter())
+        .chain(cards.regressed.iter())
+        .chain(cards.unchanged.iter())
+        .filter_map(|card| {
+            let after = card.after.as_ref()?;
+            if !is_actionable_class(&after.class_name) {
+                return None;
+            }
+            Some(OutcomeRemainingGap {
+                card_id: card.card_id.clone(),
+                class_name: after.class_name.clone(),
+                priority: after.priority.clone(),
+                operation_family: after.operation_family.clone(),
+                missing_count: after.missing_count,
+                next_action: after.next_action.clone(),
+            })
+        })
+        .collect::<Vec<_>>();
+    gaps.sort_by(|left, right| {
+        priority_rank(&left.priority)
+            .cmp(&priority_rank(&right.priority))
+            .then_with(|| right.missing_count.cmp(&left.missing_count))
+            .then_with(|| left.card_id.cmp(&right.card_id))
+    });
+    gaps
+}
+
+fn priority_rank(value: &str) -> u8 {
+    match value {
+        "high" => 0,
+        "medium" => 1,
+        "low" => 2,
+        _ => 3,
+    }
+}
+
 fn markdown_state(state: Option<&OutcomeCardState>) -> String {
     match state {
         Some(state) => {
@@ -542,6 +697,13 @@ mod tests {
         assert_eq!(report.summary.improved, 1);
         assert_eq!(report.summary.regressed, 1);
         assert_eq!(report.summary.unchanged, 1);
+        assert_eq!(report.reviewer_delta.new_cards, 1);
+        assert_eq!(report.reviewer_delta.resolved_cards, 1);
+        assert_eq!(report.reviewer_delta.improved_cards, 1);
+        assert_eq!(report.reviewer_delta.regressed_cards, 1);
+        assert_eq!(report.reviewer_delta.unchanged_cards, 1);
+        assert_eq!(report.reviewer_delta.top_remaining_gaps.len(), 4);
+        assert_eq!(report.reviewer_delta.top_remaining_gaps[0].priority, "high");
         assert!(report.before_id.starts_with("snapshot-"));
         assert!(report.after_id.starts_with("snapshot-"));
         assert_eq!(report.cards.new.len(), 1);
@@ -577,6 +739,16 @@ mod tests {
             serde_json::from_str(&json).map_err(|err| format!("parse JSON failed: {err}"))?;
         assert_eq!(value["mode"], "outcome");
         assert_eq!(value["summary"]["new"], 1);
+        assert_eq!(value["reviewer_delta"]["new_cards"], 1);
+        assert_eq!(value["reviewer_delta"]["resolved_cards"], 0);
+        assert_eq!(
+            value["reviewer_delta"]["top_remaining_gaps"][0]["card_id"],
+            "UR-new-c1"
+        );
+        assert_eq!(
+            value["reviewer_delta"]["top_remaining_gaps"][0]["operation_family"],
+            "raw_pointer_read"
+        );
         assert_eq!(value["cards"]["new"][0]["card_id"], "UR-new-c1");
         assert_eq!(
             value["cards"]["new"][0]["after"]["operation_family"],
@@ -620,6 +792,10 @@ mod tests {
 
         let markdown = render_markdown(&report);
         assert!(markdown.contains("# unsafe-review outcome"));
+        assert!(markdown.contains("## Reviewer delta"));
+        assert!(markdown.contains("- New cards: 1"));
+        assert!(markdown.contains("- Receipt movement: 0 improved, 0 regressed"));
+        assert!(markdown.contains("Top remaining gaps"));
         assert!(markdown.contains("| Status | Card | Reason | Before | After |"));
         assert!(markdown.contains("## Limitations"));
         assert!(markdown.contains("## Trust boundary"));
@@ -663,6 +839,8 @@ mod tests {
         let report = compare_json(&before, &after)?;
 
         assert_eq!(report.summary.improved, 1);
+        assert_eq!(report.reviewer_delta.receipt_movement.improved, 1);
+        assert_eq!(report.reviewer_delta.receipt_movement.regressed, 0);
         assert!(
             report.cards.improved[0]
                 .reason
@@ -696,6 +874,8 @@ mod tests {
         let report = compare_json(&before, &after)?;
 
         assert_eq!(report.summary.regressed, 1);
+        assert_eq!(report.reviewer_delta.receipt_movement.improved, 0);
+        assert_eq!(report.reviewer_delta.receipt_movement.regressed, 1);
         assert!(
             report.cards.regressed[0]
                 .reason

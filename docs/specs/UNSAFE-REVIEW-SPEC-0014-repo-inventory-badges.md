@@ -75,6 +75,11 @@ missing-evidence counts, and saved witness receipt strength from the supplied
 snapshots. It must not rerun analysis, run witnesses, post policy decisions, or
 claim repository safety.
 
+Outcome comparison also includes a compact `reviewer_delta` front panel derived
+from the same grouped card outcomes. It reports new/resolved/improved/regressed
+counts, receipt-strength movement, and top remaining gaps from the after
+snapshot. It does not introduce another classification path.
+
 Baseline-known items, suppressions, and no-new-debt policy promotion remain
 separate policy surfaces and are not part of badge proof.
 
@@ -110,6 +115,9 @@ separate policy surfaces and are not part of badge proof.
   `after_id` snapshot fingerprints, grouped `cards.new`, `cards.resolved`,
   `cards.improved`, `cards.regressed`, and `cards.unchanged` arrays, explicit
   limitations, and the trust boundary.
+- Outcome JSON includes `reviewer_delta` with compact reviewer counts,
+  receipt movement, and top remaining gaps projected from the same outcome
+  cards.
 - Each outcome card includes a reason that explains the snapshot movement, such
   as a class change, missing-evidence count change, witness receipt strength
   movement, new card, or resolved card.

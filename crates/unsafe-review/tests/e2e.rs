@@ -903,6 +903,18 @@ fn outcome_compares_existing_json_snapshots_without_safety_claim() -> Result<(),
     assert_eq!(outcome["after"]["cards"], 1);
     assert_eq!(outcome["summary"]["new"], 1);
     assert_eq!(outcome["summary"]["resolved"], 0);
+    assert_eq!(outcome["reviewer_delta"]["new_cards"], 1);
+    assert_eq!(outcome["reviewer_delta"]["resolved_cards"], 0);
+    assert_eq!(
+        outcome["reviewer_delta"]["top_remaining_gaps"][0]["operation_family"],
+        "raw_pointer_read"
+    );
+    assert!(
+        outcome["reviewer_delta"]["top_remaining_gaps"][0]["next_action"]
+            .as_str()
+            .unwrap_or("")
+            .contains("Add or expose")
+    );
     assert!(outcome["cards"]["new"][0]["card_id"].is_string());
     assert_eq!(
         outcome["cards"]["new"][0]["after"]["operation_family"],
@@ -955,6 +967,10 @@ fn outcome_compares_existing_json_snapshots_without_safety_claim() -> Result<(),
     ])?;
     let markdown = stdout_text(&markdown)?;
     assert!(markdown.contains("# unsafe-review outcome"));
+    assert!(markdown.contains("## Reviewer delta"));
+    assert!(markdown.contains("- New cards: 1"));
+    assert!(markdown.contains("- Receipt movement: 0 improved, 0 regressed"));
+    assert!(markdown.contains("Top remaining gaps"));
     assert!(markdown.contains("| Status | Card | Reason | Before | After |"));
     assert!(markdown.contains("## Limitations"));
     assert!(markdown.contains("## Trust boundary"));
