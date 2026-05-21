@@ -152,7 +152,25 @@ The following MUST remain true for the 0.2.0 lane:
 - No broad suppressions as first-run UX substitute.
 - No safety/UB-free/Miri-clean/site-executed/proof claims.
 
-## 12. Release-proof minimum for 0.2.0
+## 12. Projection contract summary
+
+Every first-run surface is a projection from ReviewCard.
+
+- PR gate: hard-fail tool, artifact, schema, and trust-boundary failures; keep
+  findings advisory by default.
+- PR comments: write `comment-plan.json` first; cap at three candidates; changed
+  lines only; no posting by default.
+- Saved LSP: `lsp.json` is the 0.2.0 editor surface; diagnostics carry
+  ReviewCard-derived evidence; hovers mirror reviewer-first explain; actions are
+  command-only and contain no `WorkspaceEdit`.
+- Agent packets: card-scoped, readiness-classified, bounded context, allowed
+  repairs, do-not-do list, verify commands, and stop conditions.
+- Badges: repo posture only; `unsafe-review` means open gaps and
+  `unsafe-review+` means contract/guard/witness mix.
+
+These surfaces MUST NOT create alternate analyzer truth.
+
+## 13. Release-proof minimum for 0.2.0
 
 Release readiness evidence MUST include smoke proof for:
 
@@ -165,7 +183,7 @@ Release readiness evidence MUST include smoke proof for:
 
 It MUST also preserve advisory boundary language across outputs.
 
-## 13. Acceptance checklist
+## 14. Acceptance checklist
 
 0.2.0 first-run cockpit is acceptable when:
 
@@ -176,6 +194,6 @@ It MUST also preserve advisory boundary language across outputs.
 - Posture/limits are explicit and consistent.
 - No surface overclaims safety/proof.
 
-## 14. Out of scope for this spec
+## 15. Out of scope for this spec
 
 Detailed analyzer evolution, live LSP hardening implementation, editor extension packaging, and calibrated policy gating are deferred to post-0.2.0 lanes.

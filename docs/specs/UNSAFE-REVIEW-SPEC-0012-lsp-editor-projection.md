@@ -28,6 +28,26 @@ static-review trust boundary. Code actions include stable object `payload`
 fields with `card_id` plus action-specific details so editor adapters do not
 need to parse positional legacy arguments.
 
+## Projection contract
+
+For 0.2.0, the editor surface is the saved `lsp.json` projection. A live LSP
+server remains a later lane until the live-server hardening gate in SPEC-0018 is
+met.
+
+All editor diagnostics, hovers, and actions project from `ReviewCard`. They must
+not reclassify cards, invent separate evidence, or parse prose to recover
+machine fields.
+
+Code actions are command-only. They may copy a bounded agent packet, copy a
+witness command, explain a witness route, or open a statically related test.
+They must not contain `WorkspaceEdit`, apply patches, insert SAFETY comments,
+execute witnesses, post comments, or enforce policy.
+
+Every diagnostic and card-scoped action must carry the relevant `card_id` and
+the static-review trust boundary. Diagnostic data must include the operation
+identity, required safety conditions, obligation-level evidence states, missing
+evidence, witness routes, and verify commands.
+
 ## Non-goals
 
 - no soundness claim

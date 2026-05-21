@@ -83,6 +83,22 @@ snapshot. It does not introduce another classification path.
 Baseline-known items, suppressions, and no-new-debt policy promotion remain
 separate policy surfaces and are not part of badge proof.
 
+## Projection contract
+
+Repo posture and badges are ReviewCard projections. They summarize unresolved
+unsafe-review evidence gaps; they do not count raw unsafe usage as repository
+posture and do not certify repository safety.
+
+Badge meanings are fixed:
+
+- `unsafe-review`: open unsafe-review gap count
+- `unsafe-review+`: contract, guard, and guarded-unwitnessed evidence mix
+
+Badges must never imply that the repo is sound, memory-safe, UB-free,
+Miri-clean, verified, all clear, policy-ready, or that any unsafe site executed.
+If a badge endpoint cannot be generated or verified, the public badge row must
+be withheld or marked planned rather than inferred from another surface.
+
 ## Non-goals
 
 - no soundness claim

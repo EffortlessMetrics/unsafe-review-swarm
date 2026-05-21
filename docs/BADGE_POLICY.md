@@ -7,6 +7,8 @@
 - Every badge is an advisory evidence indicator.
 - Badge rows summarize public status surfaces; they do not certify analyzer correctness.
 - No badge implies memory safety, soundness, UB-freedom, or Miri execution.
+- Every public badge maps to checked-in endpoint JSON or an explicitly planned
+  surface. README badges must not be inferred from ungenerated artifacts.
 
 ## Meaning table
 
@@ -39,3 +41,17 @@ renderer and covered by repository checks.
 Endpoint badges may appear in README rows only when `badges/unsafe-review.json`
 and `badges/unsafe-review-plus.json` are checked in and covered by the
 validation path above.
+
+## Forbidden badge posture
+
+Badge labels, messages, docs, and endpoint JSON must not say or imply:
+
+- safe or all clear
+- sound
+- verified
+- UB-free
+- Miri-clean
+- policy-ready or blocking-ready
+- site execution
+
+Those words may appear only in explicit negative trust-boundary wording.

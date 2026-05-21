@@ -65,6 +65,21 @@ do-not-do list, verify commands, and stop conditions. They are copy-only in
 v0.x; `unsafe-review` does not run an agent, edit source, post comments, or
 claim that the packet resolves the card.
 
+## Projection contract
+
+Agent packets are card-scoped handoffs, not autonomous repair authority. Each
+packet must name one ReviewCard, the exact missing obligation evidence, allowed
+repair shapes, do-not-do rules, verify commands, and stop conditions.
+
+The packet may classify whether the card is ready for bounded repair delegation,
+but that classification is advisory metadata. It must not hide the ReviewCard,
+weaken missing evidence, or promote human-deep-review, ambiguous macro-heavy,
+unsupported provenance, or FFI ownership cards into automatic repair tasks.
+
+Bounded source context must stay small: unsafe site, nearby contract/guard
+summaries, related test mentions, witness route, and explicit trust boundary.
+Whole-file dumps are out of scope by default.
+
 ## Non-goals
 
 - no soundness claim

@@ -33,6 +33,25 @@ operation expression, witness route details, and verify commands used by JSON,
 SARIF, and LSP projections so review bots and maintainers do not need to parse
 comment prose or reclassify findings.
 
+## Projection contract
+
+PR CI has two separate responsibilities:
+
+- artifact contract checks
+- advisory unsafe-review findings
+
+The gate may fail when the tool cannot run, an artifact is missing or malformed,
+a schema/trust-boundary contract is violated, or an output overclaims the
+evidence. A ReviewCard finding is advisory by default and must not become a
+blocking PR decision unless an explicit policy mode says so.
+
+`comment-plan.json` is the only inline-comment surface for v0.x. It is
+plan-only, capped at three candidate comments, restricted to changed lines, and
+limited to high-signal actionable cards. It must not include `static_unknown`,
+baseline-known, or suppressed cards. No workflow posts the plan by default; a
+future trusted poster must consume this artifact rather than regenerating its
+own analyzer truth.
+
 ## Non-goals
 
 - no soundness claim

@@ -56,6 +56,29 @@ cargo run --locked -p xtask -- check-advisory-artifacts target/unsafe-review
 The comment plan is an artifact of candidate high-signal inline comments. It is
 not posted by the workflow.
 
+The PR gate fails on infrastructure and contract failures, not on advisory
+findings by default:
+
+- tool invocation failed,
+- required artifact missing,
+- machine-readable artifact malformed,
+- card IDs inconsistent across projections,
+- trust boundary missing,
+- output contains positive safety/proof wording,
+- comment plan violates its artifact contract.
+
+The comment-plan contract is intentionally narrow:
+
+- at most three planned comments,
+- changed lines only,
+- high-confidence actionable cards only,
+- no `static_unknown`, baseline-known, or suppressed cards,
+- no posting by default.
+
+A future trusted poster must consume `comment-plan.json` and keep the same
+ReviewCard identity, witness route, verify-command, and trust-boundary fields.
+It must not rerun analysis and create a second comment truth.
+
 The workflow does not run Miri, sanitizers, Loom, Kani, or other witness tools.
 It does not post comments and does not enable blocking policy.
 
