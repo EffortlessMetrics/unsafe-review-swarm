@@ -32,3 +32,18 @@ commands = [
   "cargo run --locked -p xtask -- source-divergence",
   "git diff --check",
 ]
+
+
+[[work_item]]
+id = "docs-automation-control-plane"
+status = "active"
+proposal = "UNSAFE-REVIEW-PROP-0002"
+spec = "UNSAFE-REVIEW-SPEC-0025"
+plan = "plans/0.2.0/implementation-plan.md"
+commands = [
+  "cargo run --locked -p xtask -- check-doc-artifacts",
+  "cargo run --locked -p xtask -- check-goals",
+  "cargo run --locked -p xtask -- check-docs",
+  "cargo run --locked -p xtask -- source-divergence",
+  "git diff --check",
+]
