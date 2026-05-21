@@ -1704,6 +1704,21 @@ mod tests {
     }
 
     #[test]
+    fn policy_report_rejects_explicit_human_format() {
+        let command = parse(args([
+            "unsafe-review",
+            "policy",
+            "report",
+            "--format=human",
+        ]));
+
+        assert_eq!(
+            command,
+            Err("policy report only supports json or markdown output, got `human`".to_string())
+        );
+    }
+
+    #[test]
     fn policy_report_rejects_non_advisory_policy() {
         let command = parse(args([
             "unsafe-review",
