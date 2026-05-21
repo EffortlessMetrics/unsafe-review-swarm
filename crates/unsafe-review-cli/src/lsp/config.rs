@@ -1,3 +1,5 @@
+use std::convert::TryFrom;
+
 use serde_json::Value;
 
 #[derive(Clone, Debug)]
@@ -32,8 +34,10 @@ pub(super) fn parse_config(v: Value) -> LspConfig {
         if let Some(base) = u.get("base").and_then(Value::as_str) {
             cfg.base = Some(base.to_string());
         }
-        if let Some(m) = u.get("maxCards").and_then(Value::as_u64) {
-            cfg.max_cards = Some(m as usize);
+        if let Some(m) = u.get("maxCards").and_then(Value::as_u64)
+            && let Ok(max_cards) = usize::try_from(m)
+        {
+            cfg.max_cards = Some(max_cards);
         }
         if let Some(b) = u.get("refreshOnOpen").and_then(Value::as_bool) {
             cfg.refresh_on_open = b;

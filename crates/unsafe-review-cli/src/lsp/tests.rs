@@ -85,6 +85,19 @@ fn invalid_config_falls_back_to_safe_defaults() {
     assert!(!config.refresh_on_save);
 }
 
+
+#[test]
+fn parse_config_ignores_max_cards_that_do_not_fit_usize() {
+    let config = parse_config(json!({
+        "unsafeReview": {
+            "maxCards": u64::MAX
+        }
+    }));
+
+    let expected = usize::try_from(u64::MAX).ok();
+    assert_eq!(config.max_cards, expected);
+}
+
 #[test]
 fn diagnostic_for_card_carries_card_id_and_trust_boundary() -> Result<(), Box<dyn Error>> {
     let (root, output) = fixture_output("raw_pointer_alignment")?;
