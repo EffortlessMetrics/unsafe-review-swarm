@@ -86,6 +86,16 @@ mod tests {
             let displayed = path_display(&path);
 
             prop_assert!(!displayed.contains('\\'));
+            prop_assert_eq!(displayed.as_str(), displayed.replace('\\', "/"));
+        }
+
+        #[test]
+        fn stable_hash_hex_is_lower_hex_and_matches_byte_hash(input in "\\PC{0,256}") {
+            let rendered = stable_hash_hex(&input);
+
+            prop_assert_eq!(rendered.len(), 16);
+            prop_assert!(rendered.chars().all(|ch| ch.is_ascii_hexdigit() && !ch.is_ascii_uppercase()));
+            prop_assert_eq!(rendered, format!("{:016x}", stable_hash(input.as_bytes())));
         }
     }
 }
