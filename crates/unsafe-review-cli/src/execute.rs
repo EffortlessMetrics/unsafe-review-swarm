@@ -444,7 +444,16 @@ fn badges(root: &Path, out: &Path) -> Result<(), String> {
         .map_err(|err| format!("write badge failed: {err}"))?;
     fs::write(out.join("unsafe-review-plus.json"), plus)
         .map_err(|err| format!("write badge failed: {err}"))?;
-    println!("wrote badges to {}", out.display());
+    println!("wrote:");
+    println!("  {}", out.join("unsafe-review.json").display());
+    println!("  {}", out.join("unsafe-review-plus.json").display());
+    println!();
+    println!("next:");
+    println!("  unsafe-review badges snippet --format markdown");
+    println!("  unsafe-review badges validate");
+    println!();
+    println!("recommended:");
+    println!("  unsafe-review badges init --ci github");
     Ok(())
 }
 
