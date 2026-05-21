@@ -2904,13 +2904,15 @@ fn parse_rev_list_counts(text: &str) -> Result<(usize, usize), String> {
             "git rev-list count output must contain only two counts: {text}"
         ));
     }
-    let left = left
-        .parse::<usize>()
-        .map_err(|err| format!("invalid source-only count `{left}`: {err}"))?;
-    let right = right
-        .parse::<usize>()
-        .map_err(|err| format!("invalid swarm-only count `{right}`: {err}"))?;
-    Ok((left, right))
+    Ok((
+        parse_rev_list_count(left, "source-only")?,
+        parse_rev_list_count(right, "swarm-only")?,
+    ))
+}
+
+fn parse_rev_list_count(text: &str, label: &str) -> Result<usize, String> {
+    text.parse::<usize>()
+        .map_err(|err| format!("invalid {label} count `{text}`: {err}"))
 }
 
 fn print_commit_section(label: &str, commits: &str) {
@@ -3618,6 +3620,7 @@ mod tests {
         assert!(err_text(parse_rev_list_counts("12"))?.contains("two counts"));
         assert!(err_text(parse_rev_list_counts("12 3 extra"))?.contains("only two counts"));
         assert!(err_text(parse_rev_list_counts("source 3"))?.contains("invalid source-only count"));
+        assert!(err_text(parse_rev_list_counts("12 swarm"))?.contains("invalid swarm-only count"));
         Ok(())
     }
 
