@@ -2,6 +2,9 @@ pub(crate) fn path_display(path: &std::path::Path) -> String {
     path.to_string_lossy().replace('\\', "/")
 }
 
+const FNV_OFFSET_BASIS_64: u64 = 0xcbf2_9ce4_8422_2325;
+const FNV_PRIME_64: u64 = 0x0000_0100_0000_01b3;
+
 pub(crate) fn slug(value: &str) -> String {
     let mut out = String::new();
     let mut trailing_dash = false;
@@ -20,12 +23,16 @@ pub(crate) fn slug(value: &str) -> String {
 }
 
 pub(crate) fn stable_hash_hex(value: &str) -> String {
-    let mut hash = 0xcbf2_9ce4_8422_2325_u64;
-    for byte in value.as_bytes() {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
+    format!("{:016x}", stable_hash(value.as_bytes()))
+}
+
+fn stable_hash(bytes: &[u8]) -> u64 {
+    let mut hash = FNV_OFFSET_BASIS_64;
+    for &byte in bytes {
+        hash ^= u64::from(byte);
+        hash = hash.wrapping_mul(FNV_PRIME_64);
     }
-    format!("{hash:016x}")
+    hash
 }
 
 #[cfg(test)]
