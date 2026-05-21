@@ -29,5 +29,6 @@ commands = [
   "cargo run --locked -p xtask -- check-goals",
   "cargo run --locked -p xtask -- check-package-boundary",
   "cargo run --locked -p xtask -- check-ci-lanes",
+  "cargo run --locked -p xtask -- source-divergence",
   "git diff --check",
 ]

@@ -39,12 +39,14 @@ const POLICY_FILES: &[&str] = &[
     "policy/doc-artifacts.toml",
     "policy/ci-lane-whitelist.toml",
     "policy/package-boundary.toml",
+    "policy/source-sync.toml",
 ];
 const WORKFLOW_ALLOWLIST: &str = "policy/workflow-allowlist.toml";
 const WORKFLOW_DIR: &str = ".github/workflows";
 const DOC_ARTIFACT_LEDGER: &str = "policy/doc-artifacts.toml";
 const CI_LANE_LEDGER: &str = "policy/ci-lane-whitelist.toml";
 const PACKAGE_BOUNDARY_LEDGER: &str = "policy/package-boundary.toml";
+const SOURCE_SYNC_LEDGER: &str = "policy/source-sync.toml";
 const ACTIVE_GOAL_MANIFEST: &str = ".unsafe-review/goals/active.toml";
 const DOC_ARTIFACT_KINDS: &[&str] = &["proposal", "spec", "adr", "plan", "goal"];
 const DOC_ARTIFACT_STATUSES: &[&str] = &["proposed", "accepted", "active", "done", "deferred"];
@@ -152,8 +154,6 @@ const PUBLIC_BADGE_ENDPOINTS: &[(&str, &str)] = &[
     ("badges/unsafe-review.json", "unsafe-review"),
     ("badges/unsafe-review-plus.json", "unsafe-review+"),
 ];
-const SOURCE_REPO_URL: &str = "https://github.com/EffortlessMetrics/unsafe-review.git";
-const SWARM_REPO_URL: &str = "https://github.com/EffortlessMetrics/unsafe-review-swarm.git";
 const SOURCE_MAIN_REF: &str = "refs/unsafe-review-sync/source-main";
 const SWARM_MAIN_REF: &str = "refs/unsafe-review-sync/swarm-main";
 
@@ -2845,8 +2845,9 @@ fn check_tracked_generated_artifacts() -> Result<(), String> {
 }
 
 fn report_source_divergence() -> Result<(), String> {
-    fetch_main_ref(SOURCE_REPO_URL, SOURCE_MAIN_REF)?;
-    fetch_main_ref(SWARM_REPO_URL, SWARM_MAIN_REF)?;
+    let checkpoint = source_sync_checkpoint()?;
+    fetch_main_ref(&checkpoint.source_repo, SOURCE_MAIN_REF)?;
+    fetch_main_ref(&checkpoint.swarm_repo, SWARM_MAIN_REF)?;
 
     let counts = git_stdout([
         "rev-list",
@@ -2855,6 +2856,13 @@ fn report_source_divergence() -> Result<(), String> {
         &format!("{SOURCE_MAIN_REF}...{SWARM_MAIN_REF}"),
     ])?;
     let (source_only, swarm_only) = parse_rev_list_counts(&counts)?;
+    let new_source_commits = git_stdout([
+        "rev-list",
+        "--count",
+        &format!("{}..{SOURCE_MAIN_REF}", checkpoint.acknowledged_source_main),
+    ])?
+    .parse::<usize>()
+    .map_err(|err| format!("invalid source checkpoint count: {err}"))?;
     let source_head = git_stdout(["rev-parse", "--short", SOURCE_MAIN_REF])?;
     let swarm_head = git_stdout(["rev-parse", "--short", SWARM_MAIN_REF])?;
     let source_commits = git_stdout([
@@ -2863,7 +2871,7 @@ fn report_source_divergence() -> Result<(), String> {
         "--max-count=10",
         SOURCE_MAIN_REF,
         "--not",
-        SWARM_MAIN_REF,
+        &checkpoint.acknowledged_source_main,
     ])?;
     let swarm_commits = git_stdout([
         "log",
@@ -2875,15 +2883,21 @@ fn report_source_divergence() -> Result<(), String> {
     ])?;
 
     println!("source-divergence: advisory");
-    println!("source_repo={SOURCE_REPO_URL}");
-    println!("swarm_repo={SWARM_REPO_URL}");
+    println!("source_repo={}", checkpoint.source_repo);
+    println!("swarm_repo={}", checkpoint.swarm_repo);
     println!("source_main={source_head}");
     println!("swarm_main={swarm_head}");
-    println!("source_only={source_only}");
-    println!("swarm_only={swarm_only}");
+    println!(
+        "acknowledged_source_main={}",
+        checkpoint.acknowledged_source_main
+    );
+    println!("acknowledged_by={}", checkpoint.acknowledged_by);
+    println!("new_source_commits={new_source_commits}");
+    println!("raw_source_only={source_only}");
+    println!("raw_swarm_only={swarm_only}");
 
-    if source_only == 0 {
-        println!("status: swarm contains current source main");
+    if new_source_commits == 0 {
+        println!("status: no source commits after the acknowledged swarm sync point");
     } else {
         println!(
             "status: source is ahead of swarm; open a swarm sync PR before routine development"
@@ -2895,9 +2909,35 @@ fn report_source_divergence() -> Result<(), String> {
         );
     }
 
-    print_commit_section("source_only_commits", &source_commits);
+    print_commit_section("new_source_commits", &source_commits);
     print_commit_section("swarm_only_commits", &swarm_commits);
     Ok(())
+}
+
+struct SourceSyncCheckpoint {
+    source_repo: String,
+    swarm_repo: String,
+    acknowledged_source_main: String,
+    acknowledged_by: String,
+}
+
+fn source_sync_checkpoint() -> Result<SourceSyncCheckpoint, String> {
+    let value = parse_toml_file(Path::new(SOURCE_SYNC_LEDGER))?;
+    require_toml_string(&value, "schema_version", SOURCE_SYNC_LEDGER)?;
+    require_toml_string(&value, "policy", SOURCE_SYNC_LEDGER)?;
+    let source_repo = required_toml_string(&value, "source_repo", SOURCE_SYNC_LEDGER)?.to_string();
+    let swarm_repo = required_toml_string(&value, "swarm_repo", SOURCE_SYNC_LEDGER)?.to_string();
+    let acknowledged_source_main =
+        required_toml_string(&value, "acknowledged_source_main", SOURCE_SYNC_LEDGER)?.to_string();
+    let acknowledged_by =
+        required_toml_string(&value, "acknowledged_by", SOURCE_SYNC_LEDGER)?.to_string();
+    require_file(&acknowledged_by)?;
+    Ok(SourceSyncCheckpoint {
+        source_repo,
+        swarm_repo,
+        acknowledged_source_main,
+        acknowledged_by,
+    })
 }
 
 fn fetch_main_ref(repo_url: &str, target_ref: &str) -> Result<(), String> {
