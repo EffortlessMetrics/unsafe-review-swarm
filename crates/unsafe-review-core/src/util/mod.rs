@@ -4,13 +4,18 @@ pub(crate) fn path_display(path: &std::path::Path) -> String {
 
 pub(crate) fn slug(value: &str) -> String {
     let mut out = String::new();
+    let mut last_was_dash = false;
+
     for ch in value.chars() {
         if ch.is_ascii_alphanumeric() {
             out.push(ch.to_ascii_lowercase());
-        } else if !out.ends_with('-') {
+            last_was_dash = false;
+        } else if !last_was_dash {
             out.push('-');
+            last_was_dash = true;
         }
     }
+
     out.trim_matches('-').to_string()
 }
 
@@ -28,6 +33,21 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
     use std::path::PathBuf;
+
+
+
+    #[test]
+    fn slug_collapses_separator_runs_and_lowercases_ascii() {
+        assert_eq!(slug("Hello___WORLD   123"), "hello-world-123");
+    }
+
+    #[test]
+    fn stable_hash_hex_is_deterministic_and_fixed_width() {
+        let hash = stable_hash_hex("review-card");
+        assert_eq!(hash, stable_hash_hex("review-card"));
+        assert_eq!(hash.len(), 16);
+        assert!(hash.chars().all(|ch| ch.is_ascii_hexdigit() && !ch.is_ascii_uppercase()));
+    }
 
     proptest! {
         #[test]
