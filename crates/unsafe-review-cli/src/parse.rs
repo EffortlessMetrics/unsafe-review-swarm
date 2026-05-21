@@ -183,16 +183,24 @@ mod check_parse {
                 Ok(Some(1))
             }
             "--max-cards" => {
-                options.max_cards = Some(parse_max_cards(value(args, idx + 1, "--max-cards")?)?);
+                options.max_cards = Some(parse_max_cards_arg(args, idx + 1, "--max-cards")?);
                 Ok(Some(2))
             }
             arg if arg.starts_with("--max-cards=") => {
-                options.max_cards = Some(parse_max_cards(inline_value(arg, "--max-cards")?)?);
+                options.max_cards = Some(parse_max_cards_inline(arg, "--max-cards")?);
                 Ok(Some(1))
             }
             _ => Ok(None),
         }
     }
+}
+
+fn parse_max_cards_arg(args: &[String], idx: usize, flag: &str) -> Result<usize, String> {
+    parse_max_cards(value(args, idx, flag)?)
+}
+
+fn parse_max_cards_inline(arg: &str, flag: &str) -> Result<usize, String> {
+    parse_max_cards(inline_value(arg, flag)?)
 }
 
 fn parse_badges(args: Vec<String>) -> Result<Command, String> {
