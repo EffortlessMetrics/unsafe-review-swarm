@@ -337,7 +337,7 @@ mod tests {
     use super::*;
     use crate::api::{AnalysisMode, DiffSource, PolicyMode, Scope};
     use crate::domain::{
-        HazardKind, OperationFamily, ReviewCard, ReviewClass, UnsafeSiteKind, WitnessKind,
+        HazardKind, OperationFamily, Priority, ReviewCard, ReviewClass, UnsafeSiteKind, WitnessKind,
     };
     use std::fs;
     use std::path::Path;

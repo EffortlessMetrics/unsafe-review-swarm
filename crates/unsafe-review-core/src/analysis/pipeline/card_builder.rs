@@ -1,5 +1,5 @@
-use super::{classify, evidence, obligations, receipts, witness};
-use crate::domain::{CardId, MissingEvidence, NextAction, Priority, ReviewCard, ReviewClass};
+use crate::analysis::{classify, evidence, obligations, receipts, witness};
+use crate::domain::{MissingEvidence, NextAction, Priority, ReviewCard, ReviewClass};
 
 pub(super) struct CardBuildContext<'a> {
     pub root: &'a std::path::Path,
