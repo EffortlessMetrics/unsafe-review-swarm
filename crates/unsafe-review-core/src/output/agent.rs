@@ -1,11 +1,13 @@
 use crate::domain::{
-    Confidence, EvidenceState, ObligationEvidence, OperationFamily, ReviewCard, ReviewClass,
-    WitnessKind, WitnessRoute,
+    Confidence, EvidenceState, ObligationEvidence, OperationFamily, RelatedTest, ReviewCard,
+    ReviewClass, WitnessKind, WitnessRoute,
 };
 use crate::util::path_display;
 use serde::Serialize;
 
 const TRUST_BOUNDARY: &str = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.";
+const MAX_CONTEXT_EVIDENCE: usize = 3;
+const MAX_RELATED_TESTS: usize = 3;
 
 pub(crate) fn render(card: &ReviewCard) -> String {
     render_pretty(&AgentPacket::from(card))
@@ -30,6 +32,7 @@ struct AgentPacket<'a> {
     card: AgentCard<'a>,
     task: &'a str,
     context: AgentContext<'a>,
+    source_context: AgentSourceContext<'a>,
     safety_contract: AgentSafetyContract<'a>,
     required_safety_conditions: Vec<&'a str>,
     obligation_evidence: Vec<AgentObligationEvidence<'a>>,
@@ -59,6 +62,7 @@ impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
             card: AgentCard::from(card),
             task: &card.next_action.summary,
             context: AgentContext::from(card),
+            source_context: AgentSourceContext::from(card),
             safety_contract: AgentSafetyContract::from(card),
             required_safety_conditions: card
                 .obligations
@@ -388,6 +392,99 @@ impl<'a> From<&'a ReviewCard> for AgentContext<'a> {
 }
 
 #[derive(Serialize)]
+struct AgentSourceContext<'a> {
+    unsafe_site: AgentSourceSite<'a>,
+    nearby_safety_contract: Option<AgentContextEvidence<'a>>,
+    nearby_guard_evidence: Vec<AgentContextEvidence<'a>>,
+    related_tests: Vec<AgentRelatedTest<'a>>,
+    limits: &'static [&'static str],
+}
+
+impl<'a> From<&'a ReviewCard> for AgentSourceContext<'a> {
+    fn from(card: &'a ReviewCard) -> Self {
+        let nearby_safety_contract = card.contract.present.then_some(AgentContextEvidence {
+            kind: "safety_contract",
+            key: None,
+            summary: &card.contract.summary,
+        });
+        let nearby_guard_evidence = card
+            .obligation_evidence
+            .iter()
+            .filter(|evidence| evidence.discharge.present)
+            .take(MAX_CONTEXT_EVIDENCE)
+            .map(|evidence| AgentContextEvidence {
+                kind: "guard_evidence",
+                key: Some(evidence.obligation.key.as_str()),
+                summary: &evidence.discharge.summary,
+            })
+            .collect();
+        let related_tests = card
+            .related_tests
+            .iter()
+            .take(MAX_RELATED_TESTS)
+            .map(AgentRelatedTest::from)
+            .collect();
+
+        Self {
+            unsafe_site: AgentSourceSite::from(card),
+            nearby_safety_contract,
+            nearby_guard_evidence,
+            related_tests,
+            limits: &[
+                "bounded source context only; this packet does not include whole files",
+                "related test mentions do not prove the unsafe site executed",
+                "evidence summaries are ReviewCard projections, not independent analyzer truth",
+            ],
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct AgentSourceSite<'a> {
+    file: String,
+    line: usize,
+    column: usize,
+    owner: &'a str,
+    snippet: &'a str,
+}
+
+impl<'a> From<&'a ReviewCard> for AgentSourceSite<'a> {
+    fn from(card: &'a ReviewCard) -> Self {
+        Self {
+            file: path_display(&card.site.location.file),
+            line: card.site.location.line,
+            column: card.site.location.column,
+            owner: card.site.owner.as_deref().unwrap_or(""),
+            snippet: &card.site.snippet,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct AgentContextEvidence<'a> {
+    kind: &'static str,
+    key: Option<&'a str>,
+    summary: &'a str,
+}
+
+#[derive(Serialize)]
+struct AgentRelatedTest<'a> {
+    name: &'a str,
+    file: &'a str,
+    line: usize,
+}
+
+impl<'a> From<&'a RelatedTest> for AgentRelatedTest<'a> {
+    fn from(test: &'a RelatedTest) -> Self {
+        Self {
+            name: &test.name,
+            file: &test.file,
+            line: test.line,
+        }
+    }
+}
+
+#[derive(Serialize)]
 struct AgentSafetyContract<'a> {
     required_conditions: Vec<&'a str>,
     contract_evidence: &'a str,
@@ -525,6 +622,36 @@ mod tests {
             "unsafe { ptr.cast::<Header>().read() }"
         );
         assert_eq!(value["context"]["operation_family"], "raw_pointer_read");
+        assert_eq!(value["source_context"]["unsafe_site"]["file"], "src/lib.rs");
+        assert_eq!(
+            value["source_context"]["unsafe_site"]["snippet"],
+            "unsafe { ptr.cast::<Header>().read() }"
+        );
+        assert!(
+            value["source_context"]["nearby_safety_contract"]["summary"]
+                .as_str()
+                .unwrap_or("")
+                .contains("SAFETY")
+        );
+        assert_eq!(
+            value["source_context"]["nearby_guard_evidence"][0]["key"],
+            "bounds"
+        );
+        assert!(
+            value["source_context"]["nearby_guard_evidence"][0]["summary"]
+                .as_str()
+                .unwrap_or("")
+                .contains("bounds guard")
+        );
+        assert_eq!(
+            value["source_context"]["related_tests"][0]["name"],
+            "read_header"
+        );
+        assert!(
+            serde_json::to_string(&value["source_context"]["limits"])
+                .map_err(|err| format!("render source context limits failed: {err}"))?
+                .contains("does not include whole files")
+        );
         assert!(value["safety_contract"]["required_conditions"].is_array());
         assert!(
             value["safety_contract"]["reach_limitation"]

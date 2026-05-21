@@ -28,6 +28,9 @@ source of analyzer truth. It carries:
 - the card identity, class, priority, and confidence
 - the unsafe site context, concrete operation expression, operation family,
   snippet, and hazards
+- bounded source context containing the unsafe site, nearby safety-contract
+  summary, nearby guard-evidence summaries, and at most three related test
+  mentions
 - required safety conditions and obligation-level evidence
 - missing evidence
 - allowed repairs scoped to the current card, derived from the ReviewCard
@@ -42,6 +45,12 @@ source of analyzer truth. It carries:
 For compatibility with the initial context-packet scaffold, the packet keeps
 top-level `card_id`, `required_safety_conditions`, `missing`, and string-array
 `allowed_repairs` fields while adding richer structured fields.
+
+`source_context` is intentionally bounded. It may include the unsafe site
+snippet, ReviewCard-derived summaries for nearby contract and guard evidence,
+and a few related test mentions. It must not dump whole files by default, and a
+related test mention remains reach evidence only; it is not a claim that the
+unsafe site executed.
 
 `agent_readiness` is additive metadata, not analyzer truth. A packet is marked
 `ready` only when the ReviewCard has an actionable class, a concrete operation
@@ -78,6 +87,9 @@ claim that the packet resolves the card.
 - The packet names `source = review_card` and repeats the card identity.
 - The packet carries the exact ReviewCard operation expression and operation
   family, so repair work is scoped to one unsafe operation.
+- The packet carries bounded `source_context` with the unsafe site, local
+  contract/guard summaries, related test mentions, and explicit limits against
+  whole-file dumps and site-execution claims.
 - The packet includes obligation-level evidence, missing evidence, witness
   routes, do-not-do rules, stop conditions, and the trust boundary.
 - Allowed repairs name the current card's missing obligation shape. For

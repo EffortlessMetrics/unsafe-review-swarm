@@ -320,6 +320,28 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
         "unsafe { ptr.cast::<Header>().read() }"
     );
     assert_eq!(packet["context"]["operation_family"], "raw_pointer_read");
+    assert_eq!(
+        packet["source_context"]["unsafe_site"]["file"],
+        "src/lib.rs"
+    );
+    assert_eq!(
+        packet["source_context"]["unsafe_site"]["snippet"],
+        "unsafe { ptr.cast::<Header>().read() }"
+    );
+    assert!(
+        packet["source_context"]["nearby_safety_contract"]["summary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("SAFETY")
+    );
+    assert_eq!(
+        packet["source_context"]["nearby_guard_evidence"][0]["key"],
+        "bounds"
+    );
+    assert_eq!(
+        packet["source_context"]["related_tests"][0]["name"],
+        "read_header"
+    );
     assert!(packet["witness_routes"].is_array());
     assert_eq!(packet["agent_readiness"]["ready"], true);
     assert_eq!(packet["agent_readiness"]["state"], "ready");
