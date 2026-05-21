@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 mod command_args;
+mod docs_automation_paths;
 mod markdown;
 mod workflow_allowlist;
 
@@ -542,42 +543,13 @@ fn docs_automation_paths(
 
 fn docs_automation_glob_paths(path_glob: &str) -> Result<Vec<PathBuf>, String> {
     let pattern_path = Path::new(path_glob);
-    let directory = pattern_path
-        .parent()
-        .filter(|path| !path.as_os_str().is_empty())
-        .ok_or_else(|| {
-            format!("{DOCS_AUTOMATION_LEDGER} path_glob `{path_glob}` needs a directory")
-        })?;
-    let file_pattern = pattern_path
-        .file_name()
-        .and_then(OsStr::to_str)
-        .ok_or_else(|| {
-            format!("{DOCS_AUTOMATION_LEDGER} path_glob `{path_glob}` needs a file pattern")
-        })?;
-    if !file_pattern.contains('*') {
+    let file_pattern = pattern_path.file_name().and_then(|value| value.to_str());
+    if file_pattern.is_some_and(|pattern| !pattern.contains('*')) {
         require_file(path_glob)?;
         return Ok(vec![PathBuf::from(path_glob)]);
     }
 
-    let mut paths = Vec::new();
-    for entry in fs::read_dir(directory)
-        .map_err(|err| format!("failed to read {}: {err}", directory.display()))?
-    {
-        let entry = entry.map_err(|err| {
-            format!(
-                "failed to read directory entry under {}: {err}",
-                directory.display()
-            )
-        })?;
-        let name = entry.file_name();
-        let Some(name) = name.to_str() else {
-            continue;
-        };
-        if wildcard_match(file_pattern, name) && entry.path().is_file() {
-            paths.push(entry.path());
-        }
-    }
-    paths.sort();
+    let paths = docs_automation_paths::collect_paths(path_glob, DOCS_AUTOMATION_LEDGER)?;
     if paths.is_empty() {
         Err(format!(
             "{DOCS_AUTOMATION_LEDGER} path_glob `{path_glob}` did not match any files"
@@ -616,38 +588,6 @@ fn require_existing_repo_path(path: &str, ledger: &str, field: &str) -> Result<(
         Ok(())
     } else {
         Err(format!("{ledger} {field} path does not exist: {path}"))
-    }
-}
-
-fn wildcard_match(pattern: &str, value: &str) -> bool {
-    if !pattern.contains('*') {
-        return pattern == value;
-    }
-
-    let parts = pattern.split('*').collect::<Vec<_>>();
-    let mut remainder = value;
-    if let Some(first) = parts.first().filter(|part| !part.is_empty()) {
-        let Some(stripped) = remainder.strip_prefix(first) else {
-            return false;
-        };
-        remainder = stripped;
-    }
-
-    let middle_end = parts.len().saturating_sub(1);
-    for part in parts.iter().skip(1).take(middle_end.saturating_sub(1)) {
-        if part.is_empty() {
-            continue;
-        }
-        let Some(index) = remainder.find(part) else {
-            return false;
-        };
-        remainder = &remainder[index + part.len()..];
-    }
-
-    if let Some(last) = parts.last().filter(|part| !part.is_empty()) {
-        remainder.ends_with(last)
-    } else {
-        true
     }
 }
 
@@ -4135,11 +4075,11 @@ jobs:
 
     #[test]
     fn docs_automation_glob_matches_publication_receipts() {
-        assert!(wildcard_match(
+        assert!(docs_automation_paths::wildcard_match(
             "*publication*.md",
             "2026-05-21-release-0.2.0-publication.md",
         ));
-        assert!(!wildcard_match(
+        assert!(!docs_automation_paths::wildcard_match(
             "*publication*.md",
             "2026-05-21-source-promotion-0.2-sync.md",
         ));
