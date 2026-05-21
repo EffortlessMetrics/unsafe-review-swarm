@@ -106,7 +106,7 @@ all first-run artifacts, and writes a GitHub job summary.
 Default behavior of the example workflow:
 
 - runs `unsafe-review first-pr --base origin/<base>`;
-- verifies with `cargo xtask check-first-pr-artifacts target/unsafe-review`;
+- verifies with `cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review`;
 - uploads `cards.json`, `pr-summary.md`, `cards.sarif`, `comment-plan.json`,
   `witness-plan.md`, and `lsp.json`;
 - does not post comments;
