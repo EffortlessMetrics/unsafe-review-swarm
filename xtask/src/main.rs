@@ -1467,22 +1467,41 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
 fn check_witness_plan_artifact(dir: &Path, card_count: usize) -> Result<(), String> {
     let path = dir.join("witness-plan.md");
     let text = read_to_string(&path)?;
-    require_text_contains(&text, "# unsafe-review witness plan", &path)?;
-    require_text_contains(&text, &format!("- Review cards: {card_count}"), &path)?;
-    require_text_contains(&text, "does not run Miri", &path)?;
-    require_text_contains(&text, "cargo-careful", &path)?;
-    require_text_contains(&text, "not a proof of memory safety", &path)?;
-    require_text_contains(&text, "not UB-free status", &path)?;
-    require_text_contains(&text, "not a Miri result", &path)?;
+    let review_cards_line = format!("- Review cards: {card_count}");
+    require_text_contains_all(
+        &text,
+        &path,
+        &[
+            "# unsafe-review witness plan",
+            review_cards_line.as_str(),
+            "does not run Miri",
+            "cargo-careful",
+            "not a proof of memory safety",
+            "not UB-free status",
+            "not a Miri result",
+        ],
+    )?;
     if card_count > 0 {
-        require_text_contains(&text, "## Route groups", &path)?;
-        require_text_contains(&text, "- Route:", &path)?;
-        require_text_contains(&text, "What it can show", &path)?;
-        require_text_contains(&text, "What it cannot prove", &path)?;
-        require_text_contains(&text, "Receipt hint", &path)?;
+        require_text_contains_all(
+            &text,
+            &path,
+            &[
+                "## Route groups",
+                "- Route:",
+                "What it can show",
+                "What it cannot prove",
+                "Receipt hint",
+            ],
+        )?;
     } else {
-        require_text_contains(&text, "No changed unsafe-review gaps were found.", &path)?;
-        require_text_contains(&text, "unsafe site executed", &path)?;
+        require_text_contains_all(
+            &text,
+            &path,
+            &[
+                "No changed unsafe-review gaps were found.",
+                "unsafe site executed",
+            ],
+        )?;
     }
     Ok(())
 }
@@ -3232,6 +3251,13 @@ fn require_text_contains(text: &str, needle: &str, path: &Path) -> Result<(), St
     } else {
         Err(format!("{} is missing `{needle}`", path.display()))
     }
+}
+
+fn require_text_contains_all(text: &str, path: &Path, needles: &[&str]) -> Result<(), String> {
+    for needle in needles {
+        require_text_contains(text, needle, path)?;
+    }
+    Ok(())
 }
 
 fn require_boundary_text(text: &str, path: &str) -> Result<(), String> {
