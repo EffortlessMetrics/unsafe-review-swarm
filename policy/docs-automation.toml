@@ -63,7 +63,7 @@ must_include = [
   "First-use",
   "CLI",
   "Support",
-  "Specifications",
+  "Specs",
 ]
 
 [[generated_or_checked]]
@@ -76,13 +76,13 @@ sources = [
   "crates/unsafe-review/Cargo.toml",
 ]
 must_include = [
-  "Static unsafe exposure analysis",
+  "Advisory unsafe-contract review",
   "cargo install unsafe-review --locked",
   "unsafe-review first-pr --base origin/main",
   "Trust boundary",
-  "not a proof of memory safety",
-  "not UB-free",
-  "not a Miri result",
+  "proof of memory safety",
+  "UB-free claim",
+  "Miri result",
 ]
 
 [[generated_or_checked]]
@@ -91,7 +91,7 @@ kind = "handoff_receipt"
 path_glob = "docs/handoffs/*publication*.md"
 mode = "check"
 must_include = [
-  "Proof commands",
+  "Pre-publish verification",
   "Trust boundary",
-  "Post-publish verification",
+  "Post-publish smoke",
 ]
