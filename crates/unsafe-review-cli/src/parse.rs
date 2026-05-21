@@ -99,41 +99,17 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
     let mut options = FirstPrOptions::default();
     let mut idx = 0usize;
     while idx < args.len() {
+        if let Some(consumed) = check_parse::try_apply_check_arg(&args, idx, &mut options.check)? {
+            idx += consumed;
+            continue;
+        }
         match args[idx].as_str() {
-            "--root" => {
-                idx += 1;
-                options.check.root = PathBuf::from(value(&args, idx, "--root")?);
-            }
-            arg if arg.starts_with("--root=") => {
-                options.check.root = PathBuf::from(inline_value(arg, "--root")?);
-            }
-            "--base" => {
-                idx += 1;
-                options.check.base = Some(value(&args, idx, "--base")?.to_string());
-            }
-            arg if arg.starts_with("--base=") => {
-                options.check.base = Some(inline_value(arg, "--base")?.to_string());
-            }
-            "--diff" => {
-                idx += 1;
-                options.check.diff = Some(parse_diff_input(value(&args, idx, "--diff")?));
-            }
-            arg if arg.starts_with("--diff=") => {
-                options.check.diff = Some(parse_diff_input(inline_value(arg, "--diff")?));
-            }
             "--out-dir" => {
                 idx += 1;
                 options.out_dir = PathBuf::from(value(&args, idx, "--out-dir")?);
             }
             arg if arg.starts_with("--out-dir=") => {
                 options.out_dir = PathBuf::from(inline_value(arg, "--out-dir")?);
-            }
-            "--max-cards" => {
-                idx += 1;
-                options.check.max_cards = Some(parse_max_cards(value(&args, idx, "--max-cards")?)?);
-            }
-            arg if arg.starts_with("--max-cards=") => {
-                options.check.max_cards = Some(parse_max_cards(inline_value(arg, "--max-cards")?)?);
             }
             other => return Err(format!("unknown first-pr argument `{other}`")),
         }
@@ -164,72 +140,81 @@ mod check_parse {
         idx: usize,
         options: &mut CheckOptions,
     ) -> Result<usize, String> {
+        try_apply_check_arg(args, idx, options)?
+            .ok_or_else(|| format!("unknown argument `{}`", args[idx]))
+    }
+
+    pub(super) fn try_apply_check_arg(
+        args: &[String],
+        idx: usize,
+        options: &mut CheckOptions,
+    ) -> Result<Option<usize>, String> {
         match args[idx].as_str() {
             "--root" => {
                 options.root = PathBuf::from(value(args, idx + 1, "--root")?);
-                Ok(2)
+                Ok(Some(2))
             }
             arg if arg.starts_with("--root=") => {
                 options.root = PathBuf::from(inline_value(arg, "--root")?);
-                Ok(1)
+                Ok(Some(1))
             }
             "--base" => {
                 options.base = Some(value(args, idx + 1, "--base")?.to_string());
-                Ok(2)
+                Ok(Some(2))
             }
             arg if arg.starts_with("--base=") => {
                 options.base = Some(inline_value(arg, "--base")?.to_string());
-                Ok(1)
+                Ok(Some(1))
             }
             "--diff" => {
                 options.diff = Some(parse_diff_input(value(args, idx + 1, "--diff")?));
-                Ok(2)
+                Ok(Some(2))
             }
             arg if arg.starts_with("--diff=") => {
                 options.diff = Some(parse_diff_input(inline_value(arg, "--diff")?));
-                Ok(1)
+                Ok(Some(1))
             }
             "--format" => {
                 options.format = parse_format(value(args, idx + 1, "--format")?)?;
-                Ok(2)
+                Ok(Some(2))
             }
             arg if arg.starts_with("--format=") => {
                 options.format = parse_format(inline_value(arg, "--format")?)?;
-                Ok(1)
+                Ok(Some(1))
             }
             "--policy" => {
                 options.policy = parse_policy(value(args, idx + 1, "--policy")?)?;
-                Ok(2)
+                Ok(Some(2))
             }
             arg if arg.starts_with("--policy=") => {
                 options.policy = parse_policy(inline_value(arg, "--policy")?)?;
-                Ok(1)
+                Ok(Some(1))
             }
             "--json" => {
                 options.format = Format::Json;
-                Ok(1)
+                Ok(Some(1))
             }
             "--markdown" => {
                 options.format = Format::Markdown;
-                Ok(1)
+                Ok(Some(1))
             }
             "--out" => {
                 options.out = Some(PathBuf::from(value(args, idx + 1, "--out")?));
-                Ok(2)
+                Ok(Some(2))
             }
             arg if arg.starts_with("--out=") => {
                 options.out = Some(PathBuf::from(inline_value(arg, "--out")?));
-                Ok(1)
+                Ok(Some(1))
             }
             "--max-cards" => {
                 options.max_cards = Some(parse_max_cards(value(args, idx + 1, "--max-cards")?)?);
-                Ok(2)
+                Ok(Some(2))
             }
             arg if arg.starts_with("--max-cards=") => {
                 options.max_cards = Some(parse_max_cards(inline_value(arg, "--max-cards")?)?);
-                Ok(1)
+                Ok(Some(1))
             }
-            other => Err(format!("unknown argument `{other}`")),
+            _ => Ok(None),
         }
     }
 }
