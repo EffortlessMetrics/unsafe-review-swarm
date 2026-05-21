@@ -548,13 +548,15 @@ mod ci_lanes {
         for (idx, lane) in lanes.iter().enumerate() {
             let lane_id = validate_lane(lane, idx)?;
             if !ids.insert(lane_id.to_string()) {
-                return Err(format!("{CI_LANE_LEDGER} contains duplicate lane `{lane_id}`"));
+                return Err(format!(
+                    "{CI_LANE_LEDGER} contains duplicate lane `{lane_id}`"
+                ));
             }
         }
         Ok(ids)
     }
 
-    fn validate_lane<'a>(lane: &'a toml::Value, idx: usize) -> Result<&'a str, String> {
+    fn validate_lane(lane: &toml::Value, idx: usize) -> Result<&str, String> {
         let table = toml_table(lane, CI_LANE_LEDGER, "lane", idx)?;
         let lane_id = required_table_string(table, "id", CI_LANE_LEDGER, "lane", idx)?;
         for key in REQUIRED_LANE_KEYS {
