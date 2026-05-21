@@ -240,6 +240,31 @@ index 1111111..2222222 100644
     }
 
     #[test]
+    fn parse_unified_diff_keeps_added_line_sets_scoped_per_file() {
+        let diff = r#"diff --git a/src/first.rs b/src/first.rs
+--- a/src/first.rs
++++ b/src/first.rs
+@@ -3,1 +3,2 @@
+ keep();
++first_added();
+diff --git a/src/second.rs b/src/second.rs
+--- a/src/second.rs
++++ b/src/second.rs
+@@ -10,0 +10,2 @@
++second_added_one();
++second_added_two();
+"#;
+
+        let index = parse_unified_diff(diff);
+        let first = PathBuf::from("src/first.rs");
+        let second = PathBuf::from("src/second.rs");
+
+        assert_eq!(index.changed_lines[&first], BTreeSet::from([4]));
+        assert_eq!(index.changed_lines[&second], BTreeSet::from([10, 11]));
+        assert!(index.contains_in_range(&first, 4, 4));
+        assert!(!index.contains_in_range(&first, 10, 11));
+    }
+    #[test]
     fn parse_unified_diff_tracks_new_file_added_lines() {
         let diff = r#"diff --git a/src/new.rs b/src/new.rs
 --- /dev/null
