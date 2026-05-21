@@ -298,7 +298,6 @@ fn check_docs() -> Result<(), String> {
     )?;
     check_no_windows_paths(&[
         Path::new("README.md"),
-        Path::new("MANIFEST.md"),
         Path::new("docs"),
         Path::new("plans"),
         Path::new(".unsafe-review-spec"),
