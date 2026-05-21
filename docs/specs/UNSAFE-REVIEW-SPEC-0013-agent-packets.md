@@ -32,6 +32,8 @@ source of analyzer truth. It carries:
 - missing evidence
 - allowed repairs scoped to the current card, derived from the ReviewCard
   operation family and missing obligation evidence
+- `agent_readiness`, an advisory classification of whether this card is a
+  bounded repair-delegation candidate
 - witness routes and verify commands from the card
 - do-not-do rules
 - stop conditions
@@ -40,6 +42,14 @@ source of analyzer truth. It carries:
 For compatibility with the initial context-packet scaffold, the packet keeps
 top-level `card_id`, `required_safety_conditions`, `missing`, and string-array
 `allowed_repairs` fields while adding richer structured fields.
+
+`agent_readiness` is additive metadata, not analyzer truth. A packet is marked
+`ready` only when the ReviewCard has an actionable class, a concrete operation
+family, medium-or-high confidence, card-scoped allowed repairs, and a verify
+command. Cards that require human deep review, unsupported witness routes,
+ambiguous operation families, weak confidence, or external specialist routing
+are marked not ready with reasons. This classification does not execute an
+agent, apply edits, run witnesses, or resolve the card.
 
 Packets constrain LLMs with task, contract, missing evidence, allowed repairs,
 do-not-do list, verify commands, and stop conditions. They are copy-only in
@@ -74,6 +84,9 @@ claim that the packet resolves the card.
   example, raw-pointer read packets may name same-pointer alignment or
   initialization evidence, while copy packets may name range and non-overlap
   evidence. They must not suggest an obligation the ReviewCard does not carry.
+- Agent readiness is `ready` for a high-confidence, card-scoped repair packet
+  with a verify command, and is not ready for human-review or unsupported
+  operation families such as inline assembly and FFI ownership boundaries.
 - If evidence is not knowable statically, the packet names the limitation
   instead of overclaiming.
 

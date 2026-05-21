@@ -321,6 +321,8 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     );
     assert_eq!(packet["context"]["operation_family"], "raw_pointer_read");
     assert!(packet["witness_routes"].is_array());
+    assert_eq!(packet["agent_readiness"]["ready"], true);
+    assert_eq!(packet["agent_readiness"]["state"], "ready");
     let allowed_repairs = serde_json::to_string(&packet["allowed_repairs"])?;
     assert!(allowed_repairs.contains("alignment guard"));
     assert!(allowed_repairs.contains("witness receipt"));

@@ -1,4 +1,7 @@
-use crate::domain::{EvidenceState, ObligationEvidence, OperationFamily, ReviewCard, WitnessRoute};
+use crate::domain::{
+    Confidence, EvidenceState, ObligationEvidence, OperationFamily, ReviewCard, ReviewClass,
+    WitnessKind, WitnessRoute,
+};
 use crate::util::path_display;
 use serde::Serialize;
 
@@ -33,6 +36,7 @@ struct AgentPacket<'a> {
     missing: Vec<&'a str>,
     missing_evidence: Vec<AgentMissingEvidence<'a>>,
     allowed_repairs: Vec<String>,
+    agent_readiness: AgentReadiness,
     repair_scope: &'static str,
     witness_routes: Vec<AgentWitnessRoute<'a>>,
     verify_commands: &'a [String],
@@ -42,6 +46,8 @@ struct AgentPacket<'a> {
 
 impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
     fn from(card: &'a ReviewCard) -> Self {
+        let allowed_repairs = allowed_repairs(card);
+        let agent_readiness = agent_readiness(card, &allowed_repairs);
         Self {
             schema_version: "0.1",
             tool: "unsafe-review",
@@ -77,7 +83,8 @@ impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
                     message: &missing.message,
                 })
                 .collect(),
-            allowed_repairs: allowed_repairs(card),
+            allowed_repairs,
+            agent_readiness,
             repair_scope: "this card only",
             witness_routes: card.routes.iter().map(AgentWitnessRoute::from).collect(),
             verify_commands: &card.next_action.verify_commands,
@@ -95,6 +102,84 @@ impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
                 "the ReviewCard identity still maps to the same unsafe seam",
             ],
         }
+    }
+}
+
+fn agent_readiness(card: &ReviewCard, allowed_repairs: &[String]) -> AgentReadiness {
+    let mut reasons = Vec::new();
+
+    if !card.class.is_actionable() {
+        reasons.push(format!(
+            "card class `{}` is not an open actionable repair target",
+            card.class.as_str()
+        ));
+        return AgentReadiness::not_ready("not_recommended", reasons);
+    }
+
+    if matches!(
+        card.class,
+        ReviewClass::StaticUnknown
+            | ReviewClass::MiriUnsupported
+            | ReviewClass::RequiresSanitizer
+            | ReviewClass::RequiresKaniOrCrux
+            | ReviewClass::RequiresLoom
+    ) {
+        reasons.push(format!(
+            "card class `{}` requires specialist review or external witness routing",
+            card.class.as_str()
+        ));
+    }
+
+    if matches!(
+        card.operation.family,
+        OperationFamily::Unknown
+            | OperationFamily::Ffi
+            | OperationFamily::InlineAsm
+            | OperationFamily::TargetFeature
+    ) {
+        reasons.push(format!(
+            "operation family `{}` is not safe for automatic repair delegation",
+            card.operation.family.as_str()
+        ));
+    }
+
+    if card.routes.iter().any(|route| {
+        matches!(
+            route.kind,
+            WitnessKind::HumanDeepReview | WitnessKind::Unsupported
+        )
+    }) {
+        reasons.push("witness route requires human deep review or is unsupported".to_string());
+    }
+
+    if !matches!(card.confidence, Confidence::High | Confidence::Medium) {
+        reasons.push(format!(
+            "card confidence `{}` is too weak for bounded repair delegation",
+            card.confidence.as_str()
+        ));
+    }
+
+    if allowed_repairs.is_empty() {
+        reasons.push("no card-scoped allowed repair is available".to_string());
+    }
+
+    if card.next_action.verify_commands.is_empty() {
+        reasons.push("no verify command is available for this card".to_string());
+    }
+
+    if reasons.is_empty() {
+        AgentReadiness {
+            ready: true,
+            state: "ready",
+            reasons: vec![
+                "specific operation family".to_string(),
+                "card-scoped allowed repairs".to_string(),
+                "verify commands available".to_string(),
+                "medium-or-high confidence".to_string(),
+            ],
+        }
+    } else {
+        AgentReadiness::not_ready("needs_human_review", reasons)
     }
 }
 
@@ -376,6 +461,23 @@ struct AgentMissingEvidence<'a> {
 }
 
 #[derive(Serialize)]
+struct AgentReadiness {
+    ready: bool,
+    state: &'static str,
+    reasons: Vec<String>,
+}
+
+impl AgentReadiness {
+    fn not_ready(state: &'static str, reasons: Vec<String>) -> Self {
+        Self {
+            ready: false,
+            state,
+            reasons,
+        }
+    }
+}
+
+#[derive(Serialize)]
 struct AgentWitnessRoute<'a> {
     kind: &'static str,
     reason: &'a str,
@@ -435,6 +537,13 @@ mod tests {
         assert!(value["missing"].is_array());
         assert!(value["missing_evidence"].is_array());
         assert!(value["allowed_repairs"].is_array());
+        assert_eq!(value["agent_readiness"]["ready"], true);
+        assert_eq!(value["agent_readiness"]["state"], "ready");
+        assert!(
+            serde_json::to_string(&value["agent_readiness"]["reasons"])
+                .map_err(|err| format!("render readiness reasons failed: {err}"))?
+                .contains("card-scoped allowed repairs")
+        );
         let allowed_repairs = serde_json::to_string(&value["allowed_repairs"])
             .map_err(|err| format!("render allowed repairs failed: {err}"))?;
         assert!(allowed_repairs.contains("alignment guard"));
@@ -517,12 +626,36 @@ mod tests {
         assert!(routes.contains("asan"));
         assert!(routes.contains("cargo-careful"));
         assert!(!routes.contains("\"miri\""));
+        assert_eq!(value["agent_readiness"]["ready"], false);
+        assert_eq!(value["agent_readiness"]["state"], "needs_human_review");
+        let reasons = serde_json::to_string(&value["agent_readiness"]["reasons"])
+            .map_err(|err| format!("render readiness reasons failed: {err}"))?;
+        assert!(reasons.contains("miri_unsupported"));
+        assert!(reasons.contains("ffi"));
         assert!(
             value["trust_boundary"]
                 .as_str()
                 .unwrap_or("")
                 .contains("not UB-free status")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn agent_packet_marks_inline_asm_as_not_ready_for_repair_delegation() -> Result<(), String> {
+        let output = fixture_output("inline_asm_human_review")?;
+        let Some(card) = output.cards.first() else {
+            return Err("fixture should emit one card".to_string());
+        };
+        let value = parse_json(&render(card))?;
+
+        assert_eq!(value["context"]["operation_family"], "inline_asm");
+        assert_eq!(value["agent_readiness"]["ready"], false);
+        assert_eq!(value["agent_readiness"]["state"], "needs_human_review");
+        let reasons = serde_json::to_string(&value["agent_readiness"]["reasons"])
+            .map_err(|err| format!("render readiness reasons failed: {err}"))?;
+        assert!(reasons.contains("inline_asm"));
+        assert!(reasons.contains("human deep review"));
         Ok(())
     }
 
