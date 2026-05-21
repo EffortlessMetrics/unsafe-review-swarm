@@ -1474,13 +1474,15 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
     }
 
     for action in json_array_at(&lsp, "/code_actions", "lsp.json")? {
-        require_known_card_id(action, "lsp.json code_action", card_ids)?;
+        let action_card_id = require_known_card_id(action, "lsp.json code_action", card_ids)?;
         let Some(command) = action.get("command").and_then(serde_json::Value::as_str) else {
             return Err("lsp.json code_action is missing command".to_string());
         };
         if command.trim().is_empty() {
             return Err("lsp.json code_action command must not be empty".to_string());
         }
+        json_array_at(action, "/arguments", "lsp.json code_action")?;
+        check_lsp_code_action_payload(action, action_card_id, command, card_ids)?;
         if action.get("edit").is_some() || action.get("workspace_edit").is_some() {
             return Err("lsp.json code_action must not contain source edits".to_string());
         }
@@ -1488,16 +1490,70 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
     Ok(())
 }
 
-fn require_known_card_id(
-    value: &serde_json::Value,
-    context: &str,
+fn check_lsp_code_action_payload(
+    action: &serde_json::Value,
+    action_card_id: &str,
+    command: &str,
     card_ids: &BTreeSet<String>,
 ) -> Result<(), String> {
+    let Some(payload) = action.get("payload") else {
+        return Err("lsp.json code_action is missing payload".to_string());
+    };
+    if !payload.is_object() {
+        return Err("lsp.json code_action payload must be an object".to_string());
+    }
+    let payload_card_id = require_known_card_id(payload, "lsp.json code_action payload", card_ids)?;
+    if payload_card_id != action_card_id {
+        return Err(format!(
+            "lsp.json code_action payload card_id `{payload_card_id}` does not match action card_id `{action_card_id}`"
+        ));
+    }
+    let expected_kind = match command {
+        "unsafe-review.copyAgentPacket" => "unsafe-review.agent_packet",
+        "unsafe-review.explainWitnessRoute" => "unsafe-review.witness_route",
+        "unsafe-review.openRelatedTest" => {
+            require_non_empty_json_str(payload, "file", "lsp.json code_action payload")?;
+            let line = json_usize_at(payload, "/line", "lsp.json code_action payload")?;
+            if line == 0 {
+                return Err("lsp.json code_action payload line must be one-based".to_string());
+            }
+            require_non_empty_json_str(payload, "name", "lsp.json code_action payload")?;
+            "unsafe-review.related_test"
+        }
+        "unsafe-review.copyWitnessCommand" => {
+            require_non_empty_json_str(payload, "command", "lsp.json code_action payload")?;
+            "unsafe-review.witness_command"
+        }
+        _ => {
+            return Err(format!(
+                "lsp.json code_action command `{command}` is not verifier-known"
+            ));
+        }
+    };
+    require_json_str(
+        payload,
+        "kind",
+        expected_kind,
+        "lsp.json code_action payload",
+    )?;
+    let boundary = payload
+        .get("trust_boundary")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "lsp.json code_action payload is missing trust_boundary".to_string())?;
+    require_boundary_text(boundary, "lsp.json code_action payload")?;
+    Ok(())
+}
+
+fn require_known_card_id<'a>(
+    value: &'a serde_json::Value,
+    context: &str,
+    card_ids: &BTreeSet<String>,
+) -> Result<&'a str, String> {
     let Some(card_id) = value.get("card_id").and_then(serde_json::Value::as_str) else {
         return Err(format!("{context} is missing card_id"));
     };
     if card_ids.contains(card_id) {
-        Ok(())
+        Ok(card_id)
     } else {
         Err(format!("{context} references unknown card id `{card_id}`"))
     }
@@ -4467,6 +4523,24 @@ impl WitnessKind {
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_lsp_code_action_without_payload() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-lsp-action-payload")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        fs::write(
+            dir.join("lsp.json"),
+            r#"{"tool":"unsafe-review","mode":"read_only_projection","policy":"advisory","status":{"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"diagnostics":[{"card_id":"card-1","witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verify_commands":["cargo +nightly miri test card"],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}],"hovers":[{"card_id":"card-1","contents":"Trust boundary: static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}],"code_actions":[{"card_id":"card-1","command":"unsafe-review.copyAgentPacket","arguments":["card-1"]}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
+        )
+        .map_err(|err| format!("write lsp failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(result.err().unwrap_or_default().contains("missing payload"));
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_positive_overclaims() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-overclaim")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -4762,7 +4836,7 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write witness plan failed: {err}"))?;
         fs::write(
             dir.join("lsp.json"),
-            r#"{"tool":"unsafe-review","mode":"read_only_projection","policy":"advisory","status":{"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"diagnostics":[{"card_id":"card-1","witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verify_commands":["cargo +nightly miri test card"],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}],"hovers":[{"card_id":"card-1","contents":"Trust boundary: static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}],"code_actions":[{"card_id":"card-1","command":"unsafe-review.collectAgentPacket"}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
+            r#"{"tool":"unsafe-review","mode":"read_only_projection","policy":"advisory","status":{"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"diagnostics":[{"card_id":"card-1","witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verify_commands":["cargo +nightly miri test card"],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}],"hovers":[{"card_id":"card-1","contents":"Trust boundary: static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}],"code_actions":[{"card_id":"card-1","command":"unsafe-review.copyAgentPacket","payload":{"kind":"unsafe-review.agent_packet","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
         )
         .map_err(|err| format!("write lsp failed: {err}"))?;
         Ok(())
