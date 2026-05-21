@@ -39,6 +39,8 @@ mod tests {
         assert_eq!(stable_hash_hex(""), "cbf29ce484222325");
         assert_eq!(stable_hash_hex("a"), "af63dc4c8601ec8c");
         assert_eq!(stable_hash_hex("hello"), "a430d84680aabd0b");
+        assert_eq!(stable_hash_hex("unsafe-review"), "9b8f659941f48b06");
+        assert_eq!(stable_hash_hex("ReviewCard"), "06da7eb4d46c02c3");
     }
 
     #[test]
