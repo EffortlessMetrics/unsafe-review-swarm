@@ -61,7 +61,7 @@ impl DiffParserState {
         }
 
         if let Some(path) = raw.strip_prefix("+++ b/") {
-            let path = PathBuf::from(path.trim());
+            let path = PathBuf::from(path);
             self.current_path = Some(path.clone());
             self.index.changed_lines.entry(path).or_default();
             return true;
@@ -237,6 +237,22 @@ index 1111111..2222222 100644
         assert!(index.contains_near(&path, 22));
         assert!(!index.contains_near(&path, 40));
         assert_eq!(index.changed_lines[&path], BTreeSet::from([2, 22]));
+    }
+
+    #[test]
+    fn parse_unified_diff_preserves_trailing_spaces_in_paths() {
+        let diff = concat!(
+            "diff --git a/src/name-with-trailing-space.rs  b/src/name-with-trailing-space.rs \n",
+            "--- a/src/name-with-trailing-space.rs \n",
+            "+++ b/src/name-with-trailing-space.rs \n",
+            "@@ -1,0 +1,1 @@\n",
+            "+fn added() {}\n",
+        );
+        let path = PathBuf::from("src/name-with-trailing-space.rs ");
+        let index = parse_unified_diff(diff);
+
+        assert!(index.contains_file(&path));
+        assert_eq!(index.changed_lines[&path], BTreeSet::from([1]));
     }
 
     #[test]
