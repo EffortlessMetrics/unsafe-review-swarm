@@ -180,7 +180,10 @@ Invalid configuration must log warning, fall back to defaults, and must not enab
 - High priority maps to Warning; all others to Information.
 - No `Error` severity in v1.
 - Diagnostic ranges use UTF-16 character width.
-- Diagnostic `data` includes `card_id`, `operation_family`, `hazards`, `missing_evidence`, and trust boundary metadata.
+- Diagnostic `data` includes `card_id`, operation details, `operation_family`,
+  `hazards`, required safety conditions, evidence summary, obligation-level
+  evidence states, missing evidence, witness routes, verify commands, and trust
+  boundary metadata.
 - Hover is derived from the `ReviewCard` under the URI and cursor position and
   includes obligations, evidence summary, missing evidence, next action,
   optional witness route, and trust boundary.

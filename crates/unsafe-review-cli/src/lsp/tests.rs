@@ -107,6 +107,39 @@ fn diagnostic_for_card_carries_card_id_and_trust_boundary() -> Result<(), Box<dy
             .unwrap_or("")
             .contains("not UB-free status")
     );
+    let data = diagnostic
+        .data
+        .as_ref()
+        .ok_or("diagnostic data should be present")?;
+    assert_eq!(data["operation_family"], "raw_pointer_read");
+    assert_eq!(data["required_safety_conditions"][0]["key"], "pointer-live");
+    assert!(
+        data["required_safety_conditions"][0]["description"]
+            .as_str()
+            .unwrap_or("")
+            .contains("pointer is live")
+    );
+    assert_eq!(data["evidence_summary"]["contract"]["state"], "present");
+    assert_eq!(data["evidence_summary"]["discharge"]["state"], "missing");
+    assert!(
+        data["evidence_summary"]["reach_limitation"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not proof")
+    );
+    assert!(data["obligation_evidence"].as_array().is_some_and(|items| {
+        items.iter().any(|item| {
+            item["key"] == "alignment"
+                && item["discharge"]["state"] == "missing"
+                && item["witness"]["state"] == "missing"
+        })
+    }));
+    assert!(
+        data["witness_routes"][0]["command"]
+            .as_str()
+            .unwrap_or("")
+            .contains("cargo +nightly miri test read_header")
+    );
     Ok(())
 }
 
