@@ -598,29 +598,47 @@ fn detect_syntax_sites(parsed: &ParsedSource) -> Vec<DetectedSyntaxSite> {
 }
 
 fn without_parent_duplicate_operations(sites: Vec<DetectedSyntaxSite>) -> Vec<DetectedSyntaxSite> {
-    sites
+    let mut operation_indices: Vec<usize> = sites
         .iter()
         .enumerate()
-        .filter(|(idx, site)| {
-            !is_parent_duplicate_operation(
-                site,
-                sites[..*idx].iter().chain(sites[*idx + 1..].iter()),
-            )
-        })
-        .map(|(_idx, site)| site.clone())
-        .collect()
-}
+        .filter_map(|(index, site)| (site.kind == UnsafeSiteKind::Operation).then_some(index))
+        .collect();
+    operation_indices.sort_by(|left, right| {
+        sites[*left]
+            .family
+            .as_str()
+            .cmp(sites[*right].family.as_str())
+            .then(sites[*left].start.cmp(&sites[*right].start))
+            .then(sites[*right].end.cmp(&sites[*left].end))
+    });
 
-fn is_parent_duplicate_operation<'a>(
-    site: &DetectedSyntaxSite,
-    others: impl Iterator<Item = &'a DetectedSyntaxSite>,
-) -> bool {
-    site.kind == UnsafeSiteKind::Operation
-        && others
-            .filter(|other| other.kind == UnsafeSiteKind::Operation)
-            .any(|other| {
-                site.family == other.family && site.start < other.start && other.end < site.end
-            })
+    let mut parent_duplicate = vec![false; sites.len()];
+    let mut active_ranges: Vec<(usize, OperationFamily, usize, usize)> = Vec::new();
+
+    for index in operation_indices {
+        let site = &sites[index];
+        while let Some((_index, family, _start, end)) = active_ranges.last() {
+            if *family != site.family || *end <= site.start {
+                active_ranges.pop();
+                continue;
+            }
+            break;
+        }
+
+        for (parent_index, family, start, end) in &active_ranges {
+            if *family == site.family && *start < site.start && site.end < *end {
+                parent_duplicate[*parent_index] = true;
+            }
+        }
+
+        active_ranges.push((index, site.family.clone(), site.start, site.end));
+    }
+
+    sites
+        .into_iter()
+        .enumerate()
+        .filter_map(|(index, site)| (!parent_duplicate[index]).then_some(site))
+        .collect()
 }
 
 fn syntax_owner(site: &DetectedSyntaxSite, lines: &[&str], idx: usize) -> Option<String> {
@@ -1262,6 +1280,37 @@ fn parse_ident(rest: &str) -> Option<String> {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn duplicate_operation_pruning_removes_containing_parent_operation() {
+        let parent = DetectedSyntaxSite {
+            line: 1,
+            end_line: 1,
+            column: 1,
+            start: 10,
+            end: 100,
+            kind: UnsafeSiteKind::Operation,
+            family: OperationFamily::RawPointerRead,
+            card_snippet: "unsafe { ptr.read() }".to_string(),
+            source_snippet: "unsafe { ptr.read() }".to_string(),
+        };
+        let child = DetectedSyntaxSite {
+            line: 1,
+            end_line: 1,
+            column: 10,
+            start: 25,
+            end: 45,
+            kind: UnsafeSiteKind::Operation,
+            family: OperationFamily::RawPointerRead,
+            card_snippet: "ptr.read()".to_string(),
+            source_snippet: "ptr.read()".to_string(),
+        };
+
+        let sites = without_parent_duplicate_operations(vec![parent, child]);
+
+        assert_eq!(sites.len(), 1);
+        assert_eq!(sites[0].card_snippet, "ptr.read()");
+    }
 
     #[test]
     fn text_detection_ignores_comment_only_unsafe_tokens() {
