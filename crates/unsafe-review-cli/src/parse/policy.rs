@@ -13,23 +13,19 @@ pub(super) fn parse_policy_command(args: Vec<String>) -> Result<Command, String>
 
 fn parse_policy_report(args: &[String]) -> Result<CheckOptions, String> {
     let mut options = super::parse_check(args.to_vec())?;
-    if !matches!(options.format, Format::Human) {
-        options.format = parse_policy_report_format(super::format_name(&options.format))?;
-    } else {
-        options.format = Format::Json;
-    }
+    options.format = normalize_policy_report_format(options.format)?;
     if options.policy != PolicyMode::Advisory {
         return Err("policy report is advisory-only".to_string());
     }
     Ok(options)
 }
 
-fn parse_policy_report_format(raw: &str) -> Result<Format, String> {
-    match super::parse_format(raw)? {
-        Format::Json => Ok(Format::Json),
-        Format::Markdown => Ok(Format::Markdown),
+fn normalize_policy_report_format(format: Format) -> Result<Format, String> {
+    match format {
+        Format::Human => Ok(Format::Json),
+        Format::Json | Format::Markdown => Ok(format),
         other => Err(format!(
-            "policy report only supports json or markdown output, got `{}`",
+            "unsupported policy report format `{}` (expected json/markdown)",
             super::format_name(&other)
         )),
     }

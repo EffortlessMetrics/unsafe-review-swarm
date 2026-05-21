@@ -1660,7 +1660,7 @@ mod tests {
 
         assert_eq!(
             command,
-            Err("policy report only supports json or markdown output, got `sarif`".to_string())
+            Err("unsupported policy report format `sarif` (expected json/markdown)".to_string())
         );
     }
 
