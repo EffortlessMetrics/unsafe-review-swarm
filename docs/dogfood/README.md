@@ -9,7 +9,8 @@ claim, not calibrated precision/recall measurement, and not memory-safety proof.
 
 The manifest is [`corpus.toml`](corpus.toml). The human-facing index is
 [`index.md`](index.md), with a machine-readable companion at
-[`index.json`](index.json).
+[`index.json`](index.json). Reviewer usefulness notes live in
+[`usefulness-notes.md`](usefulness-notes.md).
 
 ## PR Diff Targets
 

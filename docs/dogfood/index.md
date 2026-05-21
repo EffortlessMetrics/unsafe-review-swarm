@@ -4,6 +4,7 @@ Date: 2026-05-18
 Status: experimental selected-corpus evidence
 Source manifest: [`corpus.toml`](corpus.toml)
 Machine-readable index: [`index.json`](index.json)
+Usefulness notes: [`usefulness-notes.md`](usefulness-notes.md)
 
 This index is a front panel for the real-crate dogfood corpus. It summarizes
 which crates and PR diffs have been used to exercise `unsafe-review`, where the
