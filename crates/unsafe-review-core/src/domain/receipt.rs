@@ -496,26 +496,13 @@ fn validate_sanitizer_success_output(output: &str, tool: &str) -> Result<(), Str
 }
 
 fn validate_utc_timestamp(value: &str, key: &str) -> Result<(), String> {
-    let bytes = value.as_bytes();
-    let valid_shape = bytes.len() == 20
-        && bytes[4] == b'-'
-        && bytes[7] == b'-'
-        && bytes[10] == b'T'
-        && bytes[13] == b':'
-        && bytes[16] == b':'
-        && bytes[19] == b'Z'
-        && [0, 1, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18]
-            .iter()
-            .all(|index| bytes[*index].is_ascii_digit());
-    if !valid_shape {
+    if !timestamp_validation::has_utc_shape(value) {
         return Err(format!(
             "`{key}` must use UTC timestamp format YYYY-MM-DDTHH:MM:SSZ"
         ));
     }
     validate_date(&value[..10], key)?;
-    validate_range(decimal_at(value, 11, 2), 0, 23, key)?;
-    validate_range(decimal_at(value, 14, 2), 0, 59, key)?;
-    validate_range(decimal_at(value, 17, 2), 0, 59, key)
+    timestamp_validation::validate_time_components(value, key)
 }
 
 fn validate_date(value: &str, key: &str) -> Result<(), String> {
@@ -557,6 +544,30 @@ fn looks_like_counted_card_id(value: &str) -> bool {
         && !prefix.is_empty()
         && !count.is_empty()
         && count.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+mod timestamp_validation {
+    use super::{decimal_at, validate_range};
+
+    pub(super) fn has_utc_shape(value: &str) -> bool {
+        let bytes = value.as_bytes();
+        bytes.len() == 20
+            && bytes[4] == b'-'
+            && bytes[7] == b'-'
+            && bytes[10] == b'T'
+            && bytes[13] == b':'
+            && bytes[16] == b':'
+            && bytes[19] == b'Z'
+            && [0, 1, 2, 3, 5, 6, 8, 9, 11, 12, 14, 15, 17, 18]
+                .iter()
+                .all(|index| bytes[*index].is_ascii_digit())
+    }
+
+    pub(super) fn validate_time_components(value: &str, key: &str) -> Result<(), String> {
+        validate_range(decimal_at(value, 11, 2), 0, 23, key)?;
+        validate_range(decimal_at(value, 14, 2), 0, 59, key)?;
+        validate_range(decimal_at(value, 17, 2), 0, 59, key)
+    }
 }
 
 #[cfg(test)]
