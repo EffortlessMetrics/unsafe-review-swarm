@@ -4,7 +4,7 @@ use std::path::Path;
 use tower_lsp_server::ls_types::{
     Diagnostic, DiagnosticSeverity, NumberOrString, Position, Range, Uri,
 };
-use unsafe_review_core::{AnalyzeOutput, ReviewCard};
+use unsafe_review_core::{AnalyzeOutput, Priority, ReviewCard};
 
 use super::uri::uri_from_path;
 
@@ -20,31 +20,42 @@ pub(super) fn diagnostics_by_uri(
         let Some(uri) = uri_from_path(path) else {
             continue;
         };
-        let line = card.site.location.line.saturating_sub(1) as u32;
-        let start = Position::new(line, card.site.location.column.saturating_sub(1) as u32);
-        let end = Position::new(line, start.character + lsp_width(&card.site.snippet));
-        let diagnostic = Diagnostic {
-            range: Range::new(start, end),
-            severity: Some(
-                if matches!(card.priority, unsafe_review_core::Priority::High) {
-                    DiagnosticSeverity::WARNING
-                } else {
-                    DiagnosticSeverity::INFORMATION
-                },
-            ),
-            code: Some(NumberOrString::String(card.class.as_str().to_string())),
-            source: Some("unsafe-review".into()),
-            message: format!(
-                "{}: {}",
-                card.operation.family.as_str(),
-                card.next_action.summary
-            ),
-            data: Some(data::build_diagnostic_data(card)),
-            ..Default::default()
-        };
-        map.entry(uri).or_insert_with(Vec::new).push(diagnostic);
+        map.entry(uri)
+            .or_insert_with(Vec::new)
+            .push(diagnostic_from_card(card));
     }
     map
+}
+
+fn diagnostic_from_card(card: &ReviewCard) -> Diagnostic {
+    let line = card.site.location.line.saturating_sub(1) as u32;
+    let start = Position::new(line, card.site.location.column.saturating_sub(1) as u32);
+    let end = Position::new(line, start.character + lsp_width(&card.site.snippet));
+    Diagnostic {
+        range: Range::new(start, end),
+        severity: Some(diagnostic_severity(card)),
+        code: Some(NumberOrString::String(card.class.as_str().to_string())),
+        source: Some("unsafe-review".into()),
+        message: diagnostic_message(card),
+        data: Some(data::build_diagnostic_data(card)),
+        ..Default::default()
+    }
+}
+
+fn diagnostic_severity(card: &ReviewCard) -> DiagnosticSeverity {
+    if matches!(card.priority, Priority::High) {
+        DiagnosticSeverity::WARNING
+    } else {
+        DiagnosticSeverity::INFORMATION
+    }
+}
+
+fn diagnostic_message(card: &ReviewCard) -> String {
+    format!(
+        "{}: {}",
+        card.operation.family.as_str(),
+        card.next_action.summary
+    )
 }
 
 pub(super) fn lsp_width(text: &str) -> u32 {
