@@ -375,5 +375,87 @@ diff --git a/src/second.rs b/src/second.rs
             prop_assert!(parsed.contains_file(&path));
             prop_assert_eq!(actual, BTreeSet::new());
         }
+
+        #[test]
+        fn multi_file_hunks_keep_added_lines_scoped_to_their_file(
+            first_start in 1usize..250,
+            second_start in 251usize..500,
+            first_lines in prop::collection::vec(diff_line_strategy(), 0..40),
+            second_lines in prop::collection::vec(diff_line_strategy(), 0..40),
+        ) {
+            let first_path = PathBuf::from("src/first.rs");
+            let second_path = PathBuf::from("src/second.rs");
+            let mut diff = format!(
+                "diff --git a/src/first.rs b/src/first.rs\n--- a/src/first.rs\n+++ b/src/first.rs\n@@ -1,1 +{first_start},1 @@\n"
+            );
+
+            let mut first_expected = BTreeSet::new();
+            let mut first_new_line = first_start;
+            for line in first_lines {
+                match line {
+                    DiffLine::Context(text) => {
+                        diff.push(' ');
+                        diff.push_str(&text);
+                        diff.push('\n');
+                        first_new_line = first_new_line.saturating_add(1);
+                    }
+                    DiffLine::Added(text) => {
+                        diff.push('+');
+                        diff.push_str(&text);
+                        diff.push('\n');
+                        first_expected.insert(first_new_line);
+                        first_new_line = first_new_line.saturating_add(1);
+                    }
+                    DiffLine::Removed(text) => {
+                        diff.push('-');
+                        diff.push_str(&text);
+                        diff.push('\n');
+                    }
+                    DiffLine::EmptyContext => {
+                        diff.push('\n');
+                        first_new_line = first_new_line.saturating_add(1);
+                    }
+                }
+            }
+
+            diff.push_str(&format!(
+                "diff --git a/src/second.rs b/src/second.rs\n--- a/src/second.rs\n+++ b/src/second.rs\n@@ -1,1 +{second_start},1 @@\n"
+            ));
+            let mut second_expected = BTreeSet::new();
+            let mut second_new_line = second_start;
+            for line in second_lines {
+                match line {
+                    DiffLine::Context(text) => {
+                        diff.push(' ');
+                        diff.push_str(&text);
+                        diff.push('\n');
+                        second_new_line = second_new_line.saturating_add(1);
+                    }
+                    DiffLine::Added(text) => {
+                        diff.push('+');
+                        diff.push_str(&text);
+                        diff.push('\n');
+                        second_expected.insert(second_new_line);
+                        second_new_line = second_new_line.saturating_add(1);
+                    }
+                    DiffLine::Removed(text) => {
+                        diff.push('-');
+                        diff.push_str(&text);
+                        diff.push('\n');
+                    }
+                    DiffLine::EmptyContext => {
+                        diff.push('\n');
+                        second_new_line = second_new_line.saturating_add(1);
+                    }
+                }
+            }
+
+            let parsed = parse_unified_diff(&diff);
+            let first_actual = parsed.changed_lines.get(&first_path).cloned().unwrap_or_default();
+            let second_actual = parsed.changed_lines.get(&second_path).cloned().unwrap_or_default();
+
+            prop_assert_eq!(first_actual, first_expected);
+            prop_assert_eq!(second_actual, second_expected);
+        }
     }
 }
