@@ -65,53 +65,35 @@ fn workflow_policy_entries(allowlist: &Path) -> Result<Vec<WorkflowPolicyEntry>,
 
     let mut out = Vec::new();
     for (idx, entry) in entries.iter().enumerate() {
-        let path = required_toml_string(entry, "path", &format!("{path_display} workflow[{idx}]"))?
-            .to_string();
-        let permissions = required_toml_string(
-            entry,
-            "permissions",
-            &format!("{path_display} workflow[{idx}]"),
-        )?
-        .to_string();
-        let reason =
-            required_toml_string(entry, "reason", &format!("{path_display} workflow[{idx}]"))?;
+        let entry_context = format!("{path_display} workflow[{idx}]");
+        let path = required_toml_string(entry, "path", &entry_context)?.to_string();
+        let permissions = required_toml_string(entry, "permissions", &entry_context)?.to_string();
+        let reason = required_toml_string(entry, "reason", &entry_context)?;
         if reason.len() < 16 {
-            return Err(format!(
-                "{path_display} workflow[{idx}] reason is too terse"
-            ));
+            return Err(format!("{entry_context} reason is too terse"));
         }
-        let review_after = required_toml_string(
-            entry,
-            "review_after",
-            &format!("{path_display} workflow[{idx}]"),
-        )?;
+        let review_after = required_toml_string(entry, "review_after", &entry_context)?;
         if !looks_like_iso_date(review_after) {
-            return Err(format!(
-                "{path_display} workflow[{idx}] review_after must use YYYY-MM-DD"
-            ));
+            return Err(format!("{entry_context} review_after must use YYYY-MM-DD"));
         }
         let actions = entry
             .get("actions")
             .and_then(toml::Value::as_array)
-            .ok_or_else(|| format!("{path_display} workflow[{idx}] is missing actions array"))?;
+            .ok_or_else(|| format!("{entry_context} is missing actions array"))?;
         let mut action_set = BTreeSet::new();
         for (action_idx, action) in actions.iter().enumerate() {
             let Some(action) = action.as_str() else {
                 return Err(format!(
-                    "{path_display} workflow[{idx}] actions[{action_idx}] must be a string"
+                    "{entry_context} actions[{action_idx}] must be a string"
                 ));
             };
             if action.trim().is_empty() {
-                return Err(format!(
-                    "{path_display} workflow[{idx}] actions[{action_idx}] is empty"
-                ));
+                return Err(format!("{entry_context} actions[{action_idx}] is empty"));
             }
             action_set.insert(action.to_string());
         }
         if action_set.is_empty() {
-            return Err(format!(
-                "{path_display} workflow[{idx}] must list at least one action"
-            ));
+            return Err(format!("{entry_context} must list at least one action"));
         }
         out.push(WorkflowPolicyEntry {
             path,
