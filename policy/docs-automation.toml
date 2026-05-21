@@ -1,0 +1,97 @@
+schema_version = "1.0"
+
+[scope]
+owned_roots = [
+  ".unsafe-review-spec",
+  "docs",
+  "policy",
+  "plans",
+  "crates/unsafe-review/README.md",
+  "crates/unsafe-review-core/README.md",
+  "crates/unsafe-review-cli/README.md",
+]
+external_awareness_only = [
+  ".codex",
+  ".spec",
+  ".claude",
+  ".jules",
+]
+
+[[generated_or_checked]]
+id = "spec-status-dashboard"
+kind = "spec_status_dashboard"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-STATUS.md"
+mode = "check"
+sources = [
+  "policy/doc-artifacts.toml",
+  ".unsafe-review-spec/goals/active.toml",
+  "docs/specs",
+  "docs/handoffs",
+]
+must_include = [
+  "UNSAFE-REVIEW-SPEC-0020",
+  "Proof commands",
+  "Follow-up",
+]
+
+[[generated_or_checked]]
+id = "spec-start-here"
+kind = "operator_front_door"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-START-HERE.md"
+mode = "check"
+sources = [
+  ".unsafe-review-spec/goals/active.toml",
+  "docs/specs",
+]
+must_include = [
+  ".unsafe-review-spec/goals/active.toml",
+  "linked plan",
+  "linked spec",
+  "linked proposal",
+]
+
+[[generated_or_checked]]
+id = "docs-map"
+kind = "docs_map"
+path = "docs/README.md"
+mode = "check"
+sources = [
+  "docs",
+  "policy/doc-artifacts.toml",
+]
+must_include = [
+  "First-use",
+  "CLI",
+  "Support",
+  "Specs",
+]
+
+[[generated_or_checked]]
+id = "published-facade-readme"
+kind = "published_surface"
+path = "crates/unsafe-review/README.md"
+mode = "check"
+sources = [
+  "README.md",
+  "crates/unsafe-review/Cargo.toml",
+]
+must_include = [
+  "Advisory unsafe-contract review",
+  "cargo install unsafe-review --locked",
+  "unsafe-review first-pr --base origin/main",
+  "Trust boundary",
+  "proof of memory safety",
+  "UB-free claim",
+  "Miri result",
+]
+
+[[generated_or_checked]]
+id = "release-publication-receipts"
+kind = "handoff_receipt"
+path_glob = "docs/handoffs/*publication*.md"
+mode = "check"
+must_include = [
+  "Pre-publish verification",
+  "Trust boundary",
+  "Post-publish smoke",
+]

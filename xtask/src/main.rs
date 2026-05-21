@@ -52,16 +52,28 @@ const POLICY_FILES: &[&str] = &[
     "policy/ci-lane-whitelist.toml",
     "policy/package-boundary.toml",
     "policy/source-sync.toml",
+    "policy/docs-automation.toml",
+    "policy/accuracy-calibration.toml",
+    "policy/public-surfaces.toml",
 ];
 const WORKFLOW_ALLOWLIST: &str = "policy/workflow-allowlist.toml";
 const WORKFLOW_DIR: &str = ".github/workflows";
 const DOC_ARTIFACT_LEDGER: &str = "policy/doc-artifacts.toml";
+const DOCS_AUTOMATION_LEDGER: &str = "policy/docs-automation.toml";
 const CI_LANE_LEDGER: &str = "policy/ci-lane-whitelist.toml";
 const PACKAGE_BOUNDARY_LEDGER: &str = "policy/package-boundary.toml";
 const SOURCE_SYNC_LEDGER: &str = "policy/source-sync.toml";
 const ACTIVE_GOAL_MANIFEST: &str = ".unsafe-review-spec/goals/active.toml";
 const DOC_ARTIFACT_KINDS: &[&str] = &["proposal", "spec", "adr", "plan", "goal"];
 const DOC_ARTIFACT_STATUSES: &[&str] = &["proposed", "accepted", "active", "done", "deferred"];
+const DOCS_AUTOMATION_KINDS: &[&str] = &[
+    "spec_status_dashboard",
+    "operator_front_door",
+    "docs_map",
+    "published_surface",
+    "handoff_receipt",
+];
+const DOCS_AUTOMATION_MODES: &[&str] = &["check", "generate"];
 const GOAL_WORK_ITEM_STATUSES: &[&str] = &["ready", "active", "blocked", "done", "superseded"];
 const PACKAGE_CLASSIFICATIONS: &[&str] = &["published", "private", "internal", "deferred"];
 const CI_LANE_STATUSES: &[&str] = &["advisory", "required", "deferred", "retired"];
@@ -184,7 +196,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
     match args.get(1).map(|arg| arg.as_str()) {
         None | Some("help") | Some("--help") => {
             println!(
-                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, source-divergence, check-source-sync"
+                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, source-divergence, check-source-sync"
             );
             Ok(())
         }
@@ -212,6 +224,10 @@ fn run(args: Vec<String>) -> Result<(), String> {
         Some("check-doc-artifacts") => {
             command_args::require_no_extra_args(&args, "check-doc-artifacts")?;
             check_doc_artifacts()
+        }
+        Some("check-docs-automation") => {
+            command_args::require_no_extra_args(&args, "check-docs-automation")?;
+            check_docs_automation()
         }
         Some("check-goals") => {
             command_args::require_no_extra_args(&args, "check-goals")?;
@@ -325,6 +341,7 @@ fn check_policy() -> Result<(), String> {
         LedgerKind::Suppression,
     )?;
     check_doc_artifacts()?;
+    check_docs_automation()?;
     check_goals()?;
     check_package_boundary()?;
     check_ci_lanes()?;
@@ -392,6 +409,246 @@ fn check_doc_artifacts_impl() -> Result<BTreeSet<String>, String> {
     }
 
     Ok(ids)
+}
+
+fn check_docs_automation() -> Result<(), String> {
+    let surfaces = check_docs_automation_impl()?;
+    println!("check-docs-automation: ok ({surfaces} surfaces)");
+    Ok(())
+}
+
+fn check_docs_automation_impl() -> Result<usize, String> {
+    let value = parse_toml_file(Path::new(DOCS_AUTOMATION_LEDGER))?;
+    require_toml_string(&value, "schema_version", DOCS_AUTOMATION_LEDGER)?;
+
+    let scope = value
+        .get("scope")
+        .and_then(toml::Value::as_table)
+        .ok_or_else(|| format!("{DOCS_AUTOMATION_LEDGER} is missing table `scope`"))?;
+    require_scope_paths(scope, "owned_roots", true)?;
+    require_scope_paths(scope, "external_awareness_only", false)?;
+
+    let surfaces = toml_array(&value, "generated_or_checked", DOCS_AUTOMATION_LEDGER)?;
+    if surfaces.is_empty() {
+        return Err(format!(
+            "{DOCS_AUTOMATION_LEDGER} must list at least one generated_or_checked entry"
+        ));
+    }
+
+    let mut ids = BTreeSet::new();
+    for (idx, surface) in surfaces.iter().enumerate() {
+        let table = toml_table(surface, DOCS_AUTOMATION_LEDGER, "generated_or_checked", idx)?;
+        let id = required_table_string(
+            table,
+            "id",
+            DOCS_AUTOMATION_LEDGER,
+            "generated_or_checked",
+            idx,
+        )?;
+        if !ids.insert(id.to_string()) {
+            return Err(format!(
+                "{DOCS_AUTOMATION_LEDGER} contains duplicate generated_or_checked id `{id}`"
+            ));
+        }
+
+        let kind = required_table_string(
+            table,
+            "kind",
+            DOCS_AUTOMATION_LEDGER,
+            "generated_or_checked",
+            idx,
+        )?;
+        let mode = required_table_string(
+            table,
+            "mode",
+            DOCS_AUTOMATION_LEDGER,
+            "generated_or_checked",
+            idx,
+        )?;
+        require_known(
+            kind,
+            DOCS_AUTOMATION_KINDS,
+            DOCS_AUTOMATION_LEDGER,
+            "generated_or_checked.kind",
+        )?;
+        require_known(
+            mode,
+            DOCS_AUTOMATION_MODES,
+            DOCS_AUTOMATION_LEDGER,
+            "generated_or_checked.mode",
+        )?;
+
+        if let Some(sources) = table.get("sources") {
+            for source in toml_str_array(sources, DOCS_AUTOMATION_LEDGER, "sources")? {
+                require_existing_repo_path(source, DOCS_AUTOMATION_LEDGER, "sources")?;
+            }
+        }
+
+        let paths = docs_automation_paths(table, idx)?;
+        if let Some(required_text) = table.get("must_include") {
+            let required_text =
+                toml_str_array(required_text, DOCS_AUTOMATION_LEDGER, "must_include")?;
+            require_docs_automation_text(id, &paths, &required_text)?;
+        }
+    }
+
+    Ok(ids.len())
+}
+
+fn require_scope_paths(
+    scope: &toml::map::Map<String, toml::Value>,
+    key: &str,
+    must_exist: bool,
+) -> Result<(), String> {
+    let Some(values) = scope.get(key) else {
+        return Err(format!(
+            "{DOCS_AUTOMATION_LEDGER} scope is missing array `{key}`"
+        ));
+    };
+    let values = toml_str_array(values, DOCS_AUTOMATION_LEDGER, key)?;
+    if values.is_empty() {
+        return Err(format!(
+            "{DOCS_AUTOMATION_LEDGER} scope `{key}` must not be empty"
+        ));
+    }
+    if must_exist {
+        for value in values {
+            require_existing_repo_path(value, DOCS_AUTOMATION_LEDGER, key)?;
+        }
+    }
+    Ok(())
+}
+
+fn docs_automation_paths(
+    table: &toml::map::Map<String, toml::Value>,
+    idx: usize,
+) -> Result<Vec<PathBuf>, String> {
+    let path = table.get("path").and_then(toml::Value::as_str);
+    let path_glob = table.get("path_glob").and_then(toml::Value::as_str);
+    match (path, path_glob) {
+        (Some(path), None) => {
+            require_file(path)?;
+            Ok(vec![PathBuf::from(path)])
+        }
+        (None, Some(path_glob)) => docs_automation_glob_paths(path_glob),
+        (Some(_), Some(_)) => Err(format!(
+            "{DOCS_AUTOMATION_LEDGER} generated_or_checked[{idx}] must not set both path and path_glob"
+        )),
+        (None, None) => Err(format!(
+            "{DOCS_AUTOMATION_LEDGER} generated_or_checked[{idx}] must set path or path_glob"
+        )),
+    }
+}
+
+fn docs_automation_glob_paths(path_glob: &str) -> Result<Vec<PathBuf>, String> {
+    let pattern_path = Path::new(path_glob);
+    let directory = pattern_path
+        .parent()
+        .filter(|path| !path.as_os_str().is_empty())
+        .ok_or_else(|| {
+            format!("{DOCS_AUTOMATION_LEDGER} path_glob `{path_glob}` needs a directory")
+        })?;
+    let file_pattern = pattern_path
+        .file_name()
+        .and_then(OsStr::to_str)
+        .ok_or_else(|| {
+            format!("{DOCS_AUTOMATION_LEDGER} path_glob `{path_glob}` needs a file pattern")
+        })?;
+    if !file_pattern.contains('*') {
+        require_file(path_glob)?;
+        return Ok(vec![PathBuf::from(path_glob)]);
+    }
+
+    let mut paths = Vec::new();
+    for entry in fs::read_dir(directory)
+        .map_err(|err| format!("failed to read {}: {err}", directory.display()))?
+    {
+        let entry = entry.map_err(|err| {
+            format!(
+                "failed to read directory entry under {}: {err}",
+                directory.display()
+            )
+        })?;
+        let name = entry.file_name();
+        let Some(name) = name.to_str() else {
+            continue;
+        };
+        if wildcard_match(file_pattern, name) && entry.path().is_file() {
+            paths.push(entry.path());
+        }
+    }
+    paths.sort();
+    if paths.is_empty() {
+        Err(format!(
+            "{DOCS_AUTOMATION_LEDGER} path_glob `{path_glob}` did not match any files"
+        ))
+    } else {
+        Ok(paths)
+    }
+}
+
+fn require_docs_automation_text(
+    id: &str,
+    paths: &[PathBuf],
+    required_text: &[&str],
+) -> Result<(), String> {
+    let mut documents = Vec::new();
+    for path in paths {
+        documents.push((path, read_to_string(path)?));
+    }
+    for needle in required_text {
+        if !documents.iter().any(|(_, text)| text.contains(needle)) {
+            let paths = paths
+                .iter()
+                .map(|path| path.display().to_string())
+                .collect::<Vec<_>>()
+                .join(", ");
+            return Err(format!(
+                "{DOCS_AUTOMATION_LEDGER} generated_or_checked `{id}` requires text `{needle}` in one of: {paths}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn require_existing_repo_path(path: &str, ledger: &str, field: &str) -> Result<(), String> {
+    if Path::new(path).exists() {
+        Ok(())
+    } else {
+        Err(format!("{ledger} {field} path does not exist: {path}"))
+    }
+}
+
+fn wildcard_match(pattern: &str, value: &str) -> bool {
+    if !pattern.contains('*') {
+        return pattern == value;
+    }
+
+    let parts = pattern.split('*').collect::<Vec<_>>();
+    let mut remainder = value;
+    if let Some(first) = parts.first().filter(|part| !part.is_empty()) {
+        let Some(stripped) = remainder.strip_prefix(first) else {
+            return false;
+        };
+        remainder = stripped;
+    }
+
+    let middle_end = parts.len().saturating_sub(1);
+    for part in parts.iter().skip(1).take(middle_end.saturating_sub(1)) {
+        if part.is_empty() {
+            continue;
+        }
+        let Some(index) = remainder.find(part) else {
+            return false;
+        };
+        remainder = &remainder[index + part.len()..];
+    }
+
+    if let Some(last) = parts.last().filter(|part| !part.is_empty()) {
+        remainder.ends_with(last)
+    } else {
+        true
+    }
 }
 
 fn check_goals() -> Result<(), String> {
@@ -3874,6 +4131,18 @@ jobs:
         assert!(err.contains("unknown support summary posture"));
         assert!(err.contains("Unsupported"));
         Ok(())
+    }
+
+    #[test]
+    fn docs_automation_glob_matches_publication_receipts() {
+        assert!(wildcard_match(
+            "*publication*.md",
+            "2026-05-21-release-0.2.0-publication.md",
+        ));
+        assert!(!wildcard_match(
+            "*publication*.md",
+            "2026-05-21-source-promotion-0.2-sync.md",
+        ));
     }
 
     #[test]
