@@ -19,11 +19,5 @@ fn parse_policy_report(args: &[String]) -> Result<CheckOptions, String> {
 }
 
 fn normalize_policy_report_format(format: Format) -> Result<Format, String> {
-    match format {
-        Format::Json | Format::Markdown => Ok(format),
-        other => Err(format!(
-            "unsupported policy report format `{}` (expected json/markdown)",
-            super::format_name(&other)
-        )),
-    }
+    super::json_or_markdown_format(format, "policy report")
 }

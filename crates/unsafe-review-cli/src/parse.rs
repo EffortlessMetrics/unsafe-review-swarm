@@ -1678,6 +1678,17 @@ mod tests {
     }
 
     #[test]
+    fn policy_report_accepts_markdown_alias() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "policy", "report", "--format=md"]))?;
+
+        let Command::PolicyReport(options) = command else {
+            return Err("expected policy report command".to_string());
+        };
+        assert_eq!(options.format, Format::Markdown);
+        Ok(())
+    }
+
+    #[test]
     fn policy_report_rejects_non_report_format() {
         let command = parse(args([
             "unsafe-review",
@@ -1688,7 +1699,7 @@ mod tests {
 
         assert_eq!(
             command,
-            Err("unsupported policy report format `sarif` (expected json/markdown)".to_string())
+            Err("policy report only supports json or markdown output, got `sarif`".to_string())
         );
     }
 
