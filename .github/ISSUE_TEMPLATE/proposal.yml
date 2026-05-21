@@ -1,0 +1,11 @@
+name: Proposal
+about: Propose why a campaign should happen
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+  - type: textarea
+    id: success
+    attributes:
+      label: Success criteria

@@ -285,5 +285,5 @@ Before handing a packet to an agent, check:
   witness result.
 - The `do_not_do` and `stop_conditions` are copied with the task.
 
-The safe default is to ask the agent to stop after one card and return a patch,
-validation output, and any remaining missing evidence.
+The conservative default is to ask the agent to stop after one card and return a
+patch, validation output, and any remaining missing evidence.
