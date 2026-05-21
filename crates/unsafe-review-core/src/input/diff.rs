@@ -30,54 +30,86 @@ impl DiffIndex {
     }
 }
 
-pub(crate) fn parse_unified_diff(input: &str) -> DiffIndex {
-    let mut index = DiffIndex::default();
-    let mut current_path: Option<PathBuf> = None;
-    let mut new_line = 0usize;
+#[derive(Debug, Default)]
+struct DiffParserState {
+    index: DiffIndex,
+    current_path: Option<PathBuf>,
+    new_line: usize,
+}
 
-    for raw in input.lines() {
+impl DiffParserState {
+    fn consume_line(&mut self, raw: &str) {
+        if self.consume_file_boundary(raw) || self.consume_hunk_header(raw) {
+            return;
+        }
+
+        let Some(path) = self.current_path.clone() else {
+            return;
+        };
+
+        if should_skip_metadata(raw) {
+            return;
+        }
+
+        self.consume_content_line(&path, raw);
+    }
+
+    fn consume_file_boundary(&mut self, raw: &str) -> bool {
         if raw.starts_with("diff --git ") {
-            current_path = None;
-            continue;
+            self.current_path = None;
+            return true;
         }
 
         if let Some(path) = raw.strip_prefix("+++ b/") {
             let path = PathBuf::from(path.trim());
-            current_path = Some(path.clone());
-            index.changed_lines.entry(path).or_default();
-            continue;
+            self.current_path = Some(path.clone());
+            self.index.changed_lines.entry(path).or_default();
+            return true;
         }
 
-        if raw.starts_with("@@") {
-            if let Some(start) = parse_new_start(raw) {
-                new_line = start;
-            }
-            continue;
+        false
+    }
+
+    fn consume_hunk_header(&mut self, raw: &str) -> bool {
+        if !raw.starts_with("@@") {
+            return false;
         }
 
-        let Some(path) = current_path.as_ref() else {
-            continue;
-        };
-
-        if raw.starts_with("+++") || raw.starts_with("---") {
-            continue;
+        if let Some(start) = parse_new_start(raw) {
+            self.new_line = start;
         }
 
+        true
+    }
+
+    fn consume_content_line(&mut self, path: &PathBuf, raw: &str) {
         if raw.starts_with('+') {
-            index
+            self.index
                 .changed_lines
                 .entry(path.clone())
                 .or_default()
-                .insert(new_line);
-            new_line = new_line.saturating_add(1);
+                .insert(self.new_line);
+            self.new_line = self.new_line.saturating_add(1);
         } else if raw.starts_with('-') {
             // Removed lines do not advance the new-file coordinate.
         } else if raw.starts_with(' ') || raw.is_empty() {
-            new_line = new_line.saturating_add(1);
+            self.new_line = self.new_line.saturating_add(1);
         }
     }
+}
 
-    index
+fn should_skip_metadata(raw: &str) -> bool {
+    raw.starts_with("+++") || raw.starts_with("---")
+}
+
+pub(crate) fn parse_unified_diff(input: &str) -> DiffIndex {
+    let mut parser = DiffParserState::default();
+
+    for raw in input.lines() {
+        parser.consume_line(raw);
+    }
+
+    parser.index
 }
 
 fn parse_new_start(header: &str) -> Option<usize> {
