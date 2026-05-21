@@ -229,39 +229,39 @@ fn route_cannot_prove(kind: WitnessKind) -> &'static str {
 fn receipt_hint(card: &ReviewCard, route: &WitnessRoute) -> String {
     let command = route.command.as_deref().unwrap_or("<command>");
     match route.kind {
-        WitnessKind::Miri => format!(
-            "after running this outside `unsafe-review`, import saved output with `unsafe-review receipt import-miri {} --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command \"{}\"`",
-            card.id, command
-        ),
-        WitnessKind::CargoCareful => format!(
-            "after running this outside `unsafe-review`, import saved output with `unsafe-review receipt import-careful {} --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command \"{}\"`",
-            card.id, command
-        ),
+        WitnessKind::Miri => receipt_import_hint(card, "import-miri", None, command),
+        WitnessKind::CargoCareful => receipt_import_hint(card, "import-careful", None, command),
         WitnessKind::AddressSanitizer
         | WitnessKind::MemorySanitizer
         | WitnessKind::ThreadSanitizer
-        | WitnessKind::LeakSanitizer => format!(
-            "after running this outside `unsafe-review`, import saved output with `unsafe-review receipt import-sanitizer {} --tool {} --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command \"{}\"`",
-            card.id,
-            route.kind.as_str(),
-            command
-        ),
-        WitnessKind::Loom | WitnessKind::Shuttle => format!(
-            "after running this outside `unsafe-review`, import saved output with `unsafe-review receipt import-concurrency {} --tool {} --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command \"{}\"`",
-            card.id,
-            route.kind.as_str(),
-            command
-        ),
-        WitnessKind::Kani | WitnessKind::Crux => format!(
-            "after running this outside `unsafe-review`, import saved output with `unsafe-review receipt import-proof {} --tool {} --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command \"{}\"`",
-            card.id,
-            route.kind.as_str(),
-            command
-        ),
+        | WitnessKind::LeakSanitizer => {
+            receipt_import_hint(card, "import-sanitizer", Some(route.kind), command)
+        }
+        WitnessKind::Loom | WitnessKind::Shuttle => {
+            receipt_import_hint(card, "import-concurrency", Some(route.kind), command)
+        }
+        WitnessKind::Kani | WitnessKind::Crux => {
+            receipt_import_hint(card, "import-proof", Some(route.kind), command)
+        }
         WitnessKind::HumanDeepReview | WitnessKind::Unsupported => {
             "no saved-output receipt applies until an external witness run exists; keep review assumptions and limits explicit".to_string()
         }
     }
+}
+
+fn receipt_import_hint(
+    card: &ReviewCard,
+    import_kind: &str,
+    tool: Option<WitnessKind>,
+    command: &str,
+) -> String {
+    let tool_arg = tool
+        .map(|kind| format!(" --tool {}", kind.as_str()))
+        .unwrap_or_default();
+    format!(
+        "after running this outside `unsafe-review`, import saved output with `unsafe-review receipt {} {}{} --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command \"{}\"`",
+        import_kind, card.id, tool_arg, command
+    )
 }
 
 fn missing_summary(card: &ReviewCard) -> String {
