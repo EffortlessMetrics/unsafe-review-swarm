@@ -36,6 +36,14 @@ starts in source and is not release/public-surface/hotfix work, move the work
 to `unsafe-review-swarm` or stop and leave a handoff explaining the routing
 problem.
 
+When there is no narrower owner instruction, continue improving this codebase in
+`unsafe-review-swarm` along the current rails. Good default work includes
+ReviewCard correctness, evidence precision, artifact/schema verification,
+first-run UX, saved LSP/agent projections, dogfood calibration, tests,
+maintainability refactors, and source-of-truth spec alignment. Do not treat the
+absence of a new direction as a reason to pause if the work clearly advances one
+of those rails.
+
 Before routine swarm implementation, run the source sync guard:
 
 ```bash
@@ -61,6 +69,12 @@ Use the repo source-of-truth stack:
 
 If a specific command, lint, API, feature flag, crate name, or workflow name is mentioned, verify it exists before building a PR around it.
 
+Spec rails are meant to make routine progress easier, not ceremonial. If a PR or
+agent task references a not-yet-existing rail and the rail belongs in the repo,
+add or align it in `.unsafe-review-spec` or the corresponding `docs/specs/`
+contract. Do not put durable repo operating state in `.codex`; keep agent-local
+state there only if a local tool requires it.
+
 ## PR queue discipline
 
 Review PRs before merging them. Do not merge a batch blindly because checks are
@@ -73,10 +87,14 @@ For Codex Web or other generated PR batches:
 2. Inspect the stated intent and actual diff.
 3. Verify the change is scoped to the PR title and does not create a second
    analyzer truth outside `ReviewCard`.
-4. Run the narrow validation first, then broader repo gates when practical.
-5. Merge only when the diff is scoped, checks are green, and the repository
+4. Check whether the change advances an active `.unsafe-review-spec` plan item,
+   a documented projection contract, or a narrow maintainability/test goal. If
+   it creates a useful new rail, land the rail in the source-of-truth stack with
+   the same PR or a clearly linked follow-up.
+5. Run the narrow validation first, then broader repo gates when practical.
+6. Merge only when the diff is scoped, checks are green, and the repository
    state supports the disposition.
-6. If a PR is stale, conflicting, duplicate, or superseded, leave a
+7. If a PR is stale, conflicting, duplicate, or superseded, leave a
    repository-level disposition comment that names the replacement PR, commit,
    or future lane.
 
