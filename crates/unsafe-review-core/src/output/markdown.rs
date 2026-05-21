@@ -5,6 +5,8 @@ use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
 use crate::util::path_display;
 use std::collections::BTreeMap;
 
+const DEFAULT_ROUTE_KIND: &str = "human-deep-review";
+
 pub(crate) fn render(output: &AnalyzeOutput) -> String {
     if matches!(output.scope, Scope::Repo) {
         return render_repo_posture(output);
@@ -33,7 +35,7 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
     for card in &output.cards {
         let hazard = card.hazards.first().map_or("unknown", |h| h.as_str());
         let missing = card.missing.first().map_or("", |m| m.kind.as_str());
-        let route = card.routes.first().map_or("human", |r| r.kind.as_str());
+        let route = primary_route_kind_diff(card);
         out.push_str(&format!(
             "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |\n",
             md_cell(&card.id.to_string()),
@@ -90,10 +92,7 @@ fn render_repo_posture(output: &AnalyzeOutput) -> String {
         );
         out.push_str("|---|---|---|---|---|---|---|\n");
         for card in &output.cards {
-            let route = card
-                .routes
-                .first()
-                .map_or("human-deep-review", |route| route.kind.as_str());
+            let route = primary_route_kind(card);
             out.push_str(&format!(
                 "| `{}` | `{}` | `{}` | `{}` | {} | `{}` | {} |\n",
                 md_cell(&card.id.to_string()),
@@ -134,10 +133,7 @@ fn operation_counts(output: &AnalyzeOutput) -> BTreeMap<String, usize> {
 fn route_counts(output: &AnalyzeOutput) -> BTreeMap<String, usize> {
     let mut counts = BTreeMap::new();
     for card in &output.cards {
-        let route = card
-            .routes
-            .first()
-            .map_or("human-deep-review", |route| route.kind.as_str());
+        let route = primary_route_kind(card);
         *counts.entry(route.to_string()).or_default() += 1;
     }
     counts
@@ -214,10 +210,7 @@ pub(crate) fn render_pr_summary(output: &AnalyzeOutput) -> String {
     );
     out.push_str("|---|---|---|---|---|---|---|---|\n");
     for card in &output.cards {
-        let route = card
-            .routes
-            .first()
-            .map_or("human-deep-review", |route| route.kind.as_str());
+        let route = primary_route_kind(card);
         out.push_str(&format!(
             "| `{}` | `{}` | {} | `{}` | `{}` | {} | `{}` | {} |\n",
             md_cell(&card.id.to_string()),
@@ -412,6 +405,16 @@ fn md_cell(value: &str) -> String {
 
 fn one_line(value: &str) -> String {
     value.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn primary_route_kind(card: &ReviewCard) -> &str {
+    card.routes
+        .first()
+        .map_or(DEFAULT_ROUTE_KIND, |route| route.kind.as_str())
+}
+
+fn primary_route_kind_diff(card: &ReviewCard) -> &str {
+    card.routes.first().map_or("human", |route| route.kind.as_str())
 }
 
 #[cfg(test)]
