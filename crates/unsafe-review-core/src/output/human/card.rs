@@ -14,14 +14,18 @@ pub(super) fn render_card(out: &mut String, card: &ReviewCard) {
         "  operation_family: {}\n",
         card.operation.family.as_str()
     ));
-    out.push_str("  hazards:\n");
-    for hazard in &card.hazards {
-        out.push_str(&format!("    - {}\n", hazard.as_str()));
-    }
-    out.push_str("  required safety conditions:\n");
-    for obligation in &card.obligations {
-        out.push_str(&format!("    - {}\n", obligation.description));
-    }
+    push_list(
+        out,
+        "  hazards:\n",
+        card.hazards.iter().map(|hazard| hazard.as_str()),
+    );
+    push_list(
+        out,
+        "  required safety conditions:\n",
+        card.obligations
+            .iter()
+            .map(|obligation| obligation.description.as_str()),
+    );
     out.push_str(&format!("  contract: {}\n", card.contract.summary));
     out.push_str(&format!("  discharge: {}\n", card.discharge.summary));
     out.push_str(&format!("  reach: {}\n", card.reach.summary));
@@ -39,10 +43,11 @@ pub(super) fn render_card(out: &mut String, card: &ReviewCard) {
             ));
         }
     }
-    out.push_str("  missing:\n");
-    for missing in &card.missing {
-        out.push_str(&format!("    - {}\n", missing.message));
-    }
+    push_list(
+        out,
+        "  missing:\n",
+        card.missing.iter().map(|missing| missing.message.as_str()),
+    );
     if !card.routes.is_empty() {
         out.push_str("  witness routes:\n");
         for route in &card.routes {
@@ -64,4 +69,13 @@ pub(super) fn render_card(out: &mut String, card: &ReviewCard) {
         }
     }
     out.push('\n');
+}
+
+fn push_list<'a>(out: &mut String, title: &str, lines: impl Iterator<Item = &'a str>) {
+    out.push_str(title);
+    for line in lines {
+        out.push_str("    - ");
+        out.push_str(line);
+        out.push('\n');
+    }
 }
