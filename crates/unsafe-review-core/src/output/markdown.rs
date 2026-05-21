@@ -5,6 +5,8 @@ use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
 use crate::util::path_display;
 use std::collections::BTreeMap;
 
+const DEFAULT_REVIEW_ROUTE: &str = "human-deep-review";
+
 pub(crate) fn render(output: &AnalyzeOutput) -> String {
     if matches!(output.scope, Scope::Repo) {
         return render_repo_posture(output);
@@ -20,9 +22,8 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
         out.push_str(&card.next_action.summary);
         out.push_str("\n\n");
         if let Some(cmd) = card.next_action.verify_commands.first() {
-            out.push_str("```bash\n");
-            out.push_str(cmd);
-            out.push_str("\n```\n\n");
+            push_bash_block(&mut out, cmd);
+            out.push('\n');
         }
     } else {
         render_no_changed_gaps(&mut out);
@@ -147,7 +148,7 @@ fn diff_primary_route(card: &ReviewCard) -> &str {
 fn repo_primary_route(card: &ReviewCard) -> &str {
     card.routes
         .first()
-        .map_or("human-deep-review", |route| route.kind.as_str())
+        .map_or(DEFAULT_REVIEW_ROUTE, |route| route.kind.as_str())
 }
 
 fn render_counts_table(out: &mut String, label: &str, counts: BTreeMap<String, usize>) {
@@ -216,9 +217,8 @@ fn render_pr_summary_top_card(out: &mut String, output: &AnalyzeOutput) {
                 route.reason
             ));
             if let Some(command) = &route.command {
-                out.push_str("\n```bash\n");
-                out.push_str(command);
-                out.push_str("\n```\n");
+                out.push('\n');
+                push_bash_block(out, command);
             }
         }
         out.push_str(&format!("- Next action: {}\n\n", card.next_action.summary));
@@ -384,9 +384,8 @@ fn render_resolution_guidance(out: &mut String, card: &ReviewCard) {
             "- Then attach a matching witness receipt only after running a focused command such as:\n",
         );
         for command in &card.next_action.verify_commands {
-            out.push_str("\n```bash\n");
-            out.push_str(command);
-            out.push_str("\n```\n");
+            out.push('\n');
+            push_bash_block(out, command);
         }
     }
 }
@@ -408,11 +407,17 @@ fn render_witness_routes(out: &mut String, card: &ReviewCard) {
     for route in &card.routes {
         out.push_str(&format!("- `{}`: {}\n", route.kind.as_str(), route.reason));
         if let Some(command) = &route.command {
-            out.push_str("\n```bash\n");
-            out.push_str(command);
-            out.push_str("\n```\n\n");
+            out.push('\n');
+            push_bash_block(out, command);
+            out.push('\n');
         }
     }
+}
+
+fn push_bash_block(out: &mut String, command: &str) {
+    out.push_str("```bash\n");
+    out.push_str(command);
+    out.push_str("\n```\n");
 }
 
 fn missing_summary(card: &ReviewCard) -> String {
