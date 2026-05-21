@@ -34,20 +34,7 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
         out.push_str("| Status | Receipt | Card | Matched card | Tool | Strength | Issues |\n");
         out.push_str("|---|---|---|---|---|---|---|\n");
         for receipt in &report.receipts {
-            out.push_str(&format!(
-                "| {} | `{}` | {} | {} | {} | {} | {} |\n",
-                markdown_cell(&receipt.statuses.join(", ")),
-                receipt.path,
-                optional_code(receipt.card_id.as_deref()),
-                matched_card(receipt.matched_card.as_ref()),
-                optional_code(receipt.receipt_tool.as_deref()),
-                optional_code(receipt.strength.as_deref()),
-                if receipt.issues.is_empty() {
-                    "-".to_string()
-                } else {
-                    markdown_cell(&receipt.issues.join("; "))
-                }
-            ));
+            out.push_str(&receipt_row(receipt));
         }
         out.push('\n');
     }
@@ -62,6 +49,26 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
     out.push_str(&report.trust_boundary);
     out.push('\n');
     out
+}
+
+fn receipt_row(receipt: &crate::analysis::receipts::ReceiptAuditEntry) -> String {
+    format!(
+        "| {} | `{}` | {} | {} | {} | {} | {} |\n",
+        markdown_cell(&receipt.statuses.join(", ")),
+        receipt.path,
+        optional_code(receipt.card_id.as_deref()),
+        matched_card(receipt.matched_card.as_ref()),
+        optional_code(receipt.receipt_tool.as_deref()),
+        optional_code(receipt.strength.as_deref()),
+        issues_cell(&receipt.issues)
+    )
+}
+
+fn issues_cell(issues: &[String]) -> String {
+    if issues.is_empty() {
+        return "-".to_string();
+    }
+    markdown_cell(&issues.join("; "))
 }
 
 fn optional_code(value: Option<&str>) -> String {
