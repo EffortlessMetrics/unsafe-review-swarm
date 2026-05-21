@@ -18,6 +18,7 @@ use unsafe_review_core::{
 };
 
 mod card_lookup;
+mod first_pr;
 
 const NO_CHANGED_GAPS_MESSAGE: &str = "No changed unsafe-review gaps were found.";
 const NO_CHANGED_GAPS_LIMITATION: &str =
@@ -145,58 +146,13 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         write_artifact(&options.out_dir.join(name), renderer(&output))?;
     }
 
-    println!("unsafe-review first-pr");
-    println!("unsafe-review wrote an advisory PR bundle.");
-    println!("- Artifact directory: {}", options.out_dir.display());
-    println!("- Review cards: {}", output.summary.cards);
-    println!(
-        "- Open actionable gaps: {}",
-        output.summary.open_actionable_gaps
-    );
-    println!("Open:");
-    println!("  {}", options.out_dir.join("pr-summary.md").display());
-    if output.summary.open_actionable_gaps == 0 {
-        println!("{NO_CHANGED_GAPS_MESSAGE}");
-        println!("{NO_CHANGED_GAPS_LIMITATION}");
-    } else if let Some(card) = output.cards.first() {
-        println!("Top card:");
-        println!(
-            "  {}:{} `{}`",
-            card.site.location.file.display(),
-            card.site.location.line,
-            card.operation.family.as_str()
-        );
-        println!("  Class: `{}`", card.class.as_str());
-        if !card.missing.is_empty() {
-            let missing = card
-                .missing
-                .iter()
-                .map(|missing| missing.kind.as_str())
-                .collect::<Vec<_>>()
-                .join(", ");
-            println!("  Missing: {missing}");
-        }
-        if let Some(route) = card.routes.first() {
-            println!("  Route: `{}`", route.kind.as_str());
-        }
-        println!("  Next: {}", card.next_action.summary);
-        println!("Inspect top card:");
-        println!(
-            "  unsafe-review explain --root {} {}",
-            root.display(),
-            card.id
-        );
-    }
-    println!("Artifacts:");
-    for (name, _) in FIRST_PR_ARTIFACTS {
-        println!("  {}", options.out_dir.join(name).display());
-    }
-    println!("Trust boundary:");
-    println!(
-        "  static unsafe contract review only; not memory-safety proof, not UB-free status, and not Miri-clean status."
-    );
-    println!(
-        "  unsafe-review did not run witnesses, post comments, edit source, or enforce blocking policy."
+    first_pr::print_first_pr_report(
+        &output,
+        &options.out_dir,
+        &root,
+        NO_CHANGED_GAPS_MESSAGE,
+        NO_CHANGED_GAPS_LIMITATION,
+        &FIRST_PR_ARTIFACTS,
     );
 
     Ok(())
