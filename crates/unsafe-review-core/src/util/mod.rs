@@ -29,6 +29,20 @@ mod tests {
     use proptest::prelude::*;
     use std::path::PathBuf;
 
+    #[test]
+    fn stable_hash_hex_matches_known_vectors() {
+        assert_eq!(stable_hash_hex(""), "cbf29ce484222325");
+        assert_eq!(stable_hash_hex("a"), "af63dc4c8601ec8c");
+        assert_eq!(stable_hash_hex("hello"), "a430d84680aabd0b");
+    }
+
+    #[test]
+    fn slug_collapses_symbol_runs_and_trims_boundaries() {
+        assert_eq!(slug("  Hello,   WORLD!!!  "), "hello-world");
+        assert_eq!(slug("___Rust__Unsafe__Review___"), "rust-unsafe-review");
+        assert_eq!(slug("***"), "");
+    }
+
     proptest! {
         #[test]
         fn slug_outputs_are_stable_ascii_tokens(input in "\\PC{0,256}") {
