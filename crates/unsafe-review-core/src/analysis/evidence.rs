@@ -1,3 +1,4 @@
+use super::set_len_shrink;
 use crate::analysis::scanner::ScannedSite;
 use crate::domain::{
     ContractEvidence, DischargeEvidence, EvidenceState, ObligationEvidence, OperationFamily,
@@ -2898,39 +2899,7 @@ fn pointer_binding_has_type_before_operation(
 }
 
 fn has_set_len_shrink_evidence(lower: &str) -> bool {
-    let compact = compact_code(lower);
-    if compact.contains(".set_len(0)") {
-        return true;
-    }
-    if compact.contains(".set_len(last_index)")
-        && (compact.contains("last_index=self.len-1")
-            || compact.contains("last_index=self.len()-1")
-            || (compact.contains("last_index=")
-                && (compact.contains(".len-1") || compact.contains(".len()-1"))))
-        && (compact.contains("self.len==0")
-            || compact.contains("self.len()==0")
-            || compact.contains(".len==0")
-            || compact.contains(".len()==0")
-            || compact.contains("self.len>0")
-            || compact.contains("self.len()>0")
-            || compact.contains("!self.is_empty()"))
-    {
-        return true;
-    }
-    if compact.contains(".set_len(start)")
-        && (compact.contains("start<=len")
-            || (compact.contains("start<=end") && compact.contains("end<=len")))
-        && (compact.contains("len=self.len()")
-            || (compact.contains("letlen=") && compact.contains(".len()")))
-    {
-        return true;
-    }
-    if !compact.contains(".set_len(new_len)") {
-        return false;
-    }
-    ((compact.contains("new_len<=") || compact.contains("new_len<")) && compact.contains(".len()"))
-        || (compact.contains("new_len=") && compact.contains(".len()-"))
-        || (compact.contains("len=self.len()") && compact.contains("new_len=len-"))
+    set_len_shrink::has_set_len_shrink_evidence(lower)
 }
 
 fn compact_code(lower: &str) -> String {
