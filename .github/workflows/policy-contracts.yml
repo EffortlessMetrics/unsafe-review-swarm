@@ -8,12 +8,17 @@ on:
 jobs:
   policy-contracts:
     runs-on: ubuntu-latest
-    continue-on-error: true
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - name: Check doc artifacts
-        run: cargo xtask check-doc-artifacts
+        run: cargo run --locked -p xtask -- check-doc-artifacts
       - name: Check active goals
-        run: cargo xtask check-goals
+        run: cargo run --locked -p xtask -- check-goals
       - name: Check package boundary
-        run: cargo xtask check-package-boundary
+        run: cargo run --locked -p xtask -- check-package-boundary
+      - name: Check CI lane ledger
+        run: cargo run --locked -p xtask -- check-ci-lanes

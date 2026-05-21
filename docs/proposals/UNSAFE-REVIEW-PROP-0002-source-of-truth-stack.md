@@ -5,7 +5,7 @@ Owner: repo-infra
 Created: 2026-05-20
 Target milestone: 0.2.0
 Linked specs:
-- UNSAFE-REVIEW-SPEC-0018-source-of-truth-stack
+- UNSAFE-REVIEW-SPEC-0020-source-of-truth-stack
 Linked ADRs:
 - none
 Linked plan:
@@ -35,7 +35,7 @@ Keep ad hoc docs; rejected because it cannot be validated reliably by automation
 
 ## Specs to create or update
 
-- UNSAFE-REVIEW-SPEC-0018
+- UNSAFE-REVIEW-SPEC-0020
 
 ## Architecture decisions needed
 

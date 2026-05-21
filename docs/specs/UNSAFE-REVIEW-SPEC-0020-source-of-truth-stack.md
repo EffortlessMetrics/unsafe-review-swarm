@@ -1,4 +1,4 @@
-# UNSAFE-REVIEW-SPEC-0018: source-of-truth stack contract
+# UNSAFE-REVIEW-SPEC-0020: source-of-truth stack contract
 
 Status: accepted
 Owner: repo-infra
@@ -44,11 +44,12 @@ Policy-contract workflow commands and TOML parse checks.
 
 ## Implementation mapping
 
-`docs/`, `plans/`, `.codex/goals/`, `policy/`, `.github/workflows/`.
+`docs/`, `plans/`, `.unsafe-review/goals/`, `policy/`, `.github/workflows/`.
 
 ## CI proof
 
-`cargo xtask check-doc-artifacts` (target), plus interim parse/lint checks.
+`cargo run --locked -p xtask -- check-doc-artifacts`, plus goal, package-boundary,
+and CI-lane checks.
 
 ## Metrics / promotion rule
 

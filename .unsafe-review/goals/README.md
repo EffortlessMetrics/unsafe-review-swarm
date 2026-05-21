@@ -1,6 +1,6 @@
 # Active goals
 
-Codex execution flow:
+Repository execution flow:
 
 1. Read `active.toml`.
 2. Follow linked plan item(s).

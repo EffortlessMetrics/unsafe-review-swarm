@@ -1,26 +1,33 @@
-id = "unsafe-review-0-1-review-card-loop"
-title = "unsafe-review 0.1 review-card loop"
+schema_version = "1.0"
+
+id = "unsafe-review-source-of-truth-stack"
+title = "unsafe-review source-of-truth stack rollout"
 status = "active"
-owner = "core/product"
-created = "2026-05-17"
+owner = "repo-infra"
+created = "2026-05-20"
 
 objective = """
-Build the stable-first unsafe contract review scaffold: source scanner, review cards,
-policy docs, repo inventory, badges, and packet-ready outputs.
+Establish linked proposal/spec/ADR/plan/goal/support-tier/policy artifacts with
+machine-checkable references and clear proof boundaries.
 """
 
 end_state = [
-  "Diff mode emits review cards for changed unsafe seams.",
-  "Repo mode emits inventory and badge data.",
-  "Every card names contract, guard, reach, and witness evidence.",
-  "No output claims memory-safety proof.",
+  "Document artifacts are tracked in policy/doc-artifacts.toml.",
+  "Active unsafe-review goal state is present and linked.",
+  "Support tiers map claims to proof commands.",
+  "Plan and spec layers are linked through stable IDs.",
 ]
 
 [[work_item]]
-id = "review-card-loop-v1"
-status = "done"
-spec = "docs/specs/UNSAFE-REVIEW-SPEC-0002-review-card-schema.md"
-plan = "plans/0.1.0/implementation-plan.md"
+id = "docs/source-of-truth-scaffold"
+status = "active"
+proposal = "UNSAFE-REVIEW-PROP-0002"
+spec = "UNSAFE-REVIEW-SPEC-0020"
+plan = "plans/0.2.0/implementation-plan.md"
 commands = [
-  "cargo xtask check-pr"
+  "cargo run --locked -p xtask -- check-doc-artifacts",
+  "cargo run --locked -p xtask -- check-goals",
+  "cargo run --locked -p xtask -- check-package-boundary",
+  "cargo run --locked -p xtask -- check-ci-lanes",
+  "git diff --check",
 ]

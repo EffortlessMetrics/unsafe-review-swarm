@@ -4,7 +4,7 @@
 
 Status: active
 Linked proposal: UNSAFE-REVIEW-PROP-0002
-Linked spec: UNSAFE-REVIEW-SPEC-0018
+Linked spec: UNSAFE-REVIEW-SPEC-0020
 Linked ADR: none
 Blocks: doc-artifact-ledger
 Blocked by: none
@@ -31,6 +31,10 @@ Required paths exist and are cross-linked with stable IDs.
 ### Proof commands
 
 ```bash
+cargo run --locked -p xtask -- check-doc-artifacts
+cargo run --locked -p xtask -- check-goals
+cargo run --locked -p xtask -- check-package-boundary
+cargo run --locked -p xtask -- check-ci-lanes
 git diff --check
 ```
 
@@ -40,4 +44,5 @@ Revert this commit.
 
 ### Claim boundary
 
-This does not prove xtask validators are fully implemented.
+This proves only the source-of-truth scaffolding links and ledgers. It does not
+prove unsafe-review runtime analysis behavior.

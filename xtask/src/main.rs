@@ -35,9 +35,21 @@ const POLICY_FILES: &[&str] = &[
     "policy/workflow-allowlist.toml",
     "policy/process-allowlist.toml",
     "policy/network-allowlist.toml",
+    "policy/doc-artifacts.toml",
+    "policy/ci-lane-whitelist.toml",
+    "policy/package-boundary.toml",
 ];
 const WORKFLOW_ALLOWLIST: &str = "policy/workflow-allowlist.toml";
 const WORKFLOW_DIR: &str = ".github/workflows";
+const DOC_ARTIFACT_LEDGER: &str = "policy/doc-artifacts.toml";
+const CI_LANE_LEDGER: &str = "policy/ci-lane-whitelist.toml";
+const PACKAGE_BOUNDARY_LEDGER: &str = "policy/package-boundary.toml";
+const ACTIVE_GOAL_MANIFEST: &str = ".unsafe-review/goals/active.toml";
+const DOC_ARTIFACT_KINDS: &[&str] = &["proposal", "spec", "adr", "plan", "goal"];
+const DOC_ARTIFACT_STATUSES: &[&str] = &["proposed", "accepted", "active", "done", "deferred"];
+const GOAL_WORK_ITEM_STATUSES: &[&str] = &["ready", "active", "blocked", "done", "superseded"];
+const PACKAGE_CLASSIFICATIONS: &[&str] = &["published", "private", "internal", "deferred"];
+const CI_LANE_STATUSES: &[&str] = &["advisory", "required", "deferred", "retired"];
 
 const FIXTURE_REQUIRED_FILES: &[&str] = &["Cargo.toml", "change.diff", "src/lib.rs"];
 
@@ -155,7 +167,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
     match args.get(1).map(|arg| arg.as_str()) {
         None | Some("help") | Some("--help") => {
             println!(
-                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>"
+                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>"
             );
             Ok(())
         }
@@ -179,6 +191,22 @@ fn run(args: Vec<String>) -> Result<(), String> {
         Some("check-policy") => {
             require_no_extra_args(&args, "check-policy")?;
             check_policy()
+        }
+        Some("check-doc-artifacts") => {
+            require_no_extra_args(&args, "check-doc-artifacts")?;
+            check_doc_artifacts()
+        }
+        Some("check-goals") => {
+            require_no_extra_args(&args, "check-goals")?;
+            check_goals()
+        }
+        Some("check-package-boundary") => {
+            require_no_extra_args(&args, "check-package-boundary")?;
+            check_package_boundary()
+        }
+        Some("check-ci-lanes") => {
+            require_no_extra_args(&args, "check-ci-lanes")?;
+            check_ci_lanes()
         }
         Some("check-support-tiers") => {
             require_no_extra_args(&args, "check-support-tiers")?;
@@ -293,8 +321,222 @@ fn check_policy() -> Result<(), String> {
         Path::new("policy/unsafe-review-suppressions.toml"),
         LedgerKind::Suppression,
     )?;
-    parse_toml_file(Path::new(".unsafe-review/goals/active.toml"))?;
+    check_doc_artifacts()?;
+    check_goals()?;
+    check_package_boundary()?;
+    check_ci_lanes()?;
     println!("check-policy: ok");
+    Ok(())
+}
+
+fn check_doc_artifacts() -> Result<(), String> {
+    let ids = check_doc_artifacts_impl()?;
+    println!("check-doc-artifacts: ok ({} artifacts)", ids.len());
+    Ok(())
+}
+
+fn check_doc_artifacts_impl() -> Result<BTreeSet<String>, String> {
+    let value = parse_toml_file(Path::new(DOC_ARTIFACT_LEDGER))?;
+    require_toml_string(&value, "schema_version", DOC_ARTIFACT_LEDGER)?;
+    let artifacts = toml_array(&value, "artifact", DOC_ARTIFACT_LEDGER)?;
+    if artifacts.is_empty() {
+        return Err(format!(
+            "{DOC_ARTIFACT_LEDGER} must list at least one artifact"
+        ));
+    }
+
+    let mut ids = BTreeSet::new();
+    let mut linked_ids = Vec::new();
+    for (idx, artifact) in artifacts.iter().enumerate() {
+        let table = toml_table(artifact, DOC_ARTIFACT_LEDGER, "artifact", idx)?;
+        let id = required_table_string(table, "id", DOC_ARTIFACT_LEDGER, "artifact", idx)?;
+        let kind = required_table_string(table, "kind", DOC_ARTIFACT_LEDGER, "artifact", idx)?;
+        let path = required_table_string(table, "path", DOC_ARTIFACT_LEDGER, "artifact", idx)?;
+        let status = required_table_string(table, "status", DOC_ARTIFACT_LEDGER, "artifact", idx)?;
+        required_table_string(table, "owner", DOC_ARTIFACT_LEDGER, "artifact", idx)?;
+
+        require_known(kind, DOC_ARTIFACT_KINDS, DOC_ARTIFACT_LEDGER, "kind")?;
+        require_known(status, DOC_ARTIFACT_STATUSES, DOC_ARTIFACT_LEDGER, "status")?;
+        if !ids.insert(id.to_string()) {
+            return Err(format!(
+                "{DOC_ARTIFACT_LEDGER} contains duplicate id `{id}`"
+            ));
+        }
+        require_file(path)?;
+        if let Some(linked_proposal) = table.get("linked_proposal").and_then(toml::Value::as_str) {
+            linked_ids.push((
+                id.to_string(),
+                "linked_proposal",
+                linked_proposal.to_string(),
+            ));
+        }
+        if let Some(linked_spec) = table.get("linked_spec").and_then(toml::Value::as_str) {
+            linked_ids.push((id.to_string(), "linked_spec", linked_spec.to_string()));
+        }
+        if let Some(policy_impact) = table.get("policy_impact") {
+            for path in toml_str_array(policy_impact, DOC_ARTIFACT_LEDGER, "policy_impact")? {
+                require_file(path)?;
+            }
+        }
+    }
+
+    for (id, field, linked_id) in linked_ids {
+        if !ids.contains(&linked_id) {
+            return Err(format!(
+                "{DOC_ARTIFACT_LEDGER} artifact `{id}` has {field} `{linked_id}` not listed as an artifact"
+            ));
+        }
+    }
+
+    Ok(ids)
+}
+
+fn check_goals() -> Result<(), String> {
+    let artifact_ids = check_doc_artifacts_impl()?;
+    let value = parse_toml_file(Path::new(ACTIVE_GOAL_MANIFEST))?;
+    require_toml_string(&value, "schema_version", ACTIVE_GOAL_MANIFEST)?;
+    for key in ["id", "title", "status", "owner", "created", "objective"] {
+        required_toml_string(&value, key, ACTIVE_GOAL_MANIFEST)?;
+    }
+    require_known(
+        required_toml_string(&value, "status", ACTIVE_GOAL_MANIFEST)?,
+        GOAL_WORK_ITEM_STATUSES,
+        ACTIVE_GOAL_MANIFEST,
+        "status",
+    )?;
+    let end_state = toml_array(&value, "end_state", ACTIVE_GOAL_MANIFEST)?;
+    if end_state.is_empty() {
+        return Err(format!(
+            "{ACTIVE_GOAL_MANIFEST} end_state must not be empty"
+        ));
+    }
+    for item in end_state {
+        if item.as_str().is_none_or(|value| value.trim().is_empty()) {
+            return Err(format!(
+                "{ACTIVE_GOAL_MANIFEST} end_state entries must be non-empty strings"
+            ));
+        }
+    }
+
+    let work_items = toml_array(&value, "work_item", ACTIVE_GOAL_MANIFEST)?;
+    if work_items.is_empty() {
+        return Err(format!(
+            "{ACTIVE_GOAL_MANIFEST} must list at least one work_item"
+        ));
+    }
+    let mut ids = BTreeSet::new();
+    for (idx, item) in work_items.iter().enumerate() {
+        let table = toml_table(item, ACTIVE_GOAL_MANIFEST, "work_item", idx)?;
+        let id = required_table_string(table, "id", ACTIVE_GOAL_MANIFEST, "work_item", idx)?;
+        if !ids.insert(id.to_string()) {
+            return Err(format!(
+                "{ACTIVE_GOAL_MANIFEST} contains duplicate work_item `{id}`"
+            ));
+        }
+        let status =
+            required_table_string(table, "status", ACTIVE_GOAL_MANIFEST, "work_item", idx)?;
+        require_known(
+            status,
+            GOAL_WORK_ITEM_STATUSES,
+            ACTIVE_GOAL_MANIFEST,
+            "work_item.status",
+        )?;
+        for key in ["proposal", "spec"] {
+            if let Some(linked_id) = table.get(key).and_then(toml::Value::as_str)
+                && !artifact_ids.contains(linked_id)
+            {
+                return Err(format!(
+                    "{ACTIVE_GOAL_MANIFEST} work_item `{id}` references {key} `{linked_id}` not listed in {DOC_ARTIFACT_LEDGER}"
+                ));
+            }
+        }
+        let plan = required_table_string(table, "plan", ACTIVE_GOAL_MANIFEST, "work_item", idx)?;
+        require_file(plan)?;
+        let commands = table.get("commands").ok_or_else(|| {
+            format!("{ACTIVE_GOAL_MANIFEST} work_item `{id}` is missing commands")
+        })?;
+        let commands = toml_str_array(commands, ACTIVE_GOAL_MANIFEST, "commands")?;
+        if commands.is_empty() {
+            return Err(format!(
+                "{ACTIVE_GOAL_MANIFEST} work_item `{id}` commands must not be empty"
+            ));
+        }
+    }
+    println!("check-goals: ok ({} work items)", ids.len());
+    Ok(())
+}
+
+fn check_package_boundary() -> Result<(), String> {
+    let value = parse_toml_file(Path::new(PACKAGE_BOUNDARY_LEDGER))?;
+    require_toml_string(&value, "schema_version", PACKAGE_BOUNDARY_LEDGER)?;
+    let packages = toml_array(&value, "package", PACKAGE_BOUNDARY_LEDGER)?;
+    if packages.is_empty() {
+        return Err(format!(
+            "{PACKAGE_BOUNDARY_LEDGER} must list at least one package"
+        ));
+    }
+    let mut names = BTreeSet::new();
+    for (idx, package) in packages.iter().enumerate() {
+        let table = toml_table(package, PACKAGE_BOUNDARY_LEDGER, "package", idx)?;
+        let name = required_table_string(table, "name", PACKAGE_BOUNDARY_LEDGER, "package", idx)?;
+        if !names.insert(name.to_string()) {
+            return Err(format!(
+                "{PACKAGE_BOUNDARY_LEDGER} contains duplicate package `{name}`"
+            ));
+        }
+        let path = required_table_string(table, "path", PACKAGE_BOUNDARY_LEDGER, "package", idx)?;
+        let classification = required_table_string(
+            table,
+            "classification",
+            PACKAGE_BOUNDARY_LEDGER,
+            "package",
+            idx,
+        )?;
+        require_known(
+            classification,
+            PACKAGE_CLASSIFICATIONS,
+            PACKAGE_BOUNDARY_LEDGER,
+            "classification",
+        )?;
+        required_table_string(table, "owner", PACKAGE_BOUNDARY_LEDGER, "package", idx)?;
+        required_table_string(table, "reason", PACKAGE_BOUNDARY_LEDGER, "package", idx)?;
+        require_file(&format!("{path}/Cargo.toml"))?;
+    }
+    println!("check-package-boundary: ok ({} packages)", names.len());
+    Ok(())
+}
+
+fn check_ci_lanes() -> Result<(), String> {
+    let value = parse_toml_file(Path::new(CI_LANE_LEDGER))?;
+    require_toml_string(&value, "schema_version", CI_LANE_LEDGER)?;
+    let lanes = toml_array(&value, "lane", CI_LANE_LEDGER)?;
+    if lanes.is_empty() {
+        return Err(format!("{CI_LANE_LEDGER} must list at least one lane"));
+    }
+    let mut ids = BTreeSet::new();
+    for (idx, lane) in lanes.iter().enumerate() {
+        let table = toml_table(lane, CI_LANE_LEDGER, "lane", idx)?;
+        let id = required_table_string(table, "id", CI_LANE_LEDGER, "lane", idx)?;
+        if !ids.insert(id.to_string()) {
+            return Err(format!("{CI_LANE_LEDGER} contains duplicate lane `{id}`"));
+        }
+        for key in [
+            "owner",
+            "intent",
+            "proof_obligation",
+            "cost_estimate",
+            "trigger_policy",
+            "review_after",
+        ] {
+            required_table_string(table, key, CI_LANE_LEDGER, "lane", idx)?;
+        }
+        let status = required_table_string(table, "status", CI_LANE_LEDGER, "lane", idx)?;
+        require_known(status, CI_LANE_STATUSES, CI_LANE_LEDGER, "status")?;
+        if id == "policy-contracts" {
+            require_file(".github/workflows/policy-contracts.yml")?;
+        }
+    }
+    println!("check-ci-lanes: ok ({} lanes)", ids.len());
     Ok(())
 }
 
@@ -2673,6 +2915,81 @@ fn required_toml_string<'a>(
         Err(format!("{path} string key `{key}` is empty"))
     } else {
         Ok(value)
+    }
+}
+
+fn toml_array<'a>(
+    value: &'a toml::Value,
+    key: &str,
+    path: &str,
+) -> Result<&'a Vec<toml::Value>, String> {
+    value
+        .get(key)
+        .and_then(toml::Value::as_array)
+        .ok_or_else(|| format!("{path} is missing array key `{key}`"))
+}
+
+fn toml_table<'a>(
+    value: &'a toml::Value,
+    path: &str,
+    key: &str,
+    idx: usize,
+) -> Result<&'a toml::map::Map<String, toml::Value>, String> {
+    value
+        .as_table()
+        .ok_or_else(|| format!("{path} {key}[{idx}] must be a table"))
+}
+
+fn toml_str_array<'a>(
+    value: &'a toml::Value,
+    path: &str,
+    key: &str,
+) -> Result<Vec<&'a str>, String> {
+    let values = value
+        .as_array()
+        .ok_or_else(|| format!("{path} `{key}` must be an array"))?;
+    let mut result = Vec::new();
+    for (idx, value) in values.iter().enumerate() {
+        let Some(text) = value.as_str() else {
+            return Err(format!("{path} `{key}`[{idx}] must be a string"));
+        };
+        if text.trim().is_empty() {
+            return Err(format!("{path} `{key}`[{idx}] must not be empty"));
+        }
+        result.push(text);
+    }
+    Ok(result)
+}
+
+fn required_table_string<'a>(
+    table: &'a toml::map::Map<String, toml::Value>,
+    key: &str,
+    path: &str,
+    table_name: &str,
+    idx: usize,
+) -> Result<&'a str, String> {
+    let Some(value) = table.get(key).and_then(toml::Value::as_str) else {
+        return Err(format!(
+            "{path} {table_name}[{idx}] is missing string `{key}`"
+        ));
+    };
+    if value.trim().is_empty() {
+        Err(format!(
+            "{path} {table_name}[{idx}] string `{key}` is empty"
+        ))
+    } else {
+        Ok(value)
+    }
+}
+
+fn require_known(value: &str, known: &[&str], path: &str, field: &str) -> Result<(), String> {
+    if known.contains(&value) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{path} has unsupported {field} `{value}`; expected one of {}",
+            known.join(", ")
+        ))
     }
 }
 
