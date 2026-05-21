@@ -2,7 +2,7 @@
 
 Use the repo source-of-truth stack:
 
-1. Read `.unsafe-review/goals/active.toml`.
+1. Read `.unsafe-review-spec/goals/active.toml`.
 2. Read the linked plan item.
 3. Read the linked spec.
 4. Read the linked proposal only for context.
@@ -10,7 +10,7 @@ Use the repo source-of-truth stack:
 6. Update support tiers or policy ledgers only if the claim/policy changes.
 7. Run the proof commands listed in the plan item.
 8. Do not invent missing claims. If proof is missing, keep the claim advisory/experimental.
-9. Do not use `.jules` or `.codex` as unsafe-review source-of-truth state.
+9. Do not use `.jules`, `.codex`, or product runtime output directories as unsafe-review source-of-truth state.
 10. Do not stop at “human merge required” unless the repo has that policy in a current source-of-truth file.
 
 If a specific command, lint, API, feature flag, crate name, or workflow name is mentioned, verify it exists before building a PR around it.

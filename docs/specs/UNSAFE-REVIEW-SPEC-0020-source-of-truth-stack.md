@@ -44,7 +44,8 @@ Policy-contract workflow commands and TOML parse checks.
 
 ## Implementation mapping
 
-`docs/`, `plans/`, `.unsafe-review/goals/`, `policy/`, `.github/workflows/`.
+`docs/`, `plans/`, `.unsafe-review-spec/goals/`, `policy/`,
+`.github/workflows/`.
 
 ## CI proof
 

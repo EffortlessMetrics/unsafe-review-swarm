@@ -47,7 +47,7 @@ const DOC_ARTIFACT_LEDGER: &str = "policy/doc-artifacts.toml";
 const CI_LANE_LEDGER: &str = "policy/ci-lane-whitelist.toml";
 const PACKAGE_BOUNDARY_LEDGER: &str = "policy/package-boundary.toml";
 const SOURCE_SYNC_LEDGER: &str = "policy/source-sync.toml";
-const ACTIVE_GOAL_MANIFEST: &str = ".unsafe-review/goals/active.toml";
+const ACTIVE_GOAL_MANIFEST: &str = ".unsafe-review-spec/goals/active.toml";
 const DOC_ARTIFACT_KINDS: &[&str] = &["proposal", "spec", "adr", "plan", "goal"];
 const DOC_ARTIFACT_STATUSES: &[&str] = &["proposed", "accepted", "active", "done", "deferred"];
 const GOAL_WORK_ITEM_STATUSES: &[&str] = &["ready", "active", "blocked", "done", "superseded"];
@@ -309,7 +309,7 @@ fn check_docs() -> Result<(), String> {
         Path::new("MANIFEST.md"),
         Path::new("docs"),
         Path::new("plans"),
-        Path::new(".unsafe-review"),
+        Path::new(".unsafe-review-spec"),
         Path::new("policy"),
     ])?;
     println!("check-docs: ok");

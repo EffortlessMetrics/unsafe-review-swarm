@@ -23,7 +23,12 @@ fn visit(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), String> 
         if path.is_dir() {
             if matches!(
                 name.as_ref(),
-                ".git" | "target" | ".unsafe-review" | ".github" | "node_modules"
+                ".git"
+                    | "target"
+                    | ".unsafe-review"
+                    | ".unsafe-review-spec"
+                    | ".github"
+                    | "node_modules"
             ) {
                 continue;
             }
