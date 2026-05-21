@@ -1528,6 +1528,33 @@ fn check_manual_fuzz_harness() -> Result<(), String> {
             return Err(format!("fuzz/.gitignore must ignore `{ignored}`"));
         }
     }
+    let corpus_dir = repo_path("fuzz/corpus/analyze");
+    let corpus_entries = fs::read_dir(&corpus_dir)
+        .map_err(|err| format!("failed to read {}: {err}", corpus_dir.display()))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|err| format!("failed to enumerate {}: {err}", corpus_dir.display()))?;
+    if corpus_entries.is_empty() {
+        return Err("fuzz/corpus/analyze must include at least one corpus seed".to_string());
+    }
+    let mut has_diff_marker_seed = false;
+    for entry in corpus_entries {
+        let seed_path = entry.path();
+        if !seed_path.is_file() {
+            continue;
+        }
+        let seed = fs::read_to_string(&seed_path)
+            .map_err(|err| format!("failed to read {}: {err}", seed_path.display()))?;
+        if seed.contains("---DIFF---") {
+            has_diff_marker_seed = true;
+            break;
+        }
+    }
+    if !has_diff_marker_seed {
+        return Err(
+            "fuzz/corpus/analyze must include at least one seed containing `---DIFF---`"
+                .to_string(),
+        );
+    }
 
     println!("check-fuzz: ok");
     Ok(())
