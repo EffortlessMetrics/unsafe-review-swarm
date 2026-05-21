@@ -307,27 +307,8 @@ fn detect_site(line: &str) -> Option<(UnsafeSiteKind, OperationFamily)> {
     if is_import_item(line) {
         return None;
     }
-    if contains_call_name(line, "copy_nonoverlapping") {
-        return Some((
-            UnsafeSiteKind::Operation,
-            OperationFamily::CopyNonOverlapping,
-        ));
-    }
-    if is_ptr_copy_call(line) {
-        return Some((UnsafeSiteKind::Operation, OperationFamily::PtrCopy));
-    }
-    if is_ptr_replace_call(line) {
-        return Some((UnsafeSiteKind::Operation, OperationFamily::PtrReplace));
-    }
-    if is_vec_from_raw_parts_call(line) {
-        return Some((UnsafeSiteKind::Operation, OperationFamily::VecFromRawParts));
-    }
-    if contains_call_name(line, "from_raw_parts") || contains_call_name(line, "from_raw_parts_mut")
-    {
-        return Some((
-            UnsafeSiteKind::Operation,
-            OperationFamily::SliceFromRawParts,
-        ));
+    if let Some(family) = detect_operation_family(line) {
+        return Some((UnsafeSiteKind::Operation, family));
     }
     if contains_call_name(line, "from_utf8_unchecked") {
         return Some((
@@ -340,9 +321,6 @@ fn detect_site(line: &str) -> Option<(UnsafeSiteKind, OperationFamily)> {
             UnsafeSiteKind::Operation,
             OperationFamily::MaybeUninitAssumeInit,
         ));
-    }
-    if contains_call_name(line, "set_len") {
-        return Some((UnsafeSiteKind::Operation, OperationFamily::VecSetLen));
     }
     if contains_call_name(line, "transmute") || contains_call_name(line, "transmute_copy") {
         return Some((UnsafeSiteKind::Operation, OperationFamily::Transmute));
@@ -437,6 +415,33 @@ fn is_import_item(line: &str) -> bool {
     trimmed.starts_with("use ")
         || trimmed.starts_with("pub use ")
         || (trimmed.starts_with("pub(") && trimmed.contains(" use "))
+}
+
+fn detect_operation_family(line: &str) -> Option<OperationFamily> {
+    let direct_mappings = [
+        ("copy_nonoverlapping", OperationFamily::CopyNonOverlapping),
+        ("set_len", OperationFamily::VecSetLen),
+    ];
+    if let Some((_, family)) = direct_mappings
+        .into_iter()
+        .find(|(call, _)| contains_call_name(line, call))
+    {
+        return Some(family);
+    }
+    if is_ptr_copy_call(line) {
+        return Some(OperationFamily::PtrCopy);
+    }
+    if is_ptr_replace_call(line) {
+        return Some(OperationFamily::PtrReplace);
+    }
+    if is_vec_from_raw_parts_call(line) {
+        return Some(OperationFamily::VecFromRawParts);
+    }
+    if contains_call_name(line, "from_raw_parts") || contains_call_name(line, "from_raw_parts_mut")
+    {
+        return Some(OperationFamily::SliceFromRawParts);
+    }
+    None
 }
 
 fn is_static_mut_item(line: &str) -> bool {
