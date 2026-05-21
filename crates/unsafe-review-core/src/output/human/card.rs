@@ -46,7 +46,11 @@ pub(super) fn render_card(out: &mut String, card: &ReviewCard) {
     if !card.routes.is_empty() {
         out.push_str("  witness routes:\n");
         for route in &card.routes {
-            out.push_str(&format!("    - {}: {}\n", route.kind.as_str(), route.reason));
+            out.push_str(&format!(
+                "    - {}: {}\n",
+                route.kind.as_str(),
+                route.reason
+            ));
             if let Some(command) = &route.command {
                 out.push_str(&format!("      command: {}\n", command));
             }
