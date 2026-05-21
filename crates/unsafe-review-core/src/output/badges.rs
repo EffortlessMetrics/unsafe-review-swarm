@@ -3,23 +3,21 @@ use serde::Serialize;
 
 pub(crate) fn render(output: &AnalyzeOutput) -> (String, String) {
     let color = badge_color(output.summary.open_actionable_gaps);
-    let main = ShieldsBadge {
-        schema_version: 1,
-        label: "unsafe-review",
-        message: format!("{} open gaps", output.summary.open_actionable_gaps),
+    let main = badge(
+        "unsafe-review",
+        format!("{} open gaps", output.summary.open_actionable_gaps),
         color,
-    };
-    let plus = ShieldsBadge {
-        schema_version: 1,
-        label: "unsafe-review+",
-        message: format!(
+    );
+    let plus = badge(
+        "unsafe-review+",
+        format!(
             "{} contract / {} guard / {} witness",
             output.summary.contract_missing,
             output.summary.guard_missing,
             output.summary.guarded_unwitnessed
         ),
         color,
-    };
+    );
     (render_pretty(&main), render_pretty(&plus))
 }
 
@@ -40,6 +38,15 @@ fn render_pretty(value: &impl Serialize) -> String {
             text
         }
         Err(err) => format!("{{\n  \"error\": \"badge serialization failed: {err}\"\n}}\n"),
+    }
+}
+
+fn badge(label: &'static str, message: String, color: &'static str) -> ShieldsBadge<'static> {
+    ShieldsBadge {
+        schema_version: 1,
+        label,
+        message,
+        color,
     }
 }
 
