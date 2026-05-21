@@ -33,7 +33,7 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
     for card in &output.cards {
         let hazard = card.hazards.first().map_or("unknown", |h| h.as_str());
         let missing = card.missing.first().map_or("", |m| m.kind.as_str());
-        let route = card.routes.first().map_or("human", |r| r.kind.as_str());
+        let route = diff_primary_route(card);
         out.push_str(&format!(
             "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |\n",
             md_cell(&card.id.to_string()),
@@ -90,10 +90,7 @@ fn render_repo_posture(output: &AnalyzeOutput) -> String {
         );
         out.push_str("|---|---|---|---|---|---|---|\n");
         for card in &output.cards {
-            let route = card
-                .routes
-                .first()
-                .map_or("human-deep-review", |route| route.kind.as_str());
+            let route = repo_primary_route(card);
             out.push_str(&format!(
                 "| `{}` | `{}` | `{}` | `{}` | {} | `{}` | {} |\n",
                 md_cell(&card.id.to_string()),
@@ -134,13 +131,23 @@ fn operation_counts(output: &AnalyzeOutput) -> BTreeMap<String, usize> {
 fn route_counts(output: &AnalyzeOutput) -> BTreeMap<String, usize> {
     let mut counts = BTreeMap::new();
     for card in &output.cards {
-        let route = card
-            .routes
-            .first()
-            .map_or("human-deep-review", |route| route.kind.as_str());
-        *counts.entry(route.to_string()).or_default() += 1;
+        *counts
+            .entry(repo_primary_route(card).to_string())
+            .or_default() += 1;
     }
     counts
+}
+
+fn diff_primary_route(card: &ReviewCard) -> &str {
+    card.routes
+        .first()
+        .map_or("human", |route| route.kind.as_str())
+}
+
+fn repo_primary_route(card: &ReviewCard) -> &str {
+    card.routes
+        .first()
+        .map_or("human-deep-review", |route| route.kind.as_str())
 }
 
 fn render_counts_table(out: &mut String, label: &str, counts: BTreeMap<String, usize>) {
@@ -227,10 +234,7 @@ fn render_pr_summary_card_table(out: &mut String, output: &AnalyzeOutput) {
     );
     out.push_str("|---|---|---|---|---|---|---|---|\n");
     for card in &output.cards {
-        let route = card
-            .routes
-            .first()
-            .map_or("human-deep-review", |route| route.kind.as_str());
+        let route = repo_primary_route(card);
         out.push_str(&format!(
             "| `{}` | `{}` | {} | `{}` | `{}` | {} | `{}` | {} |\n",
             md_cell(&card.id.to_string()),
