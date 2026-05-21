@@ -1,0 +1,22 @@
+schema_version = "1.0"
+
+[[package]]
+name = "unsafe-review"
+path = "crates/unsafe-review"
+classification = "published"
+owner = "runtime"
+reason = "Primary CLI entry crate"
+
+[[package]]
+name = "unsafe-review-cli"
+path = "crates/unsafe-review-cli"
+classification = "published"
+owner = "runtime"
+reason = "CLI interface crate"
+
+[[package]]
+name = "unsafe-review-core"
+path = "crates/unsafe-review-core"
+classification = "published"
+owner = "runtime"
+reason = "Core analysis contract crate"
