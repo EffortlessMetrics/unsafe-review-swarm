@@ -22,25 +22,33 @@ impl Default for LspConfig {
 }
 
 pub(super) fn parse_config(v: Value) -> LspConfig {
+    v.get("unsafeReview")
+        .map_or_else(LspConfig::default, parse_unsafe_review_config)
+}
+
+fn parse_unsafe_review_config(config: &Value) -> LspConfig {
     let mut cfg = LspConfig::default();
-    if let Some(u) = v.get("unsafeReview") {
-        if let Some(mode) = u.get("mode").and_then(Value::as_str)
-            && matches!(mode, "repo" | "diff")
-        {
-            cfg.mode = mode.to_string();
-        }
-        if let Some(base) = u.get("base").and_then(Value::as_str) {
-            cfg.base = Some(base.to_string());
-        }
-        cfg.max_cards = parse_max_cards(u);
-        if let Some(b) = u.get("refreshOnOpen").and_then(Value::as_bool) {
-            cfg.refresh_on_open = b;
-        }
-        if let Some(b) = u.get("refreshOnSave").and_then(Value::as_bool) {
-            cfg.refresh_on_save = b;
-        }
+    if let Some(mode) = parse_mode(config) {
+        cfg.mode = mode.to_string();
+    }
+    if let Some(base) = config.get("base").and_then(Value::as_str) {
+        cfg.base = Some(base.to_string());
+    }
+    cfg.max_cards = parse_max_cards(config);
+    if let Some(refresh_on_open) = config.get("refreshOnOpen").and_then(Value::as_bool) {
+        cfg.refresh_on_open = refresh_on_open;
+    }
+    if let Some(refresh_on_save) = config.get("refreshOnSave").and_then(Value::as_bool) {
+        cfg.refresh_on_save = refresh_on_save;
     }
     cfg
+}
+
+fn parse_mode(config: &Value) -> Option<&str> {
+    config
+        .get("mode")
+        .and_then(Value::as_str)
+        .filter(|mode| matches!(*mode, "repo" | "diff"))
 }
 
 fn parse_max_cards(config: &Value) -> Option<usize> {
