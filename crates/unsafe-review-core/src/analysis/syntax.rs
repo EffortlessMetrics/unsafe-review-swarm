@@ -60,7 +60,7 @@ struct LineColumn {
 }
 
 fn line_column(text: &str, offset: usize, line_starts: &[usize]) -> LineColumn {
-    let offset = offset.min(text.len());
+    let offset = clamp_to_char_boundary(text, offset.min(text.len()));
     let line_idx = line_starts
         .partition_point(|line_start| *line_start <= offset)
         .saturating_sub(1);
@@ -75,6 +75,18 @@ fn line_column(text: &str, offset: usize, line_starts: &[usize]) -> LineColumn {
         + 1;
 
     LineColumn { line, column }
+}
+
+fn clamp_to_char_boundary(text: &str, offset: usize) -> usize {
+    if text.is_char_boundary(offset) {
+        return offset;
+    }
+
+    let mut candidate = offset;
+    while candidate > 0 && !text.is_char_boundary(candidate) {
+        candidate -= 1;
+    }
+    candidate
 }
 
 fn snippet(text: &str, start: usize, end: usize) -> String {
@@ -130,6 +142,17 @@ mod tests {
         assert_eq!(call.column, 14);
         assert_eq!(call.snippet, "core::ptr::read(0 as *const u8)");
         Ok(())
+    }
+
+    #[test]
+    fn line_column_clamps_non_boundary_offsets() {
+        let text = "a\u{e9}z";
+        let line_starts = line_starts(text);
+
+        let position = line_column(text, 2, &line_starts);
+
+        assert_eq!(position.line, 1);
+        assert_eq!(position.column, 2);
     }
 
     #[test]
