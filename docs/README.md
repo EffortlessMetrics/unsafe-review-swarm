@@ -14,6 +14,8 @@
 | ADRs | durable architecture decisions | `docs/adr/` |
 | Templates | reusable proposal, spec, plan, closeout, and publication receipt skeletons | `docs/templates/` |
 | Contribution process | swarm-to-main routing and source PR requirements | `docs/contributing/SWARM_TO_MAIN.md` |
+| Spec style | durable source-of-truth ownership boundaries and artifact role split | `docs/spec-style.md` |
+| Spec rails guide | contributor workflow for source-of-truth rails and tool-state boundaries | `docs/contributing/spec-rails.md` |
 | Implementation plans | PR-sized sequence and proof commands | `plans/` |
 | Active lane | current dogfood-calibrated evidence loop | `docs/status/DOGFOOD_CALIBRATED_EVIDENCE_LANE.md` |
 | Dogfood index | selected real-crate dogfood targets, usefulness notes, and recorded outcome movement | `docs/dogfood/index.md`, `docs/dogfood/index.json`, `docs/dogfood/usefulness-notes.md` |

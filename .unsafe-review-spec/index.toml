@@ -1,0 +1,38 @@
+schema_version = "1.0"
+
+repo = "unsafe-review"
+namespace = ".unsafe-review-spec"
+
+[conventions]
+proposal_prefix = "UNSAFE-REVIEW-PROP"
+spec_prefix = "UNSAFE-REVIEW-SPEC"
+adr_prefix = "UNSAFE-REVIEW-ADR"
+lane_prefix = "unsafe-review"
+
+[external_namespaces]
+codex = ".codex"
+speckit = ".spec"
+claude = ".claude"
+jules = ".jules"
+
+[[artifact]]
+id = "UNSAFE-REVIEW-PROP-0002"
+kind = "proposal"
+path = "docs/proposals/UNSAFE-REVIEW-PROP-0002-source-of-truth-stack.md"
+status = "proposed"
+owner = "repo-infra"
+
+[[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0020"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0020-source-of-truth-stack.md"
+status = "accepted"
+owner = "repo-infra"
+linked_proposal = "UNSAFE-REVIEW-PROP-0002"
+
+[[lane]]
+id = "docs/source-of-truth-scaffold"
+name = "source-of-truth scaffold"
+path = ".unsafe-review-spec/goals/active.toml"
+status = "active"
+owner = "repo-infra"
