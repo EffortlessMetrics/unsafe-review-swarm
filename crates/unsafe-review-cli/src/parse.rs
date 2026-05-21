@@ -59,10 +59,10 @@ fn parse_doctor(args: Vec<String>) -> Result<Command, String> {
         match args[idx].as_str() {
             "--root" => {
                 idx += 1;
-                root = PathBuf::from(value(&args, idx, "--root")?);
+                root = parse_path_value(&args, idx, "--root")?;
             }
             arg if arg.starts_with("--root=") => {
-                root = PathBuf::from(inline_value(arg, "--root")?);
+                root = parse_inline_path_value(arg, "--root")?;
             }
             other => return Err(format!("unknown doctor argument `{other}`")),
         }
@@ -211,17 +211,17 @@ fn parse_badges(args: Vec<String>) -> Result<Command, String> {
         match args[idx].as_str() {
             "--root" => {
                 idx += 1;
-                root = PathBuf::from(value(&args, idx, "--root")?);
+                root = parse_path_value(&args, idx, "--root")?;
             }
             arg if arg.starts_with("--root=") => {
-                root = PathBuf::from(inline_value(arg, "--root")?);
+                root = parse_inline_path_value(arg, "--root")?;
             }
             "--out" => {
                 idx += 1;
-                out = PathBuf::from(value(&args, idx, "--out")?);
+                out = parse_path_value(&args, idx, "--out")?;
             }
             arg if arg.starts_with("--out=") => {
-                out = PathBuf::from(inline_value(arg, "--out")?);
+                out = parse_inline_path_value(arg, "--out")?;
             }
             other => return Err(format!("unknown badges argument `{other}`")),
         }
@@ -239,10 +239,10 @@ fn parse_explain(args: Vec<String>) -> Result<Command, String> {
         match args[idx].as_str() {
             "--root" => {
                 idx += 1;
-                root = PathBuf::from(value(&args, idx, "--root")?);
+                root = parse_path_value(&args, idx, "--root")?;
             }
             arg if arg.starts_with("--root=") => {
-                root = PathBuf::from(inline_value(arg, "--root")?);
+                root = parse_inline_path_value(arg, "--root")?;
             }
             "--format" => {
                 idx += 1;
@@ -275,10 +275,10 @@ fn parse_context(args: Vec<String>) -> Result<Command, String> {
         match args[idx].as_str() {
             "--root" => {
                 idx += 1;
-                root = PathBuf::from(value(&args, idx, "--root")?);
+                root = parse_path_value(&args, idx, "--root")?;
             }
             arg if arg.starts_with("--root=") => {
-                root = PathBuf::from(inline_value(arg, "--root")?);
+                root = parse_inline_path_value(arg, "--root")?;
             }
             "--json" => {}
             "--format" => {
@@ -636,10 +636,10 @@ fn parse_receipt_validate(args: Vec<String>) -> Result<Command, String> {
         match args[idx].as_str() {
             "--root" => {
                 idx += 1;
-                root = PathBuf::from(value(&args, idx, "--root")?);
+                root = parse_path_value(&args, idx, "--root")?;
             }
             arg if arg.starts_with("--root=") => {
-                root = PathBuf::from(inline_value(arg, "--root")?);
+                root = parse_inline_path_value(arg, "--root")?;
             }
             other => return Err(format!("unknown receipt validate argument `{other}`")),
         }
@@ -668,6 +668,14 @@ fn parse_receipt_audit_format(raw: &str) -> Result<Format, String> {
             format_name(&other)
         )),
     }
+}
+
+fn parse_path_value(args: &[String], idx: usize, flag: &str) -> Result<PathBuf, String> {
+    Ok(PathBuf::from(value(args, idx, flag)?))
+}
+
+fn parse_inline_path_value(arg: &str, flag: &str) -> Result<PathBuf, String> {
+    Ok(PathBuf::from(inline_value(arg, flag)?))
 }
 
 fn parse_diff_input(raw: &str) -> DiffInput {
