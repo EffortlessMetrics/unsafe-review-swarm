@@ -47,10 +47,6 @@ impl DiffParserState {
             return;
         };
 
-        if should_skip_metadata(raw) {
-            return;
-        }
-
         self.consume_content_line(&path, raw);
     }
 
@@ -98,9 +94,6 @@ impl DiffParserState {
     }
 }
 
-fn should_skip_metadata(raw: &str) -> bool {
-    raw.starts_with("+++") || raw.starts_with("---")
-}
 
 pub(crate) fn parse_unified_diff(input: &str) -> DiffIndex {
     let mut parser = DiffParserState::default();
@@ -214,6 +207,22 @@ index 1111111..2222222 100644
         assert!(!index.contains_near(&path, 14));
         assert!(!index.contains_near(&path, 28));
         assert!(!index.contains_near(&PathBuf::from("src/other.rs"), 21));
+    }
+
+
+    #[test]
+    fn parse_unified_diff_counts_added_lines_that_start_with_plus_markers() {
+        let diff = r#"diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -3,0 +4,2 @@
++++++ not metadata
++--- also content
+"#;
+        let path = PathBuf::from("src/lib.rs");
+        let index = parse_unified_diff(diff);
+
+        assert_eq!(index.changed_lines[&path], BTreeSet::from([4, 5]));
     }
 
     #[test]
