@@ -390,14 +390,8 @@ fn parse_receipt(args: Vec<String>) -> Result<Command, String> {
 
 fn parse_receipt_audit(args: Vec<String>) -> Result<CheckOptions, String> {
     let mut options = parse_check(args)?;
-    if !matches!(options.format, Format::Human) {
-        options.format = parse_receipt_audit_format(format_name(&options.format))?;
-    } else {
-        options.format = Format::Json;
-    }
-    if options.policy != PolicyMode::Advisory {
-        return Err("receipt audit is advisory-only".to_string());
-    }
+    options.format = normalize_report_format(options.format, parse_receipt_audit_format)?;
+    require_advisory_policy(&options, "receipt audit is advisory-only")?;
     Ok(options)
 }
 
@@ -648,12 +642,30 @@ fn parse_receipt_validate(args: Vec<String>) -> Result<Command, String> {
     Ok(Command::ReceiptValidate { root })
 }
 
-fn parse_outcome_format(raw: &str) -> Result<Format, String> {
-    parse_json_or_markdown_format(raw, "outcome")
+fn normalize_report_format(
+    format: Format,
+    validate: impl FnOnce(Format) -> Result<Format, String>,
+) -> Result<Format, String> {
+    if matches!(format, Format::Human) {
+        return Ok(Format::Json);
+    }
+    validate(format)
 }
 
-fn parse_receipt_audit_format(raw: &str) -> Result<Format, String> {
-    parse_json_or_markdown_format(raw, "receipt audit")
+fn require_advisory_policy(options: &CheckOptions, message: &str) -> Result<(), String> {
+    if options.policy == PolicyMode::Advisory {
+        Ok(())
+    } else {
+        Err(message.to_string())
+    }
+}
+
+fn parse_outcome_format(raw: &str) -> Result<Format, String> {
+    json_or_markdown_format(parse_format(raw)?, "outcome")
+}
+
+fn parse_receipt_audit_format(format: Format) -> Result<Format, String> {
+    json_or_markdown_format(format, "receipt audit")
 }
 
 fn parse_path_value(args: &[String], idx: usize, flag: &str) -> Result<PathBuf, String> {
@@ -664,8 +676,8 @@ fn parse_inline_path_value(arg: &str, flag: &str) -> Result<PathBuf, String> {
     Ok(PathBuf::from(inline_value(arg, flag)?))
 }
 
-fn parse_json_or_markdown_format(raw: &str, command_name: &str) -> Result<Format, String> {
-    match parse_format(raw)? {
+fn json_or_markdown_format(format: Format, command_name: &str) -> Result<Format, String> {
+    match format {
         Format::Json => Ok(Format::Json),
         Format::Markdown => Ok(Format::Markdown),
         other => Err(format!(

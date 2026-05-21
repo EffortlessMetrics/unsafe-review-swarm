@@ -1,5 +1,4 @@
 use crate::command::{CheckOptions, Command, Format};
-use unsafe_review_core::PolicyMode;
 
 pub(super) fn parse_policy_command(args: Vec<String>) -> Result<Command, String> {
     let Some((subcommand, rest)) = args.split_first() else {
@@ -13,16 +12,14 @@ pub(super) fn parse_policy_command(args: Vec<String>) -> Result<Command, String>
 
 fn parse_policy_report(args: &[String]) -> Result<CheckOptions, String> {
     let mut options = super::parse_check(args.to_vec())?;
-    options.format = normalize_policy_report_format(options.format)?;
-    if options.policy != PolicyMode::Advisory {
-        return Err("policy report is advisory-only".to_string());
-    }
+    options.format =
+        super::normalize_report_format(options.format, normalize_policy_report_format)?;
+    super::require_advisory_policy(&options, "policy report is advisory-only")?;
     Ok(options)
 }
 
 fn normalize_policy_report_format(format: Format) -> Result<Format, String> {
     match format {
-        Format::Human => Ok(Format::Json),
         Format::Json | Format::Markdown => Ok(format),
         other => Err(format!(
             "unsupported policy report format `{}` (expected json/markdown)",
