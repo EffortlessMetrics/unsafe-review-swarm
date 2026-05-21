@@ -3,12 +3,15 @@ pub(crate) fn path_display(path: &std::path::Path) -> String {
 }
 
 pub(crate) fn slug(value: &str) -> String {
-    let mut out = String::new();
+    let mut out = String::with_capacity(value.len());
+    let mut last_was_separator = false;
     for ch in value.chars() {
         if ch.is_ascii_alphanumeric() {
             out.push(ch.to_ascii_lowercase());
-        } else if !out.ends_with('-') {
+            last_was_separator = false;
+        } else if !last_was_separator {
             out.push('-');
+            last_was_separator = true;
         }
     }
     out.trim_matches('-').to_string()
