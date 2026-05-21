@@ -158,6 +158,15 @@ fn render_counts_table(out: &mut String, label: &str, counts: BTreeMap<String, u
 
 pub(crate) fn render_pr_summary(output: &AnalyzeOutput) -> String {
     let mut out = String::new();
+    render_pr_summary_header(&mut out, output);
+    render_pr_summary_top_card(&mut out, output);
+    render_pr_summary_card_table(&mut out, output);
+    render_pr_summary_witness_plan(&mut out, output);
+    render_pr_summary_trust_boundary(&mut out);
+    out
+}
+
+fn render_pr_summary_header(out: &mut String, output: &AnalyzeOutput) {
     out.push_str("# unsafe-review PR summary\n\n");
     out.push_str(&format!(
         "- Scope: `{}`\n",
@@ -172,7 +181,9 @@ pub(crate) fn render_pr_summary(output: &AnalyzeOutput) -> String {
         output.summary.open_actionable_gaps
     ));
     out.push_str(&format!("- Policy mode: `{}`\n\n", output.policy.as_str()));
+}
 
+fn render_pr_summary_top_card(out: &mut String, output: &AnalyzeOutput) {
     out.push_str("## Top card\n\n");
     if let Some(card) = output.cards.first() {
         out.push_str(&format!("- ID: `{}`\n", card.id));
@@ -205,9 +216,11 @@ pub(crate) fn render_pr_summary(output: &AnalyzeOutput) -> String {
         }
         out.push_str(&format!("- Next action: {}\n\n", card.next_action.summary));
     } else {
-        render_no_changed_gaps(&mut out);
+        render_no_changed_gaps(out);
     }
+}
 
+fn render_pr_summary_card_table(out: &mut String, output: &AnalyzeOutput) {
     out.push_str("## Card table\n\n");
     out.push_str(
         "| ID | Class | Location | Operation family | Operation | Missing evidence | Route | Next action |\n",
@@ -234,41 +247,44 @@ pub(crate) fn render_pr_summary(output: &AnalyzeOutput) -> String {
             md_cell(&card.next_action.summary)
         ));
     }
+}
 
+fn render_pr_summary_witness_plan(out: &mut String, output: &AnalyzeOutput) {
     out.push_str("\n## Witness plan\n\n");
     if output.cards.is_empty() {
         out.push_str("No witness route is recommended because no review cards were emitted.\n\n");
-    } else {
-        for card in &output.cards {
-            if let Some(route) = card.routes.first() {
-                out.push_str(&format!(
-                    "- `{}`: `{}` because {}\n",
-                    card.id,
-                    route.kind.as_str(),
-                    route.reason
-                ));
-                if let Some(command) = &route.command {
-                    out.push_str("\n```bash\n");
-                    out.push_str(command);
-                    out.push_str("\n```\n");
-                } else {
-                    out.push_str(
-                        "  - No automatic command is available; route this to human review.\n",
-                    );
-                }
-            } else {
-                out.push_str(&format!(
-                    "- `{}`: no witness route was selected; route this to human review.\n",
-                    card.id
-                ));
-            }
-        }
-        out.push('\n');
+        return;
     }
+    for card in &output.cards {
+        if let Some(route) = card.routes.first() {
+            out.push_str(&format!(
+                "- `{}`: `{}` because {}\n",
+                card.id,
+                route.kind.as_str(),
+                route.reason
+            ));
+            if let Some(command) = &route.command {
+                out.push_str("\n```bash\n");
+                out.push_str(command);
+                out.push_str("\n```\n");
+            } else {
+                out.push_str(
+                    "  - No automatic command is available; route this to human review.\n",
+                );
+            }
+        } else {
+            out.push_str(&format!(
+                "- `{}`: no witness route was selected; route this to human review.\n",
+                card.id
+            ));
+        }
+    }
+    out.push('\n');
+}
 
+fn render_pr_summary_trust_boundary(out: &mut String) {
     out.push_str("## Trust boundary\n\n");
     out.push_str("This artifact projects existing unsafe-review cards for PR review. It is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n");
-    out
 }
 
 fn render_no_changed_gaps(out: &mut String) {
