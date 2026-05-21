@@ -144,7 +144,23 @@ struct LspCodeAction<'a> {
     title: String,
     kind: &'static str,
     command: &'static str,
+    payload: LspCodeActionPayload<'a>,
     arguments: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct LspCodeActionPayload<'a> {
+    kind: &'static str,
+    card_id: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    file: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    line: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    name: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    command: Option<&'a str>,
+    trust_boundary: &'static str,
 }
 
 #[derive(Serialize)]
@@ -180,6 +196,15 @@ fn code_actions(card: &ReviewCard) -> Vec<LspCodeAction<'_>> {
             title: format!("Copy unsafe-review packet for {}", card.id.0),
             kind: "quickfix",
             command: "unsafe-review.copyAgentPacket",
+            payload: LspCodeActionPayload {
+                kind: "unsafe-review.agent_packet",
+                card_id: &card.id.0,
+                file: None,
+                line: None,
+                name: None,
+                command: None,
+                trust_boundary: TRUST_BOUNDARY,
+            },
             arguments: vec![card.id.0.clone()],
         },
         LspCodeAction {
@@ -189,6 +214,15 @@ fn code_actions(card: &ReviewCard) -> Vec<LspCodeAction<'_>> {
             title: "Explain unsafe-review witness route".to_string(),
             kind: "quickfix",
             command: "unsafe-review.explainWitnessRoute",
+            payload: LspCodeActionPayload {
+                kind: "unsafe-review.witness_route",
+                card_id: &card.id.0,
+                file: None,
+                line: None,
+                name: None,
+                command: None,
+                trust_boundary: TRUST_BOUNDARY,
+            },
             arguments: vec![card.id.0.clone()],
         },
     ];
@@ -209,6 +243,15 @@ fn code_actions(card: &ReviewCard) -> Vec<LspCodeAction<'_>> {
             title: format!("Open related test {}", test.name),
             kind: "quickfix",
             command: "unsafe-review.openRelatedTest",
+            payload: LspCodeActionPayload {
+                kind: "unsafe-review.related_test",
+                card_id: &card.id.0,
+                file: Some(&test.file),
+                line: Some(test.line),
+                name: Some(&test.name),
+                command: None,
+                trust_boundary: TRUST_BOUNDARY,
+            },
             arguments: vec![
                 card.id.0.clone(),
                 test.file.clone(),
@@ -225,6 +268,15 @@ fn code_actions(card: &ReviewCard) -> Vec<LspCodeAction<'_>> {
             title: "Copy recommended witness command".to_string(),
             kind: "quickfix",
             command: "unsafe-review.copyWitnessCommand",
+            payload: LspCodeActionPayload {
+                kind: "unsafe-review.witness_command",
+                card_id: &card.id.0,
+                file: None,
+                line: None,
+                name: None,
+                command: Some(command),
+                trust_boundary: TRUST_BOUNDARY,
+            },
             arguments: vec![command.clone()],
         });
     }
@@ -480,10 +532,44 @@ mod tests {
             value["code_actions"][0]["command"],
             "unsafe-review.copyAgentPacket"
         );
+        assert_eq!(
+            value["code_actions"][0]["payload"]["kind"],
+            "unsafe-review.agent_packet"
+        );
+        assert_eq!(
+            value["code_actions"][0]["payload"]["card_id"],
+            value["diagnostics"][0]["card_id"]
+        );
+        assert!(value["code_actions"][0]["arguments"].is_array());
         assert!(value["code_actions"].as_array().is_some_and(|actions| {
             actions
                 .iter()
                 .any(|action| action["command"] == "unsafe-review.openRelatedTest")
+        }));
+        assert!(value["code_actions"].as_array().is_some_and(|actions| {
+            actions.iter().any(|action| {
+                action["command"] == "unsafe-review.openRelatedTest"
+                    && action["payload"]["kind"] == "unsafe-review.related_test"
+                    && action["payload"]["card_id"] == value["diagnostics"][0]["card_id"]
+                    && action["payload"]["file"] == "src/lib.rs"
+                    && action["payload"]["line"] == 3
+                    && action["payload"]["name"] == "read_header"
+            })
+        }));
+        assert!(value["code_actions"].as_array().is_some_and(|actions| {
+            actions.iter().any(|action| {
+                action["command"] == "unsafe-review.copyWitnessCommand"
+                    && action["payload"]["kind"] == "unsafe-review.witness_command"
+                    && action["payload"]["card_id"] == value["diagnostics"][0]["card_id"]
+                    && action["payload"]["command"]
+                        .as_str()
+                        .unwrap_or("")
+                        .contains("cargo +nightly miri test read_header")
+                    && action["payload"]["trust_boundary"]
+                        .as_str()
+                        .unwrap_or("")
+                        .contains("not UB-free status")
+            })
         }));
         assert!(
             !serde_json::to_string(&value["code_actions"])

@@ -23,7 +23,9 @@ expression from the `ReviewCard`, so editor consumers do not need to parse hover
 text or reclassify findings. Hover text is a compact reviewer view: card
 identity, required safety conditions, ReviewCard evidence summaries, missing
 evidence, next action, verify commands when available, witness route, and the
-static-review trust boundary.
+static-review trust boundary. Code actions include stable object `payload`
+fields with `card_id` plus action-specific details so editor adapters do not
+need to parse positional legacy arguments.
 
 ## Non-goals
 

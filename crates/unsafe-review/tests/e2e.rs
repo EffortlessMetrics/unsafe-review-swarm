@@ -301,10 +301,42 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
         lsp["code_actions"][0]["command"],
         "unsafe-review.copyAgentPacket"
     );
+    assert_eq!(
+        lsp["code_actions"][0]["payload"]["kind"],
+        "unsafe-review.agent_packet"
+    );
+    assert_eq!(
+        lsp["code_actions"][0]["payload"]["card_id"]
+            .as_str()
+            .unwrap_or(""),
+        card_id
+    );
+    assert!(lsp["code_actions"][0]["arguments"].is_array());
     assert!(lsp["code_actions"].as_array().is_some_and(|actions| {
         actions
             .iter()
             .any(|action| action["command"] == "unsafe-review.openRelatedTest")
+    }));
+    assert!(lsp["code_actions"].as_array().is_some_and(|actions| {
+        actions.iter().any(|action| {
+            action["command"] == "unsafe-review.openRelatedTest"
+                && action["payload"]["kind"] == "unsafe-review.related_test"
+                && action["payload"]["card_id"].as_str() == Some(card_id)
+                && action["payload"]["file"] == "src/lib.rs"
+                && action["payload"]["line"] == 3
+                && action["payload"]["name"] == "read_header"
+        })
+    }));
+    assert!(lsp["code_actions"].as_array().is_some_and(|actions| {
+        actions.iter().any(|action| {
+            action["command"] == "unsafe-review.copyWitnessCommand"
+                && action["payload"]["kind"] == "unsafe-review.witness_command"
+                && action["payload"]["card_id"].as_str() == Some(card_id)
+                && action["payload"]["command"]
+                    .as_str()
+                    .unwrap_or("")
+                    .contains("cargo +nightly miri test read_header")
+        })
     }));
 
     let witness_plan_path = temp.path().join("witness-plan.md");

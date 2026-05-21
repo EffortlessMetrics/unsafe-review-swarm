@@ -60,7 +60,8 @@ Open `target/unsafe-review/lsp.json` and look for:
 - `diagnostics`: one entry per ReviewCard site,
 - `hovers`: compact card explanations with required conditions, evidence
   summaries, missing evidence, next action, witness route, and trust boundary,
-- `code_actions`: command-shaped payloads for copy/open actions.
+- `code_actions`: command-shaped copy/open actions with stable object
+  `payload` fields and legacy positional `arguments`.
 
 The projection is useful when checking whether a card would be explainable in
 an editor before any live client exists.
