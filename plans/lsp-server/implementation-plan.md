@@ -18,6 +18,36 @@ Linked ADR: ../../docs/adr/UNSAFE-REVIEW-ADR-0006-live-lsp-server-is-read-only.m
 8. docs(lsp): record live LSP support boundary.
 9. editors(vscode): optional adapter skeleton (later).
 
+## First scaffold hardening gate
+
+Do not promote the first live LSP scaffold out of swarm until the server proves
+these operational details:
+
+- `git diff` failures are logged and do not silently become a clean repo scan.
+- `spawn_blocking` join errors and analyzer errors are logged.
+- refresh failures clear stale diagnostics or mark status stale.
+- refresh publishing does not hold state locks across `.await`.
+- refresh generations prevent stale analysis results from publishing.
+- diagnostic ranges use UTF-16 character width.
+- hover selection is based on URI and cursor position, not the first card.
+- code actions are card-scoped and command-only.
+- execute-command arguments use stable object payloads with `card_id`.
+- dependency and lockfile changes are limited to the live server surface.
+
+Minimum tests before merging the scaffold:
+
+```text
+initialize_returns_read_only_capabilities
+diagnostic_for_card_carries_card_id_and_trust_boundary
+diagnostic_range_uses_utf16_width
+hover_selects_card_at_cursor
+code_actions_are_command_only
+execute_collect_agent_packet_returns_packet_for_card
+execute_unknown_command_returns_none
+refresh_failure_clears_stale_diagnostics
+did_change_does_not_trigger_analysis_by_default
+```
+
 ## Validation commands
 
 ```bash

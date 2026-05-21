@@ -166,8 +166,12 @@ Invalid configuration must log warning, fall back to defaults, and must not enab
 - Saved-files server only in v1.
 - `didChange` must not analyze unsaved buffer content by default.
 - Single in-flight refresh guard.
+- `git diff` failures must be logged and must not silently become a clean repo scan.
+- Analysis and `spawn_blocking` failures must be logged.
 - Refresh failures must not imply clean/safe state.
+- Refresh failures clear stale diagnostics or mark status stale.
 - Stale generations must not publish diagnostics.
+- Refresh publishing must not hold state locks across `.await`.
 - `AnalyzeOutput`/`ReviewCard` remain canonical facts.
 
 ## Diagnostics / hover / actions
@@ -175,10 +179,13 @@ Invalid configuration must log warning, fall back to defaults, and must not enab
 - One `ReviewCard` maps to one `Diagnostic`.
 - High priority maps to Warning; all others to Information.
 - No `Error` severity in v1.
+- Diagnostic ranges use UTF-16 character width.
 - Diagnostic `data` includes `card_id`, `operation_family`, `hazards`, `missing_evidence`, and trust boundary metadata.
-- Hover is derived from `ReviewCard` and includes obligations, missing evidence, next action, optional witness route, and trust boundary.
+- Hover is derived from the `ReviewCard` under the URI and cursor position and
+  includes obligations, evidence summary, missing evidence, next action,
+  optional witness route, and trust boundary.
 - Hover must not overclaim safety/soundness/UB-free/Miri-clean status.
-- All code actions are command-only (`edit == None`).
+- All code actions are card-scoped and command-only (`edit == None`).
 
 ## Execute command contract
 
@@ -191,6 +198,8 @@ Supported commands:
 - `unsafe-review.openRelatedTest`
 
 Each command returns bounded payloads (or `null`) and must not edit source or execute witness tools.
+Command arguments use stable object payloads that include `card_id` when a
+command is card-scoped.
 
 ## Security and policy contract
 
