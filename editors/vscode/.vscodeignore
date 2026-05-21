@@ -1,0 +1,10 @@
+.git/**
+.github/**
+.vscode/**
+out/test/**
+src/**
+node_modules/**/.cache/**
+*.log
+target/**
+**/*.tok
+**/*secret*

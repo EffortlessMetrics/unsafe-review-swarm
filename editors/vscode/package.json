@@ -1,0 +1,28 @@
+{
+  "name": "unsafe-review",
+  "displayName": "unsafe-review",
+  "publisher": "effortlessmetrics",
+  "description": "Static unsafe exposure analysis for Rust PRs.",
+  "version": "0.0.1",
+  "license": "MIT OR Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/EffortlessMetrics/unsafe-review"
+  },
+  "engines": {
+    "vscode": "^1.92.0"
+  },
+  "categories": ["Linters", "Programming Languages", "Other"],
+  "keywords": ["rust", "unsafe", "static-analysis", "review", "miri"],
+  "activationEvents": [],
+  "main": "./out/extension.js",
+  "contributes": {},
+  "scripts": {
+    "compile": "tsc -p ./",
+    "test": "node -e \"console.log('no extension runtime tests yet')\""
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.57",
+    "typescript": "^5.6.3"
+  }
+}
