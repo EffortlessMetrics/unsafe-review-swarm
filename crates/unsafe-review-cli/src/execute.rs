@@ -10,12 +10,14 @@ use unsafe_review_core::{
     AnalysisMode, AnalyzeInput, CardId, CargoCarefulReceiptInput, ConcurrencyReceiptInput,
     DiffSource, MiriReceiptInput, PolicyMode, ProofReceiptInput, SanitizerReceiptInput, Scope,
     WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze, audit_witness_receipts,
-    collect_context, compare_outcome_json, evaluate_policy_report, explain_card,
-    render_badge_jsons, render_comment_plan, render_human, render_json, render_lsp,
-    render_markdown, render_outcome_json, render_outcome_markdown, render_policy_report_json,
-    render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
-    render_receipt_audit_markdown, render_sarif, render_witness_plan, validate_witness_receipts,
+    compare_outcome_json, evaluate_policy_report, render_badge_jsons, render_comment_plan,
+    render_human, render_json, render_lsp, render_markdown, render_outcome_json,
+    render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
+    render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown, render_sarif,
+    render_witness_plan, validate_witness_receipts,
 };
+
+mod card_lookup;
 
 const NO_CHANGED_GAPS_MESSAGE: &str = "No changed unsafe-review gaps were found.";
 const NO_CHANGED_GAPS_LIMITATION: &str =
@@ -456,24 +458,12 @@ fn badges(root: &Path, out: &Path) -> Result<(), String> {
 }
 
 fn explain(root: &Path, id: &str, format: Format) -> Result<(), String> {
-    let output = analyze(AnalyzeInput {
-        root: root.to_path_buf(),
-        scope: Scope::Repo,
-        diff: DiffSource::NoneRepoScan,
-        mode: AnalysisMode::Repo,
-        policy: PolicyMode::Advisory,
-        include_unchanged_tests: true,
-        max_cards: None,
-    })?;
+    let output = card_lookup::analyze_repo_cards(root)?;
     let id = CardId(id.to_string());
-    let Some(detail) = explain_card(&output, &id) else {
-        return Err(format!("card `{id}` not found"));
-    };
+    let detail = card_lookup::explain_text(&output, &id)?;
     match format {
         Format::Json => {
-            let Some(packet) = collect_context(&output, &id) else {
-                return Err(format!("card `{id}` not found"));
-            };
+            let packet = card_lookup::context_packet(&output, &id)?;
             println!("{packet}");
         }
         _ => println!("{detail}"),
@@ -482,19 +472,9 @@ fn explain(root: &Path, id: &str, format: Format) -> Result<(), String> {
 }
 
 fn context(root: &Path, id: &str) -> Result<(), String> {
-    let output = analyze(AnalyzeInput {
-        root: root.to_path_buf(),
-        scope: Scope::Repo,
-        diff: DiffSource::NoneRepoScan,
-        mode: AnalysisMode::Repo,
-        policy: PolicyMode::Advisory,
-        include_unchanged_tests: true,
-        max_cards: None,
-    })?;
+    let output = card_lookup::analyze_repo_cards(root)?;
     let id = CardId(id.to_string());
-    let Some(packet) = collect_context(&output, &id) else {
-        return Err(format!("card `{id}` not found"));
-    };
+    let packet = card_lookup::context_packet(&output, &id)?;
     println!("{packet}");
     Ok(())
 }
