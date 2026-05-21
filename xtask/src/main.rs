@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 mod command_args;
+mod commands;
 mod markdown;
 mod workflow_allowlist;
 
@@ -193,15 +194,14 @@ fn run(args: Vec<String>) -> Result<(), String> {
     std::env::set_current_dir(&root)
         .map_err(|err| format!("failed to enter workspace root {}: {err}", root.display()))?;
 
-    match args.get(1).map(|arg| arg.as_str()) {
-        None | Some("help") | Some("--help") => {
+    match commands::XtaskCommand::parse(&args)? {
+        commands::XtaskCommand::Help => {
             println!(
                 "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, source-divergence, check-source-sync"
             );
             Ok(())
         }
-        Some("check-pr") => {
-            command_args::require_no_extra_args(&args, "check-pr")?;
+        commands::XtaskCommand::CheckPr => {
             check_docs()?;
             check_policy()?;
             check_support_tiers()?;
@@ -213,67 +213,21 @@ fn run(args: Vec<String>) -> Result<(), String> {
             println!("check-pr: ok");
             Ok(())
         }
-        Some("check-docs") => {
-            command_args::require_no_extra_args(&args, "check-docs")?;
-            check_docs()
-        }
-        Some("check-policy") => {
-            command_args::require_no_extra_args(&args, "check-policy")?;
-            check_policy()
-        }
-        Some("check-doc-artifacts") => {
-            command_args::require_no_extra_args(&args, "check-doc-artifacts")?;
-            check_doc_artifacts()
-        }
-        Some("check-docs-automation") => {
-            command_args::require_no_extra_args(&args, "check-docs-automation")?;
-            check_docs_automation()
-        }
-        Some("check-goals") => {
-            command_args::require_no_extra_args(&args, "check-goals")?;
-            check_goals()
-        }
-        Some("check-package-boundary") => {
-            command_args::require_no_extra_args(&args, "check-package-boundary")?;
-            check_package_boundary()
-        }
-        Some("check-ci-lanes") => {
-            command_args::require_no_extra_args(&args, "check-ci-lanes")?;
-            check_ci_lanes()
-        }
-        Some("check-support-tiers") => {
-            command_args::require_no_extra_args(&args, "check-support-tiers")?;
-            check_support_tiers()
-        }
-        Some("check-fixtures") => {
-            command_args::require_no_extra_args(&args, "check-fixtures")?;
-            check_fixtures()
-        }
-        Some("check-calibration") => {
-            command_args::require_no_extra_args(&args, "check-calibration")?;
-            check_calibration()
-        }
-        Some("check-dogfood") => {
-            command_args::require_no_extra_args(&args, "check-dogfood")?;
-            check_dogfood()
-        }
-        Some("check-fuzz") => {
-            command_args::require_no_extra_args(&args, "check-fuzz")?;
-            check_manual_fuzz_harness()
-        }
-        Some("check-advisory-artifacts") => {
-            let dir = command_args::require_subcommand_dir_arg(&args, "check-advisory-artifacts")?;
-            check_advisory_artifacts(&dir)
-        }
-        Some("check-first-pr-artifacts") => {
-            let dir = command_args::require_subcommand_dir_arg(&args, "check-first-pr-artifacts")?;
-            check_first_pr_artifacts(&dir)
-        }
-        Some("source-divergence") | Some("check-source-sync") => {
-            command_args::require_no_extra_args(&args, "source-divergence")?;
-            report_source_divergence()
-        }
-        Some(other) => Err(format!("unknown xtask command `{other}`")),
+        commands::XtaskCommand::CheckDocs => check_docs(),
+        commands::XtaskCommand::CheckPolicy => check_policy(),
+        commands::XtaskCommand::CheckDocArtifacts => check_doc_artifacts(),
+        commands::XtaskCommand::CheckDocsAutomation => check_docs_automation(),
+        commands::XtaskCommand::CheckGoals => check_goals(),
+        commands::XtaskCommand::CheckPackageBoundary => check_package_boundary(),
+        commands::XtaskCommand::CheckCiLanes => check_ci_lanes(),
+        commands::XtaskCommand::CheckSupportTiers => check_support_tiers(),
+        commands::XtaskCommand::CheckFixtures => check_fixtures(),
+        commands::XtaskCommand::CheckCalibration => check_calibration(),
+        commands::XtaskCommand::CheckDogfood => check_dogfood(),
+        commands::XtaskCommand::CheckFuzz => check_manual_fuzz_harness(),
+        commands::XtaskCommand::CheckAdvisoryArtifacts(dir) => check_advisory_artifacts(&dir),
+        commands::XtaskCommand::CheckFirstPrArtifacts(dir) => check_first_pr_artifacts(&dir),
+        commands::XtaskCommand::SourceDivergence => report_source_divergence(),
     }
 }
 
