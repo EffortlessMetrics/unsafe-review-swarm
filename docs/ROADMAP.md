@@ -10,14 +10,15 @@
 - human / JSON / Markdown output
 - specification and policy system
 
-## 0.2.0 — PR and CI projection
+## 0.2.0 — First-run cockpit usability
 
-- GitHub summary artifact
-- SARIF artifact
-- advisory GitHub workflow
-- inline comment planning artifact
-- advisory artifact verifier
-- dogfood receipts for real PR artifacts
+- first-run cockpit flow (`doctor` -> `first-pr` -> `pr-summary.md` -> `explain`)
+- advisory PR bundle (`cards.json`, `pr-summary.md`, `cards.sarif`, `comment-plan.json`, `witness-plan.md`, optional `lsp.json`)
+- concise first-pr terminal handoff to summary and top-card explain
+- reviewer-first explain layout with explicit resolve/do-not-resolve guidance
+- first-run doctor readiness checks and support posture surface
+- first-pr artifact verification and release smoke proof
+- strict no-overclaim trust boundary across all outputs
 
 ## 0.3.0 — LSP and agent workflow
 
