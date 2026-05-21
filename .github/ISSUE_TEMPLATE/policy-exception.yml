@@ -1,0 +1,11 @@
+name: Policy exception
+about: Request or review a policy ledger exception
+body:
+  - type: input
+    id: policy_file
+    attributes:
+      label: Policy file
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Rationale and expiration
