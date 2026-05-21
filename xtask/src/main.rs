@@ -2946,16 +2946,25 @@ fn print_commit_section(label: &str, commits: &str) {
 }
 
 fn parse_toml_file(path: &Path) -> Result<toml::Value, String> {
-    let text = read_to_string(path)?;
-    text.parse::<toml::Table>()
-        .map(toml::Value::Table)
-        .map_err(|err| format!("{} is not valid TOML: {err}", path.display()))
+    parse_text_file(path, "TOML", |text| {
+        text.parse::<toml::Table>().map(toml::Value::Table)
+    })
 }
 
 fn parse_json_file(path: &Path) -> Result<serde_json::Value, String> {
+    parse_text_file(path, "JSON", |text| serde_json::from_str(text))
+}
+
+fn parse_text_file<T, E>(
+    path: &Path,
+    format_name: &str,
+    parser: impl FnOnce(&str) -> Result<T, E>,
+) -> Result<T, String>
+where
+    E: std::fmt::Display,
+{
     let text = read_to_string(path)?;
-    serde_json::from_str(&text)
-        .map_err(|err| format!("{} is not valid JSON: {err}", path.display()))
+    parser(&text).map_err(|err| format!("{} is not valid {format_name}: {err}", path.display()))
 }
 
 fn advisory_card_ids(cards: &serde_json::Value) -> Result<BTreeSet<String>, String> {
