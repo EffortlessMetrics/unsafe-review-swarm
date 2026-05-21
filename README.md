@@ -198,7 +198,7 @@ cargo run --locked -p xtask -- check-dogfood
 - [Explain examples](docs/explanation/explain-examples.md)
 - [Specifications](docs/specs/README.md)
 - [ADRs](docs/adr/README.md)
-- [Implementation plan](plans/0.1.0/implementation-plan.md)
+- [Implementation plan](plans/0.2.0/implementation-plan.md)
 - [Support summary](docs/status/SUPPORT_SUMMARY.md)
 - [Support tiers](docs/status/SUPPORT_TIERS.md)
 - [Dogfood index](docs/dogfood/index.md)
