@@ -1,4 +1,4 @@
-use crate::domain::{EvidenceState, ObligationEvidence, ReviewCard, WitnessRoute};
+use crate::domain::{EvidenceState, ObligationEvidence, OperationFamily, ReviewCard, WitnessRoute};
 use crate::util::path_display;
 use serde::Serialize;
 
@@ -32,7 +32,7 @@ struct AgentPacket<'a> {
     obligation_evidence: Vec<AgentObligationEvidence<'a>>,
     missing: Vec<&'a str>,
     missing_evidence: Vec<AgentMissingEvidence<'a>>,
-    allowed_repairs: Vec<&'a str>,
+    allowed_repairs: Vec<String>,
     repair_scope: &'static str,
     witness_routes: Vec<AgentWitnessRoute<'a>>,
     verify_commands: &'a [String],
@@ -77,7 +77,7 @@ impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
                     message: &missing.message,
                 })
                 .collect(),
-            allowed_repairs: vec![card.next_action.summary.as_str()],
+            allowed_repairs: allowed_repairs(card),
             repair_scope: "this card only",
             witness_routes: card.routes.iter().map(AgentWitnessRoute::from).collect(),
             verify_commands: &card.next_action.verify_commands,
@@ -96,6 +96,161 @@ impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
             ],
         }
     }
+}
+
+fn allowed_repairs(card: &ReviewCard) -> Vec<String> {
+    let mut repairs = Vec::new();
+
+    match card.operation.family {
+        OperationFamily::RawPointerDeref
+        | OperationFamily::RawPointerRead
+        | OperationFamily::RawPointerWrite => {
+            add_raw_pointer_repairs(card, &mut repairs, true);
+        }
+        OperationFamily::RawPointerReadUnaligned | OperationFamily::RawPointerWriteUnaligned => {
+            add_raw_pointer_repairs(card, &mut repairs, false);
+        }
+        OperationFamily::CopyNonOverlapping => {
+            if missing_discharge(card, "valid-range") {
+                repairs.push(
+                    "add guards proving `count` fits both source and destination ranges before this copy"
+                        .to_string(),
+                );
+            }
+            if missing_discharge(card, "non-overlap") {
+                repairs.push(
+                    "prove source and destination ranges do not overlap, or use `ptr::copy` only if overlap is intended"
+                        .to_string(),
+                );
+            }
+        }
+        OperationFamily::PtrCopy => {
+            if missing_discharge(card, "valid-range") {
+                repairs.push(
+                    "add guards proving `count` fits both source and destination ranges before this copy"
+                        .to_string(),
+                );
+            }
+            if missing_discharge(card, "initialized") {
+                repairs.push(
+                    "show that the source range is initialized for the copied element count"
+                        .to_string(),
+                );
+            }
+        }
+        OperationFamily::VecSetLen => {
+            if missing_discharge(card, "capacity") {
+                repairs.push(
+                    "add a same-vector capacity guard before `set_len` for the requested length"
+                        .to_string(),
+                );
+            }
+            if missing_discharge(card, "initialized") {
+                repairs.push(
+                    "initialize the extended element range before calling `set_len`".to_string(),
+                );
+            }
+        }
+        OperationFamily::StrFromUtf8Unchecked if missing_discharge(card, "utf8") => {
+            repairs.push(
+                "validate the same byte buffer as UTF-8 on an open path before calling `from_utf8_unchecked`"
+                    .to_string(),
+            );
+        }
+        OperationFamily::NonNullUnchecked if missing_discharge(card, "non-null") => {
+            repairs.push(
+                "add a same-pointer non-null guard before `NonNull::new_unchecked`".to_string(),
+            );
+        }
+        OperationFamily::UnsafeImplSendSync => {
+            repairs.push(
+                "document or add evidence for the thread-safety invariant of this unsafe impl"
+                    .to_string(),
+            );
+            repairs.push(
+                "route concurrency-sensitive evidence through Loom or Shuttle when the invariant depends on interleavings"
+                    .to_string(),
+            );
+        }
+        OperationFamily::Ffi => {
+            repairs.push(
+                "document the ABI, ownership, and lifetime contract for this FFI boundary"
+                    .to_string(),
+            );
+            repairs.push(
+                "attach sanitizer or cargo-careful receipt evidence after running the scoped command outside unsafe-review"
+                    .to_string(),
+            );
+        }
+        _ => {}
+    }
+
+    if missing_kind(card, "contract") {
+        repairs.push("add or expose the local safety contract for this card".to_string());
+    }
+    if missing_kind(card, "test") {
+        repairs
+            .push("add or point to a focused test that exercises this owner or seam".to_string());
+    }
+    if missing_kind(card, "witness") {
+        repairs.push(
+            "attach a scoped witness receipt after running the suggested command outside unsafe-review"
+                .to_string(),
+        );
+    }
+
+    if repairs.is_empty() {
+        repairs.push(card.next_action.summary.clone());
+    }
+    dedupe_preserve_order(repairs)
+}
+
+fn add_raw_pointer_repairs(card: &ReviewCard, repairs: &mut Vec<String>, alignment_required: bool) {
+    if missing_discharge(card, "pointer-live") {
+        repairs.push("add a same-pointer live/nullability guard before this operation".to_string());
+    }
+    if missing_discharge(card, "bounds") {
+        repairs.push(
+            "add a same-pointer or same-buffer bounds guard before this operation".to_string(),
+        );
+    }
+    if alignment_required && missing_discharge(card, "alignment") {
+        repairs.push(
+            "add a same-pointer alignment guard, or switch to an unaligned operation only if unaligned input is intended"
+                .to_string(),
+        );
+    }
+    if missing_discharge(card, "initialized") {
+        repairs.push(
+            "show that memory is initialized for the accessed type before this operation"
+                .to_string(),
+        );
+    }
+    if missing_discharge(card, "allocation") {
+        repairs.push(
+            "show that the access stays inside one live allocation for this pointer".to_string(),
+        );
+    }
+}
+
+fn missing_discharge(card: &ReviewCard, key: &str) -> bool {
+    card.obligation_evidence
+        .iter()
+        .any(|evidence| evidence.obligation.key == key && !evidence.discharge.present)
+}
+
+fn missing_kind(card: &ReviewCard, kind: &str) -> bool {
+    card.missing.iter().any(|missing| missing.kind == kind)
+}
+
+fn dedupe_preserve_order(repairs: Vec<String>) -> Vec<String> {
+    let mut deduped = Vec::new();
+    for repair in repairs {
+        if !deduped.contains(&repair) {
+            deduped.push(repair);
+        }
+    }
+    deduped
 }
 
 #[derive(Serialize)]
@@ -280,12 +435,11 @@ mod tests {
         assert!(value["missing"].is_array());
         assert!(value["missing_evidence"].is_array());
         assert!(value["allowed_repairs"].is_array());
-        assert!(
-            value["allowed_repairs"][0]
-                .as_str()
-                .unwrap_or("")
-                .contains("Add or expose the local guard")
-        );
+        let allowed_repairs = serde_json::to_string(&value["allowed_repairs"])
+            .map_err(|err| format!("render allowed repairs failed: {err}"))?;
+        assert!(allowed_repairs.contains("alignment guard"));
+        assert!(allowed_repairs.contains("unaligned operation"));
+        assert!(allowed_repairs.contains("witness receipt"));
         assert_eq!(value["repair_scope"], "this card only");
         assert!(value["witness_routes"].is_array());
         assert!(value["verify_commands"].is_array());
@@ -313,6 +467,40 @@ mod tests {
                 .unwrap_or("")
                 .contains("not a Miri result")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn agent_packet_scopes_copy_repairs_to_range_and_overlap() -> Result<(), String> {
+        let output = fixture_output("copy_nonoverlapping")?;
+        let Some(card) = output.cards.first() else {
+            return Err("fixture should emit one card".to_string());
+        };
+        let value = parse_json(&render(card))?;
+        let allowed_repairs = serde_json::to_string(&value["allowed_repairs"])
+            .map_err(|err| format!("render allowed repairs failed: {err}"))?;
+
+        assert!(allowed_repairs.contains("source and destination ranges"));
+        assert!(allowed_repairs.contains("do not overlap"));
+        assert!(allowed_repairs.contains("count"));
+        assert!(allowed_repairs.contains("witness receipt"));
+        assert!(!allowed_repairs.contains("alignment guard"));
+        Ok(())
+    }
+
+    #[test]
+    fn agent_packet_does_not_suggest_alignment_for_unaligned_read() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_read_unaligned")?;
+        let Some(card) = output.cards.first() else {
+            return Err("fixture should emit one card".to_string());
+        };
+        let value = parse_json(&render(card))?;
+        let allowed_repairs = serde_json::to_string(&value["allowed_repairs"])
+            .map_err(|err| format!("render allowed repairs failed: {err}"))?;
+
+        assert!(!allowed_repairs.contains("alignment guard"));
+        assert!(!allowed_repairs.contains("unaligned operation"));
+        assert!(allowed_repairs.contains("witness receipt"));
         Ok(())
     }
 

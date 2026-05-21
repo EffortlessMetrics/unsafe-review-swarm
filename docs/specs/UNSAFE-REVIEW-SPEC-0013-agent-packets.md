@@ -30,7 +30,8 @@ source of analyzer truth. It carries:
   snippet, and hazards
 - required safety conditions and obligation-level evidence
 - missing evidence
-- allowed repairs scoped to the current card
+- allowed repairs scoped to the current card, derived from the ReviewCard
+  operation family and missing obligation evidence
 - witness routes and verify commands from the card
 - do-not-do rules
 - stop conditions
@@ -69,6 +70,10 @@ claim that the packet resolves the card.
   family, so repair work is scoped to one unsafe operation.
 - The packet includes obligation-level evidence, missing evidence, witness
   routes, do-not-do rules, stop conditions, and the trust boundary.
+- Allowed repairs name the current card's missing obligation shape. For
+  example, raw-pointer read packets may name same-pointer alignment or
+  initialization evidence, while copy packets may name range and non-overlap
+  evidence. They must not suggest an obligation the ReviewCard does not carry.
 - If evidence is not knowable statically, the packet names the limitation
   instead of overclaiming.
 
