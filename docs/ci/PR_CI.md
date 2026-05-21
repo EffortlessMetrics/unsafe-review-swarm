@@ -9,16 +9,7 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --all-targets --locked
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
 cargo run --locked -p xtask -- check-pr
-unsafe-review check --base origin/main --format json
-unsafe-review check --base origin/main \
-  --format pr-summary \
-  --out target/unsafe-review/pr-summary.md
-unsafe-review check --base origin/main \
-  --format sarif \
-  --out target/unsafe-review/cards.sarif
-unsafe-review check --base origin/main \
-  --format comment-plan \
-  --out target/unsafe-review/comment-plan.json
+unsafe-review first-pr --base origin/main
 ```
 
 The CI workflow keeps repository permissions read-only, avoids persisted checkout
@@ -45,12 +36,14 @@ target/unsafe-review/cards.json
 target/unsafe-review/pr-summary.md
 target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
+target/unsafe-review/witness-plan.md
+target/unsafe-review/lsp.json
 ```
 
 Before upload, the workflow runs:
 
 ```text
-cargo run --locked -p xtask -- check-advisory-artifacts target/unsafe-review
+cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review
 ```
 
 The comment plan is an artifact of candidate high-signal inline comments. It is
@@ -86,13 +79,18 @@ After downloading or rendering an advisory artifact set, verify the artifact
 contract with:
 
 ```text
-cargo xtask check-advisory-artifacts target/unsafe-review
+cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review
 ```
 
-This checks that `cards.json`, `pr-summary.md`, `cards.sarif`, and
-`comment-plan.json` exist, machine-readable artifacts parse, the policy remains
-advisory, the comment plan remains plan-only, projected card IDs match
-`cards.json`, result counts stay consistent, and the trust boundary is present.
+This checks that the first-pr bundle exists (`cards.json`, `pr-summary.md`,
+`cards.sarif`, `comment-plan.json`, `witness-plan.md`, and `lsp.json`),
+machine-readable artifacts parse, the policy remains advisory, the comment plan
+remains plan-only, projected card IDs match `cards.json`, result counts stay
+consistent, witness route limits are present, and the trust boundary is present.
+
+Policy reports are separate explicit artifacts from `unsafe-review policy
+report`; they are not part of the default `first-pr` bundle unless a workflow
+adds that command intentionally.
 
 Witness tools are routed, not run everywhere. Miri, sanitizers, Loom, and Kani
 belong in targeted PR, nightly, or release lanes unless repo policy says

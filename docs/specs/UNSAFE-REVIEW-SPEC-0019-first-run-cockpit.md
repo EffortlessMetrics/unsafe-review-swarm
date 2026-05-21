@@ -1,7 +1,7 @@
 # UNSAFE-REVIEW-SPEC-0019 — First-run cockpit (0.2.0 lane)
 
-- Status: Draft
-- Last updated: 2026-05-20
+- Status: Accepted
+- Last updated: 2026-05-21
 - Owners: unsafe-review maintainers
 - Depends on: 0001, 0002, 0008, 0009, 0010, 0011, 0012, 0013, 0016
 
@@ -50,7 +50,8 @@ Implementations MAY use equivalent install/open commands by platform, but behavi
 - `witness-plan.md`
 - `lsp.json` (saved projection; optional when no cards or no projection content)
 
-Bundle shape MUST pass `cargo xtask check-first-pr-artifacts <dir>`.
+Bundle shape MUST pass
+`cargo run --locked -p xtask -- check-first-pr-artifacts <dir>`.
 
 ## 5. First-pr terminal summary contract
 
