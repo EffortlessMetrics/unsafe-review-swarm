@@ -13,7 +13,42 @@ Source:
 
 -
 
+## Links
+
+Proposal:
+Spec:
+ADR:
+Plan item:
+Issue:
+
+## Scope
+
+-
+
+## Non-goals
+
+-
+
+## Support-tier impact
+
+- [ ] none
+- [ ] updates `docs/status/SUPPORT_TIERS.md`
+
+## Policy impact
+
+- [ ] none
+- [ ] package boundary
+- [ ] CI lane
+- [ ] Clippy/lint
+- [ ] no-panic
+- [ ] non-Rust files
+- [ ] doc artifacts
+
 ## Validation
+
+-
+
+## Rollback
 
 -
 

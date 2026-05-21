@@ -1,0 +1,11 @@
+schema_version = "1.0"
+policy = "source-sync"
+owner = "repo-infra"
+
+source_repo = "https://github.com/EffortlessMetrics/unsafe-review.git"
+swarm_repo = "https://github.com/EffortlessMetrics/unsafe-review-swarm.git"
+
+acknowledged_source_main = "59cc418"
+acknowledged_by = "docs/handoffs/2026-05-20-source-swarm-reconciliation.md"
+reason = "Source main was absorbed into swarm by the 2026-05-20 reconciliation base repair."
+review_after = "2026-07-01"
