@@ -239,16 +239,50 @@ fn hover_contents(card: &ReviewCard) -> String {
         card.operation.family.as_str(),
         card.operation.expression
     ));
+    text.push_str(&format!(
+        "Card: `{}`; priority `{}`; confidence `{}`\n\n",
+        card.id,
+        card.priority.as_str(),
+        card.confidence.as_str()
+    ));
     text.push_str("Required safety conditions:\n");
     for obligation in &card.obligations {
         text.push_str(&format!("- {}\n", obligation.description));
     }
+    text.push_str("\nEvidence summary:\n");
+    text.push_str(&format!(
+        "- Contract [{}]: {}\n",
+        present_label(card.contract.present),
+        card.contract.summary
+    ));
+    text.push_str(&format!(
+        "- Guard/discharge [{}]: {}\n",
+        present_label(card.discharge.present),
+        card.discharge.summary
+    ));
+    text.push_str(&format!(
+        "- Reach [{}]: {}\n",
+        card.reach.state, card.reach.summary
+    ));
+    text.push_str(&format!(
+        "- Witness [{}]: {}\n",
+        present_label(card.witness.present),
+        card.witness.summary
+    ));
     text.push_str("\nMissing evidence:\n");
     if card.missing.is_empty() {
         text.push_str("- none recorded\n");
     } else {
         for missing in &card.missing {
             text.push_str(&format!("- {}\n", missing.message));
+        }
+    }
+    text.push_str("\nNext action:\n");
+    text.push_str(&format!("- {}\n", card.next_action.summary));
+    if !card.next_action.verify_commands.is_empty() {
+        text.push_str("\nVerify commands:\n");
+        for command in &card.next_action.verify_commands {
+            text.push_str(&format!("- `{command}`\n"));
         }
     }
     if let Some(route) = card.routes.first() {
@@ -264,6 +298,10 @@ fn hover_contents(card: &ReviewCard) -> String {
     text.push_str("\nTrust boundary: ");
     text.push_str(TRUST_BOUNDARY);
     text
+}
+
+fn present_label(present: bool) -> &'static str {
+    if present { "present" } else { "missing" }
 }
 
 fn range_for(card: &ReviewCard) -> LspRange {
@@ -382,6 +420,12 @@ mod tests {
             value["hovers"][0]["contents"]
                 .as_str()
                 .unwrap_or("")
+                .contains("Card: `UR-")
+        );
+        assert!(
+            value["hovers"][0]["contents"]
+                .as_str()
+                .unwrap_or("")
                 .contains("Required safety conditions")
         );
         assert!(
@@ -389,6 +433,42 @@ mod tests {
                 .as_str()
                 .unwrap_or("")
                 .contains("operation `unsafe { ptr.cast::<Header>().read() }`")
+        );
+        assert!(
+            value["hovers"][0]["contents"]
+                .as_str()
+                .unwrap_or("")
+                .contains("Evidence summary")
+        );
+        assert!(
+            value["hovers"][0]["contents"]
+                .as_str()
+                .unwrap_or("")
+                .contains("Contract [present]")
+        );
+        assert!(
+            value["hovers"][0]["contents"]
+                .as_str()
+                .unwrap_or("")
+                .contains("Guard/discharge [missing]")
+        );
+        assert!(
+            value["hovers"][0]["contents"]
+                .as_str()
+                .unwrap_or("")
+                .contains("Witness [missing]")
+        );
+        assert!(
+            value["hovers"][0]["contents"]
+                .as_str()
+                .unwrap_or("")
+                .contains("Next action")
+        );
+        assert!(
+            value["hovers"][0]["contents"]
+                .as_str()
+                .unwrap_or("")
+                .contains("Verify commands")
         );
         assert!(
             value["hovers"][0]["contents"]

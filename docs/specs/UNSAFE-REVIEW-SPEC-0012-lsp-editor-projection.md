@@ -20,7 +20,10 @@ action data from existing `ReviewCard`s. Diagnostics carry structured next
 action, witness route details, verify commands, missing evidence, and the
 static-review trust boundary. Diagnostics also include the concrete operation
 expression from the `ReviewCard`, so editor consumers do not need to parse hover
-text or reclassify findings.
+text or reclassify findings. Hover text is a compact reviewer view: card
+identity, required safety conditions, ReviewCard evidence summaries, missing
+evidence, next action, verify commands when available, witness route, and the
+static-review trust boundary.
 
 ## Non-goals
 

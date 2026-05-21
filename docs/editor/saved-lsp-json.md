@@ -58,7 +58,8 @@ Open `target/unsafe-review/lsp.json` and look for:
 
 - `status`: advisory mode and trust-boundary text,
 - `diagnostics`: one entry per ReviewCard site,
-- `hovers`: compact card explanations for editor hover surfaces,
+- `hovers`: compact card explanations with required conditions, evidence
+  summaries, missing evidence, next action, witness route, and trust boundary,
 - `code_actions`: command-shaped payloads for copy/open actions.
 
 The projection is useful when checking whether a card would be explainable in
@@ -104,4 +105,3 @@ A future editor adapter should consume this same artifact shape first:
 The adapter must stay read-only in v0.x. It must not apply patches, insert
 SAFETY comments, run Miri, run sanitizers, create receipts, or post PR
 comments.
-

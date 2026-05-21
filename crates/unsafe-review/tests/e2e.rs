@@ -259,7 +259,37 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
         lsp["hovers"][0]["contents"]
             .as_str()
             .unwrap_or("")
+            .contains("Evidence summary")
+    );
+    assert!(
+        lsp["hovers"][0]["contents"]
+            .as_str()
+            .unwrap_or("")
+            .contains("Contract [present]")
+    );
+    assert!(
+        lsp["hovers"][0]["contents"]
+            .as_str()
+            .unwrap_or("")
+            .contains("Guard/discharge [missing]")
+    );
+    assert!(
+        lsp["hovers"][0]["contents"]
+            .as_str()
+            .unwrap_or("")
             .contains("Missing visible local guard")
+    );
+    assert!(
+        lsp["hovers"][0]["contents"]
+            .as_str()
+            .unwrap_or("")
+            .contains("Next action")
+    );
+    assert!(
+        lsp["hovers"][0]["contents"]
+            .as_str()
+            .unwrap_or("")
+            .contains("cargo +nightly miri test read_header")
     );
     assert!(
         lsp["hovers"][0]["contents"]
