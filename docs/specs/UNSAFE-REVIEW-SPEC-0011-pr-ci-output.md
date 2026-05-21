@@ -52,6 +52,31 @@ baseline-known, or suppressed cards. No workflow posts the plan by default; a
 future trusted poster must consume this artifact rather than regenerating its
 own analyzer truth.
 
+PR CI uses two explicit gates:
+
+- **Artifact integrity gate (hard-fail):** prove `unsafe-review first-pr` ran,
+  emitted required artifacts, and kept trust-boundary/overclaim rules.
+- **Unsafe evidence policy gate (advisory by default):** report findings,
+  baseline/suppression state, and witness posture without failing by default.
+
+The default lane for 0.2.0 is integrity-hard + policy-advisory.
+
+For first-pr runs, the artifact bundle contract is:
+
+```text
+target/unsafe-review/cards.json
+target/unsafe-review/pr-summary.md
+target/unsafe-review/cards.sarif
+target/unsafe-review/comment-plan.json
+target/unsafe-review/witness-plan.md
+target/unsafe-review/lsp.json
+target/unsafe-review/policy-report.json
+target/unsafe-review/policy-report.md
+```
+
+`lsp.json` may be empty-by-content when there are no applicable diagnostics, but
+the saved projection contract remains part of the first-pr bundle.
+
 ## Non-goals
 
 - no soundness claim
@@ -70,16 +95,12 @@ own analyzer truth.
 - A changed unsafe seam produces one review card with stable identity.
 - The card includes missing evidence and a next action.
 - If evidence is not knowable statically, the card names the limitation instead of overclaiming.
-- `unsafe-review check --format pr-summary --out target/unsafe-review/pr-summary.md`
-  writes a GitHub-ready Markdown artifact.
-- `unsafe-review check --format sarif --out target/unsafe-review/cards.sarif`
-  writes parseable SARIF 2.1.0.
-- `unsafe-review check --format comment-plan --out target/unsafe-review/comment-plan.json`
-  writes candidate inline comments without posting them.
-- The advisory workflow uploads `cards.json`, `pr-summary.md`, `cards.sarif`,
-  and `comment-plan.json` as artifacts without running Miri, posting comments,
-  or enabling blocking policy.
-- The advisory workflow runs `cargo xtask check-advisory-artifacts` before
+- `unsafe-review first-pr --base origin/main` writes the first-pr advisory
+  bundle in `target/unsafe-review/`.
+- The advisory workflow uploads the first-pr bundle artifacts without running
+  Miri, posting comments, or enabling blocking policy.
+- The advisory workflow runs `cargo xtask check-first-pr-artifacts
+  target/unsafe-review` before
   upload so malformed artifacts fail the advisory job instead of being published
   as trusted dogfood evidence.
 - Empty output states no actionable cards and does not imply the repository is
@@ -90,7 +111,7 @@ own analyzer truth.
 ```bash
 cargo xtask check-pr
 cargo test --workspace
-cargo xtask check-advisory-artifacts target/unsafe-review
+cargo xtask check-first-pr-artifacts target/unsafe-review
 ```
 
 ## Promotion rule
