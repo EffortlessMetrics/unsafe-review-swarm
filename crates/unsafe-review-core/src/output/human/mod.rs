@@ -9,10 +9,8 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
     header::render_header(&mut out, output);
 
     if output.cards.is_empty() {
-        out.push_str(NO_CHANGED_GAPS_MESSAGE);
-        out.push('\n');
-        out.push_str(NO_CHANGED_GAPS_LIMITATION);
-        out.push('\n');
+        push_line(&mut out, NO_CHANGED_GAPS_MESSAGE);
+        push_line(&mut out, NO_CHANGED_GAPS_LIMITATION);
         return out;
     }
 
@@ -22,6 +20,11 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
 
     out.push_str("Trust boundary: static unsafe contract review; not a proof of memory safety and not a Miri result unless a witness receipt is attached.\n");
     out
+}
+
+fn push_line(out: &mut String, line: &str) {
+    out.push_str(line);
+    out.push('\n');
 }
 
 #[cfg(test)]
