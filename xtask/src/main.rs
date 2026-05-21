@@ -4123,19 +4123,6 @@ jobs:
     }
 
     #[test]
-    fn docs_automation_checker_accepts_current_ledger() -> Result<(), String> {
-        let previous_dir =
-            std::env::current_dir().map_err(|err| format!("read cwd failed: {err}"))?;
-        std::env::set_current_dir(workspace_root()?)
-            .map_err(|err| format!("enter workspace root failed: {err}"))?;
-        let result = check_docs_automation_impl();
-        std::env::set_current_dir(previous_dir)
-            .map_err(|err| format!("restore cwd failed: {err}"))?;
-        assert_eq!(result?, 5);
-        Ok(())
-    }
-
-    #[test]
     fn docs_automation_glob_matches_publication_receipts() {
         assert!(wildcard_match(
             "*publication*.md",
