@@ -99,44 +99,7 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
     let mut options = FirstPrOptions::default();
     let mut idx = 0usize;
     while idx < args.len() {
-        match args[idx].as_str() {
-            "--root" => {
-                idx += 1;
-                options.check.root = PathBuf::from(value(&args, idx, "--root")?);
-            }
-            arg if arg.starts_with("--root=") => {
-                options.check.root = PathBuf::from(inline_value(arg, "--root")?);
-            }
-            "--base" => {
-                idx += 1;
-                options.check.base = Some(value(&args, idx, "--base")?.to_string());
-            }
-            arg if arg.starts_with("--base=") => {
-                options.check.base = Some(inline_value(arg, "--base")?.to_string());
-            }
-            "--diff" => {
-                idx += 1;
-                options.check.diff = Some(parse_diff_input(value(&args, idx, "--diff")?));
-            }
-            arg if arg.starts_with("--diff=") => {
-                options.check.diff = Some(parse_diff_input(inline_value(arg, "--diff")?));
-            }
-            "--out-dir" => {
-                idx += 1;
-                options.out_dir = PathBuf::from(value(&args, idx, "--out-dir")?);
-            }
-            arg if arg.starts_with("--out-dir=") => {
-                options.out_dir = PathBuf::from(inline_value(arg, "--out-dir")?);
-            }
-            "--max-cards" => {
-                idx += 1;
-                options.check.max_cards = Some(parse_max_cards(value(&args, idx, "--max-cards")?)?);
-            }
-            arg if arg.starts_with("--max-cards=") => {
-                options.check.max_cards = Some(parse_max_cards(inline_value(arg, "--max-cards")?)?);
-            }
-            other => return Err(format!("unknown first-pr argument `{other}`")),
-        }
+        first_pr_parse::apply(&args, &mut idx, &mut options)?;
         idx += 1;
     }
     if options.check.base.is_none() && options.check.diff.is_none() {
@@ -150,64 +113,127 @@ fn parse_check(args: Vec<String>) -> Result<CheckOptions, String> {
     let mut options = CheckOptions::default();
     let mut idx = 0usize;
     while idx < args.len() {
-        match args[idx].as_str() {
+        check_parse::apply(&args, &mut idx, &mut options)?;
+        idx += 1;
+    }
+    validate_check_options(&options)?;
+    Ok(options)
+}
+
+mod first_pr_parse {
+    use super::*;
+
+    pub(super) fn apply(
+        args: &[String],
+        idx: &mut usize,
+        options: &mut FirstPrOptions,
+    ) -> Result<(), String> {
+        match args[*idx].as_str() {
             "--root" => {
-                idx += 1;
-                options.root = PathBuf::from(value(&args, idx, "--root")?);
+                *idx += 1;
+                options.check.root = PathBuf::from(value(args, *idx, "--root")?);
             }
             arg if arg.starts_with("--root=") => {
-                options.root = PathBuf::from(inline_value(arg, "--root")?);
+                options.check.root = PathBuf::from(inline_value(arg, "--root")?)
             }
             "--base" => {
-                idx += 1;
-                options.base = Some(value(&args, idx, "--base")?.to_string());
+                *idx += 1;
+                options.check.base = Some(value(args, *idx, "--base")?.to_string());
             }
             arg if arg.starts_with("--base=") => {
-                options.base = Some(inline_value(arg, "--base")?.to_string());
+                options.check.base = Some(inline_value(arg, "--base")?.to_string())
             }
             "--diff" => {
-                idx += 1;
-                options.diff = Some(parse_diff_input(value(&args, idx, "--diff")?));
+                *idx += 1;
+                options.check.diff = Some(parse_diff_input(value(args, *idx, "--diff")?));
             }
             arg if arg.starts_with("--diff=") => {
-                options.diff = Some(parse_diff_input(inline_value(arg, "--diff")?));
+                options.check.diff = Some(parse_diff_input(inline_value(arg, "--diff")?))
+            }
+            "--out-dir" => {
+                *idx += 1;
+                options.out_dir = PathBuf::from(value(args, *idx, "--out-dir")?);
+            }
+            arg if arg.starts_with("--out-dir=") => {
+                options.out_dir = PathBuf::from(inline_value(arg, "--out-dir")?)
+            }
+            "--max-cards" => {
+                *idx += 1;
+                options.check.max_cards = Some(parse_max_cards(value(args, *idx, "--max-cards")?)?);
+            }
+            arg if arg.starts_with("--max-cards=") => {
+                options.check.max_cards = Some(parse_max_cards(inline_value(arg, "--max-cards")?)?);
+            }
+            other => return Err(format!("unknown first-pr argument `{other}`")),
+        }
+        Ok(())
+    }
+}
+
+mod check_parse {
+    use super::*;
+
+    pub(super) fn apply(
+        args: &[String],
+        idx: &mut usize,
+        options: &mut CheckOptions,
+    ) -> Result<(), String> {
+        match args[*idx].as_str() {
+            "--root" => {
+                *idx += 1;
+                options.root = PathBuf::from(value(args, *idx, "--root")?);
+            }
+            arg if arg.starts_with("--root=") => {
+                options.root = PathBuf::from(inline_value(arg, "--root")?)
+            }
+            "--base" => {
+                *idx += 1;
+                options.base = Some(value(args, *idx, "--base")?.to_string());
+            }
+            arg if arg.starts_with("--base=") => {
+                options.base = Some(inline_value(arg, "--base")?.to_string())
+            }
+            "--diff" => {
+                *idx += 1;
+                options.diff = Some(parse_diff_input(value(args, *idx, "--diff")?));
+            }
+            arg if arg.starts_with("--diff=") => {
+                options.diff = Some(parse_diff_input(inline_value(arg, "--diff")?))
             }
             "--format" => {
-                idx += 1;
-                options.format = parse_format(value(&args, idx, "--format")?)?;
+                *idx += 1;
+                options.format = parse_format(value(args, *idx, "--format")?)?;
             }
             arg if arg.starts_with("--format=") => {
-                options.format = parse_format(inline_value(arg, "--format")?)?;
+                options.format = parse_format(inline_value(arg, "--format")?)?
             }
             "--policy" => {
-                idx += 1;
-                options.policy = parse_policy(value(&args, idx, "--policy")?)?;
+                *idx += 1;
+                options.policy = parse_policy(value(args, *idx, "--policy")?)?;
             }
             arg if arg.starts_with("--policy=") => {
-                options.policy = parse_policy(inline_value(arg, "--policy")?)?;
+                options.policy = parse_policy(inline_value(arg, "--policy")?)?
             }
             "--json" => options.format = Format::Json,
             "--markdown" => options.format = Format::Markdown,
             "--out" => {
-                idx += 1;
-                options.out = Some(PathBuf::from(value(&args, idx, "--out")?));
+                *idx += 1;
+                options.out = Some(PathBuf::from(value(args, *idx, "--out")?));
             }
             arg if arg.starts_with("--out=") => {
-                options.out = Some(PathBuf::from(inline_value(arg, "--out")?));
+                options.out = Some(PathBuf::from(inline_value(arg, "--out")?))
             }
             "--max-cards" => {
-                idx += 1;
-                options.max_cards = Some(parse_max_cards(value(&args, idx, "--max-cards")?)?);
+                *idx += 1;
+                options.max_cards = Some(parse_max_cards(value(args, *idx, "--max-cards")?)?);
             }
             arg if arg.starts_with("--max-cards=") => {
                 options.max_cards = Some(parse_max_cards(inline_value(arg, "--max-cards")?)?);
             }
             other => return Err(format!("unknown argument `{other}`")),
         }
-        idx += 1;
+        Ok(())
     }
-    validate_check_options(&options)?;
-    Ok(options)
 }
 
 fn parse_badges(args: Vec<String>) -> Result<Command, String> {
