@@ -2,6 +2,11 @@
 
 Specs define behavior. They do not carry the PR queue.
 
+## Operator control panel
+
+- [Spec system start-here](UNSAFE-REVIEW-SPEC-START-HERE.md)
+- [Spec lifecycle status dashboard](UNSAFE-REVIEW-SPEC-STATUS.md)
+
 ## Index
 
 1. [Product contract](UNSAFE-REVIEW-SPEC-0001-product-contract.md)
