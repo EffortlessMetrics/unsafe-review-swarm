@@ -114,31 +114,28 @@ fn render_repo_posture(output: &AnalyzeOutput) -> String {
 }
 
 fn class_counts(output: &AnalyzeOutput) -> BTreeMap<String, usize> {
-    let mut counts = BTreeMap::new();
-    for card in &output.cards {
-        *counts.entry(card.class.as_str().to_string()).or_default() += 1;
-    }
-    counts
+    count_cards_by(output, |card| card.class.as_str())
 }
 
 fn operation_counts(output: &AnalyzeOutput) -> BTreeMap<String, usize> {
-    let mut counts = BTreeMap::new();
-    for card in &output.cards {
-        *counts
-            .entry(card.operation.family.as_str().to_string())
-            .or_default() += 1;
-    }
-    counts
+    count_cards_by(output, |card| card.operation.family.as_str())
 }
 
 fn route_counts(output: &AnalyzeOutput) -> BTreeMap<String, usize> {
+    count_cards_by(output, |card| {
+        card.routes
+            .first()
+            .map_or("human-deep-review", |route| route.kind.as_str())
+    })
+}
+
+fn count_cards_by<F>(output: &AnalyzeOutput, key_fn: F) -> BTreeMap<String, usize>
+where
+    F: Fn(&ReviewCard) -> &str,
+{
     let mut counts = BTreeMap::new();
     for card in &output.cards {
-        let route = card
-            .routes
-            .first()
-            .map_or("human-deep-review", |route| route.kind.as_str());
-        *counts.entry(route.to_string()).or_default() += 1;
+        *counts.entry(key_fn(card).to_string()).or_default() += 1;
     }
     counts
 }
