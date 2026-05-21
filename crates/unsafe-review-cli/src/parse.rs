@@ -65,11 +65,7 @@ fn parse_policy_command(args: Vec<String>) -> Result<Command, String> {
 
 fn parse_policy_report(args: Vec<String>) -> Result<CheckOptions, String> {
     let mut options = parse_check(args)?;
-    if !matches!(options.format, Format::Human) {
-        options.format = parse_policy_report_format(format_name(&options.format))?;
-    } else {
-        options.format = Format::Json;
-    }
+    options.format = normalize_report_format(options.format, "policy report")?;
     if options.policy != PolicyMode::Advisory {
         return Err("policy report is advisory-only".to_string());
     }
@@ -397,11 +393,7 @@ fn parse_receipt(args: Vec<String>) -> Result<Command, String> {
 
 fn parse_receipt_audit(args: Vec<String>) -> Result<CheckOptions, String> {
     let mut options = parse_check(args)?;
-    if !matches!(options.format, Format::Human) {
-        options.format = parse_receipt_audit_format(format_name(&options.format))?;
-    } else {
-        options.format = Format::Json;
-    }
+    options.format = normalize_report_format(options.format, "receipt audit")?;
     if options.policy != PolicyMode::Advisory {
         return Err("receipt audit is advisory-only".to_string());
     }
@@ -618,23 +610,13 @@ fn parse_outcome_format(raw: &str) -> Result<Format, String> {
     }
 }
 
-fn parse_receipt_audit_format(raw: &str) -> Result<Format, String> {
-    match parse_format(raw)? {
+fn normalize_report_format(format: Format, command_name: &str) -> Result<Format, String> {
+    match format {
+        Format::Human => Ok(Format::Json),
         Format::Json => Ok(Format::Json),
         Format::Markdown => Ok(Format::Markdown),
         other => Err(format!(
-            "receipt audit only supports json or markdown output, got `{}`",
-            format_name(&other)
-        )),
-    }
-}
-
-fn parse_policy_report_format(raw: &str) -> Result<Format, String> {
-    match parse_format(raw)? {
-        Format::Json => Ok(Format::Json),
-        Format::Markdown => Ok(Format::Markdown),
-        other => Err(format!(
-            "policy report only supports json or markdown output, got `{}`",
+            "{command_name} only supports json or markdown output, got `{}`",
             format_name(&other)
         )),
     }
