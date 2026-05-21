@@ -1135,6 +1135,26 @@ fn receipt_audit_reports_matching_saved_receipts_without_running_witnesses()
             .unwrap_or("")
             .contains("does not execute witnesses")
     );
+    assert!(
+        value["limitations"]
+            .as_array()
+            .ok_or("receipt audit limitations should be an array")?
+            .iter()
+            .any(|limitation| limitation
+                .as_str()
+                .unwrap_or("")
+                .contains("does not execute Miri"))
+    );
+    assert!(
+        value["limitations"]
+            .as_array()
+            .ok_or("receipt audit limitations should be an array")?
+            .iter()
+            .any(|limitation| limitation
+                .as_str()
+                .unwrap_or("")
+                .contains("do not erase missing contracts"))
+    );
     let receipt = &value["receipts"][0];
     assert_eq!(receipt["receipt_tool"], "miri");
     assert!(
@@ -1182,6 +1202,9 @@ fn receipt_audit_reports_matching_saved_receipts_without_running_witnesses()
     assert!(markdown.contains("raw_pointer_read"));
     assert!(markdown.contains("unsafe { ptr.cast::<Header>().read() }"));
     assert!(markdown.contains("Add or expose"));
+    assert!(markdown.contains("## Limitations"));
+    assert!(markdown.contains("does not execute Miri"));
+    assert!(markdown.contains("do not erase missing contracts"));
     assert!(markdown.contains("does not execute witnesses"));
     assert!(markdown.contains("| 1 | 1 | 0 | 0 | 0 |"));
     Ok(())

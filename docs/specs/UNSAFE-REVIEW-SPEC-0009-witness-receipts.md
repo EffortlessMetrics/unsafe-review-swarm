@@ -77,7 +77,10 @@ inferring site reach, making policy decisions, or claiming safety. Matched
 receipt entries include current card operation, missing-count, and next-action
 context so a receipt can improve witness evidence without erasing remaining
 guard or contract gaps. The audit is an advisory metadata report over saved
-receipts and current cards.
+receipts and current cards. JSON and Markdown audit output must include
+explicit limitations saying the audit uses saved metadata only, does not execute
+witness tools, does not prove site reach or safety, and does not erase remaining
+contract, guard, or reach gaps.
 
 Receipt JSON fields:
 
@@ -171,6 +174,9 @@ after the `recorded_at` date.
 - The CLI receipt-audit command reports matched, stale, expired,
   wrong-identity, wrong-tool, weaker-than-required, and invalid receipts without
   executing witnesses or making policy decisions.
+- Receipt-audit JSON and Markdown include limitations that preserve the saved
+  metadata boundary and state that matched receipts only improve witness
+  evidence.
 
 ## CI proof
 

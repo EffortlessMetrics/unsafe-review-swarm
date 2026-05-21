@@ -51,6 +51,13 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
         }
         out.push('\n');
     }
+    out.push_str("## Limitations\n\n");
+    for limitation in &report.limitations {
+        out.push_str("- ");
+        out.push_str(limitation);
+        out.push('\n');
+    }
+    out.push('\n');
     out.push_str("## Trust boundary\n\n");
     out.push_str(&report.trust_boundary);
     out.push('\n');

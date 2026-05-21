@@ -65,6 +65,7 @@ pub struct ReceiptAuditReport {
     pub policy: String,
     pub audit_date: String,
     pub trust_boundary: String,
+    pub limitations: Vec<String>,
     pub summary: ReceiptAuditSummary,
     pub receipts: Vec<ReceiptAuditEntry>,
 }
@@ -142,6 +143,14 @@ fn audit_receipts_with_date(
         policy: "advisory".to_string(),
         audit_date: audit_date.to_string(),
         trust_boundary: AUDIT_TRUST_BOUNDARY.to_string(),
+        limitations: vec![
+            "audits saved witness receipt metadata only".to_string(),
+            "does not execute Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux"
+                .to_string(),
+            "does not prove site reach, memory safety, UB-free status, or repo safety".to_string(),
+            "matched receipts improve witness evidence only and do not erase missing contracts, guards, or reach evidence"
+                .to_string(),
+        ],
         summary,
         receipts,
     })
@@ -744,6 +753,19 @@ mod tests {
         assert_eq!(report.summary.weaker_than_required, 1);
         assert_eq!(report.summary.duplicate, 5);
         assert_eq!(report.summary.invalid, 1);
+        assert_eq!(report.limitations.len(), 4);
+        assert!(
+            report
+                .limitations
+                .iter()
+                .any(|limitation| limitation.contains("does not execute Miri"))
+        );
+        assert!(
+            report
+                .limitations
+                .iter()
+                .any(|limitation| limitation.contains("do not erase missing contracts"))
+        );
         assert!(report.trust_boundary.contains("does not execute witnesses"));
         let matched_entry = report
             .receipts
