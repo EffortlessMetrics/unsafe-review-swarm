@@ -28,3 +28,18 @@ These directories may exist for external tools, but this lane does not migrate, 
 2. Link artifacts with stable IDs where available.
 3. Route product claims through support tiers and policy ledgers.
 4. Add one PR-sized change at a time with explicit proof commands.
+
+## Directory Intent
+
+- `.unsafe-review-spec/goals/`: active and archived goal metadata.
+- `.unsafe-review-spec/lanes/`: focused lane trackers and implementation sequencing.
+- `docs/proposals/`: why a workstream exists, alternatives, and success criteria.
+- `docs/specs/`: behavior and evidence requirements.
+- `docs/adr/`: durable architecture decisions.
+- `docs/templates/`: reusable proposal, spec, plan, closeout, and receipt skeletons.
+- `docs/status/`: support posture, objective audits, dogfood lane status, and closeout-facing status notes.
+- `policy/`: live baselines, suppressions, ledgers, and policy references.
+
+Prefer focused lane trackers under `.unsafe-review-spec/lanes/` rather than one
+global active queue. Keep durable rails indexed through `.unsafe-review-spec/index.toml`
+when they need stable machine discovery.

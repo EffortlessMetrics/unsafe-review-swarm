@@ -8,6 +8,11 @@ roadmap -> proposal -> spec -> ADR -> implementation plan -> PRs -> proof -> sup
 
 The durable control plane for this stack is repo-owned state rooted in `.unsafe-review-spec/` and linked repository artifacts (for example `docs/`, `plans/`, and `policy/`).
 
+When contributors refer to source-of-truth "rails" in this repository, they mean
+this existing `.unsafe-review-spec/` plus linked-docs control plane. Do not add a
+parallel durable root such as `.rails/` unless a future accepted spec changes the
+namespace.
+
 ## Durable vs external state
 
 Durable rails in this repository:
