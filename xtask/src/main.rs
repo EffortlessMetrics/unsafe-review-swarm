@@ -1211,6 +1211,57 @@ fn check_dogfood() -> Result<(), String> {
     let mut repo_snapshots = 0usize;
     let mut pr_diffs = 0usize;
     for (idx, target) in targets.iter().enumerate() {
+        let stats = dogfood_checks::validate_target(target, idx, &mut ids)?;
+        repositories.insert(stats.repository);
+        *artifact_status_counts
+            .entry(stats.artifact_status)
+            .or_insert(0usize) += 1;
+        repo_snapshots += stats.repo_snapshots;
+        pr_diffs += stats.pr_diffs;
+    }
+
+    if repositories.len() < 5 {
+        return Err(format!(
+            "{DOGFOOD_MANIFEST} must cover at least 5 real repositories"
+        ));
+    }
+    if repo_snapshots == 0 || pr_diffs == 0 {
+        return Err(format!(
+            "{DOGFOOD_MANIFEST} must include repo-snapshot and pr-diff targets"
+        ));
+    }
+    check_dogfood_index(
+        targets.len(),
+        repositories.len(),
+        repo_snapshots,
+        pr_diffs,
+        &repositories,
+        &artifact_status_counts,
+    )?;
+
+    println!(
+        "check-dogfood: ok ({} targets, {} repositories)",
+        targets.len(),
+        repositories.len()
+    );
+    Ok(())
+}
+
+mod dogfood_checks {
+    use super::*;
+
+    pub(super) struct TargetStats {
+        pub(super) repository: String,
+        pub(super) artifact_status: String,
+        pub(super) repo_snapshots: usize,
+        pub(super) pr_diffs: usize,
+    }
+
+    pub(super) fn validate_target(
+        target: &toml::Value,
+        idx: usize,
+        ids: &mut BTreeSet<String>,
+    ) -> Result<TargetStats, String> {
         let Some(target) = target.as_table() else {
             return Err(format!(
                 "{DOGFOOD_MANIFEST} targets[{idx}] must be a TOML table"
@@ -1228,7 +1279,6 @@ fn check_dogfood() -> Result<(), String> {
                 "{DOGFOOD_MANIFEST} targets[{idx}] repository `{repository}` must be owner/repo"
             ));
         }
-        repositories.insert(repository.to_string());
         required_target_string(target, "crate", idx)?;
         let kind = required_target_string(target, "kind", idx)?;
         if !DOGFOOD_TARGET_KINDS.contains(&kind) {
@@ -1260,9 +1310,21 @@ fn check_dogfood() -> Result<(), String> {
                 "{DOGFOOD_MANIFEST} targets[{idx}] uses unknown artifact_status `{artifact_status}`"
             ));
         }
-        *artifact_status_counts
-            .entry(artifact_status.to_string())
-            .or_insert(0usize) += 1;
+        validate_artifacts(target, idx, artifact_status)?;
+        let (repo_snapshots, pr_diffs) = validate_kind_fields(target, idx, kind)?;
+        Ok(TargetStats {
+            repository: repository.to_string(),
+            artifact_status: artifact_status.to_string(),
+            repo_snapshots,
+            pr_diffs,
+        })
+    }
+
+    fn validate_artifacts(
+        target: &toml::Table,
+        idx: usize,
+        artifact_status: &str,
+    ) -> Result<(), String> {
         let artifacts = target
             .get("artifacts")
             .and_then(toml::Value::as_array)
@@ -1287,10 +1349,16 @@ fn check_dogfood() -> Result<(), String> {
                 ));
             }
         }
+        Ok(())
+    }
 
+    fn validate_kind_fields(
+        target: &toml::Table,
+        idx: usize,
+        kind: &str,
+    ) -> Result<(usize, usize), String> {
         match kind {
             "repo-snapshot" => {
-                repo_snapshots += 1;
                 let commit = required_target_string(target, "commit", idx)?;
                 if commit.len() != 40 || !commit.bytes().all(|byte| byte.is_ascii_hexdigit()) {
                     return Err(format!(
@@ -1299,9 +1367,9 @@ fn check_dogfood() -> Result<(), String> {
                 }
                 let root = required_target_string(target, "root", idx)?;
                 check_dogfood_path(root, idx, "root")?;
+                Ok((1, 0))
             }
             "pr-diff" => {
-                pr_diffs += 1;
                 let Some(pr) = target.get("pr").and_then(toml::Value::as_integer) else {
                     return Err(format!(
                         "{DOGFOOD_MANIFEST} targets[{idx}] is missing integer pr"
@@ -1316,40 +1384,13 @@ fn check_dogfood() -> Result<(), String> {
                 check_dogfood_path(root, idx, "root")?;
                 let diff = required_target_string(target, "diff", idx)?;
                 check_dogfood_path(diff, idx, "diff")?;
+                Ok((0, 1))
             }
-            _ => {
-                return Err(format!(
-                    "{DOGFOOD_MANIFEST} targets[{idx}] uses unsupported kind `{kind}`"
-                ));
-            }
+            _ => Err(format!(
+                "{DOGFOOD_MANIFEST} targets[{idx}] uses unsupported kind `{kind}`"
+            )),
         }
     }
-
-    if repositories.len() < 5 {
-        return Err(format!(
-            "{DOGFOOD_MANIFEST} must cover at least 5 real repositories"
-        ));
-    }
-    if repo_snapshots == 0 || pr_diffs == 0 {
-        return Err(format!(
-            "{DOGFOOD_MANIFEST} must include repo-snapshot and pr-diff targets"
-        ));
-    }
-    check_dogfood_index(
-        targets.len(),
-        repositories.len(),
-        repo_snapshots,
-        pr_diffs,
-        &repositories,
-        &artifact_status_counts,
-    )?;
-
-    println!(
-        "check-dogfood: ok ({} targets, {} repositories)",
-        targets.len(),
-        repositories.len()
-    );
-    Ok(())
 }
 
 fn check_dogfood_index(
