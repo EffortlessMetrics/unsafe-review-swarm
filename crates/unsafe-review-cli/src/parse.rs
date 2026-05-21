@@ -150,64 +150,88 @@ fn parse_check(args: Vec<String>) -> Result<CheckOptions, String> {
     let mut options = CheckOptions::default();
     let mut idx = 0usize;
     while idx < args.len() {
-        match args[idx].as_str() {
-            "--root" => {
-                idx += 1;
-                options.root = PathBuf::from(value(&args, idx, "--root")?);
-            }
-            arg if arg.starts_with("--root=") => {
-                options.root = PathBuf::from(inline_value(arg, "--root")?);
-            }
-            "--base" => {
-                idx += 1;
-                options.base = Some(value(&args, idx, "--base")?.to_string());
-            }
-            arg if arg.starts_with("--base=") => {
-                options.base = Some(inline_value(arg, "--base")?.to_string());
-            }
-            "--diff" => {
-                idx += 1;
-                options.diff = Some(parse_diff_input(value(&args, idx, "--diff")?));
-            }
-            arg if arg.starts_with("--diff=") => {
-                options.diff = Some(parse_diff_input(inline_value(arg, "--diff")?));
-            }
-            "--format" => {
-                idx += 1;
-                options.format = parse_format(value(&args, idx, "--format")?)?;
-            }
-            arg if arg.starts_with("--format=") => {
-                options.format = parse_format(inline_value(arg, "--format")?)?;
-            }
-            "--policy" => {
-                idx += 1;
-                options.policy = parse_policy(value(&args, idx, "--policy")?)?;
-            }
-            arg if arg.starts_with("--policy=") => {
-                options.policy = parse_policy(inline_value(arg, "--policy")?)?;
-            }
-            "--json" => options.format = Format::Json,
-            "--markdown" => options.format = Format::Markdown,
-            "--out" => {
-                idx += 1;
-                options.out = Some(PathBuf::from(value(&args, idx, "--out")?));
-            }
-            arg if arg.starts_with("--out=") => {
-                options.out = Some(PathBuf::from(inline_value(arg, "--out")?));
-            }
-            "--max-cards" => {
-                idx += 1;
-                options.max_cards = Some(parse_max_cards(value(&args, idx, "--max-cards")?)?);
-            }
-            arg if arg.starts_with("--max-cards=") => {
-                options.max_cards = Some(parse_max_cards(inline_value(arg, "--max-cards")?)?);
-            }
-            other => return Err(format!("unknown argument `{other}`")),
-        }
-        idx += 1;
+        idx += check_parse::apply_check_arg(&args, idx, &mut options)?;
     }
     validate_check_options(&options)?;
     Ok(options)
+}
+
+mod check_parse {
+    use super::*;
+
+    pub(super) fn apply_check_arg(
+        args: &[String],
+        idx: usize,
+        options: &mut CheckOptions,
+    ) -> Result<usize, String> {
+        match args[idx].as_str() {
+            "--root" => {
+                options.root = PathBuf::from(value(args, idx + 1, "--root")?);
+                Ok(2)
+            }
+            arg if arg.starts_with("--root=") => {
+                options.root = PathBuf::from(inline_value(arg, "--root")?);
+                Ok(1)
+            }
+            "--base" => {
+                options.base = Some(value(args, idx + 1, "--base")?.to_string());
+                Ok(2)
+            }
+            arg if arg.starts_with("--base=") => {
+                options.base = Some(inline_value(arg, "--base")?.to_string());
+                Ok(1)
+            }
+            "--diff" => {
+                options.diff = Some(parse_diff_input(value(args, idx + 1, "--diff")?));
+                Ok(2)
+            }
+            arg if arg.starts_with("--diff=") => {
+                options.diff = Some(parse_diff_input(inline_value(arg, "--diff")?));
+                Ok(1)
+            }
+            "--format" => {
+                options.format = parse_format(value(args, idx + 1, "--format")?)?;
+                Ok(2)
+            }
+            arg if arg.starts_with("--format=") => {
+                options.format = parse_format(inline_value(arg, "--format")?)?;
+                Ok(1)
+            }
+            "--policy" => {
+                options.policy = parse_policy(value(args, idx + 1, "--policy")?)?;
+                Ok(2)
+            }
+            arg if arg.starts_with("--policy=") => {
+                options.policy = parse_policy(inline_value(arg, "--policy")?)?;
+                Ok(1)
+            }
+            "--json" => {
+                options.format = Format::Json;
+                Ok(1)
+            }
+            "--markdown" => {
+                options.format = Format::Markdown;
+                Ok(1)
+            }
+            "--out" => {
+                options.out = Some(PathBuf::from(value(args, idx + 1, "--out")?));
+                Ok(2)
+            }
+            arg if arg.starts_with("--out=") => {
+                options.out = Some(PathBuf::from(inline_value(arg, "--out")?));
+                Ok(1)
+            }
+            "--max-cards" => {
+                options.max_cards = Some(parse_max_cards(value(args, idx + 1, "--max-cards")?)?);
+                Ok(2)
+            }
+            arg if arg.starts_with("--max-cards=") => {
+                options.max_cards = Some(parse_max_cards(inline_value(arg, "--max-cards")?)?);
+                Ok(1)
+            }
+            other => Err(format!("unknown argument `{other}`")),
+        }
+    }
 }
 
 fn parse_badges(args: Vec<String>) -> Result<Command, String> {
