@@ -130,10 +130,10 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
             }
             "--max-cards" => {
                 idx += 1;
-                options.check.max_cards = Some(parse_max_cards(value(&args, idx, "--max-cards")?)?);
+                options.check.max_cards = Some(parse_max_cards_value(&args, idx, "--max-cards")?);
             }
             arg if arg.starts_with("--max-cards=") => {
-                options.check.max_cards = Some(parse_max_cards(inline_value(arg, "--max-cards")?)?);
+                options.check.max_cards = Some(parse_max_cards_inline(arg, "--max-cards")?);
             }
             other => return Err(format!("unknown first-pr argument `{other}`")),
         }
@@ -197,10 +197,10 @@ fn parse_check(args: Vec<String>) -> Result<CheckOptions, String> {
             }
             "--max-cards" => {
                 idx += 1;
-                options.max_cards = Some(parse_max_cards(value(&args, idx, "--max-cards")?)?);
+                options.max_cards = Some(parse_max_cards_value(&args, idx, "--max-cards")?);
             }
             arg if arg.starts_with("--max-cards=") => {
-                options.max_cards = Some(parse_max_cards(inline_value(arg, "--max-cards")?)?);
+                options.max_cards = Some(parse_max_cards_inline(arg, "--max-cards")?);
             }
             other => return Err(format!("unknown argument `{other}`")),
         }
@@ -668,6 +668,14 @@ fn set_card_id(id: &mut Option<String>, value: &str) -> Result<(), String> {
         return Err("expected exactly one card id".to_string());
     }
     Ok(())
+}
+
+fn parse_max_cards_value(args: &[String], idx: usize, flag: &str) -> Result<usize, String> {
+    parse_max_cards(value(args, idx, flag)?)
+}
+
+fn parse_max_cards_inline(arg: &str, flag: &str) -> Result<usize, String> {
+    parse_max_cards(inline_value(arg, flag)?)
 }
 
 fn parse_max_cards(raw: &str) -> Result<usize, String> {
