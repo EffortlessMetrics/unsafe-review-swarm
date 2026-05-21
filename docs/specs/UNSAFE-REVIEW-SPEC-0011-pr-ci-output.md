@@ -415,7 +415,7 @@ weak reach-only cards
 static_unknown cards
 cards without changed-line location
 cards with ambiguous macro site
-cards already baseline-known or suppressed
+cards already baseline_known or suppressed
 ```
 
 Each candidate must include:
