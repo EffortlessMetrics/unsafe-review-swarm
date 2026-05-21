@@ -6,7 +6,8 @@ use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 use unsafe_review_core::{
-    AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, analyze, render_json,
+    AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, analyze, render_human,
+    render_json, render_markdown,
 };
 
 const MAX_SOURCE_BYTES: usize = 16 * 1024;
@@ -25,7 +26,7 @@ fuzz_target!(|data: &[u8]| {
     }
 
     let diff = changed_lib_diff(source, diff_tail);
-    let result = analyze(AnalyzeInput {
+    run_analysis(AnalyzeInput {
         root: root.clone(),
         scope: Scope::Diff,
         diff: DiffSource::Text(diff),
@@ -34,12 +35,15 @@ fuzz_target!(|data: &[u8]| {
         include_unchanged_tests: true,
         max_cards: Some(64),
     });
-
-    if let Ok(output) = result {
-        let json = render_json(&output);
-        let parsed = serde_json::from_str::<serde_json::Value>(&json);
-        assert!(parsed.is_ok(), "rendered analysis JSON must parse");
-    }
+    run_analysis(AnalyzeInput {
+        root: root.clone(),
+        scope: Scope::Repo,
+        diff: DiffSource::NoneRepoScan,
+        mode: AnalysisMode::Repo,
+        policy: PolicyMode::Advisory,
+        include_unchanged_tests: true,
+        max_cards: Some(64),
+    });
 
     let _ = fs::remove_dir_all(root);
 });
@@ -97,4 +101,24 @@ fn changed_lib_diff(source: &str, diff_tail: &str) -> String {
 
     diff.push_str(diff_tail);
     diff
+}
+
+fn run_analysis(input: AnalyzeInput) {
+    if let Ok(output) = analyze(input) {
+        let json = render_json(&output);
+        let parsed = serde_json::from_str::<serde_json::Value>(&json);
+        assert!(parsed.is_ok(), "rendered analysis JSON must parse");
+
+        let human = render_human(&output);
+        assert!(
+            !human.trim().is_empty(),
+            "rendered human output must not be empty"
+        );
+
+        let markdown = render_markdown(&output);
+        assert!(
+            !markdown.trim().is_empty(),
+            "rendered markdown output must not be empty"
+        );
+    }
 }
