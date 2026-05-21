@@ -15,7 +15,7 @@ The `analyze` target treats fuzz bytes as a temporary `src/lib.rs`, synthesizes 
 unified diff that adds that file, runs the core analyzer in advisory draft mode,
 and checks that rendered JSON remains parseable.
 
-Inputs can optionally include this marker on its own line:
+Inputs can optionally include this marker on its own line (LF or CRLF line endings are both accepted):
 
 ```text
 ---DIFF---

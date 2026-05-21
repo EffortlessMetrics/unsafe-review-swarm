@@ -12,6 +12,7 @@ use unsafe_review_core::{
 const MAX_SOURCE_BYTES: usize = 16 * 1024;
 const MAX_DIFF_BYTES: usize = 16 * 1024;
 const SPLIT_MARKER: &str = "\n---DIFF---\n";
+const SPLIT_MARKER_CRLF: &str = "\r\n---DIFF---\r\n";
 
 fuzz_target!(|data: &[u8]| {
     let input = String::from_utf8_lossy(data);
@@ -20,6 +21,7 @@ fuzz_target!(|data: &[u8]| {
     let diff_tail = clamp(diff_tail, MAX_DIFF_BYTES);
 
     let root = fuzz_root(data);
+    let _cleanup = CleanupGuard::new(root.clone());
     if write_fixture(&root, source).is_err() {
         return;
     }
@@ -41,13 +43,29 @@ fuzz_target!(|data: &[u8]| {
         assert!(parsed.is_ok(), "rendered analysis JSON must parse");
     }
 
-    let _ = fs::remove_dir_all(root);
 });
 
 fn split_input(input: &str) -> (&str, &str) {
     input
         .split_once(SPLIT_MARKER)
+        .or_else(|| input.split_once(SPLIT_MARKER_CRLF))
         .map_or((input, ""), |(source, diff)| (source, diff))
+}
+
+struct CleanupGuard {
+    root: std::path::PathBuf,
+}
+
+impl CleanupGuard {
+    fn new(root: std::path::PathBuf) -> Self {
+        Self { root }
+    }
+}
+
+impl Drop for CleanupGuard {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.root);
+    }
 }
 
 fn clamp(input: &str, max_bytes: usize) -> &str {
