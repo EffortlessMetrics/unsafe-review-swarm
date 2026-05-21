@@ -649,25 +649,11 @@ fn parse_receipt_validate(args: Vec<String>) -> Result<Command, String> {
 }
 
 fn parse_outcome_format(raw: &str) -> Result<Format, String> {
-    match parse_format(raw)? {
-        Format::Json => Ok(Format::Json),
-        Format::Markdown => Ok(Format::Markdown),
-        other => Err(format!(
-            "outcome only supports json or markdown output, got `{}`",
-            format_name(&other)
-        )),
-    }
+    parse_json_or_markdown_format(raw, "outcome")
 }
 
 fn parse_receipt_audit_format(raw: &str) -> Result<Format, String> {
-    match parse_format(raw)? {
-        Format::Json => Ok(Format::Json),
-        Format::Markdown => Ok(Format::Markdown),
-        other => Err(format!(
-            "receipt audit only supports json or markdown output, got `{}`",
-            format_name(&other)
-        )),
-    }
+    parse_json_or_markdown_format(raw, "receipt audit")
 }
 
 fn parse_path_value(args: &[String], idx: usize, flag: &str) -> Result<PathBuf, String> {
@@ -676,6 +662,17 @@ fn parse_path_value(args: &[String], idx: usize, flag: &str) -> Result<PathBuf, 
 
 fn parse_inline_path_value(arg: &str, flag: &str) -> Result<PathBuf, String> {
     Ok(PathBuf::from(inline_value(arg, flag)?))
+}
+
+fn parse_json_or_markdown_format(raw: &str, command_name: &str) -> Result<Format, String> {
+    match parse_format(raw)? {
+        Format::Json => Ok(Format::Json),
+        Format::Markdown => Ok(Format::Markdown),
+        other => Err(format!(
+            "{command_name} only supports json or markdown output, got `{}`",
+            format_name(&other)
+        )),
+    }
 }
 
 fn parse_diff_input(raw: &str) -> DiffInput {
