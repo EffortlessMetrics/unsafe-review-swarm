@@ -6,7 +6,7 @@ const FNV_OFFSET_BASIS_64: u64 = 0xcbf2_9ce4_8422_2325;
 const FNV_PRIME_64: u64 = 0x0000_0100_0000_01b3;
 
 pub(crate) fn slug(value: &str) -> String {
-    let mut out = String::new();
+    let mut out = String::with_capacity(value.len());
     let mut trailing_dash = false;
 
     for ch in value.chars() {
@@ -46,6 +46,7 @@ mod tests {
         assert_eq!(stable_hash_hex(""), "cbf29ce484222325");
         assert_eq!(stable_hash_hex("a"), "af63dc4c8601ec8c");
         assert_eq!(stable_hash_hex("hello"), "a430d84680aabd0b");
+        assert_eq!(stable_hash_hex("review-card"), "2e81ef99691f2bda");
         assert_eq!(stable_hash_hex("unsafe-review"), "9b8f659941f48b06");
         assert_eq!(stable_hash_hex("ReviewCard"), "06da7eb4d46c02c3");
     }
