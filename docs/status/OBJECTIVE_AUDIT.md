@@ -19,7 +19,9 @@ and stale-pointer controls.
 `Vec::from_raw_parts` len/cap capacity evidence now has fixture-backed controls
 for assertions, early returns, bare observations, closed branches, and stale
 checked cap arguments. `Vec::set_len` capacity evidence rejects unrelated local
-arguments merely named `cap` unless a const-capacity context is visible.
+arguments merely named `cap` unless a const-capacity context is visible, and
+`Vec::set_len` initialization evidence rejects unrelated initialization
+statements not tied to the receiver being lengthened.
 `Box::from_raw` and `ptr::drop_in_place` ownership evidence reject stale
 `Box::into_raw` origins when the raw pointer is reassigned before use.
 Unchecked-constructor availability evidence now has fixture-backed controls for

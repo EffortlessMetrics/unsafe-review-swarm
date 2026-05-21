@@ -48,6 +48,7 @@ required_core_fixtures = [
   "vec_set_len_start_bound_shrink",
   "vec_set_len_zero_clear",
   "vec_set_len_post_init_not_guard",
+  "vec_set_len_unrelated_initialization_not_guard",
   "drop_in_place_deallocation",
   "drop_in_place_box_origin",
   "drop_in_place_reassigned_origin_not_guard",
@@ -671,6 +672,16 @@ expected_hazard = "initialized_memory"
 fixture = "vec_set_len_post_init_not_guard"
 kind = "false_positive_control"
 claim = "Vec::set_len does not accept initialization evidence that appears only after the set_len call"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "vec_set_len_unrelated_initialization_not_guard"
+kind = "false_positive_control"
+claim = "Vec::set_len does not accept unrelated MaybeUninit initialization as evidence for the vector's extended range"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

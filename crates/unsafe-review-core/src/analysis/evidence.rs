@@ -1950,13 +1950,48 @@ fn box_from_raw_argument(compact_expression: &str) -> Option<&str> {
 }
 
 fn has_set_len_initialization_evidence(lower: &str) -> bool {
-    has_set_len_shrink_evidence(lower)
-        || has_set_len_call_result_initialization_evidence(lower)
-        || lower.contains("maybeuninit::new")
-        || lower.contains(".write(")
-        || lower.contains("ptr::write")
-        || lower.contains("copy_nonoverlapping")
-        || lower.contains("copy_to_nonoverlapping")
+    if has_set_len_shrink_evidence(lower) || has_set_len_call_result_initialization_evidence(lower)
+    {
+        return true;
+    }
+    let compact = compact_code(lower);
+    let Some((receiver, _new_len)) = set_len_receiver_and_argument(&compact) else {
+        return false;
+    };
+    let marker = format!("{receiver}.set_len(");
+    let Some(call_pos) = compact.find(&marker) else {
+        return false;
+    };
+    has_set_len_receiver_initialization_evidence(&compact[..call_pos], receiver)
+}
+
+fn has_set_len_receiver_initialization_evidence(before_call: &str, receiver: &str) -> bool {
+    before_call.split([';', '}']).any(|statement| {
+        contains_receiver_path(statement, receiver) && has_initialization_marker(statement)
+    }) || has_set_len_receiver_initialization_loop(before_call, receiver)
+}
+
+fn has_set_len_receiver_initialization_loop(before_call: &str, receiver: &str) -> bool {
+    before_call.split('}').any(|block| {
+        let Some((head, body)) = block.rsplit_once('{') else {
+            return false;
+        };
+        set_len_loop_iterates_receiver(head, receiver)
+            && head.contains(".iter_mut(")
+            && has_initialization_marker(body)
+    })
+}
+
+fn set_len_loop_iterates_receiver(head: &str, receiver: &str) -> bool {
+    contains_receiver_path(head, receiver) || head.contains(&format!("in{receiver}."))
+}
+
+fn has_initialization_marker(statement: &str) -> bool {
+    statement.contains("maybeuninit::new")
+        || statement.contains(".write(")
+        || statement.contains("ptr::write")
+        || statement.contains("copy_nonoverlapping")
+        || statement.contains("copy_to_nonoverlapping")
 }
 
 fn has_set_len_call_result_initialization_evidence(lower: &str) -> bool {
@@ -3083,6 +3118,26 @@ fn contains_receiver_fragment(compact: &str, fragment: &str) -> bool {
     false
 }
 
+fn contains_receiver_path(compact: &str, receiver: &str) -> bool {
+    let mut cursor = compact;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(receiver) {
+        let start = offset + pos;
+        let end = start + receiver.len();
+        let before = compact[..start].chars().next_back();
+        let after = compact[end..].chars().next();
+        if before.is_none_or(|ch| !is_receiver_path_char(ch))
+            && after.is_none_or(|ch| ch == '.' || !is_receiver_path_char(ch))
+        {
+            return true;
+        }
+        let next = pos + receiver.len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
+}
+
 fn raw_pointer_alignment_receiver(expression: &str) -> Option<String> {
     let compact = compact_code(&expression.to_ascii_lowercase());
     if let Some(receiver) = receiver_before_marker(&compact, ".cast::<") {
@@ -3801,10 +3856,28 @@ mod tests {
             state: "owner_reached".to_string(),
             summary: "reached".to_string(),
         };
-        let context = vec!["*dst = MaybeUninit::new(*src);"];
+        let context = vec![
+            "for (dst, src) in out.xs.iter_mut().zip(bytes.iter()) {",
+            "*dst = MaybeUninit::new(*src);",
+            "}",
+        ];
+        let unrelated_context = vec!["let _other = MaybeUninit::new(0_u8);"];
+        let prefixed_receiver_context = vec!["let other_out = MaybeUninit::new(0_u8);"];
         let set_len = site_with_family(
             OperationFamily::VecSetLen,
             context.clone(),
+            "out.set_len(CAP);",
+            vec![],
+        );
+        let unrelated_set_len = site_with_family(
+            OperationFamily::VecSetLen,
+            unrelated_context,
+            "out.set_len(CAP);",
+            vec![],
+        );
+        let prefixed_receiver_set_len = site_with_family(
+            OperationFamily::VecSetLen,
+            prefixed_receiver_context,
             "out.set_len(CAP);",
             vec![],
         );
@@ -3816,9 +3889,15 @@ mod tests {
         );
 
         let set_len_evidence = obligation_evidence(&set_len, &obligations, &contract, &reach);
+        let unrelated_set_len_evidence =
+            obligation_evidence(&unrelated_set_len, &obligations, &contract, &reach);
+        let prefixed_receiver_set_len_evidence =
+            obligation_evidence(&prefixed_receiver_set_len, &obligations, &contract, &reach);
         let raw_read_evidence = obligation_evidence(&raw_read, &obligations, &contract, &reach);
 
         assert!(set_len_evidence[0].discharge.present);
+        assert!(!unrelated_set_len_evidence[0].discharge.present);
+        assert!(!prefixed_receiver_set_len_evidence[0].discharge.present);
         assert_eq!(
             raw_read_evidence[0].discharge.summary,
             "No obligation-specific guard code was detected"

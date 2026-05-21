@@ -1,0 +1,25 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,20 @@
++use core::mem::MaybeUninit;
++
++pub fn unrelated_init(vec: &mut Vec<u8>, new_len: usize) {
++    assert!(new_len <= vec.capacity());
++    let _other = MaybeUninit::new(0_u8);
++    // SAFETY: capacity is checked above, but the unrelated slot does not
++    // initialize the vector's extended range.
++    unsafe {
++        vec.set_len(new_len);
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::unrelated_init;
++
++    #[test]
++    fn mentions_unrelated_init() {
++        let _ = stringify!(unrelated_init);
++    }
++}

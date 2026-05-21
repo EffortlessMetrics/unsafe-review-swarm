@@ -29,6 +29,8 @@ observations, closed positive branches, and reassigned checked cap arguments.
 `Vec::set_len` capacity evidence rejects unrelated local arguments merely named
 `cap` unless a const-capacity context is visible, and it rejects capacity checks
 made stale by reassigning the checked vector before `set_len`.
+`Vec::set_len` initialization evidence now rejects unrelated initialization
+statements unless the evidence is tied to the receiver being lengthened.
 `Box::from_raw` and `ptr::drop_in_place` reject `Box::into_raw` origin evidence
 when the raw pointer is reassigned before use.
 Unchecked-constructor availability evidence is pinned for same-receiver
