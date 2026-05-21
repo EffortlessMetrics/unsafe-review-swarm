@@ -52,7 +52,7 @@ The goal is reviewer leverage, not commenting on every card.
 `comment-plan.json` is the canonical PR comment artifact.
 
 - Mode is plan-only and policy is advisory.
-- Default candidate count is 0–3; hard max is 3.
+- Default candidate count is 0-3; hard max is 3.
 - Candidate locations must be renderable (`path` + one-based non-zero `line`).
 - Candidate bodies must include a trust boundary statement.
 
@@ -72,7 +72,7 @@ Selection is sparse and changed-line only:
 - one comment per line unless explicitly justified
 - no duplicate card IDs
 
-Never select suppressed, baseline-known, or `static_unknown` cards. Prefer actionable changed unsafe operations that name specific missing evidence and a concrete next action.
+Never select suppressed, `baseline_known`, or `static_unknown` cards. Prefer actionable changed unsafe operations that name specific missing evidence and a concrete next action.
 
 ## 6. Relevance and actionability
 
@@ -103,7 +103,7 @@ Required sections:
 - witness route (if useful)
 - trust boundary
 
-Length budget: recommended ≤140 words, hard max 220 words.
+Length budget: recommended <=140 words, hard max 220 words.
 
 Forbidden patterns include overclaims (`"This PR is unsafe."`, `"Verified."`, `"Miri-clean."`), generic non-actionable comments, and large internal dumps.
 
@@ -130,7 +130,7 @@ The poster must not rerun analysis truth, run witness tools, edit source, or pos
 - invalid line/path
 - missing trust boundary in body
 - forbidden overclaim wording
-- forbidden classes (`static_unknown`, baseline-known, suppressed)
+- forbidden classes (`static_unknown`, `baseline_known`, suppressed)
 
 Future hardening should also reject missing `selection_reason`, `actionability`, or relevance metadata, duplicates, and overlong bodies.
 
@@ -138,9 +138,9 @@ Future hardening should also reject missing `selection_reason`, `actionability`,
 
 Representative outcomes:
 
-- changed raw pointer read with missing alignment evidence → one `guard_missing` candidate with concrete repair and trust boundary.
-- `static_unknown`, baseline-known, or no changed-line anchor → no inline comment, with explicit `not_selected` reason.
-- malformed overclaim comment text → verifier failure.
+- changed raw pointer read with missing alignment evidence -> one `guard_missing` candidate with concrete repair and trust boundary.
+- `static_unknown`, `baseline_known`, or no changed-line anchor -> no inline comment, with explicit `not_selected` reason.
+- malformed overclaim comment text -> verifier failure.
 
 ## 12. CI proof
 
