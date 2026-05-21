@@ -2,20 +2,17 @@ use crate::command::{CheckOptions, Command, Format};
 use unsafe_review_core::PolicyMode;
 
 pub(super) fn parse_policy_command(args: Vec<String>) -> Result<Command, String> {
-    let mut rest = args;
-    let Some(subcommand) = rest.first() else {
+    let Some((subcommand, rest)) = args.split_first() else {
         return Err("missing policy subcommand `report`".to_string());
     };
-    let subcommand = subcommand.clone();
-    rest.remove(0);
     match subcommand.as_str() {
         "report" => parse_policy_report(rest).map(Command::PolicyReport),
         other => Err(format!("unknown policy subcommand `{other}`")),
     }
 }
 
-fn parse_policy_report(args: Vec<String>) -> Result<CheckOptions, String> {
-    let mut options = super::parse_check(args)?;
+fn parse_policy_report(args: &[String]) -> Result<CheckOptions, String> {
+    let mut options = super::parse_check(args.to_vec())?;
     if !matches!(options.format, Format::Human) {
         options.format = parse_policy_report_format(super::format_name(&options.format))?;
     } else {
