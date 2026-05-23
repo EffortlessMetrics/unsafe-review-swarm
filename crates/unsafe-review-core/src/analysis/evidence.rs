@@ -3516,6 +3516,7 @@ fn has_nullability_guard(site: &ScannedSite, lower: &str) -> bool {
         return has_nonnull_new_question_mark_guard(&guard_compact, &arg)
             || has_nonnull_new_if_let_guard(&guard_compact, &arg)
             || has_nonnull_new_let_else_guard(&guard_compact, &arg)
+            || has_nonnull_new_match_some_guard(&guard_compact, &arg)
             || has_null_early_return_guard(&guard_compact, &arg);
     }
     lower.contains("is_null") || compact.contains("nonnull::new(")
@@ -3572,6 +3573,33 @@ fn has_nonnull_new_let_else_guard(compact: &str, arg: &str) -> bool {
     false
 }
 
+fn has_nonnull_new_match_some_guard(compact: &str, arg: &str) -> bool {
+    let marker = format!("matchnonnull::new({arg}){{");
+    let mut cursor = compact;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(&marker) {
+        let after_match_start = offset + pos + marker.len();
+        let after_match = &compact[after_match_start..];
+        if let Some(branch_after_marker) = match_some_branch_after_marker(after_match)
+            && branch_still_open_at_operation(branch_after_marker)
+            && !contains_simple_assignment_to(branch_after_marker, arg)
+        {
+            return true;
+        }
+        let next = pos + marker.len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
+}
+
+fn match_some_branch_after_marker(after_match: &str) -> Option<&str> {
+    let some_pos = after_match.find("some(")?;
+    let after_some = &after_match[some_pos + "some(".len()..];
+    let (binding, after_binding) = after_some.split_once(")=>{")?;
+    is_some_binding(binding).then_some(after_binding)
+}
+
 fn ends_with_some_pattern(before_marker: &str, keyword: &str) -> bool {
     let prefix = format!("{keyword}some(");
     let Some(pattern_start) = before_marker.rfind(&prefix) else {
@@ -3581,6 +3609,10 @@ fn ends_with_some_pattern(before_marker: &str, keyword: &str) -> bool {
     let Some(binding) = binding_with_close.strip_suffix(')') else {
         return false;
     };
+    is_some_binding(binding)
+}
+
+fn is_some_binding(binding: &str) -> bool {
     !binding.is_empty()
         && (binding == "_"
             || binding
@@ -4104,6 +4136,12 @@ mod tests {
             "NonNull::new_unchecked(ptr)",
             vec![],
         );
+        let match_guard = site_with_family(
+            OperationFamily::NonNullUnchecked,
+            vec!["match NonNull::new(ptr) {", "Some(_) => {"],
+            "NonNull::new_unchecked(ptr)",
+            vec!["}", "None => None,", "}"],
+        );
         let other_guard = site_with_family(
             OperationFamily::NonNullUnchecked,
             vec!["NonNull::new(other)?;"],
@@ -4124,6 +4162,12 @@ mod tests {
             ],
             "NonNull::new_unchecked(ptr)",
             vec![],
+        );
+        let stale_match_guard = site_with_family(
+            OperationFamily::NonNullUnchecked,
+            vec!["match NonNull::new(ptr) {", "Some(_) => {", "ptr = other;"],
+            "NonNull::new_unchecked(ptr)",
+            vec!["}", "None => None,", "}"],
         );
         let method_guard = site_with_family(
             OperationFamily::NonNullUnchecked,
@@ -4154,6 +4198,11 @@ mod tests {
                 .present
         );
         assert!(
+            obligation_evidence(&match_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
             !obligation_evidence(&other_guard, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
@@ -4165,6 +4214,11 @@ mod tests {
         );
         assert!(
             !obligation_evidence(&stale_let_else_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&stale_match_guard, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
         );

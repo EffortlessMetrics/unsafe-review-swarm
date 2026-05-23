@@ -585,12 +585,14 @@ fixtures = [
   "nonnull_new_guard",
   "nonnull_if_let_new_guard",
   "nonnull_let_else_new_guard",
+  "nonnull_match_new_guard",
   "nonnull_other_guard_not_evidence",
   "nonnull_is_null_nonreturning_not_guard",
   "nonnull_observed_not_guard",
   "nonnull_post_check_not_guard",
   "nonnull_if_let_new_reassigned_ptr_not_guard",
   "nonnull_let_else_new_reassigned_ptr_not_guard",
+  "nonnull_match_new_reassigned_ptr_not_guard",
 ]
 dogfood_targets = []
 label_ledgers = [
@@ -599,9 +601,9 @@ label_ledgers = [
 labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned NonNull::new_unchecked nullability evidence distinguishes a
-same-pointer NonNull::new guard, including if-let and let-else forms, from
-wrong-pointer, observed-only, non-returning is_null, post-check, and stale
-pointer controls in the listed fixtures.
+same-pointer NonNull::new guard, including if-let, let-else, and match Some-arm
+forms, from wrong-pointer, observed-only, non-returning is_null, post-check, and
+stale pointer controls in the listed fixtures.
 """
 forbidden_claims = [
   "broad NonNull soundness",

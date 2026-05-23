@@ -115,8 +115,9 @@ The current fixture-pinned slices are:
   identity and do not introduce wrapper or fallback duplicates.
 - `NonNull::new_unchecked` nullability evidence: checks whether the `non-null`
   obligation is discharged by a same-pointer `NonNull::new` guard, including
-  if-let and let-else forms, while rejecting wrong-pointer, observed-only,
-  non-returning `is_null`, post-check, and stale-pointer controls.
+  if-let, let-else, and match Some-arm forms, while rejecting wrong-pointer,
+  observed-only, non-returning `is_null`, post-check, and stale-pointer
+  controls.
 - `Pin::new_unchecked` human-review routing: checks that pinning move-prevention
   and projection invariants route to human deep review without implying an
   executable witness ran.

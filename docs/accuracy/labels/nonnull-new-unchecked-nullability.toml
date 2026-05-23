@@ -51,6 +51,19 @@ label_source = "fixture_golden"
 rationale = "A same-pointer let-else NonNull::new early return before NonNull::new_unchecked discharges the non-null obligation."
 
 [[samples]]
+id = "nonnull-match-new-guard-present"
+fixture = "nonnull_match_new_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "non-null"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A same-pointer match NonNull::new Some arm that contains NonNull::new_unchecked discharges the non-null obligation."
+
+[[samples]]
 id = "nonnull-other-guard-not-evidence"
 fixture = "nonnull_other_guard_not_evidence"
 kind = "false_positive_control"
@@ -127,3 +140,16 @@ expected_obligation_key = "non-null"
 expected_discharge_state = "missing"
 label_source = "fixture_golden"
 rationale = "Let-else NonNull::new evidence becomes stale when the checked pointer is reassigned before NonNull::new_unchecked."
+
+[[samples]]
+id = "nonnull-match-new-reassigned-ptr-not-guard"
+fixture = "nonnull_match_new_reassigned_ptr_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "non-null"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Match NonNull::new Some-arm evidence becomes stale when the checked pointer is reassigned before NonNull::new_unchecked."

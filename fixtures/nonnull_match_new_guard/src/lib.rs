@@ -1,0 +1,21 @@
+use core::ptr::NonNull;
+
+pub fn expose_nonnull_after_match(ptr: *mut u8) -> Option<NonNull<u8>> {
+    match NonNull::new(ptr) {
+        Some(_) => {
+            // SAFETY: NonNull::new returned Some in this arm, so ptr is non-null.
+            Some(unsafe { NonNull::new_unchecked(ptr) })
+        }
+        None => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::expose_nonnull_after_match;
+
+    #[test]
+    fn mentions_expose_nonnull_after_match() {
+        let _ = stringify!(expose_nonnull_after_match);
+    }
+}
