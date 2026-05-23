@@ -426,6 +426,7 @@ mod tests {
         "get_unchecked_mut_post_check_not_guard",
         "get_unchecked_mut_bounds_observed_not_guard",
         "get_unchecked_mut_closed_bounds_not_guard",
+        "get_unchecked_mut_return_comment_not_guard",
         "get_unchecked_mut_reassigned_index_not_guard",
         "pin_new_unchecked",
     ];

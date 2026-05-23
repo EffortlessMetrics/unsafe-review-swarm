@@ -909,7 +909,7 @@ fn get_unchecked_receiver_and_index(expression: &str) -> Option<(String, String)
 }
 
 fn has_get_unchecked_bounds_guard(lower: &str, receiver: &str, index: &str) -> bool {
-    let compact = compact_code(lower);
+    let compact = compact_code(&strip_block_comments_and_literals(lower));
     let receiver = compact_code(&receiver.to_ascii_lowercase());
     let index = compact_code(&index.to_ascii_lowercase());
     if receiver.is_empty() || index.is_empty() {
@@ -4992,6 +4992,18 @@ mod tests {
             "unsafe { values.get_unchecked_mut(index) }",
             vec![],
         );
+        let commented_return_guard = site_with_family(
+            OperationFamily::GetUnchecked,
+            vec!["if index >= values.len() { /* return None; */ }"],
+            "unsafe { values.get_unchecked_mut(index) }",
+            vec![],
+        );
+        let string_return_guard = site_with_family(
+            OperationFamily::GetUnchecked,
+            vec!["if index >= values.len() { let _note = \"return None\"; }"],
+            "unsafe { values.get_unchecked_mut(index) }",
+            vec![],
+        );
         let matching_assertion = site_with_family(
             OperationFamily::GetUnchecked,
             vec!["assert!(index < values.len());"],
@@ -5038,6 +5050,16 @@ mod tests {
         );
         assert!(
             obligation_evidence(&matching_return_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&commented_return_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&string_return_guard, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
         );

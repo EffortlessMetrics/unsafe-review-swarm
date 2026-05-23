@@ -10,8 +10,9 @@ status artifact, not a support-tier promotion. `docs/status/SUPPORT_TIERS.md`
 remains the authority for public claim wording.
 
 Latest evidence-hardening notes include `get_unchecked` bounds false-positive
-controls for bare predicate observations, closed positive branches, and checked
-indexes reassigned before the unchecked access.
+controls for bare predicate observations, closed positive branches,
+comment-only early-return text, and checked indexes reassigned before the
+unchecked access.
 Raw pointer alignment evidence now also has fixture-backed controls for
 same-pointer `is_aligned` guards, observations, closed branches, and stale
 checked pointers.
@@ -45,7 +46,7 @@ The active calibration rail is now recorded in
 `.unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md`,
 `policy/accuracy-calibration.toml`, and
 `docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 34
-fixture-pinned claims, 221 calibration cases, 34 label ledgers, and 228 label
+fixture-pinned claims, 222 calibration cases, 34 label ledgers, and 229 label
 samples. It records zero dogfood-measured, labeled-calibrated, or
 policy-eligible claims. That is intentional: the current report is a
 claim-scoped fixture-pinned proof index, not a global precision/recall result

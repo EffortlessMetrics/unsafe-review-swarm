@@ -1122,6 +1122,7 @@ fixtures = [
   "get_unchecked_mut_post_check_not_guard",
   "get_unchecked_mut_bounds_observed_not_guard",
   "get_unchecked_mut_closed_bounds_not_guard",
+  "get_unchecked_mut_return_comment_not_guard",
   "get_unchecked_mut_reassigned_index_not_guard",
 ]
 dogfood_targets = []
@@ -1132,7 +1133,8 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned get_unchecked_mut bounds evidence distinguishes same-receiver
 len guards from missing, other-receiver, post-check, observed-only,
-closed-branch, and stale-index controls in the listed fixtures.
+closed-branch, comment-only early-return, and stale-index controls in the
+listed fixtures.
 """
 forbidden_claims = [
   "broad get_unchecked soundness",

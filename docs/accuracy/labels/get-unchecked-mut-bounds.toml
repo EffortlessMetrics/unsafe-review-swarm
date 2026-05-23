@@ -95,6 +95,20 @@ label_source = "fixture_golden"
 rationale = "A closed positive bounds branch does not dominate the later get_unchecked_mut call."
 
 [[samples]]
+id = "get-unchecked-mut-return-comment-not-guard"
+fixture = "get_unchecked_mut_return_comment_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Text that says return inside a comment does not make the out-of-bounds branch non-returning."
+
+[[samples]]
 id = "get-unchecked-mut-reassigned-index-not-guard"
 fixture = "get_unchecked_mut_reassigned_index_not_guard"
 kind = "false_positive_control"

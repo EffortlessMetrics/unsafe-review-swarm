@@ -1,0 +1,17 @@
+pub fn pick_after_comment_return(values: &mut [u8], index: usize) -> Option<&mut u8> {
+    if index >= values.len() {
+        /* return None; */
+    }
+    // SAFETY: this fixture intentionally mentions return without actually returning.
+    Some(unsafe { values.get_unchecked_mut(index) })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::pick_after_comment_return;
+
+    #[test]
+    fn mentions_pick_after_comment_return() {
+        let _ = stringify!(pick_after_comment_return);
+    }
+}
