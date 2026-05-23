@@ -2525,6 +2525,7 @@ fn check_fixture_card_identity(
     check_fixture_card_classification(path, idx, card)?;
     let has_missing_evidence =
         check_fixture_obligation_evidence(path, idx, card, operation_family)?;
+    check_fixture_reach_evidence(path, idx, card, site)?;
     check_fixture_missing_summary(path, idx, card, has_missing_evidence)?;
     check_fixture_next_action(path, idx, card, operation_family)?;
     check_fixture_witness_routes(path, idx, card, operation_family)?;
@@ -3209,6 +3210,163 @@ fn check_fixture_obligation_evidence(
     }
 
     Ok(has_missing_evidence)
+}
+
+fn check_fixture_reach_evidence(
+    path: &str,
+    idx: usize,
+    card: &serde_json::Value,
+    site: &serde_json::Map<String, serde_json::Value>,
+) -> Result<(), String> {
+    let card_context = format!("{path} card[{idx}]");
+    let owner = required_json_object_str(site, "owner", path, idx)?;
+    let top_level_reach = require_non_empty_json_str(card, "reach", &card_context)?;
+    reject_fixture_reach_overclaim(&card_context, "reach", top_level_reach)?;
+    let reach_claim = parse_fixture_reach_claim(top_level_reach).ok_or_else(|| {
+        format!(
+            "{card_context} reach `{top_level_reach}` must describe static test mentions for the site owner"
+        )
+    })?;
+    if reach_claim.owner != owner {
+        return Err(format!(
+            "{card_context} reach owner `{}` must match site.owner `{owner}`",
+            reach_claim.owner
+        ));
+    }
+
+    let evidence = json_array_at(card, "/obligation_evidence", &card_context)?;
+    for (evidence_idx, entry) in evidence.iter().enumerate() {
+        let Some(entry) = entry.as_object() else {
+            return Err(format!(
+                "{card_context} obligation_evidence[{evidence_idx}] must be an object"
+            ));
+        };
+        let evidence_key =
+            required_fixture_evidence_str(entry, "key", &card_context, evidence_idx)?;
+        let reach = entry
+            .get("reach")
+            .and_then(serde_json::Value::as_object)
+            .ok_or_else(|| {
+                format!(
+                    "{card_context} obligation_evidence[{evidence_idx}] `{evidence_key}` is missing object key `reach`"
+                )
+            })?;
+        let Some(present) = reach.get("present").and_then(serde_json::Value::as_bool) else {
+            return Err(format!(
+                "{card_context} obligation_evidence[{evidence_idx}] `{evidence_key}` reach.present must be a boolean"
+            ));
+        };
+        let state_name = required_fixture_state_str(
+            reach,
+            "state",
+            &card_context,
+            evidence_idx,
+            evidence_key,
+            "reach",
+        )?;
+        let summary = required_fixture_state_str(
+            reach,
+            "summary",
+            &card_context,
+            evidence_idx,
+            evidence_key,
+            "reach",
+        )?;
+        reject_fixture_reach_overclaim(&card_context, "obligation reach.summary", summary)?;
+        if summary != top_level_reach {
+            return Err(format!(
+                "{card_context} obligation_evidence[{evidence_idx}] `{evidence_key}` reach.summary `{summary}` must match top-level reach `{top_level_reach}`"
+            ));
+        }
+
+        let (expected_present, expected_state) = match reach_claim.kind {
+            FixtureReachClaimKind::RelatedTestMention => (true, "present"),
+            FixtureReachClaimKind::NoStaticTestMention => (false, "missing"),
+            FixtureReachClaimKind::NoOwnerInferred => (false, "missing"),
+        };
+        if present != expected_present || state_name != expected_state {
+            return Err(format!(
+                "{card_context} obligation_evidence[{evidence_idx}] `{evidence_key}` reach state must match top-level reach posture `{top_level_reach}`"
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+#[derive(Debug, Clone, Copy)]
+struct FixtureReachClaim<'a> {
+    kind: FixtureReachClaimKind,
+    owner: &'a str,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum FixtureReachClaimKind {
+    RelatedTestMention,
+    NoStaticTestMention,
+    NoOwnerInferred,
+}
+
+fn parse_fixture_reach_claim(summary: &str) -> Option<FixtureReachClaim<'_>> {
+    if summary == "No owner function could be inferred" {
+        return Some(FixtureReachClaim {
+            kind: FixtureReachClaimKind::NoOwnerInferred,
+            owner: "unknown",
+        });
+    }
+
+    if let Some((count, owner)) = parse_related_test_reach(summary) {
+        if count > 0 {
+            return Some(FixtureReachClaim {
+                kind: FixtureReachClaimKind::RelatedTestMention,
+                owner,
+            });
+        }
+        return None;
+    }
+
+    let owner = summary
+        .strip_prefix("No static test mention of owner `")?
+        .strip_suffix("` was found")?;
+    if owner.trim().is_empty() {
+        None
+    } else {
+        Some(FixtureReachClaim {
+            kind: FixtureReachClaimKind::NoStaticTestMention,
+            owner,
+        })
+    }
+}
+
+fn parse_related_test_reach(summary: &str) -> Option<(usize, &str)> {
+    let (count, rest) = summary.split_once(" related test file(s) mention owner `")?;
+    let owner = rest.strip_suffix('`')?;
+    if owner.trim().is_empty() {
+        return None;
+    }
+    Some((count.parse().ok()?, owner))
+}
+
+fn reject_fixture_reach_overclaim(
+    card_context: &str,
+    field: &str,
+    summary: &str,
+) -> Result<(), String> {
+    let lower = summary.to_ascii_lowercase();
+    for term in [
+        "site reached",
+        "site executed",
+        "test covered",
+        "execution proof",
+        "proves execution",
+    ] {
+        if lower.contains(term) {
+            return Err(format!(
+                "{card_context} {field} must describe static test mentions, not `{term}`"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn check_fixture_missing_summary(
@@ -5900,6 +6058,74 @@ jobs:
     }
 
     #[test]
+    fn fixture_card_identity_rejects_reach_owner_mismatch() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["reach"] =
+            serde_json::Value::String("1 related test file(s) mention owner `other_owner`".into());
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("top-level reach owner mismatch should fail".to_string());
+        };
+
+        assert!(err.contains("reach owner `other_owner`"));
+        assert!(err.contains("site.owner `read_header`"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_obligation_reach_summary_drift() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["obligation_evidence"][0]["reach"]["summary"] = serde_json::Value::String(
+            "No static test mention of owner `read_header` was found".into(),
+        );
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("obligation reach summary drift should fail".to_string());
+        };
+
+        assert!(err.contains("obligation_evidence[0]"));
+        assert!(err.contains("reach.summary"));
+        assert!(err.contains("top-level reach"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_reach_execution_overclaim() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["reach"] = serde_json::Value::String("site executed in read_header test".into());
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("reach execution overclaim should fail".to_string());
+        };
+
+        assert!(err.contains("reach"));
+        assert!(err.contains("site executed"));
+        assert!(err.contains("static test mentions"));
+        Ok(())
+    }
+
+    #[test]
     fn fixture_card_identity_rejects_empty_missing_summary_for_missing_evidence()
     -> Result<(), String> {
         let mut card = test_fixture_card(
@@ -6406,6 +6632,7 @@ jobs:
     "Missing visible local guard for inferred safety obligations",
     "No witness receipt imported for this card"
   ],
+  "reach": "1 related test file(s) mention owner `read_header`",
   "next_action": "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.",
   "witness_routes": [
     {{

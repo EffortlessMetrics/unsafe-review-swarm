@@ -44,6 +44,9 @@ The guard rejects:
   family registry row.
 - fixture golden cards whose top-level missing summaries drift away from the
   per-obligation evidence state.
+- fixture golden cards whose top-level reach, per-obligation reach summaries,
+  or reach owner drift away from static test-mention evidence or claim site
+  execution without a receipt.
 - fixture golden cards whose next_action is missing, non-actionable,
   overclaiming, or names a different operation family for safety-obligation
   repair guidance.

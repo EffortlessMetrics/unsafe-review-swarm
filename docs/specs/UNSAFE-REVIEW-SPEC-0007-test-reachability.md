@@ -12,7 +12,15 @@ Linked plan: ../../plans/0.1.0/implementation-plan.md
 
 ## Behavior
 
-Estimate static reach from tests, doctests, fuzz/model/proof harnesses, and imported receipts without claiming execution proof.
+Estimate static reach from tests, doctests, fuzz/model/proof harnesses, and
+imported receipts without claiming execution proof.
+
+Fixture and golden ReviewCards must keep reach evidence explicitly static:
+top-level `reach` and every obligation-level `reach.summary` must use the same
+site-owner static-test-mention wording or explicit no-owner-inferred wording,
+match `site.owner`, and avoid wording such as site reached, site executed, test
+covered, or execution proof unless a separate witness receipt supports that
+claim through receipt surfaces.
 
 ## Non-goals
 
@@ -31,6 +39,10 @@ Estimate static reach from tests, doctests, fuzz/model/proof harnesses, and impo
 
 - A changed unsafe seam produces one review card with stable identity.
 - The card includes missing evidence and a next action.
+- A card may say a related test mentions the site owner, but it must not present
+  that as proof that the unsafe site executed.
+- Top-level reach evidence and obligation-level reach evidence identify the same
+  owner and posture.
 - If evidence is not knowable statically, the card names the limitation instead of overclaiming.
 
 ## CI proof

@@ -60,6 +60,14 @@ contract, discharge, reach, or witness evidence is missing, and no missing
 summary is allowed when all obligation evidence is present. The summary remains
 reviewer-facing; it is not a replacement for obligation-level evidence.
 
+Fixture golden cards must keep reach evidence aligned with the static
+test-reachability boundary. The top-level `reach` summary and every
+obligation-level reach summary must match, identify the same `site.owner` or an
+explicit no-owner-inferred posture, and describe only static test mentions, the
+absence of a static test mention, or inability to infer an owner. They must not
+claim site execution, site reach, coverage, or execution proof without a witness
+receipt surface.
+
 Fixture golden cards must keep witness routes and verify commands aligned. Each
 card needs at least one advisory route, route kinds must belong to the operation
 family registry row, command-bearing routes must name the matching witness tool
@@ -115,6 +123,9 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
   registry row,
 - fixture golden missing summaries are non-empty exactly when at least one
   obligation evidence axis is missing,
+- fixture golden reach evidence keeps top-level and obligation-level summaries
+  aligned with `site.owner` and static-test-mention wording, without execution
+  proof overclaims,
 - fixture golden next actions are non-empty reviewer actions, avoid overclaim
   wording, and name the matching operation family when they refer to a safety
   obligation,
@@ -163,6 +174,8 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
   hazard outside the operation family registry row, or duplicate hazard.
 - A fixture card cannot introduce an obligation evidence key outside the
   operation family registry row.
+- A fixture card cannot drift obligation-level reach away from top-level reach,
+  name a different owner, or claim a test reached or executed the unsafe site.
 - A fixture card cannot introduce a witness route kind outside the operation
   family registry row.
 - A fixture card cannot attach a cargo-careful command to a Miri route or attach
