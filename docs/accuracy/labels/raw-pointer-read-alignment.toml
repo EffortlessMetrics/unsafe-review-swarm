@@ -11,6 +11,81 @@ ReviewCard evidence behavior; they are not a proof of memory safety, not UB-free
 """
 
 [[samples]]
+id = "raw-pointer-alignment-missing"
+fixture = "raw_pointer_alignment"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+expected_obligation_key = "alignment"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A raw pointer read with length evidence still needs separate alignment guard evidence."
+
+[[samples]]
+id = "raw-pointer-alignment-receipted-still-missing-guard"
+fixture = "raw_pointer_alignment_receipted"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+expected_obligation_key = "alignment"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A matching witness receipt must not hide the still-missing local alignment guard evidence."
+
+[[samples]]
+id = "align-of-only-not-guard"
+fixture = "align_of_only_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+expected_obligation_key = "alignment"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A bare align_of calculation is type metadata and does not prove this pointer is aligned."
+
+[[samples]]
+id = "alignment-other-pointer-not-guard"
+fixture = "alignment_other_pointer_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+expected_obligation_key = "alignment"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Alignment evidence for another pointer must not discharge this raw pointer read."
+
+[[samples]]
+id = "raw-pointer-alignment-post-check-not-guard"
+fixture = "raw_pointer_alignment_post_check_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+expected_obligation_key = "alignment"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Alignment evidence after the unsafe read must not discharge the earlier alignment obligation."
+
+[[samples]]
 id = "raw-pointer-is-aligned-guard"
 fixture = "raw_pointer_alignment_is_aligned_guard"
 kind = "positive"

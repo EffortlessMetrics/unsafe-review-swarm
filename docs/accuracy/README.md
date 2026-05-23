@@ -24,7 +24,8 @@ The current fixture-pinned slices are:
   partial, closed-branch, comment-only, and unrelated-length controls.
 - `raw_pointer_read` alignment evidence: checks whether the `alignment`
   obligation's discharge state is `present` or `missing` in the linked goldens,
-  including a comment-only false-positive control.
+  including `align_of`-only, other-pointer, post-check, comment-only, stale,
+  observed, closed-branch, and receipted-but-still-missing-guard controls.
 - `raw_pointer_read` bounds evidence: checks whether same-origin len/capacity
   assertions, typed casts, and open length branches discharge the `bounds`
   obligation, while rejecting observed branches, shadowed origins, unrelated

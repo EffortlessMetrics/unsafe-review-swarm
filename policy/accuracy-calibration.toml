@@ -134,6 +134,11 @@ operation_family = "raw_pointer_read"
 hazard = "alignment"
 support_tier = "Guard evidence mining"
 fixtures = [
+  "raw_pointer_alignment",
+  "raw_pointer_alignment_receipted",
+  "align_of_only_not_guard",
+  "alignment_other_pointer_not_guard",
+  "raw_pointer_alignment_post_check_not_guard",
   "raw_pointer_alignment_is_aligned_guard",
   "raw_pointer_alignment_observed_not_guard",
   "raw_pointer_alignment_closed_branch_not_guard",
@@ -151,7 +156,8 @@ label_ledgers = [
 labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned alignment guard evidence for raw pointer reads rejects observed,
-closed-branch, stale-pointer, comment-only, and wrong-shape evidence in the listed fixtures.
+closed-branch, stale-pointer, comment-only, post-check, other-pointer, and
+wrong-shape evidence in the listed fixtures.
 """
 forbidden_claims = [
   "broad raw pointer safety",
