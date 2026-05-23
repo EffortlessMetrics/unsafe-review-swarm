@@ -2,8 +2,8 @@
   "name": "unsafe-review",
   "displayName": "unsafe-review",
   "publisher": "effortlessmetrics",
-  "description": "Packaging scaffold for the future read-only unsafe-review editor adapter.",
-  "version": "0.0.1",
+  "description": "Read-only viewer for the saved unsafe-review lsp.json bundle: advisory diagnostics, hovers, and command-only copy/open actions.",
+  "version": "0.1.0",
   "license": "MIT OR Apache-2.0",
   "repository": {
     "type": "git",
@@ -12,18 +12,86 @@
   "engines": {
     "vscode": "^1.92.0"
   },
-  "categories": ["Linters", "Programming Languages", "Other"],
-  "keywords": ["rust", "unsafe", "static-analysis", "review"],
+  "categories": [
+    "Linters",
+    "Programming Languages",
+    "Other"
+  ],
+  "keywords": [
+    "rust",
+    "unsafe",
+    "static-analysis",
+    "review"
+  ],
   "preview": true,
-  "activationEvents": [],
+  "activationEvents": [
+    "workspaceContains:target/unsafe-review/lsp.json",
+    "onCommand:unsafe-review.refreshBundle",
+    "onCommand:unsafe-review.openPrSummary",
+    "onCommand:unsafe-review.openWitnessPlan",
+    "onCommand:unsafe-review.copyAgentPacket",
+    "onCommand:unsafe-review.copyWitnessCommand",
+    "onLanguage:rust"
+  ],
   "main": "./out/extension.js",
-  "contributes": {},
+  "contributes": {
+    "commands": [
+      {
+        "command": "unsafe-review.refreshBundle",
+        "title": "Unsafe Review: Refresh Bundle",
+        "category": "Unsafe Review"
+      },
+      {
+        "command": "unsafe-review.openPrSummary",
+        "title": "Unsafe Review: Open PR Summary (open)",
+        "category": "Unsafe Review"
+      },
+      {
+        "command": "unsafe-review.openWitnessPlan",
+        "title": "Unsafe Review: Open Witness Plan (open)",
+        "category": "Unsafe Review"
+      },
+      {
+        "command": "unsafe-review.copyAgentPacket",
+        "title": "Unsafe Review: Copy Agent Packet Command (copy)",
+        "category": "Unsafe Review"
+      },
+      {
+        "command": "unsafe-review.copyWitnessCommand",
+        "title": "Unsafe Review: Copy Witness Command (copy)",
+        "category": "Unsafe Review"
+      }
+    ],
+    "configuration": {
+      "title": "Unsafe Review",
+      "properties": {
+        "unsafeReview.bundlePath": {
+          "type": "string",
+          "default": "target/unsafe-review/lsp.json",
+          "description": "Workspace-relative path to the saved unsafe-review lsp.json bundle. The extension never invokes a subprocess; you must run `unsafe-review first-pr` to refresh this file."
+        },
+        "unsafeReview.autoRefreshOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Re-read the bundle automatically when it changes on disk. Off by default; users typically re-run `unsafe-review first-pr` and click the status bar to refresh."
+        },
+        "unsafeReview.maxDiagnosticsPerFile": {
+          "type": "integer",
+          "default": 200,
+          "minimum": 1,
+          "description": "Maximum diagnostics displayed per file. Extras are discarded to keep editor UI responsive; the full bundle remains on disk."
+        }
+      }
+    }
+  },
   "scripts": {
     "compile": "tsc -p ./",
-    "test": "node -e \"console.log('no extension runtime tests yet')\""
+    "watch": "tsc -watch -p ./",
+    "test": "node --test \"out/test/*.test.js\""
   },
   "devDependencies": {
     "@types/node": "^20.17.57",
+    "@types/vscode": "1.92.0",
     "typescript": "^5.6.3"
   }
 }
