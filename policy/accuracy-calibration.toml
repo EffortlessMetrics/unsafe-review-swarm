@@ -97,6 +97,46 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "raw-pointer-write-initialized-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "raw_pointer_write"
+hazard = "initialized_memory"
+support_tier = "Raw pointer card slice"
+fixtures = [
+  "raw_pointer_write_bytes",
+  "raw_pointer_write_bool_bytes_guard",
+  "raw_pointer_write_bool_reassigned_byte_not_guard",
+  "raw_pointer_write_bool_closed_branch_not_guard",
+  "raw_pointer_write_previous_u8_not_guard",
+  "raw_pointer_write_previous_bool_not_guard",
+  "raw_pointer_write_previous_maybeuninit_not_guard",
+  "raw_pointer_write_other_u8_not_guard",
+  "raw_pointer_write_maybeuninit",
+  "raw_pointer_write_other_maybeuninit_not_guard",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/raw-pointer-write-initialized-evidence.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned raw pointer write initialized evidence distinguishes u8, guarded
+bool, and MaybeUninit target evidence from stale, closed-branch, wrong-target,
+and previous-operation controls in the listed fixtures.
+"""
+forbidden_claims = [
+  "broad raw pointer write safety",
+  "pointer validity proof",
+  "bounds proof",
+  "allocation proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "copy-nonoverlapping-valid-range-evidence"
 status = "fixture_pinned"
 kind = "evidence_precision"

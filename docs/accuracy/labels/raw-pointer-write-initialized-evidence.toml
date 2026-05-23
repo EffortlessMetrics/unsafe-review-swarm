@@ -1,0 +1,142 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "raw-pointer-write-initialized-evidence"
+operation_family = "raw_pointer_write"
+hazard = "initialized_memory"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard initialized evidence behavior for raw pointer writes; they are
+not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "raw-pointer-write-u8-initialized-present"
+fixture = "raw_pointer_write_bytes"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "initialized"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "Writing bytes through a *mut u8 target is accepted as initialized-value evidence while pointer, bounds, and allocation obligations remain missing."
+
+[[samples]]
+id = "raw-pointer-write-bool-byte-guard-present"
+fixture = "raw_pointer_write_bool_bytes_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "initialized"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A dominating byte-domain guard for a *mut bool write discharges initialized-value evidence without proving pointer, bounds, or allocation evidence."
+
+[[samples]]
+id = "raw-pointer-write-bool-reassigned-byte-not-guard"
+fixture = "raw_pointer_write_bool_reassigned_byte_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Bool byte-domain evidence becomes stale when the checked byte is reassigned before write_bytes."
+
+[[samples]]
+id = "raw-pointer-write-bool-closed-branch-not-guard"
+fixture = "raw_pointer_write_bool_closed_branch_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A closed positive bool byte-domain branch is only an observation and does not dominate the later write."
+
+[[samples]]
+id = "raw-pointer-write-previous-u8-not-guard"
+fixture = "raw_pointer_write_previous_u8_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Initialized evidence from an earlier *mut u8 write does not apply to a later write through a different pointer."
+
+[[samples]]
+id = "raw-pointer-write-previous-bool-not-guard"
+fixture = "raw_pointer_write_previous_bool_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Initialized evidence from an earlier *mut bool write does not apply to a later write through a different pointer."
+
+[[samples]]
+id = "raw-pointer-write-previous-maybeuninit-not-guard"
+fixture = "raw_pointer_write_previous_maybeuninit_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Initialized evidence from an earlier MaybeUninit-backed write does not apply to a later write through a different pointer."
+
+[[samples]]
+id = "raw-pointer-write-other-u8-not-guard"
+fixture = "raw_pointer_write_other_u8_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "An unrelated *mut u8 binding is not initialized evidence for the target write."
+
+[[samples]]
+id = "raw-pointer-write-maybeuninit-present"
+fixture = "raw_pointer_write_maybeuninit"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "Writing into MaybeUninit storage is accepted as initialized-memory evidence while other raw write obligations remain missing."
+
+[[samples]]
+id = "raw-pointer-write-other-maybeuninit-not-guard"
+fixture = "raw_pointer_write_other_maybeuninit_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "An unrelated MaybeUninit mention is not initialized-memory evidence for the target write."
