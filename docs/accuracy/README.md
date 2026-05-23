@@ -70,6 +70,9 @@ The current fixture-pinned slices are:
 - `get_unchecked_mut` bounds evidence: checks whether same-receiver len guards
   discharge the bounds obligation, while rejecting other-receiver, post-check,
   observed-only, closed-branch, and stale-index controls.
+- Pointer arithmetic bounds evidence: checks whether `index < num_ctrl_bytes`
+  and same-slice end-pointer patterns discharge pointer-arithmetic bounds
+  evidence while preserving witness/provenance limits.
 - No-card artifact honesty: checks that safe, import-only, cfg-only, and
   unchanged-adjacent fixtures emit zero ReviewCards without turning that into an
   all-clear or safety claim.

@@ -737,6 +737,37 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "pointer-arithmetic-bounds-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "pointer_arithmetic"
+hazard = "bounds"
+support_tier = "Core operation smoke slice"
+fixtures = [
+  "pointer_arithmetic_num_ctrl_bytes_guard",
+  "pointer_arithmetic_slice_end",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/pointer-arithmetic-bounds.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned pointer arithmetic bounds evidence recognizes index <
+num_ctrl_bytes and same-slice end-pointer patterns in the listed fixtures.
+"""
+forbidden_claims = [
+  "broad pointer arithmetic soundness",
+  "pointer provenance proof",
+  "same-allocation proof",
+  "witness execution proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "no-card-artifact-honesty"
 status = "fixture_pinned"
 kind = "artifact_honesty"

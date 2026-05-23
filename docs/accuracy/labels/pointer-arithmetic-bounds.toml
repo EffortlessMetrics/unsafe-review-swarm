@@ -1,0 +1,39 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "pointer-arithmetic-bounds-evidence"
+operation_family = "pointer_arithmetic"
+hazard = "bounds"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard bounds evidence behavior for pointer arithmetic; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "pointer-arithmetic-num-ctrl-bytes-bounds-present"
+fixture = "pointer_arithmetic_num_ctrl_bytes_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "pointer_arithmetic"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "An index < num_ctrl_bytes guard discharges pointer-arithmetic bounds evidence without importing a witness receipt."
+
+[[samples]]
+id = "pointer-arithmetic-same-slice-end-bounds-present"
+fixture = "pointer_arithmetic_slice_end"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "pointer_arithmetic"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-slice start pointer plus len end-pointer pattern discharges pointer-arithmetic bounds evidence without proving arbitrary provenance."
