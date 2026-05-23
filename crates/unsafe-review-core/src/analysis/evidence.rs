@@ -2305,6 +2305,7 @@ fn has_from_utf8_unchecked_validation_evidence(lower: &str) -> bool {
     let validation = format!("from_utf8({argument})");
 
     has_validation_is_ok_branch_guard(before_call, &validation, argument_identifier)
+        || has_validation_if_let_ok_branch_guard(before_call, &validation, argument_identifier)
         || has_validation_early_return_guard(
             before_call,
             &validation,
@@ -2374,6 +2375,62 @@ fn has_validation_is_ok_branch_guard(before_call: &str, validation: &str, argume
             return true;
         }
         search_from = guard_start + guard.len();
+    }
+    false
+}
+
+fn has_validation_if_let_ok_branch_guard(
+    before_call: &str,
+    validation: &str,
+    argument: &str,
+) -> bool {
+    let mut search_from = 0;
+    while let Some(offset) = before_call[search_from..].find(validation) {
+        let validation_start = search_from + offset;
+        let before_validation = &before_call[..validation_start];
+        let Some(if_let_start) = before_validation.rfind("ifletok(") else {
+            search_from = validation_start + validation.len();
+            continue;
+        };
+        let pattern = &before_validation[if_let_start + "ifletok(".len()..];
+        let Some(pattern_end) = pattern.find(")=") else {
+            search_from = validation_start + validation.len();
+            continue;
+        };
+        let binding = &pattern[..pattern_end];
+        let path_prefix = &pattern[pattern_end + ")=".len()..];
+        if binding.is_empty()
+            || binding.contains('{')
+            || !(path_prefix.is_empty() || path_prefix.ends_with("::"))
+            || !path_prefix
+                .chars()
+                .all(|ch| is_receiver_path_char(ch) || ch == ':')
+        {
+            search_from = validation_start + validation.len();
+            continue;
+        }
+        let after_validation = &before_call[validation_start + validation.len()..];
+        let Some(after_open) = after_validation.strip_prefix('{') else {
+            search_from = validation_start + validation.len();
+            continue;
+        };
+        let mut depth = 1usize;
+        for ch in after_open.chars() {
+            match ch {
+                '{' => depth += 1,
+                '}' => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 0 {
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        if depth > 0 && !has_assignment_to_identifier(after_open, argument) {
+            return true;
+        }
+        search_from = validation_start + validation.len();
     }
     false
 }
@@ -5810,6 +5867,12 @@ mod tests {
             "unsafe { core::str::from_utf8_unchecked(bytes) }",
             vec![],
         );
+        let if_let_ok = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec!["if let Ok(_valid) = core::str::from_utf8(bytes) {"],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec!["}"],
+        );
 
         let checked_evidence = obligation_evidence(&checked, &obligations, &contract, &reach);
         let return_evidence = obligation_evidence(&early_return, &obligations, &contract, &reach);
@@ -5817,11 +5880,13 @@ mod tests {
             obligation_evidence(&question_mark, &obligations, &contract, &reach);
         let match_return_evidence =
             obligation_evidence(&match_return, &obligations, &contract, &reach);
+        let if_let_ok_evidence = obligation_evidence(&if_let_ok, &obligations, &contract, &reach);
 
         assert!(checked_evidence[0].discharge.present);
         assert!(return_evidence[0].discharge.present);
         assert!(question_mark_evidence[0].discharge.present);
         assert!(match_return_evidence[0].discharge.present);
+        assert!(if_let_ok_evidence[0].discharge.present);
     }
 
     #[test]
@@ -5865,6 +5930,16 @@ mod tests {
             OperationFamily::StrFromUtf8Unchecked,
             vec![
                 "if core::str::from_utf8(bytes).is_ok() {",
+                "    observed_valid();",
+                "}",
+            ],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
+        let closed_if_let_branch = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec![
+                "if let Ok(_valid) = core::str::from_utf8(bytes) {",
                 "    observed_valid();",
                 "}",
             ],
@@ -5921,6 +5996,15 @@ mod tests {
             "unsafe { core::str::from_utf8_unchecked(bytes) }",
             vec![],
         );
+        let reassigned_after_if_let = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec![
+                "if let Ok(_valid) = core::str::from_utf8(bytes) {",
+                "    bytes = b\"\\xff\";",
+            ],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec!["}"],
+        );
 
         let wrong_buffer_evidence =
             obligation_evidence(&wrong_buffer, &obligations, &contract, &reach);
@@ -5936,6 +6020,8 @@ mod tests {
             obligation_evidence(&observed_is_ok, &obligations, &contract, &reach);
         let closed_positive_branch_evidence =
             obligation_evidence(&closed_positive_branch, &obligations, &contract, &reach);
+        let closed_if_let_branch_evidence =
+            obligation_evidence(&closed_if_let_branch, &obligations, &contract, &reach);
         let reassigned_after_question_mark_evidence = obligation_evidence(
             &reassigned_after_question_mark,
             &obligations,
@@ -5954,6 +6040,8 @@ mod tests {
             &contract,
             &reach,
         );
+        let reassigned_after_if_let_evidence =
+            obligation_evidence(&reassigned_after_if_let, &obligations, &contract, &reach);
 
         assert!(!wrong_buffer_evidence[0].discharge.present);
         assert!(!wrong_buffer_question_mark_evidence[0].discharge.present);
@@ -5962,9 +6050,11 @@ mod tests {
         assert!(!non_returning_match_evidence[0].discharge.present);
         assert!(!observed_is_ok_evidence[0].discharge.present);
         assert!(!closed_positive_branch_evidence[0].discharge.present);
+        assert!(!closed_if_let_branch_evidence[0].discharge.present);
         assert!(!reassigned_after_question_mark_evidence[0].discharge.present);
         assert!(!reassigned_after_early_return_evidence[0].discharge.present);
         assert!(!reassigned_after_match_return_evidence[0].discharge.present);
+        assert!(!reassigned_after_if_let_evidence[0].discharge.present);
     }
 
     #[test]

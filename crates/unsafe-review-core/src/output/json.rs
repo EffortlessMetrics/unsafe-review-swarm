@@ -351,6 +351,7 @@ mod tests {
         "copy_nonoverlapping_slice_range_reassigned_src_not_guard",
         "copy_nonoverlapping_other_len_not_guard",
         "str_from_utf8_unchecked",
+        "str_from_utf8_unchecked_if_let_ok_guard",
         "zeroed_invalid_value",
         "inline_asm_human_review",
         "pointer_arithmetic_num_ctrl_bytes_guard",

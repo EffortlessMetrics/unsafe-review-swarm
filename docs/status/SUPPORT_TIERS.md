@@ -120,3 +120,8 @@ slice length assertions do not discharge the source/destination range obligation
 | Explain and agent packets | experimental | `explain <card-id>` / `context <card-id> --json` | `card_detail` and `agent_packet` renderer tests plus CLI e2e cover card-scoped explanation, concrete operation expression, operation family, routes, verify commands, bounded read-only packets, allowed repairs, do-not-do rules, stop conditions, and trust-boundary wording projected from ReviewCards | copy-only; no agent execution, source edits, comments, witness execution, or repair success claim |
 | Witness receipt import | experimental | `.unsafe-review/receipts/*.json` / `WitnessReceipt` SDK DTO | receipt parser tests cover exact identity, tool, strength, author, timestamp, and expiry validation; `WitnessReceipt` serde round-trip tests cover the public receipt shape; analyzer tests cover exact-card import; `raw_pointer_alignment_receipted` golden covers rendered card output | imports receipts only; does not execute witnesses, does not prove repository safety, and matches exact card identity only |
 | MIR/nightly facts | deferred | optional adapter | ADR needed | not v0.1 product default |
+
+Recent proof-index additions that are tracked by the calibration ledger but not
+expanded inline in the long table row above include
+`str_from_utf8_unchecked_if_let_ok_guard` for same-buffer if-let `Ok` UTF-8
+validation before `str::from_utf8_unchecked`.
