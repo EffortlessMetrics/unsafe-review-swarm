@@ -429,12 +429,16 @@ mod tests {
         "ffi_libc_call_sanitizer_route",
         "get_unchecked_mut_bounds",
         "get_unchecked_mut_len_guard",
+        "get_unchecked_mut_get_probe_guard",
+        "get_unchecked_mut_get_probe_early_return_guard",
         "get_unchecked_mut_other_len_not_guard",
         "get_unchecked_mut_post_check_not_guard",
         "get_unchecked_mut_bounds_observed_not_guard",
         "get_unchecked_mut_closed_bounds_not_guard",
         "get_unchecked_mut_return_comment_not_guard",
         "get_unchecked_mut_reassigned_index_not_guard",
+        "get_unchecked_mut_get_probe_reassigned_index_not_guard",
+        "get_unchecked_mut_get_probe_early_return_reassigned_index_not_guard",
         "pin_new_unchecked",
     ];
 

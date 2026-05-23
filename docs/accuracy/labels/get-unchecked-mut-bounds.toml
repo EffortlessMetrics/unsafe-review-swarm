@@ -39,6 +39,34 @@ label_source = "fixture_golden"
 rationale = "A same-receiver len guard before get_unchecked_mut discharges the bounds obligation."
 
 [[samples]]
+id = "get-unchecked-mut-get-probe-guard-present"
+fixture = "get_unchecked_mut_get_probe_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-receiver get(index).is_some() branch that contains get_unchecked_mut discharges the bounds obligation."
+
+[[samples]]
+id = "get-unchecked-mut-get-probe-early-return-present"
+fixture = "get_unchecked_mut_get_probe_early_return_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-receiver get(index).is_none() early return before get_unchecked_mut discharges the bounds obligation."
+
+[[samples]]
 id = "get-unchecked-mut-other-len-not-guard"
 fixture = "get_unchecked_mut_other_len_not_guard"
 kind = "false_positive_control"
@@ -121,3 +149,31 @@ expected_discharge_state = "missing"
 expected_witness_route_kinds = ["miri", "cargo-careful"]
 label_source = "fixture_golden"
 rationale = "Bounds evidence becomes stale when the checked index is reassigned before get_unchecked_mut."
+
+[[samples]]
+id = "get-unchecked-mut-get-probe-reassigned-index-not-guard"
+fixture = "get_unchecked_mut_get_probe_reassigned_index_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Get-probe evidence becomes stale when the checked index is reassigned inside the open branch before get_unchecked_mut."
+
+[[samples]]
+id = "get-unchecked-mut-get-probe-early-return-reassigned-index-not-guard"
+fixture = "get_unchecked_mut_get_probe_early_return_reassigned_index_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Get-probe early-return evidence becomes stale when the checked index is reassigned before get_unchecked_mut."

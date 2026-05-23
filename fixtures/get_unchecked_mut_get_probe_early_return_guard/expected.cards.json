@@ -1,0 +1,79 @@
+[
+{
+    "id":  "UR-get-unchecked-mut-get-probe-early-return-guard-fixture-src-lib-rs-pick-after-get-probe-return-operation-get_unchecked-get-unchecked-c7a7d2b051de-bounds-c1",
+    "class":  "guarded_unwitnessed",
+    "priority":  "medium",
+    "confidence":  "medium",
+    "site":  {
+                 "file":  "src/lib.rs",
+                 "line":  6,
+                 "column":  5,
+                 "kind":  "operation",
+                 "owner":  "pick_after_get_probe_return",
+                 "visibility":  "private",
+                 "public_api_surface":  false,
+                 "snippet":  "Some(unsafe { values.get_unchecked_mut(index) })"
+             },
+    "operation":  "Some(unsafe { values.get_unchecked_mut(index) })",
+    "operation_family":  "get_unchecked",
+    "hazards":  [
+                    "bounds"
+                ],
+    "obligations":  [
+                        "index is in bounds for the collection"
+                    ],
+    "obligation_evidence":  [
+                                {
+                                    "key":  "bounds",
+                                    "description":  "index is in bounds for the collection",
+                                    "contract":  {
+                                                     "present":  true,
+                                                     "state":  "present",
+                                                     "summary":  "Nearby `SAFETY:` comment was detected"
+                                                 },
+                                    "discharge":  {
+                                                      "present":  true,
+                                                      "state":  "present",
+                                                      "summary":  "Length or bounds guard code was detected"
+                                                  },
+                                    "reach":  {
+                                                  "present":  true,
+                                                  "state":  "present",
+                                                  "summary":  "1 related test file(s) mention owner `pick_after_get_probe_return`"
+                                              },
+                                    "witness":  {
+                                                    "present":  false,
+                                                    "state":  "missing",
+                                                    "summary":  "No imported witness receipt was found"
+                                                }
+                                }
+                            ],
+    "contract":  "Nearby `SAFETY:` comment was detected",
+    "discharge":  "All inferred safety obligations have visible local discharge evidence",
+    "reach":  "1 related test file(s) mention owner `pick_after_get_probe_return`",
+    "witness":  "No imported witness receipt was found",
+    "witness_routes":  [
+                           {
+                               "kind":  "miri",
+                               "reason":  "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+                               "command":  "cargo +nightly miri test pick_after_get_probe_return",
+                               "required":  false
+                           },
+                           {
+                               "kind":  "cargo-careful",
+                               "reason":  "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+                               "command":  "cargo +nightly careful test pick_after_get_probe_return",
+                               "required":  false
+                           }
+                       ],
+    "missing":  [
+                    "No witness receipt imported for this card"
+                ],
+    "next_action":  "Attach a focused Miri or cargo-careful witness receipt or mark the static limitation explicitly.",
+    "verify_commands":  [
+                            "cargo +nightly miri test pick_after_get_probe_return",
+                            "cargo +nightly careful test pick_after_get_probe_return"
+                        ]
+}
+]
+

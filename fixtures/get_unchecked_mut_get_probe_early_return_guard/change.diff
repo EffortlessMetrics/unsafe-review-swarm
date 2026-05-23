@@ -1,0 +1,24 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,19 @@
++pub fn pick_after_get_probe_return(values: &mut [u8], index: usize) -> Option<&mut u8> {
++    if values.get(index).is_none() {
++        return None;
++    }
++    // SAFETY: the get probe above returned early when `index` was out of bounds.
++    Some(unsafe { values.get_unchecked_mut(index) })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::pick_after_get_probe_return;
++
++    #[test]
++    fn picks_after_get_probe_return() {
++        let mut values = [1_u8, 2, 3];
++        let picked = pick_after_get_probe_return(&mut values, 1).expect("in bounds");
++        *picked = 9;
++    }
++}
+
