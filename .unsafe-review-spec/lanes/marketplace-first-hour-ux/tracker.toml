@@ -1,0 +1,192 @@
+schema_version = "1.0"
+
+id = "marketplace-first-hour-ux"
+name = "marketplace and first-hour UX"
+status = "active"
+owner = "product / cli"
+created = "2026-05-23"
+
+objective = """
+Move unsafe-review from "published on crates.io" to "a Rust maintainer can
+install it, wire it into their PRs, see value, and optionally use it in an
+editor" — without weakening the advisory ReviewCard trust boundary.
+"""
+
+scope = [
+  "first-hour CLI user path (install, doctor, first-pr, explain, support)",
+  "copy-paste GitHub Actions integration for PR review",
+  "advisory PR job-summary fragment derived from pr-summary.md",
+  "comment-plan reviewer-actionability metadata polish",
+  "VS Code / Open VSX read-only editor extension MVP over saved lsp.json",
+  "marketplace publication preparation and manual publish workflow",
+  "advisory Codecov telemetry once a successful upload exists",
+]
+
+non_goals = [
+  "automatic PR comment posting by default",
+  "default blocking on unsafe-review findings",
+  "source-editing quick fixes",
+  "default witness execution (Miri, cargo-careful, Loom, Kani, sanitizers)",
+  "live LSP wiring in the MVP extension (deferred to SPEC-0018 hardening)",
+  "automatic crate or extension publication on PR merge",
+  "safety, UB-free, Miri-clean, site-execution, or calibrated precision claims",
+]
+
+proof_commands = [
+  "cargo run --locked -p xtask -- check-pr",
+  "cargo run --locked -p xtask -- check-docs",
+  "cargo run --locked -p xtask -- check-doc-artifacts",
+  "cargo run --locked -p xtask -- check-goals",
+  "cargo run --locked -p xtask -- check-ci-lanes",
+  "cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review",
+  "cargo run --locked -p xtask -- source-divergence",
+  "git diff --check",
+]
+
+linked_plan = ".unsafe-review-spec/lanes/marketplace-first-hour-ux/implementation-plan.md"
+linked_closeout = ".unsafe-review-spec/lanes/marketplace-first-hour-ux/closeout.md"
+
+[[work_item]]
+id = "first-hour-guide"
+status = "ready"
+spec = "UNSAFE-REVIEW-SPEC-0023"
+description = """
+Add docs/FIRST_HOUR.md as the copy-pasteable maintainer first-hour walkthrough,
+linked from README and FIRST_USE.
+"""
+proof = [
+  "cargo run --locked -p xtask -- check-docs",
+  "cargo run --locked -p xtask -- check-doc-artifacts",
+  "git diff --check",
+]
+
+[[work_item]]
+id = "first-hour-smoke"
+status = "ready"
+spec = "UNSAFE-REVIEW-SPEC-0023"
+description = """
+Add an xtask check-first-hour command that exercises doctor, fixture first-pr,
+artifact verification, and the no-card fixture path so the documented first
+hour stays runnable.
+"""
+proof = [
+  "cargo run --locked -p xtask -- check-first-hour",
+  "cargo run --locked -p xtask -- check-pr",
+  "git diff --check",
+]
+
+[[work_item]]
+id = "github-actions-user-guide"
+status = "ready"
+spec = "UNSAFE-REVIEW-SPEC-0024"
+description = """
+Add a copy-paste GitHub Actions user guide and re-anchor the example workflow
+as the canonical drop-in PR lane: read-only token, advisory packet, artifact
+upload, job summary, no comments, no witnesses, no blocking.
+"""
+proof = [
+  "cargo run --locked -p xtask -- check-docs",
+  "cargo run --locked -p xtask -- check-ci-lanes",
+  "git diff --check",
+]
+
+[[work_item]]
+id = "github-summary-fragment"
+status = "proposed"
+spec = "UNSAFE-REVIEW-SPEC-0011"
+description = """
+Render a bounded target/unsafe-review/github-summary.md fragment suitable for
+GITHUB_STEP_SUMMARY without dumping the full pr-summary.md body.
+"""
+proof = [
+  "cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review",
+  "cargo run --locked -p xtask -- check-pr",
+  "git diff --check",
+]
+
+[[work_item]]
+id = "comment-plan-actionability"
+status = "in_progress"
+spec = "UNSAFE-REVIEW-SPEC-0022"
+plan = "plans/post-0.2.0/comment-plan-quality.md"
+description = """
+Continue the comment-plan-quality plan: selection_reason, actionability,
+relevance, not_selected[] reasons, capped bodies, no duplicates. No posting.
+"""
+proof = [
+  "cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review",
+  "cargo run --locked -p xtask -- check-pr",
+  "git diff --check",
+]
+
+[[work_item]]
+id = "extension-mvp-spec"
+status = "ready"
+spec = "UNSAFE-REVIEW-SPEC-0021"
+description = """
+Define the editor extension MVP as a saved-lsp.json viewer (diagnostics,
+hovers, command-only actions) ahead of any live LSP wiring. Frees the
+extension from the SPEC-0018 live-server hardening gate for the MVP path.
+"""
+proof = [
+  "cargo run --locked -p xtask -- check-docs",
+  "cargo run --locked -p xtask -- check-doc-artifacts",
+  "git diff --check",
+]
+
+[[work_item]]
+id = "extension-saved-lsp-viewer"
+status = "ready"
+spec = "UNSAFE-REVIEW-SPEC-0021"
+description = """
+Implement the saved-lsp viewer behavior in editors/vscode: load lsp.json,
+publish diagnostics, render hovers, and expose Copy Agent Packet, Copy Witness
+Command, Open PR Summary, and Refresh as command-only actions. No source
+edits, no witness execution, no LSP client wiring, no PR comment posting.
+"""
+proof = [
+  "npm --prefix editors/vscode ci",
+  "npm --prefix editors/vscode run compile",
+  "npm --prefix editors/vscode test",
+]
+
+[[work_item]]
+id = "extension-packaging-smoke"
+status = "blocked"
+blocked_by = ["extension-saved-lsp-viewer"]
+description = """
+Package the MVP extension as a VSIX and verify the package layout. Attach the
+VSIX to a GitHub Release before any Marketplace or Open VSX publication.
+"""
+proof = [
+  "npx --prefix editors/vscode @vscode/vsce package --out target/unsafe-review-vscode.vsix",
+]
+
+[[work_item]]
+id = "marketplace-publish-workflow"
+status = "blocked"
+blocked_by = ["extension-packaging-smoke"]
+description = """
+Add a workflow_dispatch-only publish workflow that takes a version, supports
+dry_run, and gates VS Marketplace / Open VSX publication behind explicit
+boolean inputs and dedicated secrets. No PR-triggered publication.
+"""
+proof = [
+  "cargo run --locked -p xtask -- check-ci-lanes",
+  "cargo run --locked -p xtask -- check-pr",
+  "git diff --check",
+]
+
+[[work_item]]
+id = "codecov-advisory"
+status = "proposed"
+description = """
+Add an advisory cargo-llvm-cov + Codecov workflow as execution-surface
+telemetry only. Codecov badge is added to README only after the first
+successful upload. Coverage is not unsafe correctness evidence.
+"""
+proof = [
+  "cargo run --locked -p xtask -- check-ci-lanes",
+  "cargo run --locked -p xtask -- check-pr",
+  "git diff --check",
+]
