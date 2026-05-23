@@ -170,6 +170,7 @@ required_core_fixtures = [
   "vec_from_raw_parts_capacity_observed_not_guard",
   "vec_from_raw_parts_capacity_value_observed_not_guard",
   "vec_from_raw_parts_capacity_closed_branch_not_guard",
+  "vec_from_raw_parts_capacity_return_comment_not_guard",
   "vec_from_raw_parts_capacity_reassigned_not_guard",
   "vec_from_raw_parts_manuallydrop_origin",
   "box_from_raw",
@@ -1898,6 +1899,16 @@ expected_hazard = "bounds"
 fixture = "vec_from_raw_parts_capacity_closed_branch_not_guard"
 kind = "false_positive_control"
 claim = "Vec::from_raw_parts does not accept closed positive len/cap branches as capacity evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_from_raw_parts"
+expected_hazard = "bounds"
+
+[[cases]]
+fixture = "vec_from_raw_parts_capacity_return_comment_not_guard"
+kind = "false_positive_control"
+claim = "Vec::from_raw_parts does not accept return text inside comments as capacity evidence"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

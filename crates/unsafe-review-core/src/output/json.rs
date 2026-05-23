@@ -364,6 +364,7 @@ mod tests {
         "vec_from_raw_parts_capacity_observed_not_guard",
         "vec_from_raw_parts_capacity_value_observed_not_guard",
         "vec_from_raw_parts_capacity_closed_branch_not_guard",
+        "vec_from_raw_parts_capacity_return_comment_not_guard",
         "vec_from_raw_parts_capacity_reassigned_not_guard",
         "vec_from_raw_parts_manuallydrop_origin",
         "box_from_raw",

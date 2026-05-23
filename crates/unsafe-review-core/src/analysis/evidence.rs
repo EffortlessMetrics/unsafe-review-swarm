@@ -1369,7 +1369,7 @@ fn has_capacity_guard(family: &OperationFamily, lower: &str) -> bool {
 }
 
 fn has_vec_from_raw_parts_capacity_evidence(expression: &str, lower: &str) -> bool {
-    let compact = compact_code(lower);
+    let compact = compact_code(&strip_block_comments_and_literals(lower));
     let compact_expression = compact_code(&expression.to_ascii_lowercase());
     let Some((_ptr, len, cap)) = vec_from_raw_parts_arguments(&compact_expression) else {
         return false;
@@ -1564,9 +1564,10 @@ fn has_len_cap_early_return(before_call: &str, predicate: &str, len: &str, cap: 
     while let Some(offset) = before_call[search_from..].find(&guard) {
         let guard_start = search_from + offset;
         let after_guard = &before_call[guard_start + guard.len()..];
-        let (guard_body, after_guard_body) = after_guard
-            .split_once('}')
-            .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
+        let (guard_body, after_guard_body) = matching_code_block_end(after_guard)
+            .map_or((after_guard, ""), |body_end| {
+                (&after_guard[..body_end], &after_guard[body_end + 1..])
+            });
         if guard_body.contains("return") && !has_len_cap_assignment(after_guard_body, len, cap) {
             return true;
         }
@@ -4273,6 +4274,53 @@ mod tests {
         );
         assert!(
             !obligation_evidence(&after_call, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+    }
+
+    #[test]
+    fn vec_from_raw_parts_capacity_early_return_ignores_comment_text() {
+        let obligations = vec![SafetyObligation::new(
+            "capacity",
+            "`len` is at most `capacity`",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let actual_return = site_with_family(
+            OperationFamily::VecFromRawParts,
+            vec!["if len > cap {", "    return None;", "}"],
+            "Some(unsafe { Vec::from_raw_parts(buf, len, cap) })",
+            vec![],
+        );
+        let commented_return = site_with_family(
+            OperationFamily::VecFromRawParts,
+            vec!["if len > cap {", "    /* return None; */", "}"],
+            "Some(unsafe { Vec::from_raw_parts(buf, len, cap) })",
+            vec![],
+        );
+        let string_return = site_with_family(
+            OperationFamily::VecFromRawParts,
+            vec!["if len > cap {", "    let _note = \"return None\";", "}"],
+            "Some(unsafe { Vec::from_raw_parts(buf, len, cap) })",
+            vec![],
+        );
+
+        assert!(
+            obligation_evidence(&actual_return, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&commented_return, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&string_return, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
         );

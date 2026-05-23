@@ -500,6 +500,7 @@ fixtures = [
   "vec_from_raw_parts_capacity_observed_not_guard",
   "vec_from_raw_parts_capacity_value_observed_not_guard",
   "vec_from_raw_parts_capacity_closed_branch_not_guard",
+  "vec_from_raw_parts_capacity_return_comment_not_guard",
   "vec_from_raw_parts_capacity_reassigned_not_guard",
   "vec_from_raw_parts_manuallydrop_origin",
 ]
@@ -511,8 +512,8 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned Vec::from_raw_parts capacity evidence distinguishes same-call
 len/cap guards, assertions, and same-origin ManuallyDrop raw-parts capacity
-from observed, closed-branch, wrong-capacity, and stale-cap controls in the
-listed fixtures.
+from observed, closed-branch, comment-only early-return, wrong-capacity, and
+stale-cap controls in the listed fixtures.
 """
 forbidden_claims = [
   "broad Vec::from_raw_parts soundness",

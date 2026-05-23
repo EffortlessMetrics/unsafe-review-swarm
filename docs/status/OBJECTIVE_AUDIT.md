@@ -18,11 +18,12 @@ checked pointers.
 Modulo alignment guards have the same fixture-backed observation, closed-branch,
 and stale-pointer controls.
 `Vec::from_raw_parts` len/cap capacity evidence now has fixture-backed controls
-for assertions, early returns, bare observations, closed branches, and stale
-checked cap arguments. `Vec::set_len` capacity evidence rejects unrelated local
-arguments merely named `cap` unless a const-capacity context is visible, and
-`Vec::set_len` initialization evidence rejects unrelated initialization
-statements not tied to the receiver being lengthened.
+for assertions, early returns, bare observations, closed branches,
+comment-only early-return text, and stale checked cap arguments. `Vec::set_len`
+capacity evidence rejects unrelated local arguments merely named `cap` unless a
+const-capacity context is visible, and `Vec::set_len` initialization evidence
+rejects unrelated initialization statements not tied to the receiver being
+lengthened.
 `Vec::set_len` capacity evidence also recognizes narrow same-vector
 `reserve(additional)` and `try_reserve(additional)?` evidence for
 `len + additional` while rejecting stale `additional` facts.
@@ -44,7 +45,7 @@ The active calibration rail is now recorded in
 `.unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md`,
 `policy/accuracy-calibration.toml`, and
 `docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 34
-fixture-pinned claims, 216 calibration cases, 34 label ledgers, and 223 label
+fixture-pinned claims, 221 calibration cases, 34 label ledgers, and 228 label
 samples. It records zero dogfood-measured, labeled-calibrated, or
 policy-eligible claims. That is intentional: the current report is a
 claim-scoped fixture-pinned proof index, not a global precision/recall result

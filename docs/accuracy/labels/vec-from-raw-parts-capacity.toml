@@ -89,6 +89,19 @@ label_source = "fixture_golden"
 rationale = "A closed positive len <= cap branch does not dominate the later Vec::from_raw_parts call."
 
 [[samples]]
+id = "vec-from-raw-parts-capacity-return-comment-not-guard"
+fixture = "vec_from_raw_parts_capacity_return_comment_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_from_raw_parts"
+expected_hazard = "bounds"
+expected_obligation_key = "capacity"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Text that says return inside a comment does not make the invalid len/cap branch non-returning."
+
+[[samples]]
 id = "vec-from-raw-parts-capacity-reassigned-not-guard"
 fixture = "vec_from_raw_parts_capacity_reassigned_not_guard"
 kind = "false_positive_control"

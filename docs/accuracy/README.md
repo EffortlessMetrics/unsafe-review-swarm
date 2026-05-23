@@ -60,7 +60,7 @@ The current fixture-pinned slices are:
 - `Vec::from_raw_parts` capacity evidence: checks whether the `capacity`
   obligation is discharged by same-call len/cap guards, assertions, or
   same-origin ManuallyDrop raw parts, while rejecting observed, closed-branch,
-  wrong-capacity, and stale-cap controls.
+  comment-only early-return, wrong-capacity, and stale-cap controls.
 - `MaybeUninit::assume_init` family initialized-memory evidence: checks that
   `assume_init`, `assume_init_read`, `assume_init_ref`, `assume_init_mut`, and
   `assume_init_drop` report missing initialized evidence and route to
