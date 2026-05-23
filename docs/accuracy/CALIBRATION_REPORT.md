@@ -60,3 +60,6 @@ dogfood target IDs, checked labeled report paths, and allowed public claim
 wording that avoids overclaim terms. A claim may include multiple
 obligation-level samples from one fixture, but the same fixture, obligation, and
 evidence expectation cannot be counted twice through duplicate ledger entries.
+Allowed public claim wording must name its claim level, and forbidden claim
+lists must include the shared global precision, global recall, and memory-safety
+proof boundaries.

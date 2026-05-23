@@ -85,6 +85,9 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - claim entries pass promotion guardrails for status-specific evidence,
   known support-tier capability names, known dogfood target IDs, checked labeled
   report files, and public wording that stays inside the supported claim,
+- allowed public claim wording names the claim level, and forbidden claim lists
+  include shared global precision, global recall, and memory-safety proof
+  overclaim boundaries,
 - every claim fixture is backed by a label sample, and every label sample stays
   inside the owning claim's fixture list,
 - label sample counts do not double-count the same fixture, obligation, and
@@ -109,3 +112,7 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - A dogfood-measured claim cannot reference an unknown dogfood target.
 - An allowed public claim cannot contain global precision/recall, policy-ready,
   UB-free, Miri-clean, or memory-safety proof wording.
+- An allowed public claim cannot omit its claim level, such as
+  `Fixture-pinned`.
+- A forbidden claim list cannot omit the shared global precision, global recall,
+  or memory-safety proof boundaries.

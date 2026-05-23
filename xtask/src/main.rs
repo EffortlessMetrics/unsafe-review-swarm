@@ -204,6 +204,8 @@ const ACCURACY_PROMOTION_FORBIDDEN_TERMS: &[&str] = &[
     "miri-clean",
     "witness execution proof",
 ];
+const ACCURACY_REQUIRED_FORBIDDEN_CLAIMS: &[&str] =
+    &["global precision", "global recall", "memory-safety proof"];
 const DOGFOOD_TARGET_KINDS: &[&str] = &["repo-snapshot", "pr-diff"];
 const DOGFOOD_TARGET_STATUSES: &[&str] = &["active", "parked", "retired"];
 const DOGFOOD_ARTIFACT_STATUSES: &[&str] = &["checked_in", "local_untracked", "remote_manual"];
@@ -1684,10 +1686,26 @@ fn validate_accuracy_policy_claim<'a>(
             ));
         }
     }
+    let required_claim_level = accuracy_claim_status_public_label(status);
+    if !text_contains_ignore_ascii_case(allowed_public_claim, required_claim_level) {
+        return Err(format!(
+            "{ACCURACY_CALIBRATION_POLICY} claim[{idx}] allowed_public_claim must include claim level `{required_claim_level}`"
+        ));
+    }
     if forbidden_claims.is_empty() {
         return Err(format!(
             "{ACCURACY_CALIBRATION_POLICY} claim[{idx}] forbidden_claims must list overclaims this entry does not support"
         ));
+    }
+    for required in ACCURACY_REQUIRED_FORBIDDEN_CLAIMS {
+        if !forbidden_claims
+            .iter()
+            .any(|claim| claim.eq_ignore_ascii_case(required))
+        {
+            return Err(format!(
+                "{ACCURACY_CALIBRATION_POLICY} claim[{idx}] forbidden_claims must include `{required}`"
+            ));
+        }
     }
 
     for ledger in &label_ledgers {
@@ -1751,6 +1769,16 @@ fn validate_accuracy_policy_claim<'a>(
         label_ledgers,
         labeled_reports,
     })
+}
+
+fn accuracy_claim_status_public_label(status: &str) -> &str {
+    match status {
+        "fixture_pinned" => "Fixture-pinned",
+        "dogfood_measured" => "Dogfood measured",
+        "labeled_calibrated" => "Labeled calibrated",
+        "policy_eligible" => "Policy-eligible",
+        _ => status,
+    }
 }
 
 fn required_table_str_array<'a>(
@@ -4462,6 +4490,48 @@ jobs:
     }
 
     #[test]
+    fn accuracy_claim_promotion_requires_public_claim_level() -> Result<(), String> {
+        let policy = test_accuracy_policy_claim(
+            "fixture_pinned",
+            r#"["raw_pointer_alignment"]"#,
+            "[]",
+            r#"["docs/accuracy/labels/raw-pointer-read-alignment.toml"]"#,
+            "[]",
+            "This test claim remains limited to fixture and label-ledger evidence.",
+        )?;
+
+        let Err(err) = accuracy_calibration_report_stats(&policy, 1, 1) else {
+            return Err("allowed public claim without claim level should fail".to_string());
+        };
+
+        assert!(err.contains("allowed_public_claim"));
+        assert!(err.contains("Fixture-pinned"));
+        Ok(())
+    }
+
+    #[test]
+    fn accuracy_claim_promotion_requires_common_forbidden_claims() -> Result<(), String> {
+        let policy = test_accuracy_policy_claim_from(TestAccuracyPolicyClaim {
+            status: "fixture_pinned",
+            support_tier: "Core operation smoke slice",
+            fixtures: r#"["raw_pointer_alignment"]"#,
+            dogfood_targets: "[]",
+            label_ledgers: r#"["docs/accuracy/labels/raw-pointer-read-alignment.toml"]"#,
+            labeled_reports: "[]",
+            allowed_public_claim: "Fixture-pinned test claim remains limited to fixture and label-ledger evidence.",
+            forbidden_claims: r#"["memory-safety proof"]"#,
+        })?;
+
+        let Err(err) = accuracy_calibration_report_stats(&policy, 1, 1) else {
+            return Err("claim without common forbidden claims should fail".to_string());
+        };
+
+        assert!(err.contains("forbidden_claims"));
+        assert!(err.contains("global precision"));
+        Ok(())
+    }
+
+    #[test]
     fn accuracy_claim_promotion_rejects_unknown_support_tier() -> Result<(), String> {
         let policy = test_accuracy_policy_claim_with_support_tier(
             "fixture_pinned",
@@ -4550,6 +4620,43 @@ Static unsafe contract review only. This is not a proof of memory safety, not UB
         labeled_reports: &str,
         allowed_public_claim: &str,
     ) -> Result<toml::Value, String> {
+        test_accuracy_policy_claim_from(TestAccuracyPolicyClaim {
+            status,
+            support_tier,
+            fixtures,
+            dogfood_targets,
+            label_ledgers,
+            labeled_reports,
+            allowed_public_claim,
+            forbidden_claims: r#"["global precision", "global recall", "memory-safety proof"]"#,
+        })
+    }
+
+    struct TestAccuracyPolicyClaim<'a> {
+        status: &'a str,
+        support_tier: &'a str,
+        fixtures: &'a str,
+        dogfood_targets: &'a str,
+        label_ledgers: &'a str,
+        labeled_reports: &'a str,
+        allowed_public_claim: &'a str,
+        forbidden_claims: &'a str,
+    }
+
+    fn test_accuracy_policy_claim_from(
+        claim: TestAccuracyPolicyClaim<'_>,
+    ) -> Result<toml::Value, String> {
+        let TestAccuracyPolicyClaim {
+            status,
+            support_tier,
+            fixtures,
+            dogfood_targets,
+            label_ledgers,
+            labeled_reports,
+            allowed_public_claim,
+            forbidden_claims,
+        } = claim;
+
         format!(
             r#"
 [[claim]]
@@ -4565,7 +4672,7 @@ labeled_reports = {labeled_reports}
 allowed_public_claim = """
 {allowed_public_claim}
 """
-forbidden_claims = ["memory-safety proof"]
+forbidden_claims = {forbidden_claims}
 "#
         )
         .parse::<toml::Table>()
