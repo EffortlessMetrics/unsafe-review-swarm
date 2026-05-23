@@ -97,6 +97,53 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "copy-nonoverlapping-valid-range-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "copy_nonoverlapping"
+hazard = "aliasing_or_provenance"
+support_tier = "Core operation smoke slice"
+fixtures = [
+  "copy_nonoverlapping",
+  "copy_nonoverlapping_slice_range_guard",
+  "copy_nonoverlapping_slice_range_conjunctive_assert_guard",
+  "copy_nonoverlapping_slice_range_early_return_guard",
+  "copy_nonoverlapping_slice_range_disjunctive_early_return_guard",
+  "copy_nonoverlapping_slice_range_open_branch_guard",
+  "copy_nonoverlapping_slice_range_conjunctive_open_branch_guard",
+  "copy_nonoverlapping_slice_range_closed_branch_not_guard",
+  "copy_nonoverlapping_slice_range_or_branch_not_guard",
+  "copy_nonoverlapping_slice_range_disjunctive_early_return_block_comment_not_guard",
+  "copy_nonoverlapping_slice_range_disjunctive_early_return_reassigned_count_not_guard",
+  "copy_nonoverlapping_slice_range_open_branch_reassigned_count_not_guard",
+  "copy_nonoverlapping_slice_range_open_branch_reassigned_src_not_guard",
+  "copy_nonoverlapping_slice_range_src_only_not_guard",
+  "copy_nonoverlapping_slice_range_dst_only_not_guard",
+  "copy_nonoverlapping_slice_range_reassigned_count_not_guard",
+  "copy_nonoverlapping_slice_range_reassigned_src_not_guard",
+  "copy_nonoverlapping_other_len_not_guard",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/copy-nonoverlapping-valid-range.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned copy_nonoverlapping valid-range evidence distinguishes same-call
+source and destination length evidence from stale, partial, closed-branch,
+comment-only, and unrelated-length controls in the listed fixtures, while
+non-overlap remains a separate missing obligation.
+"""
+forbidden_claims = [
+  "broad copy_nonoverlapping soundness",
+  "non-overlap proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "vec-set-len-initialized-range-evidence"
 status = "fixture_pinned"
 kind = "evidence_precision"

@@ -1,0 +1,246 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "copy-nonoverlapping-valid-range-evidence"
+operation_family = "copy_nonoverlapping"
+hazard = "aliasing_or_provenance"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard valid-range evidence behavior for copy_nonoverlapping; they are
+not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "copy-nonoverlapping-basic-missing-valid-range"
+fixture = "copy_nonoverlapping"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A bare copy_nonoverlapping call does not prove both source and destination ranges are valid for count elements."
+
+[[samples]]
+id = "copy-nonoverlapping-slice-range-assert-present"
+fixture = "copy_nonoverlapping_slice_range_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "Same-call source and destination slice length assertions discharge valid-range evidence while non-overlap remains missing."
+
+[[samples]]
+id = "copy-nonoverlapping-conjunctive-assert-present"
+fixture = "copy_nonoverlapping_slice_range_conjunctive_assert_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A conjunctive assertion over source and destination lengths discharges valid-range evidence."
+
+[[samples]]
+id = "copy-nonoverlapping-early-return-present"
+fixture = "copy_nonoverlapping_slice_range_early_return_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "Early returns on invalid source and destination ranges discharge valid-range evidence before the copy."
+
+[[samples]]
+id = "copy-nonoverlapping-disjunctive-early-return-present"
+fixture = "copy_nonoverlapping_slice_range_disjunctive_early_return_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A disjunctive invalid-range early return discharges valid-range evidence for both slices."
+
+[[samples]]
+id = "copy-nonoverlapping-open-branch-present"
+fixture = "copy_nonoverlapping_slice_range_open_branch_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "Nested open branches for source and destination length checks dominate the copy and discharge valid-range evidence."
+
+[[samples]]
+id = "copy-nonoverlapping-conjunctive-open-branch-present"
+fixture = "copy_nonoverlapping_slice_range_conjunctive_open_branch_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A conjunctive open branch over both slice lengths discharges valid-range evidence."
+
+[[samples]]
+id = "copy-nonoverlapping-closed-branch-not-guard"
+fixture = "copy_nonoverlapping_slice_range_closed_branch_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Closed branch observations of source and destination lengths do not dominate the later copy."
+
+[[samples]]
+id = "copy-nonoverlapping-or-branch-not-guard"
+fixture = "copy_nonoverlapping_slice_range_or_branch_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "An open branch with only a disjunctive positive range condition does not prove both ranges are valid."
+
+[[samples]]
+id = "copy-nonoverlapping-commented-return-not-guard"
+fixture = "copy_nonoverlapping_slice_range_disjunctive_early_return_block_comment_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Comment text inside an invalid-range branch is not executable early-return evidence."
+
+[[samples]]
+id = "copy-nonoverlapping-disjunctive-return-reassigned-count-not-guard"
+fixture = "copy_nonoverlapping_slice_range_disjunctive_early_return_reassigned_count_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Invalid-range early-return evidence becomes stale when count is reassigned before the copy."
+
+[[samples]]
+id = "copy-nonoverlapping-open-branch-reassigned-count-not-guard"
+fixture = "copy_nonoverlapping_slice_range_open_branch_reassigned_count_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Open-branch range evidence becomes stale when count is reassigned before the copy."
+
+[[samples]]
+id = "copy-nonoverlapping-open-branch-reassigned-src-not-guard"
+fixture = "copy_nonoverlapping_slice_range_open_branch_reassigned_src_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Open-branch range evidence becomes stale when the source slice is reassigned before the copy."
+
+[[samples]]
+id = "copy-nonoverlapping-src-only-not-guard"
+fixture = "copy_nonoverlapping_slice_range_src_only_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Checking only the source slice length does not prove the destination range is valid."
+
+[[samples]]
+id = "copy-nonoverlapping-dst-only-not-guard"
+fixture = "copy_nonoverlapping_slice_range_dst_only_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Checking only the destination slice length does not prove the source range is valid."
+
+[[samples]]
+id = "copy-nonoverlapping-reassigned-count-not-guard"
+fixture = "copy_nonoverlapping_slice_range_reassigned_count_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Length evidence for the original count does not discharge valid-range evidence after count reassignment."
+
+[[samples]]
+id = "copy-nonoverlapping-reassigned-src-not-guard"
+fixture = "copy_nonoverlapping_slice_range_reassigned_src_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Length evidence for the original source slice does not discharge valid-range evidence after source reassignment."
+
+[[samples]]
+id = "copy-nonoverlapping-other-len-not-guard"
+fixture = "copy_nonoverlapping_other_len_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A length check over unrelated state does not discharge source or destination valid-range evidence."

@@ -4,6 +4,8 @@ Claim-scoped label ledgers live here.
 
 Current ledgers:
 
+- `copy-nonoverlapping-valid-range.toml`: fixture-pinned
+  obligation-level labels for `copy_nonoverlapping` valid-range evidence.
 - `ffi-boundary-obligations.toml`: fixture-pinned obligation-level labels for
   FFI ABI/layout and ownership/lifetime/nullability evidence.
 - `ffi-sanitizer-witness-routes.toml`: fixture-pinned route-quality labels for

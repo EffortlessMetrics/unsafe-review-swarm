@@ -5,6 +5,10 @@ accuracy validation and calibration.
 
 The current fixture-pinned slices are:
 
+- `copy_nonoverlapping` valid-range evidence: checks whether the `valid-range`
+  obligation is discharged by same-call source and destination length checks,
+  while preserving missing non-overlap evidence and rejecting stale, partial,
+  closed-branch, comment-only, and unrelated-length controls.
 - `raw_pointer_read` alignment evidence: checks whether the `alignment`
   obligation's discharge state is `present` or `missing` in the linked goldens,
   including a comment-only false-positive control.
