@@ -173,12 +173,36 @@ const SUPPORT_SUMMARY_REQUIRED_PHRASES: &[&str] = &[
 ];
 const DOGFOOD_MANIFEST: &str = "docs/dogfood/corpus.toml";
 const DOGFOOD_INDEX: &str = "docs/dogfood/index.json";
+const ACCURACY_CALIBRATION_POLICY: &str = "policy/accuracy-calibration.toml";
 const ACCURACY_CALIBRATION_REPORT: &str = "docs/accuracy/CALIBRATION_REPORT.md";
 const ACCURACY_CLAIM_STATUSES: &[&str] = &[
     "fixture_pinned",
     "dogfood_measured",
     "labeled_calibrated",
     "policy_eligible",
+];
+const ACCURACY_CLAIM_KINDS: &[&str] = &[
+    "inventory",
+    "operation_family",
+    "hazard",
+    "obligation",
+    "evidence_precision",
+    "false_positive_control",
+    "false_negative_probe",
+    "route_quality",
+    "identity_stability",
+    "artifact_honesty",
+];
+const ACCURACY_PROMOTION_FORBIDDEN_TERMS: &[&str] = &[
+    "global precision",
+    "global recall",
+    "policy ready",
+    "policy-ready",
+    "policy readiness",
+    "memory-safety proof",
+    "ub-free",
+    "miri-clean",
+    "witness execution proof",
 ];
 const DOGFOOD_TARGET_KINDS: &[&str] = &["repo-snapshot", "pr-diff"];
 const DOGFOOD_TARGET_STATUSES: &[&str] = &["active", "parked", "retired"];
@@ -1520,50 +1544,43 @@ struct AccuracyCalibrationReportStats {
     policy_eligible_claims: usize,
 }
 
+struct AccuracyPolicyClaim<'a> {
+    id: &'a str,
+    status: &'a str,
+    label_ledgers: Vec<&'a str>,
+    labeled_reports: Vec<&'a str>,
+}
+
 fn accuracy_calibration_report_stats(
     policy: &toml::Value,
     calibration_case_count: usize,
     label_sample_count: usize,
 ) -> Result<AccuracyCalibrationReportStats, String> {
-    let claims = toml_array(policy, "claim", "policy/accuracy-calibration.toml")?;
+    let claims = toml_array(policy, "claim", ACCURACY_CALIBRATION_POLICY)?;
+    let dogfood_target_ids = dogfood_target_ids()?;
+    let mut claim_ids = BTreeSet::new();
     let mut status_counts = BTreeMap::new();
     let mut label_ledgers = BTreeSet::new();
     let mut labeled_report_count = 0usize;
     for (idx, claim) in claims.iter().enumerate() {
-        let table = toml_table(claim, "policy/accuracy-calibration.toml", "claim", idx)?;
-        let status = required_table_string(
-            table,
-            "status",
-            "policy/accuracy-calibration.toml",
-            "claim",
-            idx,
-        )?;
-        require_known(
-            status,
-            ACCURACY_CLAIM_STATUSES,
-            "policy/accuracy-calibration.toml",
-            "claim.status",
-        )?;
-        *status_counts.entry(status.to_string()).or_insert(0usize) += 1;
-
-        if let Some(ledgers) = table.get("label_ledgers") {
-            for ledger in toml_str_array(
-                ledgers,
-                "policy/accuracy-calibration.toml",
-                "claim.label_ledgers",
-            )? {
-                label_ledgers.insert(ledger.to_string());
-            }
+        let table = toml_table(claim, ACCURACY_CALIBRATION_POLICY, "claim", idx)?;
+        let claim = validate_accuracy_policy_claim(table, idx, &dogfood_target_ids)?;
+        if !claim_ids.insert(claim.id.to_string()) {
+            return Err(format!(
+                "{ACCURACY_CALIBRATION_POLICY} claim[{idx}] duplicates id `{}`",
+                claim.id
+            ));
         }
-        if let Some(reports) = table.get("labeled_reports") {
-            for report in toml_str_array(
-                reports,
-                "policy/accuracy-calibration.toml",
-                "claim.labeled_reports",
-            )? {
-                require_file(report)?;
-                labeled_report_count += 1;
-            }
+        *status_counts
+            .entry(claim.status.to_string())
+            .or_insert(0usize) += 1;
+
+        for ledger in claim.label_ledgers {
+            label_ledgers.insert(ledger.to_string());
+        }
+        for report in claim.labeled_reports {
+            require_file(report)?;
+            labeled_report_count += 1;
         }
     }
 
@@ -1578,6 +1595,185 @@ fn accuracy_calibration_report_stats(
         labeled_calibrated_claims: *status_counts.get("labeled_calibrated").unwrap_or(&0),
         policy_eligible_claims: *status_counts.get("policy_eligible").unwrap_or(&0),
     })
+}
+
+fn validate_accuracy_policy_claim<'a>(
+    table: &'a toml::map::Map<String, toml::Value>,
+    idx: usize,
+    known_dogfood_targets: &BTreeSet<String>,
+) -> Result<AccuracyPolicyClaim<'a>, String> {
+    let id = required_table_string(table, "id", ACCURACY_CALIBRATION_POLICY, "claim", idx)?;
+    let status = required_table_string(table, "status", ACCURACY_CALIBRATION_POLICY, "claim", idx)?;
+    require_known(
+        status,
+        ACCURACY_CLAIM_STATUSES,
+        ACCURACY_CALIBRATION_POLICY,
+        "claim.status",
+    )?;
+    let kind = required_table_string(table, "kind", ACCURACY_CALIBRATION_POLICY, "claim", idx)?;
+    require_known(
+        kind,
+        ACCURACY_CLAIM_KINDS,
+        ACCURACY_CALIBRATION_POLICY,
+        "claim.kind",
+    )?;
+    required_table_string(table, "owner", ACCURACY_CALIBRATION_POLICY, "claim", idx)?;
+    required_table_string(
+        table,
+        "support_tier",
+        ACCURACY_CALIBRATION_POLICY,
+        "claim",
+        idx,
+    )?;
+
+    let fixtures =
+        required_table_str_array(table, "fixtures", ACCURACY_CALIBRATION_POLICY, "claim", idx)?;
+    let dogfood_targets = required_table_str_array(
+        table,
+        "dogfood_targets",
+        ACCURACY_CALIBRATION_POLICY,
+        "claim",
+        idx,
+    )?;
+    let label_ledgers = required_table_str_array(
+        table,
+        "label_ledgers",
+        ACCURACY_CALIBRATION_POLICY,
+        "claim",
+        idx,
+    )?;
+    let labeled_reports = required_table_str_array(
+        table,
+        "labeled_reports",
+        ACCURACY_CALIBRATION_POLICY,
+        "claim",
+        idx,
+    )?;
+    let forbidden_claims = required_table_str_array(
+        table,
+        "forbidden_claims",
+        ACCURACY_CALIBRATION_POLICY,
+        "claim",
+        idx,
+    )?;
+    let allowed_public_claim = required_table_string(
+        table,
+        "allowed_public_claim",
+        ACCURACY_CALIBRATION_POLICY,
+        "claim",
+        idx,
+    )?;
+
+    if allowed_public_claim.trim().len() < 32 {
+        return Err(format!(
+            "{ACCURACY_CALIBRATION_POLICY} claim[{idx}] allowed_public_claim is too short to bound the claim"
+        ));
+    }
+    for term in ACCURACY_PROMOTION_FORBIDDEN_TERMS {
+        if text_contains_ignore_ascii_case(allowed_public_claim, term) {
+            return Err(format!(
+                "{ACCURACY_CALIBRATION_POLICY} claim[{idx}] allowed_public_claim contains forbidden promotion term `{term}`"
+            ));
+        }
+    }
+    if forbidden_claims.is_empty() {
+        return Err(format!(
+            "{ACCURACY_CALIBRATION_POLICY} claim[{idx}] forbidden_claims must list overclaims this entry does not support"
+        ));
+    }
+
+    for ledger in &label_ledgers {
+        require_file(ledger)?;
+    }
+    for report in &labeled_reports {
+        require_file(report)?;
+    }
+    for target in &dogfood_targets {
+        if !known_dogfood_targets.contains(*target) {
+            return Err(format!(
+                "{ACCURACY_CALIBRATION_POLICY} claim[{idx}] references unknown dogfood target `{target}`"
+            ));
+        }
+    }
+
+    match status {
+        "fixture_pinned" => {
+            if fixtures.is_empty() {
+                return Err(format!(
+                    "{ACCURACY_CALIBRATION_POLICY} claim[{idx}] fixture_pinned claims require fixtures"
+                ));
+            }
+            if label_ledgers.is_empty() {
+                return Err(format!(
+                    "{ACCURACY_CALIBRATION_POLICY} claim[{idx}] fixture_pinned claims require label_ledgers"
+                ));
+            }
+            if !dogfood_targets.is_empty() {
+                return Err(format!(
+                    "{ACCURACY_CALIBRATION_POLICY} claim[{idx}] fixture_pinned claims must not carry dogfood_targets"
+                ));
+            }
+            if !labeled_reports.is_empty() {
+                return Err(format!(
+                    "{ACCURACY_CALIBRATION_POLICY} claim[{idx}] fixture_pinned claims must not carry labeled_reports"
+                ));
+            }
+        }
+        "dogfood_measured" if dogfood_targets.is_empty() => {
+            return Err(format!(
+                "{ACCURACY_CALIBRATION_POLICY} claim[{idx}] dogfood_measured claims require dogfood_targets"
+            ));
+        }
+        "labeled_calibrated" if labeled_reports.is_empty() => {
+            return Err(format!(
+                "{ACCURACY_CALIBRATION_POLICY} claim[{idx}] labeled_calibrated claims require labeled_reports"
+            ));
+        }
+        "policy_eligible" if labeled_reports.is_empty() => {
+            return Err(format!(
+                "{ACCURACY_CALIBRATION_POLICY} claim[{idx}] policy_eligible claims require labeled_reports"
+            ));
+        }
+        _ => {}
+    }
+
+    Ok(AccuracyPolicyClaim {
+        id,
+        status,
+        label_ledgers,
+        labeled_reports,
+    })
+}
+
+fn required_table_str_array<'a>(
+    table: &'a toml::map::Map<String, toml::Value>,
+    key: &str,
+    path: &str,
+    table_name: &str,
+    idx: usize,
+) -> Result<Vec<&'a str>, String> {
+    let Some(value) = table.get(key) else {
+        return Err(format!(
+            "{path} {table_name}[{idx}] is missing array `{key}`"
+        ));
+    };
+    toml_str_array(value, path, &format!("{table_name}.{key}"))
+}
+
+fn dogfood_target_ids() -> Result<BTreeSet<String>, String> {
+    let value = parse_toml_file(&workspace_path(DOGFOOD_MANIFEST))?;
+    let targets = toml_array(&value, "targets", DOGFOOD_MANIFEST)?;
+    let mut ids = BTreeSet::new();
+    for (idx, target) in targets.iter().enumerate() {
+        let table = toml_table(target, DOGFOOD_MANIFEST, "targets", idx)?;
+        let id = required_target_string(table, "id", idx)?;
+        if !ids.insert(id.to_string()) {
+            return Err(format!(
+                "{DOGFOOD_MANIFEST} contains duplicate target id `{id}`"
+            ));
+        }
+    }
+    Ok(ids)
 }
 
 fn check_accuracy_calibration_report(stats: &AccuracyCalibrationReportStats) -> Result<(), String> {
@@ -4154,6 +4350,109 @@ jobs:
         Ok(())
     }
 
+    #[test]
+    fn accuracy_claim_promotion_rejects_fixture_claim_with_labeled_report() -> Result<(), String> {
+        let policy = test_accuracy_policy_claim(
+            "fixture_pinned",
+            r#"["raw_pointer_alignment"]"#,
+            "[]",
+            r#"["docs/accuracy/labels/raw-pointer-read-alignment.toml"]"#,
+            &format!(r#"["{ACCURACY_CALIBRATION_REPORT}"]"#),
+            "Fixture-pinned test claim remains limited to fixture and label-ledger evidence.",
+        )?;
+
+        let Err(err) = accuracy_calibration_report_stats(&policy, 1, 1) else {
+            return Err("fixture-pinned claim with labeled report should fail".to_string());
+        };
+
+        assert!(err.contains("fixture_pinned"));
+        assert!(err.contains("labeled_reports"));
+        Ok(())
+    }
+
+    #[test]
+    fn accuracy_claim_promotion_requires_dogfood_target_for_dogfood_status() -> Result<(), String> {
+        let policy = test_accuracy_policy_claim(
+            "dogfood_measured",
+            "[]",
+            "[]",
+            "[]",
+            "[]",
+            "Dogfood measured test claim remains limited to named corpus targets.",
+        )?;
+
+        let Err(err) = accuracy_calibration_report_stats(&policy, 1, 1) else {
+            return Err("dogfood-measured claim without dogfood target should fail".to_string());
+        };
+
+        assert!(err.contains("dogfood_measured"));
+        assert!(err.contains("dogfood_targets"));
+        Ok(())
+    }
+
+    #[test]
+    fn accuracy_claim_promotion_rejects_unknown_dogfood_target() -> Result<(), String> {
+        let policy = test_accuracy_policy_claim(
+            "dogfood_measured",
+            "[]",
+            r#"["missing-target"]"#,
+            "[]",
+            "[]",
+            "Dogfood measured test claim remains limited to named corpus targets.",
+        )?;
+
+        let Err(err) = accuracy_calibration_report_stats(&policy, 1, 1) else {
+            return Err(
+                "dogfood-measured claim with unknown dogfood target should fail".to_string(),
+            );
+        };
+
+        assert!(err.contains("unknown dogfood target"));
+        assert!(err.contains("missing-target"));
+        Ok(())
+    }
+
+    #[test]
+    fn accuracy_claim_promotion_requires_labeled_report_for_calibrated_status() -> Result<(), String>
+    {
+        let policy = test_accuracy_policy_claim(
+            "labeled_calibrated",
+            "[]",
+            "[]",
+            "[]",
+            "[]",
+            "Labeled calibrated test claim remains limited to checked labeled report evidence.",
+        )?;
+
+        let Err(err) = accuracy_calibration_report_stats(&policy, 1, 1) else {
+            return Err("labeled-calibrated claim without labeled report should fail".to_string());
+        };
+
+        assert!(err.contains("labeled_calibrated"));
+        assert!(err.contains("labeled_reports"));
+        Ok(())
+    }
+
+    #[test]
+    fn accuracy_claim_promotion_rejects_allowed_public_overclaim() -> Result<(), String> {
+        let policy = test_accuracy_policy_claim(
+            "fixture_pinned",
+            r#"["raw_pointer_alignment"]"#,
+            "[]",
+            r#"["docs/accuracy/labels/raw-pointer-read-alignment.toml"]"#,
+            "[]",
+            "Fixture-pinned test claim reports global precision for the analyzer.",
+        )?;
+
+        let Err(err) = accuracy_calibration_report_stats(&policy, 1, 1) else {
+            return Err("allowed public claim with overclaim wording should fail".to_string());
+        };
+
+        assert!(err.contains("allowed_public_claim"));
+        assert!(err.contains("global precision"));
+        Ok(())
+    }
+
     fn test_accuracy_report_stats() -> AccuracyCalibrationReportStats {
         AccuracyCalibrationReportStats {
             claim_count: 1,
@@ -4191,6 +4490,37 @@ Static unsafe contract review only. This is not a proof of memory safety, not UB
 - No Miri-clean status.
 "#
         .to_string()
+    }
+
+    fn test_accuracy_policy_claim(
+        status: &str,
+        fixtures: &str,
+        dogfood_targets: &str,
+        label_ledgers: &str,
+        labeled_reports: &str,
+        allowed_public_claim: &str,
+    ) -> Result<toml::Value, String> {
+        format!(
+            r#"
+[[claim]]
+id = "test-claim"
+status = "{status}"
+kind = "evidence_precision"
+owner = "calibration"
+support_tier = "Core operation smoke slice"
+fixtures = {fixtures}
+dogfood_targets = {dogfood_targets}
+label_ledgers = {label_ledgers}
+labeled_reports = {labeled_reports}
+allowed_public_claim = """
+{allowed_public_claim}
+"""
+forbidden_claims = ["memory-safety proof"]
+"#
+        )
+        .parse::<toml::Table>()
+        .map(toml::Value::Table)
+        .map_err(|err| format!("test policy TOML parse failed: {err}"))
     }
 
     #[test]

@@ -53,4 +53,6 @@ This is not UB-free status and not a Miri result.
 `cargo run --locked -p xtask -- check-calibration` verifies that this report is
 not stale against `policy/accuracy-calibration.toml`,
 `fixtures/calibration.toml`, and the label ledgers under
-`docs/accuracy/labels/`.
+`docs/accuracy/labels/`. It also checks the accuracy policy claim entries for
+status-specific evidence requirements, known dogfood target IDs, checked labeled
+report paths, and allowed public claim wording that avoids overclaim terms.

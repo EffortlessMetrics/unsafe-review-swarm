@@ -82,6 +82,9 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - labeled sample ledger validates,
 - `docs/accuracy/CALIBRATION_REPORT.md` renders and is checked for stale
   counts and no-overclaim boundary text by `check-calibration`,
+- claim entries pass promotion guardrails for status-specific evidence,
+  known dogfood target IDs, checked labeled report files, and public wording
+  that stays inside the supported claim,
 - support-tier claim map matches measured evidence,
 - no-overclaim checks pass.
 
@@ -91,3 +94,7 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - A labeled sample cannot lack an adjudicated expected outcome.
 - A support-tier promotion cannot reference a metric report that does not exist.
 - A report cannot claim calibrated precision/recall without labeled denominator data.
+- A fixture-pinned claim cannot carry labeled reports or dogfood targets.
+- A dogfood-measured claim cannot reference an unknown dogfood target.
+- An allowed public claim cannot contain global precision/recall, policy-ready,
+  UB-free, Miri-clean, or memory-safety proof wording.
