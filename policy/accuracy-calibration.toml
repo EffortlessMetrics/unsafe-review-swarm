@@ -731,6 +731,36 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "static-mut-witness-routes"
+status = "fixture_pinned"
+kind = "route_quality"
+owner = "calibration"
+operation_family = "static_mut"
+hazard = "static_mut_global_state"
+support_tier = "Witness routing"
+fixtures = [
+  "static_mut_global_state",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/static-mut-witness-routes.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned static mutable global-state witness routing sends synchronization
+and aliasing invariants to Loom/Shuttle route suggestions in the listed fixture.
+"""
+forbidden_claims = [
+  "static mutable state soundness proof",
+  "synchronization proof",
+  "aliasing proof",
+  "witness execution proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "get-unchecked-mut-bounds-evidence"
 status = "fixture_pinned"
 kind = "evidence_precision"

@@ -41,6 +41,8 @@ Current ledgers:
 - `slice-from-raw-parts-mut-initialized.toml`: fixture-pinned
   obligation-level labels for `slice::from_raw_parts_mut` initialized-memory
   evidence.
+- `static-mut-witness-routes.toml`: fixture-pinned route-quality labels for
+  `static mut` Loom/Shuttle witness routing.
 - `str-from-utf8-unchecked-validation.toml`: fixture-pinned obligation-level
   labels for `str::from_utf8_unchecked` UTF-8 validation evidence.
 - `transmute-bool-valid-value.toml`: fixture-pinned obligation-level labels for

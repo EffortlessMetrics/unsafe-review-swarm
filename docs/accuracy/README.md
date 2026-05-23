@@ -70,6 +70,9 @@ The current fixture-pinned slices are:
 - Inline assembly human-review routing: checks that `asm!` register, memory,
   clobber, and target invariants route to human deep review without implying an
   executable witness ran.
+- Static mutable global-state routing: checks that `static mut` synchronization
+  and aliasing invariants route to Loom/Shuttle interleaving witnesses without
+  implying those witnesses ran.
 - `get_unchecked_mut` bounds evidence: checks whether same-receiver len guards
   discharge the bounds obligation, while rejecting other-receiver, post-check,
   observed-only, closed-branch, and stale-index controls.

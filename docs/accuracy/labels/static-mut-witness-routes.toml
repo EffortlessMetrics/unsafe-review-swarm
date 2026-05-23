@@ -1,0 +1,26 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "static-mut-witness-routes"
+operation_family = "static_mut"
+hazard = "static_mut_global_state"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard witness routing behavior; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "static-mut-global-state-routes-loom-shuttle"
+fixture = "static_mut_global_state"
+kind = "positive"
+expected_cards = 1
+expected_class = "requires_loom"
+expected_operation_family = "static_mut"
+expected_hazard = "static_mut_global_state"
+expected_obligation_key = "global-state"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["loom", "shuttle"]
+label_source = "fixture_golden"
+rationale = "Static mutable global state should route to Loom/Shuttle interleaving review instead of Miri-first or generic human review."
