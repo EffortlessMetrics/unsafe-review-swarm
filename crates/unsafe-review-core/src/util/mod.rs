@@ -66,6 +66,31 @@ mod tests {
         );
     }
 
+    #[test]
+    fn slug_preserves_ascii_alphanumerics_and_lowercases_letters() {
+        assert_eq!(slug("AbC123xYz"), "abc123xyz");
+        assert_eq!(slug("0Rust99"), "0rust99");
+    }
+
+    #[test]
+    fn stable_hash_hex_is_fixed_width_lower_hex() {
+        let hash = stable_hash_hex("ReviewCard::unsafe { ptr.read() }");
+        assert_eq!(hash.len(), 16);
+        assert!(
+            hash.chars()
+                .all(|ch| ch.is_ascii_hexdigit() && !ch.is_ascii_uppercase())
+        );
+    }
+
+    #[test]
+    fn stable_hash_hex_tracks_exact_bytes() {
+        assert_ne!(
+            stable_hash_hex("unsafe-review"),
+            stable_hash_hex("unsafe-review\n")
+        );
+        assert_ne!(stable_hash_hex("review"), stable_hash_hex("Review"));
+    }
+
     proptest! {
         #[test]
         fn slug_outputs_are_stable_ascii_tokens(input in "\\PC{0,256}") {
