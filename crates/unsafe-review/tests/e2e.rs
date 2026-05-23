@@ -897,7 +897,9 @@ fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<()
     let stdout = stdout_text(&badges)?;
     assert!(stdout.contains("wrote:"));
     assert!(stdout.contains("unsafe-review.json"));
-    assert!(stdout.contains("unsafe-review badges validate"));
+    assert!(stdout.contains("git add"));
+    assert!(stdout.contains("OWNER/REPO/BRANCH"));
+    assert!(stdout.contains("not safety, UB-free, or Miri-clean status"));
 
     let main_badge = parse_json(&fs::read_to_string(badge_dir.join("unsafe-review.json"))?)?;
     assert_eq!(main_badge["label"], "unsafe-review");

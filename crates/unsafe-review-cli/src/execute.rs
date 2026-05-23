@@ -449,11 +449,13 @@ fn badges(root: &Path, out: &Path) -> Result<(), String> {
     println!("  {}", out.join("unsafe-review-plus.json").display());
     println!();
     println!("next:");
-    println!("  unsafe-review badges snippet --format markdown");
-    println!("  unsafe-review badges validate");
+    println!("  git add {}", out.display());
+    println!("  add Shields endpoint badges for your own OWNER/REPO/BRANCH");
     println!();
-    println!("recommended:");
-    println!("  unsafe-review badges init --ci github");
+    println!("trust boundary:");
+    println!(
+        "  badge JSON counts unsafe-review gaps; it is not safety, UB-free, or Miri-clean status."
+    );
     Ok(())
 }
 
