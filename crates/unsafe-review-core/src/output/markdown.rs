@@ -183,7 +183,7 @@ pub(crate) fn render_github_summary(output: &AnalyzeOutput) -> String {
     render_pr_summary_top_card(&mut out, output);
     out.push_str("---\n\n");
     out.push_str(
-        "Full advisory bundle (cards.json, pr-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json) is attached as the workflow artifact.\n\n",
+        "Full advisory bundle (cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json) is attached as the workflow artifact.\n\n",
     );
     out.push_str(
         "> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",

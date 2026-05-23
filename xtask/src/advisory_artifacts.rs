@@ -39,8 +39,18 @@ fn check_github_summary_artifact(dir: &Path, card_count: usize) -> Result<(), St
     super::require_text_contains(&text, "not UB-free status", &path)?;
     super::require_text_contains(&text, "not Miri-clean status", &path)?;
     super::require_text_contains(&text, "not site-execution proof", &path)?;
-    super::require_text_contains(&text, "Full advisory bundle", &path)?;
+    super::require_text_contains(
+        &text,
+        "Full advisory bundle (cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json)",
+        &path,
+    )?;
 
+    if text.contains("# unsafe-review PR summary") {
+        return Err(format!(
+            "{} must not include the full `# unsafe-review PR summary` document (use pr-summary.md for that)",
+            path.display()
+        ));
+    }
     if text.contains("## Card table") {
         return Err(format!(
             "{} must not include the full `## Card table` section (use pr-summary.md for that)",
