@@ -93,10 +93,10 @@ unsafe-review first-pr --base origin/main
 unsafe-review explain <card-id>
 ```
 
-`first-pr` writes `cards.json`, `pr-summary.md`, `cards.sarif`,
-`comment-plan.json`, and `witness-plan.md` under `target/unsafe-review/`. It is
-advisory-only: it does not run witnesses, post comments, edit source, or enforce
-blocking policy.
+`first-pr` writes `cards.json`, `pr-summary.md`, `github-summary.md`,
+`cards.sarif`, `comment-plan.json`, `witness-plan.md`, and `lsp.json` under
+`target/unsafe-review/`. It is advisory-only: it does not run witnesses, post
+comments, edit source, or enforce blocking policy.
 
 ## Add badges to your repo
 
@@ -127,6 +127,7 @@ unsafe-review first-pr \
 |---|---|---|
 | Review cards | JSON / human / Markdown | The canonical evidence object |
 | PR summary | `pr-summary.md` | Reviewer first screen |
+| GitHub job summary fragment | `github-summary.md` | Bounded slice for `GITHUB_STEP_SUMMARY` |
 | SARIF | `cards.sarif` | Code scanning / CI artifact |
 | Comment plan | `comment-plan.json` | Proposed comments, not posted |
 | Saved LSP projection | `lsp.json` | Read-only editor diagnostics and hovers |

@@ -9,6 +9,7 @@
 | CLI guide | current user-facing commands and artifact surfaces | `docs/CLI.md` |
 | CI and PR artifacts | advisory CI lanes, first-pr packets, comment plans, and future trusted poster design | `docs/ci/PR_CI.md`, `docs/ci/COMMENT_PLAN_EXAMPLES.md`, `docs/ci/TRUSTED_COMMENT_POSTER.md` |
 | GitHub Actions user guide | copy-paste drop-in workflow for downstream Rust repositories | `docs/ci/github-actions.md`, `.github/examples/unsafe-review-first-pr.yml` |
+| Coverage telemetry | advisory cargo-llvm-cov + Codecov execution-surface signal, not unsafe correctness | `docs/ci/coverage.md`, `.github/workflows/coverage.yml` |
 | Explanations | concept notes, trust boundaries, reviewer examples, and agent packet examples | `docs/explanation/` |
 | Editor workflow | saved read-only editor projection walkthrough | `docs/editor/saved-lsp-json.md` |
 | Editor extension MVP | publishable saved-lsp viewer extension scope and non-goals | `docs/editor/extension-mvp.md` |

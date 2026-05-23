@@ -43,6 +43,7 @@ This writes the standard local review bundle:
 ```text
 target/unsafe-review/cards.json
 target/unsafe-review/pr-summary.md
+target/unsafe-review/github-summary.md
 target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md

@@ -92,11 +92,17 @@ proof = [
 
 [[work_item]]
 id = "github-summary-fragment"
-status = "proposed"
+status = "done"
 spec = "UNSAFE-REVIEW-SPEC-0011"
 description = """
 Render a bounded target/unsafe-review/github-summary.md fragment suitable for
-GITHUB_STEP_SUMMARY without dumping the full pr-summary.md body.
+GITHUB_STEP_SUMMARY without dumping the full pr-summary.md body. Lands as
+unsafe_review_core::render_github_summary, the seventh first-pr bundle
+artifact, and tightens .github/workflows/unsafe-review.yml plus the
+.github/examples/unsafe-review-first-pr.yml example to cat that fragment
+into GITHUB_STEP_SUMMARY instead of shelling out to awk over pr-summary.md.
+The check-first-pr-artifacts xtask verifier requires the new artifact and
+caps its word count.
 """
 proof = [
   "cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review",

@@ -143,6 +143,10 @@ pub fn render_pr_summary(output: &AnalyzeOutput) -> String {
     markdown::render_pr_summary(output)
 }
 
+pub fn render_github_summary(output: &AnalyzeOutput) -> String {
+    markdown::render_github_summary(output)
+}
+
 pub fn render_sarif(output: &AnalyzeOutput) -> String {
     sarif::render(output)
 }

@@ -1,0 +1,72 @@
+name: coverage
+
+# Advisory execution-surface telemetry only.
+#
+# This workflow runs cargo-llvm-cov against the workspace and uploads the
+# resulting LCOV to Codecov. It is not a memory-safety, UB-free,
+# Miri-clean, site-execution, or unsafe-correctness signal. It does not
+# enforce a coverage threshold and must not become a required PR gate.
+
+on:
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - "editors/vscode/**"
+  push:
+    branches: [main, master]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - "editors/vscode/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  llvm_cov:
+    name: cargo-llvm-cov advisory upload
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        run: cargo install cargo-llvm-cov --locked --version 0.6.16
+
+      - name: Run cargo-llvm-cov
+        run: |
+          mkdir -p target/llvm-cov
+          cargo llvm-cov \
+            --workspace \
+            --all-targets \
+            --locked \
+            --lcov \
+            --output-path target/llvm-cov/lcov.info
+
+      - uses: codecov/codecov-action@v5
+        if: always()
+        with:
+          files: target/llvm-cov/lcov.info
+          flags: workspace
+          fail_ci_if_error: false
+          disable_search: true
+          verbose: true
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: unsafe-review-coverage
+          path: target/llvm-cov/lcov.info
+          if-no-files-found: warn

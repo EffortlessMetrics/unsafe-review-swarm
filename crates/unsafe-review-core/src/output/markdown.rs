@@ -169,6 +169,44 @@ pub(crate) fn render_pr_summary(output: &AnalyzeOutput) -> String {
     out
 }
 
+/// Bounded summary fragment suitable for `GITHUB_STEP_SUMMARY`.
+///
+/// Renders the same scope/cards/policy bullets and top-card section as
+/// `render_pr_summary` but omits the (potentially large) card table and
+/// witness plan, drops the inner H1 since the fragment is embedded under
+/// another heading, and points reviewers at the full advisory bundle
+/// uploaded as a workflow artifact.
+pub(crate) fn render_github_summary(output: &AnalyzeOutput) -> String {
+    let mut out = String::new();
+    out.push_str("## unsafe-review advisory summary\n\n");
+    render_pr_summary_header_bullets(&mut out, output);
+    render_pr_summary_top_card(&mut out, output);
+    out.push_str("---\n\n");
+    out.push_str(
+        "Full advisory bundle (cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json) is attached as the workflow artifact.\n\n",
+    );
+    out.push_str(
+        "> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",
+    );
+    out
+}
+
+fn render_pr_summary_header_bullets(out: &mut String, output: &AnalyzeOutput) {
+    out.push_str(&format!(
+        "- Scope: `{}`\n",
+        match output.scope {
+            crate::api::Scope::Diff => "diff",
+            crate::api::Scope::Repo => "repo",
+        }
+    ));
+    out.push_str(&format!("- Review cards: {}\n", output.summary.cards));
+    out.push_str(&format!(
+        "- Open actionable gaps: {}\n",
+        output.summary.open_actionable_gaps
+    ));
+    out.push_str(&format!("- Policy mode: `{}`\n\n", output.policy.as_str()));
+}
+
 fn render_pr_summary_header(out: &mut String, output: &AnalyzeOutput) {
     out.push_str("# unsafe-review PR summary\n\n");
     out.push_str(&format!(

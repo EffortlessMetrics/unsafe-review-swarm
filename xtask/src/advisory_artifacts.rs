@@ -18,9 +18,64 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
     let summary = check_advisory_artifact_set(dir)?;
     check_witness_plan_artifact(dir, summary.card_count)?;
     check_lsp_artifact(dir, &summary.card_ids)?;
+    check_github_summary_artifact(dir, summary.card_count)?;
     check_first_pr_artifact_overclaims(dir)?;
 
     println!("check-first-pr-artifacts: ok ({})", dir.display());
+    Ok(())
+}
+
+const GITHUB_SUMMARY_WORD_LIMIT: usize = 600;
+
+fn check_github_summary_artifact(dir: &Path, card_count: usize) -> Result<(), String> {
+    let path = dir.join("github-summary.md");
+    let text = super::read_to_string(&path)?;
+
+    super::require_text_contains(&text, "## unsafe-review advisory summary", &path)?;
+    super::require_text_contains(&text, &format!("- Review cards: {card_count}"), &path)?;
+    super::require_text_contains(&text, "## Top card", &path)?;
+    super::require_text_contains(&text, "static unsafe contract review", &path)?;
+    super::require_text_contains(&text, "not memory-safety proof", &path)?;
+    super::require_text_contains(&text, "not UB-free status", &path)?;
+    super::require_text_contains(&text, "not Miri-clean status", &path)?;
+    super::require_text_contains(&text, "not site-execution proof", &path)?;
+    super::require_text_contains(
+        &text,
+        "Full advisory bundle (cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json)",
+        &path,
+    )?;
+
+    if text.contains("# unsafe-review PR summary") {
+        return Err(format!(
+            "{} must not include the full `# unsafe-review PR summary` document (use pr-summary.md for that)",
+            path.display()
+        ));
+    }
+    if text.contains("## Card table") {
+        return Err(format!(
+            "{} must not include the full `## Card table` section (use pr-summary.md for that)",
+            path.display()
+        ));
+    }
+    if text.contains("## Witness plan") {
+        return Err(format!(
+            "{} must not include the full `## Witness plan` section (use pr-summary.md for that)",
+            path.display()
+        ));
+    }
+
+    let word_count = text.split_whitespace().count();
+    if word_count > GITHUB_SUMMARY_WORD_LIMIT {
+        return Err(format!(
+            "{} is {word_count} words; github-summary.md must stay under {GITHUB_SUMMARY_WORD_LIMIT}",
+            path.display()
+        ));
+    }
+
+    if card_count == 0 {
+        super::require_text_contains(&text, "No changed unsafe-review gaps were found.", &path)?;
+    }
+
     Ok(())
 }
 

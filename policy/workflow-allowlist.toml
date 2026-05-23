@@ -64,3 +64,17 @@ actions = [
 reason = "Manual editor extension publish workflow. workflow_dispatch only from main with dry_run default true; non-dry-run requires at least one explicit publish target and validated package identity; publication to VS Marketplace requires VSCE_PAT secret and explicit publish_to_vs_marketplace=true, publication to Open VSX requires OVSX_PAT secret and explicit publish_to_open_vsx=true. No witness execution, no source edits, no comment posting, no automatic publication on PR or push."
 created = "2026-05-23"
 review_after = "2026-07-23"
+
+[[workflow]]
+id = "workflow-0006"
+path = ".github/workflows/coverage.yml"
+permissions = "contents: read"
+actions = [
+  "actions/checkout@v6",
+  "dtolnay/rust-toolchain@1.95.0",
+  "codecov/codecov-action@v5",
+  "actions/upload-artifact@v7",
+]
+reason = "Advisory cargo-llvm-cov + Codecov telemetry workflow. It uploads LCOV as execution-surface telemetry without threshold gating, without PR comment posting, without witness execution, without default branch-protection blocking, and without claiming memory safety, UB-free status, Miri-clean status, or site-execution proof."
+created = "2026-05-23"
+review_after = "2026-08-23"
