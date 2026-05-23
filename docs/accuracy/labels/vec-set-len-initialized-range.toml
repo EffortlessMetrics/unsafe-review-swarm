@@ -37,6 +37,66 @@ label_source = "fixture_golden"
 rationale = "A visible initialization loop over the extended range discharges initialized-range evidence."
 
 [[samples]]
+id = "vec-set-len-capacity-observed-missing"
+fixture = "vec_set_len_capacity_observed_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A capacity observation without an initialized-range proof does not discharge Vec::set_len initialization."
+
+[[samples]]
+id = "vec-set-len-unrelated-capacity-comparison-missing"
+fixture = "vec_set_len_unrelated_capacity_comparison_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "An unrelated capacity comparison must not discharge the target Vec::set_len initialized range."
+
+[[samples]]
+id = "vec-set-len-cap-argument-missing"
+fixture = "vec_set_len_cap_argument_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A local argument named cap is not initialized-range evidence for the Vec::set_len target."
+
+[[samples]]
+id = "vec-set-len-reassigned-receiver-missing"
+fixture = "vec_set_len_reassigned_receiver_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Initialization or capacity evidence becomes stale after the checked Vec receiver is reassigned."
+
+[[samples]]
 id = "vec-set-len-call-result-init-present"
 fixture = "vec_set_len_call_result_init"
 kind = "positive"
@@ -61,6 +121,36 @@ expected_obligation_key = "initialized"
 expected_discharge_state = "present"
 label_source = "fixture_golden"
 rationale = "Shrinking a Vec length does not expose newly uninitialized elements, so initialized-range evidence is present."
+
+[[samples]]
+id = "vec-set-len-last-index-shrink-present"
+fixture = "vec_set_len_last_index_shrink"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A non-empty last-index shrink keeps the new length inside the already initialized Vec range."
+
+[[samples]]
+id = "vec-set-len-start-bound-shrink-present"
+fixture = "vec_set_len_start_bound_shrink"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A start/end bound proving the new length is within current len is shrink evidence for Vec::set_len."
 
 [[samples]]
 id = "vec-set-len-zero-clear-present"

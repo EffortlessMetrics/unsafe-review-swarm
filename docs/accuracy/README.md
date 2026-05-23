@@ -50,8 +50,9 @@ The current fixture-pinned slices are:
   instead of falling back to generic unsafe-block classification.
 - `Vec::set_len` initialized-range evidence: checks whether the `initialized`
   obligation is discharged by visible initialization, shrink, zero-clear, or
-  call-result patterns, while rejecting capacity-only, post-init, and unrelated
-  initialization controls.
+  call-result patterns, including last-index and start-bound shrink evidence,
+  while rejecting capacity-only, unrelated-capacity, cap-name-only, stale
+  receiver, post-init, and unrelated initialization controls.
 - `Vec::from_raw_parts` capacity evidence: checks whether the `capacity`
   obligation is discharged by same-call len/cap guards, assertions, or
   same-origin ManuallyDrop raw parts, while rejecting observed, closed-branch,
