@@ -110,6 +110,8 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
   report files, and public wording that stays inside the supported claim,
 - fixture golden obligations and obligation evidence are one-to-one,
   description-aligned, and carry coherent per-axis evidence states,
+- fixture golden obligation evidence keys belong to the operation family
+  registry row,
 - fixture golden missing summaries are non-empty exactly when at least one
   obligation evidence axis is missing,
 - fixture golden next actions are non-empty reviewer actions, avoid overclaim
@@ -157,6 +159,8 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
   coordinate, private public-API flag, or operation/snippet mismatch.
 - A fixture card cannot introduce an unknown operation family, unknown hazard,
   hazard outside the operation family registry row, or duplicate hazard.
+- A fixture card cannot introduce an obligation evidence key outside the
+  operation family registry row.
 - A fixture card cannot introduce an unknown class, priority, or confidence, or
   pair a supported class with a stale priority/confidence signal.
 - An allowed public claim cannot contain global precision/recall, policy-ready,

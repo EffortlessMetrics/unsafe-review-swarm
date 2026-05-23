@@ -40,6 +40,8 @@ The guard rejects:
 - fixture golden cards whose obligations and obligation_evidence are not
   one-to-one, description-aligned, and coherent across contract/discharge/reach/
   witness present-state fields.
+- fixture golden cards whose obligation_evidence keys fall outside the operation
+  family registry row.
 - fixture golden cards whose top-level missing summaries drift away from the
   per-obligation evidence state.
 - fixture golden cards whose next_action is missing, non-actionable,

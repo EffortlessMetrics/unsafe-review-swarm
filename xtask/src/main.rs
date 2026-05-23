@@ -2452,7 +2452,8 @@ fn check_fixture_card_identity(
     check_fixture_hazards(path, idx, card, id, operation_family)?;
 
     check_fixture_card_classification(path, idx, card)?;
-    let has_missing_evidence = check_fixture_obligation_evidence(path, idx, card)?;
+    let has_missing_evidence =
+        check_fixture_obligation_evidence(path, idx, card, operation_family)?;
     check_fixture_missing_summary(path, idx, card, has_missing_evidence)?;
     check_fixture_next_action(path, idx, card, operation_family)?;
     check_fixture_witness_routes(path, idx, card)?;
@@ -2961,6 +2962,7 @@ fn check_fixture_obligation_evidence(
     path: &str,
     idx: usize,
     card: &serde_json::Value,
+    operation_family: &str,
 ) -> Result<bool, String> {
     let card_context = format!("{path} card[{idx}]");
     let obligations = json_array_at(card, "/obligations", &card_context)?;
@@ -2996,6 +2998,14 @@ fn check_fixture_obligation_evidence(
         ));
     }
 
+    let registry_obligation_keys = operation_family_registry_obligation_keys()?;
+    let allowed_keys = registry_obligation_keys
+        .get(operation_family)
+        .ok_or_else(|| {
+            format!(
+                "{card_context} operation_family `{operation_family}` must have an obligation/evidence key row in {OPERATION_FAMILY_REGISTRY}"
+            )
+        })?;
     let mut evidence_keys = BTreeSet::new();
     let mut evidence_descriptions = BTreeSet::new();
     let mut has_missing_evidence = false;
@@ -3006,6 +3016,11 @@ fn check_fixture_obligation_evidence(
             ));
         };
         let key = required_fixture_evidence_str(entry, "key", &card_context, evidence_idx)?;
+        if !allowed_keys.contains(key) {
+            return Err(format!(
+                "{card_context} obligation_evidence[{evidence_idx}] key `{key}` is not listed for operation_family `{operation_family}` in {OPERATION_FAMILY_REGISTRY}"
+            ));
+        }
         if !evidence_keys.insert(key) {
             return Err(format!(
                 "{card_context} obligation_evidence must not duplicate key `{key}`"
@@ -5631,6 +5646,29 @@ jobs:
 
         assert!(err.contains("obligation_evidence[0]"));
         assert!(err.contains("must match an obligation"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_obligation_key_outside_operation_registry()
+    -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["obligation_evidence"][0]["key"] = serde_json::Value::String("utf8".to_string());
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("operation-family/obligation-key mismatch should fail".to_string());
+        };
+
+        assert!(err.contains("obligation_evidence[0] key `utf8`"));
+        assert!(err.contains("operation_family `raw_pointer_read`"));
+        assert!(err.contains(OPERATION_FAMILY_REGISTRY));
         Ok(())
     }
 
