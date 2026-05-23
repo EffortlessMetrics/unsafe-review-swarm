@@ -55,6 +55,8 @@ The guard rejects:
 - fixture golden ReviewCard IDs that omit stable fixture/package, file, owner,
   site kind, operation family, operation path/callee, snippet hash, hazard, or
   counted suffix components.
+- fixture golden cards whose operation_family or hazards use unknown domain
+  vocabulary, or whose hazard list contains duplicate entries.
 
 ## Proof commands
 

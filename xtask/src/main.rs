@@ -2427,6 +2427,7 @@ fn check_fixture_card_identity(
     check_fixture_site_metadata(path, idx, card, site)?;
     let operation_family =
         require_non_empty_json_str(card, "operation_family", &format!("{path} card[{idx}]"))?;
+    check_fixture_operation_family(path, idx, operation_family)?;
     let operation_path = fixture_card_operation_path(card, site, operation_family, path, idx)?;
     for (field, token) in [
         ("fixture", fixture),
@@ -2448,20 +2449,98 @@ fn check_fixture_card_identity(
         require_identity_token(id, token, path, idx, field)?;
     }
 
+    check_fixture_hazards(path, idx, card, id)?;
+
+    check_fixture_card_classification(path, idx, card)?;
+    let has_missing_evidence = check_fixture_obligation_evidence(path, idx, card)?;
+    check_fixture_missing_summary(path, idx, card, has_missing_evidence)?;
+    check_fixture_next_action(path, idx, card, operation_family)?;
+    check_fixture_witness_routes(path, idx, card)?;
+
+    Ok(())
+}
+
+fn check_fixture_operation_family(
+    path: &str,
+    idx: usize,
+    operation_family: &str,
+) -> Result<(), String> {
+    if !fixture_known_operation_family(operation_family) {
+        return Err(format!(
+            "{path} card[{idx}] operation_family `{operation_family}` must be a known OperationFamily string"
+        ));
+    }
+    Ok(())
+}
+
+fn fixture_known_operation_family(operation_family: &str) -> bool {
+    matches!(
+        operation_family,
+        "raw_pointer_deref"
+            | "raw_pointer_read"
+            | "raw_pointer_read_unaligned"
+            | "raw_pointer_write"
+            | "raw_pointer_write_unaligned"
+            | "pointer_arithmetic"
+            | "ptr_copy"
+            | "ptr_replace"
+            | "copy_nonoverlapping"
+            | "slice_from_raw_parts"
+            | "vec_from_raw_parts"
+            | "str_from_utf8_unchecked"
+            | "maybe_uninit_assume_init"
+            | "vec_set_len"
+            | "transmute"
+            | "zeroed"
+            | "drop_in_place"
+            | "atomic_pointer_state"
+            | "unwrap_unchecked"
+            | "unreachable_unchecked"
+            | "unsafe_fn_call"
+            | "box_from_raw"
+            | "nonnull_unchecked"
+            | "pin_unchecked"
+            | "get_unchecked"
+            | "unsafe_impl_send_sync"
+            | "ffi"
+            | "static_mut"
+            | "inline_asm"
+            | "target_feature"
+            | "unknown"
+    )
+}
+
+fn check_fixture_hazards(
+    path: &str,
+    idx: usize,
+    card: &serde_json::Value,
+    id: &str,
+) -> Result<(), String> {
     let hazards = json_array_at(card, "/hazards", &format!("{path} card[{idx}]"))?;
     if hazards.is_empty() {
         return Err(format!("{path} card[{idx}] hazards must not be empty"));
     }
+    let mut seen = BTreeSet::new();
     let mut has_hazard_token = false;
-    for hazard in hazards {
+    for (hazard_idx, hazard) in hazards.iter().enumerate() {
         let Some(hazard) = hazard.as_str() else {
             return Err(format!(
-                "{path} card[{idx}] hazards entries must be strings"
+                "{path} card[{idx}] hazards[{hazard_idx}] must be a string"
             ));
         };
         if hazard.trim().is_empty() {
             return Err(format!(
-                "{path} card[{idx}] hazards entries must not be empty"
+                "{path} card[{idx}] hazards[{hazard_idx}] must not be empty"
+            ));
+        }
+        if !fixture_known_hazard(hazard) {
+            return Err(format!(
+                "{path} card[{idx}] hazards[{hazard_idx}] `{hazard}` must be a known HazardKind string"
+            ));
+        }
+        if !seen.insert(hazard) {
+            return Err(format!(
+                "{path} card[{idx}] hazards must not duplicate `{hazard}`"
             ));
         }
         if identity_contains_token(id, hazard) {
@@ -2474,13 +2553,33 @@ fn check_fixture_card_identity(
         ));
     }
 
-    check_fixture_card_classification(path, idx, card)?;
-    let has_missing_evidence = check_fixture_obligation_evidence(path, idx, card)?;
-    check_fixture_missing_summary(path, idx, card, has_missing_evidence)?;
-    check_fixture_next_action(path, idx, card, operation_family)?;
-    check_fixture_witness_routes(path, idx, card)?;
-
     Ok(())
+}
+
+fn fixture_known_hazard(hazard: &str) -> bool {
+    matches!(
+        hazard,
+        "pointer_validity"
+            | "alignment"
+            | "same_allocation"
+            | "bounds"
+            | "initialized_memory"
+            | "invalid_value"
+            | "aliasing_or_provenance"
+            | "panic_safety"
+            | "drop_or_deallocation"
+            | "ffi_abi"
+            | "ffi_ownership"
+            | "send_sync_invariant"
+            | "pin_invariant"
+            | "atomic_ordering"
+            | "layout_or_repr"
+            | "static_mut_global_state"
+            | "target_feature"
+            | "inline_asm"
+            | "leak_or_ownership_transfer"
+            | "unknown"
+    )
 }
 
 fn check_fixture_site_metadata(
@@ -5289,6 +5388,68 @@ jobs:
 
         assert!(err.contains("operation_path"));
         assert!(err.contains("cast-header"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_unknown_operation_family() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-surprise_operation-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["operation_family"] = serde_json::Value::String("surprise_operation".to_string());
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("unknown operation family should fail".to_string());
+        };
+
+        assert!(err.contains("operation_family `surprise_operation`"));
+        assert!(err.contains("known OperationFamily"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_unknown_hazard() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["hazards"] = serde_json::json!(["pointer_validity", "mystery_hazard"]);
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("unknown hazard should fail".to_string());
+        };
+
+        assert!(err.contains("hazards[1] `mystery_hazard`"));
+        assert!(err.contains("known HazardKind"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_duplicate_hazard() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["hazards"] = serde_json::json!(["pointer_validity", "pointer_validity"]);
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("duplicate hazard should fail".to_string());
+        };
+
+        assert!(err.contains("hazards must not duplicate `pointer_validity`"));
         Ok(())
     }
 
