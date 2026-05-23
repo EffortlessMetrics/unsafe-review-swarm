@@ -127,8 +127,9 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - fixture golden ReviewCard IDs preserve fixture/package, file, owner, site
   kind, operation family, operation path/callee, snippet hash, hazard, and
   counted identity suffix,
-- fixture golden operation families and hazards use known domain vocabulary, and
-  hazard lists do not contain duplicates,
+- fixture golden operation families and hazards use known domain vocabulary,
+  hazards belong to the operation family registry row, and hazard lists do not
+  contain duplicates,
 - fixture golden site metadata uses known site kinds, known visibility values,
   positive source coordinates, relative Rust source paths, coherent public API
   flags, and one operation expression shared by `operation` and `site.snippet`,
@@ -155,7 +156,7 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - A fixture card cannot introduce an unknown site kind, invalid source
   coordinate, private public-API flag, or operation/snippet mismatch.
 - A fixture card cannot introduce an unknown operation family, unknown hazard,
-  or duplicate hazard.
+  hazard outside the operation family registry row, or duplicate hazard.
 - A fixture card cannot introduce an unknown class, priority, or confidence, or
   pair a supported class with a stale priority/confidence signal.
 - An allowed public claim cannot contain global precision/recall, policy-ready,

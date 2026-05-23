@@ -56,7 +56,8 @@ The guard rejects:
   site kind, operation family, operation path/callee, snippet hash, hazard, or
   counted suffix components.
 - fixture golden cards whose operation_family or hazards use unknown domain
-  vocabulary, or whose hazard list contains duplicate entries.
+  vocabulary, whose hazards fall outside the operation family registry row, or
+  whose hazard list contains duplicate entries.
 
 ## Proof commands
 

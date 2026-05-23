@@ -2449,7 +2449,7 @@ fn check_fixture_card_identity(
         require_identity_token(id, token, path, idx, field)?;
     }
 
-    check_fixture_hazards(path, idx, card, id)?;
+    check_fixture_hazards(path, idx, card, id, operation_family)?;
 
     check_fixture_card_classification(path, idx, card)?;
     let has_missing_evidence = check_fixture_obligation_evidence(path, idx, card)?;
@@ -2515,11 +2515,18 @@ fn check_fixture_hazards(
     idx: usize,
     card: &serde_json::Value,
     id: &str,
+    operation_family: &str,
 ) -> Result<(), String> {
     let hazards = json_array_at(card, "/hazards", &format!("{path} card[{idx}]"))?;
     if hazards.is_empty() {
         return Err(format!("{path} card[{idx}] hazards must not be empty"));
     }
+    let registry_hazards = operation_family_registry_hazards()?;
+    let allowed_hazards = registry_hazards.get(operation_family).ok_or_else(|| {
+        format!(
+            "{path} card[{idx}] operation_family `{operation_family}` must have a hazard row in {OPERATION_FAMILY_REGISTRY}"
+        )
+    })?;
     let mut seen = BTreeSet::new();
     let mut has_hazard_token = false;
     for (hazard_idx, hazard) in hazards.iter().enumerate() {
@@ -2536,6 +2543,11 @@ fn check_fixture_hazards(
         if !fixture_known_hazard(hazard) {
             return Err(format!(
                 "{path} card[{idx}] hazards[{hazard_idx}] `{hazard}` must be a known HazardKind string"
+            ));
+        }
+        if !allowed_hazards.contains(hazard) {
+            return Err(format!(
+                "{path} card[{idx}] hazards[{hazard_idx}] `{hazard}` is not listed for operation_family `{operation_family}` in {OPERATION_FAMILY_REGISTRY}"
             ));
         }
         if !seen.insert(hazard) {
@@ -5450,6 +5462,28 @@ jobs:
         };
 
         assert!(err.contains("hazards must not duplicate `pointer_validity`"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_hazard_outside_operation_registry() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["hazards"] = serde_json::json!(["pointer_validity", "ffi_ownership"]);
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("operation-family/hazard mismatch should fail".to_string());
+        };
+
+        assert!(err.contains("hazards[1] `ffi_ownership`"));
+        assert!(err.contains("operation_family `raw_pointer_read`"));
+        assert!(err.contains(OPERATION_FAMILY_REGISTRY));
         Ok(())
     }
 
