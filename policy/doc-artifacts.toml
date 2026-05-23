@@ -39,6 +39,37 @@ owner = "repo-infra"
 linked_proposal = "UNSAFE-REVIEW-PROP-0002"
 linked_spec = "UNSAFE-REVIEW-SPEC-0020"
 
+[[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0019"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0019-first-run-cockpit.md"
+status = "accepted"
+owner = "product / cli"
+linked_proposal = "UNSAFE-REVIEW-PROP-0002"
+
+[[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0023"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0023-first-hour-experience.md"
+status = "proposed"
+owner = "product / cli"
+linked_proposal = "UNSAFE-REVIEW-PROP-0002"
+linked_spec = "UNSAFE-REVIEW-SPEC-0019"
+
+[[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0024"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0024-ci-design.md"
+status = "proposed"
+owner = "repo-infra"
+linked_proposal = "UNSAFE-REVIEW-PROP-0002"
+linked_spec = "UNSAFE-REVIEW-SPEC-0020"
+policy_impact = [
+  "policy/ci-lane-whitelist.toml",
+  "policy/doc-artifacts.toml",
+  "policy/workflow-allowlist.toml",
+]
+
 
 [[artifact]]
 id = "UNSAFE-REVIEW-SPEC-0025"
