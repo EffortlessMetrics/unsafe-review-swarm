@@ -60,6 +60,29 @@ If `new_source_commits` is nonzero, repair or acknowledge the source-to-swarm
 sync before continuing feature work unless a current handoff already covers the
 source-only exception.
 
+## Worktree and branch hygiene
+
+Start every repo operation by inspecting the current branch, dirty state, PR
+queue, and source/swarm sync posture. A dirty local checkout, stale branch, or
+Codex session branch is not the repository state.
+
+When the primary checkout has unrelated local changes, create a fresh worktree
+from current `origin/main` for the PR-sized task instead of editing through the
+dirty tree:
+
+```bash
+rtk git fetch origin
+rtk git worktree add -b <branch> <path> origin/main
+```
+
+Do not reset, rebase, delete, or rewrite another worktree to make room for a
+new task. Treat existing dirty worktrees as owner or in-flight agent work unless
+the owner explicitly asks you to clean them.
+
+After a PR merges, verify the merged `origin/main` state with the relevant proof
+commands, then remove only the temporary worktree you created and only after
+its status is clean.
+
 Use the repo source-of-truth stack:
 
 1. Read `.unsafe-review-spec/goals/active.toml`.
@@ -158,3 +181,9 @@ Optimize for card correctness before analyzer breadth. Evidence must be
 obligation-level: a length guard does not discharge alignment, a `SAFETY`
 comment is not a guard, and a targeted test is not site-execution proof unless
 a receipt proves it.
+
+When in doubt, preserve the product sentence:
+
+```text
+unsafe-review finds unsafe Rust changes missing a safety contract, guard, test, or witness.
+```

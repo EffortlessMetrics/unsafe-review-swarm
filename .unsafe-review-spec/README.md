@@ -7,6 +7,7 @@ development and release lanes.
 - Current goal: `.unsafe-review-spec/goals/active.toml`
 - Historical goals: `.unsafe-review-spec/goals/archive/`
 - Lane trackers: `.unsafe-review-spec/lanes/`
+- Agent operating entrypoint: `AGENTS.md`
 
 ## Source-of-Truth Rule
 
@@ -24,3 +25,7 @@ Do not store durable repo operating state in external tool namespaces such as
 tool/session state, but unsafe-review's durable coordination state belongs in
 `.unsafe-review-spec/`, `docs/`, `plans/`, `policy/`, and documented handoff or
 status surfaces.
+
+`AGENTS.md` is the agent-facing entrypoint for these rules. Keep it aligned
+with this directory when repo operation style changes, but do not move durable
+unsafe-review source-of-truth data into agent-local tool directories.

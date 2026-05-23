@@ -45,7 +45,7 @@ Policy-contract workflow commands and TOML parse checks.
 ## Implementation mapping
 
 `docs/`, `plans/`, `.unsafe-review-spec/goals/`, `policy/`,
-`.github/workflows/`.
+`.github/workflows/`, and `AGENTS.md` for the agent-facing operating entrypoint.
 
 ## CI proof
 
