@@ -62,8 +62,9 @@ The current fixture-pinned slices are:
   same-origin ManuallyDrop raw parts, while rejecting observed, closed-branch,
   comment-only early-return, wrong-capacity, and stale-cap controls.
 - `MaybeUninit::assume_init` family initialized-memory evidence: checks that
-  `assume_init`, `assume_init_read`, `assume_init_ref`, `assume_init_mut`, and
-  `assume_init_drop` report missing initialized evidence and route to
+  same-slot `write` and `MaybeUninit::new` discharge initialized evidence,
+  stale writes remain missing evidence, and `assume_init`, `assume_init_read`,
+  `assume_init_ref`, `assume_init_mut`, and `assume_init_drop` route to
   Miri/cargo-careful witness suggestions.
 - `transmute::<u8, bool>` / `transmute_copy::<u8, bool>` valid-value evidence:
   checks whether the `valid-value` obligation is discharged by dominating
@@ -79,11 +80,12 @@ The current fixture-pinned slices are:
   remaining-capacity and availability guards discharge generic unsafe callee
   preconditions, while rejecting wrong-receiver, observed-only, and
   closed-branch controls.
-- FFI witness routing: checks that unsafe extern C boundaries route away from
+- FFI witness routing: checks that unsafe extern C boundaries, unsafe calls to
+  same-file extern declarations, and unsafe `libc::` path calls route away from
   Miri-first review to sanitizer/cargo-careful witness suggestions.
 - FFI boundary obligation evidence: checks that ABI/layout compatibility and
   ownership/lifetime/nullability contracts are tracked as separate obligations
-  for unsafe extern C seams.
+  for unsafe extern C declarations and calls.
 - Inline assembly human-review routing: checks that `asm!` register, memory,
   clobber, and target invariants route to human deep review without implying an
   executable witness ran.

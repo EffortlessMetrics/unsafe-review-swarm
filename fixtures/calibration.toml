@@ -31,6 +31,9 @@ required_core_fixtures = [
   "private_unsafe_helper_safety_comment",
   "local_safety_colon_comment",
   "maybeuninit_assume_init",
+  "maybeuninit_assume_init_write_guard",
+  "maybeuninit_assume_init_new_guard",
+  "maybeuninit_assume_init_stale_write_not_guard",
   "maybeuninit_assume_init_read",
   "maybeuninit_assume_init_ref",
   "maybeuninit_assume_init_mut",
@@ -198,6 +201,8 @@ required_core_fixtures = [
   "unsafe_impl_send_generic_owner",
   "unsafe_impl_sync_generic_bound",
   "ffi_sanitizer_route",
+  "ffi_call_sanitizer_route",
+  "ffi_libc_call_sanitizer_route",
   "safe_code_no_cards",
   "safe_reference_deref_no_cards",
   "imports_not_unsafe_operations",
@@ -511,6 +516,36 @@ expected_hazard = "unknown"
 fixture = "maybeuninit_assume_init"
 kind = "positive"
 claim = "MaybeUninit::assume_init reports missing initialization evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "maybe_uninit_assume_init"
+expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "maybeuninit_assume_init_write_guard"
+kind = "positive"
+claim = "MaybeUninit::assume_init recognizes same-slot write initialization evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "maybe_uninit_assume_init"
+expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "maybeuninit_assume_init_new_guard"
+kind = "positive"
+claim = "MaybeUninit::assume_init recognizes same-slot MaybeUninit::new initialization evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "maybe_uninit_assume_init"
+expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "maybeuninit_assume_init_stale_write_not_guard"
+kind = "false_positive_control"
+claim = "MaybeUninit::assume_init rejects stale same-slot write evidence after reassignment"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -2181,6 +2216,26 @@ expected_hazard = "send_sync_invariant"
 fixture = "ffi_sanitizer_route"
 kind = "positive"
 claim = "unsafe extern C boundary routes away from Miri-first review"
+support_tier = "Witness routing"
+expected_cards = 1
+expected_class = "miri_unsupported"
+expected_operation_family = "ffi"
+expected_hazard = "ffi_abi"
+
+[[cases]]
+fixture = "ffi_call_sanitizer_route"
+kind = "positive"
+claim = "unsafe call to a same-file extern C declaration routes away from Miri-first review"
+support_tier = "Witness routing"
+expected_cards = 1
+expected_class = "miri_unsupported"
+expected_operation_family = "ffi"
+expected_hazard = "ffi_abi"
+
+[[cases]]
+fixture = "ffi_libc_call_sanitizer_route"
+kind = "positive"
+claim = "unsafe libc path call routes away from Miri-first review"
 support_tier = "Witness routing"
 expected_cards = 1
 expected_class = "miri_unsupported"
