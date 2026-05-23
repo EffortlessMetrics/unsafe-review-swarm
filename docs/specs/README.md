@@ -31,9 +31,10 @@ Specs define behavior. They do not carry the PR queue.
 20. [Source-of-truth stack](UNSAFE-REVIEW-SPEC-0020-source-of-truth-stack.md)
 21. [VS Code and Open VSX editor extension](UNSAFE-REVIEW-SPEC-0021-vscode-openvsx-extension.md)
 22. [PR commenting experience](UNSAFE-REVIEW-SPEC-0022-pr-commenting-experience.md)
-23. [CI design](UNSAFE-REVIEW-SPEC-0024-ci-design.md)
-24. [Docs automation](UNSAFE-REVIEW-SPEC-0025-docs-automation.md)
-25. [Accuracy validation and calibration](UNSAFE-REVIEW-SPEC-0026-accuracy-validation-and-calibration.md)
+23. [First-hour experience](UNSAFE-REVIEW-SPEC-0023-first-hour-experience.md)
+24. [CI design](UNSAFE-REVIEW-SPEC-0024-ci-design.md)
+25. [Docs automation](UNSAFE-REVIEW-SPEC-0025-docs-automation.md)
+26. [Accuracy validation and calibration](UNSAFE-REVIEW-SPEC-0026-accuracy-validation-and-calibration.md)
 
 
 ## Appendices

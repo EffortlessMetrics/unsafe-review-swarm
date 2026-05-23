@@ -1,6 +1,16 @@
 schema_version = "1.0"
 
 [[lane]]
+id = "default-workspace"
+owner = "repo-infra"
+intent = "Protect the Rust workspace with deterministic fmt, build, lint, test, rustdoc, and repo policy checks"
+proof_obligation = "workspace commands and xtask check-pr pass without witnesses, publishing, source edits, or comment posting"
+cost_estimate = "medium"
+trigger_policy = "pull_request, push(main), workflow_dispatch"
+status = "required"
+review_after = "2026-07-01"
+
+[[lane]]
 id = "policy-contracts"
 owner = "repo-infra"
 intent = "Validate source-of-truth ledgers and links"
@@ -8,4 +18,54 @@ proof_obligation = "doc artifacts and goal manifests parse and resolve"
 cost_estimate = "low"
 trigger_policy = "pull_request, push(main)"
 status = "advisory"
+review_after = "2026-07-01"
+
+[[lane]]
+id = "advisory-first-pr"
+owner = "repo-infra / ci"
+intent = "Render and verify advisory unsafe-review PR packets without blocking on findings"
+proof_obligation = "first-pr artifacts parse, align across projections, preserve trust boundary, and remain plan-only/read-only"
+cost_estimate = "medium"
+trigger_policy = "pull_request, workflow_dispatch"
+status = "advisory"
+review_after = "2026-07-01"
+
+[[lane]]
+id = "source-divergence"
+owner = "repo-infra"
+intent = "Report source/swarm drift before routine swarm implementation"
+proof_obligation = "source-divergence reports source-only and swarm-only commit counts"
+cost_estimate = "low"
+trigger_policy = "local preflight, workflow_dispatch if promoted"
+status = "advisory"
+review_after = "2026-07-01"
+
+[[lane]]
+id = "coverage"
+owner = "repo-infra / coverage"
+intent = "Publish Rust test execution-surface telemetry"
+proof_obligation = "LCOV is generated and uploaded without threshold, release-readiness, or unsafe-correctness claims"
+cost_estimate = "medium"
+trigger_policy = "workflow_dispatch, scheduled or pull_request only after lane promotion"
+status = "deferred"
+review_after = "2026-07-01"
+
+[[lane]]
+id = "release-readiness"
+owner = "release"
+intent = "Run package, dry-run publish, install, first-pr, and support smoke proof before publication"
+proof_obligation = "release proof commands pass without publishing unless a trusted release workflow is separately specified"
+cost_estimate = "high"
+trigger_policy = "workflow_dispatch or release-prep branch only after lane promotion"
+status = "deferred"
+review_after = "2026-07-01"
+
+[[lane]]
+id = "trusted-comment-poster"
+owner = "repo-infra / ci"
+intent = "Post or update PR comments from a verified comment-plan artifact"
+proof_obligation = "trusted workflow verifies comment-plan without rerunning untrusted analysis before using pull-requests write"
+cost_estimate = "medium"
+trigger_policy = "workflow_run or explicit trusted dispatch only after design acceptance"
+status = "deferred"
 review_after = "2026-07-01"

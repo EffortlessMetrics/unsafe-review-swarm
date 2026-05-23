@@ -98,6 +98,21 @@ unsafe-review explain <card-id>
 advisory-only: it does not run witnesses, post comments, edit source, or enforce
 blocking policy.
 
+## Add badges to your repo
+
+```bash
+cargo install unsafe-review --locked
+unsafe-review badges --out badges/
+git add badges/
+```
+
+Then add Shields endpoint badges that point at your own repository and policy
+document.
+
+> Do not copy this repository’s badge URLs. Badge endpoints are repo-scoped
+> static evidence projections and must point at your own `OWNER/REPO/BRANCH`
+> `badges/*.json` paths.
+
 Try the bundled smoke fixture:
 
 ```bash
