@@ -207,3 +207,7 @@ witnesses, or make a policy decision.
 
 For command details, receipt import examples, policy report examples, and output
 format reference, see the [CLI guide](CLI.md).
+
+For a longer walkthrough that covers explain, support posture, witness plans,
+agent packets, and the saved editor projection in one path, see the
+[first-hour guide](FIRST_HOUR.md).

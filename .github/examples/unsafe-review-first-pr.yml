@@ -1,3 +1,23 @@
+# Drop-in PR workflow for unsafe-review.
+#
+# Copy this file to your repository at:
+#   .github/workflows/unsafe-review-first-pr.yml
+#
+# The workflow installs the published unsafe-review CLI from crates.io,
+# renders the advisory first-pr bundle against the PR base, uploads the
+# bundle as an artifact, and writes a bounded job summary fragment.
+#
+# It does NOT:
+#   - request write tokens
+#   - post PR comments
+#   - run Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux
+#   - edit source files
+#   - block on unsafe-review findings
+#   - claim memory safety, UB-free status, Miri-clean status, or site-execution proof
+#
+# See docs/ci/github-actions.md in the unsafe-review repository for the full
+# user-facing guide.
+
 name: unsafe-review-first-pr-example
 
 on:
@@ -17,40 +37,73 @@ jobs:
     name: unsafe-review advisory packet
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    env:
+      UNSAFE_REVIEW_VERSION: "0.2.0"
+      BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
+      BUNDLE_DIR: target/unsafe-review
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 0
+          fetch-depth: 100
           persist-credentials: false
 
       - uses: dtolnay/rust-toolchain@1.95.0
 
-      - name: Build unsafe-review
-        run: cargo build --locked -p unsafe-review
+      - name: Fetch base ref
+        run: git fetch --no-tags --depth=100 origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+
+      - name: Install unsafe-review from crates.io
+        run: cargo install unsafe-review --locked --version "${UNSAFE_REVIEW_VERSION}"
 
       - name: Render first-pr advisory bundle
-        env:
-          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
         run: |
-          mkdir -p target/unsafe-review
-          ./target/debug/unsafe-review first-pr \
+          mkdir -p "${BUNDLE_DIR}"
+          unsafe-review first-pr \
             --base "origin/${BASE_REF}" \
-            --out-dir target/unsafe-review
+            --out-dir "${BUNDLE_DIR}"
 
-      - name: Verify first-pr artifact contract
-        run: cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review
-
-      - name: Write GitHub summary
+      - name: Verify bundle file shape
         run: |
+          set -euo pipefail
+          for required in \
+            cards.json \
+            pr-summary.md \
+            cards.sarif \
+            comment-plan.json \
+            witness-plan.md \
+            lsp.json
+          do
+            if [ ! -s "${BUNDLE_DIR}/${required}" ]; then
+              echo "::error::unsafe-review bundle is missing ${required}"
+              exit 1
+            fi
+          done
+
+      - name: Write bounded GitHub job summary
+        run: |
+          set -euo pipefail
+          summary_md="${BUNDLE_DIR}/pr-summary.md"
+
           {
             echo "## unsafe-review advisory summary"
             echo
-            cat target/unsafe-review/pr-summary.md
+            # Header bullets (Scope/Review cards/Open actionable gaps/Policy mode)
+            # plus the Top card section. Stop before the (potentially large)
+            # Card table and Witness plan, both of which live in the uploaded
+            # bundle.
+            awk '
+              BEGIN { keep = 1 }
+              /^## Card table/ { keep = 0 }
+              keep == 1 { print }
+            ' "${summary_md}"
             echo
+            echo "---"
+            echo
+            echo "Full advisory bundle (cards.json, pr-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json) is attached as the workflow artifact."
             echo
             echo "> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof."
-          } >> "$GITHUB_STEP_SUMMARY"
+          } >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Upload first-pr artifacts
         uses: actions/upload-artifact@v7
