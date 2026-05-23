@@ -92,6 +92,9 @@ The current fixture-pinned slices are:
 - `Pin::new_unchecked` human-review routing: checks that pinning move-prevention
   and projection invariants route to human deep review without implying an
   executable witness ran.
+- `mem::zeroed` valid-zero evidence: checks that invalid zero bit-patterns keep
+  valid-zero evidence missing while known primitive valid-zero targets discharge
+  the obligation, with Miri/cargo-careful routes still only suggested.
 
 This remains experimental/advisory until human-adjudicated calibration and
 report checks are landed.

@@ -578,6 +578,38 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "zeroed-valid-zero-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "zeroed"
+hazard = "invalid_value"
+support_tier = "Core operation smoke slice"
+fixtures = [
+  "zeroed_invalid_value",
+  "zeroed_valid_u32",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/zeroed-valid-zero-evidence.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned mem::zeroed valid-zero evidence distinguishes invalid all-zero
+target types from narrow known primitive valid-zero targets in the listed fixtures.
+"""
+forbidden_claims = [
+  "broad mem::zeroed soundness",
+  "type validity proof",
+  "layout proof",
+  "witness execution proof",
+  "Miri-clean",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "unsafe-impl-send-sync-witness-routes"
 status = "fixture_pinned"
 kind = "route_quality"

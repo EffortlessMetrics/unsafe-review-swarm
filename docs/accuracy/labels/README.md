@@ -59,6 +59,8 @@ Current ledgers:
   for `Vec::from_raw_parts` capacity evidence.
 - `vec-set-len-initialized-range.toml`: fixture-pinned obligation-level labels
   for `Vec::set_len` initialized-range evidence.
+- `zeroed-valid-zero-evidence.toml`: fixture-pinned obligation-level labels
+  for `mem::zeroed` valid-zero evidence and witness routing.
 
 Each file must identify the linked policy claim, corpus metadata, sample set,
 source kind, and trust boundary. Fixture-pinned ledgers do not create calibrated

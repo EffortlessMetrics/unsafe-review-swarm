@@ -1,0 +1,41 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "zeroed-valid-zero-evidence"
+operation_family = "zeroed"
+hazard = "invalid_value"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard valid-zero evidence behavior; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "zeroed-nonnull-valid-zero-missing"
+fixture = "zeroed_invalid_value"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "zeroed"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-zero"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Zeroing NonNull<u8> keeps valid-zero evidence missing and routes to concrete execution witnesses without claiming they ran."
+
+[[samples]]
+id = "zeroed-u32-valid-zero-present"
+fixture = "zeroed_valid_u32"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "zeroed"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-zero"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Zeroing u32 has narrow known valid-zero evidence but still preserves missing witness evidence until a receipt is imported."
