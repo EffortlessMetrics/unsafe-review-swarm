@@ -16,6 +16,8 @@ Current ledgers:
 - `no-card-artifact-honesty.toml`: fixture-pinned artifact-honesty labels for
   safe/import-only/cfg-only/unchanged-adjacent fixtures that should emit zero
   ReviewCards.
+- `ptr-copy-valid-range.toml`: fixture-pinned obligation-level labels for
+  `ptr::copy` valid-range evidence.
 - `public-unsafe-api-safety-docs.toml`: fixture-pinned obligation-level labels
   for public unsafe API `# Safety` contract evidence.
 - `raw-pointer-read-alignment.toml`: fixture-pinned obligation-level labels for

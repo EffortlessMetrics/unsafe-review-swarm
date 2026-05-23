@@ -1,0 +1,246 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "ptr-copy-valid-range-evidence"
+operation_family = "ptr_copy"
+hazard = "pointer_validity"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard valid-range evidence behavior for ptr::copy; they are
+not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "ptr-copy-basic-missing-valid-range"
+fixture = "ptr_copy_overlapping"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A bare ptr::copy call does not prove both source and destination ranges are valid for count elements."
+
+[[samples]]
+id = "ptr-copy-slice-range-assert-present"
+fixture = "ptr_copy_slice_range_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "Same-call source and destination slice length assertions discharge valid-range evidence while initialized evidence remains missing."
+
+[[samples]]
+id = "ptr-copy-conjunctive-assert-present"
+fixture = "ptr_copy_slice_range_conjunctive_assert_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A conjunctive assertion over source and destination lengths discharges valid-range evidence."
+
+[[samples]]
+id = "ptr-copy-early-return-present"
+fixture = "ptr_copy_slice_range_early_return_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "Early returns on invalid source and destination ranges discharge valid-range evidence before the copy."
+
+[[samples]]
+id = "ptr-copy-disjunctive-early-return-present"
+fixture = "ptr_copy_slice_range_disjunctive_early_return_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A disjunctive invalid-range early return discharges valid-range evidence for both slices."
+
+[[samples]]
+id = "ptr-copy-open-branch-present"
+fixture = "ptr_copy_slice_range_open_branch_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "Nested open branches for source and destination length checks dominate the copy and discharge valid-range evidence."
+
+[[samples]]
+id = "ptr-copy-conjunctive-open-branch-present"
+fixture = "ptr_copy_slice_range_conjunctive_open_branch_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A conjunctive open branch over both slice lengths discharges valid-range evidence."
+
+[[samples]]
+id = "ptr-copy-closed-branch-not-guard"
+fixture = "ptr_copy_slice_range_closed_branch_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Closed branch observations of source and destination lengths do not dominate the later copy."
+
+[[samples]]
+id = "ptr-copy-or-branch-not-guard"
+fixture = "ptr_copy_slice_range_or_branch_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "An open branch with only a disjunctive positive range condition does not prove both ranges are valid."
+
+[[samples]]
+id = "ptr-copy-commented-return-not-guard"
+fixture = "ptr_copy_slice_range_disjunctive_early_return_block_comment_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Comment text inside an invalid-range branch is not executable early-return evidence."
+
+[[samples]]
+id = "ptr-copy-disjunctive-return-reassigned-count-not-guard"
+fixture = "ptr_copy_slice_range_disjunctive_early_return_reassigned_count_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Invalid-range early-return evidence becomes stale when count is reassigned before the copy."
+
+[[samples]]
+id = "ptr-copy-open-branch-reassigned-count-not-guard"
+fixture = "ptr_copy_slice_range_open_branch_reassigned_count_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Open-branch range evidence becomes stale when count is reassigned before the copy."
+
+[[samples]]
+id = "ptr-copy-open-branch-reassigned-dst-not-guard"
+fixture = "ptr_copy_slice_range_open_branch_reassigned_dst_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Open-branch range evidence becomes stale when the destination slice is reassigned before the copy."
+
+[[samples]]
+id = "ptr-copy-src-only-not-guard"
+fixture = "ptr_copy_slice_range_src_only_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Checking only the source slice length does not prove the destination range is valid."
+
+[[samples]]
+id = "ptr-copy-dst-only-not-guard"
+fixture = "ptr_copy_slice_range_dst_only_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Checking only the destination slice length does not prove the source range is valid."
+
+[[samples]]
+id = "ptr-copy-reassigned-count-not-guard"
+fixture = "ptr_copy_slice_range_reassigned_count_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Length evidence for the original count does not discharge valid-range evidence after count reassignment."
+
+[[samples]]
+id = "ptr-copy-reassigned-dst-not-guard"
+fixture = "ptr_copy_slice_range_reassigned_dst_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Length evidence for the original destination slice does not discharge valid-range evidence after destination reassignment."
+
+[[samples]]
+id = "ptr-copy-other-len-not-guard"
+fixture = "ptr_copy_other_len_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A length check over unrelated state does not discharge source or destination valid-range evidence."
