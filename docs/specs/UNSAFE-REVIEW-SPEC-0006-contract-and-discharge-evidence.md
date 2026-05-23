@@ -18,6 +18,13 @@ Linked plan: ../../plans/0.1.0/implementation-plan.md
 - `reach`: static relation from tests/harness inventory only.
 - `witness`: imported receipt evidence only.
 
+Top-level evidence summaries are reviewer-facing projections of
+obligation-level evidence, not separate truth. Top-level `contract` and
+`witness` summaries must mirror the matching obligation-level summaries when
+the fixture carries one summary for that axis. Top-level `discharge` may
+aggregate per-obligation guard state, but the aggregate must match the
+obligation-level present/missing posture.
+
 ## Matching / precedence rules
 
 1. Contract evidence never auto-discharges obligations by itself.

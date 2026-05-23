@@ -2525,6 +2525,7 @@ fn check_fixture_card_identity(
     check_fixture_card_classification(path, idx, card)?;
     let has_missing_evidence =
         check_fixture_obligation_evidence(path, idx, card, operation_family)?;
+    check_fixture_top_level_evidence_summaries(path, idx, card)?;
     check_fixture_reach_evidence(path, idx, card, site)?;
     check_fixture_missing_summary(path, idx, card, has_missing_evidence)?;
     check_fixture_next_action(path, idx, card, operation_family)?;
@@ -3210,6 +3211,134 @@ fn check_fixture_obligation_evidence(
     }
 
     Ok(has_missing_evidence)
+}
+
+fn check_fixture_top_level_evidence_summaries(
+    path: &str,
+    idx: usize,
+    card: &serde_json::Value,
+) -> Result<(), String> {
+    for axis in ["contract", "witness"] {
+        check_fixture_direct_axis_summary(path, idx, card, axis)?;
+    }
+    check_fixture_discharge_summary(path, idx, card)
+}
+
+fn check_fixture_direct_axis_summary(
+    path: &str,
+    idx: usize,
+    card: &serde_json::Value,
+    axis: &str,
+) -> Result<(), String> {
+    let card_context = format!("{path} card[{idx}]");
+    let top_level = require_non_empty_json_str(card, axis, &card_context)?;
+    let summaries = fixture_obligation_axis_summaries(&card_context, card, axis)?;
+    if summaries.len() != 1 {
+        return Err(format!(
+            "{card_context} top-level {axis} summary must have one matching obligation-level {axis}.summary, found {}",
+            summaries.len()
+        ));
+    }
+    let Some(summary) = summaries.iter().next() else {
+        return Err(format!(
+            "{card_context} top-level {axis} summary must have a matching obligation-level {axis}.summary"
+        ));
+    };
+    if top_level != *summary {
+        return Err(format!(
+            "{card_context} top-level {axis} `{top_level}` must match obligation-level {axis}.summary `{summary}`"
+        ));
+    }
+    Ok(())
+}
+
+fn check_fixture_discharge_summary(
+    path: &str,
+    idx: usize,
+    card: &serde_json::Value,
+) -> Result<(), String> {
+    let card_context = format!("{path} card[{idx}]");
+    let top_level = require_non_empty_json_str(card, "discharge", &card_context)?;
+    let states = fixture_obligation_axis_states(&card_context, card, "discharge")?;
+    let summaries = fixture_obligation_axis_summaries(&card_context, card, "discharge")?;
+
+    let expected = if states.len() == 1 && states.contains("missing") {
+        "No visible local guard detected"
+    } else if states.contains("missing") && states.contains("present") {
+        "Some inferred safety obligations are missing local guard evidence"
+    } else if states.len() == 1 && states.contains("present") {
+        if summaries.len() == 1
+            && summaries
+                .iter()
+                .next()
+                .is_some_and(|summary| top_level == *summary)
+        {
+            return Ok(());
+        }
+        "All inferred safety obligations have visible local discharge evidence"
+    } else {
+        return Err(format!(
+            "{card_context} discharge obligation states must contain `present`, `missing`, or both"
+        ));
+    };
+
+    if top_level != expected {
+        return Err(format!(
+            "{card_context} top-level discharge `{top_level}` must summarize obligation-level discharge states as `{expected}`"
+        ));
+    }
+    Ok(())
+}
+
+fn fixture_obligation_axis_states<'a>(
+    card_context: &str,
+    card: &'a serde_json::Value,
+    axis: &str,
+) -> Result<BTreeSet<&'a str>, String> {
+    fixture_obligation_axis_values(card_context, card, axis, "state")
+}
+
+fn fixture_obligation_axis_summaries<'a>(
+    card_context: &str,
+    card: &'a serde_json::Value,
+    axis: &str,
+) -> Result<BTreeSet<&'a str>, String> {
+    fixture_obligation_axis_values(card_context, card, axis, "summary")
+}
+
+fn fixture_obligation_axis_values<'a>(
+    card_context: &str,
+    card: &'a serde_json::Value,
+    axis: &str,
+    key: &str,
+) -> Result<BTreeSet<&'a str>, String> {
+    let evidence = json_array_at(card, "/obligation_evidence", card_context)?;
+    let mut values = BTreeSet::new();
+    for (evidence_idx, entry) in evidence.iter().enumerate() {
+        let Some(entry) = entry.as_object() else {
+            return Err(format!(
+                "{card_context} obligation_evidence[{evidence_idx}] must be an object"
+            ));
+        };
+        let evidence_key = required_fixture_evidence_str(entry, "key", card_context, evidence_idx)?;
+        let axis_value = entry
+            .get(axis)
+            .and_then(serde_json::Value::as_object)
+            .ok_or_else(|| {
+                format!(
+                    "{card_context} obligation_evidence[{evidence_idx}] `{evidence_key}` is missing object key `{axis}`"
+                )
+            })?;
+        values.insert(required_fixture_state_str(
+            axis_value,
+            key,
+            card_context,
+            evidence_idx,
+            evidence_key,
+            axis,
+        )?);
+    }
+    Ok(values)
 }
 
 fn check_fixture_reach_evidence(
@@ -6058,6 +6187,73 @@ jobs:
     }
 
     #[test]
+    fn fixture_card_identity_rejects_top_level_contract_drift() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["contract"] = serde_json::Value::String("Unrelated contract summary".to_string());
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("top-level contract drift should fail".to_string());
+        };
+
+        assert!(err.contains("top-level contract"));
+        assert!(err.contains("obligation-level contract.summary"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_top_level_discharge_drift() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["discharge"] = serde_json::Value::String(
+            "All inferred safety obligations have visible local discharge evidence".to_string(),
+        );
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("top-level discharge drift should fail".to_string());
+        };
+
+        assert!(err.contains("top-level discharge"));
+        assert!(err.contains("No visible local guard detected"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_top_level_witness_drift() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["witness"] = serde_json::Value::String(
+            "Imported miri receipt with `ran` strength: focused fixture witness passed".to_string(),
+        );
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("top-level witness drift should fail".to_string());
+        };
+
+        assert!(err.contains("top-level witness"));
+        assert!(err.contains("obligation-level witness.summary"));
+        Ok(())
+    }
+
+    #[test]
     fn fixture_card_identity_rejects_reach_owner_mismatch() -> Result<(), String> {
         let mut card = test_fixture_card(
             "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
@@ -6157,9 +6353,18 @@ jobs:
         card["obligation_evidence"][0]["discharge"]["present"] = serde_json::Value::Bool(true);
         card["obligation_evidence"][0]["discharge"]["state"] =
             serde_json::Value::String("present".to_string());
+        card["obligation_evidence"][0]["discharge"]["summary"] =
+            serde_json::Value::String("Alignment guard code was detected".to_string());
+        card["discharge"] = serde_json::Value::String(
+            "All inferred safety obligations have visible local discharge evidence".to_string(),
+        );
         card["obligation_evidence"][0]["witness"]["present"] = serde_json::Value::Bool(true);
         card["obligation_evidence"][0]["witness"]["state"] =
             serde_json::Value::String("present".to_string());
+        card["obligation_evidence"][0]["witness"]["summary"] =
+            serde_json::Value::String("Imported miri receipt with `ran` strength".to_string());
+        card["witness"] =
+            serde_json::Value::String("Imported miri receipt with `ran` strength".to_string());
 
         let Err(err) = check_fixture_card_identity(
             "fixtures/raw_pointer_alignment/expected.cards.json",
@@ -6632,7 +6837,10 @@ jobs:
     "Missing visible local guard for inferred safety obligations",
     "No witness receipt imported for this card"
   ],
+  "contract": "Nearby `SAFETY:` comment was detected",
+  "discharge": "No visible local guard detected",
   "reach": "1 related test file(s) mention owner `read_header`",
+  "witness": "No imported witness receipt was found",
   "next_action": "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.",
   "witness_routes": [
     {{

@@ -54,6 +54,12 @@ stable key, and coherent `contract`, `discharge`, `reach`, and `witness`
 present/state/summary fields. This prevents top-level card classes or comments
 from standing in for per-obligation evidence.
 
+Fixture golden cards must keep top-level evidence summaries aligned with
+obligation-level evidence. Top-level `contract` and `witness` summaries mirror
+the matching obligation-level summary for that axis. Top-level `discharge` is
+allowed to aggregate per-obligation guard state, but only as the checked
+all-missing, mixed, all-present, or caller-contract declaration posture.
+
 Fixture golden cards must keep the top-level `missing` summaries aligned with
 the per-obligation evidence rows: at least one summary is required when any
 contract, discharge, reach, or witness evidence is missing, and no missing
@@ -119,6 +125,8 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
   report files, and public wording that stays inside the supported claim,
 - fixture golden obligations and obligation evidence are one-to-one,
   description-aligned, and carry coherent per-axis evidence states,
+- fixture golden top-level contract, discharge, and witness summaries are
+  coherent projections of obligation-level evidence, not independent evidence,
 - fixture golden obligation evidence keys belong to the operation family
   registry row,
 - fixture golden missing summaries are non-empty exactly when at least one
@@ -174,6 +182,8 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
   hazard outside the operation family registry row, or duplicate hazard.
 - A fixture card cannot introduce an obligation evidence key outside the
   operation family registry row.
+- A fixture card cannot drift top-level contract, discharge, or witness
+  summaries away from the matching obligation-level evidence posture.
 - A fixture card cannot drift obligation-level reach away from top-level reach,
   name a different owner, or claim a test reached or executed the unsafe site.
 - A fixture card cannot introduce a witness route kind outside the operation
