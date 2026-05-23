@@ -12,6 +12,7 @@
 | Explanations | concept notes, trust boundaries, reviewer examples, and agent packet examples | `docs/explanation/` |
 | Editor workflow | saved read-only editor projection walkthrough | `docs/editor/saved-lsp-json.md` |
 | Editor extension MVP | publishable saved-lsp viewer extension scope and non-goals | `docs/editor/extension-mvp.md` |
+| Editor marketplace publication | owner pre-publication checklist and manual publish workflow | `docs/editor/marketplace-publication.md`, `.github/workflows/editor-publish.yml` |
 | Proposals | why a workstream exists | `docs/proposals/` |
 | Releases | release targets, readiness notes, and publication receipts | `docs/releases/` |
 | Specs | behavior contracts | `docs/specs/` |
