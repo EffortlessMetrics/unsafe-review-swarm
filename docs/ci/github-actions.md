@@ -50,8 +50,8 @@ The key properties:
   is non-empty. This is not the full unsafe-review source-repo artifact
   verifier.
 - `actions/upload-artifact@v7` — uploads `cards.json`, `pr-summary.md`,
-  `cards.sarif`, `comment-plan.json`, `witness-plan.md`, and `lsp.json` for
-  download by reviewers.
+  `github-summary.md`, `cards.sarif`, `comment-plan.json`, `witness-plan.md`,
+  and `lsp.json` for download by reviewers.
 
 The workflow does not:
 
@@ -66,9 +66,11 @@ The workflow does not:
 ## What reviewers see
 
 The PR's Checks tab shows the workflow run and its job summary. The job
-summary is a bounded fragment of `pr-summary.md`: header counts plus the top
-card. Reviewers download the full advisory bundle from the workflow's
-Artifacts section.
+summary is `target/unsafe-review/github-summary.md`, a bounded fragment
+produced by `unsafe-review first-pr` alongside the full bundle: header
+counts plus the top card and the trust-boundary footer, without the
+(potentially large) card table or witness plan. Reviewers download the
+full advisory bundle from the workflow's Artifacts section.
 
 The advisory bundle is what makes the review credible. The job summary is the
 reviewer-first preview.
