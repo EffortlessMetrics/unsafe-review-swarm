@@ -2456,7 +2456,7 @@ fn check_fixture_card_identity(
         check_fixture_obligation_evidence(path, idx, card, operation_family)?;
     check_fixture_missing_summary(path, idx, card, has_missing_evidence)?;
     check_fixture_next_action(path, idx, card, operation_family)?;
-    check_fixture_witness_routes(path, idx, card)?;
+    check_fixture_witness_routes(path, idx, card, operation_family)?;
 
     Ok(())
 }
@@ -2835,6 +2835,7 @@ fn check_fixture_witness_routes(
     path: &str,
     idx: usize,
     card: &serde_json::Value,
+    operation_family: &str,
 ) -> Result<(), String> {
     let card_context = format!("{path} card[{idx}]");
     let routes = json_array_at(card, "/witness_routes", &card_context)?;
@@ -2844,6 +2845,12 @@ fn check_fixture_witness_routes(
         ));
     }
 
+    let registry_routes = operation_family_registry_witness_routes()?;
+    let allowed_routes = registry_routes.get(operation_family).ok_or_else(|| {
+        format!(
+            "{card_context} operation_family `{operation_family}` must have a witness route row in {OPERATION_FAMILY_REGISTRY}"
+        )
+    })?;
     let mut route_keys = BTreeSet::new();
     let mut route_commands = BTreeSet::new();
     for (route_idx, route) in routes.iter().enumerate() {
@@ -2853,6 +2860,11 @@ fn check_fixture_witness_routes(
             ));
         };
         let kind = required_fixture_route_str(route, "kind", &card_context, route_idx)?;
+        if !allowed_routes.contains(kind) {
+            return Err(format!(
+                "{card_context} witness_routes[{route_idx}] kind `{kind}` is not listed for operation_family `{operation_family}` in {OPERATION_FAMILY_REGISTRY}"
+            ));
+        }
         let _reason = required_fixture_route_str(route, "reason", &card_context, route_idx)?;
         let Some(required) = route.get("required").and_then(serde_json::Value::as_bool) else {
             return Err(format!(
@@ -5852,6 +5864,29 @@ jobs:
 
         assert!(err.contains("verify_commands[0]"));
         assert!(err.contains("must be backed by a witness route command"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_witness_route_outside_operation_registry() -> Result<(), String>
+    {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["witness_routes"][0]["kind"] = serde_json::Value::String("loom".to_string());
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("operation-family/witness-route mismatch should fail".to_string());
+        };
+
+        assert!(err.contains("witness_routes[0] kind `loom`"));
+        assert!(err.contains("operation_family `raw_pointer_read`"));
+        assert!(err.contains(OPERATION_FAMILY_REGISTRY));
         Ok(())
     }
 

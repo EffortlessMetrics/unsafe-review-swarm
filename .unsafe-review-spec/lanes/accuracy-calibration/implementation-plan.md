@@ -53,7 +53,8 @@ The guard rejects:
 - fixture golden cards whose class, priority, or confidence are unknown or
   inconsistent with the fixture-pinned classification signal.
 - fixture golden cards whose witness routes are missing, required by default,
-  or out of sync with verify_commands.
+  outside the operation family registry row, or out of sync with
+  verify_commands.
 - fixture golden ReviewCard IDs that omit stable fixture/package, file, owner,
   site kind, operation family, operation path/callee, snippet hash, hazard, or
   counted suffix components.
