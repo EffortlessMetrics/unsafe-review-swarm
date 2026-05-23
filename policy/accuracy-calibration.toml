@@ -610,6 +610,42 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "unreachable-unchecked-infallible-path-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "unreachable_unchecked"
+hazard = "invalid_value"
+support_tier = "Core operation smoke slice"
+fixtures = [
+  "unreachable_unchecked_path",
+  "unreachable_unchecked_infallible_path",
+  "unreachable_unchecked_other_infallible_not_guard",
+  "unreachable_unchecked_post_infallible_not_guard",
+  "unreachable_unchecked_closed_infallible_match_not_guard",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/unreachable-unchecked-infallible-path.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned unreachable_unchecked infallible-path evidence distinguishes
+local open infallible error-path evidence from missing, wrong-context,
+post-operation, and closed-prior-match controls in the listed fixtures.
+"""
+forbidden_claims = [
+  "broad unreachable_unchecked soundness",
+  "path reachability proof",
+  "caller proof",
+  "witness execution proof",
+  "Miri-clean",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "unsafe-impl-send-sync-witness-routes"
 status = "fixture_pinned"
 kind = "route_quality"

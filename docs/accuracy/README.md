@@ -95,6 +95,9 @@ The current fixture-pinned slices are:
 - `mem::zeroed` valid-zero evidence: checks that invalid zero bit-patterns keep
   valid-zero evidence missing while known primitive valid-zero targets discharge
   the obligation, with Miri/cargo-careful routes still only suggested.
+- `unreachable_unchecked` infallible-path evidence: checks that only local open
+  infallible error-path evidence discharges the unreachable obligation, while
+  rejecting wrong-context, post-operation, and closed prior matches.
 
 This remains experimental/advisory until human-adjudicated calibration and
 report checks are landed.

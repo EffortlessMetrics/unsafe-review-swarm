@@ -51,6 +51,9 @@ Current ledgers:
   for `#[target_feature]` human-deep-review witness routing.
 - `transmute-bool-valid-value.toml`: fixture-pinned obligation-level labels for
   transmute bool valid-value evidence.
+- `unreachable-unchecked-infallible-path.toml`: fixture-pinned
+  obligation-level labels for `unreachable_unchecked` local infallible-path
+  evidence.
 - `unsafe-impl-send-sync-witness-routes.toml`: fixture-pinned route-quality
   labels for unsafe impl Send/Sync Loom/Shuttle witness routing.
 - `unsafe-fn-call-callee-contract.toml`: fixture-pinned obligation-level labels

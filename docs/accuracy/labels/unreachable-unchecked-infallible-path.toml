@@ -1,0 +1,86 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "unreachable-unchecked-infallible-path-evidence"
+operation_family = "unreachable_unchecked"
+hazard = "invalid_value"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard unreachable-path evidence behavior; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "unreachable-unchecked-no-infallible-path-missing"
+fixture = "unreachable_unchecked_path"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unreachable_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "unreachable"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A bare unreachable_unchecked error branch keeps unreachable-path evidence missing and routes to concrete execution witnesses."
+
+[[samples]]
+id = "unreachable-unchecked-local-infallible-path-present"
+fixture = "unreachable_unchecked_infallible_path"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unreachable_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "unreachable"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A local open infallible error-path match discharges unreachable_unchecked path evidence without importing a witness receipt."
+
+[[samples]]
+id = "unreachable-unchecked-other-infallible-path-missing"
+fixture = "unreachable_unchecked_other_infallible_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unreachable_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "unreachable"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Infallible evidence from another match context must not discharge the unreachable_unchecked path obligation."
+
+[[samples]]
+id = "unreachable-unchecked-post-infallible-path-missing"
+fixture = "unreachable_unchecked_post_infallible_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unreachable_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "unreachable"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Infallible evidence that appears after unreachable_unchecked must not discharge the earlier path obligation."
+
+[[samples]]
+id = "unreachable-unchecked-closed-infallible-path-missing"
+fixture = "unreachable_unchecked_closed_infallible_match_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unreachable_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "unreachable"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A closed prior infallible match must not discharge a later unrelated unreachable_unchecked operation."
