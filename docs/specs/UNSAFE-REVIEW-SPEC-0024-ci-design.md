@@ -59,6 +59,20 @@ first-pr bundle shape, artifact verification, advisory findings, comment-plan
 behavior, and the distinction between artifact failures and unsafe-review
 findings. This spec owns the broader CI lane design.
 
+This spec owns:
+
+```text
+default workspace CI
+advisory PR review lane
+artifact integrity gate
+source/swarm sync guard
+coverage / Codecov lane
+release readiness lane
+future trusted comment poster lane
+security and token posture
+runner/cost posture
+```
+
 ## 2. Core doctrine
 
 CI has four different jobs.
@@ -235,6 +249,8 @@ target/unsafe-review/lsp.json
 The drop-in example workflow follows this shape. The live swarm advisory
 workflow may be tightened toward this lane, but it must preserve read-only
 permissions, no comment posting, no witness execution, and no source edits.
+It should build `unsafe-review`, run one `first-pr` command, verify the bundle,
+write a GitHub summary, and upload the first-pr artifacts.
 
 May fail on:
 
@@ -721,6 +737,46 @@ Codecov upload
 fail_ci_if_error: false initially
 ```
 
+Recommended workflow shape:
+
+```yaml
+name: Coverage
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Generate LCOV
+        run: |
+          cargo llvm-cov --workspace --all-targets --locked \
+            --lcov \
+            --output-path target/llvm-cov/lcov.info
+      - name: Upload to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          files: target/llvm-cov/lcov.info
+          fail_ci_if_error: false
+```
+
+The workflow must not become a release gate or an unsafe-correctness signal
+without a separate accepted policy change.
+
 Badge posture:
 
 ```text
@@ -841,8 +897,13 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: unsafe-review-first-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   first_pr_bundle:
+    name: unsafe-review advisory packet
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -853,17 +914,37 @@ jobs:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@1.95.0
       - run: cargo build --locked -p unsafe-review
-      - run: |
+      - name: Render first-pr advisory bundle
+        env:
+          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
+        run: |
           mkdir -p target/unsafe-review
           ./target/debug/unsafe-review first-pr \
             --base "origin/${BASE_REF}" \
             --out-dir target/unsafe-review
-      - run: cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review
+      - name: Verify first-pr artifact contract
+        run: cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review
+      - name: Write GitHub summary
+        run: |
+          {
+            echo "## unsafe-review advisory summary"
+            echo
+            cat target/unsafe-review/pr-summary.md
+            echo
+            echo
+            echo "> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and not a Miri result unless a matching receipt exists."
+          } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: unsafe-review-first-pr
-          path: target/unsafe-review/
+          path: |
+            target/unsafe-review/cards.json
+            target/unsafe-review/pr-summary.md
+            target/unsafe-review/cards.sarif
+            target/unsafe-review/comment-plan.json
+            target/unsafe-review/witness-plan.md
+            target/unsafe-review/lsp.json
           if-no-files-found: error
 ```
 

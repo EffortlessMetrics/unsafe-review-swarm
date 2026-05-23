@@ -8,11 +8,16 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: unsafe-review-first-pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   first_pr_bundle:
-    name: unsafe-review first-pr bundle
+    name: unsafe-review advisory packet
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
         with:
@@ -29,7 +34,9 @@ jobs:
           BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
         run: |
           mkdir -p target/unsafe-review
-          ./target/debug/unsafe-review first-pr --base "origin/${BASE_REF}" --out-dir target/unsafe-review
+          ./target/debug/unsafe-review first-pr \
+            --base "origin/${BASE_REF}" \
+            --out-dir target/unsafe-review
 
       - name: Verify first-pr artifact contract
         run: cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review
@@ -37,11 +44,12 @@ jobs:
       - name: Write GitHub summary
         run: |
           {
-            echo "## unsafe-review first-pr summary"
+            echo "## unsafe-review advisory summary"
             echo
             cat target/unsafe-review/pr-summary.md
             echo
-            echo "> Trust boundary: advisory unsafe seam review; findings are not safety proof."
+            echo
+            echo "> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and not a Miri result unless a matching receipt exists."
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload first-pr artifacts

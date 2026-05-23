@@ -82,6 +82,14 @@ contract. Prefer the smallest useful rail: a plan item, spec clause, template,
 or verifier hook that keeps future PRs pointed at the same truth without adding
 fake enforcement.
 
+For CI, workflow, PR artifact, or comment-posting work, read
+`docs/specs/UNSAFE-REVIEW-SPEC-0024-ci-design.md` before editing. Keep the lane
+split intact: default CI protects workspace and policy health, first-pr lanes
+verify advisory packet integrity, source-divergence reports source/swarm drift,
+coverage remains telemetry, release readiness stays explicit, and trusted
+comment posting remains a future split-token lane. Do not turn advisory
+unsafe-review findings into default CI failures.
+
 Use the rails as forward drive. A well-designed missing rail is usually a repo
 alignment task, not a blocker. Add it when it keeps future work convergent and
 does not turn the current PR into a broad process rewrite.

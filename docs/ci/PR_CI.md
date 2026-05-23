@@ -12,6 +12,16 @@ Malformed or dishonest unsafe-review artifacts fail CI.
 Unsafe-review findings do not fail CI by default.
 ```
 
+CI lanes have separate jobs and authority:
+
+- Default workspace CI protects build, lint, tests, docs, and repo policy.
+- Policy-contracts validates source-of-truth ledgers and goal/spec rails.
+- First-pr advisory CI renders and verifies the public PR packet.
+- Source-divergence reports source/swarm drift before routine swarm work.
+- Coverage is optional execution-surface telemetry, not proof.
+- Release readiness is explicit package/install smoke proof, not every-PR cost.
+- Trusted comment posting is future split-token infrastructure, not default CI.
+
 ## Default workspace gate
 
 Default PR CI runs the cheap repository policy gate on the pinned Rust
@@ -54,16 +64,22 @@ signals; those PRs still pass through the same advisory CI and review process.
 The `dtolnay/rust-toolchain` action ref is intentionally pinned to the repo
 toolchain version and is not Dependabot-managed.
 
+Default analyzer and artifact lanes must not request write tokens. A workflow
+that can post comments, mutate branches, publish crates, or write releases must
+be specified as a separate trusted lane before it is introduced.
+
 ## Policy contracts lane
 
-The policy contracts workflow validates the source-of-truth rails without
-running unsafe-review analysis:
+The policy contracts lane validates the source-of-truth rails without running
+unsafe-review analysis. The full lane contract is:
 
 ```text
 cargo run --locked -p xtask -- check-doc-artifacts
+cargo run --locked -p xtask -- check-docs-automation
 cargo run --locked -p xtask -- check-goals
 cargo run --locked -p xtask -- check-package-boundary
 cargo run --locked -p xtask -- check-ci-lanes
+cargo run --locked -p xtask -- check-policy
 ```
 
 This lane may fail on malformed or drifting source-of-truth ledgers. It must not
