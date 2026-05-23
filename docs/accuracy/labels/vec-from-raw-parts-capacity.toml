@@ -1,0 +1,115 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "vec-from-raw-parts-capacity-evidence"
+operation_family = "vec_from_raw_parts"
+hazard = "bounds"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard capacity evidence behavior for Vec::from_raw_parts; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "vec-from-raw-parts-basic-missing-capacity"
+fixture = "vec_from_raw_parts"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_from_raw_parts"
+expected_hazard = "drop_or_deallocation"
+expected_obligation_key = "capacity"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A bare Vec::from_raw_parts call does not prove len is at most capacity."
+
+[[samples]]
+id = "vec-from-raw-parts-capacity-guard-present"
+fixture = "vec_from_raw_parts_capacity_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_from_raw_parts"
+expected_hazard = "bounds"
+expected_obligation_key = "capacity"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "An early return on len > cap discharges the capacity obligation while allocator and ownership evidence remain missing."
+
+[[samples]]
+id = "vec-from-raw-parts-capacity-assert-present"
+fixture = "vec_from_raw_parts_capacity_assert_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_from_raw_parts"
+expected_hazard = "bounds"
+expected_obligation_key = "capacity"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A same-call len <= cap assertion discharges the capacity obligation."
+
+[[samples]]
+id = "vec-from-raw-parts-capacity-observed-not-guard"
+fixture = "vec_from_raw_parts_capacity_observed_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_from_raw_parts"
+expected_hazard = "bounds"
+expected_obligation_key = "capacity"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A check against another capacity value does not discharge the cap argument passed to Vec::from_raw_parts."
+
+[[samples]]
+id = "vec-from-raw-parts-capacity-value-observed-not-guard"
+fixture = "vec_from_raw_parts_capacity_value_observed_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_from_raw_parts"
+expected_hazard = "bounds"
+expected_obligation_key = "capacity"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A bare observed len <= cap boolean is not a dominating guard for Vec::from_raw_parts."
+
+[[samples]]
+id = "vec-from-raw-parts-capacity-closed-branch-not-guard"
+fixture = "vec_from_raw_parts_capacity_closed_branch_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_from_raw_parts"
+expected_hazard = "bounds"
+expected_obligation_key = "capacity"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A closed positive len <= cap branch does not dominate the later Vec::from_raw_parts call."
+
+[[samples]]
+id = "vec-from-raw-parts-capacity-reassigned-not-guard"
+fixture = "vec_from_raw_parts_capacity_reassigned_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_from_raw_parts"
+expected_hazard = "bounds"
+expected_obligation_key = "capacity"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Capacity evidence becomes stale when the checked cap argument is reassigned before Vec::from_raw_parts."
+
+[[samples]]
+id = "vec-from-raw-parts-manuallydrop-origin-capacity-present"
+fixture = "vec_from_raw_parts_manuallydrop_origin"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_from_raw_parts"
+expected_hazard = "leak_or_ownership_transfer"
+expected_obligation_key = "capacity"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "Capacity read from the same ManuallyDrop Vec raw-parts origin discharges the capacity obligation while alignment still remains separate."

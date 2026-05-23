@@ -219,6 +219,46 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "vec-from-raw-parts-capacity-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "vec_from_raw_parts"
+hazard = "bounds"
+support_tier = "Core operation smoke slice"
+fixtures = [
+  "vec_from_raw_parts",
+  "vec_from_raw_parts_capacity_guard",
+  "vec_from_raw_parts_capacity_assert_guard",
+  "vec_from_raw_parts_capacity_observed_not_guard",
+  "vec_from_raw_parts_capacity_value_observed_not_guard",
+  "vec_from_raw_parts_capacity_closed_branch_not_guard",
+  "vec_from_raw_parts_capacity_reassigned_not_guard",
+  "vec_from_raw_parts_manuallydrop_origin",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/vec-from-raw-parts-capacity.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned Vec::from_raw_parts capacity evidence distinguishes same-call
+len/cap guards, assertions, and same-origin ManuallyDrop raw-parts capacity
+from observed, closed-branch, wrong-capacity, and stale-cap controls in the
+listed fixtures.
+"""
+forbidden_claims = [
+  "broad Vec::from_raw_parts soundness",
+  "allocator proof",
+  "ownership proof",
+  "alignment proof",
+  "initialized-memory proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "ptr-copy-valid-range-evidence"
 status = "fixture_pinned"
 kind = "evidence_precision"
