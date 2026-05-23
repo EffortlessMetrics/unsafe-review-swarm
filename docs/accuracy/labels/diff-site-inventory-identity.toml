@@ -1,0 +1,131 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "diff-site-inventory-identity"
+operation_family = "mixed"
+hazard = "mixed"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard owner, site-kind, and dedupe behavior; they are not a proof of memory safety,
+not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "split-unsafe-block-owner-site"
+fixture = "split_unsafe_block"
+kind = "positive"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+expected_owner = "split_block"
+expected_site_kind = "unsafe_block"
+expected_obligation_key = "unknown"
+expected_contract_state = "missing"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A split unsafe block without a concrete operation should emit one owner-scoped unknown unsafe-block ReviewCard."
+
+[[samples]]
+id = "attributed-unsafe-fn-no-duplicate-owner-site"
+fixture = "attributed_unsafe_fn_no_duplicate"
+kind = "false_positive_control"
+expected_cards = 2
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+expected_owner = "write_one"
+expected_site_kind = "unsafe_fn"
+expected_obligation_key = "unknown"
+expected_contract_state = "missing"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "An attributed unsafe fn declaration should keep the function owner and avoid fallback line-scanner duplicates."
+
+[[samples]]
+id = "inline-unsafe-raw-pointer-deref-no-wrapper-duplicate"
+fixture = "inline_unsafe_raw_pointer_deref_no_duplicate"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_deref"
+expected_hazard = "pointer_validity"
+expected_owner = "with_byte"
+expected_site_kind = "operation"
+expected_obligation_key = "pointer-live"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "An inline unsafe block with a concrete raw pointer deref should emit the operation card without an unknown wrapper duplicate."
+
+[[samples]]
+id = "impl-trait-bound-owner-inference"
+fixture = "impl_trait_bound_owner_inference"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+expected_owner = "try_reserve"
+expected_site_kind = "operation"
+expected_obligation_key = "callee-contract"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A multi-line impl Trait bound should not replace the real function owner on the unsafe call ReviewCard."
+
+[[samples]]
+id = "long-unsafe-fn-owner-inference"
+fixture = "long_unsafe_fn_owner_inference"
+kind = "positive"
+expected_cards = 2
+expected_class = "contract_missing"
+expected_operation_family = "drop_in_place"
+expected_hazard = "pointer_validity"
+expected_owner = "run"
+expected_site_kind = "operation"
+expected_obligation_key = "pointer-live"
+expected_contract_state = "missing"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "An unsafe operation deep inside a long unsafe function should retain the enclosing function owner identity."
+
+[[samples]]
+id = "macro-rules-owner-inference"
+fixture = "macro_rules_owner_inference"
+kind = "positive"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "box_from_raw"
+expected_hazard = "pointer_validity"
+expected_owner = "spawn_unchecked"
+expected_site_kind = "operation"
+expected_obligation_key = "ownership"
+expected_contract_state = "missing"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Unsafe operations inside macro_rules bodies should preserve the macro name as the ReviewCard owner."
+
+[[samples]]
+id = "nested-unsafe-operation-call-dedupe"
+fixture = "nested_unsafe_operation_call_dedupe"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+expected_owner = "expose_bucket"
+expected_site_kind = "operation"
+expected_obligation_key = "non-null"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Nested unsafe operations should keep the inner concrete operation card without an extra parent-call duplicate."

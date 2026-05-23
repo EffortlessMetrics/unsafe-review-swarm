@@ -98,6 +98,10 @@ The current fixture-pinned slices are:
 - No-card artifact honesty: checks that safe, import-only, cfg-only, and
   unchanged-adjacent fixtures emit zero ReviewCards without turning that into an
   all-clear or safety claim.
+- Diff unsafe site inventory identity: checks that split unsafe blocks,
+  attributed declarations, inline concrete operations, impl trait bounds, long
+  functions, macro bodies, and nested unsafe calls keep stable owner/site-kind
+  identity and do not introduce wrapper or fallback duplicates.
 - `NonNull::new_unchecked` nullability evidence: checks whether the `non-null`
   obligation is discharged by a same-pointer `NonNull::new` guard, while
   rejecting wrong-pointer, observed-only, non-returning `is_null`, and

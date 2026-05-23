@@ -12,6 +12,8 @@ Current ledgers:
   `ptr::drop_in_place` Miri/cargo-careful witness routing.
 - `copy-nonoverlapping-valid-range.toml`: fixture-pinned
   obligation-level labels for `copy_nonoverlapping` valid-range evidence.
+- `diff-site-inventory-identity.toml`: fixture-pinned owner, site-kind, and
+  dedupe labels for diff unsafe site inventory behavior.
 - `ffi-boundary-obligations.toml`: fixture-pinned obligation-level labels for
   FFI ABI/layout and ownership/lifetime/nullability evidence.
 - `ffi-sanitizer-witness-routes.toml`: fixture-pinned route-quality labels for
@@ -85,3 +87,7 @@ separate label-specific truth.
 
 Samples may pin `expected_witness_route_kinds` when the claim is about witness
 routing. Route kinds are read from the ReviewCard `witness_routes` projection.
+
+Samples may pin `expected_owner` and `expected_site_kind` when the claim is
+about ReviewCard identity or inventory behavior. These fields are read from the
+matching ReviewCard `site.owner` and `site.kind`.

@@ -1168,3 +1168,37 @@ forbidden_claims = [
   "global recall",
   "memory-safety proof",
 ]
+
+[[claim]]
+id = "diff-site-inventory-identity"
+status = "fixture_pinned"
+kind = "identity_stability"
+owner = "calibration"
+support_tier = "Diff unsafe site inventory"
+fixtures = [
+  "split_unsafe_block",
+  "attributed_unsafe_fn_no_duplicate",
+  "inline_unsafe_raw_pointer_deref_no_duplicate",
+  "impl_trait_bound_owner_inference",
+  "long_unsafe_fn_owner_inference",
+  "macro_rules_owner_inference",
+  "nested_unsafe_operation_call_dedupe",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/diff-site-inventory-identity.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned diff unsafe site inventory identity keeps owner, site-kind,
+operation family, and dedupe behavior stable for split unsafe blocks,
+attributed declarations, inline operations, long functions, macro bodies, impl
+trait bounds, and nested unsafe calls in the listed fixtures.
+"""
+forbidden_claims = [
+  "complete changed unsafe inventory",
+  "global identity stability",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]

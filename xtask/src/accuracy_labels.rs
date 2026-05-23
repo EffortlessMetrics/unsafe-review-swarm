@@ -22,6 +22,8 @@ const LABEL_SAMPLE_FIELDS: &[&str] = &[
     "expected_class",
     "expected_operation_family",
     "expected_hazard",
+    "expected_owner",
+    "expected_site_kind",
     "expected_obligation_key",
     "expected_contract_state",
     "expected_discharge_state",
@@ -71,6 +73,8 @@ struct FixtureObligation<'a> {
     fixture: &'a str,
     operation_family: &'a str,
     hazard: &'a str,
+    expected_owner: Option<&'a str>,
+    expected_site_kind: Option<&'a str>,
     obligation_key: &'a str,
 }
 
@@ -317,11 +321,15 @@ fn validate_sample(
         fixture,
         fixture_case.expected_hazard.as_deref(),
     )?;
+    let expected_owner = optional_table_string(sample, "expected_owner", path, idx)?;
+    let expected_site_kind = optional_table_string(sample, "expected_site_kind", path, idx)?;
     let obligation_key = required_table_string(sample, "expected_obligation_key", path, idx)?;
     let fixture_obligation = FixtureObligation {
         fixture,
         operation_family: expected_operation_family,
         hazard: expected_hazard,
+        expected_owner,
+        expected_site_kind,
         obligation_key,
     };
     if let Some(contract_state) =
@@ -370,14 +378,7 @@ fn validate_sample(
                 path,
                 "expected_witness_route_kinds",
             )?;
-            check_fixture_witness_route_kind(
-                path,
-                idx,
-                fixture,
-                expected_operation_family,
-                expected_hazard,
-                route_kind,
-            )?;
+            check_fixture_witness_route_kind(path, idx, &fixture_obligation, route_kind)?;
         }
     }
     Ok(())
@@ -392,6 +393,8 @@ fn reject_zero_card_fields(
         "expected_class",
         "expected_operation_family",
         "expected_hazard",
+        "expected_owner",
+        "expected_site_kind",
         "expected_obligation_key",
         "expected_contract_state",
         "expected_discharge_state",
@@ -447,12 +450,7 @@ fn check_fixture_obligation_evidence_state(
     })?;
     let mut saw_key = false;
     for card in cards {
-        if card
-            .get("operation_family")
-            .and_then(serde_json::Value::as_str)
-            != Some(obligation.operation_family)
-            || !json_array_contains_str(card, "hazards", obligation.hazard)
-        {
+        if !card_matches_obligation_selector(card, obligation) {
             continue;
         }
         for evidence in super::json_array_at(
@@ -493,10 +491,9 @@ fn check_fixture_obligation_evidence_state(
         ))
     } else {
         Err(format!(
-            "{path} samples[{idx}] expected_obligation_key `{}` was not found for `{}` / `{}` in `{}`",
+            "{path} samples[{idx}] expected_obligation_key `{}` was not found for {} in `{}`",
             obligation.obligation_key,
-            obligation.operation_family,
-            obligation.hazard,
+            obligation_selector_description(obligation),
             obligation.fixture
         ))
     }
@@ -505,33 +502,29 @@ fn check_fixture_obligation_evidence_state(
 fn check_fixture_witness_route_kind(
     path: &str,
     idx: usize,
-    fixture: &str,
-    operation_family: &str,
-    hazard: &str,
+    obligation: &FixtureObligation<'_>,
     route_kind: &str,
 ) -> Result<(), String> {
     let cards_path = super::workspace_path("fixtures")
-        .join(fixture)
+        .join(obligation.fixture)
         .join("expected.cards.json");
     let cards = super::parse_json_file(&cards_path)?;
-    let cards = cards
-        .as_array()
-        .ok_or_else(|| format!("{fixture}/expected.cards.json must contain a JSON array"))?;
+    let cards = cards.as_array().ok_or_else(|| {
+        format!(
+            "{}/expected.cards.json must contain a JSON array",
+            obligation.fixture
+        )
+    })?;
     let mut matched_card = false;
     for card in cards {
-        if card
-            .get("operation_family")
-            .and_then(serde_json::Value::as_str)
-            != Some(operation_family)
-            || !json_array_contains_str(card, "hazards", hazard)
-        {
+        if !card_matches_obligation_selector(card, obligation) {
             continue;
         }
         matched_card = true;
         for route in super::json_array_at(
             card,
             "/witness_routes",
-            &format!("{fixture}/expected.cards.json"),
+            &format!("{}/expected.cards.json", obligation.fixture),
         )? {
             if route.get("kind").and_then(serde_json::Value::as_str) == Some(route_kind) {
                 return Ok(());
@@ -540,13 +533,62 @@ fn check_fixture_witness_route_kind(
     }
     if matched_card {
         Err(format!(
-            "{path} samples[{idx}] expected_witness_route_kinds route `{route_kind}` was not found for `{operation_family}` / `{hazard}` in `{fixture}`"
+            "{path} samples[{idx}] expected_witness_route_kinds route `{route_kind}` was not found for {} in `{}`",
+            obligation_selector_description(obligation),
+            obligation.fixture
         ))
     } else {
         Err(format!(
-            "{path} samples[{idx}] no `{operation_family}` / `{hazard}` card was found in `{fixture}`"
+            "{path} samples[{idx}] no card matching {} was found in `{}`",
+            obligation_selector_description(obligation),
+            obligation.fixture
         ))
     }
+}
+
+fn card_matches_obligation_selector(
+    card: &serde_json::Value,
+    obligation: &FixtureObligation<'_>,
+) -> bool {
+    if card
+        .get("operation_family")
+        .and_then(serde_json::Value::as_str)
+        != Some(obligation.operation_family)
+        || !json_array_contains_str(card, "hazards", obligation.hazard)
+    {
+        return false;
+    }
+    if let Some(expected_owner) = obligation.expected_owner
+        && card
+            .pointer("/site/owner")
+            .and_then(serde_json::Value::as_str)
+            != Some(expected_owner)
+    {
+        return false;
+    }
+    if let Some(expected_site_kind) = obligation.expected_site_kind
+        && card
+            .pointer("/site/kind")
+            .and_then(serde_json::Value::as_str)
+            != Some(expected_site_kind)
+    {
+        return false;
+    }
+    true
+}
+
+fn obligation_selector_description(obligation: &FixtureObligation<'_>) -> String {
+    let mut parts = vec![
+        format!("operation `{}`", obligation.operation_family),
+        format!("hazard `{}`", obligation.hazard),
+    ];
+    if let Some(expected_owner) = obligation.expected_owner {
+        parts.push(format!("expected_owner `{expected_owner}`"));
+    }
+    if let Some(expected_site_kind) = obligation.expected_site_kind {
+        parts.push(format!("expected_site_kind `{expected_site_kind}`"));
+    }
+    parts.join(" / ")
 }
 
 fn json_array_contains_str(value: &serde_json::Value, key: &str, expected: &str) -> bool {
@@ -908,6 +950,64 @@ rationale = "The fixture intentionally has alignment evidence, so missing should
                 .unwrap_or_default()
                 .contains("expected_discharge_state")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn label_ledger_rejects_wrong_card_owner() -> Result<(), String> {
+        let ledger = r#"
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "raw-pointer-read-alignment-evidence"
+operation_family = "raw_pointer_read"
+hazard = "alignment"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result."
+
+[[samples]]
+id = "bad-owner"
+fixture = "raw_pointer_alignment_is_aligned_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+expected_owner = "wrong_owner"
+expected_obligation_key = "alignment"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "The fixture owner should be checked as part of ReviewCard identity calibration."
+"#
+        .parse::<toml::Table>()
+        .map(toml::Value::Table)
+        .map_err(|err| format!("parse test ledger failed: {err}"))?;
+        let mut cases = BTreeMap::new();
+        cases.insert(
+            "raw_pointer_alignment_is_aligned_guard".to_string(),
+            CalibrationFixtureCase {
+                kind: "positive".to_string(),
+                expected_cards: 1,
+                expected_class: Some("guard_missing".to_string()),
+                expected_operation_family: Some("raw_pointer_read".to_string()),
+                expected_hazard: Some("alignment".to_string()),
+            },
+        );
+        let claim = PolicyClaim {
+            operation_family: Some("raw_pointer_read".to_string()),
+            hazard: Some("alignment".to_string()),
+            label_ledgers: BTreeSet::new(),
+        };
+
+        let result = validate_label_ledger(
+            "docs/accuracy/labels/test.toml",
+            &ledger,
+            "raw-pointer-read-alignment-evidence",
+            &claim,
+            &cases,
+        );
+
+        assert!(result.err().unwrap_or_default().contains("expected_owner"));
         Ok(())
     }
 }
