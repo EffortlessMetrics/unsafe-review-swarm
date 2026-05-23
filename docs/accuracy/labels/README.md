@@ -6,6 +6,9 @@ Current ledgers:
 
 - `ffi-sanitizer-witness-routes.toml`: fixture-pinned route-quality labels for
   FFI sanitizer/cargo-careful witness routing.
+- `no-card-artifact-honesty.toml`: fixture-pinned artifact-honesty labels for
+  safe/import-only/cfg-only/unchanged-adjacent fixtures that should emit zero
+  ReviewCards.
 - `public-unsafe-api-safety-docs.toml`: fixture-pinned obligation-level labels
   for public unsafe API `# Safety` contract evidence.
 - `raw-pointer-read-alignment.toml`: fixture-pinned obligation-level labels for

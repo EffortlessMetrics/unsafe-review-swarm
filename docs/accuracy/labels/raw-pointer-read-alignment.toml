@@ -113,3 +113,16 @@ expected_obligation_key = "alignment"
 expected_discharge_state = "missing"
 label_source = "fixture_golden"
 rationale = "A modulo alignment guard for an earlier pointer does not discharge evidence after pointer reassignment."
+
+[[samples]]
+id = "comment-alignment-not-guard"
+fixture = "comment_alignment_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+expected_obligation_key = "alignment"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Comment text mentioning alignment does not discharge the alignment obligation for a raw pointer read."

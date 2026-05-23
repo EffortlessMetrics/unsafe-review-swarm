@@ -1,0 +1,51 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "no-card-artifact-honesty"
+operation_family = "none"
+hazard = "none"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+zero-card artifact behavior; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "safe-code-emits-no-cards"
+fixture = "safe_code_no_cards"
+kind = "negative"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "A safe Rust-only change should not create advisory ReviewCards or imply an unsafe-review gap."
+
+[[samples]]
+id = "safe-reference-deref-emits-no-cards"
+fixture = "safe_reference_deref_no_cards"
+kind = "negative"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "Dereferencing a safe Rust reference is not an unsafe seam and should emit no ReviewCards."
+
+[[samples]]
+id = "unsafe-import-paths-emit-no-cards"
+fixture = "imports_not_unsafe_operations"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "Importing or mentioning unsafe operation paths is not itself an executed unsafe operation."
+
+[[samples]]
+id = "cfg-target-feature-predicate-emits-no-cards"
+fixture = "cfg_target_feature_not_operation"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "A cfg target_feature predicate is configuration text, not a changed unsafe operation."
+
+[[samples]]
+id = "adjacent-unchanged-unsafe-declaration-emits-no-cards"
+fixture = "adjacent_unchanged_unsafe_fn_no_card"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "An unchanged adjacent unsafe declaration should not become a ReviewCard for a neighboring safe edit."

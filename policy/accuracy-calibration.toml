@@ -45,6 +45,7 @@ fixtures = [
   "raw_pointer_alignment_modulo_observed_not_guard",
   "raw_pointer_alignment_modulo_closed_branch_not_guard",
   "raw_pointer_alignment_modulo_reassigned_pointer_not_guard",
+  "comment_alignment_not_guard",
 ]
 dogfood_targets = []
 label_ledgers = [
@@ -53,7 +54,7 @@ label_ledgers = [
 labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned alignment guard evidence for raw pointer reads rejects observed,
-closed-branch, stale-pointer, and wrong-shape evidence in the listed fixtures.
+closed-branch, stale-pointer, comment-only, and wrong-shape evidence in the listed fixtures.
 """
 forbidden_claims = [
   "broad raw pointer safety",
@@ -220,6 +221,39 @@ sanitizer/cargo-careful route suggestions in the listed fixture.
 """
 forbidden_claims = [
   "FFI ABI correctness proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
+id = "no-card-artifact-honesty"
+status = "fixture_pinned"
+kind = "artifact_honesty"
+owner = "calibration"
+support_tier = "Diff unsafe site inventory"
+fixtures = [
+  "safe_code_no_cards",
+  "safe_reference_deref_no_cards",
+  "imports_not_unsafe_operations",
+  "cfg_target_feature_not_operation",
+  "adjacent_unchanged_unsafe_fn_no_card",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/no-card-artifact-honesty.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned no-card behavior for the listed safe, import-only, cfg-only, and
+unchanged-adjacent fixtures emits zero ReviewCards without saying the repo is safe.
+"""
+forbidden_claims = [
+  "all clear",
+  "repo safe",
+  "UB-free",
+  "Miri-clean",
+  "site-execution proof",
   "global precision",
   "global recall",
   "memory-safety proof",

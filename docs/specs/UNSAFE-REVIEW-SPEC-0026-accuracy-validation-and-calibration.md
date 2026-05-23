@@ -59,6 +59,12 @@ matching ReviewCard `witness_routes`. A route-quality label proves only that the
 static card recommends the expected next witness route; it does not prove the
 witness was run or passed.
 
+When a claim is about no-card artifact honesty, the ledger pins
+`expected_cards = 0` for the named fixture and must not include per-card
+operation, hazard, obligation, evidence-state, or witness-route expectations.
+The claim proves only that the listed fixtures emit zero ReviewCards. It does
+not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
+
 ## Non-goals
 
 - no global precision/recall claim,
