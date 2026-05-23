@@ -64,7 +64,7 @@ The current fixture-pinned slices are:
 - `transmute::<u8, bool>` / `transmute_copy::<u8, bool>` valid-value evidence:
   checks whether the `valid-value` obligation is discharged by dominating
   bool-domain or invalid-byte early-return guards, while rejecting layout-only,
-  observed, closed-branch, and stale-byte controls.
+  observed, closed-branch, stale-byte, and multiline `transmute_copy` controls.
 - `str::from_utf8_unchecked` UTF-8 validation evidence: checks whether the
   `utf8` obligation is discharged by same-buffer validation before conversion,
   while rejecting post-validation, wrong-buffer, observed-only, and stale-buffer

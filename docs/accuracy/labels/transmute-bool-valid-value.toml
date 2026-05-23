@@ -115,6 +115,21 @@ label_source = "fixture_golden"
 rationale = "A bare transmute_copy from referenced `u8` to `bool` does not prove destination validity."
 
 [[samples]]
+id = "transmute-copy-bool-layout-only-missing-valid-value"
+fixture = "transmute_copy_layout_size_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A transmute_copy layout-size guard does not discharge the referenced bool valid-value obligation."
+
+[[samples]]
 id = "transmute-copy-bool-domain-guard-present"
 fixture = "transmute_copy_bool_valid_value_guard"
 kind = "positive"
@@ -154,6 +169,21 @@ label_source = "fixture_golden"
 rationale = "A bare referenced-byte bool-domain observation is not a dominating guard for transmute_copy."
 
 [[samples]]
+id = "transmute-copy-bool-closed-branch-not-guard"
+fixture = "transmute_copy_bool_closed_if_observed_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A closed positive referenced-byte bool-domain branch does not dominate the later transmute_copy."
+
+[[samples]]
 id = "transmute-copy-bool-reassigned-not-guard"
 fixture = "transmute_copy_bool_guard_then_reassigned_not_guard"
 kind = "false_positive_control"
@@ -165,3 +195,18 @@ expected_obligation_key = "valid-value"
 expected_discharge_state = "missing"
 label_source = "fixture_golden"
 rationale = "Referenced-byte bool-domain evidence becomes stale when the byte is reassigned before transmute_copy."
+
+[[samples]]
+id = "multiline-transmute-copy-bool-missing-valid-value"
+fixture = "multiline_transmute_copy_invalid_value"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A multiline transmute_copy keeps concrete transmute obligations and still lacks bool valid-value evidence."
