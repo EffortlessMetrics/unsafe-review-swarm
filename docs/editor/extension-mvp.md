@@ -34,9 +34,11 @@ Ship a publishable extension that consumes the saved bundle only:
 - Watch (or manually load) `${workspace}/target/unsafe-review/lsp.json`.
 - Publish diagnostics from that file using the saved `diagnostics[]` entries.
 - Render hovers from the saved `hovers[]` entries.
-- Expose command-only actions matching the saved `code_actions[]` payloads:
+- Expose per-card command-only actions from the saved `code_actions[]` payloads:
   - `unsafe-review.copyAgentPacket` — copy the bounded card-scoped repair packet to the clipboard.
   - `unsafe-review.copyWitnessCommand` — copy the witness command to the clipboard.
+- Expose bundle-level command-only actions derived from the configured bundle
+  path:
   - `unsafe-review.openPrSummary` — open `target/unsafe-review/pr-summary.md` in the editor.
   - `unsafe-review.openWitnessPlan` — open `target/unsafe-review/witness-plan.md` in the editor.
   - `unsafe-review.refreshBundle` — re-read `target/unsafe-review/lsp.json`.
@@ -101,8 +103,8 @@ Diagnostics are taken directly from the saved projection. The MVP must:
 - preserve the message exactly as saved (it already includes the obligation,
   missing evidence, and next action),
 - preserve the saved range when present and reject (skip) entries whose
-  `range.start.line` is missing or zero — those are not renderable in an
-  editor and should not silently shift to `0:0`.
+  range fields are missing or non-numeric. Line `0` is valid because the saved
+  projection uses LSP-style zero-based ranges.
 
 The extension may cap diagnostics per file at `unsafeReview.maxDiagnosticsPerFile`
 to keep editor UI responsive on very noisy bundles; capping always discards
@@ -117,15 +119,18 @@ Code actions are pure clipboard / open-document commands.
   compatibility.
 - Code actions must declare `kind = CodeActionKind.Empty` (or a `quickfix`
   alias that is purely informational); they must not modify the document.
-- Each code action title must end with `(copy)` or `(open)` so users see
-  immediately that no source edit will happen.
+- Extension-defined command labels should end with `(copy)` or `(open)` where
+  practical so users see immediately that no source edit will happen. Saved
+  projection titles may be shown as-is when preserving the bundle text is more
+  important.
 
 ## Hover shape
 
 Hovers are rendered from the saved `hovers[]` text. The extension must:
 
 - render hovers as Markdown,
-- append the trust boundary as a footer block on every hover,
+- ensure the trust boundary is present as a footer block on every hover,
+  reusing the saved hover text when it already includes that footer,
 - include the card id in a code span so reviewers can paste it into
   `unsafe-review explain` or `unsafe-review context --json`.
 
