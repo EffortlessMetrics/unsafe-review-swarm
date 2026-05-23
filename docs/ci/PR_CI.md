@@ -148,6 +148,7 @@ The comment-plan contract is intentionally narrow:
 - changed lines only,
 - high-confidence actionable cards only,
 - no duplicate card IDs or duplicate inline anchors,
+- comment bodies stay within the hard 220-word limit,
 - no `static_unknown`, baseline-known, or suppressed cards,
 - no posting by default.
 

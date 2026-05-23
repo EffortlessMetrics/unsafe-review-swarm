@@ -8720,6 +8720,55 @@ impl WitnessKind {
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_overlong_comment_body() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-comment-overlong-body")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        let next_action = "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.";
+        let filler = std::iter::repeat_n("word", 230)
+            .collect::<Vec<_>>()
+            .join(" ");
+        let body = format!(
+            "Next action: {next_action}\n\nPlan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision.\n\n{filler}"
+        );
+        let comment_plan = serde_json::json!({
+            "mode": "plan_only",
+            "policy": "advisory",
+            "comments": [{
+                "card_id": "card-1",
+                "path": "src/lib.rs",
+                "line": 7,
+                "class": "guard_missing",
+                "priority": "high",
+                "confidence": "medium",
+                "operation": "unsafe { ptr.cast::<Header>().read() }",
+                "operation_family": "raw_pointer_read",
+                "witness_routes": [{
+                    "kind": "miri",
+                    "reason": "route",
+                    "command": "cargo +nightly miri test card",
+                    "required": false
+                }],
+                "next_action": next_action,
+                "verify_commands": ["cargo +nightly miri test card"],
+                "selection_reason": "actionable high-priority review card",
+                "actionability": "specific_guard_missing",
+                "trust_boundary": "static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result",
+                "body": body
+            }],
+            "trust_boundary": "static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"
+        });
+        fs::write(dir.join("comment-plan.json"), comment_plan.to_string())
+            .map_err(|err| format!("write comment plan failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(result.err().unwrap_or_default().contains("at most 220"));
+        Ok(())
+    }
+
+    #[test]
     fn policy_ledger_accepts_empty_status_without_entries() -> Result<(), String> {
         let path = unique_temp_dir("unsafe-review-empty-ledger")?.with_extension("toml");
         fs::write(

@@ -135,11 +135,11 @@ The poster must not rerun analysis truth, run witness tools, edit source, or pos
   `trust_boundary`
 - body text that drifts from the structured `next_action`
 - missing trust boundary in body
+- body text over 220 words
 - forbidden overclaim wording
 - forbidden classes (`static_unknown`, `baseline_known`, suppressed)
 
-Future hardening should also reject missing relevance metadata and overlong
-bodies.
+Future hardening should also reject missing relevance metadata.
 
 ## 11. Acceptance examples
 

@@ -6,6 +6,8 @@ struct AdvisoryArtifactSummary {
     card_count: usize,
 }
 
+const COMMENT_PLAN_BODY_WORD_LIMIT: usize = 220;
+
 pub(crate) fn check_advisory_artifacts(dir: &Path) -> Result<(), String> {
     check_advisory_artifact_set(dir)?;
     println!("check-advisory-artifacts: ok ({})", dir.display());
@@ -166,6 +168,12 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
                 "comment-plan.json comment body must state that unsafe-review did not post this comment"
                     .to_string(),
             );
+        }
+        let body_word_count = body.split_whitespace().count();
+        if body_word_count > COMMENT_PLAN_BODY_WORD_LIMIT {
+            return Err(format!(
+                "comment-plan.json comment body has {body_word_count} word(s), expected at most {COMMENT_PLAN_BODY_WORD_LIMIT}"
+            ));
         }
         let class_name =
             super::require_non_empty_json_str(comment, "class", "comment-plan.json comment")?;

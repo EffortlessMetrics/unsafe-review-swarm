@@ -218,6 +218,8 @@ Planned comments must not repeat a `card_id` or a `path`/`line` inline anchor.
 
 Each body must include the trust boundary.
 
+Each body must stay at or below 220 words.
+
 #### 3.5 `witness-plan.md`
 
 Reviewer-readable witness routing.
