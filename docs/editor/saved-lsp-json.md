@@ -108,3 +108,8 @@ A future editor adapter should consume this same artifact shape first:
 The adapter must stay read-only in v0.x. It must not apply patches, insert
 SAFETY comments, run Miri, run sanitizers, create receipts, or post PR
 comments.
+
+The first publishable adapter is scoped in
+[docs/editor/extension-mvp.md](extension-mvp.md). It is a saved-`lsp.json`
+viewer with command-only actions; it explicitly does not start an LSP server
+and does not run any subprocess.
