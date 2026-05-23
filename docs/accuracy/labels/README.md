@@ -54,6 +54,8 @@ Current ledgers:
 - `unreachable-unchecked-infallible-path.toml`: fixture-pinned
   obligation-level labels for `unreachable_unchecked` local infallible-path
   evidence.
+- `unwrap-unchecked-valid-value-evidence.toml`: fixture-pinned
+  obligation-level labels for `unwrap_unchecked` valid-value evidence.
 - `unsafe-impl-send-sync-witness-routes.toml`: fixture-pinned route-quality
   labels for unsafe impl Send/Sync Loom/Shuttle witness routing.
 - `unsafe-fn-call-callee-contract.toml`: fixture-pinned obligation-level labels

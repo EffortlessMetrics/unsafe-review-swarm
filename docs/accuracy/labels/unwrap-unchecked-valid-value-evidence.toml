@@ -1,0 +1,191 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "unwrap-unchecked-valid-value-evidence"
+operation_family = "unwrap_unchecked"
+hazard = "invalid_value"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard valid-value evidence behavior; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "unwrap-unchecked-result-missing-valid-value"
+fixture = "unwrap_unchecked_result"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A bare Result unwrap_unchecked keeps valid-value evidence missing and routes to concrete execution witnesses."
+
+[[samples]]
+id = "unwrap-unchecked-infallible-result-present"
+fixture = "unwrap_unchecked_infallible_result"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A local Fallibility::Infallible result discharges unwrap_unchecked valid-value evidence without importing a receipt."
+
+[[samples]]
+id = "unwrap-unchecked-other-infallible-result-missing"
+fixture = "unwrap_unchecked_other_infallible_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Fallibility::Infallible evidence for another result must not discharge this unwrap_unchecked receiver."
+
+[[samples]]
+id = "unwrap-unchecked-is-some-present"
+fixture = "unwrap_unchecked_is_some_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-receiver is_some guard discharges Option unwrap_unchecked valid-value evidence."
+
+[[samples]]
+id = "unwrap-unchecked-is-ok-present"
+fixture = "unwrap_unchecked_is_ok_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-receiver is_ok guard discharges Result unwrap_unchecked valid-value evidence."
+
+[[samples]]
+id = "unwrap-unchecked-is-some-observed-missing"
+fixture = "unwrap_unchecked_is_some_observed_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A bare observed is_some value is not a dominating guard for the later unwrap_unchecked operation."
+
+[[samples]]
+id = "unwrap-unchecked-if-let-some-present"
+fixture = "unwrap_unchecked_if_let_some_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-receiver if-let Some as_ref guard discharges Option unwrap_unchecked valid-value evidence."
+
+[[samples]]
+id = "unwrap-unchecked-other-if-let-some-missing"
+fixture = "unwrap_unchecked_other_if_let_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "If-let Some evidence for another receiver must not discharge this unwrap_unchecked operation."
+
+[[samples]]
+id = "unwrap-unchecked-post-check-missing"
+fixture = "unwrap_unchecked_post_check_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A post-call is_some check must not discharge the earlier unwrap_unchecked valid-value obligation."
+
+[[samples]]
+id = "unwrap-unchecked-stale-guard-missing"
+fixture = "unwrap_unchecked_guard_then_reassigned_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A receiver-state guard becomes stale after reassignment and must not discharge unwrap_unchecked evidence."
+
+[[samples]]
+id = "unwrap-unchecked-is-none-return-present"
+fixture = "unwrap_unchecked_is_none_return_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-receiver is_none early return discharges Option unwrap_unchecked valid-value evidence."
+
+[[samples]]
+id = "unwrap-unchecked-is-err-return-present"
+fixture = "unwrap_unchecked_is_err_return_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-receiver is_err early return discharges Result unwrap_unchecked valid-value evidence."
