@@ -47,10 +47,6 @@ impl DiffParserState {
             return;
         };
 
-        if should_skip_metadata(raw) {
-            return;
-        }
-
         self.consume_content_line(&path, raw);
     }
 
@@ -96,10 +92,6 @@ impl DiffParserState {
             self.new_line = self.new_line.saturating_add(1);
         }
     }
-}
-
-fn should_skip_metadata(raw: &str) -> bool {
-    raw.starts_with("+++") || raw.starts_with("---")
 }
 
 pub(crate) fn parse_unified_diff(input: &str) -> DiffIndex {
@@ -214,6 +206,21 @@ index 1111111..2222222 100644
         assert!(!index.contains_near(&path, 14));
         assert!(!index.contains_near(&path, 28));
         assert!(!index.contains_near(&PathBuf::from("src/other.rs"), 21));
+    }
+
+    #[test]
+    fn parse_unified_diff_counts_added_lines_that_start_with_plus_markers() {
+        let diff = r#"diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -3,0 +4,2 @@
++++++ not metadata
++--- also content
+"#;
+        let path = PathBuf::from("src/lib.rs");
+        let index = parse_unified_diff(diff);
+
+        assert_eq!(index.changed_lines[&path], BTreeSet::from([4, 5]));
     }
 
     #[test]
@@ -351,7 +358,73 @@ diff --git a/src/second.rs b/src/second.rs
 
             let parsed = parse_unified_diff(&diff);
             let actual = parsed.changed_lines.get(&path).cloned().unwrap_or_default();
-            prop_assert_eq!(actual, expected);
+            prop_assert_eq!(actual, expected.clone());
+        }
+
+        #[test]
+        fn contains_near_matches_six_line_window_for_recorded_changes(
+            start in 1usize..500,
+            lines in prop::collection::vec(diff_line_strategy(), 1..80),
+        ) {
+            let path = PathBuf::from("src/lib.rs");
+            let mut diff = format!(
+                "diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,1 +{start},1 @@
+"
+            );
+            let mut expected = BTreeSet::new();
+            let mut new_line = start;
+
+            for line in lines {
+                match line {
+                    DiffLine::Context(text) => {
+                        diff.push(' ');
+                        diff.push_str(&text);
+                        diff.push('\n');
+                        new_line = new_line.saturating_add(1);
+                    }
+                    DiffLine::Added(text) => {
+                        diff.push('+');
+                        diff.push_str(&text);
+                        diff.push('\n');
+                        expected.insert(new_line);
+                        new_line = new_line.saturating_add(1);
+                    }
+                    DiffLine::Removed(text) => {
+                        diff.push('-');
+                        diff.push_str(&text);
+                        diff.push('\n');
+                    }
+                    DiffLine::EmptyContext => {
+                        diff.push('\n');
+                        new_line = new_line.saturating_add(1);
+                    }
+                }
+            }
+
+            let parsed = parse_unified_diff(&diff);
+            let actual = parsed.changed_lines.get(&path).cloned().unwrap_or_default();
+            prop_assert_eq!(actual, expected.clone());
+
+            for line in 1usize..=600 {
+                let expected_near = expected
+                    .iter()
+                    .any(|changed| changed.abs_diff(line) <= 6);
+                prop_assert_eq!(parsed.contains_near(&path, line), expected_near);
+            }
+
+            for window_start in 1usize..=590 {
+                let window_end = window_start + 10;
+                let expected_range = expected
+                    .iter()
+                    .any(|changed| *changed >= window_start && *changed <= window_end);
+                prop_assert_eq!(
+                    parsed.contains_in_range(&path, window_start, window_end),
+                    expected_range
+                );
+            }
         }
 
         #[test]

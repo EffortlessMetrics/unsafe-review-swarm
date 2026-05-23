@@ -6,48 +6,120 @@ use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 use unsafe_review_core::{
-    AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, analyze, render_json,
+    AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, analyze, render_human,
+    render_json, render_markdown,
 };
 
 const MAX_SOURCE_BYTES: usize = 16 * 1024;
 const MAX_DIFF_BYTES: usize = 16 * 1024;
 const SPLIT_MARKER: &str = "\n---DIFF---\n";
+const SPLIT_MARKER_CRLF: &str = "\r\n---DIFF---\r\n";
 
 fuzz_target!(|data: &[u8]| {
-    let input = String::from_utf8_lossy(data);
+    let (config, body) = parse_config(data);
+    let input = String::from_utf8_lossy(body);
     let (source, diff_tail) = split_input(&input);
     let source = clamp(source, MAX_SOURCE_BYTES);
     let diff_tail = clamp(diff_tail, MAX_DIFF_BYTES);
 
     let root = fuzz_root(data);
+    let _cleanup = CleanupGuard::new(root.clone());
     if write_fixture(&root, source).is_err() {
         return;
     }
 
-    let diff = changed_lib_diff(source, diff_tail);
-    let result = analyze(AnalyzeInput {
+    let diff = changed_lib_diff(source, diff_tail, config.emit_empty_hunk);
+    run_analysis(AnalyzeInput {
         root: root.clone(),
-        scope: Scope::Diff,
+        scope: config.scope,
         diff: DiffSource::Text(diff),
-        mode: AnalysisMode::Draft,
+        mode: config.mode,
+        policy: PolicyMode::Advisory,
+        include_unchanged_tests: true,
+        max_cards: config.max_cards,
+    });
+    run_analysis(AnalyzeInput {
+        root: root.clone(),
+        scope: Scope::Repo,
+        diff: DiffSource::NoneRepoScan,
+        mode: AnalysisMode::Repo,
         policy: PolicyMode::Advisory,
         include_unchanged_tests: true,
         max_cards: Some(64),
     });
+});
 
-    if let Ok(output) = result {
-        let json = render_json(&output);
-        let parsed = serde_json::from_str::<serde_json::Value>(&json);
-        assert!(parsed.is_ok(), "rendered analysis JSON must parse");
+struct FuzzConfig {
+    scope: Scope,
+    mode: AnalysisMode,
+    max_cards: Option<usize>,
+    emit_empty_hunk: bool,
+}
+
+fn parse_config(data: &[u8]) -> (FuzzConfig, &[u8]) {
+    if data.len() < 2 {
+        return (
+            FuzzConfig {
+                scope: Scope::Diff,
+                mode: AnalysisMode::Draft,
+                max_cards: Some(64),
+                emit_empty_hunk: false,
+            },
+            data,
+        );
     }
 
-    let _ = fs::remove_dir_all(root);
-});
+    let header = data[0];
+    let max_cards_seed = data[1];
+    let scope = if header & 1 == 0 {
+        Scope::Diff
+    } else {
+        Scope::Repo
+    };
+    let mode = if header & 2 == 0 {
+        AnalysisMode::Draft
+    } else {
+        AnalysisMode::Ready
+    };
+    let emit_empty_hunk = header & 4 != 0;
+    let max_cards = if header & 8 == 0 {
+        Some((max_cards_seed as usize % 128).max(1))
+    } else {
+        None
+    };
+
+    (
+        FuzzConfig {
+            scope,
+            mode,
+            max_cards,
+            emit_empty_hunk,
+        },
+        &data[2..],
+    )
+}
 
 fn split_input(input: &str) -> (&str, &str) {
     input
         .split_once(SPLIT_MARKER)
+        .or_else(|| input.split_once(SPLIT_MARKER_CRLF))
         .map_or((input, ""), |(source, diff)| (source, diff))
+}
+
+struct CleanupGuard {
+    root: std::path::PathBuf,
+}
+
+impl CleanupGuard {
+    fn new(root: std::path::PathBuf) -> Self {
+        Self { root }
+    }
+}
+
+impl Drop for CleanupGuard {
+    fn drop(&mut self) {
+        let _ = fs::remove_dir_all(&self.root);
+    }
 }
 
 fn clamp(input: &str, max_bytes: usize) -> &str {
@@ -79,7 +151,13 @@ fn write_fixture(root: &Path, source: &str) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-fn changed_lib_diff(source: &str, diff_tail: &str) -> String {
+fn changed_lib_diff(source: &str, diff_tail: &str, emit_empty_hunk: bool) -> String {
+    if emit_empty_hunk {
+        return format!(
+            "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n{diff_tail}"
+        );
+    }
+
     let added_lines = source.lines().count().max(1);
     let mut diff = format!(
         "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -0,0 +1,{added_lines} @@\n"
@@ -97,4 +175,24 @@ fn changed_lib_diff(source: &str, diff_tail: &str) -> String {
 
     diff.push_str(diff_tail);
     diff
+}
+
+fn run_analysis(input: AnalyzeInput) {
+    if let Ok(output) = analyze(input) {
+        let json = render_json(&output);
+        let parsed = serde_json::from_str::<serde_json::Value>(&json);
+        assert!(parsed.is_ok(), "rendered analysis JSON must parse");
+
+        let human = render_human(&output);
+        assert!(
+            !human.trim().is_empty(),
+            "rendered human output must not be empty"
+        );
+
+        let markdown = render_markdown(&output);
+        assert!(
+            !markdown.trim().is_empty(),
+            "rendered markdown output must not be empty"
+        );
+    }
 }
