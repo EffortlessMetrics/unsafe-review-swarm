@@ -77,13 +77,16 @@ pub(crate) fn scan_file(
         if !changed && !repo_mode {
             continue;
         }
-        let owner =
-            if kind == UnsafeSiteKind::Operation && family == OperationFamily::TargetFeature {
+        let owner = match (&kind, &family) {
+            (UnsafeSiteKind::Operation, OperationFamily::TargetFeature) => {
                 find_following_fn_owner(&lines, idx)
-            } else {
-                None
             }
-            .or_else(|| find_owner(&lines, idx));
+            (UnsafeSiteKind::StaticMut, OperationFamily::StaticMut) => {
+                parse_static_mut_name(detection_trimmed)
+            }
+            _ => None,
+        }
+        .or_else(|| find_owner(&lines, idx));
         let visibility = visibility_for_snippet(trimmed).to_string();
         let public_api_surface = is_public_api_surface(&kind, trimmed);
         let context_before = context_before_site(&lines, idx);
@@ -723,6 +726,7 @@ fn syntax_owner(site: &DetectedSyntaxSite, lines: &[&str], idx: usize) -> Option
         UnsafeSiteKind::UnsafeImpl
         | UnsafeSiteKind::UnsafeImplSend
         | UnsafeSiteKind::UnsafeImplSync => parse_impl_owner(&site.source_snippet),
+        UnsafeSiteKind::StaticMut => parse_static_mut_name(&site.source_snippet),
         UnsafeSiteKind::Operation if site.family == OperationFamily::TargetFeature => {
             find_following_fn_owner(lines, idx)
         }
@@ -1373,6 +1377,17 @@ fn parse_trait_name(line: &str) -> Option<String> {
     let marker = "trait ";
     let pos = line.find(marker)?;
     let rest = &line[pos + marker.len()..];
+    parse_ident(rest)
+}
+
+fn parse_static_mut_name(line: &str) -> Option<String> {
+    let mut rest = line.trim_start();
+    if let Some(after_pub) = rest.strip_prefix("pub ") {
+        rest = after_pub.trim_start();
+    } else if rest.starts_with("pub(") {
+        rest = rest.split_once(')')?.1.trim_start();
+    }
+    let rest = rest.strip_prefix("static mut ")?.trim_start();
     parse_ident(rest)
 }
 
@@ -2051,6 +2066,12 @@ mod tests {
                 .iter()
                 .all(|site| site.operation.family == OperationFamily::StaticMut),
             "static mut sites should keep the static_mut operation family: {sites:#?}"
+        );
+        assert_eq!(static_mut_sites[0].site.owner.as_deref(), Some("ROOT"));
+        assert_eq!(static_mut_sites[1].site.owner.as_deref(), Some("PUBLIC"));
+        assert_eq!(
+            static_mut_sites[2].site.owner.as_deref(),
+            Some("RESTRICTED")
         );
         Ok(())
     }

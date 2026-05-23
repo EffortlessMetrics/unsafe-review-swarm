@@ -93,9 +93,9 @@ The current fixture-pinned slices are:
 - Inline assembly human-review routing: checks that `asm!` register, memory,
   clobber, and target invariants route to human deep review without implying an
   executable witness ran.
-- Static mutable global-state routing: checks that `static mut` synchronization
-  and aliasing invariants route to Loom/Shuttle interleaving witnesses without
-  implying those witnesses ran.
+- Static mutable global-state routing: checks that `static mut` declarations keep
+  the declared global owner and route synchronization and aliasing invariants to
+  Loom/Shuttle interleaving witnesses without implying those witnesses ran.
 - Atomic pointer state routing: checks that atomic pointer state transitions,
   ownership invariants, and ordering obligations route to Loom/Shuttle
   interleaving witnesses without implying those witnesses ran.

@@ -1045,8 +1045,9 @@ label_ledgers = [
 ]
 labeled_reports = []
 allowed_public_claim = """
-Fixture-pinned static mutable global-state witness routing sends synchronization
-and aliasing invariants to Loom/Shuttle route suggestions in the listed fixture.
+Fixture-pinned static mutable global-state witness routing keeps the declared
+global owner and sends synchronization and aliasing invariants to Loom/Shuttle
+route suggestions in the listed fixture.
 """
 forbidden_claims = [
   "static mutable state soundness proof",
