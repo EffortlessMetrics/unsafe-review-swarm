@@ -214,6 +214,7 @@ witness_routes
 verify_commands
 selection_reason
 actionability
+relevance
 body
 trust_boundary
 ```
@@ -223,8 +224,8 @@ trust_boundary
 Planned comments must not repeat a `card_id` or a `path`/`line` inline anchor.
 
 Each `not_selected` entry must reference a known card, must not repeat a
-planned comment card, and must include a reason for staying out of the inline
-comment budget.
+planned comment card, and must include actionability, relevance, and a reason
+for staying out of the inline comment budget.
 
 Each body must include the trust boundary.
 

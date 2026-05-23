@@ -256,11 +256,8 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             "comment-plan.json comment",
         )?;
         super::require_non_empty_json_str(comment, "actionability", "comment-plan.json comment")?;
-        let relevance = super::require_non_empty_json_str(
-            comment,
-            "relevance",
-            "comment-plan.json comment",
-        )?;
+        let relevance =
+            super::require_non_empty_json_str(comment, "relevance", "comment-plan.json comment")?;
         require_relevance_value(relevance, "comment-plan.json comment")?;
         let comment_boundary = comment
             .get("trust_boundary")

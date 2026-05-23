@@ -155,8 +155,8 @@ The comment-plan contract is intentionally narrow:
 - no posting by default.
 
 A future trusted poster must consume `comment-plan.json` and keep the same
-ReviewCard identity, next action, actionability, witness route, verify-command,
-and trust-boundary fields.
+ReviewCard identity, next action, actionability, relevance, witness route,
+verify-command, and trust-boundary fields.
 It must not rerun analysis and create a second comment truth.
 Card-present/no-comment cases should be represented through `not_selected`
 entries in `comment-plan.json`, so reviewers can see why a card stayed out of
