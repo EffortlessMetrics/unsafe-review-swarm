@@ -54,5 +54,6 @@ This is not UB-free status and not a Miri result.
 not stale against `policy/accuracy-calibration.toml`,
 `fixtures/calibration.toml`, and the label ledgers under
 `docs/accuracy/labels/`. It also checks the accuracy policy claim entries for
-status-specific evidence requirements, known dogfood target IDs, checked labeled
-report paths, and allowed public claim wording that avoids overclaim terms.
+status-specific evidence requirements, support-tier names that map to
+`docs/status/SUPPORT_TIERS.md`, known dogfood target IDs, checked labeled report
+paths, and allowed public claim wording that avoids overclaim terms.

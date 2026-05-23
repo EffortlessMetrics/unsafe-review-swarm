@@ -23,6 +23,8 @@ The guard rejects:
 - unknown claim statuses or kinds,
 - duplicate claim IDs,
 - missing evidence fields,
+- support-tier names that do not match `docs/status/SUPPORT_TIERS.md`
+  capabilities,
 - fixture-pinned claims that carry dogfood targets or labeled reports,
 - dogfood-measured claims without known dogfood target IDs,
 - labeled-calibrated or policy-eligible claims without checked report files,

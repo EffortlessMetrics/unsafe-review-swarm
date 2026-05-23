@@ -1558,13 +1558,15 @@ fn accuracy_calibration_report_stats(
 ) -> Result<AccuracyCalibrationReportStats, String> {
     let claims = toml_array(policy, "claim", ACCURACY_CALIBRATION_POLICY)?;
     let dogfood_target_ids = dogfood_target_ids()?;
+    let support_capabilities = support_tier_capabilities()?;
     let mut claim_ids = BTreeSet::new();
     let mut status_counts = BTreeMap::new();
     let mut label_ledgers = BTreeSet::new();
     let mut labeled_report_count = 0usize;
     for (idx, claim) in claims.iter().enumerate() {
         let table = toml_table(claim, ACCURACY_CALIBRATION_POLICY, "claim", idx)?;
-        let claim = validate_accuracy_policy_claim(table, idx, &dogfood_target_ids)?;
+        let claim =
+            validate_accuracy_policy_claim(table, idx, &dogfood_target_ids, &support_capabilities)?;
         if !claim_ids.insert(claim.id.to_string()) {
             return Err(format!(
                 "{ACCURACY_CALIBRATION_POLICY} claim[{idx}] duplicates id `{}`",
@@ -1601,6 +1603,7 @@ fn validate_accuracy_policy_claim<'a>(
     table: &'a toml::map::Map<String, toml::Value>,
     idx: usize,
     known_dogfood_targets: &BTreeSet<String>,
+    support_capabilities: &BTreeSet<String>,
 ) -> Result<AccuracyPolicyClaim<'a>, String> {
     let id = required_table_string(table, "id", ACCURACY_CALIBRATION_POLICY, "claim", idx)?;
     let status = required_table_string(table, "status", ACCURACY_CALIBRATION_POLICY, "claim", idx)?;
@@ -1618,13 +1621,18 @@ fn validate_accuracy_policy_claim<'a>(
         "claim.kind",
     )?;
     required_table_string(table, "owner", ACCURACY_CALIBRATION_POLICY, "claim", idx)?;
-    required_table_string(
+    let support_tier = required_table_string(
         table,
         "support_tier",
         ACCURACY_CALIBRATION_POLICY,
         "claim",
         idx,
     )?;
+    if !support_capabilities.contains(support_tier) {
+        return Err(format!(
+            "{ACCURACY_CALIBRATION_POLICY} claim[{idx}] support_tier `{support_tier}` is not a capability in {SUPPORT_TIERS_DOC}"
+        ));
+    }
 
     let fixtures =
         required_table_str_array(table, "fixtures", ACCURACY_CALIBRATION_POLICY, "claim", idx)?;
@@ -4453,6 +4461,28 @@ jobs:
         Ok(())
     }
 
+    #[test]
+    fn accuracy_claim_promotion_rejects_unknown_support_tier() -> Result<(), String> {
+        let policy = test_accuracy_policy_claim_with_support_tier(
+            "fixture_pinned",
+            "Missing support tier",
+            r#"["raw_pointer_alignment"]"#,
+            "[]",
+            r#"["docs/accuracy/labels/raw-pointer-read-alignment.toml"]"#,
+            "[]",
+            "Fixture-pinned test claim remains limited to known support tier evidence.",
+        )?;
+
+        let Err(err) = accuracy_calibration_report_stats(&policy, 1, 1) else {
+            return Err("accuracy claim with unknown support tier should fail".to_string());
+        };
+
+        assert!(err.contains("support_tier"));
+        assert!(err.contains("Missing support tier"));
+        assert!(err.contains(SUPPORT_TIERS_DOC));
+        Ok(())
+    }
+
     fn test_accuracy_report_stats() -> AccuracyCalibrationReportStats {
         AccuracyCalibrationReportStats {
             claim_count: 1,
@@ -4500,6 +4530,26 @@ Static unsafe contract review only. This is not a proof of memory safety, not UB
         labeled_reports: &str,
         allowed_public_claim: &str,
     ) -> Result<toml::Value, String> {
+        test_accuracy_policy_claim_with_support_tier(
+            status,
+            "Core operation smoke slice",
+            fixtures,
+            dogfood_targets,
+            label_ledgers,
+            labeled_reports,
+            allowed_public_claim,
+        )
+    }
+
+    fn test_accuracy_policy_claim_with_support_tier(
+        status: &str,
+        support_tier: &str,
+        fixtures: &str,
+        dogfood_targets: &str,
+        label_ledgers: &str,
+        labeled_reports: &str,
+        allowed_public_claim: &str,
+    ) -> Result<toml::Value, String> {
         format!(
             r#"
 [[claim]]
@@ -4507,7 +4557,7 @@ id = "test-claim"
 status = "{status}"
 kind = "evidence_precision"
 owner = "calibration"
-support_tier = "Core operation smoke slice"
+support_tier = "{support_tier}"
 fixtures = {fixtures}
 dogfood_targets = {dogfood_targets}
 label_ledgers = {label_ledgers}
