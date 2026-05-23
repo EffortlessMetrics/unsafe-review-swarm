@@ -41,6 +41,14 @@ mod tests {
     use proptest::prelude::*;
     use std::path::PathBuf;
 
+    fn stable_hash_extend(mut hash: u64, bytes: &[u8]) -> u64 {
+        for &byte in bytes {
+            hash ^= u64::from(byte);
+            hash = hash.wrapping_mul(FNV_PRIME_64);
+        }
+        hash
+    }
+
     #[test]
     fn stable_hash_hex_matches_known_vectors() {
         assert_eq!(stable_hash_hex(""), "cbf29ce484222325");
@@ -66,6 +74,31 @@ mod tests {
         );
     }
 
+    #[test]
+    fn slug_preserves_ascii_alphanumerics_and_lowercases_letters() {
+        assert_eq!(slug("AbC123xYz"), "abc123xyz");
+        assert_eq!(slug("0Rust99"), "0rust99");
+    }
+
+    #[test]
+    fn stable_hash_hex_is_fixed_width_lower_hex() {
+        let hash = stable_hash_hex("ReviewCard::unsafe { ptr.read() }");
+        assert_eq!(hash.len(), 16);
+        assert!(
+            hash.chars()
+                .all(|ch| ch.is_ascii_hexdigit() && !ch.is_ascii_uppercase())
+        );
+    }
+
+    #[test]
+    fn stable_hash_hex_tracks_exact_bytes() {
+        assert_ne!(
+            stable_hash_hex("unsafe-review"),
+            stable_hash_hex("unsafe-review\n")
+        );
+        assert_ne!(stable_hash_hex("review"), stable_hash_hex("Review"));
+    }
+
     proptest! {
         #[test]
         fn slug_outputs_are_stable_ascii_tokens(input in "\\PC{0,256}") {
@@ -86,6 +119,38 @@ mod tests {
             let displayed = path_display(&path);
 
             prop_assert!(!displayed.contains('\\'));
+            prop_assert_eq!(displayed.as_str(), displayed.replace('\\', "/"));
+        }
+
+        #[test]
+        fn stable_hash_hex_is_lower_hex_and_matches_byte_hash(input in "\\PC{0,256}") {
+            let rendered = stable_hash_hex(&input);
+
+            prop_assert_eq!(rendered.len(), 16);
+            prop_assert!(rendered.chars().all(|ch| ch.is_ascii_hexdigit() && !ch.is_ascii_uppercase()));
+            prop_assert_eq!(rendered, format!("{:016x}", stable_hash(input.as_bytes())));
+        }
+
+        #[test]
+        fn stable_hash_matches_incremental_streaming(
+            prefix in proptest::collection::vec(any::<u8>(), 0..256),
+            suffix in proptest::collection::vec(any::<u8>(), 0..256),
+        ) {
+            let mut combined = prefix.clone();
+            combined.extend_from_slice(&suffix);
+
+            let expected = stable_hash(&combined);
+            let prefix_hash = stable_hash(&prefix);
+            let streaming = stable_hash_extend(prefix_hash, &suffix);
+
+            prop_assert_eq!(streaming, expected);
+        }
+
+        #[test]
+        fn stable_hash_hex_is_lower_hex_with_fixed_width(input in "\\PC{0,512}") {
+            let hex = stable_hash_hex(&input);
+            prop_assert_eq!(hex.len(), 16);
+            prop_assert!(hex.chars().all(|ch| ch.is_ascii_hexdigit() && !ch.is_ascii_uppercase()));
         }
     }
 }
