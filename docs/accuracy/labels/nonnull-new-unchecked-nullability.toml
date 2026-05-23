@@ -1,0 +1,77 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "nonnull-new-unchecked-nullability-evidence"
+operation_family = "nonnull_unchecked"
+hazard = "pointer_validity"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard nullability evidence behavior for NonNull::new_unchecked; they are
+not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "nonnull-new-guard-present"
+fixture = "nonnull_new_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "non-null"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A same-pointer NonNull::new question-mark guard discharges the non-null obligation before NonNull::new_unchecked."
+
+[[samples]]
+id = "nonnull-other-guard-not-evidence"
+fixture = "nonnull_other_guard_not_evidence"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "non-null"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "NonNull::new evidence for another pointer does not discharge the target pointer's non-null obligation."
+
+[[samples]]
+id = "nonnull-is-null-nonreturning-not-guard"
+fixture = "nonnull_is_null_nonreturning_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "non-null"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A same-pointer is_null observation that does not exit the null path is not a dominating non-null guard."
+
+[[samples]]
+id = "nonnull-observed-not-guard"
+fixture = "nonnull_observed_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "non-null"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A bare same-pointer NonNull::new observation is not checked and does not discharge non-null evidence."
+
+[[samples]]
+id = "nonnull-post-check-not-guard"
+fixture = "nonnull_post_check_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "non-null"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A nullability check after NonNull::new_unchecked does not discharge evidence needed before construction."

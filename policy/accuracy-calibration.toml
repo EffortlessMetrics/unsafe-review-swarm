@@ -226,6 +226,39 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "nonnull-new-unchecked-nullability-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "nonnull_unchecked"
+hazard = "pointer_validity"
+support_tier = "Core operation smoke slice"
+fixtures = [
+  "nonnull_new_guard",
+  "nonnull_other_guard_not_evidence",
+  "nonnull_is_null_nonreturning_not_guard",
+  "nonnull_observed_not_guard",
+  "nonnull_post_check_not_guard",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/nonnull-new-unchecked-nullability.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned NonNull::new_unchecked nullability evidence distinguishes a
+same-pointer NonNull::new guard from wrong-pointer, observed-only,
+non-returning is_null, and post-check controls in the listed fixtures.
+"""
+forbidden_claims = [
+  "broad NonNull soundness",
+  "pointer validity proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "maybeuninit-assume-init-initialized-evidence"
 status = "fixture_pinned"
 kind = "evidence_precision"

@@ -45,6 +45,10 @@ The current fixture-pinned slices are:
 - No-card artifact honesty: checks that safe, import-only, cfg-only, and
   unchanged-adjacent fixtures emit zero ReviewCards without turning that into an
   all-clear or safety claim.
+- `NonNull::new_unchecked` nullability evidence: checks whether the `non-null`
+  obligation is discharged by a same-pointer `NonNull::new` guard, while
+  rejecting wrong-pointer, observed-only, non-returning `is_null`, and
+  post-check controls.
 
 This remains experimental/advisory until human-adjudicated calibration and
 report checks are landed.
