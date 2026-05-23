@@ -2445,6 +2445,7 @@ fn has_from_utf8_unchecked_validation_evidence(lower: &str) -> bool {
         || has_validation_if_let_ok_branch_guard(before_call, &validation, argument_identifier)
         || has_validation_let_else_ok_guard(before_call, &validation, argument_identifier)
         || has_validation_match_ok_branch_guard(before_call, &validation, argument_identifier)
+        || has_validation_if_let_err_return_guard(before_call, &validation, argument_identifier)
         || has_validation_early_return_guard(
             before_call,
             &validation,
@@ -2610,6 +2611,55 @@ fn has_validation_let_else_ok_guard(before_call: &str, validation: &str, argumen
                 (&after_else[..else_end], &after_else[else_end + 1..])
             });
         if else_body.contains("return") && !has_assignment_to_identifier(after_else_body, argument)
+        {
+            return true;
+        }
+        search_from = validation_start + validation.len();
+    }
+    false
+}
+
+fn has_validation_if_let_err_return_guard(
+    before_call: &str,
+    validation: &str,
+    argument: &str,
+) -> bool {
+    let mut search_from = 0usize;
+    while let Some(offset) = before_call[search_from..].find(validation) {
+        let validation_start = search_from + offset;
+        let before_validation = &before_call[..validation_start];
+        let Some(if_let_start) = before_validation.rfind("ifleterr(") else {
+            search_from = validation_start + validation.len();
+            continue;
+        };
+        let pattern = &before_validation[if_let_start + "ifleterr(".len()..];
+        let Some(pattern_end) = pattern.find(")=") else {
+            search_from = validation_start + validation.len();
+            continue;
+        };
+        let binding = &pattern[..pattern_end];
+        let path_prefix = &pattern[pattern_end + ")=".len()..];
+        if binding.is_empty()
+            || binding.contains('{')
+            || !(path_prefix.is_empty() || path_prefix.ends_with("::"))
+            || !path_prefix
+                .chars()
+                .all(|ch| is_receiver_path_char(ch) || ch == ':')
+        {
+            search_from = validation_start + validation.len();
+            continue;
+        }
+        let after_validation = &before_call[validation_start + validation.len()..];
+        let Some(after_open) = after_validation.strip_prefix('{') else {
+            search_from = validation_start + validation.len();
+            continue;
+        };
+        let (guard_body, after_guard_body) = matching_code_block_end(after_open)
+            .map_or((after_open, ""), |body_end| {
+                (&after_open[..body_end], &after_open[body_end + 1..])
+            });
+        if guard_body.contains("return")
+            && !has_assignment_to_identifier(after_guard_body, argument)
         {
             return true;
         }
@@ -6385,6 +6435,16 @@ mod tests {
             "unsafe { core::str::from_utf8_unchecked(bytes) }",
             vec![],
         );
+        let if_let_err_return = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec![
+                "if let Err(_err) = core::str::from_utf8(bytes) {",
+                "    return \"\";",
+                "}",
+            ],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
         let question_mark = site_with_family(
             OperationFamily::StrFromUtf8Unchecked,
             vec!["core::str::from_utf8(bytes)?;"],
@@ -6427,6 +6487,8 @@ mod tests {
 
         let checked_evidence = obligation_evidence(&checked, &obligations, &contract, &reach);
         let return_evidence = obligation_evidence(&early_return, &obligations, &contract, &reach);
+        let if_let_err_return_evidence =
+            obligation_evidence(&if_let_err_return, &obligations, &contract, &reach);
         let question_mark_evidence =
             obligation_evidence(&question_mark, &obligations, &contract, &reach);
         let match_return_evidence =
@@ -6438,6 +6500,7 @@ mod tests {
 
         assert!(checked_evidence[0].discharge.present);
         assert!(return_evidence[0].discharge.present);
+        assert!(if_let_err_return_evidence[0].discharge.present);
         assert!(question_mark_evidence[0].discharge.present);
         assert!(match_return_evidence[0].discharge.present);
         assert!(if_let_ok_evidence[0].discharge.present);
@@ -6512,6 +6575,16 @@ mod tests {
             "unsafe { core::str::from_utf8_unchecked(bytes) }",
             vec![],
         );
+        let non_returning_if_let_err = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec![
+                "if let Err(_err) = core::str::from_utf8(bytes) {",
+                "    log_invalid();",
+                "}",
+            ],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
         let non_returning_match = site_with_family(
             OperationFamily::StrFromUtf8Unchecked,
             vec![
@@ -6533,6 +6606,17 @@ mod tests {
             OperationFamily::StrFromUtf8Unchecked,
             vec![
                 "if core::str::from_utf8(bytes).is_err() {",
+                "    return \"\";",
+                "}",
+                "bytes = b\"\\xff\";",
+            ],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
+        let reassigned_after_if_let_err = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec![
+                "if let Err(_err) = core::str::from_utf8(bytes) {",
                 "    return \"\";",
                 "}",
                 "bytes = b\"\\xff\";",
@@ -6591,6 +6675,8 @@ mod tests {
             obligation_evidence(&wrong_buffer_match, &obligations, &contract, &reach);
         let non_returning_evidence =
             obligation_evidence(&non_returning_branch, &obligations, &contract, &reach);
+        let non_returning_if_let_err_evidence =
+            obligation_evidence(&non_returning_if_let_err, &obligations, &contract, &reach);
         let non_returning_match_evidence =
             obligation_evidence(&non_returning_match, &obligations, &contract, &reach);
         let observed_is_ok_evidence =
@@ -6607,6 +6693,12 @@ mod tests {
         );
         let reassigned_after_early_return_evidence = obligation_evidence(
             &reassigned_after_early_return,
+            &obligations,
+            &contract,
+            &reach,
+        );
+        let reassigned_after_if_let_err_evidence = obligation_evidence(
+            &reassigned_after_if_let_err,
             &obligations,
             &contract,
             &reach,
@@ -6628,12 +6720,14 @@ mod tests {
         assert!(!wrong_buffer_question_mark_evidence[0].discharge.present);
         assert!(!wrong_buffer_match_evidence[0].discharge.present);
         assert!(!non_returning_evidence[0].discharge.present);
+        assert!(!non_returning_if_let_err_evidence[0].discharge.present);
         assert!(!non_returning_match_evidence[0].discharge.present);
         assert!(!observed_is_ok_evidence[0].discharge.present);
         assert!(!closed_positive_branch_evidence[0].discharge.present);
         assert!(!closed_if_let_branch_evidence[0].discharge.present);
         assert!(!reassigned_after_question_mark_evidence[0].discharge.present);
         assert!(!reassigned_after_early_return_evidence[0].discharge.present);
+        assert!(!reassigned_after_if_let_err_evidence[0].discharge.present);
         assert!(!reassigned_after_match_return_evidence[0].discharge.present);
         assert!(!reassigned_after_if_let_evidence[0].discharge.present);
         assert!(!reassigned_after_let_else_evidence[0].discharge.present);

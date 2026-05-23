@@ -140,10 +140,14 @@ Recent proof-index additions that are tracked by the calibration ledger but not
 expanded inline in the long table row above include
 `str_from_utf8_unchecked_if_let_ok_guard` for same-buffer if-let `Ok` UTF-8
 validation before `str::from_utf8_unchecked`,
+`str_from_utf8_unchecked_if_let_err_return_guard` for same-buffer if-let `Err`
+early-return validation,
 `str_from_utf8_unchecked_let_else_ok_guard` for same-buffer let-else `Ok`
 validation,
 `str_from_utf8_unchecked_match_ok_guard` for same-buffer match `Ok` arm
-validation, `str_from_utf8_unchecked_let_else_ok_reassigned_not_guard` for
-stale-buffer rejection after let-else validation, and
+validation, `str_from_utf8_unchecked_if_let_err_reassigned_not_guard` for
+stale-buffer rejection after if-let `Err` validation,
+`str_from_utf8_unchecked_let_else_ok_reassigned_not_guard` for stale-buffer
+rejection after let-else validation, and
 `str_from_utf8_unchecked_match_ok_reassigned_not_guard` for stale-buffer
 rejection after reassignment inside that arm.

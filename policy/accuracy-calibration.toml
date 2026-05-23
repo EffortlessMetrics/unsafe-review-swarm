@@ -705,6 +705,7 @@ fixtures = [
   "str_from_utf8_unchecked",
   "str_from_utf8_unchecked_is_ok_guard",
   "str_from_utf8_unchecked_if_let_ok_guard",
+  "str_from_utf8_unchecked_if_let_err_return_guard",
   "str_from_utf8_unchecked_is_err_return_guard",
   "str_from_utf8_unchecked_question_mark_guard",
   "str_from_utf8_unchecked_match_return_guard",
@@ -714,6 +715,7 @@ fixtures = [
   "str_from_utf8_unchecked_other_buffer_not_guard",
   "str_from_utf8_unchecked_is_ok_observed_not_guard",
   "str_from_utf8_unchecked_guard_then_reassigned_not_guard",
+  "str_from_utf8_unchecked_if_let_err_reassigned_not_guard",
   "str_from_utf8_unchecked_let_else_ok_reassigned_not_guard",
   "str_from_utf8_unchecked_match_ok_reassigned_not_guard",
 ]
@@ -725,8 +727,9 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned str::from_utf8_unchecked UTF-8 validation evidence distinguishes
 same-buffer validation before conversion, including if-let Ok branch validation
-and let-else or match Ok-arm validation, from post-validation, wrong-buffer,
-observed-only, and stale-buffer controls in the listed fixtures.
+if-let Err early-return validation, and let-else or match Ok-arm validation,
+from post-validation, wrong-buffer, observed-only, and stale-buffer controls in
+the listed fixtures.
 """
 forbidden_claims = [
   "broad UTF-8 safety",

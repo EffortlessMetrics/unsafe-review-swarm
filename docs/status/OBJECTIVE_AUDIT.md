@@ -49,7 +49,7 @@ The active calibration rail is now recorded in
 `.unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md`,
 `policy/accuracy-calibration.toml`, and
 `docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 34
-fixture-pinned claims, 249 calibration cases, 34 label ledgers, and 260 label
+fixture-pinned claims, 251 calibration cases, 34 label ledgers, and 262 label
 samples. It records zero dogfood-measured, labeled-calibrated, or
 policy-eligible claims. That is intentional: the current report is a
 claim-scoped fixture-pinned proof index, not a global precision/recall result
@@ -211,11 +211,11 @@ These are not failures; they are the next unsupported or weakly verified areas:
   before snippet normalization, but broader large-repo performance calibration
   still needs more repos and uncapped or sampled runs.
 - `str::from_utf8_unchecked` now recognizes same-buffer `is_ok`, if-let `Ok`,
-  let-else `Ok`, `is_err` early-return, question-mark propagation,
-  match-return validation, and match `Ok` arm validation evidence, and has
-  post-validation, wrong-buffer, and reassigned-buffer false-positive-control
-  fixtures. Broader indirect wrapper validation and aliasing-sensitive
-  byte-slice equivalence remain unsupported.
+  if-let `Err` early-return, let-else `Ok`, `is_err` early-return,
+  question-mark propagation, match-return validation, and match `Ok` arm
+  validation evidence, and has post-validation, wrong-buffer, and
+  reassigned-buffer false-positive-control fixtures. Broader indirect wrapper
+  validation and aliasing-sensitive byte-slice equivalence remain unsupported.
 - The `bytes#826` `Vec::from_raw_parts` site is now labeled as a Vec ownership
   operation rather than a slice operation, and fixture coverage recognizes the
   narrow same-pointer `ManuallyDrop` raw-parts origin shape as pointer/capacity,
