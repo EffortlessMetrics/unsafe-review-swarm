@@ -761,6 +761,36 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "pin-unchecked-human-review-routes"
+status = "fixture_pinned"
+kind = "route_quality"
+owner = "calibration"
+operation_family = "pin_unchecked"
+hazard = "pin_invariant"
+support_tier = "Witness routing"
+fixtures = [
+  "pin_new_unchecked",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/pin-unchecked-human-review-routes.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned Pin::new_unchecked witness routing sends pinning
+move-prevention and projection invariants to human deep review in the listed fixture.
+"""
+forbidden_claims = [
+  "pinning soundness proof",
+  "move-prevention proof",
+  "projection invariant proof",
+  "witness execution proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "get-unchecked-mut-bounds-evidence"
 status = "fixture_pinned"
 kind = "evidence_precision"

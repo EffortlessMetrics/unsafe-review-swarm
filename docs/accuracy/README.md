@@ -86,6 +86,9 @@ The current fixture-pinned slices are:
   obligation is discharged by a same-pointer `NonNull::new` guard, while
   rejecting wrong-pointer, observed-only, non-returning `is_null`, and
   post-check controls.
+- `Pin::new_unchecked` human-review routing: checks that pinning move-prevention
+  and projection invariants route to human deep review without implying an
+  executable witness ran.
 
 This remains experimental/advisory until human-adjudicated calibration and
 report checks are landed.

@@ -1,0 +1,26 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "pin-unchecked-human-review-routes"
+operation_family = "pin_unchecked"
+hazard = "pin_invariant"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard witness routing behavior; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "pin-new-unchecked-routes-human-deep-review"
+fixture = "pin_new_unchecked"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "pin_unchecked"
+expected_hazard = "pin_invariant"
+expected_obligation_key = "pin"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "Pin::new_unchecked move-prevention and projection invariants should route to human deep review rather than an executable witness."

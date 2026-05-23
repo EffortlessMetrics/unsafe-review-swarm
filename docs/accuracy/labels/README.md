@@ -28,6 +28,8 @@ Current ledgers:
   ReviewCards.
 - `nonnull-new-unchecked-nullability.toml`: fixture-pinned obligation-level
   labels for `NonNull::new_unchecked` nullability evidence.
+- `pin-unchecked-human-review-routes.toml`: fixture-pinned route-quality labels
+  for `Pin::new_unchecked` human-deep-review witness routing.
 - `pointer-arithmetic-bounds.toml`: fixture-pinned obligation-level labels for
   pointer arithmetic bounds evidence.
 - `ptr-copy-valid-range.toml`: fixture-pinned obligation-level labels for
