@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: 100
           persist-credentials: false
 
       - uses: dtolnay/rust-toolchain@1.95.0
@@ -32,7 +32,7 @@ jobs:
       - name: Fetch base ref
         env:
           BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
-        run: git fetch --no-tags --depth=1 origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+        run: git fetch --no-tags --depth=100 origin "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
 
       - name: Build unsafe-review
         run: cargo build --locked -p unsafe-review
