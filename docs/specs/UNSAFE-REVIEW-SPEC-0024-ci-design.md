@@ -5,27 +5,29 @@ Owner: repo-infra / ci
 Created: 2026-05-21
 
 Linked specs:
-- UNSAFE-REVIEW-SPEC-0011: PR and CI output
-- UNSAFE-REVIEW-SPEC-0012: LSP and editor projection
-- UNSAFE-REVIEW-SPEC-0019: First-run cockpit
-- UNSAFE-REVIEW-SPEC-0020: Source-of-truth stack
-- UNSAFE-REVIEW-SPEC-0022: PR commenting experience
-- UNSAFE-REVIEW-SPEC-0023: First-hour experience
+- [UNSAFE-REVIEW-SPEC-0011: PR and CI output](UNSAFE-REVIEW-SPEC-0011-pr-ci-output.md)
+- [UNSAFE-REVIEW-SPEC-0012: LSP and editor projection](UNSAFE-REVIEW-SPEC-0012-lsp-editor-projection.md)
+- [UNSAFE-REVIEW-SPEC-0019: First-run cockpit](UNSAFE-REVIEW-SPEC-0019-first-run-cockpit.md)
+- [UNSAFE-REVIEW-SPEC-0020: Source-of-truth stack](UNSAFE-REVIEW-SPEC-0020-source-of-truth-stack.md)
+- [UNSAFE-REVIEW-SPEC-0022: PR commenting experience](UNSAFE-REVIEW-SPEC-0022-pr-commenting-experience.md)
+- [UNSAFE-REVIEW-SPEC-0023: First-hour experience](UNSAFE-REVIEW-SPEC-0023-first-hour-experience.md)
 
 Linked docs:
-- docs/ci/PR_CI.md
-- .github/workflows/ci.yml
-- .github/examples/unsafe-review-first-pr.yml
-- docs/contributing/SWARM_TO_MAIN.md
-- docs/BADGE_POLICY.md
+- [docs/ci/PR_CI.md](../ci/PR_CI.md)
+- [.github/workflows/ci.yml](../../.github/workflows/ci.yml)
+- [.github/workflows/unsafe-review.yml](../../.github/workflows/unsafe-review.yml)
+- [.github/examples/unsafe-review-first-pr.yml](../../.github/examples/unsafe-review-first-pr.yml)
+- [docs/contributing/SWARM_TO_MAIN.md](../contributing/SWARM_TO_MAIN.md)
+- [docs/BADGE_POLICY.md](../BADGE_POLICY.md)
 
 Support-tier impact:
-- docs/status/SUPPORT_TIERS.md
+- [docs/status/SUPPORT_TIERS.md](../status/SUPPORT_TIERS.md)
 
 Policy impact:
-- policy/ci-lane-whitelist.toml
-- policy/doc-artifacts.toml
-- policy/package-boundary.toml
+- [policy/ci-lane-whitelist.toml](../../policy/ci-lane-whitelist.toml)
+- [policy/doc-artifacts.toml](../../policy/doc-artifacts.toml)
+- [policy/package-boundary.toml](../../policy/package-boundary.toml)
+- [policy/workflow-allowlist.toml](../../policy/workflow-allowlist.toml)
 
 ## 1. Purpose
 
@@ -36,7 +38,8 @@ the Rust workspace
 the advisory unsafe-review artifact contract
 ```
 
-CI must make the repo safe to maintain and useful to users without overstating what the tool proves.
+CI must make the repo safe to maintain and useful to users without overstating
+what the tool proves.
 
 The default CI design is:
 
@@ -48,7 +51,13 @@ cheap deterministic workspace checks
 + no blocking on unsafe-review findings by default
 ```
 
-CI proves that the tool and artifacts are well-formed. It does **not** prove the reviewed Rust code is safe.
+CI proves that the tool and artifacts are well formed. It does not prove the
+reviewed Rust code is safe.
+
+`UNSAFE-REVIEW-SPEC-0011` remains the owner of PR and CI output artifacts:
+first-pr bundle shape, artifact verification, advisory findings, comment-plan
+behavior, and the distinction between artifact failures and unsafe-review
+findings. This spec owns the broader CI lane design.
 
 ## 2. Core doctrine
 
@@ -74,9 +83,14 @@ The third is advisory by default.
 
 The fourth belongs to release lanes, not every PR.
 
-The current PR/CI model already encodes the key rule: the PR gate fails on infrastructure and contract failures, not advisory unsafe-review findings by default.
+The core line:
 
-## 3. Current default CI contract
+```text
+Malformed or dishonest unsafe-review artifacts fail CI.
+Unsafe-review findings do not fail CI by default.
+```
+
+## 3. Default CI contract
 
 The default workflow runs on:
 
@@ -86,9 +100,10 @@ push to main/master
 workflow_dispatch
 ```
 
-It uses read-only repository permissions, cancels superseded pull request runs, disables persisted checkout credentials, and bounds the Rust job with a timeout. The current workflow uses `contents: read`, `persist-credentials: false`, `cancel-in-progress` for pull requests, and a 20-minute Rust workspace timeout.
+It uses read-only repository permissions, cancels superseded pull request runs,
+disables persisted checkout credentials, and bounds Rust jobs with timeouts.
 
-The default workspace gate is:
+The full workspace proof set is:
 
 ```bash
 cargo fmt --check
@@ -101,9 +116,19 @@ cargo run --locked -p xtask -- check-pr
 
 That is the baseline.
 
+The live swarm workflow may route a cheaper Rust Small lane through
+`cargo run --locked -p xtask -- check-pr` while broader workspace checks remain
+local, release, or future full-lane proof. That routing must stay explicit and
+must not smuggle witnesses, publishing, comment posting, or source edits into
+the default gate.
+
 ## 4. CI lane taxonomy
 
-### 4.1 `ci.yml` — default workspace gate
+Every live or planned CI lane must have a named purpose. High-cost or
+write-token lanes must not be folded into the default workspace gate by
+convenience.
+
+### 4.1 `ci.yml` - default workspace gate
 
 Purpose:
 
@@ -154,7 +179,30 @@ permissions:
   contents: read
 ```
 
-### 4.2 `unsafe-review-first-pr.yml` — advisory PR packet lane
+### 4.2 `policy-contracts.yml` - source-of-truth gate
+
+Purpose:
+
+```text
+protect spec, policy, package-boundary, docs-automation, goal, and CI-lane ledgers
+```
+
+Runs:
+
+```text
+check-doc-artifacts
+check-docs-automation
+check-goals
+check-package-boundary
+check-ci-lanes
+check-policy
+```
+
+May fail on malformed or drifting source-of-truth rails. It must not run
+first-pr analysis, witnesses, coverage, publishing, comment posting, or source
+mutation.
+
+### 4.3 `unsafe-review-first-pr.yml` - advisory PR packet lane
 
 Purpose:
 
@@ -184,46 +232,238 @@ target/unsafe-review/witness-plan.md
 target/unsafe-review/lsp.json
 ```
 
-The current example workflow already follows this shape: it builds `unsafe-review`, runs `first-pr`, verifies the bundle, writes a GitHub summary, and uploads the first-pr artifacts.
+The drop-in example workflow follows this shape. The live swarm advisory
+workflow may be tightened toward this lane, but it must preserve read-only
+permissions, no comment posting, no witness execution, and no source edits.
 
-May fail on artifact contract violations and overclaims, but not on advisory findings by default.
+May fail on:
 
-### 4.3 `coverage.yml` — advisory coverage / Codecov lane
+```text
+unsafe-review could not run
+required artifact missing
+artifact malformed
+card IDs inconsistent across artifacts
+trust boundary missing
+positive safety/proof wording
+comment-plan contract violation
+saved LSP contract violation
+witness-plan route-limit violation
+```
 
-Coverage is telemetry for Rust test execution surface, not unsafe correctness proof. This lane should start advisory (`fail_ci_if_error: false`) with no threshold gate.
+Must not fail on:
 
-### 4.4 `release-readiness.yml` — manual release proof lane
+```text
+cards exist
+guard_missing exists
+contract_missing exists
+witness missing
+policy report has advisory new gaps
+```
 
-Manual release readiness commands may include package list, publish dry-run, install smoke, first-pr smoke, and support smoke. This lane must not publish by itself without a dedicated owner-approved workflow.
+Must not do:
 
-### 4.5 `source-divergence.yml` or local-only sync guard
+```text
+post comments
+run witnesses
+edit source
+enable blocking policy
+claim safety
+```
 
-Source/swarm sync is checked with:
+### 4.4 `coverage.yml` - advisory coverage / Codecov lane
+
+Purpose:
+
+```text
+publish Rust test execution-surface telemetry
+```
+
+Coverage is useful public signal, but it is not unsafe correctness evidence.
+
+Recommended command:
+
+```bash
+cargo llvm-cov --workspace --all-targets --locked \
+  --lcov \
+  --output-path target/llvm-cov/lcov.info
+```
+
+Initial posture:
+
+```text
+advisory
+no coverage threshold gate
+no default PR failure on Codecov upload failure
+no release readiness claim
+no unsafe correctness claim
+no Miri-clean claim
+no README badge until the first successful upload
+```
+
+### 4.5 `release-readiness.yml` - manual release proof lane
+
+Purpose:
+
+```text
+prove package and install readiness before publication
+```
+
+Trigger:
+
+```text
+workflow_dispatch
+release-prep branch
+tag candidate, if used later
+```
+
+Commands:
+
+```bash
+cargo fmt --check
+cargo check --workspace --all-targets --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+cargo run --locked -p xtask -- check-pr
+cargo run --locked -p xtask -- check-calibration
+cargo run --locked -p xtask -- check-dogfood
+
+cargo package -p unsafe-review-core --list
+cargo package -p unsafe-review-cli --list
+cargo package -p unsafe-review --list
+
+cargo publish -p unsafe-review-core --dry-run
+cargo publish -p unsafe-review-cli --dry-run
+cargo publish -p unsafe-review --dry-run
+```
+
+Release readiness may prove package list correctness, publish dry-run
+correctness, install smoke, first-pr smoke, support smoke, and docs.rs readiness
+after publication.
+
+It must not publish by itself unless a separate trusted release workflow is
+specified and owner approved.
+
+### 4.6 `source-divergence.yml` or local-only sync guard
+
+Purpose:
+
+```text
+prevent unsafe-review-swarm from drifting behind unsafe-review
+```
+
+Command:
 
 ```bash
 cargo run --locked -p xtask -- source-divergence
 ```
 
-Default behavior is advisory at first.
+Alias, when present:
 
-### 4.6 Future `comment-poster.yml` — trusted poster lane
+```bash
+cargo run --locked -p xtask -- check-source-sync
+```
 
-Any write-token comment poster must verify artifacts and consume `comment-plan.json` in a separate trusted workflow that does not run PR-controlled code before posting.
+Default behavior:
+
+```text
+advisory report
+not a hard CI failure at first
+```
+
+May become a hard check for routine swarm work once the routing policy
+stabilizes.
+
+The source/swarm model must remain:
+
+```text
+unsafe-review-swarm develops
+unsafe-review publishes
+```
+
+### 4.7 Future `comment-poster.yml` - trusted poster lane
+
+Purpose:
+
+```text
+post or update PR comments from verified comment-plan.json
+```
+
+This is not part of 0.2.x default behavior.
+
+Required architecture:
+
+```text
+pull_request workflow:
+  run analyzer with read-only permissions
+  verify artifacts
+  upload comment-plan.json
+
+trusted workflow:
+  download artifacts
+  verify comment-plan.json again
+  post/update comments
+```
+
+The trusted poster must consume `comment-plan.json`.
+
+It must not:
+
+```text
+rerun analysis
+run witnesses
+edit source
+insert suppressions
+post more than the plan
+post from malformed artifacts
+```
+
+Security reason: write-token workflows must not combine untrusted
+PR-controlled code execution with comment-writing authority.
 
 ## 5. CI permissions policy
 
-Default workspace and first-pr lanes use:
+Default workspace, policy-contracts, first-pr, source-divergence, and coverage
+lanes use:
 
 ```yaml
 permissions:
   contents: read
 ```
 
-Grant write scopes only in explicitly trusted workflows.
+Add only if needed:
+
+```yaml
+security-events: write
+```
+
+for SARIF upload.
+
+Do not grant these to default analyzer jobs:
+
+```yaml
+contents: write
+pull-requests: write
+issues: write
+actions: write
+id-token: write
+```
+
+Manual `cargo publish` remains local/operator-driven unless a dedicated trusted
+release workflow is specified.
+
+Future trusted comment posting may use:
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+```
+
+only in a workflow that does not run PR-controlled code before posting.
 
 ## 6. Checkout and token posture
 
-All workflows should prefer:
+All workflows must prefer:
 
 ```yaml
 - uses: actions/checkout@v6
@@ -231,59 +471,405 @@ All workflows should prefer:
     persist-credentials: false
 ```
 
-except for explicitly scoped trusted commit-back flows.
+Exception:
 
-## 7. Toolchain posture
+```text
+a deliberately trusted commit-back workflow
+```
 
-CI should install pinned Rust 1.95.0 and required components (`rustfmt`, `clippy`).
+Such workflows must be isolated and separately specified. No job should keep
+credentials around merely because it is convenient.
+
+All live workflow actions must be listed in
+`policy/workflow-allowlist.toml` with explicit `@` refs. Branch-floating refs
+such as `@main`, `@master`, or `@HEAD` are rejected; use a reviewed version tag
+or immutable SHA.
+
+## 7. Toolchain, runner, and cost posture
+
+The repo toolchain is Rust 1.95.0.
+
+CI should install the pinned toolchain and Rust components:
+
+```yaml
+- uses: dtolnay/rust-toolchain@1.95.0
+  with:
+    components: rustfmt, clippy
+```
+
+Rust version drift must be caught by repo checks and docs.
+
+If the repo later introduces an MSRV matrix, it should be an explicit
+compatibility lane, not a surprise expansion of default PR cost.
+
+Default PR CI must stay cheap enough to run on every pull request without
+turning advisory unsafe-review into a heavy witness system.
+
+The default posture is:
+
+```text
+ubuntu-latest runners
+bounded job timeouts
+no default matrix
+no default nightly-only tools
+no default witness execution
+no publish or release side effects
+```
+
+Swarm may carry experimental, scheduled, or workflow-dispatch lanes while they
+are being proven, but a lane must be listed in
+`policy/ci-lane-whitelist.toml` with its cost estimate and trigger policy
+before it becomes a live workflow.
 
 ## 8. Artifact integrity checks
 
-The first-pr artifact checker is a CI gate:
+The first-pr artifact checker is a CI gate.
+
+Command:
 
 ```bash
 cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review
 ```
 
-It must verify machine-readable artifact parseability and cross-artifact consistency, plan-only comment-plan behavior, trust-boundary presence, and no positive overclaim wording.
+It must validate:
+
+```text
+cards.json exists and parses
+pr-summary.md exists
+cards.sarif exists and parses
+comment-plan.json exists and parses
+witness-plan.md exists
+lsp.json exists and parses
+
+card IDs align across artifacts
+result counts stay internally consistent
+comment-plan is plan-only
+comment-plan has <= 3 candidates
+comment-plan references known cards
+comment-plan has renderable line/path fields
+comment-plan includes trust boundary
+witness-plan includes route limits
+lsp.json contains read-only projections
+lsp.json code actions are command-only
+no WorkspaceEdit appears
+no positive overclaim wording appears
+```
+
+The checker validates the first-pr bundle, parses machine-readable artifacts,
+confirms advisory policy, verifies comment-plan plan-only behavior, checks card
+IDs, keeps counts consistent, requires witness route limits, and requires trust
+boundary presence.
 
 ## 9. Overclaim rejection
 
-Public artifacts must reject positive safety/proof claims (safe/sound/verified/UB-free/Miri-clean/all clear) unless they appear in explicit negative trust-boundary wording.
+CI must reject public artifacts that say or imply:
+
+```text
+safe
+sound
+verified
+proved
+UB-free
+Miri-clean
+all clear
+site reached
+test covered this unsafe site
+blocking-ready
+calibrated precision
+calibrated recall
+```
+
+unless those terms appear only in explicit negative/trust-boundary wording,
+such as:
+
+```text
+This does not prove the repo safe.
+This is not UB-free status.
+This is not a Miri result.
+```
+
+This applies to:
+
+```text
+README badge text
+badge endpoint JSON
+pr-summary.md
+comment-plan.json
+witness-plan.md
+lsp.json
+policy report
+outcome report
+GitHub job summary
+release notes
+publication receipts
+```
 
 ## 10. PR summary / GitHub summary contract
 
-First-pr workflows should publish concise advisory summary content and always include trust-boundary wording.
+The first-pr workflow should write a GitHub job summary.
+
+Minimum shape:
+
+```markdown
+## unsafe-review advisory summary
+
+Artifacts verified.
+
+Cards:
+- Total: N
+- Actionable: N
+- Suppressed: N
+- Baseline-known: N
+
+Top card:
+- `UR-...`
+- Operation: `raw_pointer_read`
+- Missing: alignment evidence
+- Route: Miri / cargo-careful
+
+Open:
+- `target/unsafe-review/pr-summary.md`
+- `target/unsafe-review/witness-plan.md`
+
+Trust boundary:
+Static unsafe contract review only. Not memory-safety proof, not UB-free status,
+not Miri-clean status, and not site-execution proof.
+```
+
+If no changed gaps:
+
+```markdown
+## unsafe-review advisory summary
+
+Artifacts verified.
+
+No changed unsafe-review gaps were found.
+
+This does not prove the repo safe, UB-free, Miri-clean, or that any unsafe site executed.
+```
 
 ## 11. Comment-plan CI behavior
 
-`comment-plan.json` may be generated and verified in CI, but not posted by default.
+The CI workflow may generate:
+
+```text
+comment-plan.json
+```
+
+It must not post it by default.
+
+Comment-plan constraints:
+
+```text
+max 3 candidates
+changed lines only
+high-confidence actionable cards only
+no static_unknown
+no baseline-known
+no suppressed
+no posting by default
+```
+
+If comment-plan verification fails, CI may fail because the artifact contract is
+broken.
+
+If comment-plan contains zero candidates, CI should still pass.
 
 ## 12. Witness tool policy
 
-Default CI routes witness tools in `witness-plan.md`; it does not execute witness tools by default.
+Default CI must not run:
+
+```text
+Miri
+cargo-careful
+ASan
+MSan
+TSan
+LSan
+Loom
+Shuttle
+Kani
+Crux
+fuzzing
+mutation testing
+```
+
+Default CI may route to those tools in `witness-plan.md`.
+
+Witness execution belongs to:
+
+```text
+targeted PR lane
+nightly lane
+release readiness lane
+manual local user action
+```
+
+A witness receipt may be imported only through explicit receipt surfaces. CI
+must not fabricate receipts.
 
 ## 13. Coverage / Codecov design
 
-Coverage belongs in a separate advisory lane and does not prove unsafe correctness, memory safety, UB freedom, or witness adequacy.
+Codecov belongs in a separate advisory lane.
+
+Recommended workflow posture:
+
+```text
+cargo-llvm-cov
+LCOV output
+Codecov upload
+fail_ci_if_error: false initially
+```
+
+Badge posture:
+
+```text
+Codecov = Rust test execution-surface telemetry
+not unsafe correctness
+not memory-safety proof
+not UB-free status
+not witness adequacy
+```
 
 ## 14. Source/swarm CI routing
 
-`unsafe-review-swarm` carries routine development lanes; `unsafe-review` remains the release/public source-of-record lane.
+CI design must respect repo roles.
+
+```text
+unsafe-review-swarm:
+  routine implementation, analyzer, evidence, dogfood, LSP/agent, CI experiments
+
+unsafe-review:
+  source of record, curated promotions, release prep, publication receipt, package metadata
+```
+
+Source repo CI should remain quieter and release-focused.
+
+Swarm CI may carry more experimental lanes.
+
+Every direct source PR must declare whether it is:
+
+```text
+swarm-originated promotion
+direct public/release surface
+urgent source hotfix
+source-only repo hygiene
+```
+
+The source/swarm promotion policy exists to prevent routine implementation from
+drifting into the source repo and to keep source as the public release surface.
 
 ## 15. Branch protection and merge behavior
 
-CI design distinguishes quality failures from configuration obstacles and agent runtime state.
+CI design must distinguish:
+
+```text
+quality failure
+configuration obstacle
+agent runtime state
+```
+
+A green PR blocked only by a single-contributor external-review branch policy is
+a configuration obstacle, not a code quality finding.
+
+Agent runtime state is never PR state.
+
+CI and PR policies must not close, supersede, park, or mutate PRs because:
+
+```text
+Codex session is busy
+agent cap was hit
+another PR is active
+current branch differs
+```
+
+Runtime/session state is a handoff fact, not a repository fact.
 
 ## 16. Example default workflow
 
-See `.github/workflows/ci.yml` and `docs/ci/PR_CI.md` for the current default shape and required checks.
+The default workflow shape is:
+
+```yaml
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --check
+      - run: cargo check --workspace --all-targets --locked
+      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      - run: cargo test --workspace --all-targets --locked
+      - run: cargo doc --workspace --no-deps --locked
+        env:
+          RUSTDOCFLAGS: -D warnings
+      - run: cargo run --locked -p xtask -- check-pr
+```
 
 ## 17. Example advisory first-pr workflow
 
-See `.github/examples/unsafe-review-first-pr.yml` for the advisory packet lane and trust-boundary summary model.
+The first-pr workflow shape is:
+
+```yaml
+name: unsafe-review first-pr
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  first_pr_bundle:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - run: cargo build --locked -p unsafe-review
+      - run: |
+          mkdir -p target/unsafe-review
+          ./target/debug/unsafe-review first-pr \
+            --base "origin/${BASE_REF}" \
+            --out-dir target/unsafe-review
+      - run: cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: unsafe-review-first-pr
+          path: target/unsafe-review/
+          if-no-files-found: error
+```
 
 ## 18. CI proof
+
+This spec is satisfied when these pass locally and in CI:
 
 ```bash
 cargo fmt --check
@@ -292,17 +878,169 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --all-targets --locked
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
 cargo run --locked -p xtask -- check-pr
+```
+
+First-pr artifact proof:
+
+```bash
+cargo run --locked -p unsafe-review -- first-pr \
+  --root fixtures/raw_pointer_alignment \
+  --diff fixtures/raw_pointer_alignment/change.diff \
+  --out-dir target/unsafe-review-first-pr-smoke
+
+cargo run --locked -p xtask -- check-first-pr-artifacts \
+  target/unsafe-review-first-pr-smoke
+```
+
+No-card artifact proof:
+
+```bash
+cargo run --locked -p unsafe-review -- first-pr \
+  --root fixtures/safe_code_no_cards \
+  --diff fixtures/safe_code_no_cards/change.diff \
+  --out-dir target/unsafe-review-no-card-smoke
+
+cargo run --locked -p xtask -- check-first-pr-artifacts \
+  target/unsafe-review-no-card-smoke
+```
+
+Source/swarm proof:
+
+```bash
 cargo run --locked -p xtask -- source-divergence
+```
+
+Release proof:
+
+```bash
+cargo package -p unsafe-review-core --list
+cargo package -p unsafe-review-cli --list
+cargo package -p unsafe-review --list
+cargo publish -p unsafe-review-core --dry-run
+cargo publish -p unsafe-review-cli --dry-run
+cargo publish -p unsafe-review --dry-run
 ```
 
 ## 19. Acceptance examples
 
-- Card found, artifacts valid: CI passes (advisory finding).
-- Artifact malformed: checker fails and CI fails.
-- No cards found: CI passes with no-card honesty text.
-- Coverage upload failure: advisory lane may warn/fail without blocking default workspace CI.
-- Source drift found: swarm routine work pauses for sync/ack handling.
+### Example A - card found, CI passes
+
+Input:
+
+```text
+PR changes a raw pointer read.
+unsafe-review emits one guard_missing card.
+```
+
+Expected:
+
+```text
+workspace CI passes
+first-pr bundle verifies
+GitHub summary shows advisory card
+CI passes
+```
+
+Reason:
+
+```text
+findings are advisory by default
+```
+
+### Example B - malformed artifact, CI fails
+
+Input:
+
+```text
+comment-plan.json references unknown card_id
+```
+
+Expected:
+
+```text
+check-first-pr-artifacts fails
+first-pr lane fails
+```
+
+Reason:
+
+```text
+artifact integrity failure
+```
+
+### Example C - no cards, CI passes
+
+Input:
+
+```text
+PR has no changed unsafe-review gaps
+```
+
+Expected:
+
+```text
+first-pr bundle verifies
+summary says no changed unsafe-review gaps were found
+summary says this does not prove safety / UB-free / Miri-clean / site execution
+CI passes
+```
+
+### Example D - Codecov upload fails, CI passes initially
+
+Input:
+
+```text
+Codecov upload flakes
+```
+
+Expected initial behavior:
+
+```text
+coverage workflow reports warning/failure in advisory lane
+default workspace CI unaffected
+release not blocked
+```
+
+Later policy may change this, but not by default.
+
+### Example E - source drift detected, swarm work pauses
+
+Input:
+
+```text
+source has new implementation commits not mirrored into swarm
+```
+
+Expected:
+
+```text
+source-divergence reports new_source_commits
+routine feature work pauses
+sync/ack PR is opened in swarm
+```
 
 ## 20. Promotion rule
 
-Promote to accepted when SPEC-0024 is indexed, docs align, default lanes enforce read-only posture, first-pr verifier is documented and used, no default comment posting/witness execution is preserved, and source-divergence/release-readiness expectations are documented.
+Move CI design from draft to accepted when:
+
+```text
+SPEC-0024 exists and is linked from the spec index
+docs/ci/PR_CI.md matches SPEC-0024
+default CI uses read-only permissions
+first-pr example workflow exists
+first-pr artifact verifier is documented
+comment-plan remains plan-only
+no workflow posts comments by default
+no workflow runs witnesses by default
+source-divergence is documented
+release-readiness commands are documented
+```
+
+Move to release-backed when:
+
+```text
+0.2.x publication receipt records install / first-pr / support smoke
+first-pr bundle verification passes in CI
+source/swarm sync guard is used in swarm
+coverage lane, if present, has advisory wording and first successful upload
+```

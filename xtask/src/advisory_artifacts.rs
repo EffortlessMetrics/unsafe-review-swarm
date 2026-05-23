@@ -498,59 +498,7 @@ fn check_first_pr_artifact_overclaims(dir: &Path) -> Result<(), String> {
     ] {
         let path = dir.join(name);
         if path.is_file() {
-            reject_positive_overclaims(&path, &super::read_to_string(&path)?)?;
-        }
-    }
-    Ok(())
-}
-
-fn reject_positive_overclaims(path: &Path, text: &str) -> Result<(), String> {
-    for (line_no, line) in text.lines().enumerate() {
-        let lower = line.to_ascii_lowercase();
-        for forbidden in ["all clear", "safe to merge", "proved safe", "proven safe"] {
-            if lower.contains(forbidden) {
-                return Err(format!(
-                    "{}:{} must not imply `{forbidden}`",
-                    path.display(),
-                    line_no + 1
-                ));
-            }
-        }
-        if (lower.contains("miri-clean") || lower.contains("miri clean"))
-            && !lower.contains("not miri-clean")
-            && !lower.contains("not a miri-clean")
-            && !lower.contains("not miri clean")
-            && !lower.contains("cannot prove")
-            && !lower.contains("does not")
-        {
-            return Err(format!(
-                "{}:{} must not imply Miri-clean status",
-                path.display(),
-                line_no + 1
-            ));
-        }
-        if lower.contains("ub-free")
-            && !lower.contains("not ub-free")
-            && !lower.contains("not a ub-free")
-            && !lower.contains("cannot prove")
-            && !lower.contains("does not")
-        {
-            return Err(format!(
-                "{}:{} must not imply UB-free status",
-                path.display(),
-                line_no + 1
-            ));
-        }
-        if lower.contains("site reached")
-            && !lower.contains("not")
-            && !lower.contains("cannot prove")
-            && !lower.contains("does not")
-        {
-            return Err(format!(
-                "{}:{} must not imply site execution",
-                path.display(),
-                line_no + 1
-            ));
+            super::reject_positive_overclaims(&path, &super::read_to_string(&path)?)?;
         }
     }
     Ok(())
