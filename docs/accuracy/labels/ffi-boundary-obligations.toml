@@ -35,3 +35,29 @@ expected_obligation_key = "ownership"
 expected_discharge_state = "missing"
 label_source = "fixture_golden"
 rationale = "The extern C boundary card tracks ownership, lifetime, and nullability contract evidence separately from ABI layout."
+
+[[samples]]
+id = "ffi-call-abi-missing-discharge"
+fixture = "ffi_call_sanitizer_route"
+kind = "positive"
+expected_cards = 1
+expected_class = "miri_unsupported"
+expected_operation_family = "ffi"
+expected_hazard = "ffi_abi"
+expected_obligation_key = "abi"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "The unsafe extern C call card tracks ABI/layout compatibility as a distinct missing discharge obligation."
+
+[[samples]]
+id = "ffi-call-ownership-missing-discharge"
+fixture = "ffi_call_sanitizer_route"
+kind = "positive"
+expected_cards = 1
+expected_class = "miri_unsupported"
+expected_operation_family = "ffi"
+expected_hazard = "ffi_abi"
+expected_obligation_key = "ownership"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "The unsafe extern C call card tracks ownership, lifetime, and nullability contract evidence separately from ABI layout."

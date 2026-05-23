@@ -26,7 +26,8 @@ pub(crate) fn scan_file(
         fs::read_to_string(&abs).map_err(|err| format!("read {} failed: {err}", abs.display()))?;
     let lines: Vec<&str> = text.lines().collect();
     let parsed = super::syntax::parse_source(text.as_str());
-    let syntax_sites = detect_syntax_sites(&parsed);
+    let extern_names = extern_fn_names(&lines);
+    let syntax_sites = detect_syntax_sites(&parsed, &extern_names);
     let syntax_operation_lines = syntax_sites
         .iter()
         .filter(|site| site.kind == UnsafeSiteKind::Operation)
@@ -410,6 +411,38 @@ fn is_extern_boundary(line: &str) -> bool {
         || trimmed.starts_with("extern {")
 }
 
+fn extern_fn_names(lines: &[&str]) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
+    let mut in_extern = false;
+    let mut state = LineCommentState::default();
+    for raw in lines {
+        let detection_line = line_for_text_detection(raw, &mut state);
+        let trimmed = detection_line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        if is_extern_boundary(trimmed) {
+            in_extern = true;
+        }
+        if in_extern {
+            if let Some(name) = parse_fn_name(trimmed) {
+                names.insert(name);
+            }
+            if trimmed.contains('}') {
+                in_extern = false;
+            }
+        }
+    }
+    names
+}
+
+fn unsafe_block_calls_known_extern(line: &str, extern_names: &BTreeSet<String>) -> bool {
+    unsafe_block_contains_call(line)
+        && extern_names
+            .iter()
+            .any(|name| contains_call_name(line, name))
+}
+
 fn is_import_item(line: &str) -> bool {
     let trimmed = line.trim_start();
     trimmed.starts_with("use ")
@@ -561,7 +594,10 @@ struct DetectedSyntaxSite {
     source_snippet: String,
 }
 
-fn detect_syntax_sites(parsed: &ParsedSource) -> Vec<DetectedSyntaxSite> {
+fn detect_syntax_sites(
+    parsed: &ParsedSource,
+    extern_names: &BTreeSet<String>,
+) -> Vec<DetectedSyntaxSite> {
     let mut sites = Vec::new();
     let unsafe_block_ranges = unsafe_block_ranges(parsed);
     let operation_block_ranges = operation_block_ranges(parsed, &unsafe_block_ranges);
@@ -571,6 +607,7 @@ fn detect_syntax_sites(parsed: &ParsedSource) -> Vec<DetectedSyntaxSite> {
             &parsed.text,
             &unsafe_block_ranges,
             &operation_block_ranges,
+            extern_names,
         ) else {
             continue;
         };
@@ -659,6 +696,14 @@ fn syntax_site_covers_fallback(
     kind: &UnsafeSiteKind,
     family: &OperationFamily,
 ) -> bool {
+    if *kind == UnsafeSiteKind::Operation && *family == OperationFamily::UnsafeFnCall {
+        return syntax_sites.iter().any(|site| {
+            site.kind == UnsafeSiteKind::FfiCall
+                && site.family == OperationFamily::Ffi
+                && site.line <= line
+                && line <= site.end_line
+        });
+    }
     if !matches!(
         kind,
         UnsafeSiteKind::UnsafeFn
@@ -707,6 +752,7 @@ fn detect_syntax_site(
     source: &str,
     unsafe_block_ranges: &[(usize, usize)],
     operation_block_ranges: &BTreeSet<(usize, usize)>,
+    extern_names: &BTreeSet<String>,
 ) -> Option<(UnsafeSiteKind, OperationFamily)> {
     if !syntax_kind_can_be_unsafe_site(&fact.kind) {
         return None;
@@ -749,6 +795,13 @@ fn detect_syntax_site(
         }
         "STATIC" if compact.contains("static mut") => {
             Some((UnsafeSiteKind::StaticMut, OperationFamily::StaticMut))
+        }
+        "BLOCK_EXPR"
+            if compact.starts_with("unsafe {")
+                && !operation_block_ranges.contains(&(fact.start, fact.end))
+                && unsafe_block_calls_known_extern(&compact, extern_names) =>
+        {
+            Some((UnsafeSiteKind::FfiCall, OperationFamily::Ffi))
         }
         "BLOCK_EXPR"
             if compact.starts_with("unsafe {")
@@ -826,6 +879,7 @@ fn card_snippet_for(
                 .filter(|line| !line.is_empty())
                 .unwrap_or_else(|| normalize_call_spacing(&compact))
         }
+        UnsafeSiteKind::FfiCall => normalize_call_spacing(&compact),
         UnsafeSiteKind::Operation => normalize_call_spacing(&compact),
         _ => compact,
     }
@@ -1359,6 +1413,32 @@ mod tests {
             detect_site("unsafe extern \"C\" {"),
             Some((UnsafeSiteKind::ExternBlock, OperationFamily::Ffi))
         );
+    }
+
+    #[test]
+    fn syntax_detection_classifies_known_extern_calls_as_ffi_calls() -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "unsafe extern \"C\" {\n    fn strlen(ptr: *const u8) -> usize;\n}\n\npub fn len(ptr: *const u8) -> usize {\n    // SAFETY: caller provides a C string pointer.\n    unsafe { strlen(ptr) }\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+        let diff = crate::input::diff::parse_unified_diff(
+            "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -7,1 +7,1 @@\n+    unsafe { strlen(ptr) }\n",
+        );
+
+        let rel = PathBuf::from("src/lib.rs");
+        let sites = scan_file(&root, &rel, Some(&diff), false)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert_eq!(sites.len(), 1, "unexpected sites: {sites:#?}");
+        assert_eq!(sites[0].site.kind, UnsafeSiteKind::FfiCall);
+        assert_eq!(sites[0].operation.family, OperationFamily::Ffi);
+        assert_eq!(sites[0].site.owner, Some("len".to_string()));
+        assert_eq!(sites[0].site.snippet, "unsafe { strlen(ptr) }");
+        Ok(())
     }
 
     #[test]

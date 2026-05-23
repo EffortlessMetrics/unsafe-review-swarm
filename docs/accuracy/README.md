@@ -80,11 +80,12 @@ The current fixture-pinned slices are:
   remaining-capacity and availability guards discharge generic unsafe callee
   preconditions, while rejecting wrong-receiver, observed-only, and
   closed-branch controls.
-- FFI witness routing: checks that unsafe extern C boundaries route away from
-  Miri-first review to sanitizer/cargo-careful witness suggestions.
+- FFI witness routing: checks that unsafe extern C boundaries and unsafe calls
+  to same-file extern declarations route away from Miri-first review to
+  sanitizer/cargo-careful witness suggestions.
 - FFI boundary obligation evidence: checks that ABI/layout compatibility and
   ownership/lifetime/nullability contracts are tracked as separate obligations
-  for unsafe extern C seams.
+  for unsafe extern C declarations and calls.
 - Inline assembly human-review routing: checks that `asm!` register, memory,
   clobber, and target invariants route to human deep review without implying an
   executable witness ran.

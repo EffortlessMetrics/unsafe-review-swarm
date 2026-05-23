@@ -917,6 +917,7 @@ hazard = "ffi_abi"
 support_tier = "Witness routing"
 fixtures = [
   "ffi_sanitizer_route",
+  "ffi_call_sanitizer_route",
 ]
 dogfood_targets = []
 label_ledgers = [
@@ -925,7 +926,8 @@ label_ledgers = [
 labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned FFI witness routing sends unsafe extern C boundaries to
-sanitizer/cargo-careful route suggestions in the listed fixture.
+sanitizer/cargo-careful route suggestions in the listed fixtures, including
+unsafe calls to same-file extern C declarations.
 """
 forbidden_claims = [
   "FFI ABI correctness proof",
@@ -944,6 +946,7 @@ hazard = "ffi_abi"
 support_tier = "Core operation smoke slice"
 fixtures = [
   "ffi_sanitizer_route",
+  "ffi_call_sanitizer_route",
 ]
 dogfood_targets = []
 label_ledgers = [
@@ -952,7 +955,7 @@ label_ledgers = [
 labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned FFI boundary evidence records ABI/layout and ownership/lifetime/
-nullability obligations separately for the listed unsafe extern C fixture.
+nullability obligations separately for the listed unsafe extern C fixtures.
 """
 forbidden_claims = [
   "FFI ABI correctness proof",
