@@ -1,0 +1,10 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,5 @@
++pub fn reserve_then_extend(values: &mut Vec<u8>, additional: usize) {
++    let new_len = values.len() + additional;
++    values.reserve(additional);
++    // SAFETY: reserve proves capacity for the new length, but this fixture intentionally omits initialization.
++    unsafe { values.set_len(new_len) }
++}

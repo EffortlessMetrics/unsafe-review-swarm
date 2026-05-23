@@ -1590,6 +1590,7 @@ fn has_set_len_capacity_evidence(lower: &str) -> bool {
         || has_set_len_call_result_initialization_evidence(lower)
         || has_set_len_const_cap_evidence(lower)
         || has_set_len_with_capacity_evidence(lower)
+        || has_set_len_reserve_capacity_evidence(lower)
         || has_capacity_bound_guard(lower)
 }
 
@@ -1732,6 +1733,74 @@ fn has_set_len_with_capacity_evidence(lower: &str) -> bool {
         };
         binding == receiver && with_capacity_argument(right).is_some_and(|arg| arg == new_len)
     })
+}
+
+fn has_set_len_reserve_capacity_evidence(lower: &str) -> bool {
+    let compact = compact_code(lower);
+    let Some((receiver, new_len)) = set_len_receiver_and_argument(&compact) else {
+        return false;
+    };
+    if !is_simple_identifier(new_len) {
+        return false;
+    }
+    let marker = format!("{receiver}.set_len(");
+    let Some(call_pos) = compact.find(&marker) else {
+        return false;
+    };
+    let before_call = &compact[..call_pos];
+    let mut consumed = 0usize;
+    for statement in before_call.split_inclusive(';') {
+        let Some((left, right)) = statement.trim_end_matches(';').split_once('=') else {
+            consumed += statement.len();
+            continue;
+        };
+        if let_binding_name(left) != Some(new_len) {
+            consumed += statement.len();
+            continue;
+        }
+        let Some(additional) = len_plus_additional_argument(right.trim(), receiver) else {
+            consumed += statement.len();
+            continue;
+        };
+        let after_len_binding = &before_call[consumed + statement.len()..];
+        if has_fresh_set_len_reserve_call(after_len_binding, receiver, new_len, additional) {
+            return true;
+        }
+        consumed += statement.len();
+    }
+    false
+}
+
+fn len_plus_additional_argument<'a>(expression: &'a str, receiver: &str) -> Option<&'a str> {
+    let len_expr = format!("{receiver}.len()");
+    let after_len = expression.strip_prefix(&format!("{len_expr}+"));
+    let before_len = expression.strip_suffix(&format!("+{len_expr}"));
+    after_len
+        .or(before_len)
+        .filter(|additional| is_simple_identifier(additional))
+}
+
+fn has_fresh_set_len_reserve_call(
+    after_len_binding: &str,
+    receiver: &str,
+    new_len: &str,
+    additional: &str,
+) -> bool {
+    let reserve = format!("{receiver}.reserve({additional});");
+    let identifiers = [receiver, new_len, additional];
+    let mut search_from = 0usize;
+    while let Some(offset) = after_len_binding[search_from..].find(&reserve) {
+        let reserve_start = search_from + offset;
+        let before_reserve = &after_len_binding[..reserve_start];
+        let after_reserve = &after_len_binding[reserve_start + reserve.len()..];
+        if !has_assignment_to_any_identifier(before_reserve, &identifiers)
+            && !has_assignment_to_any_identifier(after_reserve, &identifiers)
+        {
+            return true;
+        }
+        search_from = reserve_start + reserve.len();
+    }
+    false
 }
 
 fn set_len_receiver_and_argument(compact: &str) -> Option<(&str, &str)> {
@@ -3977,6 +4046,78 @@ mod tests {
         );
         assert!(
             !obligation_evidence(&other_receiver, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+    }
+
+    #[test]
+    fn set_len_reserve_discharges_capacity_only_for_same_receiver_and_fresh_len() {
+        let obligations = vec![SafetyObligation::new(
+            "capacity",
+            "new length is at most capacity",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let matching = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "let new_len = values.len() + additional;",
+                "values.reserve(additional);",
+            ],
+            "unsafe { values.set_len(new_len); }",
+            vec![],
+        );
+        let other_receiver = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "let new_len = values.len() + additional;",
+                "other.reserve(additional);",
+            ],
+            "unsafe { values.set_len(new_len); }",
+            vec![],
+        );
+        let stale_additional = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "let new_len = values.len() + additional;",
+                "additional = 0;",
+                "values.reserve(additional);",
+            ],
+            "unsafe { values.set_len(new_len); }",
+            vec![],
+        );
+        let stale_new_len = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "let new_len = values.len() + additional;",
+                "values.reserve(additional);",
+                "new_len = values.capacity() + 1;",
+            ],
+            "unsafe { values.set_len(new_len); }",
+            vec![],
+        );
+
+        assert!(
+            obligation_evidence(&matching, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&other_receiver, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&stale_additional, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&stale_new_len, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
         );

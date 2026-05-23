@@ -459,6 +459,8 @@ fixtures = [
   "vec_set_len_start_bound_shrink",
   "vec_set_len_zero_clear",
   "vec_set_len_with_capacity",
+  "vec_set_len_reserve_capacity",
+  "vec_set_len_reserve_reassigned_additional_not_guard",
   "vec_set_len_post_init_not_guard",
   "vec_set_len_unrelated_initialization_not_guard",
 ]
@@ -469,9 +471,9 @@ label_ledgers = [
 labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned Vec::set_len initialized-range evidence distinguishes initialized
-loop, call-result, shrink, and zero-clear evidence from capacity-only,
-post-init, unrelated-initialization, unrelated-capacity, stale-receiver, and
-cap-name-only controls in the listed fixtures.
+loop, call-result, shrink, zero-clear, and capacity-only reserve evidence from
+post-init, unrelated-initialization, unrelated-capacity, stale-receiver,
+stale-additional, and cap-name-only controls in the listed fixtures.
 """
 forbidden_claims = [
   "broad Vec soundness",

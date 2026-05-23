@@ -1,0 +1,11 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,7 @@
++pub fn reserve_with_stale_additional(values: &mut Vec<u8>, mut additional: usize) {
++    let new_len = values.len() + additional;
++    additional = 0;
++    values.reserve(additional);
++    // SAFETY: this fixture reserves with a stale additional amount and omits initialization.
++    unsafe { values.set_len(new_len) }
++}
