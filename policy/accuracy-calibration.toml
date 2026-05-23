@@ -168,3 +168,59 @@ forbidden_claims = [
   "global recall",
   "memory-safety proof",
 ]
+
+[[claim]]
+id = "unsafe-impl-send-sync-witness-routes"
+status = "fixture_pinned"
+kind = "route_quality"
+owner = "calibration"
+operation_family = "unsafe_impl_send_sync"
+hazard = "send_sync_invariant"
+support_tier = "Witness routing"
+fixtures = [
+  "unsafe_impl_send",
+  "unsafe_impl_send_generic_owner",
+  "unsafe_impl_sync_generic_bound",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/unsafe-impl-send-sync-witness-routes.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned unsafe impl Send/Sync witness routing sends thread-safety
+invariants to Loom/Shuttle route suggestions in the listed fixtures.
+"""
+forbidden_claims = [
+  "concurrency correctness proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
+id = "ffi-sanitizer-witness-routes"
+status = "fixture_pinned"
+kind = "route_quality"
+owner = "calibration"
+operation_family = "ffi"
+hazard = "ffi_abi"
+support_tier = "Witness routing"
+fixtures = [
+  "ffi_sanitizer_route",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/ffi-sanitizer-witness-routes.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned FFI witness routing sends unsafe extern C boundaries to
+sanitizer/cargo-careful route suggestions in the listed fixture.
+"""
+forbidden_claims = [
+  "FFI ABI correctness proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]

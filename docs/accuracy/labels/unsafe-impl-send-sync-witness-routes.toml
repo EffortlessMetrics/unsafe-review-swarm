@@ -1,0 +1,53 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "unsafe-impl-send-sync-witness-routes"
+operation_family = "unsafe_impl_send_sync"
+hazard = "send_sync_invariant"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard witness routing behavior; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "unsafe-impl-send-routes-loom-shuttle"
+fixture = "unsafe_impl_send"
+kind = "positive"
+expected_cards = 1
+expected_class = "requires_loom"
+expected_operation_family = "unsafe_impl_send_sync"
+expected_hazard = "send_sync_invariant"
+expected_obligation_key = "thread-safety"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["loom", "shuttle"]
+label_source = "fixture_golden"
+rationale = "Unsafe impl Send invariants should route to Loom/Shuttle interleaving witnesses."
+
+[[samples]]
+id = "unsafe-impl-send-generic-owner-routes-loom-shuttle"
+fixture = "unsafe_impl_send_generic_owner"
+kind = "positive"
+expected_cards = 1
+expected_class = "requires_loom"
+expected_operation_family = "unsafe_impl_send_sync"
+expected_hazard = "send_sync_invariant"
+expected_obligation_key = "thread-safety"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["loom", "shuttle"]
+label_source = "fixture_golden"
+rationale = "Generic unsafe impl Send should keep the implemented type owner and route to Loom/Shuttle."
+
+[[samples]]
+id = "unsafe-impl-sync-generic-bound-routes-loom-shuttle"
+fixture = "unsafe_impl_sync_generic_bound"
+kind = "positive"
+expected_cards = 1
+expected_class = "requires_loom"
+expected_operation_family = "unsafe_impl_send_sync"
+expected_hazard = "send_sync_invariant"
+expected_obligation_key = "thread-safety"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["loom", "shuttle"]
+label_source = "fixture_golden"
+rationale = "Unsafe impl Sync invariants should route to Loom/Shuttle interleaving witnesses."

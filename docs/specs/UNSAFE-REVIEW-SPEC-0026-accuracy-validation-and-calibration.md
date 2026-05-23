@@ -54,6 +54,11 @@ When a claim is about public contract evidence, the ledger must pin
 public unsafe API `# Safety` documentation claim unless the ReviewCard contract
 evidence records it as public API documentation.
 
+When a claim is about witness routing, the ledger must pin route kinds from the
+matching ReviewCard `witness_routes`. A route-quality label proves only that the
+static card recommends the expected next witness route; it does not prove the
+witness was run or passed.
+
 ## Non-goals
 
 - no global precision/recall claim,

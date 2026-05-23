@@ -18,6 +18,10 @@ The current fixture-pinned slices are:
   checks whether the `valid-value` obligation is discharged by dominating
   bool-domain or invalid-byte early-return guards, while rejecting layout-only,
   observed, closed-branch, and stale-byte controls.
+- Unsafe impl Send/Sync witness routing: checks that thread-safety invariants
+  route to Loom/Shuttle witness suggestions.
+- FFI witness routing: checks that unsafe extern C boundaries route away from
+  Miri-first review to sanitizer/cargo-careful witness suggestions.
 
 This remains experimental/advisory until human-adjudicated calibration and
 report checks are landed.

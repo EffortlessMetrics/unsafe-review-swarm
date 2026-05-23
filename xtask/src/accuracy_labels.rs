@@ -25,6 +25,7 @@ const LABEL_SAMPLE_FIELDS: &[&str] = &[
     "expected_obligation_key",
     "expected_contract_state",
     "expected_discharge_state",
+    "expected_witness_route_kinds",
     "label_source",
     "labelers",
     "adjudicator",
@@ -36,6 +37,19 @@ const LABEL_PARTITIONS: &[&str] = &["fixture", "dogfood", "labeled", "holdout"];
 const LABEL_SOURCE_KINDS: &[&str] = &["fixture_golden", "human_adjudicated"];
 const LABEL_SAMPLE_KINDS: &[&str] = &["positive", "negative", "false_positive_control"];
 const DISCHARGE_STATES: &[&str] = &["present", "missing"];
+const WITNESS_ROUTE_KINDS: &[&str] = &[
+    "miri",
+    "cargo-careful",
+    "asan",
+    "msan",
+    "tsan",
+    "lsan",
+    "loom",
+    "shuttle",
+    "kani",
+    "crux",
+    "human-deep-review",
+];
 
 #[derive(Clone, Debug)]
 pub(crate) struct CalibrationFixtureCase {
@@ -347,6 +361,25 @@ fn validate_sample(
             expected_state: discharge_state,
         },
     )?;
+    let route_kinds = optional_table_str_array(sample, "expected_witness_route_kinds", path, idx)?;
+    if !route_kinds.is_empty() {
+        for route_kind in route_kinds {
+            require_allowed(
+                route_kind,
+                WITNESS_ROUTE_KINDS,
+                path,
+                "expected_witness_route_kinds",
+            )?;
+            check_fixture_witness_route_kind(
+                path,
+                idx,
+                fixture,
+                expected_operation_family,
+                expected_hazard,
+                route_kind,
+            )?;
+        }
+    }
     Ok(())
 }
 
@@ -362,6 +395,7 @@ fn reject_zero_card_fields(
         "expected_obligation_key",
         "expected_contract_state",
         "expected_discharge_state",
+        "expected_witness_route_kinds",
     ] {
         if sample.contains_key(field) {
             return Err(format!(
@@ -464,6 +498,53 @@ fn check_fixture_obligation_evidence_state(
             obligation.operation_family,
             obligation.hazard,
             obligation.fixture
+        ))
+    }
+}
+
+fn check_fixture_witness_route_kind(
+    path: &str,
+    idx: usize,
+    fixture: &str,
+    operation_family: &str,
+    hazard: &str,
+    route_kind: &str,
+) -> Result<(), String> {
+    let cards_path = super::workspace_path("fixtures")
+        .join(fixture)
+        .join("expected.cards.json");
+    let cards = super::parse_json_file(&cards_path)?;
+    let cards = cards
+        .as_array()
+        .ok_or_else(|| format!("{fixture}/expected.cards.json must contain a JSON array"))?;
+    let mut matched_card = false;
+    for card in cards {
+        if card
+            .get("operation_family")
+            .and_then(serde_json::Value::as_str)
+            != Some(operation_family)
+            || !json_array_contains_str(card, "hazards", hazard)
+        {
+            continue;
+        }
+        matched_card = true;
+        for route in super::json_array_at(
+            card,
+            "/witness_routes",
+            &format!("{fixture}/expected.cards.json"),
+        )? {
+            if route.get("kind").and_then(serde_json::Value::as_str) == Some(route_kind) {
+                return Ok(());
+            }
+        }
+    }
+    if matched_card {
+        Err(format!(
+            "{path} samples[{idx}] expected_witness_route_kinds route `{route_kind}` was not found for `{operation_family}` / `{hazard}` in `{fixture}`"
+        ))
+    } else {
+        Err(format!(
+            "{path} samples[{idx}] no `{operation_family}` / `{hazard}` card was found in `{fixture}`"
         ))
     }
 }
@@ -641,6 +722,69 @@ fn require_allowed(value: &str, allowed: &[&str], path: &str, key: &str) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn label_ledger_rejects_missing_witness_route_kind() -> Result<(), String> {
+        let ledger = r#"
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "unsafe-impl-send-sync-witness-routes"
+operation_family = "unsafe_impl_send_sync"
+hazard = "send_sync_invariant"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result."
+
+[[samples]]
+id = "bad-route"
+fixture = "unsafe_impl_send"
+kind = "positive"
+expected_cards = 1
+expected_class = "requires_loom"
+expected_operation_family = "unsafe_impl_send_sync"
+expected_hazard = "send_sync_invariant"
+expected_obligation_key = "thread-safety"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["asan"]
+label_source = "fixture_golden"
+rationale = "The fixture routes Send/Sync invariants to Loom/Shuttle, so ASan should be rejected."
+"#
+        .parse::<toml::Table>()
+        .map(toml::Value::Table)
+        .map_err(|err| format!("parse test ledger failed: {err}"))?;
+        let mut cases = BTreeMap::new();
+        cases.insert(
+            "unsafe_impl_send".to_string(),
+            CalibrationFixtureCase {
+                kind: "positive".to_string(),
+                expected_cards: 1,
+                expected_class: Some("requires_loom".to_string()),
+                expected_operation_family: Some("unsafe_impl_send_sync".to_string()),
+                expected_hazard: Some("send_sync_invariant".to_string()),
+            },
+        );
+        let claim = PolicyClaim {
+            operation_family: Some("unsafe_impl_send_sync".to_string()),
+            hazard: Some("send_sync_invariant".to_string()),
+            label_ledgers: BTreeSet::new(),
+        };
+
+        let result = validate_label_ledger(
+            "docs/accuracy/labels/test.toml",
+            &ledger,
+            "unsafe-impl-send-sync-witness-routes",
+            &claim,
+            &cases,
+        );
+
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("expected_witness_route_kinds")
+        );
+        Ok(())
+    }
 
     #[test]
     fn label_ledger_rejects_wrong_obligation_contract_state() -> Result<(), String> {
