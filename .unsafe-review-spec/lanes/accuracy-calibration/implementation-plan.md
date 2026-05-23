@@ -10,7 +10,7 @@ new calibrated public claims.
 1. Spec and lane scaffolding
 2. Accuracy policy ledger
 3. Labeling protocol and schema
-4. Calibration report/checker commands
+4. Checked calibration report
 5. Claim-promotion guardrails
 
 ## Proof commands

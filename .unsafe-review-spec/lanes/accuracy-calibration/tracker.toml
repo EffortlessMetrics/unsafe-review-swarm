@@ -13,7 +13,7 @@ readiness.
 """
 
 end_state = [
-  "Every calibrated claim is linked to fixtures, dogfood targets, labeled samples, and a metric report.",
+  "Every calibrated claim is linked to fixtures, dogfood targets, labeled samples, and a checked metric report.",
   "Support-tier promotion requires an explicit calibration report and known-limits text.",
   "False-positive controls and false-negative probes are first-class dataset entries.",
   "No global precision/recall claim is possible without a scoped labeled denominator.",
@@ -26,6 +26,7 @@ status = "ready"
 spec = "UNSAFE-REVIEW-SPEC-0026"
 plan = ".unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md"
 commands = [
+  "cargo run --locked -p xtask -- check-calibration",
   "cargo run --locked -p xtask -- check-doc-artifacts",
   "cargo run --locked -p xtask -- check-goals",
   "cargo run --locked -p xtask -- check-pr",

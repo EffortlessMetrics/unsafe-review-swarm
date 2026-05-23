@@ -173,6 +173,13 @@ const SUPPORT_SUMMARY_REQUIRED_PHRASES: &[&str] = &[
 ];
 const DOGFOOD_MANIFEST: &str = "docs/dogfood/corpus.toml";
 const DOGFOOD_INDEX: &str = "docs/dogfood/index.json";
+const ACCURACY_CALIBRATION_REPORT: &str = "docs/accuracy/CALIBRATION_REPORT.md";
+const ACCURACY_CLAIM_STATUSES: &[&str] = &[
+    "fixture_pinned",
+    "dogfood_measured",
+    "labeled_calibrated",
+    "policy_eligible",
+];
 const DOGFOOD_TARGET_KINDS: &[&str] = &["repo-snapshot", "pr-diff"];
 const DOGFOOD_TARGET_STATUSES: &[&str] = &["active", "parked", "retired"];
 const DOGFOOD_ARTIFACT_STATUSES: &[&str] = &["checked_in", "local_untracked", "remote_manual"];
@@ -1489,11 +1496,142 @@ fn check_calibration() -> Result<(), String> {
     let accuracy_policy = parse_toml_file(&workspace_path("policy/accuracy-calibration.toml"))?;
     let label_count =
         accuracy_labels::check_accuracy_label_ledgers(&accuracy_policy, &fixture_cases)?;
+    let report_stats =
+        accuracy_calibration_report_stats(&accuracy_policy, cases.len(), label_count)?;
+    check_accuracy_calibration_report(&report_stats)?;
 
     println!(
         "check-calibration: ok ({} cases, {label_count} labels)",
         cases.len()
     );
+    Ok(())
+}
+
+#[derive(Debug)]
+struct AccuracyCalibrationReportStats {
+    claim_count: usize,
+    calibration_case_count: usize,
+    label_ledger_count: usize,
+    label_sample_count: usize,
+    labeled_report_count: usize,
+    fixture_pinned_claims: usize,
+    dogfood_measured_claims: usize,
+    labeled_calibrated_claims: usize,
+    policy_eligible_claims: usize,
+}
+
+fn accuracy_calibration_report_stats(
+    policy: &toml::Value,
+    calibration_case_count: usize,
+    label_sample_count: usize,
+) -> Result<AccuracyCalibrationReportStats, String> {
+    let claims = toml_array(policy, "claim", "policy/accuracy-calibration.toml")?;
+    let mut status_counts = BTreeMap::new();
+    let mut label_ledgers = BTreeSet::new();
+    let mut labeled_report_count = 0usize;
+    for (idx, claim) in claims.iter().enumerate() {
+        let table = toml_table(claim, "policy/accuracy-calibration.toml", "claim", idx)?;
+        let status = required_table_string(
+            table,
+            "status",
+            "policy/accuracy-calibration.toml",
+            "claim",
+            idx,
+        )?;
+        require_known(
+            status,
+            ACCURACY_CLAIM_STATUSES,
+            "policy/accuracy-calibration.toml",
+            "claim.status",
+        )?;
+        *status_counts.entry(status.to_string()).or_insert(0usize) += 1;
+
+        if let Some(ledgers) = table.get("label_ledgers") {
+            for ledger in toml_str_array(
+                ledgers,
+                "policy/accuracy-calibration.toml",
+                "claim.label_ledgers",
+            )? {
+                label_ledgers.insert(ledger.to_string());
+            }
+        }
+        if let Some(reports) = table.get("labeled_reports") {
+            for report in toml_str_array(
+                reports,
+                "policy/accuracy-calibration.toml",
+                "claim.labeled_reports",
+            )? {
+                require_file(report)?;
+                labeled_report_count += 1;
+            }
+        }
+    }
+
+    Ok(AccuracyCalibrationReportStats {
+        claim_count: claims.len(),
+        calibration_case_count,
+        label_ledger_count: label_ledgers.len(),
+        label_sample_count,
+        labeled_report_count,
+        fixture_pinned_claims: *status_counts.get("fixture_pinned").unwrap_or(&0),
+        dogfood_measured_claims: *status_counts.get("dogfood_measured").unwrap_or(&0),
+        labeled_calibrated_claims: *status_counts.get("labeled_calibrated").unwrap_or(&0),
+        policy_eligible_claims: *status_counts.get("policy_eligible").unwrap_or(&0),
+    })
+}
+
+fn check_accuracy_calibration_report(stats: &AccuracyCalibrationReportStats) -> Result<(), String> {
+    require_file(ACCURACY_CALIBRATION_REPORT)?;
+    let text = read_to_string(&workspace_path(ACCURACY_CALIBRATION_REPORT))?;
+    check_accuracy_calibration_report_text(ACCURACY_CALIBRATION_REPORT, &text, stats)
+}
+
+fn check_accuracy_calibration_report_text(
+    path: &str,
+    text: &str,
+    stats: &AccuracyCalibrationReportStats,
+) -> Result<(), String> {
+    require_boundary_text(text, path)?;
+    for needle in [
+        "No global precision/recall claim",
+        "No policy readiness claim",
+        "No support-tier promotion",
+        "No witness execution claim",
+        "No memory-safety proof",
+        "No UB-free status",
+        "No Miri-clean status",
+    ] {
+        if !text_contains_ignore_ascii_case(text, needle) {
+            return Err(format!(
+                "{path} is missing required boundary text `{needle}`"
+            ));
+        }
+    }
+
+    for expected in [
+        format!("- Claims: {}", stats.claim_count),
+        format!("- Fixture-pinned claims: {}", stats.fixture_pinned_claims),
+        format!(
+            "- Dogfood-measured claims: {}",
+            stats.dogfood_measured_claims
+        ),
+        format!(
+            "- Labeled-calibrated claims: {}",
+            stats.labeled_calibrated_claims
+        ),
+        format!("- Policy-eligible claims: {}", stats.policy_eligible_claims),
+        format!("- Calibration cases: {}", stats.calibration_case_count),
+        format!("- Label ledgers: {}", stats.label_ledger_count),
+        format!("- Label samples: {}", stats.label_sample_count),
+        format!("- Labeled reports: {}", stats.labeled_report_count),
+    ] {
+        if !text.contains(&expected) {
+            return Err(format!(
+                "{path} is missing expected report line `{expected}`"
+            ));
+        }
+    }
+
     Ok(())
 }
 
@@ -3988,6 +4126,74 @@ jobs:
     }
 
     #[test]
+    fn calibration_report_rejects_stale_counts() -> Result<(), String> {
+        let stats = test_accuracy_report_stats();
+        let text = test_accuracy_report_text().replace("- Label samples: 2", "- Label samples: 1");
+
+        let Err(err) = check_accuracy_calibration_report_text("test-report.md", &text, &stats)
+        else {
+            return Err("stale label sample counts should fail".to_string());
+        };
+
+        assert!(err.contains("- Label samples: 2"));
+        Ok(())
+    }
+
+    #[test]
+    fn calibration_report_requires_boundary_text() -> Result<(), String> {
+        let stats = test_accuracy_report_stats();
+        let text =
+            test_accuracy_report_text().replace("No policy readiness claim.", "Policy ready.");
+
+        let Err(err) = check_accuracy_calibration_report_text("test-report.md", &text, &stats)
+        else {
+            return Err("missing policy readiness boundary should fail".to_string());
+        };
+
+        assert!(err.contains("No policy readiness claim"));
+        Ok(())
+    }
+
+    fn test_accuracy_report_stats() -> AccuracyCalibrationReportStats {
+        AccuracyCalibrationReportStats {
+            claim_count: 1,
+            calibration_case_count: 2,
+            label_ledger_count: 1,
+            label_sample_count: 2,
+            labeled_report_count: 0,
+            fixture_pinned_claims: 1,
+            dogfood_measured_claims: 0,
+            labeled_calibrated_claims: 0,
+            policy_eligible_claims: 0,
+        }
+    }
+
+    fn test_accuracy_report_text() -> String {
+        r#"
+Static unsafe contract review only. This is not a proof of memory safety, not UB-free status, and not a Miri result.
+
+- Claims: 1
+- Fixture-pinned claims: 1
+- Dogfood-measured claims: 0
+- Labeled-calibrated claims: 0
+- Policy-eligible claims: 0
+- Calibration cases: 2
+- Label ledgers: 1
+- Label samples: 2
+- Labeled reports: 0
+
+- No global precision/recall claim.
+- No policy readiness claim.
+- No support-tier promotion.
+- No witness execution claim.
+- No memory-safety proof.
+- No UB-free status.
+- No Miri-clean status.
+"#
+        .to_string()
+    }
+
+    #[test]
     fn operation_registry_rejects_missing_fixture_backed_family() -> Result<(), String> {
         let mut families = operation_family_registry_rows()?;
         let fixture_proofs = operation_family_registry_fixture_proofs()?;
@@ -4466,14 +4672,16 @@ OperationFamily::RawPointerRead => vec![
     }
 
     #[test]
-    fn spec_status_proof_commands_reject_unknown_xtask_commands() {
-        let err = check_spec_status_proof_commands(
+    fn spec_status_proof_commands_reject_unknown_xtask_commands() -> Result<(), String> {
+        let Err(err) = check_spec_status_proof_commands(
             "UNSAFE-REVIEW-SPEC-0024",
             "`cargo run --locked -p xtask -- check-fake-thing`",
-        )
-        .expect_err("unknown xtask commands should fail");
+        ) else {
+            return Err("unknown xtask commands should fail".to_string());
+        };
 
         assert!(err.contains("check-fake-thing"));
+        Ok(())
     }
 
     #[test]

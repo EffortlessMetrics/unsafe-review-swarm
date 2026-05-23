@@ -3,6 +3,10 @@
 This directory holds the source-of-truth documentation for claim-scoped
 accuracy validation and calibration.
 
+Current checked report:
+
+- [Accuracy calibration report](CALIBRATION_REPORT.md)
+
 The current fixture-pinned slices are:
 
 - `Box::from_raw` ownership evidence: checks whether the `ownership`

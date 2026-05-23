@@ -80,7 +80,8 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - fixture calibration manifest passes,
 - dogfood corpus manifest passes,
 - labeled sample ledger validates,
-- calibration report renders,
+- `docs/accuracy/CALIBRATION_REPORT.md` renders and is checked for stale
+  counts and no-overclaim boundary text by `check-calibration`,
 - support-tier claim map matches measured evidence,
 - no-overclaim checks pass.
 
