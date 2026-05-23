@@ -37,6 +37,9 @@ The guard rejects:
 - allowed public claim wording that contains global precision/recall,
   policy-ready, memory-safety proof, UB-free, Miri-clean, or witness-execution
   proof language.
+- fixture golden cards whose obligations and obligation_evidence are not
+  one-to-one, description-aligned, and coherent across contract/discharge/reach/
+  witness present-state fields.
 - fixture golden ReviewCard IDs that omit stable fixture/package, file, owner,
   site kind, operation family, operation path/callee, snippet hash, hazard, or
   counted suffix components.

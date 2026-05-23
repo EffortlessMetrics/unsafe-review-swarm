@@ -2473,7 +2473,171 @@ fn check_fixture_card_identity(
         ));
     }
 
+    check_fixture_obligation_evidence(path, idx, card)?;
+
     Ok(())
+}
+
+fn check_fixture_obligation_evidence(
+    path: &str,
+    idx: usize,
+    card: &serde_json::Value,
+) -> Result<(), String> {
+    let card_context = format!("{path} card[{idx}]");
+    let obligations = json_array_at(card, "/obligations", &card_context)?;
+    if obligations.is_empty() {
+        return Err(format!("{card_context} obligations must not be empty"));
+    }
+
+    let mut obligation_descriptions = BTreeSet::new();
+    for (obligation_idx, obligation) in obligations.iter().enumerate() {
+        let Some(description) = obligation.as_str() else {
+            return Err(format!(
+                "{card_context} obligations[{obligation_idx}] must be a string"
+            ));
+        };
+        if description.trim().is_empty() {
+            return Err(format!(
+                "{card_context} obligations[{obligation_idx}] must not be empty"
+            ));
+        }
+        if !obligation_descriptions.insert(description) {
+            return Err(format!(
+                "{card_context} obligations must not duplicate `{description}`"
+            ));
+        }
+    }
+
+    let evidence = json_array_at(card, "/obligation_evidence", &card_context)?;
+    if evidence.len() != obligations.len() {
+        return Err(format!(
+            "{card_context} obligation_evidence count {} must match obligations count {}",
+            evidence.len(),
+            obligations.len()
+        ));
+    }
+
+    let mut evidence_keys = BTreeSet::new();
+    let mut evidence_descriptions = BTreeSet::new();
+    for (evidence_idx, entry) in evidence.iter().enumerate() {
+        let Some(entry) = entry.as_object() else {
+            return Err(format!(
+                "{card_context} obligation_evidence[{evidence_idx}] must be an object"
+            ));
+        };
+        let key = required_fixture_evidence_str(entry, "key", &card_context, evidence_idx)?;
+        if !evidence_keys.insert(key) {
+            return Err(format!(
+                "{card_context} obligation_evidence must not duplicate key `{key}`"
+            ));
+        }
+        let description =
+            required_fixture_evidence_str(entry, "description", &card_context, evidence_idx)?;
+        if !obligation_descriptions.contains(description) {
+            return Err(format!(
+                "{card_context} obligation_evidence[{evidence_idx}] description `{description}` must match an obligation"
+            ));
+        }
+        if !evidence_descriptions.insert(description) {
+            return Err(format!(
+                "{card_context} obligation_evidence must not duplicate description `{description}`"
+            ));
+        }
+
+        for axis in ["contract", "discharge", "reach", "witness"] {
+            check_fixture_evidence_state(&card_context, evidence_idx, key, axis, entry.get(axis))?;
+        }
+    }
+
+    Ok(())
+}
+
+fn required_fixture_evidence_str<'a>(
+    object: &'a serde_json::Map<String, serde_json::Value>,
+    key: &str,
+    card_context: &str,
+    evidence_idx: usize,
+) -> Result<&'a str, String> {
+    let Some(value) = object.get(key).and_then(serde_json::Value::as_str) else {
+        return Err(format!(
+            "{card_context} obligation_evidence[{evidence_idx}] is missing string key `{key}`"
+        ));
+    };
+    if value.trim().is_empty() {
+        Err(format!(
+            "{card_context} obligation_evidence[{evidence_idx}] string key `{key}` is empty"
+        ))
+    } else {
+        Ok(value)
+    }
+}
+
+fn check_fixture_evidence_state(
+    card_context: &str,
+    evidence_idx: usize,
+    evidence_key: &str,
+    axis: &str,
+    value: Option<&serde_json::Value>,
+) -> Result<(), String> {
+    let Some(state) = value.and_then(serde_json::Value::as_object) else {
+        return Err(format!(
+            "{card_context} obligation_evidence[{evidence_idx}] `{evidence_key}` is missing object key `{axis}`"
+        ));
+    };
+    let Some(present) = state.get("present").and_then(serde_json::Value::as_bool) else {
+        return Err(format!(
+            "{card_context} obligation_evidence[{evidence_idx}] `{evidence_key}` {axis}.present must be a boolean"
+        ));
+    };
+    let state_name = required_fixture_state_str(
+        state,
+        "state",
+        card_context,
+        evidence_idx,
+        evidence_key,
+        axis,
+    )?;
+    let _summary = required_fixture_state_str(
+        state,
+        "summary",
+        card_context,
+        evidence_idx,
+        evidence_key,
+        axis,
+    )?;
+    if !matches!(state_name, "present" | "missing") {
+        return Err(format!(
+            "{card_context} obligation_evidence[{evidence_idx}] `{evidence_key}` {axis}.state `{state_name}` must be `present` or `missing`"
+        ));
+    }
+    if present != (state_name == "present") {
+        return Err(format!(
+            "{card_context} obligation_evidence[{evidence_idx}] `{evidence_key}` {axis}.present={present} must agree with state `{state_name}`"
+        ));
+    }
+    Ok(())
+}
+
+fn required_fixture_state_str<'a>(
+    object: &'a serde_json::Map<String, serde_json::Value>,
+    key: &str,
+    card_context: &str,
+    evidence_idx: usize,
+    evidence_key: &str,
+    axis: &str,
+) -> Result<&'a str, String> {
+    let Some(value) = object.get(key).and_then(serde_json::Value::as_str) else {
+        return Err(format!(
+            "{card_context} obligation_evidence[{evidence_idx}] `{evidence_key}` {axis}.{key} must be a string"
+        ));
+    };
+    if value.trim().is_empty() {
+        Err(format!(
+            "{card_context} obligation_evidence[{evidence_idx}] `{evidence_key}` {axis}.{key} must not be empty"
+        ))
+    } else {
+        Ok(value)
+    }
 }
 
 fn required_json_object_str<'a>(
@@ -4699,6 +4863,49 @@ jobs:
     }
 
     #[test]
+    fn fixture_card_identity_rejects_orphan_obligation_evidence() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["obligation_evidence"][0]["description"] =
+            serde_json::Value::String("unlisted obligation".to_string());
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("orphan obligation evidence should fail".to_string());
+        };
+
+        assert!(err.contains("obligation_evidence[0]"));
+        assert!(err.contains("must match an obligation"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_evidence_state_mismatch() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["obligation_evidence"][0]["discharge"]["present"] = serde_json::Value::Bool(true);
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("evidence present/state mismatch should fail".to_string());
+        };
+
+        assert!(err.contains("discharge.present=true"));
+        assert!(err.contains("state `missing`"));
+        Ok(())
+    }
+
+    #[test]
     fn calibration_manifest_validates_current_fixture_contract() -> Result<(), String> {
         check_calibration()
     }
@@ -4910,7 +5117,34 @@ jobs:
   }},
   "operation": "unsafe {{ ptr.cast::<Header>().read() }}",
   "operation_family": "raw_pointer_read",
-  "hazards": ["pointer_validity", "alignment"]
+  "hazards": ["pointer_validity", "alignment"],
+  "obligations": ["pointer is aligned for the accessed type"],
+  "obligation_evidence": [
+    {{
+      "key": "alignment",
+      "description": "pointer is aligned for the accessed type",
+      "contract": {{
+        "present": true,
+        "state": "present",
+        "summary": "Nearby `SAFETY:` comment was detected"
+      }},
+      "discharge": {{
+        "present": false,
+        "state": "missing",
+        "summary": "No alignment guard code was detected"
+      }},
+      "reach": {{
+        "present": true,
+        "state": "present",
+        "summary": "1 related test file(s) mention owner `read_header`"
+      }},
+      "witness": {{
+        "present": false,
+        "state": "missing",
+        "summary": "No imported witness receipt was found"
+      }}
+    }}
+  ]
 }}"#
         )
         .parse::<serde_json::Value>()

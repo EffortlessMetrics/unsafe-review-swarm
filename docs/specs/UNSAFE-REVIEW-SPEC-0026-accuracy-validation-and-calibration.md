@@ -48,6 +48,12 @@ obligation-level. For a ReviewCard with multiple obligations, the ledger names
 the expected obligation key and evidence state instead of treating the card
 class as proof that every obligation is discharged.
 
+Fixture golden cards must keep `obligations` and `obligation_evidence` aligned.
+Every obligation needs exactly one evidence row with the same description, a
+stable key, and coherent `contract`, `discharge`, `reach`, and `witness`
+present/state/summary fields. This prevents top-level card classes or comments
+from standing in for per-obligation evidence.
+
 Fixture golden cards must preserve counted ReviewCard identity components:
 package/fixture, file, owner, site kind, operation family, operation path or
 callee token, normalized snippet hash, hazard, and count suffix. This keeps
@@ -91,6 +97,8 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - claim entries pass promotion guardrails for status-specific evidence,
   known support-tier capability names, known dogfood target IDs, checked labeled
   report files, and public wording that stays inside the supported claim,
+- fixture golden obligations and obligation evidence are one-to-one,
+  description-aligned, and carry coherent per-axis evidence states,
 - allowed public claim wording names the claim level, and forbidden claim lists
   include shared global precision, global recall, and memory-safety proof
   overclaim boundaries,
