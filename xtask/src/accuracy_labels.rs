@@ -66,7 +66,13 @@ pub(crate) struct CalibrationFixtureCase {
 struct PolicyClaim {
     operation_family: Option<String>,
     hazard: Option<String>,
+    fixtures: BTreeSet<String>,
     label_ledgers: BTreeSet<String>,
+}
+
+struct LabelLedgerStats {
+    sample_count: usize,
+    fixtures: BTreeSet<String>,
 }
 
 struct FixtureObligation<'a> {
@@ -109,6 +115,7 @@ pub(crate) fn check_accuracy_label_ledgers(
 
     let mut sample_count = 0usize;
     for (claim_id, claim) in &claims {
+        let mut claim_sample_fixtures = BTreeSet::new();
         for ledger in &claim.label_ledgers {
             if !actual_ledgers.contains(ledger) {
                 return Err(format!(
@@ -116,11 +123,33 @@ pub(crate) fn check_accuracy_label_ledgers(
                 ));
             }
             let value = super::parse_toml_file(&super::workspace_path(ledger))?;
-            sample_count += validate_label_ledger(ledger, &value, claim_id, claim, fixture_cases)?;
+            let stats = validate_label_ledger(ledger, &value, claim_id, claim, fixture_cases)?;
+            sample_count += stats.sample_count;
+            claim_sample_fixtures.extend(stats.fixtures);
         }
+        check_policy_claim_fixture_sample_coverage(claim_id, claim, &claim_sample_fixtures)?;
     }
 
     Ok(sample_count)
+}
+
+fn check_policy_claim_fixture_sample_coverage(
+    claim_id: &str,
+    claim: &PolicyClaim,
+    sample_fixtures: &BTreeSet<String>,
+) -> Result<(), String> {
+    let missing_sample_fixtures = claim
+        .fixtures
+        .difference(sample_fixtures)
+        .cloned()
+        .collect::<Vec<_>>();
+    if !missing_sample_fixtures.is_empty() {
+        return Err(format!(
+            "policy/accuracy-calibration.toml claim `{claim_id}` lists fixture(s) without label samples: {}",
+            missing_sample_fixtures.join(", ")
+        ));
+    }
+    Ok(())
 }
 
 fn policy_claims(policy: &toml::Value) -> Result<BTreeMap<String, PolicyClaim>, String> {
@@ -142,6 +171,16 @@ fn policy_claims(policy: &toml::Value) -> Result<BTreeMap<String, PolicyClaim>, 
         let hazard =
             optional_table_string(claim, "hazard", "policy/accuracy-calibration.toml", idx)?
                 .map(str::to_string);
+        let fixtures =
+            optional_table_str_array(claim, "fixtures", "policy/accuracy-calibration.toml", idx)?;
+        let mut claimed_fixtures = BTreeSet::new();
+        for fixture in fixtures {
+            if !claimed_fixtures.insert(fixture.to_string()) {
+                return Err(format!(
+                    "policy/accuracy-calibration.toml claim[{idx}] duplicates fixture `{fixture}`"
+                ));
+            }
+        }
         let label_ledgers = optional_table_str_array(
             claim,
             "label_ledgers",
@@ -168,6 +207,7 @@ fn policy_claims(policy: &toml::Value) -> Result<BTreeMap<String, PolicyClaim>, 
                 PolicyClaim {
                     operation_family,
                     hazard,
+                    fixtures: claimed_fixtures,
                     label_ledgers: ledgers,
                 },
             )
@@ -187,7 +227,7 @@ fn validate_label_ledger(
     claim_id: &str,
     claim: &PolicyClaim,
     fixture_cases: &BTreeMap<String, CalibrationFixtureCase>,
-) -> Result<usize, String> {
+) -> Result<LabelLedgerStats, String> {
     let table = value
         .as_table()
         .ok_or_else(|| format!("{path} must contain a TOML table"))?;
@@ -221,13 +261,26 @@ fn validate_label_ledger(
         return Err(format!("{path} must contain at least one sample"));
     }
     let mut ids = BTreeSet::new();
+    let mut fixtures = BTreeSet::new();
     for (idx, sample) in samples.iter().enumerate() {
         let sample = sample
             .as_table()
             .ok_or_else(|| format!("{path} samples[{idx}] must be a TOML table"))?;
-        validate_sample(path, idx, sample, source_kind, fixture_cases, &mut ids)?;
+        let fixture = validate_sample(
+            path,
+            idx,
+            sample,
+            source_kind,
+            claim,
+            fixture_cases,
+            &mut ids,
+        )?;
+        fixtures.insert(fixture);
     }
-    Ok(samples.len())
+    Ok(LabelLedgerStats {
+        sample_count: samples.len(),
+        fixtures,
+    })
 }
 
 fn validate_sample(
@@ -235,9 +288,10 @@ fn validate_sample(
     idx: usize,
     sample: &toml::map::Map<String, toml::Value>,
     ledger_source_kind: &str,
+    claim: &PolicyClaim,
     fixture_cases: &BTreeMap<String, CalibrationFixtureCase>,
     ids: &mut BTreeSet<String>,
-) -> Result<(), String> {
+) -> Result<String, String> {
     for field in sample.keys() {
         if !LABEL_SAMPLE_FIELDS.contains(&field.as_str()) {
             return Err(format!(
@@ -266,6 +320,11 @@ fn validate_sample(
         required_table_string(sample, "adjudicator", path, idx)?;
     }
     let fixture = required_table_string(sample, "fixture", path, idx)?;
+    if !claim.fixtures.contains(fixture) {
+        return Err(format!(
+            "{path} samples[{idx}] references fixture `{fixture}` not listed by policy/accuracy-calibration.toml claim"
+        ));
+    }
     let fixture_case = fixture_cases.get(fixture).ok_or_else(|| {
         format!("{path} samples[{idx}] references fixture `{fixture}` not present in fixtures/calibration.toml")
     })?;
@@ -291,7 +350,7 @@ fn validate_sample(
 
     if expected_cards == 0 {
         reject_zero_card_fields(path, idx, sample)?;
-        return Ok(());
+        return Ok(fixture.to_string());
     }
 
     compare_optional_sample_field(
@@ -381,7 +440,7 @@ fn validate_sample(
             check_fixture_witness_route_kind(path, idx, &fixture_obligation, route_kind)?;
         }
     }
-    Ok(())
+    Ok(fixture.to_string())
 }
 
 fn reject_zero_card_fields(
@@ -808,6 +867,7 @@ rationale = "The fixture routes Send/Sync invariants to Loom/Shuttle, so ASan sh
         let claim = PolicyClaim {
             operation_family: Some("unsafe_impl_send_sync".to_string()),
             hazard: Some("send_sync_invariant".to_string()),
+            fixtures: BTreeSet::from(["unsafe_impl_send".to_string()]),
             label_ledgers: BTreeSet::new(),
         };
 
@@ -871,6 +931,7 @@ rationale = "The fixture intentionally lacks public safety docs, so present cont
         let claim = PolicyClaim {
             operation_family: Some("unknown".to_string()),
             hazard: Some("unknown".to_string()),
+            fixtures: BTreeSet::from(["public_unsafe_fn_missing_safety".to_string()]),
             label_ledgers: BTreeSet::new(),
         };
 
@@ -933,6 +994,7 @@ rationale = "The fixture intentionally has alignment evidence, so missing should
         let claim = PolicyClaim {
             operation_family: Some("raw_pointer_read".to_string()),
             hazard: Some("alignment".to_string()),
+            fixtures: BTreeSet::from(["raw_pointer_alignment_is_aligned_guard".to_string()]),
             label_ledgers: BTreeSet::new(),
         };
 
@@ -996,6 +1058,7 @@ rationale = "The fixture owner should be checked as part of ReviewCard identity 
         let claim = PolicyClaim {
             operation_family: Some("raw_pointer_read".to_string()),
             hazard: Some("alignment".to_string()),
+            fixtures: BTreeSet::from(["raw_pointer_alignment_is_aligned_guard".to_string()]),
             label_ledgers: BTreeSet::new(),
         };
 
@@ -1008,6 +1071,92 @@ rationale = "The fixture owner should be checked as part of ReviewCard identity 
         );
 
         assert!(result.err().unwrap_or_default().contains("expected_owner"));
+        Ok(())
+    }
+
+    #[test]
+    fn label_ledger_rejects_sample_outside_policy_claim_fixture_list() -> Result<(), String> {
+        let ledger = r#"
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "raw-pointer-read-alignment-evidence"
+operation_family = "raw_pointer_read"
+hazard = "alignment"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result."
+
+[[samples]]
+id = "outside-claim-fixture"
+fixture = "raw_pointer_alignment_is_aligned_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+expected_obligation_key = "alignment"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "The fixture is valid calibration data, but this claim did not list it."
+"#
+        .parse::<toml::Table>()
+        .map(toml::Value::Table)
+        .map_err(|err| format!("parse test ledger failed: {err}"))?;
+        let mut cases = BTreeMap::new();
+        cases.insert(
+            "raw_pointer_alignment_is_aligned_guard".to_string(),
+            CalibrationFixtureCase {
+                kind: "positive".to_string(),
+                expected_cards: 1,
+                expected_class: Some("guard_missing".to_string()),
+                expected_operation_family: Some("raw_pointer_read".to_string()),
+                expected_hazard: Some("alignment".to_string()),
+            },
+        );
+        let claim = PolicyClaim {
+            operation_family: Some("raw_pointer_read".to_string()),
+            hazard: Some("alignment".to_string()),
+            fixtures: BTreeSet::from(["raw_pointer_alignment".to_string()]),
+            label_ledgers: BTreeSet::new(),
+        };
+
+        let result = validate_label_ledger(
+            "docs/accuracy/labels/test.toml",
+            &ledger,
+            "raw-pointer-read-alignment-evidence",
+            &claim,
+            &cases,
+        );
+
+        let err = result.err().unwrap_or_default();
+        assert!(err.contains("not listed"));
+        assert!(err.contains("raw_pointer_alignment_is_aligned_guard"));
+        Ok(())
+    }
+
+    #[test]
+    fn policy_claim_fixture_coverage_rejects_unsampled_claim_fixture() -> Result<(), String> {
+        let claim = PolicyClaim {
+            operation_family: Some("raw_pointer_read".to_string()),
+            hazard: Some("alignment".to_string()),
+            fixtures: BTreeSet::from([
+                "raw_pointer_alignment".to_string(),
+                "raw_pointer_alignment_is_aligned_guard".to_string(),
+            ]),
+            label_ledgers: BTreeSet::new(),
+        };
+        let sample_fixtures = BTreeSet::from(["raw_pointer_alignment".to_string()]);
+
+        let Err(err) = check_policy_claim_fixture_sample_coverage(
+            "raw-pointer-read-alignment-evidence",
+            &claim,
+            &sample_fixtures,
+        ) else {
+            return Err("claim fixture without label sample should fail".to_string());
+        };
+
+        assert!(err.contains("without label samples"));
+        assert!(err.contains("raw_pointer_alignment_is_aligned_guard"));
         Ok(())
     }
 }

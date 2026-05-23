@@ -85,6 +85,8 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - claim entries pass promotion guardrails for status-specific evidence,
   known support-tier capability names, known dogfood target IDs, checked labeled
   report files, and public wording that stays inside the supported claim,
+- every claim fixture is backed by a label sample, and every label sample stays
+  inside the owning claim's fixture list,
 - support-tier claim map matches measured evidence,
 - no-overclaim checks pass.
 
@@ -96,6 +98,9 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - A report cannot claim calibrated precision/recall without labeled denominator data.
 - A calibrated claim cannot name a support tier that is absent from
   `docs/status/SUPPORT_TIERS.md`.
+- A label ledger cannot add fixture evidence outside the owning claim's
+  `fixtures` list.
+- A claim cannot list a fixture that has no matching label sample.
 - A fixture-pinned claim cannot carry labeled reports or dogfood targets.
 - A dogfood-measured claim cannot reference an unknown dogfood target.
 - An allowed public claim cannot contain global precision/recall, policy-ready,

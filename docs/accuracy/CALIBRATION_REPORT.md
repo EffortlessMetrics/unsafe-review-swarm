@@ -55,5 +55,6 @@ not stale against `policy/accuracy-calibration.toml`,
 `fixtures/calibration.toml`, and the label ledgers under
 `docs/accuracy/labels/`. It also checks the accuracy policy claim entries for
 status-specific evidence requirements, support-tier names that map to
-`docs/status/SUPPORT_TIERS.md`, known dogfood target IDs, checked labeled report
-paths, and allowed public claim wording that avoids overclaim terms.
+`docs/status/SUPPORT_TIERS.md`, claim fixtures that match label samples, known
+dogfood target IDs, checked labeled report paths, and allowed public claim
+wording that avoids overclaim terms.
