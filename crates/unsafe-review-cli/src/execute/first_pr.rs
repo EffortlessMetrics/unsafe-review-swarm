@@ -2,13 +2,16 @@ use std::path::Path;
 
 use unsafe_review_core::AnalyzeOutput;
 
+type ArtifactRenderer = fn(&AnalyzeOutput) -> String;
+type ArtifactSpec<'a> = (&'a str, ArtifactRenderer);
+
 pub(super) fn print_first_pr_report(
     output: &AnalyzeOutput,
     out_dir: &Path,
     root: &Path,
     no_changed_gaps_message: &str,
     no_changed_gaps_limitation: &str,
-    artifacts: &[(&str, fn(&AnalyzeOutput) -> String)],
+    artifacts: &[ArtifactSpec<'_>],
 ) {
     print_first_pr_overview(output, out_dir);
     print_top_card_summary(
@@ -79,7 +82,7 @@ fn print_top_card_summary(
     );
 }
 
-fn print_artifact_paths(out_dir: &Path, artifacts: &[(&str, fn(&AnalyzeOutput) -> String)]) {
+fn print_artifact_paths(out_dir: &Path, artifacts: &[ArtifactSpec<'_>]) {
     println!("Artifacts:");
     for (name, _) in artifacts {
         println!("  {}", out_dir.join(name).display());
