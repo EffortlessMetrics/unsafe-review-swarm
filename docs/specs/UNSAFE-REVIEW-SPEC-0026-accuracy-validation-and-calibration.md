@@ -87,6 +87,8 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
   report files, and public wording that stays inside the supported claim,
 - every claim fixture is backed by a label sample, and every label sample stays
   inside the owning claim's fixture list,
+- label sample counts do not double-count the same fixture, obligation, and
+  evidence expectation within one claim,
 - support-tier claim map matches measured evidence,
 - no-overclaim checks pass.
 
@@ -101,6 +103,8 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - A label ledger cannot add fixture evidence outside the owning claim's
   `fixtures` list.
 - A claim cannot list a fixture that has no matching label sample.
+- A claim cannot count the same fixture/obligation/evidence expectation twice
+  through one or more label ledgers.
 - A fixture-pinned claim cannot carry labeled reports or dogfood targets.
 - A dogfood-measured claim cannot reference an unknown dogfood target.
 - An allowed public claim cannot contain global precision/recall, policy-ready,

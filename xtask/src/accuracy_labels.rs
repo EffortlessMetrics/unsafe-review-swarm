@@ -73,6 +73,12 @@ struct PolicyClaim {
 struct LabelLedgerStats {
     sample_count: usize,
     fixtures: BTreeSet<String>,
+    sample_keys: BTreeSet<String>,
+}
+
+struct LabelSampleStats {
+    fixture: String,
+    key: String,
 }
 
 struct FixtureObligation<'a> {
@@ -116,6 +122,7 @@ pub(crate) fn check_accuracy_label_ledgers(
     let mut sample_count = 0usize;
     for (claim_id, claim) in &claims {
         let mut claim_sample_fixtures = BTreeSet::new();
+        let mut claim_sample_keys = BTreeSet::new();
         for ledger in &claim.label_ledgers {
             if !actual_ledgers.contains(ledger) {
                 return Err(format!(
@@ -125,12 +132,36 @@ pub(crate) fn check_accuracy_label_ledgers(
             let value = super::parse_toml_file(&super::workspace_path(ledger))?;
             let stats = validate_label_ledger(ledger, &value, claim_id, claim, fixture_cases)?;
             sample_count += stats.sample_count;
-            claim_sample_fixtures.extend(stats.fixtures);
+            extend_claim_label_samples(
+                claim_id,
+                ledger,
+                &mut claim_sample_fixtures,
+                &mut claim_sample_keys,
+                stats,
+            )?;
         }
         check_policy_claim_fixture_sample_coverage(claim_id, claim, &claim_sample_fixtures)?;
     }
 
     Ok(sample_count)
+}
+
+fn extend_claim_label_samples(
+    claim_id: &str,
+    ledger: &str,
+    claim_sample_fixtures: &mut BTreeSet<String>,
+    claim_sample_keys: &mut BTreeSet<String>,
+    ledger_stats: LabelLedgerStats,
+) -> Result<(), String> {
+    claim_sample_fixtures.extend(ledger_stats.fixtures);
+    for key in ledger_stats.sample_keys {
+        if !claim_sample_keys.insert(key.clone()) {
+            return Err(format!(
+                "policy/accuracy-calibration.toml claim `{claim_id}` has duplicate label sample `{key}` across label ledgers including `{ledger}`"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn check_policy_claim_fixture_sample_coverage(
@@ -262,11 +293,12 @@ fn validate_label_ledger(
     }
     let mut ids = BTreeSet::new();
     let mut fixtures = BTreeSet::new();
+    let mut sample_keys = BTreeSet::new();
     for (idx, sample) in samples.iter().enumerate() {
         let sample = sample
             .as_table()
             .ok_or_else(|| format!("{path} samples[{idx}] must be a TOML table"))?;
-        let fixture = validate_sample(
+        let sample = validate_sample(
             path,
             idx,
             sample,
@@ -275,11 +307,15 @@ fn validate_label_ledger(
             fixture_cases,
             &mut ids,
         )?;
-        fixtures.insert(fixture);
+        fixtures.insert(sample.fixture);
+        if !sample_keys.insert(sample.key.clone()) {
+            return Err(format!("{path} contains duplicate sample `{}`", sample.key));
+        }
     }
     Ok(LabelLedgerStats {
         sample_count: samples.len(),
         fixtures,
+        sample_keys,
     })
 }
 
@@ -291,7 +327,7 @@ fn validate_sample(
     claim: &PolicyClaim,
     fixture_cases: &BTreeMap<String, CalibrationFixtureCase>,
     ids: &mut BTreeSet<String>,
-) -> Result<String, String> {
+) -> Result<LabelSampleStats, String> {
     for field in sample.keys() {
         if !LABEL_SAMPLE_FIELDS.contains(&field.as_str()) {
             return Err(format!(
@@ -350,7 +386,10 @@ fn validate_sample(
 
     if expected_cards == 0 {
         reject_zero_card_fields(path, idx, sample)?;
-        return Ok(fixture.to_string());
+        return Ok(LabelSampleStats {
+            fixture: fixture.to_string(),
+            key: format!("{fixture}|zero-card"),
+        });
     }
 
     compare_optional_sample_field(
@@ -391,9 +430,8 @@ fn validate_sample(
         expected_site_kind,
         obligation_key,
     };
-    if let Some(contract_state) =
-        optional_table_string(sample, "expected_contract_state", path, idx)?
-    {
+    let contract_state = optional_table_string(sample, "expected_contract_state", path, idx)?;
+    if let Some(contract_state) = contract_state {
         require_allowed(
             contract_state,
             DISCHARGE_STATES,
@@ -430,7 +468,7 @@ fn validate_sample(
     )?;
     let route_kinds = optional_table_str_array(sample, "expected_witness_route_kinds", path, idx)?;
     if !route_kinds.is_empty() {
-        for route_kind in route_kinds {
+        for route_kind in &route_kinds {
             require_allowed(
                 route_kind,
                 WITNESS_ROUTE_KINDS,
@@ -440,7 +478,19 @@ fn validate_sample(
             check_fixture_witness_route_kind(path, idx, &fixture_obligation, route_kind)?;
         }
     }
-    Ok(fixture.to_string())
+    Ok(LabelSampleStats {
+        fixture: fixture.to_string(),
+        key: format!(
+            "{}|{}|{}|{}|contract={}|discharge={}|routes={}",
+            fixture,
+            expected_operation_family,
+            expected_hazard,
+            obligation_key,
+            contract_state.unwrap_or(""),
+            discharge_state,
+            route_kinds.join(",")
+        ),
+    })
 }
 
 fn reject_zero_card_fields(
@@ -1157,6 +1207,105 @@ rationale = "The fixture is valid calibration data, but this claim did not list 
 
         assert!(err.contains("without label samples"));
         assert!(err.contains("raw_pointer_alignment_is_aligned_guard"));
+        Ok(())
+    }
+
+    #[test]
+    fn label_ledger_rejects_duplicate_sample_fixture() -> Result<(), String> {
+        let ledger = r#"
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "raw-pointer-read-alignment-evidence"
+operation_family = "raw_pointer_read"
+hazard = "alignment"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result."
+
+[[samples]]
+id = "first"
+fixture = "raw_pointer_alignment_is_aligned_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+expected_obligation_key = "alignment"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "The fixture has same-pointer alignment evidence before the raw pointer read."
+
+[[samples]]
+id = "second"
+fixture = "raw_pointer_alignment_is_aligned_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+expected_obligation_key = "alignment"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A second sample for the same fixture would overstate the claim sample count."
+"#
+        .parse::<toml::Table>()
+        .map(toml::Value::Table)
+        .map_err(|err| format!("parse test ledger failed: {err}"))?;
+        let mut cases = BTreeMap::new();
+        cases.insert(
+            "raw_pointer_alignment_is_aligned_guard".to_string(),
+            CalibrationFixtureCase {
+                kind: "positive".to_string(),
+                expected_cards: 1,
+                expected_class: Some("guard_missing".to_string()),
+                expected_operation_family: Some("raw_pointer_read".to_string()),
+                expected_hazard: Some("alignment".to_string()),
+            },
+        );
+        let claim = PolicyClaim {
+            operation_family: Some("raw_pointer_read".to_string()),
+            hazard: Some("alignment".to_string()),
+            fixtures: BTreeSet::from(["raw_pointer_alignment_is_aligned_guard".to_string()]),
+            label_ledgers: BTreeSet::new(),
+        };
+
+        let result = validate_label_ledger(
+            "docs/accuracy/labels/test.toml",
+            &ledger,
+            "raw-pointer-read-alignment-evidence",
+            &claim,
+            &cases,
+        );
+
+        let err = result.err().unwrap_or_default();
+        assert!(err.contains("duplicate sample"));
+        assert!(err.contains("raw_pointer_alignment_is_aligned_guard"));
+        Ok(())
+    }
+
+    #[test]
+    fn claim_fixture_coverage_rejects_duplicate_sample_across_ledgers() -> Result<(), String> {
+        let key = "raw_pointer_alignment|raw_pointer_read|alignment|alignment|contract=|discharge=missing|routes=";
+        let mut seen_fixtures = BTreeSet::from(["raw_pointer_alignment".to_string()]);
+        let mut seen_keys = BTreeSet::from([key.to_string()]);
+        let ledger_stats = LabelLedgerStats {
+            sample_count: 1,
+            fixtures: BTreeSet::from(["raw_pointer_alignment".to_string()]),
+            sample_keys: BTreeSet::from([key.to_string()]),
+        };
+
+        let Err(err) = extend_claim_label_samples(
+            "raw-pointer-read-alignment-evidence",
+            "docs/accuracy/labels/duplicate.toml",
+            &mut seen_fixtures,
+            &mut seen_keys,
+            ledger_stats,
+        ) else {
+            return Err("duplicate fixture sample across ledgers should fail".to_string());
+        };
+
+        assert!(err.contains("duplicate label sample"));
+        assert!(err.contains("raw_pointer_alignment"));
         Ok(())
     }
 }

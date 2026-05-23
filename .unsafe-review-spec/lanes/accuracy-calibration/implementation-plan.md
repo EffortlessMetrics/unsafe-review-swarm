@@ -27,6 +27,7 @@ The guard rejects:
   capabilities,
 - label samples outside the claim's fixture list, or claim fixtures without
   label samples,
+- duplicate fixture/obligation/evidence samples within a claim,
 - fixture-pinned claims that carry dogfood targets or labeled reports,
 - dogfood-measured claims without known dogfood target IDs,
 - labeled-calibrated or policy-eligible claims without checked report files,

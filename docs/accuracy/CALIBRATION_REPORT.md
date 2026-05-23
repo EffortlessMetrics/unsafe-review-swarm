@@ -57,4 +57,6 @@ not stale against `policy/accuracy-calibration.toml`,
 status-specific evidence requirements, support-tier names that map to
 `docs/status/SUPPORT_TIERS.md`, claim fixtures that match label samples, known
 dogfood target IDs, checked labeled report paths, and allowed public claim
-wording that avoids overclaim terms.
+wording that avoids overclaim terms. A claim may include multiple
+obligation-level samples from one fixture, but the same fixture, obligation, and
+evidence expectation cannot be counted twice through duplicate ledger entries.
