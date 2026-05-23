@@ -46,6 +46,8 @@ The guard rejects:
   family registry row.
 - fixture golden cards whose top-level missing summaries drift away from the
   per-obligation evidence state.
+- fixture golden cards whose contract, guard, witness, or reach missing
+  summaries are omitted or stale relative to the matching evidence axis.
 - fixture golden cards whose top-level reach, per-obligation reach summaries,
   or reach owner drift away from static test-mention evidence or claim site
   execution without a receipt.

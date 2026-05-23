@@ -65,6 +65,12 @@ the per-obligation evidence rows: at least one summary is required when any
 contract, discharge, reach, or witness evidence is missing, and no missing
 summary is allowed when all obligation evidence is present. The summary remains
 reviewer-facing; it is not a replacement for obligation-level evidence.
+Stable missing-summary categories must agree with the corresponding evidence
+axis: missing contract evidence requires contract-missing wording, missing
+discharge evidence requires guard-missing wording, missing witness evidence
+requires witness-missing wording, and those summaries must not remain after the
+axis is present. Reach-missing summaries are allowed when static reach is
+missing, but must not appear when reach evidence is present.
 
 Fixture golden cards must keep reach evidence aligned with the static
 test-reachability boundary. The top-level `reach` summary and every
@@ -130,7 +136,8 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - fixture golden obligation evidence keys belong to the operation family
   registry row,
 - fixture golden missing summaries are non-empty exactly when at least one
-  obligation evidence axis is missing,
+  obligation evidence axis is missing and stable contract/discharge/witness
+  missing categories match their evidence axes,
 - fixture golden reach evidence keeps top-level and obligation-level summaries
   aligned with `site.owner` and static-test-mention wording, without execution
   proof overclaims,
@@ -184,6 +191,9 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
   operation family registry row.
 - A fixture card cannot drift top-level contract, discharge, or witness
   summaries away from the matching obligation-level evidence posture.
+- A fixture card cannot omit required contract, guard, or witness missing
+  summaries, or keep stale missing summaries after the corresponding evidence
+  axis is present.
 - A fixture card cannot drift obligation-level reach away from top-level reach,
   name a different owner, or claim a test reached or executed the unsafe site.
 - A fixture card cannot introduce a witness route kind outside the operation

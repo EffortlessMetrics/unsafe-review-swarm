@@ -3536,7 +3536,103 @@ fn check_fixture_missing_summary(
         ));
     }
 
+    check_fixture_missing_summary_axes(&card_context, card, &summaries)?;
+
     Ok(())
+}
+
+fn check_fixture_missing_summary_axes(
+    card_context: &str,
+    card: &serde_json::Value,
+    summaries: &BTreeSet<&str>,
+) -> Result<(), String> {
+    check_fixture_missing_summary_axis(
+        card_context,
+        card,
+        summaries,
+        "contract",
+        summary_is_contract_missing,
+        "contract evidence is missing",
+        "contract missing summary",
+    )?;
+    check_fixture_missing_summary_axis(
+        card_context,
+        card,
+        summaries,
+        "discharge",
+        summary_is_discharge_missing,
+        "discharge evidence is missing",
+        "guard missing summary",
+    )?;
+    check_fixture_missing_summary_axis(
+        card_context,
+        card,
+        summaries,
+        "witness",
+        summary_is_witness_missing,
+        "witness evidence is missing",
+        "witness missing summary",
+    )?;
+
+    if !fixture_obligation_axis_has_state(card_context, card, "reach", "missing")?
+        && summaries
+            .iter()
+            .any(|summary| summary_is_reach_missing(summary))
+    {
+        return Err(format!(
+            "{card_context} missing must not include a reach missing summary when reach evidence is present"
+        ));
+    }
+
+    Ok(())
+}
+
+fn check_fixture_missing_summary_axis(
+    card_context: &str,
+    card: &serde_json::Value,
+    summaries: &BTreeSet<&str>,
+    axis: &str,
+    matches_summary: fn(&str) -> bool,
+    missing_reason: &str,
+    summary_name: &str,
+) -> Result<(), String> {
+    let axis_missing = fixture_obligation_axis_has_state(card_context, card, axis, "missing")?;
+    let summary_present = summaries.iter().any(|summary| matches_summary(summary));
+    match (axis_missing, summary_present) {
+        (true, false) => Err(format!(
+            "{card_context} missing must include {summary_name} because {missing_reason}"
+        )),
+        (false, true) => Err(format!(
+            "{card_context} missing must not include {summary_name} when {axis} evidence is present"
+        )),
+        _ => Ok(()),
+    }
+}
+
+fn fixture_obligation_axis_has_state(
+    card_context: &str,
+    card: &serde_json::Value,
+    axis: &str,
+    state: &str,
+) -> Result<bool, String> {
+    Ok(fixture_obligation_axis_states(card_context, card, axis)?.contains(state))
+}
+
+fn summary_is_contract_missing(summary: &str) -> bool {
+    summary.contains("Missing `# Safety` documentation")
+        || summary.contains("Missing public `# Safety` documentation")
+}
+
+fn summary_is_discharge_missing(summary: &str) -> bool {
+    summary == "Missing visible local guard for inferred safety obligations"
+}
+
+fn summary_is_witness_missing(summary: &str) -> bool {
+    summary == "No witness receipt imported for this card"
+}
+
+fn summary_is_reach_missing(summary: &str) -> bool {
+    summary == "No related test path was found by static search"
 }
 
 fn required_fixture_evidence_str<'a>(
@@ -6341,6 +6437,85 @@ jobs:
         };
 
         assert!(err.contains("missing must summarize"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_missing_summary_without_witness_gap() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["obligation_evidence"][0]["witness"]["present"] = serde_json::Value::Bool(true);
+        card["obligation_evidence"][0]["witness"]["state"] =
+            serde_json::Value::String("present".to_string());
+        card["obligation_evidence"][0]["witness"]["summary"] =
+            serde_json::Value::String("Imported miri receipt with `ran` strength".to_string());
+        card["witness"] =
+            serde_json::Value::String("Imported miri receipt with `ran` strength".to_string());
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("stale witness missing summary should fail".to_string());
+        };
+
+        assert!(err.contains("witness missing summary"));
+        assert!(err.contains("witness evidence is present"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_missing_contract_summary_omission() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        let missing_contract = "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment";
+        card["obligation_evidence"][0]["contract"]["present"] = serde_json::Value::Bool(false);
+        card["obligation_evidence"][0]["contract"]["state"] =
+            serde_json::Value::String("missing".to_string());
+        card["obligation_evidence"][0]["contract"]["summary"] =
+            serde_json::Value::String(missing_contract.to_string());
+        card["contract"] = serde_json::Value::String(missing_contract.to_string());
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("omitted contract missing summary should fail".to_string());
+        };
+
+        assert!(err.contains("contract missing summary"));
+        assert!(err.contains("contract evidence is missing"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_stale_reach_missing_summary() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["missing"] = serde_json::json!([
+            "Missing visible local guard for inferred safety obligations",
+            "No related test path was found by static search",
+            "No witness receipt imported for this card"
+        ]);
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("stale reach missing summary should fail".to_string());
+        };
+
+        assert!(err.contains("reach missing summary"));
+        assert!(err.contains("reach evidence is present"));
         Ok(())
     }
 
