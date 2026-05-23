@@ -1,0 +1,37 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "ffi-boundary-obligation-evidence"
+operation_family = "ffi"
+hazard = "ffi_abi"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard FFI obligation evidence behavior; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "ffi-boundary-abi-missing-discharge"
+fixture = "ffi_sanitizer_route"
+kind = "positive"
+expected_cards = 1
+expected_class = "miri_unsupported"
+expected_operation_family = "ffi"
+expected_hazard = "ffi_abi"
+expected_obligation_key = "abi"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "The extern C boundary card tracks ABI/layout compatibility as a distinct missing discharge obligation."
+
+[[samples]]
+id = "ffi-boundary-ownership-missing-discharge"
+fixture = "ffi_sanitizer_route"
+kind = "positive"
+expected_cards = 1
+expected_class = "miri_unsupported"
+expected_operation_family = "ffi"
+expected_hazard = "ffi_abi"
+expected_obligation_key = "ownership"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "The extern C boundary card tracks ownership, lifetime, and nullability contract evidence separately from ABI layout."

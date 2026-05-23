@@ -31,6 +31,9 @@ The current fixture-pinned slices are:
   route to Loom/Shuttle witness suggestions.
 - FFI witness routing: checks that unsafe extern C boundaries route away from
   Miri-first review to sanitizer/cargo-careful witness suggestions.
+- FFI boundary obligation evidence: checks that ABI/layout compatibility and
+  ownership/lifetime/nullability contracts are tracked as separate obligations
+  for unsafe extern C seams.
 - No-card artifact honesty: checks that safe, import-only, cfg-only, and
   unchanged-adjacent fixtures emit zero ReviewCards without turning that into an
   all-clear or safety claim.

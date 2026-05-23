@@ -4,6 +4,8 @@ Claim-scoped label ledgers live here.
 
 Current ledgers:
 
+- `ffi-boundary-obligations.toml`: fixture-pinned obligation-level labels for
+  FFI ABI/layout and ownership/lifetime/nullability evidence.
 - `ffi-sanitizer-witness-routes.toml`: fixture-pinned route-quality labels for
   FFI sanitizer/cargo-careful witness routing.
 - `maybeuninit-assume-init-initialized.toml`: fixture-pinned

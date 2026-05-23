@@ -297,6 +297,34 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "ffi-boundary-obligation-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "ffi"
+hazard = "ffi_abi"
+support_tier = "Core operation smoke slice"
+fixtures = [
+  "ffi_sanitizer_route",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/ffi-boundary-obligations.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned FFI boundary evidence records ABI/layout and ownership/lifetime/
+nullability obligations separately for the listed unsafe extern C fixture.
+"""
+forbidden_claims = [
+  "FFI ABI correctness proof",
+  "FFI ownership correctness proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "no-card-artifact-honesty"
 status = "fixture_pinned"
 kind = "artifact_honesty"
