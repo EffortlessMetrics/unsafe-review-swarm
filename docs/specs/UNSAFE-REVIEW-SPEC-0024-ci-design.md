@@ -14,6 +14,7 @@ Linked specs:
 
 Linked docs:
 - [docs/ci/PR_CI.md](../ci/PR_CI.md)
+- [docs/ci/TRUSTED_COMMENT_POSTER.md](../ci/TRUSTED_COMMENT_POSTER.md)
 - [.github/workflows/ci.yml](../../.github/workflows/ci.yml)
 - [.github/workflows/unsafe-review.yml](../../.github/workflows/unsafe-review.yml)
 - [.github/examples/unsafe-review-first-pr.yml](../../.github/examples/unsafe-review-first-pr.yml)
@@ -435,6 +436,11 @@ post from malformed artifacts
 
 Security reason: write-token workflows must not combine untrusted
 PR-controlled code execution with comment-writing authority.
+
+The future trusted-poster architecture is specified in
+[docs/ci/TRUSTED_COMMENT_POSTER.md](../ci/TRUSTED_COMMENT_POSTER.md). It is not
+part of the default workflow set and must remain deferred until separately
+implemented and reviewed.
 
 ## 5. CI permissions policy
 

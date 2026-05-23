@@ -20,7 +20,8 @@ plan without enabling automatic comment posting by default.
 5. Add fixture-backed examples for selected and not-selected cards, with
    `not_selected` reasons in the plan artifact.
 6. Document a future trusted poster workflow that consumes verified artifacts
-   without rerunning analysis truth.
+   without rerunning analysis truth. The design lives in
+   `docs/ci/TRUSTED_COMMENT_POSTER.md`.
 
 ## Non-goals
 

@@ -131,6 +131,10 @@ Required split model:
 
 The poster must not rerun analysis truth, run witness tools, edit source, or post beyond the validated plan.
 
+The detailed trusted-poster design is in
+[docs/ci/TRUSTED_COMMENT_POSTER.md](../ci/TRUSTED_COMMENT_POSTER.md). That
+document is a future-lane contract, not a live workflow.
+
 ## 10. Verifier contract
 
 `cargo run --locked -p xtask -- check-first-pr-artifacts <dir>` must reject malformed or policy-violating `comment-plan.json`, including:
