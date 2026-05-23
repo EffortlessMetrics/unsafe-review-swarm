@@ -16,6 +16,11 @@ ReviewCard is the canonical unit for CLI, PR, SARIF, LSP, badges, and agent pack
 Machine-readable review-card and agent-packet JSON output is produced through
 serde-backed DTOs so escaping, arrays, and required fields are parser-checked rather
 than hand-rendered strings.
+Cards include stable site metadata: relative Rust file path, positive line and
+column, known site kind, owner, visibility, public API surface flag, and a
+single-line snippet. The top-level `operation` string must match
+`site.snippet`, keeping PR, editor, agent, SARIF, and receipt projections on the
+same operation expression.
 Cards include the concrete operation expression, operation family, and an
 `obligation_evidence` array that reports contract, discharge, reach, and witness
 state per safety obligation. Top-level evidence summaries remain for
@@ -48,6 +53,9 @@ contract gap to a weaker or unknown PR-review signal.
 ## Acceptance examples
 
 - A changed unsafe seam produces one review card with stable identity.
+- The card's site metadata uses known kind/visibility values, positive source
+  coordinates, a relative Rust source path, and an operation string that matches
+  the site snippet.
 - The card's class, priority, and confidence are known ReviewCard values and
   match the fixture-pinned classification signal.
 - The card includes missing evidence and a next action.

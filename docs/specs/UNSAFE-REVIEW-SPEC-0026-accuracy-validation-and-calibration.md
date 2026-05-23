@@ -127,6 +127,9 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - fixture golden ReviewCard IDs preserve fixture/package, file, owner, site
   kind, operation family, operation path/callee, snippet hash, hazard, and
   counted identity suffix,
+- fixture golden site metadata uses known site kinds, known visibility values,
+  positive source coordinates, relative Rust source paths, coherent public API
+  flags, and one operation expression shared by `operation` and `site.snippet`,
 - fixture golden class, priority, and confidence fields use known ReviewCard
   values and fixture-pinned classification signals,
 - support-tier claim map matches measured evidence,
@@ -147,6 +150,8 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
   through one or more label ledgers.
 - A fixture-pinned claim cannot carry labeled reports or dogfood targets.
 - A dogfood-measured claim cannot reference an unknown dogfood target.
+- A fixture card cannot introduce an unknown site kind, invalid source
+  coordinate, private public-API flag, or operation/snippet mismatch.
 - A fixture card cannot introduce an unknown class, priority, or confidence, or
   pair a supported class with a stale priority/confidence signal.
 - An allowed public claim cannot contain global precision/recall, policy-ready,

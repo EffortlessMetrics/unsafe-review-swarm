@@ -2424,6 +2424,7 @@ fn check_fixture_card_identity(
         .get("site")
         .and_then(serde_json::Value::as_object)
         .ok_or_else(|| format!("{path} card[{idx}] is missing object key `site`"))?;
+    check_fixture_site_metadata(path, idx, card, site)?;
     let operation_family =
         require_non_empty_json_str(card, "operation_family", &format!("{path} card[{idx}]"))?;
     let operation_path = fixture_card_operation_path(card, site, operation_family, path, idx)?;
@@ -2480,6 +2481,94 @@ fn check_fixture_card_identity(
     check_fixture_witness_routes(path, idx, card)?;
 
     Ok(())
+}
+
+fn check_fixture_site_metadata(
+    path: &str,
+    idx: usize,
+    card: &serde_json::Value,
+    site: &serde_json::Map<String, serde_json::Value>,
+) -> Result<(), String> {
+    let card_context = format!("{path} card[{idx}]");
+    let file = required_json_object_str(site, "file", path, idx)?;
+    if !file.ends_with(".rs")
+        || file.starts_with('/')
+        || file.contains('\\')
+        || file.split('/').any(|part| part == ".." || part.is_empty())
+    {
+        return Err(format!(
+            "{card_context} site.file `{file}` must be a relative Rust source path"
+        ));
+    }
+
+    let line = required_json_object_u64(site, "line", path, idx)?;
+    if line == 0 {
+        return Err(format!("{card_context} site.line must be positive"));
+    }
+    let column = required_json_object_u64(site, "column", path, idx)?;
+    if column == 0 {
+        return Err(format!("{card_context} site.column must be positive"));
+    }
+
+    let kind = required_json_object_str(site, "kind", path, idx)?;
+    if !fixture_known_site_kind(kind) {
+        return Err(format!(
+            "{card_context} site.kind `{kind}` must be a known UnsafeSiteKind string"
+        ));
+    }
+
+    let visibility = required_json_object_str(site, "visibility", path, idx)?;
+    if !matches!(visibility, "public" | "private") {
+        return Err(format!(
+            "{card_context} site.visibility `{visibility}` must be `public` or `private`"
+        ));
+    }
+
+    let Some(public_api_surface) = site
+        .get("public_api_surface")
+        .and_then(serde_json::Value::as_bool)
+    else {
+        return Err(format!(
+            "{card_context} site is missing boolean key `public_api_surface`"
+        ));
+    };
+    if public_api_surface && visibility != "public" {
+        return Err(format!(
+            "{card_context} public_api_surface requires site.visibility `public`"
+        ));
+    }
+
+    let snippet = required_json_object_str(site, "snippet", path, idx)?;
+    if snippet.contains('\n') || snippet.contains('\r') {
+        return Err(format!(
+            "{card_context} site.snippet must be a single-line review snippet"
+        ));
+    }
+
+    let operation = require_non_empty_json_str(card, "operation", &card_context)?;
+    if operation != snippet {
+        return Err(format!(
+            "{card_context} operation must match site.snippet so card projections share one operation expression"
+        ));
+    }
+
+    Ok(())
+}
+
+fn fixture_known_site_kind(kind: &str) -> bool {
+    matches!(
+        kind,
+        "unsafe_block"
+            | "unsafe_fn"
+            | "unsafe_trait"
+            | "unsafe_impl"
+            | "unsafe_impl_send"
+            | "unsafe_impl_sync"
+            | "extern_block"
+            | "ffi_call"
+            | "static_mut"
+            | "operation"
+    )
 }
 
 fn check_fixture_card_classification(
@@ -2987,6 +3076,18 @@ fn required_json_object_str<'a>(
     } else {
         Ok(value)
     }
+}
+
+fn required_json_object_u64(
+    object: &serde_json::Map<String, serde_json::Value>,
+    key: &str,
+    path: &str,
+    idx: usize,
+) -> Result<u64, String> {
+    object
+        .get(key)
+        .and_then(serde_json::Value::as_u64)
+        .ok_or_else(|| format!("{path} card[{idx}] site is missing unsigned integer key `{key}`"))
 }
 
 fn fixture_card_operation_path(
@@ -5192,6 +5293,68 @@ jobs:
     }
 
     #[test]
+    fn fixture_card_identity_rejects_unknown_site_kind() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["site"]["kind"] = serde_json::Value::String("unsafeish".to_string());
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("unknown site kind should fail".to_string());
+        };
+
+        assert!(err.contains("site.kind `unsafeish`"));
+        assert!(err.contains("known UnsafeSiteKind"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_private_public_api_surface() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["site"]["public_api_surface"] = serde_json::Value::Bool(true);
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("private public-api surface should fail".to_string());
+        };
+
+        assert!(err.contains("public_api_surface"));
+        assert!(err.contains("visibility `public`"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_operation_snippet_mismatch() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["operation"] = serde_json::Value::String("ptr.read()".to_string());
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("operation/snippet mismatch should fail".to_string());
+        };
+
+        assert!(err.contains("operation must match site.snippet"));
+        Ok(())
+    }
+
+    #[test]
     fn fixture_card_identity_rejects_unknown_class() -> Result<(), String> {
         let mut card = test_fixture_card(
             "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
@@ -5690,8 +5853,13 @@ jobs:
   "confidence": "medium",
   "site": {{
     "file": "src/lib.rs",
+    "line": 8,
+    "column": 5,
     "owner": "read_header",
-    "kind": "operation"
+    "kind": "operation",
+    "visibility": "private",
+    "public_api_surface": false,
+    "snippet": "unsafe {{ ptr.cast::<Header>().read() }}"
   }},
   "operation": "unsafe {{ ptr.cast::<Header>().read() }}",
   "operation_family": "raw_pointer_read",
