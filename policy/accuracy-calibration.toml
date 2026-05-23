@@ -829,6 +829,10 @@ fixtures = [
   "unwrap_unchecked_let_else_some_reassigned_not_guard",
   "unwrap_unchecked_let_else_ok_guard",
   "unwrap_unchecked_let_else_ok_reassigned_not_guard",
+  "unwrap_unchecked_match_some_guard",
+  "unwrap_unchecked_match_some_reassigned_not_guard",
+  "unwrap_unchecked_match_ok_guard",
+  "unwrap_unchecked_match_ok_reassigned_not_guard",
   "unwrap_unchecked_other_if_let_not_guard",
   "unwrap_unchecked_other_if_let_ok_not_guard",
   "unwrap_unchecked_post_check_not_guard",
@@ -845,9 +849,9 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned unwrap_unchecked valid-value evidence distinguishes
 same-receiver Option/Result state, local infallible results, if-let guards,
-let-else early-return guards, and early-return guards from bare observations,
-wrong receivers, post-checks, comment-only early-return text, and stale guards
-in the listed fixtures.
+let-else early-return guards, match-arm guards, and early-return guards from
+bare observations, wrong receivers, post-checks, comment-only early-return text,
+and stale guards in the listed fixtures.
 """
 forbidden_claims = [
   "broad unwrap_unchecked soundness",

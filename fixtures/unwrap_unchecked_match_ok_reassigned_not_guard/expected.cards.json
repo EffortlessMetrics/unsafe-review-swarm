@@ -1,0 +1,79 @@
+[
+  {
+    "id": "UR-unwrap-unchecked-match-ok-reassigned-not-guard-fixture-src-lib-rs-extract-operation-unwrap_unchecked-unwrap-unchecked-e87efbc55d06-invalid_value-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 6,
+      "column": 13,
+      "kind": "operation",
+      "owner": "extract",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { result.unwrap_unchecked() }"
+    },
+    "operation": "unsafe { result.unwrap_unchecked() }",
+    "operation_family": "unwrap_unchecked",
+    "hazards": [
+      "invalid_value"
+    ],
+    "obligations": [
+      "value is known to be `Some` or `Ok` before `unwrap_unchecked`"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "valid-value",
+        "description": "value is known to be `Some` or `Ok` before `unwrap_unchecked`",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `extract`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "No visible local guard detected",
+    "reach": "1 related test file(s) mention owner `extract`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test extract",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test extract",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose the local guard that discharges the `unwrap_unchecked` safety obligation.",
+    "verify_commands": [
+      "cargo +nightly miri test extract",
+      "cargo +nightly careful test extract"
+    ]
+  }
+]

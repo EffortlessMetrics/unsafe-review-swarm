@@ -130,9 +130,9 @@ The current fixture-pinned slices are:
   rejecting wrong-context, post-operation, and closed prior matches.
 - `unwrap_unchecked` valid-value evidence: checks whether same-receiver
   Option/Result state, local infallible results, if-let guards, let-else
-  early-return guards, and early-return guards discharge the valid-value
-  obligation, while rejecting bare observations, wrong receivers, post-checks,
-  comment-only early-return text, and stale guards.
+  early-return guards, match-arm guards, and early-return guards discharge the
+  valid-value obligation, while rejecting bare observations, wrong receivers,
+  post-checks, comment-only early-return text, and stale guards.
 
 This remains experimental/advisory until human-adjudicated calibration and
 report checks are landed.

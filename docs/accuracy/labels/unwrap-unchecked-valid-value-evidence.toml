@@ -206,6 +206,66 @@ label_source = "fixture_golden"
 rationale = "A same-receiver let-else Ok guard becomes stale after receiver reassignment and must not discharge unwrap_unchecked valid-value evidence."
 
 [[samples]]
+id = "unwrap-unchecked-match-some-present"
+fixture = "unwrap_unchecked_match_some_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-receiver match Some as_ref arm discharges Option unwrap_unchecked valid-value evidence."
+
+[[samples]]
+id = "unwrap-unchecked-match-some-reassigned-missing"
+fixture = "unwrap_unchecked_match_some_reassigned_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-receiver match Some arm becomes stale after receiver reassignment and must not discharge unwrap_unchecked valid-value evidence."
+
+[[samples]]
+id = "unwrap-unchecked-match-ok-present"
+fixture = "unwrap_unchecked_match_ok_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-receiver match Ok as_ref arm discharges Result unwrap_unchecked valid-value evidence."
+
+[[samples]]
+id = "unwrap-unchecked-match-ok-reassigned-missing"
+fixture = "unwrap_unchecked_match_ok_reassigned_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-receiver match Ok arm becomes stale after receiver reassignment and must not discharge unwrap_unchecked valid-value evidence."
+
+[[samples]]
 id = "unwrap-unchecked-other-if-let-some-missing"
 fixture = "unwrap_unchecked_other_if_let_not_guard"
 kind = "false_positive_control"

@@ -1,0 +1,20 @@
+pub fn extract(option: Option<u8>) -> u8 {
+    match option.as_ref() {
+        Some(_) => {
+            // SAFETY: the match arm only reaches this point when the option is Some.
+            unsafe { option.unwrap_unchecked() }
+        }
+        None => 0,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::extract;
+
+    #[test]
+    fn extracts_some_value() {
+        assert_eq!(extract(Some(7)), 7);
+        assert_eq!(extract(None), 0);
+    }
+}
