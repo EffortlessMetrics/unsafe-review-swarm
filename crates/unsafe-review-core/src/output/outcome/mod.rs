@@ -1,6 +1,11 @@
-use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
+
+#[cfg(test)]
+use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
+
+mod markdown;
+mod witness;
 
 const TRUST_BOUNDARY: &str = "Static unsafe contract review outcome only; this compares existing ReviewCard snapshots, not memory-safety proof, not UB-free status, and not witness execution.";
 
@@ -144,94 +149,7 @@ pub fn render_json(report: &OutcomeReport) -> String {
 }
 
 pub fn render_markdown(report: &OutcomeReport) -> String {
-    let mut out = String::new();
-    out.push_str("# unsafe-review outcome\n\n");
-    out.push_str("Static comparison of two existing unsafe-review JSON snapshots.\n\n");
-    out.push_str("## Summary\n\n");
-    out.push_str("| New | Resolved | Improved | Regressed | Unchanged |\n");
-    out.push_str("|---:|---:|---:|---:|---:|\n");
-    out.push_str(&format!(
-        "| {} | {} | {} | {} | {} |\n\n",
-        report.summary.new,
-        report.summary.resolved,
-        report.summary.improved,
-        report.summary.regressed,
-        report.summary.unchanged
-    ));
-    out.push_str("## Reviewer delta\n\n");
-    out.push_str(&format!(
-        "- New cards: {}\n",
-        report.reviewer_delta.new_cards
-    ));
-    out.push_str(&format!(
-        "- Resolved cards: {}\n",
-        report.reviewer_delta.resolved_cards
-    ));
-    out.push_str(&format!(
-        "- Improved cards: {}\n",
-        report.reviewer_delta.improved_cards
-    ));
-    out.push_str(&format!(
-        "- Regressed cards: {}\n",
-        report.reviewer_delta.regressed_cards
-    ));
-    out.push_str(&format!(
-        "- Receipt movement: {} improved, {} regressed\n",
-        report.reviewer_delta.receipt_movement.improved,
-        report.reviewer_delta.receipt_movement.regressed
-    ));
-    if report.reviewer_delta.top_remaining_gaps.is_empty() {
-        out.push_str("- Top remaining gaps: none in the after snapshot\n\n");
-    } else {
-        out.push_str("\nTop remaining gaps:\n\n");
-        out.push_str("| Card | Class | Priority | Operation family | Missing | Next action |\n");
-        out.push_str("|---|---|---|---|---:|---|\n");
-        for gap in &report.reviewer_delta.top_remaining_gaps {
-            out.push_str(&format!(
-                "| `{}` | `{}` | `{}` | `{}` | {} | {} |\n",
-                gap.card_id,
-                gap.class_name,
-                gap.priority,
-                markdown_cell(gap.operation_family.as_deref().unwrap_or("unknown")),
-                gap.missing_count,
-                markdown_cell(gap.next_action.as_deref().unwrap_or(""))
-            ));
-        }
-        out.push('\n');
-    }
-    out.push_str("## Card outcomes\n\n");
-    if report.cards.is_empty() {
-        out.push_str(NO_CHANGED_GAPS_MESSAGE);
-        out.push_str(" No ReviewCards were present in either saved snapshot.\n");
-        out.push_str(NO_CHANGED_GAPS_LIMITATION);
-        out.push_str("\n\n");
-    } else {
-        out.push_str("| Status | Card | Reason | Before | After |\n");
-        out.push_str("|---|---|---|---|---|\n");
-        for (status, cards) in report.cards.groups() {
-            for card in cards {
-                out.push_str(&format!(
-                    "| `{status}` | `{}` | {} | {} | {} |\n",
-                    card.card_id,
-                    card.reason,
-                    markdown_state(card.before.as_ref()),
-                    markdown_state(card.after.as_ref())
-                ));
-            }
-        }
-        out.push('\n');
-    }
-    out.push_str("## Limitations\n\n");
-    for limitation in &report.limitations {
-        out.push_str("- ");
-        out.push_str(limitation);
-        out.push('\n');
-    }
-    out.push('\n');
-    out.push_str("## Trust boundary\n\n");
-    out.push_str(&report.trust_boundary);
-    out.push('\n');
-    out
+    markdown::render_markdown(report)
 }
 
 fn parse_snapshot(text: &str, label: &str) -> Result<Snapshot, String> {
@@ -379,8 +297,8 @@ fn changed_reason(status: &str, before: &SnapshotCard, after: &SnapshotCard) -> 
             "missing evidence count changed from {before_missing} to {after_missing}"
         ));
     }
-    let before_witness = witness_state(before);
-    let after_witness = witness_state(after);
+    let before_witness = witness::witness_state(before);
+    let after_witness = witness::witness_state(after);
     if before_witness.label != after_witness.label {
         reasons.push(format!(
             "witness receipt strength changed from `{}` to `{}`",
@@ -408,9 +326,9 @@ fn changed_status(before: &SnapshotCard, after: &SnapshotCard) -> &'static str {
         "improved"
     } else if after_missing > before_missing {
         "regressed"
-    } else if witness_state(after).rank > witness_state(before).rank {
+    } else if witness::witness_state(after).rank > witness::witness_state(before).rank {
         "improved"
-    } else if witness_state(after).rank < witness_state(before).rank {
+    } else if witness::witness_state(after).rank < witness::witness_state(before).rank {
         "regressed"
     } else {
         "unchanged"
@@ -516,8 +434,8 @@ fn receipt_movement(cards: &OutcomeCards) -> OutcomeReceiptMovement {
         let Some(after) = card.after.as_ref() else {
             continue;
         };
-        let before_rank = witness_rank(&before.witness);
-        let after_rank = witness_rank(&after.witness);
+        let before_rank = witness::witness_rank(&before.witness);
+        let after_rank = witness::witness_rank(&after.witness);
         if after_rank > before_rank {
             movement.improved += 1;
         } else if after_rank < before_rank {
@@ -567,35 +485,6 @@ fn priority_rank(value: &str) -> u8 {
     }
 }
 
-fn markdown_state(state: Option<&OutcomeCardState>) -> String {
-    match state {
-        Some(state) => {
-            let mut parts = vec![format!(
-                "`{}` / `{}` / {} missing / witness `{}`",
-                state.class_name, state.priority, state.missing_count, state.witness
-            )];
-            if let Some(operation_family) = state.operation_family.as_deref() {
-                parts.push(format!(
-                    "operation family `{}`",
-                    markdown_cell(operation_family)
-                ));
-            }
-            if let Some(operation) = state.operation.as_deref() {
-                parts.push(format!("operation `{}`", markdown_cell(operation)));
-            }
-            if let Some(next_action) = state.next_action.as_deref() {
-                parts.push(format!("next: {}", markdown_cell(next_action)));
-            }
-            parts.join("; ")
-        }
-        None => "-".to_string(),
-    }
-}
-
-fn markdown_cell(value: &str) -> String {
-    value.replace('|', "\\|").replace('\n', " ")
-}
-
 impl From<&Snapshot> for OutcomeSnapshotSummary {
     fn from(snapshot: &Snapshot) -> Self {
         Self {
@@ -614,58 +503,10 @@ impl From<&SnapshotCard> for OutcomeCardState {
             operation_family: card.operation_family.clone(),
             priority: card.priority.clone(),
             missing_count: card.missing.len(),
-            witness: witness_state(card).label,
+            witness: witness::witness_state(card).label,
             next_action: card.next_action.clone(),
             missing: card.missing.clone(),
         }
-    }
-}
-
-struct WitnessState {
-    label: String,
-    rank: u8,
-}
-
-fn witness_state(card: &SnapshotCard) -> WitnessState {
-    if let Some(strength) = imported_receipt_strength(&card.witness) {
-        return WitnessState {
-            rank: witness_rank(&strength),
-            label: strength,
-        };
-    }
-    if card
-        .missing
-        .iter()
-        .any(|item| item.to_ascii_lowercase().contains("witness"))
-        || card.witness.contains("No imported witness receipt")
-        || card.witness.trim().is_empty()
-    {
-        return WitnessState {
-            label: "missing".to_string(),
-            rank: 0,
-        };
-    }
-    WitnessState {
-        label: "present".to_string(),
-        rank: witness_rank("ran"),
-    }
-}
-
-fn imported_receipt_strength(summary: &str) -> Option<String> {
-    let marker = " receipt with `";
-    let start = summary.find(marker)? + marker.len();
-    let end = summary[start..].find("` strength")? + start;
-    Some(summary[start..end].to_string())
-}
-
-fn witness_rank(value: &str) -> u8 {
-    match value {
-        "missing" => 0,
-        "configured" => 1,
-        "ran" => 2,
-        "test_targeted" => 3,
-        "site_reached" => 4,
-        _ => 2,
     }
 }
 

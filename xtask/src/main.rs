@@ -1,12 +1,23 @@
 #![forbid(unsafe_code)]
 use std::collections::{BTreeMap, BTreeSet};
-use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use calibration_constants::{
+    CALIBRATION_CASE_FIELDS, CALIBRATION_REQUIRED_KINDS, HAZARD_KIND_SOURCE,
+    OPERATION_FAMILY_REGISTRY, OPERATION_FAMILY_REGISTRY_COLUMNS, OPERATION_FAMILY_REGISTRY_HEADER,
+    OPERATION_FAMILY_REGISTRY_OBLIGATION_KEYS_COLUMN,
+    OPERATION_FAMILY_REGISTRY_REQUIRED_TEXT_COLUMNS, OPERATION_FAMILY_SOURCE,
+    SAFETY_OBLIGATION_SOURCE, WITNESS_KIND_SOURCE, ZERO_CARD_EXPECTATION_FIELDS,
+};
+
+mod calibration_constants;
 mod command_args;
+mod commands;
+mod docs_automation_paths;
 mod markdown;
+mod source_sync;
 mod workflow_allowlist;
 
 #[cfg(test)]
@@ -60,9 +71,9 @@ const WORKFLOW_ALLOWLIST: &str = "policy/workflow-allowlist.toml";
 const WORKFLOW_DIR: &str = ".github/workflows";
 const DOC_ARTIFACT_LEDGER: &str = "policy/doc-artifacts.toml";
 const DOCS_AUTOMATION_LEDGER: &str = "policy/docs-automation.toml";
+const PUBLIC_SURFACES_LEDGER: &str = "policy/public-surfaces.toml";
 const CI_LANE_LEDGER: &str = "policy/ci-lane-whitelist.toml";
 const PACKAGE_BOUNDARY_LEDGER: &str = "policy/package-boundary.toml";
-const SOURCE_SYNC_LEDGER: &str = "policy/source-sync.toml";
 const ACTIVE_GOAL_MANIFEST: &str = ".unsafe-review-spec/goals/active.toml";
 const DOC_ARTIFACT_KINDS: &[&str] = &["proposal", "spec", "adr", "plan", "goal"];
 const DOC_ARTIFACT_STATUSES: &[&str] = &["proposed", "accepted", "active", "done", "deferred"];
@@ -74,6 +85,15 @@ const DOCS_AUTOMATION_KINDS: &[&str] = &[
     "handoff_receipt",
 ];
 const DOCS_AUTOMATION_MODES: &[&str] = &["check", "generate"];
+const PUBLIC_SURFACE_STATUSES: &[&str] = &["experimental", "accepted", "deferred"];
+const PUBLIC_SURFACE_FRONT_DOORS: &[&str] = &[
+    "README.md",
+    "docs/FIRST_USE.md",
+    "docs/CLI.md",
+    "crates/unsafe-review/README.md",
+    "crates/unsafe-review-cli/README.md",
+    "crates/unsafe-review-core/README.md",
+];
 const GOAL_WORK_ITEM_STATUSES: &[&str] = &["ready", "active", "blocked", "done", "superseded"];
 const PACKAGE_CLASSIFICATIONS: &[&str] = &["published", "private", "internal", "deferred"];
 const CI_LANE_STATUSES: &[&str] = &["advisory", "required", "deferred", "retired"];
@@ -87,48 +107,6 @@ const FIXTURE_EXPECTED_CARDS_EXCEPTIONS: &[&str] = &[
 
 const FIXTURE_PACKAGE_PREFIX_EXCEPTIONS: &[(&str, &str)] =
     &[("raw_pointer_alignment_line_drift", "raw-pointer-alignment")];
-
-const CALIBRATION_REQUIRED_KINDS: &[&str] = &["positive", "negative", "false_positive_control"];
-const CALIBRATION_CASE_FIELDS: &[&str] = &[
-    "fixture",
-    "kind",
-    "claim",
-    "support_tier",
-    "expected_cards",
-    "expected_class",
-    "expected_operation_family",
-    "expected_hazard",
-];
-const OPERATION_FAMILY_REGISTRY: &str =
-    "docs/specs/appendices/UNSAFE-REVIEW-SPEC-0005-appendix-operation-family-registry.md";
-const OPERATION_FAMILY_REGISTRY_COLUMNS: usize = 9;
-const OPERATION_FAMILY_REGISTRY_HEADER: &[&str] = &[
-    "operation_family",
-    "detected syntax shapes",
-    "hazards",
-    "not hazards",
-    "obligation / evidence keys",
-    "witness route",
-    "fixture proof",
-    "known false-positive controls",
-    "known limits",
-];
-const OPERATION_FAMILY_REGISTRY_REQUIRED_TEXT_COLUMNS: &[(usize, &str)] = &[
-    (1, "detected syntax shapes"),
-    (7, "known false-positive controls"),
-    (8, "known limits"),
-];
-const OPERATION_FAMILY_REGISTRY_OBLIGATION_KEYS_COLUMN: (usize, &str) =
-    (4, "obligation / evidence keys");
-const OPERATION_FAMILY_SOURCE: &str = "crates/unsafe-review-core/src/domain/operation.rs";
-const SAFETY_OBLIGATION_SOURCE: &str = "crates/unsafe-review-core/src/analysis/obligations.rs";
-const HAZARD_KIND_SOURCE: &str = "crates/unsafe-review-core/src/domain/hazard.rs";
-const WITNESS_KIND_SOURCE: &str = "crates/unsafe-review-core/src/domain/witness.rs";
-const ZERO_CARD_EXPECTATION_FIELDS: &[&str] = &[
-    "expected_class",
-    "expected_operation_family",
-    "expected_hazard",
-];
 
 const SUPPORT_TIERS_DOC: &str = "docs/status/SUPPORT_TIERS.md";
 const SUPPORT_SUMMARY_DOC: &str = "docs/status/SUPPORT_SUMMARY.md";
@@ -178,8 +156,6 @@ const PUBLIC_BADGE_ENDPOINTS: &[(&str, &str)] = &[
     ("badges/unsafe-review.json", "unsafe-review"),
     ("badges/unsafe-review-plus.json", "unsafe-review+"),
 ];
-const SOURCE_MAIN_REF: &str = "refs/unsafe-review-sync/source-main";
-const SWARM_MAIN_REF: &str = "refs/unsafe-review-sync/swarm-main";
 
 fn main() {
     if let Err(err) = run(std::env::args().collect()) {
@@ -193,15 +169,14 @@ fn run(args: Vec<String>) -> Result<(), String> {
     std::env::set_current_dir(&root)
         .map_err(|err| format!("failed to enter workspace root {}: {err}", root.display()))?;
 
-    match args.get(1).map(|arg| arg.as_str()) {
-        None | Some("help") | Some("--help") => {
+    match commands::XtaskCommand::parse(&args)? {
+        commands::XtaskCommand::Help => {
             println!(
-                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, source-divergence, check-source-sync"
+                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, source-divergence, check-source-sync"
             );
             Ok(())
         }
-        Some("check-pr") => {
-            command_args::require_no_extra_args(&args, "check-pr")?;
+        commands::XtaskCommand::CheckPr => {
             check_docs()?;
             check_policy()?;
             check_support_tiers()?;
@@ -213,67 +188,22 @@ fn run(args: Vec<String>) -> Result<(), String> {
             println!("check-pr: ok");
             Ok(())
         }
-        Some("check-docs") => {
-            command_args::require_no_extra_args(&args, "check-docs")?;
-            check_docs()
-        }
-        Some("check-policy") => {
-            command_args::require_no_extra_args(&args, "check-policy")?;
-            check_policy()
-        }
-        Some("check-doc-artifacts") => {
-            command_args::require_no_extra_args(&args, "check-doc-artifacts")?;
-            check_doc_artifacts()
-        }
-        Some("check-docs-automation") => {
-            command_args::require_no_extra_args(&args, "check-docs-automation")?;
-            check_docs_automation()
-        }
-        Some("check-goals") => {
-            command_args::require_no_extra_args(&args, "check-goals")?;
-            check_goals()
-        }
-        Some("check-package-boundary") => {
-            command_args::require_no_extra_args(&args, "check-package-boundary")?;
-            check_package_boundary()
-        }
-        Some("check-ci-lanes") => {
-            command_args::require_no_extra_args(&args, "check-ci-lanes")?;
-            check_ci_lanes()
-        }
-        Some("check-support-tiers") => {
-            command_args::require_no_extra_args(&args, "check-support-tiers")?;
-            check_support_tiers()
-        }
-        Some("check-fixtures") => {
-            command_args::require_no_extra_args(&args, "check-fixtures")?;
-            check_fixtures()
-        }
-        Some("check-calibration") => {
-            command_args::require_no_extra_args(&args, "check-calibration")?;
-            check_calibration()
-        }
-        Some("check-dogfood") => {
-            command_args::require_no_extra_args(&args, "check-dogfood")?;
-            check_dogfood()
-        }
-        Some("check-fuzz") => {
-            command_args::require_no_extra_args(&args, "check-fuzz")?;
-            check_manual_fuzz_harness()
-        }
-        Some("check-advisory-artifacts") => {
-            let dir = command_args::require_subcommand_dir_arg(&args, "check-advisory-artifacts")?;
-            check_advisory_artifacts(&dir)
-        }
-        Some("check-first-pr-artifacts") => {
-            let dir = command_args::require_subcommand_dir_arg(&args, "check-first-pr-artifacts")?;
-            check_first_pr_artifacts(&dir)
-        }
-        Some("source-divergence") | Some("check-source-sync") => {
-            command_args::require_no_extra_args(&args, "source-divergence")?;
-            report_source_divergence()
-        }
-        Some(other) => Err(format!("unknown xtask command `{other}`")),
+        commands::XtaskCommand::CheckDocs => check_docs(),
+        commands::XtaskCommand::CheckPolicy => check_policy(),
+        commands::XtaskCommand::CheckDocArtifacts => check_doc_artifacts(),
+        commands::XtaskCommand::CheckDocsAutomation => check_docs_automation(),
+        commands::XtaskCommand::CheckPublicSurfaces => check_public_surfaces(),
+        commands::XtaskCommand::CheckGoals => check_goals(),
+        commands::XtaskCommand::CheckPackageBoundary => check_package_boundary(),
+        commands::XtaskCommand::CheckCiLanes => check_ci_lanes(),
+        commands::XtaskCommand::CheckSupportTiers => check_support_tiers(),
+        commands::XtaskCommand::CheckFixtures => check_fixtures(),
+        commands::XtaskCommand::CheckCalibration => check_calibration(),
+        commands::XtaskCommand::CheckDogfood => check_dogfood(),
+        commands::XtaskCommand::CheckFuzz => check_manual_fuzz_harness(),
+        commands::XtaskCommand::CheckAdvisoryArtifacts(dir) => check_advisory_artifacts(&dir),
+        commands::XtaskCommand::CheckFirstPrArtifacts(dir) => check_first_pr_artifacts(&dir),
+        commands::XtaskCommand::SourceDivergence => source_sync::report_source_divergence(),
     }
 }
 
@@ -342,10 +272,53 @@ fn check_policy() -> Result<(), String> {
     )?;
     check_doc_artifacts()?;
     check_docs_automation()?;
+    check_public_surfaces()?;
     check_goals()?;
     check_package_boundary()?;
     check_ci_lanes()?;
+    check_ci_routing_contract()?;
     println!("check-policy: ok");
+    Ok(())
+}
+
+fn check_ci_routing_contract() -> Result<(), String> {
+    let path = ".github/workflows/ci.yml";
+    let text =
+        std::fs::read_to_string(path).map_err(|err| format!("failed to read {path}: {err}"))?;
+    if text.contains("repos/${") && text.contains("/actions/runners") {
+        return Err(format!(
+            "{path} must use organization runner discovery, not repository runner discovery"
+        ));
+    }
+    for needle in [
+        "gh api \"orgs/${ORG}/actions/runners?per_page=100\"",
+        "EM_RUNNER_READ_TOKEN",
+        "router_target=",
+        "router_reason=",
+        "Rust Small on CPX42",
+        "labels: [self-hosted, linux, x64, em-ci, cpx42, rust-16gb, rust-medium, trusted-pr]",
+        "Prepare CPX42 scratch",
+        "dtolnay/rust-toolchain@v1",
+        "toolchain: 1.95.0",
+        "Rust Small on CX43",
+        "Rust Small on CX53",
+        "dtolnay/rust-toolchain@1.95.0",
+        "Rust Small on GitHub Hosted",
+        "Unsafe Review Rust Small Result",
+    ] {
+        if !text.contains(needle) {
+            return Err(format!(
+                "{path} missing required routed CI contract marker: {needle}"
+            ));
+        }
+    }
+    for forbidden in ["em-ci-rust:1.95", "docker run --rm"] {
+        if text.contains(forbidden) {
+            return Err(format!(
+                "{path} must not depend on broken Docker Rust Small marker: {forbidden}"
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -415,6 +388,90 @@ fn check_docs_automation() -> Result<(), String> {
     let surfaces = check_docs_automation_impl()?;
     println!("check-docs-automation: ok ({surfaces} surfaces)");
     Ok(())
+}
+
+fn check_public_surfaces() -> Result<(), String> {
+    let surfaces = check_public_surfaces_impl()?;
+    println!("check-public-surfaces: ok ({surfaces} surfaces)");
+    Ok(())
+}
+
+fn check_public_surfaces_impl() -> Result<usize, String> {
+    let value = parse_toml_file(&workspace_path(PUBLIC_SURFACES_LEDGER))?;
+    require_toml_string(&value, "schema_version", PUBLIC_SURFACES_LEDGER)?;
+    require_known(
+        required_toml_string(&value, "status", PUBLIC_SURFACES_LEDGER)?,
+        PUBLIC_SURFACE_STATUSES,
+        PUBLIC_SURFACES_LEDGER,
+        "status",
+    )?;
+    let trust_boundary = required_toml_string(&value, "trust_boundary", PUBLIC_SURFACES_LEDGER)?;
+    for required in ["advisory", "memory-safety proof", "UB-free", "Miri-clean"] {
+        if !text_contains_ignore_ascii_case(trust_boundary, required) {
+            return Err(format!(
+                "{PUBLIC_SURFACES_LEDGER} trust_boundary must mention `{required}`"
+            ));
+        }
+    }
+
+    let forbidden_terms = value
+        .get("forbidden_terms")
+        .ok_or_else(|| format!("{PUBLIC_SURFACES_LEDGER} is missing `forbidden_terms` array"))?;
+    let forbidden_terms =
+        toml_str_array(forbidden_terms, PUBLIC_SURFACES_LEDGER, "forbidden_terms")?;
+    if forbidden_terms.is_empty() {
+        return Err(format!(
+            "{PUBLIC_SURFACES_LEDGER} forbidden_terms must not be empty"
+        ));
+    }
+    let mut seen = BTreeSet::new();
+    for term in forbidden_terms {
+        if term.trim().is_empty() {
+            return Err(format!(
+                "{PUBLIC_SURFACES_LEDGER} forbidden_terms entries must be non-empty"
+            ));
+        }
+        if !seen.insert(term.to_ascii_lowercase()) {
+            return Err(format!(
+                "{PUBLIC_SURFACES_LEDGER} contains duplicate forbidden term `{term}`"
+            ));
+        }
+    }
+
+    check_public_badge_endpoints()?;
+    for path in PUBLIC_SURFACE_FRONT_DOORS {
+        check_public_surface_front_door(path)?;
+    }
+
+    Ok(PUBLIC_SURFACE_FRONT_DOORS.len() + PUBLIC_BADGE_ENDPOINTS.len())
+}
+
+fn check_public_surface_front_door(path: &str) -> Result<(), String> {
+    require_file(path)?;
+    check_markdown_local_links(path)?;
+    let source = workspace_path(path);
+    let text = read_to_string(&source)?;
+    reject_positive_overclaims(Path::new(path), &text)?;
+    if !public_surface_has_trust_boundary(&text) {
+        return Err(format!(
+            "{path} must include advisory trust-boundary wording such as not-proof, not-UB-free, no-default-witness, or no-default-blocking language"
+        ));
+    }
+    Ok(())
+}
+
+fn public_surface_has_trust_boundary(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    let has_negative = lower.contains("not")
+        || lower.contains("does not")
+        || lower.contains("no ")
+        || lower.contains("without");
+    let has_boundary = lower.contains("proof")
+        || lower.contains("ub-free")
+        || lower.contains("miri")
+        || lower.contains("witness")
+        || lower.contains("blocking");
+    has_negative && has_boundary
 }
 
 fn check_docs_automation_impl() -> Result<usize, String> {
@@ -542,42 +599,13 @@ fn docs_automation_paths(
 
 fn docs_automation_glob_paths(path_glob: &str) -> Result<Vec<PathBuf>, String> {
     let pattern_path = Path::new(path_glob);
-    let directory = pattern_path
-        .parent()
-        .filter(|path| !path.as_os_str().is_empty())
-        .ok_or_else(|| {
-            format!("{DOCS_AUTOMATION_LEDGER} path_glob `{path_glob}` needs a directory")
-        })?;
-    let file_pattern = pattern_path
-        .file_name()
-        .and_then(OsStr::to_str)
-        .ok_or_else(|| {
-            format!("{DOCS_AUTOMATION_LEDGER} path_glob `{path_glob}` needs a file pattern")
-        })?;
-    if !file_pattern.contains('*') {
+    let file_pattern = pattern_path.file_name().and_then(|value| value.to_str());
+    if file_pattern.is_some_and(|pattern| !pattern.contains('*')) {
         require_file(path_glob)?;
         return Ok(vec![PathBuf::from(path_glob)]);
     }
 
-    let mut paths = Vec::new();
-    for entry in fs::read_dir(directory)
-        .map_err(|err| format!("failed to read {}: {err}", directory.display()))?
-    {
-        let entry = entry.map_err(|err| {
-            format!(
-                "failed to read directory entry under {}: {err}",
-                directory.display()
-            )
-        })?;
-        let name = entry.file_name();
-        let Some(name) = name.to_str() else {
-            continue;
-        };
-        if wildcard_match(file_pattern, name) && entry.path().is_file() {
-            paths.push(entry.path());
-        }
-    }
-    paths.sort();
+    let paths = docs_automation_paths::collect_paths(path_glob, DOCS_AUTOMATION_LEDGER)?;
     if paths.is_empty() {
         Err(format!(
             "{DOCS_AUTOMATION_LEDGER} path_glob `{path_glob}` did not match any files"
@@ -616,38 +644,6 @@ fn require_existing_repo_path(path: &str, ledger: &str, field: &str) -> Result<(
         Ok(())
     } else {
         Err(format!("{ledger} {field} path does not exist: {path}"))
-    }
-}
-
-fn wildcard_match(pattern: &str, value: &str) -> bool {
-    if !pattern.contains('*') {
-        return pattern == value;
-    }
-
-    let parts = pattern.split('*').collect::<Vec<_>>();
-    let mut remainder = value;
-    if let Some(first) = parts.first().filter(|part| !part.is_empty()) {
-        let Some(stripped) = remainder.strip_prefix(first) else {
-            return false;
-        };
-        remainder = stripped;
-    }
-
-    let middle_end = parts.len().saturating_sub(1);
-    for part in parts.iter().skip(1).take(middle_end.saturating_sub(1)) {
-        if part.is_empty() {
-            continue;
-        }
-        let Some(index) = remainder.find(part) else {
-            return false;
-        };
-        remainder = &remainder[index + part.len()..];
-    }
-
-    if let Some(last) = parts.last().filter(|part| !part.is_empty()) {
-        remainder.ends_with(last)
-    } else {
-        true
     }
 }
 
@@ -1211,6 +1207,57 @@ fn check_dogfood() -> Result<(), String> {
     let mut repo_snapshots = 0usize;
     let mut pr_diffs = 0usize;
     for (idx, target) in targets.iter().enumerate() {
+        let stats = dogfood_checks::validate_target(target, idx, &mut ids)?;
+        repositories.insert(stats.repository);
+        *artifact_status_counts
+            .entry(stats.artifact_status)
+            .or_insert(0usize) += 1;
+        repo_snapshots += stats.repo_snapshots;
+        pr_diffs += stats.pr_diffs;
+    }
+
+    if repositories.len() < 5 {
+        return Err(format!(
+            "{DOGFOOD_MANIFEST} must cover at least 5 real repositories"
+        ));
+    }
+    if repo_snapshots == 0 || pr_diffs == 0 {
+        return Err(format!(
+            "{DOGFOOD_MANIFEST} must include repo-snapshot and pr-diff targets"
+        ));
+    }
+    check_dogfood_index(
+        targets.len(),
+        repositories.len(),
+        repo_snapshots,
+        pr_diffs,
+        &repositories,
+        &artifact_status_counts,
+    )?;
+
+    println!(
+        "check-dogfood: ok ({} targets, {} repositories)",
+        targets.len(),
+        repositories.len()
+    );
+    Ok(())
+}
+
+mod dogfood_checks {
+    use super::*;
+
+    pub(super) struct TargetStats {
+        pub(super) repository: String,
+        pub(super) artifact_status: String,
+        pub(super) repo_snapshots: usize,
+        pub(super) pr_diffs: usize,
+    }
+
+    pub(super) fn validate_target(
+        target: &toml::Value,
+        idx: usize,
+        ids: &mut BTreeSet<String>,
+    ) -> Result<TargetStats, String> {
         let Some(target) = target.as_table() else {
             return Err(format!(
                 "{DOGFOOD_MANIFEST} targets[{idx}] must be a TOML table"
@@ -1228,7 +1275,6 @@ fn check_dogfood() -> Result<(), String> {
                 "{DOGFOOD_MANIFEST} targets[{idx}] repository `{repository}` must be owner/repo"
             ));
         }
-        repositories.insert(repository.to_string());
         required_target_string(target, "crate", idx)?;
         let kind = required_target_string(target, "kind", idx)?;
         if !DOGFOOD_TARGET_KINDS.contains(&kind) {
@@ -1260,9 +1306,21 @@ fn check_dogfood() -> Result<(), String> {
                 "{DOGFOOD_MANIFEST} targets[{idx}] uses unknown artifact_status `{artifact_status}`"
             ));
         }
-        *artifact_status_counts
-            .entry(artifact_status.to_string())
-            .or_insert(0usize) += 1;
+        validate_artifacts(target, idx, artifact_status)?;
+        let (repo_snapshots, pr_diffs) = validate_kind_fields(target, idx, kind)?;
+        Ok(TargetStats {
+            repository: repository.to_string(),
+            artifact_status: artifact_status.to_string(),
+            repo_snapshots,
+            pr_diffs,
+        })
+    }
+
+    fn validate_artifacts(
+        target: &toml::Table,
+        idx: usize,
+        artifact_status: &str,
+    ) -> Result<(), String> {
         let artifacts = target
             .get("artifacts")
             .and_then(toml::Value::as_array)
@@ -1287,10 +1345,16 @@ fn check_dogfood() -> Result<(), String> {
                 ));
             }
         }
+        Ok(())
+    }
 
+    fn validate_kind_fields(
+        target: &toml::Table,
+        idx: usize,
+        kind: &str,
+    ) -> Result<(usize, usize), String> {
         match kind {
             "repo-snapshot" => {
-                repo_snapshots += 1;
                 let commit = required_target_string(target, "commit", idx)?;
                 if commit.len() != 40 || !commit.bytes().all(|byte| byte.is_ascii_hexdigit()) {
                     return Err(format!(
@@ -1299,9 +1363,9 @@ fn check_dogfood() -> Result<(), String> {
                 }
                 let root = required_target_string(target, "root", idx)?;
                 check_dogfood_path(root, idx, "root")?;
+                Ok((1, 0))
             }
             "pr-diff" => {
-                pr_diffs += 1;
                 let Some(pr) = target.get("pr").and_then(toml::Value::as_integer) else {
                     return Err(format!(
                         "{DOGFOOD_MANIFEST} targets[{idx}] is missing integer pr"
@@ -1316,40 +1380,13 @@ fn check_dogfood() -> Result<(), String> {
                 check_dogfood_path(root, idx, "root")?;
                 let diff = required_target_string(target, "diff", idx)?;
                 check_dogfood_path(diff, idx, "diff")?;
+                Ok((0, 1))
             }
-            _ => {
-                return Err(format!(
-                    "{DOGFOOD_MANIFEST} targets[{idx}] uses unsupported kind `{kind}`"
-                ));
-            }
+            _ => Err(format!(
+                "{DOGFOOD_MANIFEST} targets[{idx}] uses unsupported kind `{kind}`"
+            )),
         }
     }
-
-    if repositories.len() < 5 {
-        return Err(format!(
-            "{DOGFOOD_MANIFEST} must cover at least 5 real repositories"
-        ));
-    }
-    if repo_snapshots == 0 || pr_diffs == 0 {
-        return Err(format!(
-            "{DOGFOOD_MANIFEST} must include repo-snapshot and pr-diff targets"
-        ));
-    }
-    check_dogfood_index(
-        targets.len(),
-        repositories.len(),
-        repo_snapshots,
-        pr_diffs,
-        &repositories,
-        &artifact_status_counts,
-    )?;
-
-    println!(
-        "check-dogfood: ok ({} targets, {} repositories)",
-        targets.len(),
-        repositories.len()
-    );
-    Ok(())
 }
 
 fn check_dogfood_index(
@@ -1527,6 +1564,33 @@ fn check_manual_fuzz_harness() -> Result<(), String> {
         if !ignore.lines().any(|line| line.trim() == ignored) {
             return Err(format!("fuzz/.gitignore must ignore `{ignored}`"));
         }
+    }
+    let corpus_dir = repo_path("fuzz/corpus/analyze");
+    let corpus_entries = fs::read_dir(&corpus_dir)
+        .map_err(|err| format!("failed to read {}: {err}", corpus_dir.display()))?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|err| format!("failed to enumerate {}: {err}", corpus_dir.display()))?;
+    if corpus_entries.is_empty() {
+        return Err("fuzz/corpus/analyze must include at least one corpus seed".to_string());
+    }
+    let mut has_diff_marker_seed = false;
+    for entry in corpus_entries {
+        let seed_path = entry.path();
+        if !seed_path.is_file() {
+            continue;
+        }
+        let seed = fs::read_to_string(&seed_path)
+            .map_err(|err| format!("failed to read {}: {err}", seed_path.display()))?;
+        if seed.contains("---DIFF---") {
+            has_diff_marker_seed = true;
+            break;
+        }
+    }
+    if !has_diff_marker_seed {
+        return Err(
+            "fuzz/corpus/analyze must include at least one seed containing `---DIFF---`"
+                .to_string(),
+        );
     }
 
     println!("check-fuzz: ok");
@@ -2024,8 +2088,10 @@ fn check_first_pr_artifact_overclaims(dir: &Path) -> Result<(), String> {
 }
 
 fn reject_positive_overclaims(path: &Path, text: &str) -> Result<(), String> {
+    let mut previous = String::new();
     for (line_no, line) in text.lines().enumerate() {
-        let lower = line.to_ascii_lowercase();
+        let lower = normalize_claim_line(line);
+        let context = format!("{previous} {lower}");
         for forbidden in ["all clear", "safe to merge", "proved safe", "proven safe"] {
             if lower.contains(forbidden) {
                 return Err(format!(
@@ -2039,8 +2105,7 @@ fn reject_positive_overclaims(path: &Path, text: &str) -> Result<(), String> {
             && !lower.contains("not miri-clean")
             && !lower.contains("not a miri-clean")
             && !lower.contains("not miri clean")
-            && !lower.contains("cannot prove")
-            && !lower.contains("does not")
+            && !has_negative_claim_context(&context)
         {
             return Err(format!(
                 "{}:{} must not imply Miri-clean status",
@@ -2051,8 +2116,7 @@ fn reject_positive_overclaims(path: &Path, text: &str) -> Result<(), String> {
         if lower.contains("ub-free")
             && !lower.contains("not ub-free")
             && !lower.contains("not a ub-free")
-            && !lower.contains("cannot prove")
-            && !lower.contains("does not")
+            && !has_negative_claim_context(&context)
         {
             return Err(format!(
                 "{}:{} must not imply UB-free status",
@@ -2060,17 +2124,14 @@ fn reject_positive_overclaims(path: &Path, text: &str) -> Result<(), String> {
                 line_no + 1
             ));
         }
-        if lower.contains("site reached")
-            && !lower.contains("not")
-            && !lower.contains("cannot prove")
-            && !lower.contains("does not")
-        {
+        if lower.contains("site reached") && !has_negative_claim_context(&context) {
             return Err(format!(
                 "{}:{} must not imply site execution",
                 path.display(),
                 line_no + 1
             ));
         }
+        previous = lower;
     }
     Ok(())
 }
@@ -3035,173 +3096,6 @@ fn check_tracked_generated_artifacts() -> Result<(), String> {
     Ok(())
 }
 
-fn report_source_divergence() -> Result<(), String> {
-    let checkpoint = source_sync_checkpoint()?;
-    fetch_main_ref(&checkpoint.source_repo, SOURCE_MAIN_REF)?;
-    fetch_main_ref(&checkpoint.swarm_repo, SWARM_MAIN_REF)?;
-
-    let counts = git_stdout([
-        "rev-list",
-        "--left-right",
-        "--count",
-        &format!("{SOURCE_MAIN_REF}...{SWARM_MAIN_REF}"),
-    ])?;
-    let (source_only, swarm_only) = parse_rev_list_counts(&counts)?;
-    let new_source_commits = git_stdout([
-        "rev-list",
-        "--count",
-        &format!("{}..{SOURCE_MAIN_REF}", checkpoint.acknowledged_source_main),
-    ])?
-    .parse::<usize>()
-    .map_err(|err| format!("invalid source checkpoint count: {err}"))?;
-    let source_head = git_stdout(["rev-parse", "--short", SOURCE_MAIN_REF])?;
-    let swarm_head = git_stdout(["rev-parse", "--short", SWARM_MAIN_REF])?;
-    let source_commits = git_stdout([
-        "log",
-        "--oneline",
-        "--max-count=10",
-        SOURCE_MAIN_REF,
-        "--not",
-        &checkpoint.acknowledged_source_main,
-    ])?;
-    let swarm_commits = git_stdout([
-        "log",
-        "--oneline",
-        "--max-count=10",
-        SWARM_MAIN_REF,
-        "--not",
-        SOURCE_MAIN_REF,
-    ])?;
-
-    println!("source-divergence: advisory");
-    println!("source_repo={}", checkpoint.source_repo);
-    println!("swarm_repo={}", checkpoint.swarm_repo);
-    println!("source_main={source_head}");
-    println!("swarm_main={swarm_head}");
-    println!(
-        "acknowledged_source_main={}",
-        checkpoint.acknowledged_source_main
-    );
-    println!("acknowledged_by={}", checkpoint.acknowledged_by);
-    println!("new_source_commits={new_source_commits}");
-    println!("raw_source_only={source_only}");
-    println!("raw_swarm_only={swarm_only}");
-
-    if new_source_commits == 0 {
-        println!("status: no source commits after the acknowledged swarm sync point");
-    } else {
-        println!(
-            "status: source is ahead of swarm; open a swarm sync PR before routine development"
-        );
-    }
-    if swarm_only > 0 {
-        println!(
-            "note: swarm has work not present in source; this is expected for unpromoted workbench changes"
-        );
-    }
-
-    print_commit_section("new_source_commits", &source_commits);
-    print_commit_section("swarm_only_commits", &swarm_commits);
-    Ok(())
-}
-
-struct SourceSyncCheckpoint {
-    source_repo: String,
-    swarm_repo: String,
-    acknowledged_source_main: String,
-    acknowledged_by: String,
-}
-
-fn source_sync_checkpoint() -> Result<SourceSyncCheckpoint, String> {
-    let value = parse_toml_file(Path::new(SOURCE_SYNC_LEDGER))?;
-    require_toml_string(&value, "schema_version", SOURCE_SYNC_LEDGER)?;
-    require_toml_string(&value, "policy", SOURCE_SYNC_LEDGER)?;
-    let source_repo = required_toml_string(&value, "source_repo", SOURCE_SYNC_LEDGER)?.to_string();
-    let swarm_repo = required_toml_string(&value, "swarm_repo", SOURCE_SYNC_LEDGER)?.to_string();
-    let acknowledged_source_main =
-        required_toml_string(&value, "acknowledged_source_main", SOURCE_SYNC_LEDGER)?.to_string();
-    let acknowledged_by =
-        required_toml_string(&value, "acknowledged_by", SOURCE_SYNC_LEDGER)?.to_string();
-    require_file(&acknowledged_by)?;
-    Ok(SourceSyncCheckpoint {
-        source_repo,
-        swarm_repo,
-        acknowledged_source_main,
-        acknowledged_by,
-    })
-}
-
-fn fetch_main_ref(repo_url: &str, target_ref: &str) -> Result<(), String> {
-    let refspec = format!("+refs/heads/main:{target_ref}");
-    let output = Command::new("git")
-        .args(["fetch", "--no-tags", "--quiet", repo_url, &refspec])
-        .output()
-        .map_err(|err| format!("failed to run git fetch for {repo_url}: {err}"))?;
-    if output.status.success() {
-        Ok(())
-    } else {
-        Err(format!(
-            "git fetch {repo_url} failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ))
-    }
-}
-
-fn git_stdout<I, S>(args: I) -> Result<String, String>
-where
-    I: IntoIterator<Item = S>,
-    S: AsRef<OsStr>,
-{
-    let output = Command::new("git")
-        .args(args)
-        .output()
-        .map_err(|err| format!("failed to run git: {err}"))?;
-    if !output.status.success() {
-        return Err(format!(
-            "git command failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
-    }
-    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-}
-
-fn parse_rev_list_counts(text: &str) -> Result<(usize, usize), String> {
-    let mut fields = text.split_whitespace();
-    let Some(left) = fields.next() else {
-        return Err("git rev-list count output is empty".to_string());
-    };
-    let Some(right) = fields.next() else {
-        return Err(format!(
-            "git rev-list count output must contain two counts: {text}"
-        ));
-    };
-    if fields.next().is_some() {
-        return Err(format!(
-            "git rev-list count output must contain only two counts: {text}"
-        ));
-    }
-    Ok((
-        parse_rev_list_count(left, "source-only")?,
-        parse_rev_list_count(right, "swarm-only")?,
-    ))
-}
-
-fn parse_rev_list_count(text: &str, label: &str) -> Result<usize, String> {
-    text.parse::<usize>()
-        .map_err(|err| format!("invalid {label} count `{text}`: {err}"))
-}
-
-fn print_commit_section(label: &str, commits: &str) {
-    println!("{label}:");
-    if commits.trim().is_empty() {
-        println!("  none");
-        return;
-    }
-    for line in commits.lines() {
-        println!("  {line}");
-    }
-}
-
 fn parse_toml_file(path: &Path) -> Result<toml::Value, String> {
     parse_text_file(path, "TOML", |text| {
         text.parse::<toml::Table>().map(toml::Value::Table)
@@ -3545,8 +3439,23 @@ fn text_contains_ignore_ascii_case(text: &str, needle: &str) -> bool {
         .contains(&needle.to_ascii_lowercase())
 }
 
+fn normalize_claim_line(line: &str) -> String {
+    line.chars()
+        .filter(|character| !matches!(character, '*' | '`' | '_'))
+        .collect::<String>()
+        .to_ascii_lowercase()
+}
+
+fn has_negative_claim_context(text: &str) -> bool {
+    text.contains("not")
+        || text.contains("does not")
+        || text.contains("cannot prove")
+        || text.contains("no ")
+        || text.contains("without")
+}
+
 fn require_file(path: &str) -> Result<(), String> {
-    if Path::new(path).is_file() {
+    if workspace_path(path).is_file() {
         Ok(())
     } else {
         Err(format!("required file missing: {path}"))
@@ -3901,18 +3810,29 @@ mod tests {
 
     #[test]
     fn source_divergence_counts_parse_git_output() -> Result<(), String> {
-        assert_eq!(parse_rev_list_counts("424\t113\n")?, (424, 113));
-        assert_eq!(parse_rev_list_counts("0 7")?, (0, 7));
+        assert_eq!(
+            source_sync::parse_rev_list_counts("424\t113\n")?,
+            (424, 113)
+        );
+        assert_eq!(source_sync::parse_rev_list_counts("0 7")?, (0, 7));
         Ok(())
     }
 
     #[test]
     fn source_divergence_counts_reject_malformed_output() -> Result<(), String> {
-        assert!(err_text(parse_rev_list_counts(""))?.contains("empty"));
-        assert!(err_text(parse_rev_list_counts("12"))?.contains("two counts"));
-        assert!(err_text(parse_rev_list_counts("12 3 extra"))?.contains("only two counts"));
-        assert!(err_text(parse_rev_list_counts("source 3"))?.contains("invalid source-only count"));
-        assert!(err_text(parse_rev_list_counts("12 swarm"))?.contains("invalid swarm-only count"));
+        assert!(err_text(source_sync::parse_rev_list_counts(""))?.contains("empty"));
+        assert!(err_text(source_sync::parse_rev_list_counts("12"))?.contains("two counts"));
+        assert!(
+            err_text(source_sync::parse_rev_list_counts("12 3 extra"))?.contains("only two counts")
+        );
+        assert!(
+            err_text(source_sync::parse_rev_list_counts("source 3"))?
+                .contains("invalid source-only count")
+        );
+        assert!(
+            err_text(source_sync::parse_rev_list_counts("12 swarm"))?
+                .contains("invalid swarm-only count")
+        );
         Ok(())
     }
 
@@ -4135,11 +4055,11 @@ jobs:
 
     #[test]
     fn docs_automation_glob_matches_publication_receipts() {
-        assert!(wildcard_match(
+        assert!(docs_automation_paths::wildcard_match(
             "*publication*.md",
             "2026-05-21-release-0.2.0-publication.md",
         ));
-        assert!(!wildcard_match(
+        assert!(!docs_automation_paths::wildcard_match(
             "*publication*.md",
             "2026-05-21-source-promotion-0.2-sync.md",
         ));
@@ -4967,6 +4887,27 @@ impl WitnessKind {
     #[test]
     fn public_badge_endpoints_match_readme_and_json() -> Result<(), String> {
         check_public_badge_endpoints()
+    }
+
+    #[test]
+    fn public_surface_checker_validates_current_contract() -> Result<(), String> {
+        check_public_surfaces_impl().map(|_| ())
+    }
+
+    #[test]
+    fn public_surface_boundary_requires_negative_claim_limit() {
+        assert!(public_surface_has_trust_boundary(
+            "This is advisory review evidence, not memory-safety proof."
+        ));
+        assert!(public_surface_has_trust_boundary(
+            "The command does not run Miri or enable blocking policy by default."
+        ));
+        assert!(!public_surface_has_trust_boundary(
+            "This command proves the reviewed code is safe."
+        ));
+        assert!(!public_surface_has_trust_boundary(
+            "Install this command to review pull requests."
+        ));
     }
 
     #[test]
