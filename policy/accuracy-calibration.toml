@@ -701,6 +701,36 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "inline-asm-human-review-routes"
+status = "fixture_pinned"
+kind = "route_quality"
+owner = "calibration"
+operation_family = "inline_asm"
+hazard = "inline_asm"
+support_tier = "Witness routing"
+fixtures = [
+  "inline_asm_human_review",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/inline-asm-human-review-routes.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned inline assembly witness routing sends asm register, memory,
+clobber, and target invariants to human deep review in the listed fixture.
+"""
+forbidden_claims = [
+  "inline assembly correctness proof",
+  "register allocation proof",
+  "target-feature proof",
+  "witness execution proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "get-unchecked-mut-bounds-evidence"
 status = "fixture_pinned"
 kind = "evidence_precision"

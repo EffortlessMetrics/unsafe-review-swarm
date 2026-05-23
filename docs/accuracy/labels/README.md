@@ -18,6 +18,8 @@ Current ledgers:
   FFI sanitizer/cargo-careful witness routing.
 - `get-unchecked-mut-bounds.toml`: fixture-pinned obligation-level labels for
   `get_unchecked_mut` bounds evidence.
+- `inline-asm-human-review-routes.toml`: fixture-pinned route-quality labels
+  for inline assembly human-deep-review witness routing.
 - `maybeuninit-assume-init-initialized.toml`: fixture-pinned
   obligation-level labels for `MaybeUninit::assume_init` family initialized
   evidence and Miri/cargo-careful witness routing.

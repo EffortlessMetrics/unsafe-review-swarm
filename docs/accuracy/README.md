@@ -67,6 +67,9 @@ The current fixture-pinned slices are:
 - FFI boundary obligation evidence: checks that ABI/layout compatibility and
   ownership/lifetime/nullability contracts are tracked as separate obligations
   for unsafe extern C seams.
+- Inline assembly human-review routing: checks that `asm!` register, memory,
+  clobber, and target invariants route to human deep review without implying an
+  executable witness ran.
 - `get_unchecked_mut` bounds evidence: checks whether same-receiver len guards
   discharge the bounds obligation, while rejecting other-receiver, post-check,
   observed-only, closed-branch, and stale-index controls.

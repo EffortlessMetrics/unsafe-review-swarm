@@ -1,0 +1,26 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "inline-asm-human-review-routes"
+operation_family = "inline_asm"
+hazard = "inline_asm"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard witness routing behavior; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "inline-asm-routes-human-deep-review"
+fixture = "inline_asm_human_review"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "inline_asm"
+expected_hazard = "inline_asm"
+expected_obligation_key = "asm"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "Inline assembly register, memory, clobber, and target invariants should route to human deep review rather than a generic executable witness."
