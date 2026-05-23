@@ -668,6 +668,42 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "get-unchecked-mut-bounds-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "get_unchecked"
+hazard = "bounds"
+support_tier = "Core operation smoke slice"
+fixtures = [
+  "get_unchecked_mut_bounds",
+  "get_unchecked_mut_len_guard",
+  "get_unchecked_mut_other_len_not_guard",
+  "get_unchecked_mut_post_check_not_guard",
+  "get_unchecked_mut_bounds_observed_not_guard",
+  "get_unchecked_mut_closed_bounds_not_guard",
+  "get_unchecked_mut_reassigned_index_not_guard",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/get-unchecked-mut-bounds.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned get_unchecked_mut bounds evidence distinguishes same-receiver
+len guards from missing, other-receiver, post-check, observed-only,
+closed-branch, and stale-index controls in the listed fixtures.
+"""
+forbidden_claims = [
+  "broad get_unchecked soundness",
+  "slice bounds proof",
+  "witness execution proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "no-card-artifact-honesty"
 status = "fixture_pinned"
 kind = "artifact_honesty"

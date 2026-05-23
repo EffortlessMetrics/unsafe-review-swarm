@@ -1,0 +1,109 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "get-unchecked-mut-bounds-evidence"
+operation_family = "get_unchecked"
+hazard = "bounds"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard bounds evidence behavior for get_unchecked_mut; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "get-unchecked-mut-missing-bounds"
+fixture = "get_unchecked_mut_bounds"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A bare get_unchecked_mut call does not prove the index is in bounds for the collection."
+
+[[samples]]
+id = "get-unchecked-mut-len-guard-present"
+fixture = "get_unchecked_mut_len_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-receiver len guard before get_unchecked_mut discharges the bounds obligation."
+
+[[samples]]
+id = "get-unchecked-mut-other-len-not-guard"
+fixture = "get_unchecked_mut_other_len_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A len guard for another receiver does not discharge get_unchecked_mut bounds evidence."
+
+[[samples]]
+id = "get-unchecked-mut-post-check-not-guard"
+fixture = "get_unchecked_mut_post_check_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Bounds checks after get_unchecked_mut do not dominate the unsafe access and do not discharge the bounds obligation."
+
+[[samples]]
+id = "get-unchecked-mut-observed-not-guard"
+fixture = "get_unchecked_mut_bounds_observed_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A bare bounds predicate observation is not a dominating guard for get_unchecked_mut."
+
+[[samples]]
+id = "get-unchecked-mut-closed-branch-not-guard"
+fixture = "get_unchecked_mut_closed_bounds_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A closed positive bounds branch does not dominate the later get_unchecked_mut call."
+
+[[samples]]
+id = "get-unchecked-mut-reassigned-index-not-guard"
+fixture = "get_unchecked_mut_reassigned_index_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Bounds evidence becomes stale when the checked index is reassigned before get_unchecked_mut."

@@ -63,6 +63,9 @@ The current fixture-pinned slices are:
 - FFI boundary obligation evidence: checks that ABI/layout compatibility and
   ownership/lifetime/nullability contracts are tracked as separate obligations
   for unsafe extern C seams.
+- `get_unchecked_mut` bounds evidence: checks whether same-receiver len guards
+  discharge the bounds obligation, while rejecting other-receiver, post-check,
+  observed-only, closed-branch, and stale-index controls.
 - No-card artifact honesty: checks that safe, import-only, cfg-only, and
   unchanged-adjacent fixtures emit zero ReviewCards without turning that into an
   all-clear or safety claim.
