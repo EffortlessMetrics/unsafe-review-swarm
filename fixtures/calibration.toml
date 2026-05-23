@@ -71,6 +71,7 @@ required_core_fixtures = [
   "unwrap_unchecked_post_check_not_guard",
   "unwrap_unchecked_guard_then_reassigned_not_guard",
   "unwrap_unchecked_is_none_return_guard",
+  "unwrap_unchecked_is_none_return_comment_not_guard",
   "unwrap_unchecked_is_err_return_guard",
   "unreachable_unchecked_path",
   "unreachable_unchecked_infallible_path",
@@ -913,6 +914,16 @@ claim = "unwrap_unchecked recognizes same-receiver is_none early-return guard ev
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "unwrap_unchecked_is_none_return_comment_not_guard"
+kind = "false_positive_control"
+claim = "unwrap_unchecked does not accept return text inside comments as valid-value evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
 expected_operation_family = "unwrap_unchecked"
 expected_hazard = "invalid_value"
 
