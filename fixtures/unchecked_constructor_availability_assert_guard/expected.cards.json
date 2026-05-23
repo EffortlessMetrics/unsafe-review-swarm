@@ -63,7 +63,7 @@
     "missing": [
       "No witness receipt imported for this card"
     ],
-    "next_action": "Attach a focused witness receipt or mark the static limitation explicitly.",
+    "next_action": "Attach a human deep-review witness receipt or mark the static limitation explicitly.",
     "verify_commands": []
   }
 ]

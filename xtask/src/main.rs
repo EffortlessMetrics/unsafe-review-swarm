@@ -2925,6 +2925,14 @@ fn check_fixture_next_action(
         }
     }
     let class_name = require_non_empty_json_str(card, "class", &card_context)?;
+    let has_human_deep_review_route = json_array_at(card, "/witness_routes", &card_context)?
+        .iter()
+        .any(|route| {
+            route
+                .get("kind")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|kind| kind == "human-deep-review")
+        });
     if class_name == "guard_missing" {
         if !normalized.contains("guard") {
             return Err(format!(
@@ -2991,6 +2999,15 @@ fn check_fixture_next_action(
         {
             return Err(format!(
                 "{card_context} guarded_unwitnessed next_action must ask for a witness receipt or explicit static limitation"
+            ));
+        }
+        "guarded_unwitnessed"
+            if has_human_deep_review_route
+                && !normalized.contains("human")
+                && !normalized.contains("manual") =>
+        {
+            return Err(format!(
+                "{card_context} guarded_unwitnessed next_action for human-deep-review routes must name human or manual review evidence"
             ));
         }
         "witness_mismatch"
@@ -6854,6 +6871,35 @@ jobs:
                 "expected `{err}` to mention `{expected}`"
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_generic_human_route_witness_next_action() -> Result<(), String>
+    {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["class"] = serde_json::Value::String("guarded_unwitnessed".to_string());
+        card["witness_routes"][0]["kind"] =
+            serde_json::Value::String("human-deep-review".to_string());
+        card["witness_routes"][0]["command"] = serde_json::Value::Null;
+        card["next_action"] = serde_json::Value::String(
+            "Attach a focused witness receipt or mark the static limitation explicitly."
+                .to_string(),
+        );
+
+        let Err(err) = check_fixture_next_action(
+            "fixtures/documented_private_unsafe_fn/expected.cards.json",
+            0,
+            &card,
+            "unknown",
+        ) else {
+            return Err("generic human-route witness next_action should fail".to_string());
+        };
+
+        assert!(err.contains("human-deep-review"));
+        assert!(err.contains("human or manual review"));
         Ok(())
     }
 

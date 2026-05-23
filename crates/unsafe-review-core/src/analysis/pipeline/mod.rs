@@ -166,6 +166,12 @@ fn next_action_summary(
         crate::domain::ReviewClass::ContractMissing => "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.".to_string(),
         crate::domain::ReviewClass::GuardMissing if operation == "unknown" => "Review the unsafe site manually and add the missing obligation-specific guard once the contract is identified.".to_string(),
         crate::domain::ReviewClass::GuardMissing => format!("Add or expose the local guard that discharges the `{operation}` safety obligation."),
+        crate::domain::ReviewClass::GuardedUnwitnessed
+            if manual_only_witness_operation(operation) =>
+        {
+            "Attach a human deep-review witness receipt or mark the static limitation explicitly."
+                .to_string()
+        }
         crate::domain::ReviewClass::ReachableUnwitnessed => "Attach a focused witness receipt for the reached unsafe seam or mark the static limitation explicitly.".to_string(),
         crate::domain::ReviewClass::WitnessMismatch => "Review the witness identity or tool mismatch and attach a matching receipt for this card.".to_string(),
         crate::domain::ReviewClass::RequiresLoom => "Add or update a Loom/Shuttle model for the changed concurrency invariant.".to_string(),
@@ -178,6 +184,13 @@ fn next_action_summary(
         crate::domain::ReviewClass::Suppressed => "Suppressed card; keep the owner, reason, evidence, and review or expiry date current.".to_string(),
         _ => "Attach a focused witness receipt or mark the static limitation explicitly.".to_string(),
     }
+}
+
+fn manual_only_witness_operation(operation: &str) -> bool {
+    matches!(
+        operation,
+        "unknown" | "unsafe_fn_call" | "target_feature" | "inline_asm" | "pin_unchecked"
+    )
 }
 
 fn card_id(
@@ -771,6 +784,29 @@ mod tests {
                 class.as_str()
             );
         }
+    }
+
+    #[test]
+    fn manual_only_guarded_cards_get_human_review_next_actions() {
+        for operation in [
+            "unknown",
+            "unsafe_fn_call",
+            "target_feature",
+            "inline_asm",
+            "pin_unchecked",
+        ] {
+            let summary = next_action_summary(&ReviewClass::GuardedUnwitnessed, operation, false);
+            assert!(
+                summary.contains("human deep-review witness receipt"),
+                "`{operation}` guarded card next action `{summary}` should route to human deep-review receipt evidence"
+            );
+            assert!(summary.contains("static limitation"));
+        }
+
+        let miri_supported =
+            next_action_summary(&ReviewClass::GuardedUnwitnessed, "raw_pointer_read", false);
+        assert!(miri_supported.contains("focused witness receipt"));
+        assert!(!miri_supported.contains("human deep-review"));
     }
 
     #[test]

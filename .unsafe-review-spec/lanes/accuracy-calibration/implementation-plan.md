@@ -59,6 +59,9 @@ The guard rejects:
   Kani/Crux proof receipt, sanitizer/cargo-careful, unreached safe-wrapper test
   paths, witness receipt/static limitation, witness mismatch, static-unknown
   manual review, baseline ledger, or suppression-owner evidence guidance.
+- fixture golden `guarded_unwitnessed` cards whose only witness route is
+  `human-deep-review` but whose next_action still uses generic focused-witness
+  wording instead of human/manual review evidence.
 - fixture golden cards whose next_action asks reviewers to discharge an
   `unknown` obligation instead of routing unknown operation families to manual
   unsafe-site review and obligation-specific guard evidence.
