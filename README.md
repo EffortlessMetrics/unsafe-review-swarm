@@ -12,6 +12,7 @@
 
 <p align="center">
   <a href="https://github.com/EffortlessMetrics/unsafe-review/actions/workflows/ci.yml"><img src="https://github.com/EffortlessMetrics/unsafe-review/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI" /></a>
+  <a href="docs/ci/coverage.md"><img src="https://img.shields.io/codecov/c/github/EffortlessMetrics/unsafe-review-swarm?label=coverage%20%28advisory%29" alt="coverage (advisory execution-surface telemetry; not memory-safety, UB-free, Miri-clean, or site-execution evidence)" /></a>
 </p>
 
 <p align="center">

@@ -48,7 +48,7 @@ linked_closeout = ".unsafe-review-spec/lanes/marketplace-first-hour-ux/closeout.
 
 [[work_item]]
 id = "first-hour-guide"
-status = "ready"
+status = "done"
 spec = "UNSAFE-REVIEW-SPEC-0023"
 description = """
 Add docs/FIRST_HOUR.md as the copy-pasteable maintainer first-hour walkthrough,
@@ -62,7 +62,7 @@ proof = [
 
 [[work_item]]
 id = "first-hour-smoke"
-status = "ready"
+status = "done"
 spec = "UNSAFE-REVIEW-SPEC-0023"
 description = """
 Add an xtask check-first-hour command that exercises doctor, fixture first-pr,
@@ -77,7 +77,7 @@ proof = [
 
 [[work_item]]
 id = "github-actions-user-guide"
-status = "ready"
+status = "done"
 spec = "UNSAFE-REVIEW-SPEC-0024"
 description = """
 Add a copy-paste GitHub Actions user guide and re-anchor the example workflow
@@ -127,7 +127,7 @@ proof = [
 
 [[work_item]]
 id = "extension-mvp-spec"
-status = "ready"
+status = "done"
 spec = "UNSAFE-REVIEW-SPEC-0021"
 description = """
 Define the editor extension MVP as a saved-lsp.json viewer (diagnostics,
@@ -142,7 +142,7 @@ proof = [
 
 [[work_item]]
 id = "extension-saved-lsp-viewer"
-status = "ready"
+status = "done"
 spec = "UNSAFE-REVIEW-SPEC-0021"
 description = """
 Implement the saved-lsp viewer behavior in editors/vscode: load lsp.json,
@@ -178,7 +178,7 @@ proof = [
 
 [[work_item]]
 id = "marketplace-publish-workflow"
-status = "ready"
+status = "done"
 blocked_by = ["extension-packaging-smoke"]
 description = """
 Add a workflow_dispatch-only publish workflow that takes a version, supports
@@ -189,7 +189,10 @@ lane in policy/ci-lane-whitelist.toml. Owner-side prerequisites
 (publisher accounts, VSCE_PAT and OVSX_PAT secrets, Open VSX namespace)
 are documented in docs/editor/marketplace-publication.md. Publication is
 restricted to manual dispatch from main, and non-dry-run publication must
-select at least one marketplace target.
+select at least one marketplace target. Status `done` here means the
+workflow exists and is gated correctly; an actual marketplace publication
+still requires the owner to provision the publisher accounts, namespace,
+and secrets and to run `gh workflow run editor-publish.yml`.
 """
 proof = [
   "cargo run --locked -p xtask -- check-ci-lanes",
@@ -200,11 +203,17 @@ proof = [
 
 [[work_item]]
 id = "codecov-advisory"
-status = "proposed"
+status = "done"
 description = """
-Add an advisory cargo-llvm-cov + Codecov workflow as execution-surface
-telemetry only. Codecov badge is added to README only after the first
-successful upload. Coverage is not unsafe correctness evidence.
+Advisory cargo-llvm-cov + Codecov workflow lands as
+.github/workflows/coverage.yml; Codecov's project/patch status checks
+are made informational via codecov.yml so they never function as a
+required branch-protection gate. README carries an advisory coverage
+badge labelled `coverage (advisory)` and links to docs/ci/coverage.md
+where the not-memory-safety / not-UB-free / not-Miri-clean /
+not-site-execution / not-unsafe-correctness boundary is restated.
+Coverage is execution-surface telemetry, not unsafe correctness
+evidence.
 """
 proof = [
   "cargo run --locked -p xtask -- check-ci-lanes",

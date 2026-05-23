@@ -55,9 +55,13 @@ Behavior:
 
 ## README badge
 
-The README does **not** carry a Codecov badge until the first successful
-upload is observed in CI. Once it does, the badge is captioned as
-execution-surface telemetry only — never as a safety claim.
+After the first successful Codecov upload from `main`, the README carries
+an advisory shield labelled `coverage (advisory)` that links back to this
+guide. The label is intentional: coverage on this repo is
+execution-surface telemetry, never a memory-safety, UB-free, Miri-clean,
+site-execution, or unsafe-correctness claim. The badge does not change
+the boundary; it only surfaces the current LCOV percentage Codecov has
+on file.
 
 ## Non-goals
 
