@@ -18,11 +18,13 @@ mod calibration_constants;
 mod command_args;
 mod commands;
 mod docs_automation_paths;
+mod first_hour;
 mod markdown;
 mod source_sync;
 mod workflow_allowlist;
 
 use advisory_artifacts::{check_advisory_artifacts, check_first_pr_artifacts};
+use first_hour::check_first_hour;
 
 #[cfg(test)]
 use command_args::{require_max_args, require_no_extra_args};
@@ -239,7 +241,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
     match commands::XtaskCommand::parse(&args)? {
         commands::XtaskCommand::Help => {
             println!(
-                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, source-divergence, check-source-sync"
+                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-first-hour, source-divergence, check-source-sync"
             );
             Ok(())
         }
@@ -271,6 +273,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckFuzz => check_manual_fuzz_harness(),
         commands::XtaskCommand::CheckAdvisoryArtifacts(dir) => check_advisory_artifacts(&dir),
         commands::XtaskCommand::CheckFirstPrArtifacts(dir) => check_first_pr_artifacts(&dir),
+        commands::XtaskCommand::CheckFirstHour => check_first_hour(),
         commands::XtaskCommand::SourceDivergence => source_sync::report_source_divergence(),
     }
 }
@@ -5344,7 +5347,7 @@ fn require_boundary_text(text: &str, path: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn text_contains_ignore_ascii_case(text: &str, needle: &str) -> bool {
+pub(crate) fn text_contains_ignore_ascii_case(text: &str, needle: &str) -> bool {
     text.to_ascii_lowercase()
         .contains(&needle.to_ascii_lowercase())
 }
@@ -5364,7 +5367,7 @@ fn has_negative_claim_context(text: &str) -> bool {
         || text.contains("without")
 }
 
-fn require_file(path: &str) -> Result<(), String> {
+pub(crate) fn require_file(path: &str) -> Result<(), String> {
     if workspace_path(path).is_file() {
         Ok(())
     } else {
@@ -5389,7 +5392,7 @@ fn require_fixture_file(dir: &Path, relative: &str) -> Result<(), String> {
     }
 }
 
-fn read_to_string(path: &Path) -> Result<String, String> {
+pub(crate) fn read_to_string(path: &Path) -> Result<String, String> {
     fs::read_to_string(path).map_err(|err| format!("read {} failed: {err}", path.display()))
 }
 

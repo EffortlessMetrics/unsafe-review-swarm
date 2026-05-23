@@ -173,6 +173,7 @@ posture live in the status docs.
 | Support posture | [Support summary](docs/status/SUPPORT_SUMMARY.md) |
 | Claim-to-proof ledger | [Support tiers](docs/status/SUPPORT_TIERS.md) |
 | First-use guide | [First-use guide](docs/FIRST_USE.md) |
+| First-hour guide | [First-hour guide](docs/FIRST_HOUR.md) |
 | ReviewCard trust boundary | [ReviewCard explanation](docs/explanation/review-cards-and-trust-boundary.md) |
 | Explain examples | [Reviewer examples](docs/explanation/explain-examples.md) |
 | Dogfood evidence | [Dogfood index](docs/dogfood/index.md) |
@@ -205,6 +206,7 @@ cargo run --locked -p xtask -- check-dogfood
 ## Documentation map
 
 - [First-use guide](docs/FIRST_USE.md)
+- [First-hour guide](docs/FIRST_HOUR.md)
 - [Mission and vision](docs/MISSION.md)
 - [Roadmap](docs/ROADMAP.md)
 - [Architecture](docs/ARCHITECTURE.md)
