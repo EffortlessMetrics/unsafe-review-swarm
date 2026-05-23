@@ -38,6 +38,8 @@ Current ledgers:
   transmute bool valid-value evidence.
 - `unsafe-impl-send-sync-witness-routes.toml`: fixture-pinned route-quality
   labels for unsafe impl Send/Sync Loom/Shuttle witness routing.
+- `unsafe-fn-call-callee-contract.toml`: fixture-pinned obligation-level labels
+  for generic unsafe function call callee-contract evidence.
 - `vec-from-raw-parts-capacity.toml`: fixture-pinned obligation-level labels
   for `Vec::from_raw_parts` capacity evidence.
 - `vec-set-len-initialized-range.toml`: fixture-pinned obligation-level labels

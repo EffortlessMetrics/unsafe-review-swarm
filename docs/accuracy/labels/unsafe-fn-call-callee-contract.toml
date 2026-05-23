@@ -1,0 +1,137 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "unsafe-fn-call-callee-contract-evidence"
+operation_family = "unsafe_fn_call"
+hazard = "unknown"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard callee-contract evidence behavior for unsafe function calls; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "unsafe-fn-call-wrapper-missing-callee-contract"
+fixture = "unsafe_fn_call_wrapper"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+expected_obligation_key = "callee-contract"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A wrapper around an unsafe callee remains guard-missing when the callee's safety preconditions are not discharged locally."
+
+[[samples]]
+id = "multiline-unsafe-fn-call-wrapper-missing-callee-contract"
+fixture = "multiline_unsafe_fn_call_wrapper"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+expected_obligation_key = "callee-contract"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A multiline unsafe callee wrapper keeps the same callee-contract obligation and remains missing without a local discharge."
+
+[[samples]]
+id = "unsafe-fn-call-remaining-cap-present"
+fixture = "unsafe_fn_call_encode_utf8_remaining_cap"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+expected_obligation_key = "callee-contract"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "Visible remaining-capacity argument evidence discharges the encode_utf8 callee-contract obligation without importing a witness receipt."
+
+[[samples]]
+id = "unchecked-constructor-availability-guard-present"
+fixture = "unchecked_constructor_availability_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+expected_obligation_key = "callee-contract"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "Same-receiver availability guard evidence discharges the non-NonNull new_unchecked callee-contract obligation."
+
+[[samples]]
+id = "unchecked-constructor-availability-assert-present"
+fixture = "unchecked_constructor_availability_assert_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+expected_obligation_key = "callee-contract"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "Same-receiver availability assertions discharge the non-NonNull new_unchecked callee-contract obligation."
+
+[[samples]]
+id = "unchecked-constructor-unavailable-return-present"
+fixture = "unchecked_constructor_unavailable_return_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+expected_obligation_key = "callee-contract"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "Unavailable-path early returns discharge the non-NonNull new_unchecked callee-contract obligation."
+
+[[samples]]
+id = "unchecked-constructor-other-availability-not-guard"
+fixture = "unchecked_constructor_other_availability_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+expected_obligation_key = "callee-contract"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "Availability evidence for a different receiver does not discharge the callee-contract obligation."
+
+[[samples]]
+id = "unchecked-constructor-availability-observed-not-guard"
+fixture = "unchecked_constructor_availability_observed_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+expected_obligation_key = "callee-contract"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A bare availability observation does not dominate the unsafe constructor call and does not discharge the callee-contract obligation."
+
+[[samples]]
+id = "unchecked-constructor-availability-closed-branch-not-guard"
+fixture = "unchecked_constructor_availability_closed_branch_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+expected_obligation_key = "callee-contract"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A closed positive availability branch does not dominate the unsafe constructor call and does not discharge the callee-contract obligation."

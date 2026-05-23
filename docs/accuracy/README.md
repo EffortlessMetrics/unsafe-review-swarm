@@ -54,6 +54,10 @@ The current fixture-pinned slices are:
   controls.
 - Unsafe impl Send/Sync witness routing: checks that thread-safety invariants
   route to Loom/Shuttle witness suggestions.
+- Generic unsafe function call callee-contract evidence: checks whether
+  remaining-capacity and availability guards discharge generic unsafe callee
+  preconditions, while rejecting wrong-receiver, observed-only, and
+  closed-branch controls.
 - FFI witness routing: checks that unsafe extern C boundaries route away from
   Miri-first review to sanitizer/cargo-careful witness suggestions.
 - FFI boundary obligation evidence: checks that ABI/layout compatibility and

@@ -574,6 +574,45 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "unsafe-fn-call-callee-contract-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "unsafe_fn_call"
+hazard = "unknown"
+support_tier = "Core operation smoke slice"
+fixtures = [
+  "unsafe_fn_call_wrapper",
+  "multiline_unsafe_fn_call_wrapper",
+  "unsafe_fn_call_encode_utf8_remaining_cap",
+  "unchecked_constructor_availability_guard",
+  "unchecked_constructor_availability_assert_guard",
+  "unchecked_constructor_unavailable_return_guard",
+  "unchecked_constructor_other_availability_not_guard",
+  "unchecked_constructor_availability_observed_not_guard",
+  "unchecked_constructor_availability_closed_branch_not_guard",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/unsafe-fn-call-callee-contract.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned generic unsafe function call callee-contract evidence
+distinguishes remaining-capacity and availability guards from missing,
+wrong-receiver, observed-only, and closed-branch controls in the listed
+fixtures.
+"""
+forbidden_claims = [
+  "callee contract soundness proof",
+  "broad unsafe function call soundness",
+  "witness execution proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "ffi-sanitizer-witness-routes"
 status = "fixture_pinned"
 kind = "route_quality"
