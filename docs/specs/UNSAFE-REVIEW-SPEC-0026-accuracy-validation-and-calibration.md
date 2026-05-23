@@ -112,6 +112,9 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
   description-aligned, and carry coherent per-axis evidence states,
 - fixture golden missing summaries are non-empty exactly when at least one
   obligation evidence axis is missing,
+- fixture golden next actions are non-empty reviewer actions, avoid overclaim
+  wording, and name the matching operation family when they refer to a safety
+  obligation,
 - fixture golden witness routes are advisory, non-empty, and command-aligned
   with verify commands,
 - allowed public claim wording names the claim level, and forbidden claim lists
@@ -144,6 +147,8 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - A dogfood-measured claim cannot reference an unknown dogfood target.
 - An allowed public claim cannot contain global precision/recall, policy-ready,
   UB-free, Miri-clean, or memory-safety proof wording.
+- A fixture card next action cannot say "all clear" or name the wrong operation
+  family for safety-obligation repair guidance.
 - An allowed public claim cannot omit its claim level, such as
   `Fixture-pinned`.
 - A forbidden claim list cannot omit the shared global precision, global recall,

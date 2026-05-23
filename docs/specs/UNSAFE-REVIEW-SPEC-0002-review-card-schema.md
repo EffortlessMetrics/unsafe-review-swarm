@@ -22,7 +22,10 @@ state per safety obligation. Top-level evidence summaries remain for
 compatibility and human scanning. Cards also expose the ReviewCard's structured
 witness routes and next-action summary so JSON consumers can route the same
 reviewer action as PR summaries, SARIF, LSP hovers, and agent packets without
-reclassifying findings.
+reclassifying findings. The next-action summary is a reviewer instruction, not a
+verdict: it must be non-empty, concrete, operation-aware when it names a safety
+obligation, and free of "all clear", safety-proof, UB-free, Miri-clean, or
+site-execution claims.
 
 ## Non-goals
 
@@ -41,6 +44,8 @@ reclassifying findings.
 
 - A changed unsafe seam produces one review card with stable identity.
 - The card includes missing evidence and a next action.
+- The card's next action names a concrete review step without implying safety,
+  UB-free status, Miri-clean status, or site execution.
 - If evidence is not knowable statically, the card names the limitation instead of overclaiming.
 - Fixture `expected.cards.json` files pin the rendered card JSON for supported smoke cases.
 

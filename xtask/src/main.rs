@@ -2475,7 +2475,83 @@ fn check_fixture_card_identity(
 
     let has_missing_evidence = check_fixture_obligation_evidence(path, idx, card)?;
     check_fixture_missing_summary(path, idx, card, has_missing_evidence)?;
+    check_fixture_next_action(path, idx, card, operation_family)?;
     check_fixture_witness_routes(path, idx, card)?;
+
+    Ok(())
+}
+
+fn check_fixture_next_action(
+    path: &str,
+    idx: usize,
+    card: &serde_json::Value,
+    operation_family: &str,
+) -> Result<(), String> {
+    let card_context = format!("{path} card[{idx}]");
+    let action = require_non_empty_json_str(card, "next_action", &card_context)?;
+    let normalized = normalize_claim_line(action);
+    let starts_with_action = [
+        "add ",
+        "attach ",
+        "use ",
+        "run ",
+        "review ",
+        "document ",
+        "mark ",
+    ]
+    .iter()
+    .any(|prefix| normalized.starts_with(prefix));
+    if !starts_with_action {
+        return Err(format!(
+            "{card_context} next_action must start with a concrete reviewer action verb"
+        ));
+    }
+
+    for forbidden in [
+        "all clear",
+        "safe to merge",
+        "proved safe",
+        "proven safe",
+        "verified safe",
+        "proof of safety",
+        "no action needed",
+        "nothing to do",
+    ] {
+        if normalized.contains(forbidden) {
+            return Err(format!(
+                "{card_context} next_action must not imply `{forbidden}`"
+            ));
+        }
+    }
+
+    if (normalized.contains("miri-clean") || normalized.contains("miri clean"))
+        && !has_negative_claim_context(&normalized)
+    {
+        return Err(format!(
+            "{card_context} next_action must not imply Miri-clean status"
+        ));
+    }
+    if normalized.contains("ub-free") && !has_negative_claim_context(&normalized) {
+        return Err(format!(
+            "{card_context} next_action must not imply UB-free status"
+        ));
+    }
+    if (normalized.contains("site reached") || normalized.contains("site executed"))
+        && !has_negative_claim_context(&normalized)
+    {
+        return Err(format!(
+            "{card_context} next_action must not imply site execution"
+        ));
+    }
+
+    if normalized.contains("safety obligation") {
+        let normalized_family = operation_family.replace('_', "").to_ascii_lowercase();
+        if !normalized.contains(&normalized_family) {
+            return Err(format!(
+                "{card_context} next_action safety-obligation wording must name operation_family `{operation_family}`"
+            ));
+        }
+    }
 
     Ok(())
 }
@@ -5136,6 +5212,74 @@ jobs:
     }
 
     #[test]
+    fn fixture_card_identity_rejects_missing_next_action() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card.as_object_mut()
+            .ok_or_else(|| "test card must be an object".to_string())?
+            .remove("next_action");
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("missing next_action should fail".to_string());
+        };
+
+        assert!(err.contains("next_action"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_next_action_overclaim() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["next_action"] =
+            serde_json::Value::String("Add proof that this is all clear.".to_string());
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("overclaiming next_action should fail".to_string());
+        };
+
+        assert!(err.contains("next_action"));
+        assert!(err.contains("all clear"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_next_action_wrong_operation_family() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["next_action"] = serde_json::Value::String(
+            "Add or expose the local guard that discharges the `vec_set_len` safety obligation."
+                .to_string(),
+        );
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("wrong-operation next_action should fail".to_string());
+        };
+
+        assert!(err.contains("next_action"));
+        assert!(err.contains("operation_family"));
+        Ok(())
+    }
+
+    #[test]
     fn fixture_card_identity_rejects_route_command_missing_from_verify_commands()
     -> Result<(), String> {
         let mut card = test_fixture_card(
@@ -5443,6 +5587,7 @@ jobs:
     "Missing visible local guard for inferred safety obligations",
     "No witness receipt imported for this card"
   ],
+  "next_action": "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.",
   "witness_routes": [
     {{
       "kind": "miri",
