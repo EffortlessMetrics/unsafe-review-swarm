@@ -57,6 +57,7 @@ spec = "UNSAFE-REVIEW-SPEC-0025"
 plan = "plans/0.2.0/implementation-plan.md"
 commands = [
   "cargo run --locked -p xtask -- check-docs-automation",
+  "cargo run --locked -p xtask -- check-spec-status",
   "cargo run --locked -p xtask -- check-doc-artifacts",
   "cargo run --locked -p xtask -- check-goals",
   "cargo run --locked -p xtask -- check-docs",

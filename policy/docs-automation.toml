@@ -31,7 +31,8 @@ sources = [
 must_include = [
   "UNSAFE-REVIEW-SPEC-0020",
   "Proof commands",
-  "Follow-up",
+  "Machine Check",
+  "check-spec-status",
 ]
 
 [[generated_or_checked]]

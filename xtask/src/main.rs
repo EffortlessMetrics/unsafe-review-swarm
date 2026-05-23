@@ -75,6 +75,7 @@ const WORKFLOW_ALLOWLIST: &str = "policy/workflow-allowlist.toml";
 const WORKFLOW_DIR: &str = ".github/workflows";
 const DOC_ARTIFACT_LEDGER: &str = "policy/doc-artifacts.toml";
 const DOCS_AUTOMATION_LEDGER: &str = "policy/docs-automation.toml";
+const SPEC_STATUS_DASHBOARD: &str = "docs/specs/UNSAFE-REVIEW-SPEC-STATUS.md";
 const PUBLIC_SURFACES_LEDGER: &str = "policy/public-surfaces.toml";
 const CI_LANE_LEDGER: &str = "policy/ci-lane-whitelist.toml";
 const PACKAGE_BOUNDARY_LEDGER: &str = "policy/package-boundary.toml";
@@ -90,6 +91,32 @@ const DOCS_AUTOMATION_KINDS: &[&str] = &[
     "handoff_receipt",
 ];
 const DOCS_AUTOMATION_MODES: &[&str] = &["check", "generate"];
+const SPEC_STATUS_HEADER: &[&str] = &[
+    "Spec",
+    "Status",
+    "Implementation state",
+    "Proof commands",
+    "Last touched",
+    "Notes",
+];
+const SPEC_STATUS_LIFECYCLE_STATUSES: &[&str] = &["accepted", "draft", "proposed"];
+const SPEC_STATUS_XTASK_COMMANDS: &[&str] = &[
+    "check-advisory-artifacts",
+    "check-calibration",
+    "check-ci-lanes",
+    "check-doc-artifacts",
+    "check-docs",
+    "check-docs-automation",
+    "check-dogfood",
+    "check-first-pr-artifacts",
+    "check-goals",
+    "check-package-boundary",
+    "check-pr",
+    "check-public-surfaces",
+    "check-source-sync",
+    "check-spec-status",
+    "source-divergence",
+];
 const PUBLIC_SURFACE_STATUSES: &[&str] = &["experimental", "accepted", "deferred"];
 const PUBLIC_SURFACE_FRONT_DOORS: &[&str] = &[
     "README.md",
@@ -177,7 +204,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
     match commands::XtaskCommand::parse(&args)? {
         commands::XtaskCommand::Help => {
             println!(
-                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, source-divergence, check-source-sync"
+                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, source-divergence, check-source-sync"
             );
             Ok(())
         }
@@ -197,6 +224,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckPolicy => check_policy(),
         commands::XtaskCommand::CheckDocArtifacts => check_doc_artifacts(),
         commands::XtaskCommand::CheckDocsAutomation => check_docs_automation(),
+        commands::XtaskCommand::CheckSpecStatus => check_spec_status(),
         commands::XtaskCommand::CheckPublicSurfaces => check_public_surfaces(),
         commands::XtaskCommand::CheckGoals => check_goals(),
         commands::XtaskCommand::CheckPackageBoundary => check_package_boundary(),
@@ -227,6 +255,7 @@ fn check_docs() -> Result<(), String> {
         check_markdown_local_links(path)?;
     }
     check_public_badge_endpoints()?;
+    check_spec_status_dashboard_impl()?;
     check_docs_map_paths("docs/README.md")?;
     check_index(
         Path::new("docs/specs"),
@@ -395,6 +424,12 @@ fn check_docs_automation() -> Result<(), String> {
     Ok(())
 }
 
+fn check_spec_status() -> Result<(), String> {
+    let rows = check_spec_status_dashboard_impl()?;
+    println!("check-spec-status: ok ({rows} rows)");
+    Ok(())
+}
+
 fn check_public_surfaces() -> Result<(), String> {
     let surfaces = check_public_surfaces_impl()?;
     println!("check-public-surfaces: ok ({surfaces} surfaces)");
@@ -547,6 +582,17 @@ fn check_docs_automation_impl() -> Result<usize, String> {
         }
 
         let paths = docs_automation_paths(table, idx)?;
+        if kind == "spec_status_dashboard" {
+            if !paths
+                .iter()
+                .any(|path| path == Path::new(SPEC_STATUS_DASHBOARD))
+            {
+                return Err(format!(
+                    "{DOCS_AUTOMATION_LEDGER} generated_or_checked `{id}` must point at {SPEC_STATUS_DASHBOARD}"
+                ));
+            }
+            check_spec_status_dashboard_impl()?;
+        }
         if let Some(required_text) = table.get("must_include") {
             let required_text =
                 toml_str_array(required_text, DOCS_AUTOMATION_LEDGER, "must_include")?;
@@ -555,6 +601,209 @@ fn check_docs_automation_impl() -> Result<usize, String> {
     }
 
     Ok(ids.len())
+}
+
+fn check_spec_status_dashboard_impl() -> Result<usize, String> {
+    let source = workspace_path(SPEC_STATUS_DASHBOARD);
+    let text = read_to_string(&source)?;
+    let rows = spec_status_rows_from_text(&text)?;
+    if rows.is_empty() {
+        return Err(format!(
+            "{SPEC_STATUS_DASHBOARD} must list at least one spec row"
+        ));
+    }
+
+    let mut seen = BTreeSet::new();
+    for row in &rows {
+        if !seen.insert(row.spec_id.clone()) {
+            return Err(format!(
+                "{SPEC_STATUS_DASHBOARD} contains duplicate row for `{}`",
+                row.spec_id
+            ));
+        }
+        if !spec_file_exists_for_id(&row.spec_id)? {
+            return Err(format!(
+                "{SPEC_STATUS_DASHBOARD} references `{}` but no matching docs/specs file exists",
+                row.spec_id
+            ));
+        }
+        let status = row
+            .status
+            .split([',', ' '])
+            .next()
+            .unwrap_or_default()
+            .to_ascii_lowercase();
+        require_known(
+            &status,
+            SPEC_STATUS_LIFECYCLE_STATUSES,
+            SPEC_STATUS_DASHBOARD,
+            "status",
+        )?;
+        if row.implementation_state.trim().is_empty() {
+            return Err(format!(
+                "{SPEC_STATUS_DASHBOARD} row `{}` must describe implementation state",
+                row.spec_id
+            ));
+        }
+        if row.notes.trim().is_empty() {
+            return Err(format!(
+                "{SPEC_STATUS_DASHBOARD} row `{}` must include notes",
+                row.spec_id
+            ));
+        }
+        if !is_iso_date(&row.last_touched) {
+            return Err(format!(
+                "{SPEC_STATUS_DASHBOARD} row `{}` has invalid Last touched date `{}`",
+                row.spec_id, row.last_touched
+            ));
+        }
+        check_spec_status_proof_commands(&row.spec_id, &row.proof_commands)?;
+    }
+
+    let source_index = parse_toml_file(&workspace_path(SOURCE_OF_TRUTH_INDEX))?;
+    let indexed_artifact_ids = source_truth_index_ids(&source_index, "artifact")?;
+    for id in indexed_artifact_ids
+        .iter()
+        .filter(|id| id.starts_with("UNSAFE-REVIEW-SPEC-"))
+    {
+        if !seen.contains(id) {
+            return Err(format!(
+                "{SPEC_STATUS_DASHBOARD} is missing source-of-truth indexed spec `{id}`"
+            ));
+        }
+    }
+
+    Ok(rows.len())
+}
+
+#[derive(Debug)]
+struct SpecStatusRow {
+    spec_id: String,
+    status: String,
+    implementation_state: String,
+    proof_commands: String,
+    last_touched: String,
+    notes: String,
+}
+
+fn spec_status_rows_from_text(text: &str) -> Result<Vec<SpecStatusRow>, String> {
+    let mut rows = Vec::new();
+    let mut in_table = false;
+    let mut saw_header = false;
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if !trimmed.starts_with('|') {
+            if in_table {
+                break;
+            }
+            continue;
+        }
+        let columns = markdown_table_columns(trimmed);
+        if columns.len() != SPEC_STATUS_HEADER.len() {
+            if in_table {
+                return Err(format!(
+                    "{SPEC_STATUS_DASHBOARD} has row with {} columns, expected {}: {trimmed}",
+                    columns.len(),
+                    SPEC_STATUS_HEADER.len()
+                ));
+            }
+            continue;
+        }
+        let columns = columns.into_iter().map(str::trim).collect::<Vec<_>>();
+        if columns == SPEC_STATUS_HEADER {
+            in_table = true;
+            saw_header = true;
+            continue;
+        }
+        if in_table && is_markdown_separator_row(&columns) {
+            continue;
+        }
+        if in_table {
+            let spec_id = spec_id_from_status_cell(columns[0]).ok_or_else(|| {
+                format!("{SPEC_STATUS_DASHBOARD} row is missing backticked spec id: {trimmed}")
+            })?;
+            rows.push(SpecStatusRow {
+                spec_id,
+                status: columns[1].to_string(),
+                implementation_state: columns[2].to_string(),
+                proof_commands: columns[3].to_string(),
+                last_touched: columns[4].to_string(),
+                notes: columns[5].to_string(),
+            });
+        }
+    }
+    if !saw_header {
+        return Err(format!(
+            "{SPEC_STATUS_DASHBOARD} is missing expected status table header"
+        ));
+    }
+    Ok(rows)
+}
+
+fn is_markdown_separator_row(columns: &[&str]) -> bool {
+    columns.iter().all(|column| {
+        let value = column.trim();
+        !value.is_empty() && value.chars().all(|ch| matches!(ch, '-' | ':' | ' '))
+    })
+}
+
+fn spec_id_from_status_cell(cell: &str) -> Option<String> {
+    let marker = "`UNSAFE-REVIEW-SPEC-";
+    let start = cell.find(marker)? + 1;
+    let rest = &cell[start..];
+    let end = rest.find('`')?;
+    Some(rest[..end].to_string())
+}
+
+fn spec_file_exists_for_id(spec_id: &str) -> Result<bool, String> {
+    for path in markdown_files(&workspace_path("docs/specs"))? {
+        let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
+            return Err(format!("non-UTF-8 spec file path: {}", path.display()));
+        };
+        if name.starts_with(spec_id) && name.ends_with(".md") {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn check_spec_status_proof_commands(spec_id: &str, proof_commands: &str) -> Result<(), String> {
+    let spans = markdown::code_spans(proof_commands);
+    let mut xtask_commands = 0usize;
+    for span in spans {
+        let Some(command) = span.strip_prefix("cargo run --locked -p xtask -- ") else {
+            continue;
+        };
+        let Some(command_name) = command.split_whitespace().next() else {
+            return Err(format!(
+                "{SPEC_STATUS_DASHBOARD} row `{spec_id}` has empty xtask proof command"
+            ));
+        };
+        xtask_commands += 1;
+        require_known(
+            command_name,
+            SPEC_STATUS_XTASK_COMMANDS,
+            SPEC_STATUS_DASHBOARD,
+            "proof command",
+        )?;
+    }
+    if xtask_commands == 0 {
+        return Err(format!(
+            "{SPEC_STATUS_DASHBOARD} row `{spec_id}` must include at least one `cargo run --locked -p xtask -- ...` proof command"
+        ));
+    }
+    Ok(())
+}
+
+fn is_iso_date(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.len() == 10
+        && bytes[4] == b'-'
+        && bytes[7] == b'-'
+        && bytes
+            .iter()
+            .enumerate()
+            .all(|(idx, byte)| idx == 4 || idx == 7 || byte.is_ascii_digit())
 }
 
 fn require_scope_paths(
@@ -4192,6 +4441,39 @@ OperationFamily::RawPointerRead => vec![
     #[test]
     fn docs_map_paths_point_at_existing_repository_files() -> Result<(), String> {
         check_docs_map_paths("../docs/README.md")
+    }
+
+    #[test]
+    fn spec_status_dashboard_validates_current_table() -> Result<(), String> {
+        check_spec_status_dashboard_impl().map(|_| ())
+    }
+
+    #[test]
+    fn spec_status_table_parser_extracts_rows() -> Result<(), String> {
+        let text = r#"
+| Spec | Status | Implementation state | Proof commands | Last touched | Notes |
+|---|---|---|---|---|---|
+| `UNSAFE-REVIEW-SPEC-0024` CI design | draft | CI lane taxonomy documented | `cargo run --locked -p xtask -- check-pr` | 2026-05-23 | Advisory findings stay non-blocking |
+"#;
+
+        let rows = spec_status_rows_from_text(text)?;
+
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].spec_id, "UNSAFE-REVIEW-SPEC-0024");
+        assert_eq!(rows[0].status, "draft");
+        assert_eq!(rows[0].last_touched, "2026-05-23");
+        Ok(())
+    }
+
+    #[test]
+    fn spec_status_proof_commands_reject_unknown_xtask_commands() {
+        let err = check_spec_status_proof_commands(
+            "UNSAFE-REVIEW-SPEC-0024",
+            "`cargo run --locked -p xtask -- check-fake-thing`",
+        )
+        .expect_err("unknown xtask commands should fail");
+
+        assert!(err.contains("check-fake-thing"));
     }
 
     #[test]
