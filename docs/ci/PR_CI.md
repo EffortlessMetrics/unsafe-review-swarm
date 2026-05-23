@@ -1,6 +1,21 @@
 # PR and CI model
 
-Default PR runs cheap static review on the pinned Rust toolchain:
+This guide is the operator-facing companion to
+[UNSAFE-REVIEW-SPEC-0024: CI design](../specs/UNSAFE-REVIEW-SPEC-0024-ci-design.md).
+`UNSAFE-REVIEW-SPEC-0011` remains the artifact contract for PR output. This
+guide explains how CI lanes use that contract.
+
+The core line:
+
+```text
+Malformed or dishonest unsafe-review artifacts fail CI.
+Unsafe-review findings do not fail CI by default.
+```
+
+## Default workspace gate
+
+Default PR CI runs the cheap repository policy gate on the pinned Rust
+toolchain. The full workspace proof set remains:
 
 ```text
 cargo fmt --check
@@ -9,27 +24,62 @@ cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --all-targets --locked
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
 cargo run --locked -p xtask -- check-pr
-unsafe-review first-pr --base origin/main
 ```
 
-The CI workflow keeps repository permissions read-only, avoids persisted checkout
-credentials, cancels superseded pull request runs, supports manual dispatch for
-ad hoc verification, and bounds the Rust job with a timeout.
+This lane protects repository correctness: formatting, build, lint, tests,
+rustdoc, and repo policy checks. The live swarm workflow may route a cheaper
+Rust Small lane through `cargo run --locked -p xtask -- check-pr`; broader
+workspace checks remain local, release, or future full-lane proof until a live
+workflow explicitly promotes them.
+
+It must not run:
+
+```text
+Miri
+cargo-careful
+sanitizers
+Loom
+Kani
+mutation testing
+comment posting
+source edits
+publish
+```
+
+The CI workflow keeps repository permissions read-only, avoids persisted
+checkout credentials, cancels superseded pull request runs, supports manual
+dispatch for ad hoc verification, and bounds the Rust job with a timeout.
 Dependabot opens weekly Cargo and GitHub Actions update PRs as maintenance
 signals; those PRs still pass through the same advisory CI and review process.
 The `dtolnay/rust-toolchain` action ref is intentionally pinned to the repo
 toolchain version and is not Dependabot-managed.
 
-The PR summary artifact is Markdown for GitHub job summaries or uploaded
-artifacts. It projects existing review cards only: counts, top card, card table,
-witness plan, and the trust boundary. It must not add PR-specific analyzer truth
-and must not imply a blocking policy.
+## Policy contracts lane
 
-The SARIF artifact projects the same review cards into code-scanning shape. It
-is still advisory static review evidence; uploading SARIF must not be treated as
-proof that the changed code is memory-safe.
+The policy contracts workflow validates the source-of-truth rails without
+running unsafe-review analysis:
 
-The advisory GitHub workflow writes and uploads:
+```text
+cargo run --locked -p xtask -- check-doc-artifacts
+cargo run --locked -p xtask -- check-goals
+cargo run --locked -p xtask -- check-package-boundary
+cargo run --locked -p xtask -- check-ci-lanes
+```
+
+This lane may fail on malformed or drifting source-of-truth ledgers. It must not
+run witnesses, post comments, publish, edit source, or turn unsafe-review
+findings into a default blocking policy.
+
+## Advisory first-pr packet lane
+
+The first-pr lane produces the user-facing unsafe-review packet:
+
+```text
+unsafe-review first-pr --base origin/<base> --out-dir target/unsafe-review
+cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review
+```
+
+The bundle contains:
 
 ```text
 target/unsafe-review/cards.json
@@ -40,17 +90,23 @@ target/unsafe-review/witness-plan.md
 target/unsafe-review/lsp.json
 ```
 
-Before upload, the workflow runs:
+The PR summary artifact is Markdown for GitHub job summaries or uploaded
+artifacts. It projects existing ReviewCards only: counts, top card, card table,
+witness plan, and the trust boundary. It must not add PR-specific analyzer truth
+and must not imply a blocking policy.
 
-```text
-cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review
-```
+The SARIF artifact projects the same ReviewCards into code-scanning shape. It
+is still advisory static review evidence; uploading SARIF must not be treated as
+proof that the changed code is memory-safe.
 
-The comment plan is an artifact of candidate high-signal inline comments. It is
-not posted by the workflow.
+The comment-plan artifact is a plan of candidate high-signal inline comments.
+It is not posted by default.
 
-The PR gate fails on infrastructure and contract failures, not on advisory
-findings by default:
+The saved `lsp.json` artifact is a read-only projection for diagnostics,
+hovers, and command-only actions. It must not include `WorkspaceEdit`, source
+edits, witness execution, comment posting, or policy approval actions.
+
+The first-pr gate fails on infrastructure and artifact contract failures:
 
 - tool invocation failed,
 - required artifact missing,
@@ -58,7 +114,17 @@ findings by default:
 - card IDs inconsistent across projections,
 - trust boundary missing,
 - output contains positive safety/proof wording,
-- comment plan violates its artifact contract.
+- comment plan violates its artifact contract,
+- saved LSP violates its read-only projection contract,
+- witness-plan route limits are missing.
+
+It does not fail because advisory findings exist:
+
+- new cards,
+- guard-missing cards,
+- contract-missing cards,
+- missing witness receipts,
+- advisory policy-report gaps.
 
 The comment-plan contract is intentionally narrow:
 
@@ -72,36 +138,48 @@ A future trusted poster must consume `comment-plan.json` and keep the same
 ReviewCard identity, witness route, verify-command, and trust-boundary fields.
 It must not rerun analysis and create a second comment truth.
 
-The workflow does not run Miri, sanitizers, Loom, Kani, or other witness tools.
-It does not post comments and does not enable blocking policy.
+## Witness posture
 
-After downloading or rendering an advisory artifact set, verify the artifact
-contract with:
+The default workflows do not run Miri, cargo-careful, sanitizers, Loom, Kani,
+Crux, fuzzing, or other witness tools.
+
+Witness tools are routed, not run everywhere. They belong in targeted PR,
+nightly, release, or explicit manual/receipt lanes unless repo policy says
+otherwise. CI may generate `witness-plan.md`, but it must not fabricate receipts
+or claim a witness ran unless a matching receipt was imported.
+
+## Coverage and release lanes
+
+Coverage belongs in a separate advisory lane. It is Rust test execution-surface
+telemetry, not unsafe correctness evidence, memory-safety proof, UB-free status,
+or witness adequacy.
+
+Release readiness belongs to release lanes, not every PR. Expected release
+proof includes workspace checks, `check-pr`, `check-calibration`,
+`check-dogfood`, package lists, publish dry-runs, and install/first-pr/support
+smokes. Release readiness must not publish by itself unless a separate trusted
+release workflow is specified.
+
+## Source/swarm sync
+
+Routine implementation belongs in `unsafe-review-swarm`; source publishes
+curated promotions and release/public-surface work.
+
+Before routine swarm work, run:
 
 ```text
-cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review
+cargo run --locked -p xtask -- source-divergence
 ```
 
-This checks that the first-pr bundle exists (`cards.json`, `pr-summary.md`,
-`cards.sarif`, `comment-plan.json`, `witness-plan.md`, and `lsp.json`),
-machine-readable artifacts parse, the policy remains advisory, the comment plan
-remains plan-only, projected card IDs match `cards.json`, result counts stay
-consistent, witness route limits are present, and the trust boundary is present.
-
-Policy reports are separate explicit artifacts from `unsafe-review policy
-report`; they are not part of the default `first-pr` bundle unless a workflow
-adds that command intentionally.
-
-Witness tools are routed, not run everywhere. Miri, sanitizers, Loom, and Kani
-belong in targeted PR, nightly, or release lanes unless repo policy says
-otherwise.
-
+If source has unmirrored implementation commits, pause routine feature work and
+open a swarm sync or acknowledgement PR before continuing.
 
 ## Copy-paste first-pr workflow
 
-For a drop-in advisory PR lane, copy `.github/examples/unsafe-review-first-pr.yml`.
-It runs one `first-pr` command, verifies the full artifact bundle contract, uploads
-all first-run artifacts, and writes a GitHub job summary.
+For a drop-in advisory PR lane, copy
+`.github/examples/unsafe-review-first-pr.yml`. It runs one `first-pr` command,
+verifies the full artifact bundle contract, uploads all first-run artifacts, and
+writes a GitHub job summary.
 
 Default behavior of the example workflow:
 
@@ -111,4 +189,4 @@ Default behavior of the example workflow:
   `witness-plan.md`, and `lsp.json`;
 - does not post comments;
 - does not run witnesses;
-- does not block on findings (only on artifact/tooling contract failures).
+- does not block on findings, only on artifact/tooling contract failures.
