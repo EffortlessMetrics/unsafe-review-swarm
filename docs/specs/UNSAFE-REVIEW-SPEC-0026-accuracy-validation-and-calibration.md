@@ -43,6 +43,11 @@ Each calibrated claim names:
 - proof commands,
 - support-tier wording.
 
+Fixture-pinned label ledgers may precede human calibration, but they must stay
+obligation-level. For a ReviewCard with multiple obligations, the ledger names
+the expected obligation key and evidence state instead of treating the card
+class as proof that every obligation is discharged.
+
 ## Non-goals
 
 - no global precision/recall claim,

@@ -12,6 +12,7 @@ use calibration_constants::{
     SAFETY_OBLIGATION_SOURCE, WITNESS_KIND_SOURCE, ZERO_CARD_EXPECTATION_FIELDS,
 };
 
+mod accuracy_labels;
 mod advisory_artifacts;
 mod calibration_constants;
 mod command_args;
@@ -1092,6 +1093,7 @@ fn check_calibration() -> Result<(), String> {
     let mut kinds = BTreeSet::new();
     let mut operation_families = BTreeSet::new();
     let mut operation_family_fixtures = BTreeMap::new();
+    let mut fixture_cases = BTreeMap::new();
     let support_capabilities = support_tier_capabilities()?;
     for (idx, case) in cases.iter().enumerate() {
         let Some(case) = case.as_table() else {
@@ -1125,7 +1127,23 @@ fn check_calibration() -> Result<(), String> {
             ));
         }
         kinds.insert(kind.to_string());
+        let expected_cards = required_case_usize(case, "expected_cards", idx)?;
+        let expected_class = optional_case_string(case, "expected_class", idx)?.map(str::to_string);
+        let expected_operation_family =
+            optional_case_string(case, "expected_operation_family", idx)?.map(str::to_string);
+        let expected_hazard =
+            optional_case_string(case, "expected_hazard", idx)?.map(str::to_string);
         check_calibration_case(case, fixture, kind, idx)?;
+        fixture_cases.insert(
+            fixture.to_string(),
+            accuracy_labels::CalibrationFixtureCase {
+                kind: kind.to_string(),
+                expected_cards,
+                expected_class,
+                expected_operation_family,
+                expected_hazard,
+            },
+        );
         if let Some(operation_family) =
             optional_case_string(case, "expected_operation_family", idx)?
         {
@@ -1184,7 +1202,14 @@ fn check_calibration() -> Result<(), String> {
         }
     }
 
-    println!("check-calibration: ok ({} cases)", cases.len());
+    let accuracy_policy = parse_toml_file(&workspace_path("policy/accuracy-calibration.toml"))?;
+    let label_count =
+        accuracy_labels::check_accuracy_label_ledgers(&accuracy_policy, &fixture_cases)?;
+
+    println!(
+        "check-calibration: ok ({} cases, {label_count} labels)",
+        cases.len()
+    );
     Ok(())
 }
 

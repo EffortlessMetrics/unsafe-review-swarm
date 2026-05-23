@@ -47,6 +47,9 @@ fixtures = [
   "raw_pointer_alignment_modulo_reassigned_pointer_not_guard",
 ]
 dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/raw-pointer-read-alignment.toml",
+]
 labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned alignment guard evidence for raw pointer reads rejects observed,

@@ -1,0 +1,115 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "raw-pointer-read-alignment-evidence"
+operation_family = "raw_pointer_read"
+hazard = "alignment"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard evidence behavior; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "raw-pointer-is-aligned-guard"
+fixture = "raw_pointer_alignment_is_aligned_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+expected_obligation_key = "alignment"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A same-pointer `is_aligned` early-return guard is accepted as alignment discharge evidence."
+
+[[samples]]
+id = "raw-pointer-modulo-alignment-guard"
+fixture = "raw_pointer_alignment_modulo_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+expected_obligation_key = "alignment"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A same-pointer modulo early-return guard is accepted as alignment discharge evidence."
+
+[[samples]]
+id = "raw-pointer-is-aligned-observed-not-guard"
+fixture = "raw_pointer_alignment_observed_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+expected_obligation_key = "alignment"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A bare observed `is_aligned` value is not an open dominating guard for the unsafe read."
+
+[[samples]]
+id = "raw-pointer-is-aligned-closed-branch-not-guard"
+fixture = "raw_pointer_alignment_closed_branch_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+expected_obligation_key = "alignment"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A closed positive `is_aligned` branch does not dominate the later unsafe read."
+
+[[samples]]
+id = "raw-pointer-is-aligned-reassigned-not-guard"
+fixture = "raw_pointer_alignment_reassigned_pointer_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+expected_obligation_key = "alignment"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "An `is_aligned` guard for an earlier pointer does not discharge evidence after pointer reassignment."
+
+[[samples]]
+id = "raw-pointer-modulo-observed-not-guard"
+fixture = "raw_pointer_alignment_modulo_observed_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+expected_obligation_key = "alignment"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A bare observed modulo alignment value is not an open dominating guard for the unsafe read."
+
+[[samples]]
+id = "raw-pointer-modulo-closed-branch-not-guard"
+fixture = "raw_pointer_alignment_modulo_closed_branch_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+expected_obligation_key = "alignment"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A closed positive modulo alignment branch does not dominate the later unsafe read."
+
+[[samples]]
+id = "raw-pointer-modulo-reassigned-not-guard"
+fixture = "raw_pointer_alignment_modulo_reassigned_pointer_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+expected_obligation_key = "alignment"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A modulo alignment guard for an earlier pointer does not discharge evidence after pointer reassignment."
