@@ -31,6 +31,13 @@ owner = "repo-infra"
 linked_proposal = "UNSAFE-REVIEW-PROP-0002"
 
 [[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0023"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0023-first-hour-experience.md"
+status = "draft"
+owner = "product / cli"
+
+[[artifact]]
 id = "UNSAFE-REVIEW-SPEC-0024"
 kind = "spec"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-0024-ci-design.md"
@@ -55,6 +62,13 @@ linked_spec = "UNSAFE-REVIEW-SPEC-0021"
 [[lane]]
 id = "docs/source-of-truth-scaffold"
 name = "source-of-truth scaffold"
+path = ".unsafe-review-spec/goals/active.toml"
+status = "active"
+owner = "repo-infra"
+
+[[lane]]
+id = "ci-design-rail"
+name = "CI design contract"
 path = ".unsafe-review-spec/goals/active.toml"
 status = "active"
 owner = "repo-infra"
