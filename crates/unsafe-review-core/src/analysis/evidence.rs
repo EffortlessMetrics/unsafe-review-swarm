@@ -2329,6 +2329,7 @@ fn has_unwrap_unchecked_receiver_state_evidence(lower: &str) -> bool {
     has_receiver_positive_branch_guard(before_call, receiver, "is_some")
         || has_receiver_positive_branch_guard(before_call, receiver, "is_ok")
         || has_receiver_if_let_as_ref_guard(before_call, receiver, "some")
+        || has_receiver_let_else_as_ref_guard(before_call, receiver, "some")
         || has_receiver_if_let_as_ref_guard(before_call, receiver, "ok")
         || has_receiver_early_return_guard(before_call, receiver, "is_none")
         || has_receiver_early_return_guard(before_call, receiver, "is_err")
@@ -2366,6 +2367,30 @@ fn has_receiver_positive_branch_guard(before_call: &str, receiver: &str, predica
 fn has_receiver_if_let_as_ref_guard(before_call: &str, receiver: &str, constructor: &str) -> bool {
     let guard = format!("iflet{constructor}(_)={receiver}.as_ref(){{");
     has_open_receiver_branch_guard(before_call, receiver, &guard)
+}
+
+fn has_receiver_let_else_as_ref_guard(
+    before_call: &str,
+    receiver: &str,
+    constructor: &str,
+) -> bool {
+    let guard = format!("let{constructor}(_)={receiver}.as_ref()else{{");
+    let mut search_from = 0usize;
+    while let Some(offset) = before_call[search_from..].find(&guard) {
+        let guard_start = search_from + offset;
+        let after_guard = &before_call[guard_start + guard.len()..];
+        let (guard_body, after_guard_body) = matching_code_block_end(after_guard)
+            .map_or((after_guard, ""), |body_end| {
+                (&after_guard[..body_end], &after_guard[body_end + 1..])
+            });
+        if guard_body.contains("return")
+            && !has_receiver_assignment_after_branch(after_guard_body, receiver)
+        {
+            return true;
+        }
+        search_from = guard_start + guard.len();
+    }
+    false
 }
 
 fn has_open_receiver_branch_guard(before_call: &str, receiver: &str, guard: &str) -> bool {
@@ -6247,6 +6272,16 @@ mod tests {
             "unsafe { option.unwrap_unchecked() }",
             vec!["}"],
         );
+        let option_let_else = site_with_family(
+            OperationFamily::UnwrapUnchecked,
+            vec![
+                "let Some(_) = option.as_ref() else {",
+                "    return 0;",
+                "};",
+            ],
+            "unsafe { option.unwrap_unchecked() }",
+            vec![],
+        );
         let result = site_with_family(
             OperationFamily::UnwrapUnchecked,
             vec!["if result.is_ok() {"],
@@ -6263,12 +6298,15 @@ mod tests {
         let option_evidence = obligation_evidence(&option, &obligations, &contract, &reach);
         let option_if_let_evidence =
             obligation_evidence(&option_if_let, &obligations, &contract, &reach);
+        let option_let_else_evidence =
+            obligation_evidence(&option_let_else, &obligations, &contract, &reach);
         let result_evidence = obligation_evidence(&result, &obligations, &contract, &reach);
         let result_if_let_evidence =
             obligation_evidence(&result_if_let, &obligations, &contract, &reach);
 
         assert!(option_evidence[0].discharge.present);
         assert!(option_if_let_evidence[0].discharge.present);
+        assert!(option_let_else_evidence[0].discharge.present);
         assert!(result_evidence[0].discharge.present);
         assert!(result_if_let_evidence[0].discharge.present);
     }
@@ -6296,21 +6334,44 @@ mod tests {
             "unsafe { option.unwrap_unchecked() }",
             vec!["}"],
         );
+        let other_let_else = site_with_family(
+            OperationFamily::UnwrapUnchecked,
+            vec!["let Some(_) = other.as_ref() else {", "    return 0;", "};"],
+            "unsafe { option.unwrap_unchecked() }",
+            vec![],
+        );
         let other_result_if_let = site_with_family(
             OperationFamily::UnwrapUnchecked,
             vec!["if let Ok(_) = other.as_ref() {"],
             "unsafe { result.unwrap_unchecked() }",
             vec!["}"],
         );
+        let let_else_then_reassigned = site_with_family(
+            OperationFamily::UnwrapUnchecked,
+            vec![
+                "let Some(_) = option.as_ref() else {",
+                "    return 0;",
+                "};",
+                "option = None;",
+            ],
+            "unsafe { option.unwrap_unchecked() }",
+            vec![],
+        );
 
         let evidence = obligation_evidence(&unchecked, &obligations, &contract, &reach);
         let if_let_evidence = obligation_evidence(&other_if_let, &obligations, &contract, &reach);
+        let let_else_evidence =
+            obligation_evidence(&other_let_else, &obligations, &contract, &reach);
         let result_if_let_evidence =
             obligation_evidence(&other_result_if_let, &obligations, &contract, &reach);
+        let let_else_then_reassigned_evidence =
+            obligation_evidence(&let_else_then_reassigned, &obligations, &contract, &reach);
 
         assert!(!evidence[0].discharge.present);
         assert!(!if_let_evidence[0].discharge.present);
+        assert!(!let_else_evidence[0].discharge.present);
         assert!(!result_if_let_evidence[0].discharge.present);
+        assert!(!let_else_then_reassigned_evidence[0].discharge.present);
     }
 
     #[test]
