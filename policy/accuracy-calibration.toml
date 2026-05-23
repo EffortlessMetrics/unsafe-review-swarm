@@ -1128,6 +1128,7 @@ hazard = "target_feature"
 support_tier = "Witness routing"
 fixtures = [
   "target_feature_safety_docs",
+  "target_feature_missing_safety_docs",
 ]
 dogfood_targets = []
 label_ledgers = [
@@ -1135,8 +1136,9 @@ label_ledgers = [
 ]
 labeled_reports = []
 allowed_public_claim = """
-Fixture-pinned target-feature witness routing sends hardware availability and
-dispatch correctness obligations to human deep review in the listed fixture.
+Fixture-pinned target-feature witness routing sends documented and missing-contract
+hardware availability and dispatch correctness obligations to human deep review
+in the listed fixtures.
 """
 forbidden_claims = [
   "target-feature correctness proof",

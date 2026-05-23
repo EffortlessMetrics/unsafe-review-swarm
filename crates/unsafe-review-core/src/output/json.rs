@@ -388,6 +388,7 @@ mod tests {
         "imports_not_unsafe_operations",
         "cfg_target_feature_not_operation",
         "target_feature_safety_docs",
+        "target_feature_missing_safety_docs",
         "split_raw_pointer_read_call",
         "maybeuninit_assume_init",
         "maybeuninit_assume_init_write_guard",

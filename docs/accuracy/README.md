@@ -99,9 +99,10 @@ The current fixture-pinned slices are:
 - Atomic pointer state routing: checks that atomic pointer state transitions,
   ownership invariants, and ordering obligations route to Loom/Shuttle
   interleaving witnesses without implying those witnesses ran.
-- Target-feature human-review routing: checks that documented
-  `#[target_feature]` caller-contract sites route to human deep review for
-  hardware availability and dispatch correctness without implying witness proof.
+- Target-feature human-review routing: checks that documented and missing-contract
+  `#[target_feature]` caller-contract sites keep the annotated function owner and
+  route to human deep review for hardware availability and dispatch correctness
+  without implying witness proof.
 - `get_unchecked_mut` bounds evidence: checks whether same-receiver len guards
   and `get(index)` probe guards, including if-let, let-else, and match Some-arm
   forms, discharge the bounds obligation, while rejecting other-receiver,

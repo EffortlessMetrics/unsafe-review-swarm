@@ -77,7 +77,13 @@ pub(crate) fn scan_file(
         if !changed && !repo_mode {
             continue;
         }
-        let owner = find_owner(&lines, idx);
+        let owner =
+            if kind == UnsafeSiteKind::Operation && family == OperationFamily::TargetFeature {
+                find_following_fn_owner(&lines, idx)
+            } else {
+                None
+            }
+            .or_else(|| find_owner(&lines, idx));
         let visibility = visibility_for_snippet(trimmed).to_string();
         let public_api_surface = is_public_api_surface(&kind, trimmed);
         let context_before = context_before_site(&lines, idx);
@@ -717,6 +723,9 @@ fn syntax_owner(site: &DetectedSyntaxSite, lines: &[&str], idx: usize) -> Option
         UnsafeSiteKind::UnsafeImpl
         | UnsafeSiteKind::UnsafeImplSend
         | UnsafeSiteKind::UnsafeImplSync => parse_impl_owner(&site.source_snippet),
+        UnsafeSiteKind::Operation if site.family == OperationFamily::TargetFeature => {
+            find_following_fn_owner(lines, idx)
+        }
         _ => None,
     }
     .or_else(|| find_owner(lines, idx))
@@ -1159,6 +1168,21 @@ fn find_owner(lines: &[&str], idx: usize) -> Option<String> {
         if is_impl_declaration_line(line) && declaration_encloses_line(lines, line_idx, idx) {
             return Some("impl".to_string());
         }
+    }
+    None
+}
+
+fn find_following_fn_owner(lines: &[&str], idx: usize) -> Option<String> {
+    for line in lines.iter().skip(idx + 1).take(8) {
+        let trimmed = line.trim_start();
+        if trimmed.is_empty()
+            || trimmed.starts_with("#[")
+            || trimmed.starts_with("///")
+            || trimmed.starts_with("//")
+        {
+            continue;
+        }
+        return parse_fn_name(trimmed);
     }
     None
 }
@@ -1633,6 +1657,34 @@ mod tests {
             ),
             Some((UnsafeSiteKind::Operation, OperationFamily::TargetFeature))
         );
+    }
+
+    #[test]
+    fn target_feature_owner_inference_uses_following_function() {
+        let site = DetectedSyntaxSite {
+            line: 5,
+            end_line: 5,
+            column: 1,
+            kind: UnsafeSiteKind::Operation,
+            family: OperationFamily::TargetFeature,
+            source_snippet: "#[target_feature(enable = \"sse2\")]".to_string(),
+            card_snippet: "#[target_feature(enable = \"sse2\")]".to_string(),
+            start: 0,
+            end: 0,
+        };
+        let lines = [
+            "/// Runs a target-feature-specific path.",
+            "///",
+            "/// # Safety",
+            "/// Callers must check SSE2.",
+            "#[target_feature(enable = \"sse2\")]",
+            "#[inline]",
+            "pub unsafe fn find_raw(data: &[u8]) -> usize {",
+            "    data.len()",
+            "}",
+        ];
+
+        assert_eq!(syntax_owner(&site, &lines, 4), Some("find_raw".to_string()));
     }
 
     #[test]

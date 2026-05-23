@@ -239,6 +239,7 @@ required_core_fixtures = [
   "imports_not_unsafe_operations",
   "cfg_target_feature_not_operation",
   "target_feature_safety_docs",
+  "target_feature_missing_safety_docs",
   "attributed_unsafe_fn_no_duplicate",
   "inline_unsafe_raw_pointer_deref_no_duplicate",
   "unsafe_fn_call_wrapper",
@@ -2617,6 +2618,16 @@ claim = "documented target-feature declarations are caller-contract sites and do
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
+expected_operation_family = "target_feature"
+expected_hazard = "target_feature"
+
+[[cases]]
+fixture = "target_feature_missing_safety_docs"
+kind = "positive"
+claim = "target-feature declarations without safety docs report missing caller-contract evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "contract_missing"
 expected_operation_family = "target_feature"
 expected_hazard = "target_feature"
 
