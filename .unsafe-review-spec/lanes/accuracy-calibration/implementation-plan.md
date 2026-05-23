@@ -58,6 +58,9 @@ The guard rejects:
   ReviewCard class route, including Loom/Shuttle, sanitizer/cargo-careful,
   unreached safe-wrapper test paths, witness receipt/static limitation,
   baseline ledger, or suppression-owner evidence guidance.
+- fixture golden cards whose next_action asks reviewers to discharge an
+  `unknown` obligation instead of routing unknown operation families to manual
+  unsafe-site review and obligation-specific guard evidence.
 - fixture golden `guard_missing` cards whose next_action suggests
   documentation or comments as a substitute for concrete guard evidence.
 - fixture golden cards whose public unsafe API contract next_action suggests a

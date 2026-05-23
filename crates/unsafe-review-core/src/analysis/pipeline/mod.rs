@@ -164,6 +164,7 @@ fn next_action_summary(
                 .to_string()
         }
         crate::domain::ReviewClass::ContractMissing => "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.".to_string(),
+        crate::domain::ReviewClass::GuardMissing if operation == "unknown" => "Review the unsafe site manually and add the missing obligation-specific guard once the contract is identified.".to_string(),
         crate::domain::ReviewClass::GuardMissing => format!("Add or expose the local guard that discharges the `{operation}` safety obligation."),
         crate::domain::ReviewClass::RequiresLoom => "Add or update a Loom/Shuttle model for the changed concurrency invariant.".to_string(),
         crate::domain::ReviewClass::MiriUnsupported => "Use sanitizer/cargo-careful or an explicit FFI boundary contract; Miri may not exercise this seam.".to_string(),
@@ -2213,6 +2214,16 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
                 .missing
                 .iter()
                 .any(|missing| missing.kind == "contract")
+        );
+        assert!(
+            !card.next_action.summary.contains("`unknown`"),
+            "unknown operation next action should not ask reviewers to discharge an unknown obligation"
+        );
+        assert!(card.next_action.summary.contains("unsafe site"));
+        assert!(
+            card.next_action
+                .summary
+                .contains("obligation-specific guard")
         );
         Ok(())
     }

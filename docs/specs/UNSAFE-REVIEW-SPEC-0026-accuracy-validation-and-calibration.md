@@ -144,6 +144,9 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - fixture golden next actions are non-empty reviewer actions, avoid overclaim
   wording, and name the matching operation family when they refer to a safety
   obligation,
+- fixture golden next actions do not route reviewers to an `unknown` obligation;
+  unknown operation-family cards must ask for manual unsafe-site review and
+  obligation-specific guard evidence,
 - fixture golden next actions stay aligned with class-specific reviewer routes:
   Loom/Shuttle for `requires_loom`, sanitizer/cargo-careful for
   `miri_unsupported`, safe-wrapper test paths for `unsafe_unreached`, witness
@@ -216,6 +219,9 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
   UB-free, Miri-clean, or memory-safety proof wording.
 - A fixture card next action cannot say "all clear" or name the wrong operation
   family for safety-obligation repair guidance.
+- A fixture card next action cannot ask reviewers to discharge an `unknown`
+  safety obligation; it must route unknown-operation cards to manual unsafe-site
+  review and obligation-specific guard evidence.
 - A fixture card next action cannot drift away from the ReviewCard class route,
   such as asking for a guard when the class requires Loom/Shuttle, sanitizer,
   safe-wrapper reach, witness receipt, baseline, or suppression evidence.

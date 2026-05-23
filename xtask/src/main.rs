@@ -2900,6 +2900,14 @@ fn check_fixture_next_action(
             ));
         }
     }
+    if normalized.contains("unknown safety obligation")
+        || normalized.contains("unknown obligation")
+        || normalized.contains("unknown safety contract")
+    {
+        return Err(format!(
+            "{card_context} next_action must not route reviewers to an unknown obligation; ask for manual unsafe-site review and obligation-specific guard evidence"
+        ));
+    }
     let has_public_safety_missing = json_array_at(card, "/missing", &card_context)?
         .iter()
         .filter_map(serde_json::Value::as_str)
@@ -6779,6 +6787,30 @@ jobs:
                 "expected `{err}` to mention `{expected}`"
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_unknown_obligation_next_action() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["next_action"] = serde_json::Value::String(
+            "Add or expose the local guard that discharges the `unknown` safety obligation."
+                .to_string(),
+        );
+
+        let Err(err) = check_fixture_next_action(
+            "fixtures/private_unsafe_helper_safety_comment/expected.cards.json",
+            0,
+            &card,
+            "unknown",
+        ) else {
+            return Err("unknown obligation next_action should fail".to_string());
+        };
+
+        assert!(err.contains("unknown obligation"));
+        assert!(err.contains("manual unsafe-site review"));
         Ok(())
     }
 
