@@ -1,6 +1,6 @@
 # UNSAFE-REVIEW-SPEC-0025: docs automation
 
-- Status: proposed
+- Status: accepted
 - Owner: repo-infra
 - Created: 2026-05-21
 - Linked proposal: [UNSAFE-REVIEW-PROP-0002](../proposals/UNSAFE-REVIEW-PROP-0002-source-of-truth-stack.md)
@@ -81,5 +81,6 @@ git diff --check
 
 ## Follow-up
 
-Start with machine-checking for the spec dashboard and docs surface ledgers, then
-add generation commands only after the checker outputs are trusted.
+Machine-checking for the spec dashboard, docs surface ledgers, and agent
+operating contract has landed. Add generation commands only after the checked
+outputs are trusted enough to regenerate without weakening claim boundaries.

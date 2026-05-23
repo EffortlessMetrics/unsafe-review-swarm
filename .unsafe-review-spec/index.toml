@@ -48,7 +48,7 @@ owner = "repo-infra"
 id = "UNSAFE-REVIEW-SPEC-0025"
 kind = "spec"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-0025-docs-automation.md"
-status = "draft"
+status = "accepted"
 owner = "repo-infra"
 
 [[artifact]]
