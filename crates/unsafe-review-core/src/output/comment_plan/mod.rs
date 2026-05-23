@@ -7,7 +7,9 @@ pub(crate) use render::render;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::{AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, PolicyMode, Scope, analyze};
+    use crate::api::{
+        AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, PolicyMode, Scope, analyze,
+    };
     use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
     use std::path::PathBuf;
 
