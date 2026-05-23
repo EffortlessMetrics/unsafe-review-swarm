@@ -1,0 +1,115 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "vec-set-len-initialized-range-evidence"
+operation_family = "vec_set_len"
+hazard = "initialized_memory"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard initialized-range evidence behavior; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "vec-set-len-basic-missing-initialized-range"
+fixture = "vec_set_len"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A capacity guard alone does not prove the extended Vec range has been initialized."
+
+[[samples]]
+id = "vec-set-len-initialized-loop-present"
+fixture = "vec_set_len_initialized_loop"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A visible initialization loop over the extended range discharges initialized-range evidence."
+
+[[samples]]
+id = "vec-set-len-call-result-init-present"
+fixture = "vec_set_len_call_result_init"
+kind = "positive"
+expected_cards = 1
+expected_class = "unsafe_unreached"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A call-result length tied to encoded bytes is accepted as initialized-range evidence."
+
+[[samples]]
+id = "vec-set-len-shrink-present"
+fixture = "vec_set_len_shrink"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "Shrinking a Vec length does not expose newly uninitialized elements, so initialized-range evidence is present."
+
+[[samples]]
+id = "vec-set-len-zero-clear-present"
+fixture = "vec_set_len_zero_clear"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "Setting length to zero is treated as initialized-range evidence because no extended range is exposed."
+
+[[samples]]
+id = "vec-set-len-with-capacity-missing-initialized-range"
+fixture = "vec_set_len_with_capacity"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Allocating enough capacity does not initialize the extended Vec range."
+
+[[samples]]
+id = "vec-set-len-post-init-not-guard"
+fixture = "vec_set_len_post_init_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Initialization after `set_len` does not discharge evidence needed before exposing the extended range."
+
+[[samples]]
+id = "vec-set-len-unrelated-init-not-guard"
+fixture = "vec_set_len_unrelated_initialization_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Initialization of unrelated storage does not discharge the target Vec initialized-range obligation."

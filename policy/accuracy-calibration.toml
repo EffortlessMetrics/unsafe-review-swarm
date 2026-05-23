@@ -94,3 +94,38 @@ forbidden_claims = [
   "global recall",
   "memory-safety proof",
 ]
+
+[[claim]]
+id = "vec-set-len-initialized-range-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "vec_set_len"
+hazard = "initialized_memory"
+support_tier = "Core operation smoke slice"
+fixtures = [
+  "vec_set_len",
+  "vec_set_len_initialized_loop",
+  "vec_set_len_call_result_init",
+  "vec_set_len_shrink",
+  "vec_set_len_zero_clear",
+  "vec_set_len_with_capacity",
+  "vec_set_len_post_init_not_guard",
+  "vec_set_len_unrelated_initialization_not_guard",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/vec-set-len-initialized-range.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned Vec::set_len initialized-range evidence distinguishes initialized
+loop, call-result, shrink, and zero-clear evidence from capacity-only, post-init,
+and unrelated-initialization controls in the listed fixtures.
+"""
+forbidden_claims = [
+  "broad Vec soundness",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]

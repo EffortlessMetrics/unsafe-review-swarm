@@ -8,6 +8,8 @@ Current ledgers:
   for public unsafe API `# Safety` contract evidence.
 - `raw-pointer-read-alignment.toml`: fixture-pinned obligation-level labels for
   raw pointer read alignment evidence.
+- `vec-set-len-initialized-range.toml`: fixture-pinned obligation-level labels
+  for `Vec::set_len` initialized-range evidence.
 
 Each file must identify the linked policy claim, corpus metadata, sample set,
 source kind, and trust boundary. Fixture-pinned ledgers do not create calibrated
