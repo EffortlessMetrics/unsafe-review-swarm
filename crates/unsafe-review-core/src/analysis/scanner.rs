@@ -78,6 +78,9 @@ pub(crate) fn scan_file(
             continue;
         }
         let owner = match (&kind, &family) {
+            (UnsafeSiteKind::ExternBlock, OperationFamily::Ffi) => {
+                find_extern_block_owner(&lines, idx)
+            }
             (UnsafeSiteKind::Operation, OperationFamily::TargetFeature) => {
                 find_following_fn_owner(&lines, idx)
             }
@@ -726,6 +729,9 @@ fn syntax_owner(site: &DetectedSyntaxSite, lines: &[&str], idx: usize) -> Option
         UnsafeSiteKind::UnsafeImpl
         | UnsafeSiteKind::UnsafeImplSend
         | UnsafeSiteKind::UnsafeImplSync => parse_impl_owner(&site.source_snippet),
+        UnsafeSiteKind::ExternBlock => {
+            parse_fn_name(&site.source_snippet).or_else(|| find_extern_block_owner(lines, idx))
+        }
         UnsafeSiteKind::StaticMut => parse_static_mut_name(&site.source_snippet),
         UnsafeSiteKind::Operation if site.family == OperationFamily::TargetFeature => {
             find_following_fn_owner(lines, idx)
@@ -1187,6 +1193,26 @@ fn find_following_fn_owner(lines: &[&str], idx: usize) -> Option<String> {
             continue;
         }
         return parse_fn_name(trimmed);
+    }
+    None
+}
+
+fn find_extern_block_owner(lines: &[&str], idx: usize) -> Option<String> {
+    for line in lines.iter().skip(idx).take(16) {
+        let trimmed = line.trim_start();
+        if trimmed.is_empty()
+            || trimmed.starts_with("#[")
+            || trimmed.starts_with("///")
+            || trimmed.starts_with("//")
+        {
+            continue;
+        }
+        if let Some(name) = parse_fn_name(trimmed) {
+            return Some(name);
+        }
+        if trimmed.contains('}') {
+            break;
+        }
     }
     None
 }
@@ -2004,6 +2030,29 @@ mod tests {
             detect_site(detection_line.trim()),
             Some((UnsafeSiteKind::Operation, OperationFamily::RawPointerRead))
         );
+    }
+
+    #[test]
+    fn scan_file_infers_extern_block_owner_from_declared_function() -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "unsafe extern \"C\" {\n    fn strlen(ptr: *const u8) -> usize;\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+
+        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let extern_block = sites
+            .iter()
+            .find(|site| site.site.kind == UnsafeSiteKind::ExternBlock)
+            .ok_or_else(|| format!("expected extern block site: {sites:#?}"))?;
+        assert_eq!(extern_block.operation.family, OperationFamily::Ffi);
+        assert_eq!(extern_block.site.owner.as_deref(), Some("strlen"));
+        Ok(())
     }
 
     #[test]

@@ -1,6 +1,6 @@
 [
   {
-    "id": "UR-ffi-sanitizer-route-src-lib-rs-unknown-extern_block-ffi-ffi-603b71ab5c00-ffi_abi-c1",
+    "id": "UR-ffi-sanitizer-route-src-lib-rs-strlen-extern_block-ffi-ffi-603b71ab5c00-ffi_abi-c1",
     "class": "miri_unsupported",
     "priority": "medium",
     "confidence": "medium",
@@ -9,7 +9,7 @@
       "line": 2,
       "column": 1,
       "kind": "extern_block",
-      "owner": "unknown",
+      "owner": "strlen",
       "visibility": "private",
       "public_api_surface": false,
       "snippet": "unsafe extern \"C\" {"
@@ -41,7 +41,7 @@
         "reach": {
           "present": false,
           "state": "missing",
-          "summary": "No owner function could be inferred"
+          "summary": "No static test mention of owner `strlen` was found"
         },
         "witness": {
           "present": false,
@@ -65,7 +65,7 @@
         "reach": {
           "present": false,
           "state": "missing",
-          "summary": "No owner function could be inferred"
+          "summary": "No static test mention of owner `strlen` was found"
         },
         "witness": {
           "present": false,
@@ -76,30 +76,31 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "No visible local guard detected",
-    "reach": "No owner function could be inferred",
+    "reach": "No static test mention of owner `strlen` was found",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
         "kind": "asan",
         "reason": "FFI boundary detected; sanitizer/cargo-careful is usually more suitable than Miri for foreign calls",
-        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test",
+        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test strlen",
         "required": false
       },
       {
         "kind": "cargo-careful",
         "reason": "cargo-careful can cheaply exercise Rust-side FFI boundary assumptions when a focused test exists",
-        "command": "cargo +nightly careful test",
+        "command": "cargo +nightly careful test strlen",
         "required": false
       }
     ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
     "next_action": "Use sanitizer/cargo-careful or an explicit FFI boundary contract; Miri may not exercise this seam.",
     "verify_commands": [
-      "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test",
-      "cargo +nightly careful test"
+      "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test strlen",
+      "cargo +nightly careful test strlen"
     ]
   }
 ]
