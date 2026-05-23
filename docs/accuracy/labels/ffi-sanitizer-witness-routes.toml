@@ -37,3 +37,17 @@ expected_discharge_state = "missing"
 expected_witness_route_kinds = ["asan", "cargo-careful"]
 label_source = "fixture_golden"
 rationale = "Unsafe calls to same-file extern C declarations should route away from Miri-first review to sanitizer/cargo-careful witnesses."
+
+[[samples]]
+id = "ffi-libc-call-routes-asan-careful"
+fixture = "ffi_libc_call_sanitizer_route"
+kind = "positive"
+expected_cards = 1
+expected_class = "miri_unsupported"
+expected_operation_family = "ffi"
+expected_hazard = "ffi_abi"
+expected_obligation_key = "abi"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["asan", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Unsafe libc path calls should route away from Miri-first review to sanitizer/cargo-careful witnesses."

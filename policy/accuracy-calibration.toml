@@ -918,6 +918,7 @@ support_tier = "Witness routing"
 fixtures = [
   "ffi_sanitizer_route",
   "ffi_call_sanitizer_route",
+  "ffi_libc_call_sanitizer_route",
 ]
 dogfood_targets = []
 label_ledgers = [
@@ -927,7 +928,7 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned FFI witness routing sends unsafe extern C boundaries to
 sanitizer/cargo-careful route suggestions in the listed fixtures, including
-unsafe calls to same-file extern C declarations.
+unsafe calls to same-file extern C declarations and libc path calls.
 """
 forbidden_claims = [
   "FFI ABI correctness proof",
@@ -947,6 +948,7 @@ support_tier = "Core operation smoke slice"
 fixtures = [
   "ffi_sanitizer_route",
   "ffi_call_sanitizer_route",
+  "ffi_libc_call_sanitizer_route",
 ]
 dogfood_targets = []
 label_ledgers = [

@@ -80,9 +80,9 @@ The current fixture-pinned slices are:
   remaining-capacity and availability guards discharge generic unsafe callee
   preconditions, while rejecting wrong-receiver, observed-only, and
   closed-branch controls.
-- FFI witness routing: checks that unsafe extern C boundaries and unsafe calls
-  to same-file extern declarations route away from Miri-first review to
-  sanitizer/cargo-careful witness suggestions.
+- FFI witness routing: checks that unsafe extern C boundaries, unsafe calls to
+  same-file extern declarations, and unsafe `libc::` path calls route away from
+  Miri-first review to sanitizer/cargo-careful witness suggestions.
 - FFI boundary obligation evidence: checks that ABI/layout compatibility and
   ownership/lifetime/nullability contracts are tracked as separate obligations
   for unsafe extern C declarations and calls.

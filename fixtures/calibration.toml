@@ -202,6 +202,7 @@ required_core_fixtures = [
   "unsafe_impl_sync_generic_bound",
   "ffi_sanitizer_route",
   "ffi_call_sanitizer_route",
+  "ffi_libc_call_sanitizer_route",
   "safe_code_no_cards",
   "safe_reference_deref_no_cards",
   "imports_not_unsafe_operations",
@@ -2225,6 +2226,16 @@ expected_hazard = "ffi_abi"
 fixture = "ffi_call_sanitizer_route"
 kind = "positive"
 claim = "unsafe call to a same-file extern C declaration routes away from Miri-first review"
+support_tier = "Witness routing"
+expected_cards = 1
+expected_class = "miri_unsupported"
+expected_operation_family = "ffi"
+expected_hazard = "ffi_abi"
+
+[[cases]]
+fixture = "ffi_libc_call_sanitizer_route"
+kind = "positive"
+claim = "unsafe libc path call routes away from Miri-first review"
 support_tier = "Witness routing"
 expected_cards = 1
 expected_class = "miri_unsupported"
