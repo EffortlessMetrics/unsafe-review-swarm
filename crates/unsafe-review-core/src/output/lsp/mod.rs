@@ -5,8 +5,8 @@ mod tests;
 use crate::api::AnalyzeOutput;
 use serde::Serialize;
 
-pub(crate) use projection::project_editor;
 pub use projection::EditorProjection;
+pub(crate) use projection::project_editor;
 
 pub(crate) fn render(output: &AnalyzeOutput) -> String {
     render_pretty(&project_editor(output))
