@@ -5,7 +5,7 @@ name: coverage
 # This workflow runs cargo-llvm-cov against the workspace and uploads the
 # resulting LCOV to Codecov. It is not a memory-safety, UB-free,
 # Miri-clean, site-execution, or unsafe-correctness signal. It does not
-# enforce a coverage threshold and never blocks a PR.
+# enforce a coverage threshold and must not become a required PR gate.
 
 on:
   pull_request:

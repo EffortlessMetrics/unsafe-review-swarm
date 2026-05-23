@@ -42,10 +42,10 @@ Behavior:
 - `permissions: contents: read`; no write tokens,
 - runs `cargo llvm-cov --workspace --all-targets --locked --lcov`,
 - uploads to Codecov with `fail_ci_if_error: false` so any Codecov outage
-  cannot block CI,
+  does not fail the lane,
 - also uploads the LCOV as a workflow artifact for offline inspection,
 - never enforces a coverage threshold,
-- never blocks a PR.
+- is not a required branch-protection gate.
 
 ## README badge
 
@@ -57,7 +57,7 @@ execution-surface telemetry only — never as a safety claim.
 
 - No threshold gating.
 - No PR comment posting on coverage delta.
-- No coverage-based blocking of merges.
+- No required branch-protection or merge blocking based on coverage.
 - No claim that coverage equals unsafe correctness.
 - No relationship to `unsafe-review` ReviewCards, witness receipts, or
   policy reports.

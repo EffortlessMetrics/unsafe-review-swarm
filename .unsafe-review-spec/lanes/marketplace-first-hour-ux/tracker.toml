@@ -152,27 +152,42 @@ proof = [
 
 [[work_item]]
 id = "extension-packaging-smoke"
-status = "blocked"
+status = "done"
 blocked_by = ["extension-saved-lsp-viewer"]
 description = """
-Package the MVP extension as a VSIX and verify the package layout. Attach the
-VSIX to a GitHub Release before any Marketplace or Open VSX publication.
+Package the MVP extension as a VSIX in CI and verify the package layout.
+Lands as the editor-extension-packaging advisory lane in
+policy/ci-lane-whitelist.toml and .github/workflows/editor-extension.yml.
+Attach a VSIX to a GitHub Release before any Marketplace or Open VSX
+publication.
 """
 proof = [
-  "npx --prefix editors/vscode @vscode/vsce package --out target/unsafe-review-vscode.vsix",
+  "npm --prefix editors/vscode ci",
+  "npm --prefix editors/vscode run compile",
+  "npm --prefix editors/vscode test",
+  "npx --yes @vscode/vsce@2.32.0 package --out target/unsafe-review-vscode.vsix --allow-missing-repository",
+  "cargo run --locked -p xtask -- check-ci-lanes",
+  "cargo run --locked -p xtask -- check-policy",
 ]
 
 [[work_item]]
 id = "marketplace-publish-workflow"
-status = "blocked"
+status = "ready"
 blocked_by = ["extension-packaging-smoke"]
 description = """
 Add a workflow_dispatch-only publish workflow that takes a version, supports
 dry_run, and gates VS Marketplace / Open VSX publication behind explicit
-boolean inputs and dedicated secrets. No PR-triggered publication.
+boolean inputs and dedicated secrets. No PR-triggered publication. Lands as
+.github/workflows/editor-publish.yml plus the editor-extension-publish CI
+lane in policy/ci-lane-whitelist.toml. Owner-side prerequisites
+(publisher accounts, VSCE_PAT and OVSX_PAT secrets, Open VSX namespace)
+are documented in docs/editor/marketplace-publication.md. Publication is
+restricted to manual dispatch from main, and non-dry-run publication must
+select at least one marketplace target.
 """
 proof = [
   "cargo run --locked -p xtask -- check-ci-lanes",
+  "cargo run --locked -p xtask -- check-policy",
   "cargo run --locked -p xtask -- check-pr",
   "git diff --check",
 ]
