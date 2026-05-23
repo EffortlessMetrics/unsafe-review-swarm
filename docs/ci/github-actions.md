@@ -5,7 +5,7 @@ their repository's PR checks. It is the user-facing companion to
 [docs/ci/PR_CI.md](PR_CI.md), which documents how this repository runs its own
 CI lanes.
 
-The hard rule:
+The design rule:
 
 ```text
 Malformed or dishonest unsafe-review artifacts fail CI.
@@ -13,15 +13,19 @@ Unsafe-review findings do not fail CI by default.
 ```
 
 That keeps `unsafe-review` a quiet advisory instrument, not a default blocker.
+This repository enforces the full artifact contract with
+`cargo run --locked -p xtask -- check-first-pr-artifacts`. The drop-in workflow
+below is for downstream repositories, so it uses a portable required-file check
+until a public bundle verifier is available from the installed CLI.
 
 ## Drop-in workflow
 
 Copy [.github/examples/unsafe-review-first-pr.yml](../../.github/examples/unsafe-review-first-pr.yml)
 into your repository at `.github/workflows/unsafe-review-first-pr.yml`.
 
-The workflow renders the advisory `first-pr` bundle, verifies its artifact
-contract, writes a bounded GitHub job summary, and uploads the full bundle as
-a workflow artifact.
+The workflow renders the advisory `first-pr` bundle, checks that required
+bundle files exist and are non-empty, writes a bounded GitHub job summary, and
+uploads the full bundle as a workflow artifact.
 
 ```yaml
 name: unsafe-review-first-pr
@@ -42,7 +46,9 @@ The key properties:
   crates.io. No source checkout of unsafe-review is required in your repo.
 - `unsafe-review first-pr --base "origin/${BASE_REF}"` — writes the advisory
   bundle to `target/unsafe-review/`.
-- `unsafe-review check-first-pr-artifacts` — verifies bundle integrity.
+- `Verify bundle file shape` — checks that each expected bundle file exists and
+  is non-empty. This is not the full unsafe-review source-repo artifact
+  verifier.
 - `actions/upload-artifact@v7` — uploads `cards.json`, `pr-summary.md`,
   `cards.sarif`, `comment-plan.json`, `witness-plan.md`, and `lsp.json` for
   download by reviewers.
@@ -69,13 +75,17 @@ reviewer-first preview.
 
 ## CI failure semantics
 
-The workflow fails only when the advisory artifact contract fails:
+The drop-in workflow fails when the CLI path or portable bundle shape fails:
 
+- `unsafe-review` cannot install or run,
 - a required file is missing,
-- the trust-boundary text is missing,
-- a candidate has an unrenderable inline location,
-- the comment plan has duplicate card IDs or oversize bodies,
-- the LSP projection drifts from the cards.
+- a required file is empty,
+- artifact upload fails.
+
+The unsafe-review source repository has a stronger verifier for trust-boundary
+text, card IDs, comment-plan shape, witness-plan route limits, and saved-LSP
+projection consistency. Downstream repositories should switch to that verifier
+if it becomes available through the published CLI.
 
 It does not fail when the PR has unsafe-review findings. Those are reported
 through the bundle and job summary so the human reviewer can decide.
