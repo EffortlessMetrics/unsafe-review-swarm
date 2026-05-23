@@ -9,7 +9,7 @@
       "line": 2,
       "column": 1,
       "kind": "extern_block",
-      "owner": "",
+      "owner": "unknown",
       "visibility": "private",
       "public_api_surface": false,
       "snippet": "unsafe extern \"C\" {"

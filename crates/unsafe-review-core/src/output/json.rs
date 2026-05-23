@@ -218,7 +218,7 @@ impl<'a> From<&'a ReviewCard> for JsonSite<'a> {
             line: card.site.location.line,
             column: card.site.location.column,
             kind: card.site.kind.as_str(),
-            owner: card.site.owner.as_deref().unwrap_or(""),
+            owner: card.site.owner.as_deref().unwrap_or("unknown"),
             visibility: &card.site.visibility,
             public_api_surface: card.site.public_api_surface,
             snippet: &card.site.snippet,

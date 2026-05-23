@@ -2360,12 +2360,13 @@ fn check_fixture(dir: &Path) -> Result<(), String> {
     let expected_cards = dir.join("expected.cards.json");
     if expected_cards.is_file() {
         let expected_cards = parse_json_file(&expected_cards)?;
-        if !expected_cards.is_array() {
+        let Some(cards) = expected_cards.as_array() else {
             return Err(format!(
                 "{}/expected.cards.json must contain a JSON array of cards",
                 dir.display()
             ));
-        }
+        };
+        check_fixture_card_identities(dir, name, cards)?;
     } else if !FIXTURE_EXPECTED_CARDS_EXCEPTIONS.contains(&name) {
         return Err(format!(
             "fixture {} is missing expected.cards.json",
@@ -2382,6 +2383,177 @@ fn check_fixture(dir: &Path) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn check_fixture_card_identities(
+    dir: &Path,
+    fixture: &str,
+    cards: &[serde_json::Value],
+) -> Result<(), String> {
+    let path = format!("{}/expected.cards.json", dir.display());
+    for (idx, card) in cards.iter().enumerate() {
+        check_fixture_card_identity(&path, idx, fixture, card)?;
+    }
+    Ok(())
+}
+
+fn check_fixture_card_identity(
+    path: &str,
+    idx: usize,
+    fixture: &str,
+    card: &serde_json::Value,
+) -> Result<(), String> {
+    let id = require_non_empty_json_str(card, "id", &format!("{path} card[{idx}]"))?;
+    if !id.starts_with("UR-") {
+        return Err(format!(
+            "{path} card[{idx}] id `{id}` must start with `UR-`"
+        ));
+    }
+    if !has_reviewcard_count_suffix(id) {
+        return Err(format!(
+            "{path} card[{idx}] id `{id}` must end with a counted identity suffix like `-c1`"
+        ));
+    }
+    if !contains_hex_run(id, 12) {
+        return Err(format!(
+            "{path} card[{idx}] id `{id}` must include a normalized snippet hash"
+        ));
+    }
+
+    let site = card
+        .get("site")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| format!("{path} card[{idx}] is missing object key `site`"))?;
+    for (field, token) in [
+        ("fixture", fixture),
+        (
+            "site.file",
+            required_json_object_str(site, "file", path, idx)?,
+        ),
+        (
+            "site.owner",
+            required_json_object_str(site, "owner", path, idx)?,
+        ),
+        (
+            "site.kind",
+            required_json_object_str(site, "kind", path, idx)?,
+        ),
+        (
+            "operation_family",
+            require_non_empty_json_str(card, "operation_family", &format!("{path} card[{idx}]"))?,
+        ),
+    ] {
+        require_identity_token(id, token, path, idx, field)?;
+    }
+
+    let hazards = json_array_at(card, "/hazards", &format!("{path} card[{idx}]"))?;
+    if hazards.is_empty() {
+        return Err(format!("{path} card[{idx}] hazards must not be empty"));
+    }
+    let mut has_hazard_token = false;
+    for hazard in hazards {
+        let Some(hazard) = hazard.as_str() else {
+            return Err(format!(
+                "{path} card[{idx}] hazards entries must be strings"
+            ));
+        };
+        if hazard.trim().is_empty() {
+            return Err(format!(
+                "{path} card[{idx}] hazards entries must not be empty"
+            ));
+        }
+        if identity_contains_token(id, hazard) {
+            has_hazard_token = true;
+        }
+    }
+    if !has_hazard_token {
+        return Err(format!(
+            "{path} card[{idx}] id `{id}` must include at least one hazard token"
+        ));
+    }
+
+    Ok(())
+}
+
+fn required_json_object_str<'a>(
+    object: &'a serde_json::Map<String, serde_json::Value>,
+    key: &str,
+    path: &str,
+    idx: usize,
+) -> Result<&'a str, String> {
+    let Some(value) = object.get(key).and_then(serde_json::Value::as_str) else {
+        return Err(format!(
+            "{path} card[{idx}] site is missing string key `{key}`"
+        ));
+    };
+    if value.trim().is_empty() {
+        Err(format!(
+            "{path} card[{idx}] site string key `{key}` is empty"
+        ))
+    } else {
+        Ok(value)
+    }
+}
+
+fn require_identity_token(
+    id: &str,
+    token: &str,
+    path: &str,
+    idx: usize,
+    field: &str,
+) -> Result<(), String> {
+    if identity_contains_token(id, token) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{path} card[{idx}] id `{id}` must include {field} token `{}`",
+            identity_slug(token)
+        ))
+    }
+}
+
+fn identity_contains_token(id: &str, token: &str) -> bool {
+    id.contains(token) || id.contains(&identity_slug(token))
+}
+
+fn identity_slug(text: &str) -> String {
+    let mut slug = String::new();
+    let mut previous_separator = false;
+    for ch in text.chars() {
+        if ch.is_ascii_alphanumeric() {
+            slug.push(ch.to_ascii_lowercase());
+            previous_separator = false;
+        } else if !slug.is_empty() && !previous_separator {
+            slug.push('-');
+            previous_separator = true;
+        }
+    }
+    if previous_separator {
+        slug.pop();
+    }
+    slug
+}
+
+fn has_reviewcard_count_suffix(id: &str) -> bool {
+    let Some((_, count)) = id.rsplit_once("-c") else {
+        return false;
+    };
+    !count.is_empty() && count.chars().all(|ch| ch.is_ascii_digit())
+}
+
+fn contains_hex_run(text: &str, min_len: usize) -> bool {
+    let mut run_len = 0usize;
+    for ch in text.chars() {
+        if ch.is_ascii_hexdigit() {
+            run_len += 1;
+            if run_len >= min_len {
+                return true;
+            }
+        } else {
+            run_len = 0;
+        }
+    }
+    false
 }
 
 fn check_calibration_case(
@@ -4355,6 +4527,40 @@ jobs:
     }
 
     #[test]
+    fn fixture_card_identity_accepts_stable_tokens() -> Result<(), String> {
+        let card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+
+        check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        )
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_missing_owner_token() -> Result<(), String> {
+        let card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("card id without owner token should fail".to_string());
+        };
+
+        assert!(err.contains("site.owner"));
+        assert!(err.contains("read-header"));
+        Ok(())
+    }
+
+    #[test]
     fn calibration_manifest_validates_current_fixture_contract() -> Result<(), String> {
         check_calibration()
     }
@@ -4553,6 +4759,23 @@ jobs:
         assert!(err.contains("Missing support tier"));
         assert!(err.contains(SUPPORT_TIERS_DOC));
         Ok(())
+    }
+
+    fn test_fixture_card(id: &str) -> Result<serde_json::Value, String> {
+        format!(
+            r#"{{
+  "id": "{id}",
+  "site": {{
+    "file": "src/lib.rs",
+    "owner": "read_header",
+    "kind": "operation"
+  }},
+  "operation_family": "raw_pointer_read",
+  "hazards": ["pointer_validity", "alignment"]
+}}"#
+        )
+        .parse::<serde_json::Value>()
+        .map_err(|err| format!("parse test card failed: {err}"))
     }
 
     fn test_accuracy_report_stats() -> AccuracyCalibrationReportStats {
