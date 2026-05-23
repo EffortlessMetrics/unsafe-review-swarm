@@ -1,0 +1,105 @@
+[
+    {
+        "id":  "UR-ffi-call-sanitizer-route-src-lib-rs-len-ffi_call-ffi-ffi-98a0f273145a-ffi_abi-c1",
+        "class":  "miri_unsupported",
+        "priority":  "medium",
+        "confidence":  "medium",
+        "site":  {
+                     "file":  "src/lib.rs",
+                     "line":  7,
+                     "column":  5,
+                     "kind":  "ffi_call",
+                     "owner":  "len",
+                     "visibility":  "private",
+                     "public_api_surface":  false,
+                     "snippet":  "unsafe { strlen(ptr) }"
+                 },
+        "operation":  "unsafe { strlen(ptr) }",
+        "operation_family":  "ffi",
+        "hazards":  [
+                        "ffi_abi",
+                        "ffi_ownership"
+                    ],
+        "obligations":  [
+                            "foreign declaration matches ABI and layout on both sides",
+                            "ownership, lifetime, and nullability contract is explicit"
+                        ],
+        "obligation_evidence":  [
+                                    {
+                                        "key":  "abi",
+                                        "description":  "foreign declaration matches ABI and layout on both sides",
+                                        "contract":  {
+                                                         "present":  true,
+                                                         "state":  "present",
+                                                         "summary":  "Nearby `SAFETY:` comment was detected"
+                                                     },
+                                        "discharge":  {
+                                                          "present":  false,
+                                                          "state":  "missing",
+                                                          "summary":  "No obligation-specific guard code was detected"
+                                                      },
+                                        "reach":  {
+                                                      "present":  true,
+                                                      "state":  "present",
+                                                      "summary":  "1 related test file(s) mention owner `len`"
+                                                  },
+                                        "witness":  {
+                                                        "present":  false,
+                                                        "state":  "missing",
+                                                        "summary":  "No imported witness receipt was found"
+                                                    }
+                                    },
+                                    {
+                                        "key":  "ownership",
+                                        "description":  "ownership, lifetime, and nullability contract is explicit",
+                                        "contract":  {
+                                                         "present":  true,
+                                                         "state":  "present",
+                                                         "summary":  "Nearby `SAFETY:` comment was detected"
+                                                     },
+                                        "discharge":  {
+                                                          "present":  false,
+                                                          "state":  "missing",
+                                                          "summary":  "No obligation-specific guard code was detected"
+                                                      },
+                                        "reach":  {
+                                                      "present":  true,
+                                                      "state":  "present",
+                                                      "summary":  "1 related test file(s) mention owner `len`"
+                                                  },
+                                        "witness":  {
+                                                        "present":  false,
+                                                        "state":  "missing",
+                                                        "summary":  "No imported witness receipt was found"
+                                                    }
+                                    }
+                                ],
+        "contract":  "Nearby `SAFETY:` comment was detected",
+        "discharge":  "No visible local guard detected",
+        "reach":  "1 related test file(s) mention owner `len`",
+        "witness":  "No imported witness receipt was found",
+        "witness_routes":  [
+                               {
+                                   "kind":  "asan",
+                                   "reason":  "FFI boundary detected; sanitizer/cargo-careful is usually more suitable than Miri for foreign calls",
+                                   "command":  "RUSTFLAGS=\u0027-Z sanitizer=address\u0027 cargo +nightly test len",
+                                   "required":  false
+                               },
+                               {
+                                   "kind":  "cargo-careful",
+                                   "reason":  "cargo-careful can cheaply exercise Rust-side FFI boundary assumptions when a focused test exists",
+                                   "command":  "cargo +nightly careful test len",
+                                   "required":  false
+                               }
+                           ],
+        "missing":  [
+                        "Missing visible local guard for inferred safety obligations",
+                        "No witness receipt imported for this card"
+                    ],
+        "next_action":  "Use sanitizer/cargo-careful or an explicit FFI boundary contract; Miri may not exercise this seam.",
+        "verify_commands":  [
+                                "RUSTFLAGS=\u0027-Z sanitizer=address\u0027 cargo +nightly test len",
+                                "cargo +nightly careful test len"
+                            ]
+    }
+]

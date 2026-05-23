@@ -152,13 +152,12 @@ fn is_negated_use(lower: &str, offset: usize, len: usize) -> bool {
     {
         return true;
     }
-    if context_after.starts_with(" claim") || context_after.starts_with(" status") {
-        if context_before.contains("no ")
+    if (context_after.starts_with(" claim") || context_after.starts_with(" status"))
+        && (context_before.contains("no ")
             || context_before.contains("not")
-            || context_before.contains("without")
-        {
-            return true;
-        }
+            || context_before.contains("without"))
+    {
+        return true;
     }
     false
 }

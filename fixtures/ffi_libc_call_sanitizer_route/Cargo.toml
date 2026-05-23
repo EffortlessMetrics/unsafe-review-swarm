@@ -1,0 +1,8 @@
+[package]
+name = "ffi-libc-call-sanitizer-route"
+version = "0.0.0"
+edition = "2024"
+
+[dependencies]
+libc = "0.2"
+

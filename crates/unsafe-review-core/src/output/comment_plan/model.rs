@@ -5,7 +5,8 @@ use crate::util::path_display;
 use serde::Serialize;
 
 use super::selection::{
-    actionability, comment_body, non_selection_reason, selection_reason, should_plan_comment,
+    actionability, comment_body, non_selection_reason, relevance, selection_reason,
+    should_plan_comment,
 };
 
 const MAX_PLANNED_COMMENTS: usize = 3;
@@ -85,6 +86,7 @@ pub(super) struct PlannedComment {
     verify_commands: Vec<String>,
     selection_reason: &'static str,
     actionability: &'static str,
+    relevance: &'static str,
     trust_boundary: &'static str,
     body: String,
 }
@@ -105,6 +107,7 @@ impl From<&ReviewCard> for PlannedComment {
             verify_commands: card.next_action.verify_commands.clone(),
             selection_reason: selection_reason(card),
             actionability: actionability(card),
+            relevance: relevance(card),
             trust_boundary: TRUST_BOUNDARY,
             body: comment_body(card),
         }
@@ -121,6 +124,7 @@ pub(super) struct NotSelectedCard {
     confidence: &'static str,
     operation_family: &'static str,
     actionability: &'static str,
+    relevance: &'static str,
     reason: &'static str,
 }
 
@@ -135,6 +139,7 @@ impl NotSelectedCard {
             confidence: card.confidence.as_str(),
             operation_family: card.operation.family.as_str(),
             actionability: actionability(card),
+            relevance: relevance(card),
             reason,
         }
     }

@@ -63,14 +63,14 @@ Each selected candidate includes required fields:
 - `card_id`, `path`, `line`
 - `operation`, `operation_family`, `class`, `priority`, `confidence`
 - `next_action`, `witness_routes`, `verify_commands`
-- `selection_reason`, `actionability`
+- `selection_reason`, `actionability`, `relevance`
 - `body`, `trust_boundary`
 
 Each `not_selected` entry includes:
 
 - `card_id`, `path`, `line`
 - `class`, `priority`, `confidence`, `operation_family`
-- `actionability`
+- `actionability`, `relevance`
 - `reason`
 
 ## 5. Selection rules
@@ -86,7 +86,15 @@ Never select suppressed, `baseline_known`, or `static_unknown` cards. Prefer act
 
 ## 6. Relevance and actionability
 
-Candidates should carry transparent relevance metadata (for reviewer-noise control, not policy) and actionability taxonomy.
+Candidates carry transparent relevance metadata (for reviewer-noise control, not policy) and actionability taxonomy.
+
+Relevance values:
+
+- `high` — high priority and high confidence; the reviewer should see this comment first.
+- `medium` — one of priority or confidence is high while the other is not low; appears in the inline plan.
+- `low` — low or unknown confidence, or neither priority nor confidence is high; never inline-selected.
+
+Relevance is derived from the same priority + confidence signal that drives selection. It does not introduce a new analyzer truth or a policy gate; it only exposes the existing ranking so reviewers can sort the inline plan without re-deriving it.
 
 Actionability values:
 
@@ -146,15 +154,14 @@ document is a future-lane contract, not a live workflow.
 - a `not_selected` card that is also present in `comments[]`
 - duplicate `card_id` or duplicate `path`/`line` inline anchors
 - invalid line/path
-- missing `next_action`, `selection_reason`, `actionability`, or candidate
-  `trust_boundary`
+- missing `next_action`, `selection_reason`, `actionability`, `relevance`, or
+  candidate `trust_boundary`
+- `relevance` outside the documented set (`high`, `medium`, `low`)
 - body text that drifts from the structured `next_action`
 - missing trust boundary in body
 - body text over 220 words
 - forbidden overclaim wording
 - forbidden classes (`static_unknown`, `baseline_known`, suppressed)
-
-Future hardening should also reject missing relevance metadata.
 
 ## 11. Acceptance examples
 

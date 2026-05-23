@@ -256,6 +256,9 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             "comment-plan.json comment",
         )?;
         super::require_non_empty_json_str(comment, "actionability", "comment-plan.json comment")?;
+        let relevance =
+            super::require_non_empty_json_str(comment, "relevance", "comment-plan.json comment")?;
+        require_relevance_value(relevance, "comment-plan.json comment")?;
         let comment_boundary = comment
             .get("trust_boundary")
             .and_then(serde_json::Value::as_str)
@@ -321,6 +324,12 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
                 "actionability",
                 "comment-plan.json not_selected",
             )?;
+            let relevance = super::require_non_empty_json_str(
+                card,
+                "relevance",
+                "comment-plan.json not_selected",
+            )?;
+            require_relevance_value(relevance, "comment-plan.json not_selected")?;
             super::require_non_empty_json_str(card, "reason", "comment-plan.json not_selected")?;
         }
     }
@@ -356,6 +365,18 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         card_ids,
         card_count,
     })
+}
+
+const KNOWN_RELEVANCE_VALUES: &[&str] = &["high", "medium", "low"];
+
+fn require_relevance_value(value: &str, context: &str) -> Result<(), String> {
+    if KNOWN_RELEVANCE_VALUES.contains(&value) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{context} relevance must be one of high/medium/low; got `{value}`"
+        ))
+    }
 }
 
 fn check_witness_plan_artifact(dir: &Path, card_count: usize) -> Result<(), String> {
