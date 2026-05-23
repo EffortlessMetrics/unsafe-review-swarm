@@ -52,6 +52,27 @@ must_include = [
 ]
 
 [[generated_or_checked]]
+id = "agent-operating-contract"
+kind = "agent_operating_contract"
+path = "AGENTS.md"
+mode = "check"
+sources = [
+  "docs/contributing/SWARM_TO_MAIN.md",
+  "docs/contributing/spec-rails.md",
+  "docs/specs/UNSAFE-REVIEW-SPEC-0024-ci-design.md",
+]
+must_include = [
+  "unsafe-review-swarm develops.",
+  "unsafe-review publishes.",
+  "rtk cargo run --locked -p xtask -- source-divergence",
+  "Use the repo source-of-truth stack",
+  "Do not put durable repo operating state in `.codex`",
+  "`ReviewCard` is the canonical product unit",
+  "configuration obstacle",
+  "docs/specs/UNSAFE-REVIEW-SPEC-0024-ci-design.md",
+]
+
+[[generated_or_checked]]
 id = "docs-map"
 kind = "docs_map"
 path = "docs/README.md"

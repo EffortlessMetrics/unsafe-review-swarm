@@ -86,6 +86,7 @@ const DOC_ARTIFACT_STATUSES: &[&str] = &["proposed", "accepted", "active", "done
 const DOCS_AUTOMATION_KINDS: &[&str] = &[
     "spec_status_dashboard",
     "operator_front_door",
+    "agent_operating_contract",
     "docs_map",
     "published_surface",
     "handoff_receipt",
