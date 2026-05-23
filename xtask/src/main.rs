@@ -60,6 +60,7 @@ const WORKFLOW_ALLOWLIST: &str = "policy/workflow-allowlist.toml";
 const WORKFLOW_DIR: &str = ".github/workflows";
 const DOC_ARTIFACT_LEDGER: &str = "policy/doc-artifacts.toml";
 const DOCS_AUTOMATION_LEDGER: &str = "policy/docs-automation.toml";
+const PUBLIC_SURFACES_LEDGER: &str = "policy/public-surfaces.toml";
 const CI_LANE_LEDGER: &str = "policy/ci-lane-whitelist.toml";
 const PACKAGE_BOUNDARY_LEDGER: &str = "policy/package-boundary.toml";
 const SOURCE_SYNC_LEDGER: &str = "policy/source-sync.toml";
@@ -74,6 +75,15 @@ const DOCS_AUTOMATION_KINDS: &[&str] = &[
     "handoff_receipt",
 ];
 const DOCS_AUTOMATION_MODES: &[&str] = &["check", "generate"];
+const PUBLIC_SURFACE_STATUSES: &[&str] = &["experimental", "accepted", "deferred"];
+const PUBLIC_SURFACE_FRONT_DOORS: &[&str] = &[
+    "README.md",
+    "docs/FIRST_USE.md",
+    "docs/CLI.md",
+    "crates/unsafe-review/README.md",
+    "crates/unsafe-review-cli/README.md",
+    "crates/unsafe-review-core/README.md",
+];
 const GOAL_WORK_ITEM_STATUSES: &[&str] = &["ready", "active", "blocked", "done", "superseded"];
 const PACKAGE_CLASSIFICATIONS: &[&str] = &["published", "private", "internal", "deferred"];
 const CI_LANE_STATUSES: &[&str] = &["advisory", "required", "deferred", "retired"];
@@ -196,7 +206,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
     match args.get(1).map(|arg| arg.as_str()) {
         None | Some("help") | Some("--help") => {
             println!(
-                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, source-divergence, check-source-sync"
+                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, source-divergence, check-source-sync"
             );
             Ok(())
         }
@@ -228,6 +238,10 @@ fn run(args: Vec<String>) -> Result<(), String> {
         Some("check-docs-automation") => {
             command_args::require_no_extra_args(&args, "check-docs-automation")?;
             check_docs_automation()
+        }
+        Some("check-public-surfaces") => {
+            command_args::require_no_extra_args(&args, "check-public-surfaces")?;
+            check_public_surfaces()
         }
         Some("check-goals") => {
             command_args::require_no_extra_args(&args, "check-goals")?;
@@ -342,6 +356,7 @@ fn check_policy() -> Result<(), String> {
     )?;
     check_doc_artifacts()?;
     check_docs_automation()?;
+    check_public_surfaces()?;
     check_goals()?;
     check_package_boundary()?;
     check_ci_lanes()?;
@@ -415,6 +430,90 @@ fn check_docs_automation() -> Result<(), String> {
     let surfaces = check_docs_automation_impl()?;
     println!("check-docs-automation: ok ({surfaces} surfaces)");
     Ok(())
+}
+
+fn check_public_surfaces() -> Result<(), String> {
+    let surfaces = check_public_surfaces_impl()?;
+    println!("check-public-surfaces: ok ({surfaces} surfaces)");
+    Ok(())
+}
+
+fn check_public_surfaces_impl() -> Result<usize, String> {
+    let value = parse_toml_file(&workspace_path(PUBLIC_SURFACES_LEDGER))?;
+    require_toml_string(&value, "schema_version", PUBLIC_SURFACES_LEDGER)?;
+    require_known(
+        required_toml_string(&value, "status", PUBLIC_SURFACES_LEDGER)?,
+        PUBLIC_SURFACE_STATUSES,
+        PUBLIC_SURFACES_LEDGER,
+        "status",
+    )?;
+    let trust_boundary = required_toml_string(&value, "trust_boundary", PUBLIC_SURFACES_LEDGER)?;
+    for required in ["advisory", "memory-safety proof", "UB-free", "Miri-clean"] {
+        if !text_contains_ignore_ascii_case(trust_boundary, required) {
+            return Err(format!(
+                "{PUBLIC_SURFACES_LEDGER} trust_boundary must mention `{required}`"
+            ));
+        }
+    }
+
+    let forbidden_terms = value
+        .get("forbidden_terms")
+        .ok_or_else(|| format!("{PUBLIC_SURFACES_LEDGER} is missing `forbidden_terms` array"))?;
+    let forbidden_terms =
+        toml_str_array(forbidden_terms, PUBLIC_SURFACES_LEDGER, "forbidden_terms")?;
+    if forbidden_terms.is_empty() {
+        return Err(format!(
+            "{PUBLIC_SURFACES_LEDGER} forbidden_terms must not be empty"
+        ));
+    }
+    let mut seen = BTreeSet::new();
+    for term in forbidden_terms {
+        if term.trim().is_empty() {
+            return Err(format!(
+                "{PUBLIC_SURFACES_LEDGER} forbidden_terms entries must be non-empty"
+            ));
+        }
+        if !seen.insert(term.to_ascii_lowercase()) {
+            return Err(format!(
+                "{PUBLIC_SURFACES_LEDGER} contains duplicate forbidden term `{term}`"
+            ));
+        }
+    }
+
+    check_public_badge_endpoints()?;
+    for path in PUBLIC_SURFACE_FRONT_DOORS {
+        check_public_surface_front_door(path)?;
+    }
+
+    Ok(PUBLIC_SURFACE_FRONT_DOORS.len() + PUBLIC_BADGE_ENDPOINTS.len())
+}
+
+fn check_public_surface_front_door(path: &str) -> Result<(), String> {
+    require_file(path)?;
+    check_markdown_local_links(path)?;
+    let source = workspace_path(path);
+    let text = read_to_string(&source)?;
+    reject_positive_overclaims(Path::new(path), &text)?;
+    if !public_surface_has_trust_boundary(&text) {
+        return Err(format!(
+            "{path} must include advisory trust-boundary wording such as not-proof, not-UB-free, no-default-witness, or no-default-blocking language"
+        ));
+    }
+    Ok(())
+}
+
+fn public_surface_has_trust_boundary(text: &str) -> bool {
+    let lower = text.to_ascii_lowercase();
+    let has_negative = lower.contains("not")
+        || lower.contains("does not")
+        || lower.contains("no ")
+        || lower.contains("without");
+    let has_boundary = lower.contains("proof")
+        || lower.contains("ub-free")
+        || lower.contains("miri")
+        || lower.contains("witness")
+        || lower.contains("blocking");
+    has_negative && has_boundary
 }
 
 fn check_docs_automation_impl() -> Result<usize, String> {
@@ -2024,8 +2123,10 @@ fn check_first_pr_artifact_overclaims(dir: &Path) -> Result<(), String> {
 }
 
 fn reject_positive_overclaims(path: &Path, text: &str) -> Result<(), String> {
+    let mut previous = String::new();
     for (line_no, line) in text.lines().enumerate() {
-        let lower = line.to_ascii_lowercase();
+        let lower = normalize_claim_line(line);
+        let context = format!("{previous} {lower}");
         for forbidden in ["all clear", "safe to merge", "proved safe", "proven safe"] {
             if lower.contains(forbidden) {
                 return Err(format!(
@@ -2039,8 +2140,7 @@ fn reject_positive_overclaims(path: &Path, text: &str) -> Result<(), String> {
             && !lower.contains("not miri-clean")
             && !lower.contains("not a miri-clean")
             && !lower.contains("not miri clean")
-            && !lower.contains("cannot prove")
-            && !lower.contains("does not")
+            && !has_negative_claim_context(&context)
         {
             return Err(format!(
                 "{}:{} must not imply Miri-clean status",
@@ -2051,8 +2151,7 @@ fn reject_positive_overclaims(path: &Path, text: &str) -> Result<(), String> {
         if lower.contains("ub-free")
             && !lower.contains("not ub-free")
             && !lower.contains("not a ub-free")
-            && !lower.contains("cannot prove")
-            && !lower.contains("does not")
+            && !has_negative_claim_context(&context)
         {
             return Err(format!(
                 "{}:{} must not imply UB-free status",
@@ -2060,17 +2159,14 @@ fn reject_positive_overclaims(path: &Path, text: &str) -> Result<(), String> {
                 line_no + 1
             ));
         }
-        if lower.contains("site reached")
-            && !lower.contains("not")
-            && !lower.contains("cannot prove")
-            && !lower.contains("does not")
-        {
+        if lower.contains("site reached") && !has_negative_claim_context(&context) {
             return Err(format!(
                 "{}:{} must not imply site execution",
                 path.display(),
                 line_no + 1
             ));
         }
+        previous = lower;
     }
     Ok(())
 }
@@ -3545,8 +3641,23 @@ fn text_contains_ignore_ascii_case(text: &str, needle: &str) -> bool {
         .contains(&needle.to_ascii_lowercase())
 }
 
+fn normalize_claim_line(line: &str) -> String {
+    line.chars()
+        .filter(|character| !matches!(character, '*' | '`' | '_'))
+        .collect::<String>()
+        .to_ascii_lowercase()
+}
+
+fn has_negative_claim_context(text: &str) -> bool {
+    text.contains("not")
+        || text.contains("does not")
+        || text.contains("cannot prove")
+        || text.contains("no ")
+        || text.contains("without")
+}
+
 fn require_file(path: &str) -> Result<(), String> {
-    if Path::new(path).is_file() {
+    if workspace_path(path).is_file() {
         Ok(())
     } else {
         Err(format!("required file missing: {path}"))
@@ -4967,6 +5078,27 @@ impl WitnessKind {
     #[test]
     fn public_badge_endpoints_match_readme_and_json() -> Result<(), String> {
         check_public_badge_endpoints()
+    }
+
+    #[test]
+    fn public_surface_checker_validates_current_contract() -> Result<(), String> {
+        check_public_surfaces_impl().map(|_| ())
+    }
+
+    #[test]
+    fn public_surface_boundary_requires_negative_claim_limit() {
+        assert!(public_surface_has_trust_boundary(
+            "This is advisory review evidence, not memory-safety proof."
+        ));
+        assert!(public_surface_has_trust_boundary(
+            "The command does not run Miri or enable blocking policy by default."
+        ));
+        assert!(!public_surface_has_trust_boundary(
+            "This command proves the reviewed code is safe."
+        ));
+        assert!(!public_surface_has_trust_boundary(
+            "Install this command to review pull requests."
+        ));
     }
 
     #[test]
