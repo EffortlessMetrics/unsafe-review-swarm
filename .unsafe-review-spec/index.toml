@@ -65,3 +65,10 @@ name = "VS Code and Open VSX editor adapter"
 path = ".unsafe-review-spec/lanes/editor-extension/tracker.toml"
 status = "active"
 owner = "editor/extension"
+
+[[lane]]
+id = "public-product-surfaces"
+name = "public product surfaces"
+path = ".unsafe-review-spec/lanes/public-product-surfaces/tracker.toml"
+status = "proposed"
+owner = "release/public-surface"
