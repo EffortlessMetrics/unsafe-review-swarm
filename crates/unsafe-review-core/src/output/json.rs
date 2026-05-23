@@ -389,6 +389,8 @@ mod tests {
         "vec_set_len_with_capacity",
         "vec_set_len_reserve_capacity",
         "vec_set_len_reserve_reassigned_additional_not_guard",
+        "vec_set_len_try_reserve_capacity",
+        "vec_set_len_try_reserve_reassigned_additional_not_guard",
         "vec_set_len_call_result_init",
         "vec_set_len_shrink",
         "vec_set_len_last_index_shrink",

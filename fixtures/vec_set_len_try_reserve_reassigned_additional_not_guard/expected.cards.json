@@ -1,0 +1,105 @@
+[
+  {
+    "class": "guard_missing",
+    "confidence": "medium",
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "No visible local guard detected",
+    "hazards": [
+      "initialized_memory",
+      "bounds"
+    ],
+    "id": "UR-vec-set-len-try-reserve-reassigned-additional-not-guard-fixture-src-lib-rs-try-reserve-with-stale-additional-operation-vec_set_len-set-len-1b63c93d2803-initialized_memory-c1",
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose the local guard that discharges the `vec_set_len` safety obligation.",
+    "obligation_evidence": [
+      {
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "description": "new length is at most capacity",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No capacity guard code was detected"
+        },
+        "key": "capacity",
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `try_reserve_with_stale_additional`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "description": "elements in the extended range are initialized",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No initialization evidence was detected"
+        },
+        "key": "initialized",
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `try_reserve_with_stale_additional`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "obligations": [
+      "new length is at most capacity",
+      "elements in the extended range are initialized"
+    ],
+    "operation": "unsafe { values.set_len(new_len) }",
+    "operation_family": "vec_set_len",
+    "priority": "high",
+    "reach": "1 related test file(s) mention owner `try_reserve_with_stale_additional`",
+    "site": {
+      "column": 5,
+      "file": "src/lib.rs",
+      "kind": "operation",
+      "line": 9,
+      "owner": "try_reserve_with_stale_additional",
+      "public_api_surface": false,
+      "snippet": "unsafe { values.set_len(new_len) }",
+      "visibility": "private"
+    },
+    "verify_commands": [
+      "cargo +nightly miri test try_reserve_with_stale_additional",
+      "cargo +nightly careful test try_reserve_with_stale_additional"
+    ],
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "command": "cargo +nightly miri test try_reserve_with_stale_additional",
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "required": false
+      },
+      {
+        "command": "cargo +nightly careful test try_reserve_with_stale_additional",
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "required": false
+      }
+    ]
+  }
+]

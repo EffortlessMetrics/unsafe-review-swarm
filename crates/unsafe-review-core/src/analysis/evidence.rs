@@ -1786,19 +1786,24 @@ fn has_fresh_set_len_reserve_call(
     new_len: &str,
     additional: &str,
 ) -> bool {
-    let reserve = format!("{receiver}.reserve({additional});");
+    let reserve_patterns = [
+        format!("{receiver}.reserve({additional});"),
+        format!("{receiver}.try_reserve({additional})?;"),
+    ];
     let identifiers = [receiver, new_len, additional];
-    let mut search_from = 0usize;
-    while let Some(offset) = after_len_binding[search_from..].find(&reserve) {
-        let reserve_start = search_from + offset;
-        let before_reserve = &after_len_binding[..reserve_start];
-        let after_reserve = &after_len_binding[reserve_start + reserve.len()..];
-        if !has_assignment_to_any_identifier(before_reserve, &identifiers)
-            && !has_assignment_to_any_identifier(after_reserve, &identifiers)
-        {
-            return true;
+    for reserve in reserve_patterns {
+        let mut search_from = 0usize;
+        while let Some(offset) = after_len_binding[search_from..].find(&reserve) {
+            let reserve_start = search_from + offset;
+            let before_reserve = &after_len_binding[..reserve_start];
+            let after_reserve = &after_len_binding[reserve_start + reserve.len()..];
+            if !has_assignment_to_any_identifier(before_reserve, &identifiers)
+                && !has_assignment_to_any_identifier(after_reserve, &identifiers)
+            {
+                return true;
+            }
+            search_from = reserve_start + reserve.len();
         }
-        search_from = reserve_start + reserve.len();
     }
     false
 }
@@ -4071,6 +4076,15 @@ mod tests {
             "unsafe { values.set_len(new_len); }",
             vec![],
         );
+        let try_reserve = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "let new_len = values.len() + additional;",
+                "values.try_reserve(additional)?;",
+            ],
+            "unsafe { values.set_len(new_len); }",
+            vec![],
+        );
         let other_receiver = site_with_family(
             OperationFamily::VecSetLen,
             vec![
@@ -4103,6 +4117,11 @@ mod tests {
 
         assert!(
             obligation_evidence(&matching, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            obligation_evidence(&try_reserve, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
         );

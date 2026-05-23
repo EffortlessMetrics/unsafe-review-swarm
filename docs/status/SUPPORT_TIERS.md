@@ -31,9 +31,10 @@ observations, closed positive branches, and reassigned checked cap arguments.
 made stale by reassigning the checked vector before `set_len`.
 `Vec::set_len` initialization evidence now rejects unrelated initialization
 statements unless the evidence is tied to the receiver being lengthened.
-`Vec::set_len` capacity evidence also recognizes the narrow same-vector
-`reserve(additional)` pattern for `len + additional`, and rejects the reserve
-call when `additional` is reassigned after computing the new length.
+`Vec::set_len` capacity evidence also recognizes narrow same-vector
+`reserve(additional)` and `try_reserve(additional)?` patterns for
+`len + additional`, and rejects those calls when `additional` is reassigned
+after computing the new length.
 `Box::from_raw` and `ptr::drop_in_place` reject `Box::into_raw` origin evidence
 when the raw pointer is reassigned before use.
 Unchecked-constructor availability evidence is pinned for same-receiver

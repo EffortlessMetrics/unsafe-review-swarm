@@ -24,8 +24,8 @@ arguments merely named `cap` unless a const-capacity context is visible, and
 `Vec::set_len` initialization evidence rejects unrelated initialization
 statements not tied to the receiver being lengthened.
 `Vec::set_len` capacity evidence also recognizes narrow same-vector
-`reserve(additional)` evidence for `len + additional` while rejecting stale
-`additional` facts.
+`reserve(additional)` and `try_reserve(additional)?` evidence for
+`len + additional` while rejecting stale `additional` facts.
 `Box::from_raw` and `ptr::drop_in_place` ownership evidence reject stale
 `Box::into_raw` origins when the raw pointer is reassigned before use.
 Unchecked-constructor availability evidence now has fixture-backed controls for
@@ -115,10 +115,11 @@ These are not failures; they are the next unsupported or weakly verified areas:
 - Real PR-diff dogfood shows `Vec::set_len` guard evidence still needs broader
   modeling; visible `MaybeUninit::new` initialization loops and const `CAP`
   capacity facts now have fixture coverage, same-vector
-  `Vec::with_capacity(new_len)` and narrow same-vector
-  `reserve(additional)` capacity evidence have fixture coverage, and unrelated
-  capacity comparisons, local arguments merely named `cap`, and stale
-  `additional` facts are pinned as non-evidence before `set_len`;
+  `Vec::with_capacity(new_len)`, narrow same-vector `reserve(additional)`, and
+  narrow same-vector `try_reserve(additional)?` capacity evidence have fixture
+  coverage, and unrelated capacity comparisons, local arguments merely named
+  `cap`, and stale `additional` facts are pinned as non-evidence before
+  `set_len`;
   `arrayvec#288` has a rerun receipt;
   non-zero shrink and `set_len(0)` clear evidence also have fixture and
   dogfood-rerun coverage, start-bound shrink evidence has fixture and

@@ -1,0 +1,11 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,6 @@
++pub fn try_reserve_then_extend(values: &mut Vec<u8>, additional: usize) -> Result<(), std::collections::TryReserveError> {
++    let new_len = values.len() + additional;
++    values.try_reserve(additional)?;
++    // SAFETY: try_reserve proves capacity on the continuing path, but this fixture intentionally omits initialization.
++    unsafe { values.set_len(new_len) }
++    Ok(())
++}
