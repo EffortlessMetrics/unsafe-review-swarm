@@ -28,6 +28,12 @@ LSP client wiring is blocked until the live-server hardening gate in
 UNSAFE-REVIEW-SPEC-0018 is satisfied. Until then, this spec is a planning rail,
 not a claim that an editor package is ready to ship.
 
+The first publishable extension is the saved-`lsp.json` viewer MVP scoped in
+[docs/editor/extension-mvp.md](../editor/extension-mvp.md). The MVP path
+explicitly removes live-LSP wiring from its surface, which frees publication
+from the UNSAFE-REVIEW-SPEC-0018 hardening gate while leaving this spec as
+the long-form contract for the eventual full live extension.
+
 It provides:
 
 - diagnostics from the LSP server,

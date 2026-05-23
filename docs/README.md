@@ -9,6 +9,7 @@
 | CI and PR artifacts | advisory CI lanes, first-pr packets, comment plans, and future trusted poster design | `docs/ci/PR_CI.md`, `docs/ci/COMMENT_PLAN_EXAMPLES.md`, `docs/ci/TRUSTED_COMMENT_POSTER.md` |
 | Explanations | concept notes, trust boundaries, reviewer examples, and agent packet examples | `docs/explanation/` |
 | Editor workflow | saved read-only editor projection walkthrough | `docs/editor/saved-lsp-json.md` |
+| Editor extension MVP | publishable saved-lsp viewer extension scope and non-goals | `docs/editor/extension-mvp.md` |
 | Proposals | why a workstream exists | `docs/proposals/` |
 | Releases | release targets, readiness notes, and publication receipts | `docs/releases/` |
 | Specs | behavior contracts | `docs/specs/` |
