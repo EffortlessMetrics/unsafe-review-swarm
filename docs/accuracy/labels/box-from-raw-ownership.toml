@@ -1,0 +1,51 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "box-from-raw-ownership-evidence"
+operation_family = "box_from_raw"
+hazard = "drop_or_deallocation"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard ownership evidence behavior for Box::from_raw; they are
+not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "box-from-raw-missing-ownership"
+fixture = "box_from_raw"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "box_from_raw"
+expected_hazard = "drop_or_deallocation"
+expected_obligation_key = "ownership"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A bare Box::from_raw call does not prove the pointer came from Box::into_raw or has unique Box ownership."
+
+[[samples]]
+id = "box-from-raw-box-origin-present"
+fixture = "box_from_raw_box_origin"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "box_from_raw"
+expected_hazard = "drop_or_deallocation"
+expected_obligation_key = "ownership"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A same-pointer Box::into_raw origin discharges Box::from_raw ownership evidence without importing a witness receipt."
+
+[[samples]]
+id = "box-from-raw-reassigned-origin-not-guard"
+fixture = "box_from_raw_reassigned_origin_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "box_from_raw"
+expected_hazard = "drop_or_deallocation"
+expected_obligation_key = "ownership"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Box::into_raw origin evidence becomes stale when the raw pointer is reassigned before Box::from_raw."

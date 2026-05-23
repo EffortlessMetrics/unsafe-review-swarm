@@ -4,6 +4,8 @@ Claim-scoped label ledgers live here.
 
 Current ledgers:
 
+- `box-from-raw-ownership.toml`: fixture-pinned obligation-level labels for
+  `Box::from_raw` ownership evidence.
 - `copy-nonoverlapping-valid-range.toml`: fixture-pinned
   obligation-level labels for `copy_nonoverlapping` valid-range evidence.
 - `ffi-boundary-obligations.toml`: fixture-pinned obligation-level labels for

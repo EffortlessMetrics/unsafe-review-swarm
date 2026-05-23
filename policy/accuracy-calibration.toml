@@ -29,6 +29,39 @@ allowed = [
 ]
 
 [[claim]]
+id = "box-from-raw-ownership-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "box_from_raw"
+hazard = "drop_or_deallocation"
+support_tier = "Core operation smoke slice"
+fixtures = [
+  "box_from_raw",
+  "box_from_raw_box_origin",
+  "box_from_raw_reassigned_origin_not_guard",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/box-from-raw-ownership.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned Box::from_raw ownership evidence distinguishes same-pointer
+Box::into_raw origin evidence from bare and reassigned-origin controls in the
+listed fixtures.
+"""
+forbidden_claims = [
+  "broad Box::from_raw soundness",
+  "allocator proof",
+  "pointer validity proof",
+  "deallocation proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "raw-pointer-read-alignment-evidence"
 status = "fixture_pinned"
 kind = "evidence_precision"
