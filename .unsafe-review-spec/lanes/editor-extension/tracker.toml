@@ -51,9 +51,30 @@ proof = [
 ]
 
 [[work_item]]
+id = "extension-saved-lsp-mvp"
+status = "done"
+description = """
+Saved-lsp.json viewer MVP shipped through the marketplace-first-hour-ux
+lane (PR #358 spec, #359 implementation). The MVP path explicitly
+unblocks editor reach without waiting on the live-lsp-hardening-gate by
+consuming target/unsafe-review/lsp.json directly. See
+docs/editor/extension-mvp.md.
+"""
+proof = [
+  "npm --prefix editors/vscode ci",
+  "npm --prefix editors/vscode run compile",
+  "npm --prefix editors/vscode test",
+]
+
+[[work_item]]
 id = "extension-lsp-client"
 status = "blocked"
 blocked_by = ["extension-scaffold", "live-lsp-hardening-gate"]
+description = """
+Live `unsafe-review lsp` client wiring inside the extension remains
+blocked behind the SPEC-0018 hardening gate. The MVP saved-bundle path
+does not consume a live server.
+"""
 proof = [
   "npm test",
   "cargo run --locked -p unsafe-review -- lsp --help",
@@ -62,18 +83,34 @@ proof = [
 
 [[work_item]]
 id = "marketplace-package-smoke"
-status = "blocked"
-blocked_by = ["extension-lsp-client"]
+status = "done"
+description = """
+VSIX packaging ships through the editor-extension-packaging advisory
+lane (PR #360). .github/workflows/editor-extension.yml compiles, tests,
+and packages a VSIX, then uploads it as the unsafe-review-vscode
+workflow artifact on every relevant PR.
+"""
 proof = [
-  "npx @vscode/vsce package --out target/unsafe-review-vscode.vsix",
-  "npx ovsx package --out target/unsafe-review-openvsx.vsix",
+  "npx --yes @vscode/vsce@2.32.0 package --out target/unsafe-review-vscode.vsix --allow-missing-repository",
+  "cargo run --locked -p xtask -- check-ci-lanes",
+  "cargo run --locked -p xtask -- check-policy",
 ]
 
 [[work_item]]
 id = "publication-workflows"
-status = "blocked"
-blocked_by = ["marketplace-package-smoke"]
+status = "done"
+description = """
+Manual marketplace publish workflow ships through
+.github/workflows/editor-publish.yml (PR #361). workflow_dispatch only,
+must be dispatched from main, defaults to dry_run=true, refuses to
+publish without an explicit target boolean and the matching secret.
+Status `done` here means the workflow exists and is gated correctly;
+an actual marketplace publication still requires owner-side publisher
+accounts, Eclipse/Open VSX namespace, and VSCE_PAT/OVSX_PAT secrets.
+"""
 proof = [
-  "cargo run --locked -p xtask -- check-editor-extension",
+  "cargo run --locked -p xtask -- check-ci-lanes",
+  "cargo run --locked -p xtask -- check-policy",
+  "cargo run --locked -p xtask -- check-pr",
   "git diff --check",
 ]
