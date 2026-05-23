@@ -221,6 +221,21 @@ label_source = "fixture_golden"
 rationale = "A same-receiver is_none early return discharges Option unwrap_unchecked valid-value evidence."
 
 [[samples]]
+id = "unwrap-unchecked-is-none-return-comment-missing"
+fixture = "unwrap_unchecked_is_none_return_comment_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Text that says return inside a comment does not make the None branch non-returning."
+
+[[samples]]
 id = "unwrap-unchecked-is-err-return-present"
 fixture = "unwrap_unchecked_is_err_return_guard"
 kind = "positive"

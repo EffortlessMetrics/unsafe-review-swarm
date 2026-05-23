@@ -404,6 +404,7 @@ mod tests {
         "unwrap_unchecked_result",
         "unwrap_unchecked_infallible_result",
         "unwrap_unchecked_other_infallible_not_guard",
+        "unwrap_unchecked_is_none_return_comment_not_guard",
         "unreachable_unchecked_path",
         "unreachable_unchecked_infallible_path",
         "unreachable_unchecked_other_infallible_not_guard",
@@ -426,6 +427,7 @@ mod tests {
         "get_unchecked_mut_post_check_not_guard",
         "get_unchecked_mut_bounds_observed_not_guard",
         "get_unchecked_mut_closed_bounds_not_guard",
+        "get_unchecked_mut_return_comment_not_guard",
         "get_unchecked_mut_reassigned_index_not_guard",
         "pin_new_unchecked",
     ];

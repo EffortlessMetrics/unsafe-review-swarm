@@ -909,7 +909,7 @@ fn get_unchecked_receiver_and_index(expression: &str) -> Option<(String, String)
 }
 
 fn has_get_unchecked_bounds_guard(lower: &str, receiver: &str, index: &str) -> bool {
-    let compact = compact_code(lower);
+    let compact = compact_code(&strip_block_comments_and_literals(lower));
     let receiver = compact_code(&receiver.to_ascii_lowercase());
     let index = compact_code(&index.to_ascii_lowercase());
     if receiver.is_empty() || index.is_empty() {
@@ -2175,7 +2175,7 @@ fn has_infallible_assignment_to_receiver(before_call: &str, receiver: &str) -> b
 }
 
 fn has_unwrap_unchecked_receiver_state_evidence(lower: &str) -> bool {
-    let compact = compact_code(lower);
+    let compact = compact_code(&strip_block_comments_and_literals(lower));
     let Some((before_call, receiver)) = unwrap_unchecked_receiver_context(&compact) else {
         return false;
     };
@@ -4992,6 +4992,18 @@ mod tests {
             "unsafe { values.get_unchecked_mut(index) }",
             vec![],
         );
+        let commented_return_guard = site_with_family(
+            OperationFamily::GetUnchecked,
+            vec!["if index >= values.len() { /* return None; */ }"],
+            "unsafe { values.get_unchecked_mut(index) }",
+            vec![],
+        );
+        let string_return_guard = site_with_family(
+            OperationFamily::GetUnchecked,
+            vec!["if index >= values.len() { let _note = \"return None\"; }"],
+            "unsafe { values.get_unchecked_mut(index) }",
+            vec![],
+        );
         let matching_assertion = site_with_family(
             OperationFamily::GetUnchecked,
             vec!["assert!(index < values.len());"],
@@ -5038,6 +5050,16 @@ mod tests {
         );
         assert!(
             obligation_evidence(&matching_return_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&commented_return_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&string_return_guard, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
         );
@@ -5485,10 +5507,31 @@ mod tests {
             "unsafe { option.unwrap_unchecked() }",
             vec![],
         );
+        let comment_return = site_with_family(
+            OperationFamily::UnwrapUnchecked,
+            vec!["if option.is_none() {", "    /* return 0; */", "}"],
+            "unsafe { option.unwrap_unchecked() }",
+            vec![],
+        );
+        let string_return = site_with_family(
+            OperationFamily::UnwrapUnchecked,
+            vec![
+                "if option.is_none() {",
+                "    let _note = \"return 0\";",
+                "}",
+            ],
+            "unsafe { option.unwrap_unchecked() }",
+            vec![],
+        );
 
         let evidence = obligation_evidence(&unchecked, &obligations, &contract, &reach);
+        let comment_evidence =
+            obligation_evidence(&comment_return, &obligations, &contract, &reach);
+        let string_evidence = obligation_evidence(&string_return, &obligations, &contract, &reach);
 
         assert!(!evidence[0].discharge.present);
+        assert!(!comment_evidence[0].discharge.present);
+        assert!(!string_evidence[0].discharge.present);
     }
 
     #[test]

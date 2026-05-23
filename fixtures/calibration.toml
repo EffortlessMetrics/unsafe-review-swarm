@@ -71,6 +71,7 @@ required_core_fixtures = [
   "unwrap_unchecked_post_check_not_guard",
   "unwrap_unchecked_guard_then_reassigned_not_guard",
   "unwrap_unchecked_is_none_return_guard",
+  "unwrap_unchecked_is_none_return_comment_not_guard",
   "unwrap_unchecked_is_err_return_guard",
   "unreachable_unchecked_path",
   "unreachable_unchecked_infallible_path",
@@ -83,6 +84,7 @@ required_core_fixtures = [
   "get_unchecked_mut_post_check_not_guard",
   "get_unchecked_mut_bounds_observed_not_guard",
   "get_unchecked_mut_closed_bounds_not_guard",
+  "get_unchecked_mut_return_comment_not_guard",
   "get_unchecked_mut_reassigned_index_not_guard",
   "pin_new_unchecked",
   "raw_pointer_write_bytes",
@@ -916,6 +918,16 @@ expected_operation_family = "unwrap_unchecked"
 expected_hazard = "invalid_value"
 
 [[cases]]
+fixture = "unwrap_unchecked_is_none_return_comment_not_guard"
+kind = "false_positive_control"
+claim = "unwrap_unchecked does not accept return text inside comments as valid-value evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+
+[[cases]]
 fixture = "unwrap_unchecked_is_err_return_guard"
 kind = "positive"
 claim = "unwrap_unchecked recognizes same-receiver is_err early-return guard evidence"
@@ -1029,6 +1041,16 @@ expected_hazard = "bounds"
 fixture = "get_unchecked_mut_closed_bounds_not_guard"
 kind = "false_positive_control"
 claim = "get_unchecked_mut does not accept a closed positive bounds branch before the unchecked access as guard evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+
+[[cases]]
+fixture = "get_unchecked_mut_return_comment_not_guard"
+kind = "false_positive_control"
+claim = "get_unchecked_mut does not accept return text inside comments as bounds evidence"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

@@ -98,7 +98,8 @@ The current fixture-pinned slices are:
   hardware availability and dispatch correctness without implying witness proof.
 - `get_unchecked_mut` bounds evidence: checks whether same-receiver len guards
   discharge the bounds obligation, while rejecting other-receiver, post-check,
-  observed-only, closed-branch, and stale-index controls.
+  observed-only, closed-branch, comment-only early-return, and stale-index
+  controls.
 - Pointer arithmetic bounds evidence: checks whether `index < num_ctrl_bytes`
   and same-slice end-pointer patterns discharge pointer-arithmetic bounds
   evidence while preserving witness/provenance limits.
@@ -125,7 +126,8 @@ The current fixture-pinned slices are:
 - `unwrap_unchecked` valid-value evidence: checks whether same-receiver
   Option/Result state, local infallible results, if-let guards, and
   early-return guards discharge the valid-value obligation, while rejecting bare
-  observations, wrong receivers, post-checks, and stale guards.
+  observations, wrong receivers, post-checks, comment-only early-return text,
+  and stale guards.
 
 This remains experimental/advisory until human-adjudicated calibration and
 report checks are landed.

@@ -10,8 +10,9 @@ status artifact, not a support-tier promotion. `docs/status/SUPPORT_TIERS.md`
 remains the authority for public claim wording.
 
 Latest evidence-hardening notes include `get_unchecked` bounds false-positive
-controls for bare predicate observations, closed positive branches, and checked
-indexes reassigned before the unchecked access.
+controls for bare predicate observations, closed positive branches,
+comment-only early-return text, and checked indexes reassigned before the
+unchecked access.
 Raw pointer alignment evidence now also has fixture-backed controls for
 same-pointer `is_aligned` guards, observations, closed branches, and stale
 checked pointers.
@@ -45,7 +46,7 @@ The active calibration rail is now recorded in
 `.unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md`,
 `policy/accuracy-calibration.toml`, and
 `docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 34
-fixture-pinned claims, 221 calibration cases, 34 label ledgers, and 228 label
+fixture-pinned claims, 223 calibration cases, 34 label ledgers, and 230 label
 samples. It records zero dogfood-measured, labeled-calibrated, or
 policy-eligible claims. That is intentional: the current report is a
 claim-scoped fixture-pinned proof index, not a global precision/recall result
@@ -178,9 +179,10 @@ These are not failures; they are the next unsupported or weakly verified areas:
   operation cards, and local `Fallibility::Infallible`, same-receiver
   enclosing `is_some` / `is_ok` branches, early-return, and narrow
   `if let ... as_ref()` state evidence is recognized for `unwrap_unchecked()`;
-  bare state observations and stale receiver-state evidence after reassignment
-  remain guard-missing false-positive controls. Broader option/result state
-  proof inference remains future work.
+  bare state observations, comment-only early-return text, and stale
+  receiver-state evidence after reassignment remain guard-missing
+  false-positive controls. Broader option/result state proof inference remains
+  future work.
 - The `hashbrown#469` `unreachable_unchecked` sites are labeled as
   invalid-value operation cards, and local `Fallibility::Infallible` error-path
   evidence is recognized while other-context, post-evidence, and closed-match
