@@ -1,4 +1,5 @@
 import { strict as assert } from "node:assert";
+import * as path from "node:path";
 import test from "node:test";
 
 import {
@@ -6,6 +7,7 @@ import {
   capDiagnosticsPerFile,
   diagnosticsByFile,
   parseBundle,
+  resolveWorkspaceFilePath,
 } from "../bundle";
 
 const MINIMAL_BUNDLE = {
@@ -107,6 +109,21 @@ test("parseBundle skips diagnostics that lack a renderable range", () => {
   assert.equal(result.warnings.some((w) => w.includes("range")), true);
 });
 
+test("parseBundle accepts zero-based LSP ranges", () => {
+  const zeroBased = {
+    ...MINIMAL_BUNDLE,
+    diagnostics: [
+      {
+        ...MINIMAL_BUNDLE.diagnostics[0],
+        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 8 } },
+      },
+    ],
+  };
+  const result = parseBundle(JSON.stringify(zeroBased));
+  assert.equal(result.diagnostics.length, 1);
+  assert.equal(result.diagnostics[0].range.start.line, 0);
+});
+
 test("parseBundle skips diagnostics missing card_id, path, or message", () => {
   const broken = {
     ...MINIMAL_BUNDLE,
@@ -169,6 +186,15 @@ test("capDiagnosticsPerFile caps per file and preserves order", () => {
 test("capDiagnosticsPerFile returns input when cap is non-positive", () => {
   const diagnostics = [sampleDiagnostic("x")];
   assert.equal(capDiagnosticsPerFile(diagnostics, 0).length, 1);
+});
+
+test("resolveWorkspaceFilePath keeps paths inside workspace", () => {
+  const root = path.resolve("workspace-root");
+  assert.equal(
+    resolveWorkspaceFilePath(root, path.join("src", "lib.rs")),
+    path.join(root, "src", "lib.rs"),
+  );
+  assert.equal(resolveWorkspaceFilePath(root, path.join("..", "secret.rs")), undefined);
 });
 
 function sampleDiagnostic(cardId: string) {

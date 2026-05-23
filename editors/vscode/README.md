@@ -21,9 +21,10 @@ test, or witness. It does not prove the code free of UB.
 - Loads `${workspace}/target/unsafe-review/lsp.json` on activation and on
   request.
 - Publishes diagnostics from the saved `diagnostics[]` entries.
-- Renders hovers from the saved `hovers[]` entries, with the trust boundary
-  appended as a footer.
-- Registers command-only actions matching the saved `code_actions[]`:
+- Renders hovers from the saved `hovers[]` entries, ensuring the trust boundary
+  is present as a footer.
+- Registers per-card command-only actions from the saved `code_actions[]` and
+  bundle-level open/refresh commands:
   - **Unsafe Review: Refresh Bundle** — re-read the bundle from disk.
   - **Unsafe Review: Open PR Summary (open)** — open
     `target/unsafe-review/pr-summary.md` in the editor.

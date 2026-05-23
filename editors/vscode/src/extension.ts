@@ -11,6 +11,7 @@ import {
   capDiagnosticsPerFile,
   diagnosticsByFile,
   parseBundle,
+  resolveWorkspaceFilePath,
 } from "./bundle";
 
 const EXTENSION_ID = "unsafe-review";
@@ -70,6 +71,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand(`${EXTENSION_ID}.refreshBundle`, refreshBundle),
     vscode.commands.registerCommand(`${EXTENSION_ID}.openPrSummary`, openPrSummary),
     vscode.commands.registerCommand(`${EXTENSION_ID}.openWitnessPlan`, openWitnessPlan),
+    vscode.commands.registerCommand(`${EXTENSION_ID}.openRelatedTest`, openRelatedTest),
     vscode.commands.registerCommand(`${EXTENSION_ID}.copyAgentPacket`, copyAgentPacket),
     vscode.commands.registerCommand(`${EXTENSION_ID}.copyWitnessCommand`, copyWitnessCommand),
     vscode.workspace.onDidChangeConfiguration((event) => {
@@ -157,6 +159,7 @@ async function refreshBundle(): Promise<void> {
   }
   const folder = primaryWorkspaceFolder();
   if (folder === undefined) {
+    clearBundleState();
     setStatus("no workspace open", undefined);
     return;
   }
@@ -177,6 +180,7 @@ async function refreshBundle(): Promise<void> {
       return;
     }
     adapter.output.appendLine(`refresh failed: ${(err as Error).message}`);
+    clearBundleState();
     setStatus("bundle read failed (see Output)", undefined);
     return;
   }
@@ -187,6 +191,7 @@ async function refreshBundle(): Promise<void> {
   } catch (err) {
     if (err instanceof BundleParseError) {
       adapter.output.appendLine(`parse failed: ${err.message}`);
+      clearBundleState();
       setStatus("bundle parse failed (see Output)", undefined);
       return;
     }
@@ -218,7 +223,12 @@ function applyDiagnostics(
   const capped = capDiagnosticsPerFile(bundle.diagnostics, settings.maxDiagnosticsPerFile);
   const grouped = diagnosticsByFile(capped);
   for (const [relativePath, list] of grouped) {
-    const uri = vscode.Uri.file(path.join(folder.uri.fsPath, relativePath));
+    const absolute = resolveWorkspaceFile(folder, relativePath);
+    if (absolute === undefined) {
+      adapter.output.appendLine(`bundle warning: diagnostic path escapes workspace: ${relativePath}`);
+      continue;
+    }
+    const uri = vscode.Uri.file(absolute);
     const diags = list.map((entry) => toVscodeDiagnostic(entry));
     adapter.diagnosticsCollection.set(uri, diags);
   }
@@ -230,7 +240,11 @@ function applyHovers(bundle: ParsedBundle, folder: vscode.WorkspaceFolder): void
   }
   const grouped = new Map<string, BundleHover[]>();
   for (const hover of bundle.hovers) {
-    const absolute = path.join(folder.uri.fsPath, hover.path);
+    const absolute = resolveWorkspaceFile(folder, hover.path);
+    if (absolute === undefined) {
+      adapter.output.appendLine(`bundle warning: hover path escapes workspace: ${hover.path}`);
+      continue;
+    }
     const list = grouped.get(absolute);
     if (list === undefined) {
       grouped.set(absolute, [hover]);
@@ -247,7 +261,11 @@ function applyCodeActions(bundle: ParsedBundle, folder: vscode.WorkspaceFolder):
   }
   const grouped = new Map<string, BundleCodeAction[]>();
   for (const action of bundle.codeActions) {
-    const absolute = path.join(folder.uri.fsPath, action.path);
+    const absolute = resolveWorkspaceFile(folder, action.path);
+    if (absolute === undefined) {
+      adapter.output.appendLine(`bundle warning: code action path escapes workspace: ${action.path}`);
+      continue;
+    }
     const list = grouped.get(absolute);
     if (list === undefined) {
       grouped.set(absolute, [action]);
@@ -286,7 +304,7 @@ function toVscodeDiagnostic(entry: BundleDiagnostic): vscode.Diagnostic {
   const diagnostic = new vscode.Diagnostic(range, entry.message, severity);
   diagnostic.source = entry.source ?? "unsafe-review";
   diagnostic.code = {
-    value: entry.code,
+    value: entry.cardId,
     target: vscode.Uri.parse("https://crates.io/crates/unsafe-review"),
   };
   return diagnostic;
@@ -341,9 +359,7 @@ class BundleHoverProvider implements vscode.HoverProvider {
     const md = new vscode.MarkdownString();
     md.isTrusted = false;
     md.supportHtml = false;
-    md.appendMarkdown(chosen.contents);
-    md.appendMarkdown("\n\n---\n\n");
-    md.appendMarkdown(chosen.trustBoundary ?? TRUST_BOUNDARY_FOOTER);
+    md.appendMarkdown(withTrustBoundaryFooter(chosen.contents, chosen.trustBoundary));
     return new vscode.Hover(md);
   }
 }
@@ -403,6 +419,7 @@ function extensionCommandFor(bundleCommand: string): string {
     case "unsafe-review.copyWitnessCommand":
       return `${EXTENSION_ID}.copyWitnessCommand`;
     case "unsafe-review.openRelatedTest":
+      return `${EXTENSION_ID}.openRelatedTest`;
     case "unsafe-review.openPrSummary":
       return `${EXTENSION_ID}.openPrSummary`;
     case "unsafe-review.openWitnessPlan":
@@ -413,20 +430,49 @@ function extensionCommandFor(bundleCommand: string): string {
 }
 
 async function openPrSummary(): Promise<void> {
-  await openWorkspaceFile(PR_SUMMARY_PATH);
+  await openBundleSibling(PR_SUMMARY_PATH);
 }
 
 async function openWitnessPlan(): Promise<void> {
-  await openWorkspaceFile(WITNESS_PLAN_PATH);
+  await openBundleSibling(WITNESS_PLAN_PATH);
 }
 
-async function openWorkspaceFile(relative: string): Promise<void> {
+async function openBundleSibling(defaultRelative: string): Promise<void> {
   const folder = primaryWorkspaceFolder();
   if (folder === undefined) {
     void vscode.window.showInformationMessage("unsafe-review: no workspace open");
     return;
   }
-  const target = path.join(folder.uri.fsPath, relative);
+  const settings = readSettings();
+  const relative = path.join(path.dirname(settings.bundlePath), path.basename(defaultRelative));
+  await openWorkspaceFile(folder, relative);
+}
+
+async function openRelatedTest(payload: unknown): Promise<void> {
+  const folder = primaryWorkspaceFolder();
+  if (folder === undefined) {
+    void vscode.window.showInformationMessage("unsafe-review: no workspace open");
+    return;
+  }
+  if (!isRecord(payload) || typeof payload["file"] !== "string" || payload["file"].length === 0) {
+    void vscode.window.showInformationMessage("unsafe-review: no related test file in action");
+    return;
+  }
+  await openWorkspaceFile(folder, payload["file"], readPositiveInteger(payload["line"]));
+}
+
+async function openWorkspaceFile(
+  folder: vscode.WorkspaceFolder,
+  relative: string,
+  oneBasedLine?: number,
+): Promise<void> {
+  const target = resolveWorkspaceFile(folder, relative);
+  if (target === undefined) {
+    void vscode.window.showInformationMessage(
+      `unsafe-review: refused to open path outside workspace: ${relative}`,
+    );
+    return;
+  }
   if (!fs.existsSync(target)) {
     void vscode.window.showInformationMessage(
       `unsafe-review: ${relative} not found. Run \`unsafe-review first-pr\` first.`,
@@ -434,7 +480,13 @@ async function openWorkspaceFile(relative: string): Promise<void> {
     return;
   }
   const doc = await vscode.workspace.openTextDocument(target);
-  await vscode.window.showTextDocument(doc, { preview: false });
+  const editor = await vscode.window.showTextDocument(doc, { preview: false });
+  if (oneBasedLine !== undefined) {
+    const line = Math.max(oneBasedLine - 1, 0);
+    const position = new vscode.Position(line, 0);
+    editor.selection = new vscode.Selection(position, position);
+    editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
+  }
 }
 
 async function copyAgentPacket(payload: unknown): Promise<void> {
@@ -484,6 +536,30 @@ function pickCardId(payload: unknown): string | undefined {
     }
   }
   return undefined;
+}
+
+function readPositiveInteger(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
+}
+
+function resolveWorkspaceFile(
+  folder: vscode.WorkspaceFolder,
+  workspaceRelativePath: string,
+): string | undefined {
+  return resolveWorkspaceFilePath(folder.uri.fsPath, workspaceRelativePath);
+}
+
+function withTrustBoundaryFooter(contents: string, boundary: string | undefined): string {
+  const footer = boundary ?? TRUST_BOUNDARY_FOOTER;
+  const lower = contents.toLowerCase();
+  if (
+    lower.includes("trust boundary") ||
+    lower.includes("not memory-safety proof") ||
+    lower.includes("not a proof of memory safety")
+  ) {
+    return contents;
+  }
+  return `${contents}\n\n---\n\n${footer}`;
 }
 
 function shellQuote(value: string): string {

@@ -6,6 +6,8 @@
  * analyzer truth beyond what is in this file.
  */
 
+import * as path from "node:path";
+
 export interface BundleStatus {
   message: string;
   trustBoundary: string;
@@ -285,10 +287,8 @@ function parseRange(value: unknown): BundleRange | undefined {
   if (start === undefined || end === undefined) {
     return undefined;
   }
-  // Reject zero-line saved ranges; per the editor MVP spec they are not
-  // renderable and the projection should not silently shift them to 0:0.
-  // A zero line that comes paired with nonzero character is still allowed
-  // because the projection uses zero-based positions.
+  // The saved projection uses LSP-style zero-based positions; line 0 is valid.
+  // Reject only missing, non-finite, or negative positions.
   return { start, end };
 }
 
@@ -368,4 +368,17 @@ export function capDiagnosticsPerFile(
     out.push(diag);
   }
   return out;
+}
+
+export function resolveWorkspaceFilePath(
+  workspaceRoot: string,
+  workspaceRelativePath: string,
+): string | undefined {
+  const root = path.resolve(workspaceRoot);
+  const target = path.resolve(root, workspaceRelativePath);
+  const rootWithSeparator = root.endsWith(path.sep) ? root : `${root}${path.sep}`;
+  if (target !== root && !target.startsWith(rootWithSeparator)) {
+    return undefined;
+  }
+  return target;
 }
