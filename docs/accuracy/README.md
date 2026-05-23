@@ -85,12 +85,12 @@ The current fixture-pinned slices are:
 - FFI witness routing: checks that unsafe extern C boundaries, unsafe calls to
   same-file extern declarations, and unsafe `libc::` path calls route away from
   Miri-first review to sanitizer/cargo-careful witness suggestions, keeps
-  unsafe extern boundary cards scoped to the declared foreign function owner, and
-  avoids treating local Rust wrappers as FFI merely because their module names
-  resemble libc.
+  documented and missing-contract unsafe extern boundary cards scoped to the
+  declared foreign function owner, and avoids treating local Rust wrappers as FFI
+  merely because their module names resemble libc.
 - FFI boundary obligation evidence: checks that ABI/layout compatibility and
   ownership/lifetime/nullability contracts are tracked as separate obligations
-  for unsafe extern C declarations and calls.
+  for documented and missing-contract unsafe extern C declarations and calls.
 - Inline assembly human-review routing: checks that `asm!` register, memory,
   clobber, and target invariants route to human deep review without implying an
   executable witness ran.

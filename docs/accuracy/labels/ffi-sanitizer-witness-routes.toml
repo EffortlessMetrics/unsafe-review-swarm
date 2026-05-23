@@ -27,6 +27,23 @@ label_source = "fixture_golden"
 rationale = "Unsafe extern C boundaries should keep the declared foreign function owner and route away from Miri-first review to sanitizer/cargo-careful witnesses."
 
 [[samples]]
+id = "ffi-missing-boundary-contract-routes-asan-careful"
+fixture = "ffi_missing_boundary_contract"
+kind = "positive"
+expected_cards = 1
+expected_class = "miri_unsupported"
+expected_operation_family = "ffi"
+expected_hazard = "ffi_abi"
+expected_owner = "strlen"
+expected_site_kind = "extern_block"
+expected_obligation_key = "abi"
+expected_contract_state = "missing"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["asan", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Unsafe extern C boundaries without local contract evidence should still keep the declared foreign function owner and route away from Miri-first review to sanitizer/cargo-careful witnesses."
+
+[[samples]]
 id = "ffi-call-routes-asan-careful"
 fixture = "ffi_call_sanitizer_route"
 kind = "positive"

@@ -451,6 +451,7 @@ mod tests {
         "unsafe_impl_sync_generic_bound",
         "unsafe_impl_custom_trait_not_send_sync",
         "ffi_sanitizer_route",
+        "ffi_missing_boundary_contract",
         "ffi_call_sanitizer_route",
         "ffi_libc_call_sanitizer_route",
         "ffi_non_libc_wrapper_call_not_route",

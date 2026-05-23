@@ -948,6 +948,7 @@ hazard = "ffi_abi"
 support_tier = "Witness routing"
 fixtures = [
   "ffi_sanitizer_route",
+  "ffi_missing_boundary_contract",
   "ffi_call_sanitizer_route",
   "ffi_libc_call_sanitizer_route",
 ]
@@ -959,8 +960,8 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned FFI witness routing sends unsafe extern C boundaries to
 sanitizer/cargo-careful route suggestions in the listed fixtures, including
-owner-scoped extern block declarations, unsafe calls to same-file extern C
-declarations, and libc path calls.
+owner-scoped documented and missing-contract extern block declarations, unsafe
+calls to same-file extern C declarations, and libc path calls.
 """
 forbidden_claims = [
   "FFI ABI correctness proof",
@@ -979,6 +980,7 @@ hazard = "ffi_abi"
 support_tier = "Core operation smoke slice"
 fixtures = [
   "ffi_sanitizer_route",
+  "ffi_missing_boundary_contract",
   "ffi_call_sanitizer_route",
   "ffi_libc_call_sanitizer_route",
 ]
@@ -990,7 +992,8 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned FFI boundary evidence records ABI/layout and ownership/lifetime/
 nullability obligations separately for the listed unsafe extern C fixtures, with
-extern block cards scoped to the declared foreign function owner.
+documented and missing-contract extern block cards scoped to the declared
+foreign function owner.
 """
 forbidden_claims = [
   "FFI ABI correctness proof",

@@ -231,6 +231,7 @@ required_core_fixtures = [
   "unsafe_impl_sync_generic_bound",
   "unsafe_impl_custom_trait_not_send_sync",
   "ffi_sanitizer_route",
+  "ffi_missing_boundary_contract",
   "ffi_call_sanitizer_route",
   "ffi_libc_call_sanitizer_route",
   "ffi_non_libc_wrapper_call_not_route",
@@ -2554,6 +2555,16 @@ expected_hazard = "unknown"
 fixture = "ffi_sanitizer_route"
 kind = "positive"
 claim = "unsafe extern C boundary routes away from Miri-first review"
+support_tier = "Witness routing"
+expected_cards = 1
+expected_class = "miri_unsupported"
+expected_operation_family = "ffi"
+expected_hazard = "ffi_abi"
+
+[[cases]]
+fixture = "ffi_missing_boundary_contract"
+kind = "positive"
+claim = "unsafe extern C boundary without contract evidence still routes to sanitizer/cargo-careful"
 support_tier = "Witness routing"
 expected_cards = 1
 expected_class = "miri_unsupported"
