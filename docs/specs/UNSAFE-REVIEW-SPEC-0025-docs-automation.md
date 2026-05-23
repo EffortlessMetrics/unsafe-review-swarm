@@ -35,6 +35,11 @@ The repo MUST provide docs automation that checks or generates:
 - no-overclaim trust-boundary wording,
 - command snippets that reference `unsafe-review` or `xtask` commands.
 
+Docs automation owns repo source-of-truth paths only. Roots listed as
+`external_awareness_only` in `policy/docs-automation.toml` are context for
+agents and tools, not durable unsafe-review state; they must not appear as owned
+roots, checked/generated outputs, or source inputs for checked repo artifacts.
+
 ## Non-goals
 
 - no migration into `.codex`,
@@ -65,6 +70,8 @@ git diff --check
 - `AGENTS.md` must preserve the active improvement runway, expected generated
   PR batches, spec rails as forward drive, missing-rail alignment, and
   configuration-obstacle handling for single-contributor review gates.
+- `policy/docs-automation.toml` must keep external agent/tool roots awareness
+  only, not owned or checked source-of-truth paths.
 - Active lane plans must preserve guardrail wording that matches the checked
   policy/verifier behavior they describe.
 - If a public README claims a product boundary, it must include no-proof/no-UB-free/no-Miri-clean wording.

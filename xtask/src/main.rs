@@ -557,8 +557,9 @@ fn check_docs_automation_impl() -> Result<usize, String> {
         .get("scope")
         .and_then(toml::Value::as_table)
         .ok_or_else(|| format!("{DOCS_AUTOMATION_LEDGER} is missing table `scope`"))?;
-    require_scope_paths(scope, "owned_roots", true)?;
-    require_scope_paths(scope, "external_awareness_only", false)?;
+    let owned_roots = require_scope_paths(scope, "owned_roots", true)?;
+    let external_awareness_roots = require_scope_paths(scope, "external_awareness_only", false)?;
+    check_docs_automation_scope_boundaries(&owned_roots, &external_awareness_roots)?;
 
     let surfaces = toml_array(&value, "generated_or_checked", DOCS_AUTOMATION_LEDGER)?;
     if surfaces.is_empty() {
@@ -613,10 +614,31 @@ fn check_docs_automation_impl() -> Result<usize, String> {
         if let Some(sources) = table.get("sources") {
             for source in toml_str_array(sources, DOCS_AUTOMATION_LEDGER, "sources")? {
                 require_existing_repo_path(source, DOCS_AUTOMATION_LEDGER, "sources")?;
+                reject_docs_automation_external_path(
+                    id,
+                    "sources",
+                    source,
+                    &external_awareness_roots,
+                )?;
             }
         }
 
+        if let Some(path) = table.get("path").and_then(toml::Value::as_str) {
+            reject_docs_automation_external_path(id, "path", path, &external_awareness_roots)?;
+        }
+        if let Some(path_glob) = table.get("path_glob").and_then(toml::Value::as_str) {
+            reject_docs_automation_external_path(
+                id,
+                "path_glob",
+                path_glob,
+                &external_awareness_roots,
+            )?;
+        }
         let paths = docs_automation_paths(table, idx)?;
+        for path in &paths {
+            let path = path.display().to_string();
+            reject_docs_automation_external_path(id, "path", &path, &external_awareness_roots)?;
+        }
         if kind == "spec_status_dashboard" {
             if !paths
                 .iter()
@@ -845,7 +867,7 @@ fn require_scope_paths(
     scope: &toml::map::Map<String, toml::Value>,
     key: &str,
     must_exist: bool,
-) -> Result<(), String> {
+) -> Result<Vec<String>, String> {
     let Some(values) = scope.get(key) else {
         return Err(format!(
             "{DOCS_AUTOMATION_LEDGER} scope is missing array `{key}`"
@@ -858,11 +880,60 @@ fn require_scope_paths(
         ));
     }
     if must_exist {
-        for value in values {
+        for value in &values {
             require_existing_repo_path(value, DOCS_AUTOMATION_LEDGER, key)?;
         }
     }
+    Ok(values.into_iter().map(str::to_string).collect())
+}
+
+fn check_docs_automation_scope_boundaries(
+    owned_roots: &[String],
+    external_awareness_roots: &[String],
+) -> Result<(), String> {
+    for owned_root in owned_roots {
+        if let Some(external_root) = external_awareness_roots
+            .iter()
+            .find(|root| repo_path_is_under_scope_root(owned_root, root))
+        {
+            return Err(format!(
+                "{DOCS_AUTOMATION_LEDGER} scope owned_roots entry `{owned_root}` must not be under external_awareness_only root `{external_root}`"
+            ));
+        }
+    }
     Ok(())
+}
+
+fn reject_docs_automation_external_path(
+    id: &str,
+    field: &str,
+    path: &str,
+    external_awareness_roots: &[String],
+) -> Result<(), String> {
+    if let Some(external_root) = external_awareness_roots
+        .iter()
+        .find(|root| repo_path_is_under_scope_root(path, root))
+    {
+        return Err(format!(
+            "{DOCS_AUTOMATION_LEDGER} generated_or_checked `{id}` {field} `{path}` must not be under external_awareness_only root `{external_root}`"
+        ));
+    }
+    Ok(())
+}
+
+fn repo_path_is_under_scope_root(path: &str, root: &str) -> bool {
+    let path = normalize_repo_scope_path(path);
+    let root = normalize_repo_scope_path(root);
+    path == root || path.starts_with(&format!("{root}/"))
+}
+
+fn normalize_repo_scope_path(value: &str) -> String {
+    value
+        .trim()
+        .trim_start_matches("./")
+        .trim_end_matches('/')
+        .replace('\\', "/")
+        .to_ascii_lowercase()
 }
 
 fn docs_automation_paths(
@@ -5352,6 +5423,56 @@ jobs:
             "*publication*.md",
             "2026-05-21-source-promotion-0.2-sync.md",
         ));
+    }
+
+    #[test]
+    fn docs_automation_scope_detects_external_agent_state_roots() {
+        assert!(repo_path_is_under_scope_root(
+            ".codex/agent-state.md",
+            ".codex"
+        ));
+        assert!(repo_path_is_under_scope_root(
+            ".jules\\goals\\README.md",
+            ".jules"
+        ));
+        assert!(!repo_path_is_under_scope_root(
+            "docs/contributing/spec-rails.md",
+            ".codex"
+        ));
+    }
+
+    #[test]
+    fn docs_automation_rejects_owned_external_state_root() -> Result<(), String> {
+        let owned_roots = vec!["docs".to_string(), ".codex".to_string()];
+        let external_roots = vec![".codex".to_string()];
+
+        let Err(err) = check_docs_automation_scope_boundaries(&owned_roots, &external_roots) else {
+            return Err("external state root in owned_roots should fail".to_string());
+        };
+
+        assert!(err.contains("owned_roots"));
+        assert!(err.contains("external_awareness_only"));
+        assert!(err.contains(".codex"));
+        Ok(())
+    }
+
+    #[test]
+    fn docs_automation_rejects_checked_external_state_path() -> Result<(), String> {
+        let external_roots = vec![".codex".to_string()];
+
+        let Err(err) = reject_docs_automation_external_path(
+            "agent-operating-contract",
+            "path",
+            ".codex/AGENTS.md",
+            &external_roots,
+        ) else {
+            return Err("external state path should fail".to_string());
+        };
+
+        assert!(err.contains("agent-operating-contract"));
+        assert!(err.contains("external_awareness_only"));
+        assert!(err.contains(".codex/AGENTS.md"));
+        Ok(())
     }
 
     #[test]
