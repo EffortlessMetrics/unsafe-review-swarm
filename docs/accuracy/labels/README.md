@@ -47,6 +47,8 @@ Current ledgers:
   `static mut` Loom/Shuttle witness routing.
 - `str-from-utf8-unchecked-validation.toml`: fixture-pinned obligation-level
   labels for `str::from_utf8_unchecked` UTF-8 validation evidence.
+- `target-feature-human-review-routes.toml`: fixture-pinned route-quality labels
+  for `#[target_feature]` human-deep-review witness routing.
 - `transmute-bool-valid-value.toml`: fixture-pinned obligation-level labels for
   transmute bool valid-value evidence.
 - `unsafe-impl-send-sync-witness-routes.toml`: fixture-pinned route-quality

@@ -73,6 +73,9 @@ The current fixture-pinned slices are:
 - Static mutable global-state routing: checks that `static mut` synchronization
   and aliasing invariants route to Loom/Shuttle interleaving witnesses without
   implying those witnesses ran.
+- Target-feature human-review routing: checks that documented
+  `#[target_feature]` caller-contract sites route to human deep review for
+  hardware availability and dispatch correctness without implying witness proof.
 - `get_unchecked_mut` bounds evidence: checks whether same-receiver len guards
   discharge the bounds obligation, while rejecting other-receiver, post-check,
   observed-only, closed-branch, and stale-index controls.

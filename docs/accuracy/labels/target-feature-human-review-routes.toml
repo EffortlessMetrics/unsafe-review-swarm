@@ -1,0 +1,26 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "target-feature-human-review-routes"
+operation_family = "target_feature"
+hazard = "target_feature"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard witness routing behavior; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "target-feature-safety-docs-routes-human-deep-review"
+fixture = "target_feature_safety_docs"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "target_feature"
+expected_hazard = "target_feature"
+expected_obligation_key = "target-feature"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "Documented target-feature declarations are caller-contract sites, but hardware availability and dispatch correctness still route to human deep review."

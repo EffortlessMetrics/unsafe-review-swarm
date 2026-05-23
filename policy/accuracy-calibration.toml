@@ -791,6 +791,36 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "target-feature-human-review-routes"
+status = "fixture_pinned"
+kind = "route_quality"
+owner = "calibration"
+operation_family = "target_feature"
+hazard = "target_feature"
+support_tier = "Witness routing"
+fixtures = [
+  "target_feature_safety_docs",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/target-feature-human-review-routes.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned target-feature witness routing sends hardware availability and
+dispatch correctness obligations to human deep review in the listed fixture.
+"""
+forbidden_claims = [
+  "target-feature correctness proof",
+  "hardware availability proof",
+  "dispatch correctness proof",
+  "witness execution proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "get-unchecked-mut-bounds-evidence"
 status = "fixture_pinned"
 kind = "evidence_precision"
