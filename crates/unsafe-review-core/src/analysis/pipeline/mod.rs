@@ -157,6 +157,7 @@ fn next_action_summary(
     class: &crate::domain::ReviewClass,
     operation: &str,
     public_api_surface: bool,
+    routes: &[crate::domain::WitnessRoute],
 ) -> String {
     match class {
         crate::domain::ReviewClass::ContractMissing if public_api_surface => {
@@ -167,10 +168,27 @@ fn next_action_summary(
         crate::domain::ReviewClass::GuardMissing if operation == "unknown" => "Review the unsafe site manually and add the missing obligation-specific guard once the contract is identified.".to_string(),
         crate::domain::ReviewClass::GuardMissing => format!("Add or expose the local guard that discharges the `{operation}` safety obligation."),
         crate::domain::ReviewClass::GuardedUnwitnessed
-            if manual_only_witness_operation(operation) =>
+            if has_witness_route(routes, crate::domain::WitnessKind::HumanDeepReview) =>
         {
             "Attach a human deep-review witness receipt or mark the static limitation explicitly."
                 .to_string()
+        }
+        crate::domain::ReviewClass::GuardedUnwitnessed
+            if has_witness_route(routes, crate::domain::WitnessKind::Miri)
+                && has_witness_route(routes, crate::domain::WitnessKind::CargoCareful) =>
+        {
+            "Attach a focused Miri or cargo-careful witness receipt or mark the static limitation explicitly.".to_string()
+        }
+        crate::domain::ReviewClass::GuardedUnwitnessed
+            if has_witness_route(routes, crate::domain::WitnessKind::Miri) =>
+        {
+            "Attach a focused Miri witness receipt or mark the static limitation explicitly."
+                .to_string()
+        }
+        crate::domain::ReviewClass::GuardedUnwitnessed
+            if has_witness_route(routes, crate::domain::WitnessKind::CargoCareful) =>
+        {
+            "Attach a focused cargo-careful witness receipt or mark the static limitation explicitly.".to_string()
         }
         crate::domain::ReviewClass::ReachableUnwitnessed => "Attach a focused witness receipt for the reached unsafe seam or mark the static limitation explicitly.".to_string(),
         crate::domain::ReviewClass::WitnessMismatch => "Review the witness identity or tool mismatch and attach a matching receipt for this card.".to_string(),
@@ -186,11 +204,11 @@ fn next_action_summary(
     }
 }
 
-fn manual_only_witness_operation(operation: &str) -> bool {
-    matches!(
-        operation,
-        "unknown" | "unsafe_fn_call" | "target_feature" | "inline_asm" | "pin_unchecked"
-    )
+fn has_witness_route(
+    routes: &[crate::domain::WitnessRoute],
+    kind: crate::domain::WitnessKind,
+) -> bool {
+    routes.iter().any(|route| route.kind == kind)
 }
 
 fn card_id(
@@ -364,12 +382,22 @@ mod tests {
     use super::*;
     use crate::api::{AnalysisMode, DiffSource, PolicyMode, Scope};
     use crate::domain::{
-        HazardKind, OperationFamily, Priority, ReviewCard, ReviewClass, UnsafeSiteKind, WitnessKind,
+        HazardKind, OperationFamily, Priority, ReviewCard, ReviewClass, UnsafeSiteKind,
+        WitnessKind, WitnessRoute,
     };
     use std::fs;
     use std::path::Path;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn test_witness_route(kind: WitnessKind) -> WitnessRoute {
+        WitnessRoute {
+            kind,
+            reason: "test route".to_string(),
+            command: None,
+            required: false,
+        }
+    }
 
     #[test]
     fn raw_pointer_v1_operation_cards_are_concrete() -> Result<(), String> {
@@ -777,7 +805,7 @@ mod tests {
             (ReviewClass::WitnessMismatch, "matching receipt"),
             (ReviewClass::StaticUnknown, "witness route"),
         ] {
-            let summary = next_action_summary(&class, "raw_pointer_read", false);
+            let summary = next_action_summary(&class, "raw_pointer_read", false, &[]);
             assert!(
                 summary.contains(expected),
                 "`{}` next action `{summary}` should mention `{expected}`",
@@ -787,25 +815,33 @@ mod tests {
     }
 
     #[test]
-    fn manual_only_guarded_cards_get_human_review_next_actions() {
-        for operation in [
+    fn guarded_cards_get_route_specific_witness_next_actions() {
+        let human_route = [test_witness_route(WitnessKind::HumanDeepReview)];
+        let summary = next_action_summary(
+            &ReviewClass::GuardedUnwitnessed,
             "unknown",
-            "unsafe_fn_call",
-            "target_feature",
-            "inline_asm",
-            "pin_unchecked",
-        ] {
-            let summary = next_action_summary(&ReviewClass::GuardedUnwitnessed, operation, false);
-            assert!(
-                summary.contains("human deep-review witness receipt"),
-                "`{operation}` guarded card next action `{summary}` should route to human deep-review receipt evidence"
-            );
-            assert!(summary.contains("static limitation"));
-        }
+            false,
+            &human_route,
+        );
+        assert!(
+            summary.contains("human deep-review witness receipt"),
+            "human-routed guarded card next action `{summary}` should route to human deep-review receipt evidence"
+        );
+        assert!(summary.contains("static limitation"));
 
-        let miri_supported =
-            next_action_summary(&ReviewClass::GuardedUnwitnessed, "raw_pointer_read", false);
-        assert!(miri_supported.contains("focused witness receipt"));
+        let miri_careful_routes = [
+            test_witness_route(WitnessKind::Miri),
+            test_witness_route(WitnessKind::CargoCareful),
+        ];
+        let miri_supported = next_action_summary(
+            &ReviewClass::GuardedUnwitnessed,
+            "raw_pointer_read",
+            false,
+            &miri_careful_routes,
+        );
+        assert!(miri_supported.contains("Miri"));
+        assert!(miri_supported.contains("cargo-careful"));
+        assert!(miri_supported.contains("witness receipt"));
         assert!(!miri_supported.contains("human deep-review"));
     }
 

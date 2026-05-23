@@ -96,7 +96,7 @@
     "missing": [
       "No witness receipt imported for this card"
     ],
-    "next_action": "Attach a focused witness receipt or mark the static limitation explicitly.",
+    "next_action": "Attach a focused Miri or cargo-careful witness receipt or mark the static limitation explicitly.",
     "verify_commands": [
       "cargo +nightly miri test byte_to_bool_or_false",
       "cargo +nightly careful test byte_to_bool_or_false"

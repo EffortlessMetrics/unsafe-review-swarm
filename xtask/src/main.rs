@@ -2925,14 +2925,25 @@ fn check_fixture_next_action(
         }
     }
     let class_name = require_non_empty_json_str(card, "class", &card_context)?;
-    let has_human_deep_review_route = json_array_at(card, "/witness_routes", &card_context)?
-        .iter()
-        .any(|route| {
-            route
-                .get("kind")
-                .and_then(serde_json::Value::as_str)
-                .is_some_and(|kind| kind == "human-deep-review")
-        });
+    let witness_routes = json_array_at(card, "/witness_routes", &card_context)?;
+    let has_human_deep_review_route = witness_routes.iter().any(|route| {
+        route
+            .get("kind")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|kind| kind == "human-deep-review")
+    });
+    let has_miri_route = witness_routes.iter().any(|route| {
+        route
+            .get("kind")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|kind| kind == "miri")
+    });
+    let has_cargo_careful_route = witness_routes.iter().any(|route| {
+        route
+            .get("kind")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|kind| kind == "cargo-careful")
+    });
     if class_name == "guard_missing" {
         if !normalized.contains("guard") {
             return Err(format!(
@@ -3008,6 +3019,18 @@ fn check_fixture_next_action(
         {
             return Err(format!(
                 "{card_context} guarded_unwitnessed next_action for human-deep-review routes must name human or manual review evidence"
+            ));
+        }
+        "guarded_unwitnessed" if has_miri_route && !normalized.contains("miri") => {
+            return Err(format!(
+                "{card_context} guarded_unwitnessed next_action for Miri routes must name Miri receipt evidence"
+            ));
+        }
+        "guarded_unwitnessed"
+            if has_cargo_careful_route && !normalized.contains("cargo-careful") =>
+        {
+            return Err(format!(
+                "{card_context} guarded_unwitnessed next_action for cargo-careful routes must name cargo-careful receipt evidence"
             ));
         }
         "witness_mismatch"
@@ -6900,6 +6923,46 @@ jobs:
 
         assert!(err.contains("human-deep-review"));
         assert!(err.contains("human or manual review"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_generic_executable_route_witness_next_action()
+    -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["class"] = serde_json::Value::String("guarded_unwitnessed".to_string());
+        card["next_action"] = serde_json::Value::String(
+            "Attach a focused witness receipt or mark the static limitation explicitly."
+                .to_string(),
+        );
+
+        let Err(err) = check_fixture_next_action(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            &card,
+            "raw_pointer_read",
+        ) else {
+            return Err("generic Miri-route witness next_action should fail".to_string());
+        };
+
+        assert!(err.contains("Miri"));
+
+        card["witness_routes"][0]["kind"] = serde_json::Value::String("cargo-careful".to_string());
+        card["witness_routes"][0]["command"] =
+            serde_json::Value::String("cargo +nightly careful test read_header".to_string());
+
+        let Err(err) = check_fixture_next_action(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            &card,
+            "raw_pointer_read",
+        ) else {
+            return Err("generic cargo-careful-route witness next_action should fail".to_string());
+        };
+
+        assert!(err.contains("cargo-careful"));
         Ok(())
     }
 

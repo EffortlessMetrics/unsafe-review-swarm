@@ -62,6 +62,9 @@ The guard rejects:
 - fixture golden `guarded_unwitnessed` cards whose only witness route is
   `human-deep-review` but whose next_action still uses generic focused-witness
   wording instead of human/manual review evidence.
+- fixture golden `guarded_unwitnessed` cards whose witness routes include Miri
+  or cargo-careful but whose next_action still uses generic focused-witness
+  wording instead of naming the executable witness route evidence.
 - fixture golden cards whose next_action asks reviewers to discharge an
   `unknown` obligation instead of routing unknown operation families to manual
   unsafe-site review and obligation-specific guard evidence.

@@ -158,6 +158,9 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - fixture golden `guarded_unwitnessed` next actions with only a
   `human-deep-review` route name human or manual review evidence instead of a
   generic executable witness,
+- fixture golden `guarded_unwitnessed` next actions with Miri or
+  cargo-careful routes name the corresponding executable witness receipt
+  evidence instead of a generic witness,
 - fixture golden `guard_missing` next actions ask for concrete guard evidence
   and do not offer documentation or comments as a substitute,
 - fixture golden next actions for public unsafe API contract evidence require
@@ -235,6 +238,9 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - A `guarded_unwitnessed` fixture card routed only to `human-deep-review`
   cannot use generic focused-witness wording without naming human or manual
   review evidence.
+- A `guarded_unwitnessed` fixture card routed to Miri or cargo-careful cannot
+  use generic focused-witness wording without naming the executable witness
+  route evidence.
 - A `guard_missing` fixture card next action cannot say a `SAFETY:` comment or
   documentation resolves missing guard evidence.
 - A public unsafe API contract card next action cannot say that a `SAFETY:`
