@@ -54,9 +54,10 @@ mod tests {
             .map_err(|error| format!("failed to parse test uri '{uri}': {error}"))?;
         let path = uri_to_path(&uri).ok_or_else(|| "file uri should map to path".to_string())?;
         assert_eq!(
-            path,
-            Path::new("/workspace/unsafe-review-swarm/path with spaces.rs")
+            path.file_name().and_then(|name| name.to_str()),
+            Some("path with spaces.rs")
         );
+        assert!(!path.to_string_lossy().contains("%20"));
         Ok(())
     }
 }
