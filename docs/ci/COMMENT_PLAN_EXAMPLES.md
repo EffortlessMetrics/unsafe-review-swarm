@@ -7,33 +7,33 @@ source, or make a blocking policy decision.
 These examples are fixture-backed. Regenerate them with:
 
 ```bash
-cargo run --locked -p unsafe-review -- first-pr \
-  --root fixtures/raw_pointer_alignment \
-  --diff fixtures/raw_pointer_alignment/change.diff \
-  --out-dir target/unsafe-review-comment-plan-selected
-
-cargo run --locked -p unsafe-review -- first-pr \
-  --root fixtures/ffi_sanitizer_route \
-  --diff fixtures/ffi_sanitizer_route/change.diff \
-  --out-dir target/unsafe-review-comment-plan-not-selected
-
-cargo run --locked -p unsafe-review -- first-pr \
-  --root fixtures/safe_code_no_cards \
-  --diff fixtures/safe_code_no_cards/change.diff \
-  --out-dir target/unsafe-review-comment-plan-no-card
+for fixture in \
+  raw_pointer_alignment \
+  copy_nonoverlapping \
+  public_unsafe_fn_missing_safety \
+  ffi_sanitizer_route \
+  safe_code_no_cards
+do
+  cargo run --locked -p unsafe-review -- first-pr \
+    --root "fixtures/$fixture" \
+    --diff "fixtures/$fixture/change.diff" \
+    --out-dir "target/unsafe-review-comment-plan-$fixture"
+done
 ```
 
 Then verify each bundle:
 
 ```bash
-cargo run --locked -p xtask -- check-first-pr-artifacts \
-  target/unsafe-review-comment-plan-selected
-
-cargo run --locked -p xtask -- check-first-pr-artifacts \
-  target/unsafe-review-comment-plan-not-selected
-
-cargo run --locked -p xtask -- check-first-pr-artifacts \
-  target/unsafe-review-comment-plan-no-card
+for fixture in \
+  raw_pointer_alignment \
+  copy_nonoverlapping \
+  public_unsafe_fn_missing_safety \
+  ffi_sanitizer_route \
+  safe_code_no_cards
+do
+  cargo run --locked -p xtask -- check-first-pr-artifacts \
+    "target/unsafe-review-comment-plan-$fixture"
+done
 ```
 
 ## Selected candidate
@@ -75,7 +75,58 @@ Plan boundary: artifact-only inline comment candidate; unsafe-review did not
 post this comment, run witnesses, or make a policy decision.
 ```
 
-## Card present, not selected
+## Selected candidate — copy range guard missing
+
+Fixture: `copy_nonoverlapping`
+
+The same `guard_missing` shape recurs for `core::ptr::copy_nonoverlapping`
+when length, overlap, alignment, or initialization guards are not visible at
+the call site. The plan keeps the comment specific:
+
+```json
+{
+  "comments": [
+    {
+      "class": "guard_missing",
+      "operation_family": "copy_nonoverlapping",
+      "actionability": "specific_guard_missing",
+      "selection_reason": "actionable high-priority review card",
+      "next_action": "Add or expose the local guard that discharges the `copy_nonoverlapping` safety obligation."
+    }
+  ]
+}
+```
+
+The candidate body asks for the missing length / overlap guard explicitly; it
+does not say "copy is unsafe" or "this is UB".
+
+## Selected candidate — public unsafe fn missing `# Safety`
+
+Fixture: `public_unsafe_fn_missing_safety`
+
+When a changed `pub unsafe fn` lacks a precise public `# Safety` section, the
+plan promotes the card as `contract_missing` and asks the author to document
+the caller obligations the function relies on:
+
+```json
+{
+  "comments": [
+    {
+      "class": "contract_missing",
+      "operation_family": "unknown",
+      "actionability": "specific_contract_missing",
+      "selection_reason": "actionable high-confidence review card",
+      "next_action": "Add a precise public `# Safety` section that names the required caller obligations."
+    }
+  ]
+}
+```
+
+`operation_family` is `unknown` because the unsafe contract obligation lives
+on the `unsafe fn` declaration itself, not on a single unsafe operation. The
+plan body asks for explicit caller obligations rather than for safety prose.
+
+## Card present, not selected — human-review-only FFI
 
 Fixture: `ffi_sanitizer_route`
 
