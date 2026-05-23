@@ -2424,6 +2424,9 @@ fn check_fixture_card_identity(
         .get("site")
         .and_then(serde_json::Value::as_object)
         .ok_or_else(|| format!("{path} card[{idx}] is missing object key `site`"))?;
+    let operation_family =
+        require_non_empty_json_str(card, "operation_family", &format!("{path} card[{idx}]"))?;
+    let operation_path = fixture_card_operation_path(card, site, operation_family, path, idx)?;
     for (field, token) in [
         ("fixture", fixture),
         (
@@ -2438,10 +2441,8 @@ fn check_fixture_card_identity(
             "site.kind",
             required_json_object_str(site, "kind", path, idx)?,
         ),
-        (
-            "operation_family",
-            require_non_empty_json_str(card, "operation_family", &format!("{path} card[{idx}]"))?,
-        ),
+        ("operation_family", operation_family),
+        ("operation_path", operation_path.as_str()),
     ] {
         require_identity_token(id, token, path, idx, field)?;
     }
@@ -2493,6 +2494,123 @@ fn required_json_object_str<'a>(
     } else {
         Ok(value)
     }
+}
+
+fn fixture_card_operation_path(
+    card: &serde_json::Value,
+    site: &serde_json::Map<String, serde_json::Value>,
+    operation_family: &str,
+    path: &str,
+    idx: usize,
+) -> Result<String, String> {
+    if operation_family == "raw_pointer_deref" {
+        return Ok("deref".to_string());
+    }
+    if operation_family == "unreachable_unchecked" {
+        return Ok("unreachable_unchecked".to_string());
+    }
+    if operation_family == "unsafe_fn_call" {
+        let operation =
+            require_non_empty_json_str(card, "operation", &format!("{path} card[{idx}]"))?;
+        return Ok(unsafe_call_identity_path(operation));
+    }
+    if operation_family == "unknown" {
+        return Ok(site
+            .get("owner")
+            .and_then(serde_json::Value::as_str)
+            .filter(|owner| !owner.trim().is_empty())
+            .unwrap_or_else(|| {
+                site.get("kind")
+                    .and_then(serde_json::Value::as_str)
+                    .unwrap_or(operation_family)
+            })
+            .to_string());
+    }
+
+    let operation = require_non_empty_json_str(card, "operation", &format!("{path} card[{idx}]"))?;
+    let normalized = normalize_operation_snippet(operation);
+    let target = normalized
+        .split('(')
+        .next()
+        .unwrap_or(normalized.as_str())
+        .trim();
+    if let Some((_prefix, method)) = target.rsplit_once('.') {
+        return Ok(method.trim_matches(':').to_string());
+    }
+    if let Some((_prefix, function)) = target.rsplit_once("::") {
+        return Ok(function.trim_matches(':').to_string());
+    }
+    Ok(operation_family.to_string())
+}
+
+fn unsafe_call_identity_path(expression: &str) -> String {
+    let normalized = normalize_operation_snippet(expression);
+    if operation_contains_call_name(&normalized, "new_unchecked") {
+        return "new_unchecked".to_string();
+    }
+    let call = normalized
+        .split_once("unsafe")
+        .and_then(|(_prefix, after_unsafe)| {
+            after_unsafe.split_once('{').map(|(_open, after)| after)
+        })
+        .unwrap_or(normalized.as_str())
+        .split('(')
+        .next()
+        .unwrap_or("unsafe_fn_call")
+        .trim()
+        .trim_start_matches("match")
+        .trim();
+    let call = strip_trailing_turbofish(call);
+    if call.is_empty() {
+        "unsafe_fn_call".to_string()
+    } else if let Some((_prefix, method)) = call.rsplit_once('.') {
+        method.trim_matches(':').to_string()
+    } else if let Some((_prefix, function)) = call.rsplit_once("::") {
+        function.trim_matches(':').to_string()
+    } else {
+        call.trim_matches(':').to_string()
+    }
+}
+
+fn normalize_operation_snippet(value: &str) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn strip_trailing_turbofish(call: &str) -> &str {
+    let call = call.trim();
+    if !call.ends_with('>') {
+        return call;
+    }
+
+    let mut depth = 0usize;
+    for (idx, ch) in call.char_indices().rev() {
+        match ch {
+            '>' => depth += 1,
+            '<' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    let prefix = &call[..idx];
+                    return prefix.trim_end_matches(':').trim();
+                }
+            }
+            _ => {}
+        }
+    }
+    call
+}
+
+fn operation_contains_call_name(line: &str, name: &str) -> bool {
+    for pattern in [
+        format!("{name}("),
+        format!("{name}::"),
+        format!("{name}<"),
+        format!("{name}::<"),
+    ] {
+        if line.contains(&pattern) {
+            return true;
+        }
+    }
+    false
 }
 
 fn require_identity_token(
@@ -4561,6 +4679,26 @@ jobs:
     }
 
     #[test]
+    fn fixture_card_identity_rejects_missing_operation_path_token() -> Result<(), String> {
+        let card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-8a1362456e39-pointer_validity-c1",
+        )?;
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("card id without operation-path token should fail".to_string());
+        };
+
+        assert!(err.contains("operation_path"));
+        assert!(err.contains("cast-header"));
+        Ok(())
+    }
+
+    #[test]
     fn calibration_manifest_validates_current_fixture_contract() -> Result<(), String> {
         check_calibration()
     }
@@ -4770,6 +4908,7 @@ jobs:
     "owner": "read_header",
     "kind": "operation"
   }},
+  "operation": "unsafe {{ ptr.cast::<Header>().read() }}",
   "operation_family": "raw_pointer_read",
   "hazards": ["pointer_validity", "alignment"]
 }}"#

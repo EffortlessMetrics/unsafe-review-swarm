@@ -48,6 +48,12 @@ obligation-level. For a ReviewCard with multiple obligations, the ledger names
 the expected obligation key and evidence state instead of treating the card
 class as proof that every obligation is discharged.
 
+Fixture golden cards must preserve counted ReviewCard identity components:
+package/fixture, file, owner, site kind, operation family, operation path or
+callee token, normalized snippet hash, hazard, and count suffix. This keeps
+calibration, baselines, suppressions, and receipts tied to the same unsafe seam
+instead of to a broad operation-family bucket.
+
 When a claim is about public contract evidence, the ledger must pin
 `contract.state` from the matching ReviewCard obligation evidence. A local
 `SAFETY:` comment may document a nearby unsafe block, but it must not satisfy a
@@ -92,6 +98,9 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
   inside the owning claim's fixture list,
 - label sample counts do not double-count the same fixture, obligation, and
   evidence expectation within one claim,
+- fixture golden ReviewCard IDs preserve fixture/package, file, owner, site
+  kind, operation family, operation path/callee, snippet hash, hazard, and
+  counted identity suffix,
 - support-tier claim map matches measured evidence,
 - no-overclaim checks pass.
 
