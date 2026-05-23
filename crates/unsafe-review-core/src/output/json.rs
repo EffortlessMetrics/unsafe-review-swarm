@@ -420,6 +420,8 @@ mod tests {
         "unwrap_unchecked_result",
         "unwrap_unchecked_infallible_result",
         "unwrap_unchecked_other_infallible_not_guard",
+        "unwrap_unchecked_is_some_reassigned_not_guard",
+        "unwrap_unchecked_is_ok_reassigned_not_guard",
         "unwrap_unchecked_let_else_some_guard",
         "unwrap_unchecked_let_else_some_reassigned_not_guard",
         "unwrap_unchecked_let_else_ok_guard",

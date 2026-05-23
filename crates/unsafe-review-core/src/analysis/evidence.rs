@@ -6468,6 +6468,18 @@ mod tests {
             "unsafe { result.unwrap_unchecked() }",
             vec!["}", "Err(_) => 0,", "}"],
         );
+        let is_some_then_reassigned = site_with_family(
+            OperationFamily::UnwrapUnchecked,
+            vec!["if option.is_some() {", "    option = None;"],
+            "unsafe { option.unwrap_unchecked() }",
+            vec!["}"],
+        );
+        let is_ok_then_reassigned = site_with_family(
+            OperationFamily::UnwrapUnchecked,
+            vec!["if result.is_ok() {", "    result = Err(\"reset\");"],
+            "unsafe { result.unwrap_unchecked() }",
+            vec!["}"],
+        );
 
         let evidence = obligation_evidence(&unchecked, &obligations, &contract, &reach);
         let if_let_evidence = obligation_evidence(&other_if_let, &obligations, &contract, &reach);
@@ -6496,6 +6508,10 @@ mod tests {
             &contract,
             &reach,
         );
+        let is_some_then_reassigned_evidence =
+            obligation_evidence(&is_some_then_reassigned, &obligations, &contract, &reach);
+        let is_ok_then_reassigned_evidence =
+            obligation_evidence(&is_ok_then_reassigned, &obligations, &contract, &reach);
 
         assert!(!evidence[0].discharge.present);
         assert!(!if_let_evidence[0].discharge.present);
@@ -6512,6 +6528,8 @@ mod tests {
         );
         assert!(!match_then_reassigned_evidence[0].discharge.present);
         assert!(!result_match_then_reassigned_evidence[0].discharge.present);
+        assert!(!is_some_then_reassigned_evidence[0].discharge.present);
+        assert!(!is_ok_then_reassigned_evidence[0].discharge.present);
     }
 
     #[test]

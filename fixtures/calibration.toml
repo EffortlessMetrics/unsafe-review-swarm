@@ -64,7 +64,9 @@ required_core_fixtures = [
   "unwrap_unchecked_infallible_result",
   "unwrap_unchecked_other_infallible_not_guard",
   "unwrap_unchecked_is_some_guard",
+  "unwrap_unchecked_is_some_reassigned_not_guard",
   "unwrap_unchecked_is_ok_guard",
+  "unwrap_unchecked_is_ok_reassigned_not_guard",
   "unwrap_unchecked_is_some_observed_not_guard",
   "unwrap_unchecked_is_ok_observed_not_guard",
   "unwrap_unchecked_if_let_some_guard",
@@ -884,12 +886,32 @@ expected_operation_family = "unwrap_unchecked"
 expected_hazard = "invalid_value"
 
 [[cases]]
+fixture = "unwrap_unchecked_is_some_reassigned_not_guard"
+kind = "false_positive_control"
+claim = "unwrap_unchecked does not accept stale is_some branch evidence after receiver reassignment"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+
+[[cases]]
 fixture = "unwrap_unchecked_is_ok_guard"
 kind = "positive"
 claim = "unwrap_unchecked recognizes same-receiver is_ok guard evidence"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "unwrap_unchecked_is_ok_reassigned_not_guard"
+kind = "false_positive_control"
+claim = "unwrap_unchecked does not accept stale is_ok branch evidence after receiver reassignment"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
 expected_operation_family = "unwrap_unchecked"
 expected_hazard = "invalid_value"
 
