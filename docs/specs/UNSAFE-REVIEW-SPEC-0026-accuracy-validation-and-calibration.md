@@ -48,6 +48,12 @@ obligation-level. For a ReviewCard with multiple obligations, the ledger names
 the expected obligation key and evidence state instead of treating the card
 class as proof that every obligation is discharged.
 
+When a claim is about public contract evidence, the ledger must pin
+`contract.state` from the matching ReviewCard obligation evidence. A local
+`SAFETY:` comment may document a nearby unsafe block, but it must not satisfy a
+public unsafe API `# Safety` documentation claim unless the ReviewCard contract
+evidence records it as public API documentation.
+
 ## Non-goals
 
 - no global precision/recall claim,

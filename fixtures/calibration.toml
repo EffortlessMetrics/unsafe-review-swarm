@@ -417,6 +417,8 @@ claim = "public unsafe function without a # Safety contract reports contract_mis
 support_tier = "Contract evidence mining"
 expected_cards = 1
 expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
 
 [[cases]]
 fixture = "public_unsafe_trait_missing_safety"
@@ -430,7 +432,7 @@ expected_hazard = "unknown"
 
 [[cases]]
 fixture = "public_unsafe_fn_safety_comment_not_docs"
-kind = "positive"
+kind = "false_positive_control"
 claim = "public unsafe function requires # Safety docs and does not accept a local SAFETY comment as public API docs"
 support_tier = "Contract evidence mining"
 expected_cards = 1

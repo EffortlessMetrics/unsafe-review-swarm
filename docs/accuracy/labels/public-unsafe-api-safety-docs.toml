@@ -1,0 +1,95 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "public-unsafe-api-safety-docs-contract-evidence"
+operation_family = "unknown"
+hazard = "unknown"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard contract evidence behavior; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "public-unsafe-fn-missing-safety-docs"
+fixture = "public_unsafe_fn_missing_safety"
+kind = "positive"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+expected_obligation_key = "unknown"
+expected_contract_state = "missing"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A public unsafe function without nearby `# Safety` documentation is missing caller-contract evidence."
+
+[[samples]]
+id = "public-unsafe-trait-missing-safety-docs"
+fixture = "public_unsafe_trait_missing_safety"
+kind = "positive"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+expected_obligation_key = "unknown"
+expected_contract_state = "missing"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A public unsafe trait without nearby `# Safety` documentation is missing caller-contract evidence."
+
+[[samples]]
+id = "public-unsafe-fn-safety-comment-not-docs"
+fixture = "public_unsafe_fn_safety_comment_not_docs"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+expected_obligation_key = "unknown"
+expected_contract_state = "missing"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A local `SAFETY:` comment near a public unsafe API is not accepted as public `# Safety` documentation."
+
+[[samples]]
+id = "split-public-unsafe-fn-missing-safety-docs"
+fixture = "split_public_unsafe_fn_missing_safety"
+kind = "positive"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+expected_obligation_key = "unknown"
+expected_contract_state = "missing"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "Split public unsafe function syntax still requires nearby `# Safety` documentation."
+
+[[samples]]
+id = "public-unsafe-fn-with-safety-docs"
+fixture = "public_unsafe_fn_with_safety_docs"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+expected_obligation_key = "unknown"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A public unsafe function with a `# Safety` section is accepted as caller-contract evidence."
+
+[[samples]]
+id = "public-unsafe-fn-safety-colon-docs"
+fixture = "public_unsafe_fn_safety_colon_docs"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+expected_obligation_key = "unknown"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A public unsafe function with documented `Safety:` prose is accepted as caller-contract evidence."

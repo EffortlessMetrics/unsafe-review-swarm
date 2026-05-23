@@ -61,3 +61,36 @@ forbidden_claims = [
   "global recall",
   "memory-safety proof",
 ]
+
+[[claim]]
+id = "public-unsafe-api-safety-docs-contract-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "unknown"
+hazard = "unknown"
+support_tier = "Contract evidence mining"
+fixtures = [
+  "public_unsafe_fn_missing_safety",
+  "public_unsafe_trait_missing_safety",
+  "public_unsafe_fn_safety_comment_not_docs",
+  "split_public_unsafe_fn_missing_safety",
+  "public_unsafe_fn_with_safety_docs",
+  "public_unsafe_fn_safety_colon_docs",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/public-unsafe-api-safety-docs.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned public unsafe API contract evidence distinguishes missing `# Safety`
+docs from accepted `# Safety` / documented `Safety:` prose in the listed fixtures,
+and keeps local `SAFETY:` comments from satisfying public API documentation.
+"""
+forbidden_claims = [
+  "complete public API documentation audit",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]

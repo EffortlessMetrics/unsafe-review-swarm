@@ -23,6 +23,7 @@ const LABEL_SAMPLE_FIELDS: &[&str] = &[
     "expected_operation_family",
     "expected_hazard",
     "expected_obligation_key",
+    "expected_contract_state",
     "expected_discharge_state",
     "label_source",
     "labelers",
@@ -50,6 +51,19 @@ struct PolicyClaim {
     operation_family: Option<String>,
     hazard: Option<String>,
     label_ledgers: BTreeSet<String>,
+}
+
+struct FixtureObligation<'a> {
+    fixture: &'a str,
+    operation_family: &'a str,
+    hazard: &'a str,
+    obligation_key: &'a str,
+}
+
+struct EvidenceStateExpectation<'a> {
+    evidence_kind: &'a str,
+    field: &'a str,
+    expected_state: &'a str,
 }
 
 pub(crate) fn check_accuracy_label_ledgers(
@@ -290,6 +304,32 @@ fn validate_sample(
         fixture_case.expected_hazard.as_deref(),
     )?;
     let obligation_key = required_table_string(sample, "expected_obligation_key", path, idx)?;
+    let fixture_obligation = FixtureObligation {
+        fixture,
+        operation_family: expected_operation_family,
+        hazard: expected_hazard,
+        obligation_key,
+    };
+    if let Some(contract_state) =
+        optional_table_string(sample, "expected_contract_state", path, idx)?
+    {
+        require_allowed(
+            contract_state,
+            DISCHARGE_STATES,
+            path,
+            "expected_contract_state",
+        )?;
+        check_fixture_obligation_evidence_state(
+            path,
+            idx,
+            &fixture_obligation,
+            EvidenceStateExpectation {
+                evidence_kind: "contract",
+                field: "expected_contract_state",
+                expected_state: contract_state,
+            },
+        )?;
+    }
     let discharge_state = required_table_string(sample, "expected_discharge_state", path, idx)?;
     require_allowed(
         discharge_state,
@@ -297,14 +337,15 @@ fn validate_sample(
         path,
         "expected_discharge_state",
     )?;
-    check_fixture_obligation_discharge(
+    check_fixture_obligation_evidence_state(
         path,
         idx,
-        fixture,
-        expected_operation_family,
-        expected_hazard,
-        obligation_key,
-        discharge_state,
+        &fixture_obligation,
+        EvidenceStateExpectation {
+            evidence_kind: "discharge",
+            field: "expected_discharge_state",
+            expected_state: discharge_state,
+        },
     )?;
     Ok(())
 }
@@ -319,6 +360,7 @@ fn reject_zero_card_fields(
         "expected_operation_family",
         "expected_hazard",
         "expected_obligation_key",
+        "expected_contract_state",
         "expected_discharge_state",
     ] {
         if sample.contains_key(field) {
@@ -353,61 +395,75 @@ fn compare_optional_sample_field(
     }
 }
 
-fn check_fixture_obligation_discharge(
+fn check_fixture_obligation_evidence_state(
     path: &str,
     idx: usize,
-    fixture: &str,
-    operation_family: &str,
-    hazard: &str,
-    obligation_key: &str,
-    discharge_state: &str,
+    obligation: &FixtureObligation<'_>,
+    expectation: EvidenceStateExpectation<'_>,
 ) -> Result<(), String> {
     let cards_path = super::workspace_path("fixtures")
-        .join(fixture)
+        .join(obligation.fixture)
         .join("expected.cards.json");
     let cards = super::parse_json_file(&cards_path)?;
-    let cards = cards
-        .as_array()
-        .ok_or_else(|| format!("{}/expected.cards.json must contain a JSON array", fixture))?;
+    let cards = cards.as_array().ok_or_else(|| {
+        format!(
+            "{}/expected.cards.json must contain a JSON array",
+            obligation.fixture
+        )
+    })?;
     let mut saw_key = false;
     for card in cards {
         if card
             .get("operation_family")
             .and_then(serde_json::Value::as_str)
-            != Some(operation_family)
-            || !json_array_contains_str(card, "hazards", hazard)
+            != Some(obligation.operation_family)
+            || !json_array_contains_str(card, "hazards", obligation.hazard)
         {
             continue;
         }
         for evidence in super::json_array_at(
             card,
             "/obligation_evidence",
-            &format!("{fixture}/expected.cards.json"),
+            &format!("{}/expected.cards.json", obligation.fixture),
         )? {
-            if evidence.get("key").and_then(serde_json::Value::as_str) != Some(obligation_key) {
+            if evidence.get("key").and_then(serde_json::Value::as_str)
+                != Some(obligation.obligation_key)
+            {
                 continue;
             }
             saw_key = true;
+            let state_pointer = format!("/{}/state", expectation.evidence_kind);
             let actual = evidence
-                .pointer("/discharge/state")
+                .pointer(&state_pointer)
                 .and_then(serde_json::Value::as_str)
                 .ok_or_else(|| {
                     format!(
-                        "{fixture}/expected.cards.json obligation `{obligation_key}` is missing discharge.state"
+                        "{}/expected.cards.json obligation `{}` is missing {}.state",
+                        obligation.fixture, obligation.obligation_key, expectation.evidence_kind
                     )
                 })?;
-            if actual == discharge_state {
+            if actual == expectation.expected_state {
                 return Ok(());
             }
         }
     }
     if saw_key {
         Err(format!(
-            "{path} samples[{idx}] expected_discharge_state `{discharge_state}` was not found for `{operation_family}` / `{hazard}` obligation `{obligation_key}` in `{fixture}`"
+            "{path} samples[{idx}] {} `{}` was not found for `{}` / `{}` obligation `{}` in `{}`",
+            expectation.field,
+            expectation.expected_state,
+            obligation.operation_family,
+            obligation.hazard,
+            obligation.obligation_key,
+            obligation.fixture
         ))
     } else {
         Err(format!(
-            "{path} samples[{idx}] expected_obligation_key `{obligation_key}` was not found for `{operation_family}` / `{hazard}` in `{fixture}`"
+            "{path} samples[{idx}] expected_obligation_key `{}` was not found for `{}` / `{}` in `{}`",
+            obligation.obligation_key,
+            obligation.operation_family,
+            obligation.hazard,
+            obligation.fixture
         ))
     }
 }
@@ -585,6 +641,69 @@ fn require_allowed(value: &str, allowed: &[&str], path: &str, key: &str) -> Resu
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn label_ledger_rejects_wrong_obligation_contract_state() -> Result<(), String> {
+        let ledger = r#"
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "public-unsafe-api-safety-docs-contract-evidence"
+operation_family = "unknown"
+hazard = "unknown"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result."
+
+[[samples]]
+id = "bad-contract-state"
+fixture = "public_unsafe_fn_missing_safety"
+kind = "positive"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+expected_obligation_key = "unknown"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "The fixture intentionally lacks public safety docs, so present contract evidence should be rejected."
+"#
+        .parse::<toml::Table>()
+        .map(toml::Value::Table)
+        .map_err(|err| format!("parse test ledger failed: {err}"))?;
+        let mut cases = BTreeMap::new();
+        cases.insert(
+            "public_unsafe_fn_missing_safety".to_string(),
+            CalibrationFixtureCase {
+                kind: "positive".to_string(),
+                expected_cards: 1,
+                expected_class: Some("contract_missing".to_string()),
+                expected_operation_family: Some("unknown".to_string()),
+                expected_hazard: Some("unknown".to_string()),
+            },
+        );
+        let claim = PolicyClaim {
+            operation_family: Some("unknown".to_string()),
+            hazard: Some("unknown".to_string()),
+            label_ledgers: BTreeSet::new(),
+        };
+
+        let result = validate_label_ledger(
+            "docs/accuracy/labels/test.toml",
+            &ledger,
+            "public-unsafe-api-safety-docs-contract-evidence",
+            &claim,
+            &cases,
+        );
+
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("expected_contract_state")
+        );
+        Ok(())
+    }
 
     #[test]
     fn label_ledger_rejects_wrong_obligation_discharge_state() -> Result<(), String> {
