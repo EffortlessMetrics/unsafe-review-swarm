@@ -41,7 +41,7 @@ owner = "product / cli"
 id = "UNSAFE-REVIEW-SPEC-0024"
 kind = "spec"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-0024-ci-design.md"
-status = "draft"
+status = "accepted"
 owner = "repo-infra"
 
 [[artifact]]

@@ -1,6 +1,6 @@
 # UNSAFE-REVIEW-SPEC-0024: CI design
 
-Status: draft
+Status: accepted
 Owner: repo-infra / ci
 Created: 2026-05-21
 
@@ -1100,9 +1100,9 @@ routine feature work pauses
 sync/ack PR is opened in swarm
 ```
 
-## 20. Promotion rule
+## 20. Lifecycle status
 
-Move CI design from draft to accepted when:
+This spec is accepted because the repository now has:
 
 ```text
 SPEC-0024 exists and is linked from the spec index
