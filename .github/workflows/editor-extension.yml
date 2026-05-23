@@ -1,0 +1,60 @@
+name: editor-extension
+
+on:
+  pull_request:
+    paths:
+      - "editors/vscode/**"
+      - ".github/workflows/editor-extension.yml"
+      - "policy/workflow-allowlist.toml"
+      - "policy/ci-lane-whitelist.toml"
+  push:
+    branches: [main, master]
+    paths:
+      - "editors/vscode/**"
+      - ".github/workflows/editor-extension.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  package:
+    name: editor extension packaging
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: editors/vscode
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+
+      - name: Install extension dependencies
+        run: npm ci
+
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Run extension unit tests
+        run: npm test
+
+      - name: Package VSIX
+        run: npx --yes @vscode/vsce@^2.32.0 package --out ../../target/unsafe-review-vscode.vsix --allow-missing-repository
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: unsafe-review-vscode
+          path: target/unsafe-review-vscode.vsix
+          if-no-files-found: error

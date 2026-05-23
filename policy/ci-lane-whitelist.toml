@@ -69,3 +69,13 @@ cost_estimate = "medium"
 trigger_policy = "workflow_run or explicit trusted dispatch only after design acceptance"
 status = "deferred"
 review_after = "2026-07-01"
+
+[[lane]]
+id = "editor-extension-packaging"
+owner = "editor/extension"
+intent = "Compile, test, and package the read-only saved-lsp viewer extension as a VSIX without publishing"
+proof_obligation = "npm install, TypeScript compile, unit tests, and vsce package succeed and produce a VSIX artifact without witness execution, source edits, comment posting, marketplace publication, or write permissions"
+cost_estimate = "low"
+trigger_policy = "pull_request(paths: editors/vscode/**), push(main), workflow_dispatch"
+status = "advisory"
+review_after = "2026-07-23"
