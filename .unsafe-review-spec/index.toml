@@ -34,7 +34,7 @@ linked_proposal = "UNSAFE-REVIEW-PROP-0002"
 id = "UNSAFE-REVIEW-SPEC-0023"
 kind = "spec"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-0023-first-hour-experience.md"
-status = "draft"
+status = "accepted"
 owner = "product / cli"
 
 [[artifact]]
@@ -62,8 +62,15 @@ owner = "calibration"
 id = "UNSAFE-REVIEW-SPEC-0021"
 kind = "spec"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-0021-vscode-openvsx-extension.md"
-status = "proposed"
+status = "accepted"
 owner = "editor/extension"
+
+[[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0022"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0022-pr-commenting-experience.md"
+status = "accepted"
+owner = "core/spec"
 
 [[artifact]]
 id = "UNSAFE-REVIEW-ADR-0007"

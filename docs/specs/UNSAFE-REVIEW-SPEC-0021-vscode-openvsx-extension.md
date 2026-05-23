@@ -1,8 +1,8 @@
 # UNSAFE-REVIEW-SPEC-0021: VS Code and Open VSX editor extension
 
-Status: proposed  
-Owner: editor/extension  
-Created: 2026-05-21  
+Status: accepted, partial-runtime
+Owner: editor/extension
+Created: 2026-05-21
 Linked specs:
 - UNSAFE-REVIEW-SPEC-0012-lsp-editor-projection.md
 - UNSAFE-REVIEW-SPEC-0018-live-lsp-server.md

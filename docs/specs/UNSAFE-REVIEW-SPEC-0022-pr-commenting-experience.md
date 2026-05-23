@@ -1,6 +1,6 @@
 # UNSAFE-REVIEW-SPEC-0022: PR commenting experience
 
-Status: draft
+Status: accepted
 Owner: core/spec
 Created: 2026-05-21
 Linked specs:

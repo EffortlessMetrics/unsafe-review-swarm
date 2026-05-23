@@ -1,6 +1,6 @@
 # UNSAFE-REVIEW-SPEC-0023: First-hour experience
 
-Status: draft
+Status: accepted
 Owner: product / cli
 Created: 2026-05-21
 
