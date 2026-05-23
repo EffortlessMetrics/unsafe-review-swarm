@@ -4,6 +4,8 @@ Claim-scoped label ledgers live here.
 
 Current ledgers:
 
+- `atomic-pointer-state-witness-routes.toml`: fixture-pinned route-quality
+  labels for atomic pointer state Loom/Shuttle witness routing.
 - `box-from-raw-ownership.toml`: fixture-pinned obligation-level labels for
   `Box::from_raw` ownership evidence.
 - `drop-in-place-box-origin.toml`: fixture-pinned obligation-level labels for

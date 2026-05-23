@@ -1,0 +1,27 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "atomic-pointer-state-witness-routes"
+operation_family = "atomic_pointer_state"
+hazard = "atomic_ordering"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard witness routing behavior; they are not a proof of memory safety, not UB-free status,
+and not a Miri result.
+"""
+
+[[samples]]
+id = "atomic-pointer-state-swap-routes-loom-shuttle"
+fixture = "atomic_pointer_state_swap"
+kind = "positive"
+expected_cards = 1
+expected_class = "requires_loom"
+expected_operation_family = "atomic_pointer_state"
+expected_hazard = "atomic_ordering"
+expected_obligation_key = "ordering"
+expected_contract_state = "missing"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["loom", "shuttle"]
+label_source = "fixture_golden"
+rationale = "Atomic pointer state changes should route to Loom/Shuttle interleaving review for ordering and ownership invariants."

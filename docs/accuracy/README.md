@@ -32,8 +32,8 @@ The current fixture-pinned slices are:
   lengths, and reassigned origins.
 - Raw pointer write initialized evidence: checks whether the `initialized`
   obligation is discharged by `u8`, guarded `bool`, or `MaybeUninit` targets,
-  while rejecting stale, closed-branch, wrong-target, and previous-operation
-  controls.
+  while rejecting stale, closed-branch, wrong-target, previous-operation, and
+  stale-slice controls.
 - `slice::from_raw_parts_mut` initialized-memory evidence: checks whether
   `MaybeUninit` element slices discharge the initialized-memory obligation,
   while rejecting unrelated `MaybeUninit` mentions and keeping pointer,
@@ -86,6 +86,9 @@ The current fixture-pinned slices are:
 - Static mutable global-state routing: checks that `static mut` synchronization
   and aliasing invariants route to Loom/Shuttle interleaving witnesses without
   implying those witnesses ran.
+- Atomic pointer state routing: checks that atomic pointer state transitions,
+  ownership invariants, and ordering obligations route to Loom/Shuttle
+  interleaving witnesses without implying those witnesses ran.
 - Target-feature human-review routing: checks that documented
   `#[target_feature]` caller-contract sites route to human deep review for
   hardware availability and dispatch correctness without implying witness proof.

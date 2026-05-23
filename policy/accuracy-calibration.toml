@@ -332,6 +332,7 @@ fixtures = [
   "raw_pointer_write_previous_u8_not_guard",
   "raw_pointer_write_previous_bool_not_guard",
   "raw_pointer_write_previous_maybeuninit_not_guard",
+  "raw_pointer_write_previous_slice_not_guard",
   "raw_pointer_write_other_u8_not_guard",
   "raw_pointer_write_maybeuninit",
   "raw_pointer_write_other_maybeuninit_not_guard",
@@ -344,7 +345,8 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned raw pointer write initialized evidence distinguishes u8, guarded
 bool, and MaybeUninit target evidence from stale, closed-branch, wrong-target,
-and previous-operation controls in the listed fixtures.
+and previous-operation controls, including stale slice writes, in the listed
+fixtures.
 """
 forbidden_claims = [
   "broad raw pointer write safety",
@@ -1003,6 +1005,36 @@ forbidden_claims = [
   "static mutable state soundness proof",
   "synchronization proof",
   "aliasing proof",
+  "witness execution proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
+id = "atomic-pointer-state-witness-routes"
+status = "fixture_pinned"
+kind = "route_quality"
+owner = "calibration"
+operation_family = "atomic_pointer_state"
+hazard = "atomic_ordering"
+support_tier = "Witness routing"
+fixtures = [
+  "atomic_pointer_state_swap",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/atomic-pointer-state-witness-routes.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned atomic pointer state witness routing sends pointer state
+transition, ownership, and ordering invariants to Loom/Shuttle route
+suggestions in the listed fixture.
+"""
+forbidden_claims = [
+  "atomic ordering correctness proof",
+  "ownership proof",
   "witness execution proof",
   "global precision",
   "global recall",

@@ -103,6 +103,19 @@ label_source = "fixture_golden"
 rationale = "Initialized evidence from an earlier MaybeUninit-backed write does not apply to a later write through a different pointer."
 
 [[samples]]
+id = "raw-pointer-write-previous-slice-not-guard"
+fixture = "raw_pointer_write_previous_slice_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Initialized evidence from an earlier slice write does not apply to a later write through a different pointer."
+
+[[samples]]
 id = "raw-pointer-write-other-u8-not-guard"
 fixture = "raw_pointer_write_other_u8_not_guard"
 kind = "false_positive_control"
