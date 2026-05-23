@@ -114,9 +114,9 @@ The current fixture-pinned slices are:
   functions, macro bodies, and nested unsafe calls keep stable owner/site-kind
   identity and do not introduce wrapper or fallback duplicates.
 - `NonNull::new_unchecked` nullability evidence: checks whether the `non-null`
-  obligation is discharged by a same-pointer `NonNull::new` guard, while
-  rejecting wrong-pointer, observed-only, non-returning `is_null`, and
-  post-check controls.
+  obligation is discharged by a same-pointer `NonNull::new` guard, including
+  if-let and let-else forms, while rejecting wrong-pointer, observed-only,
+  non-returning `is_null`, post-check, and stale-pointer controls.
 - `Pin::new_unchecked` human-review routing: checks that pinning move-prevention
   and projection invariants route to human deep review without implying an
   executable witness ran.

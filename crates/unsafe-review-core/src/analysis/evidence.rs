@@ -3514,6 +3514,8 @@ fn has_nullability_guard(site: &ScannedSite, lower: &str) -> bool {
             .unwrap_or_else(|| lower.to_string());
         let guard_compact = compact_code(&guard_scope);
         return has_nonnull_new_question_mark_guard(&guard_compact, &arg)
+            || has_nonnull_new_if_let_guard(&guard_compact, &arg)
+            || has_nonnull_new_let_else_guard(&guard_compact, &arg)
             || has_null_early_return_guard(&guard_compact, &arg);
     }
     lower.contains("is_null") || compact.contains("nonnull::new(")
@@ -3521,6 +3523,69 @@ fn has_nullability_guard(site: &ScannedSite, lower: &str) -> bool {
 
 fn has_nonnull_new_question_mark_guard(compact: &str, arg: &str) -> bool {
     compact.contains(&format!("nonnull::new({arg})?"))
+}
+
+fn has_nonnull_new_if_let_guard(compact: &str, arg: &str) -> bool {
+    let marker = format!("=nonnull::new({arg}){{");
+    let mut cursor = compact;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(&marker) {
+        let marker_start = offset + pos;
+        let proof_end = marker_start + marker.len();
+        if ends_with_some_pattern(&compact[..marker_start], "iflet") {
+            let after_guard = &compact[proof_end..];
+            if branch_still_open_at_operation(after_guard)
+                && !contains_simple_assignment_to(after_guard, arg)
+            {
+                return true;
+            }
+        }
+        let next = pos + marker.len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
+}
+
+fn has_nonnull_new_let_else_guard(compact: &str, arg: &str) -> bool {
+    let marker = format!("=nonnull::new({arg})else{{");
+    let mut cursor = compact;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(&marker) {
+        let marker_start = offset + pos;
+        let proof_start = marker_start + marker.len();
+        if ends_with_some_pattern(&compact[..marker_start], "let") {
+            let after_guard = &compact[proof_start..];
+            let (guard_body, after_guard_body) = after_guard
+                .split_once('}')
+                .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
+            if guard_body.contains("return")
+                && !contains_simple_assignment_to(after_guard_body, arg)
+            {
+                return true;
+            }
+        }
+        let next = pos + marker.len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
+}
+
+fn ends_with_some_pattern(before_marker: &str, keyword: &str) -> bool {
+    let prefix = format!("{keyword}some(");
+    let Some(pattern_start) = before_marker.rfind(&prefix) else {
+        return false;
+    };
+    let binding_with_close = &before_marker[pattern_start + prefix.len()..];
+    let Some(binding) = binding_with_close.strip_suffix(')') else {
+        return false;
+    };
+    !binding.is_empty()
+        && (binding == "_"
+            || binding
+                .chars()
+                .all(|ch| ch == '_' || ch.is_ascii_alphanumeric()))
 }
 
 fn has_null_early_return_guard(compact: &str, arg: &str) -> bool {
@@ -4027,9 +4092,36 @@ mod tests {
             "NonNull::new_unchecked(ptr)",
             vec![],
         );
+        let if_let_guard = site_with_family(
+            OperationFamily::NonNullUnchecked,
+            vec!["if let Some(_) = NonNull::new(ptr) {"],
+            "NonNull::new_unchecked(ptr)",
+            vec!["}"],
+        );
+        let let_else_guard = site_with_family(
+            OperationFamily::NonNullUnchecked,
+            vec!["let Some(_) = NonNull::new(ptr) else { return None; };"],
+            "NonNull::new_unchecked(ptr)",
+            vec![],
+        );
         let other_guard = site_with_family(
             OperationFamily::NonNullUnchecked,
             vec!["NonNull::new(other)?;"],
+            "NonNull::new_unchecked(ptr)",
+            vec![],
+        );
+        let stale_if_let_guard = site_with_family(
+            OperationFamily::NonNullUnchecked,
+            vec!["if let Some(_) = NonNull::new(ptr) {", "ptr = other;"],
+            "NonNull::new_unchecked(ptr)",
+            vec!["}"],
+        );
+        let stale_let_else_guard = site_with_family(
+            OperationFamily::NonNullUnchecked,
+            vec![
+                "let Some(_) = NonNull::new(ptr) else { return None; };",
+                "ptr = other;",
+            ],
             "NonNull::new_unchecked(ptr)",
             vec![],
         );
@@ -4052,7 +4144,27 @@ mod tests {
                 .present
         );
         assert!(
+            obligation_evidence(&if_let_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            obligation_evidence(&let_else_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
             !obligation_evidence(&other_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&stale_if_let_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&stale_let_else_guard, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
         );

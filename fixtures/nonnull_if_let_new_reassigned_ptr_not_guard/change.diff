@@ -1,0 +1,18 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,14 @@
++use core::ptr::NonNull;
++
++pub fn expose_nonnull_after_stale_if_let(
++    mut ptr: *mut u8,
++    other: *mut u8,
++) -> Option<NonNull<u8>> {
++    if let Some(_) = NonNull::new(ptr) {
++        ptr = other;
++        // SAFETY: this fixture intentionally changes the checked pointer before use.
++        Some(unsafe { NonNull::new_unchecked(ptr) })
++    } else {
++        None
++    }
++}

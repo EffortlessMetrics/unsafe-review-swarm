@@ -1,0 +1,24 @@
+use core::ptr::NonNull;
+
+pub fn expose_nonnull_after_stale_if_let(
+    mut ptr: *mut u8,
+    other: *mut u8,
+) -> Option<NonNull<u8>> {
+    if let Some(_) = NonNull::new(ptr) {
+        ptr = other;
+        // SAFETY: this fixture intentionally changes the checked pointer before use.
+        Some(unsafe { NonNull::new_unchecked(ptr) })
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::expose_nonnull_after_stale_if_let;
+
+    #[test]
+    fn mentions_expose_nonnull_after_stale_if_let() {
+        let _ = stringify!(expose_nonnull_after_stale_if_let);
+    }
+}

@@ -229,10 +229,14 @@ required_core_fixtures = [
   "unchecked_constructor_availability_observed_not_guard",
   "unchecked_constructor_availability_closed_branch_not_guard",
   "nonnull_new_guard",
+  "nonnull_if_let_new_guard",
+  "nonnull_let_else_new_guard",
   "nonnull_other_guard_not_evidence",
   "nonnull_is_null_nonreturning_not_guard",
   "nonnull_observed_not_guard",
   "nonnull_post_check_not_guard",
+  "nonnull_if_let_new_reassigned_ptr_not_guard",
+  "nonnull_let_else_new_reassigned_ptr_not_guard",
   "impl_trait_bound_owner_inference",
   "long_unsafe_fn_owner_inference",
   "macro_rules_owner_inference",
@@ -2493,6 +2497,26 @@ expected_operation_family = "nonnull_unchecked"
 expected_hazard = "pointer_validity"
 
 [[cases]]
+fixture = "nonnull_if_let_new_guard"
+kind = "positive"
+claim = "if-let NonNull::new evidence discharges the non-null obligation for NonNull::new_unchecked"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "nonnull_let_else_new_guard"
+kind = "positive"
+claim = "let-else NonNull::new evidence discharges the non-null obligation for NonNull::new_unchecked"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+
+[[cases]]
 fixture = "nonnull_other_guard_not_evidence"
 kind = "false_positive_control"
 claim = "NonNull::new evidence for a different pointer does not discharge the non-null obligation"
@@ -2526,6 +2550,26 @@ expected_hazard = "pointer_validity"
 fixture = "nonnull_post_check_not_guard"
 kind = "false_positive_control"
 claim = "same-pointer nullability evidence after NonNull::new_unchecked does not discharge the non-null obligation"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "nonnull_if_let_new_reassigned_ptr_not_guard"
+kind = "false_positive_control"
+claim = "if-let NonNull::new evidence does not discharge the non-null obligation after the checked pointer is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "nonnull_let_else_new_reassigned_ptr_not_guard"
+kind = "false_positive_control"
+claim = "let-else NonNull::new evidence does not discharge the non-null obligation after the checked pointer is reassigned"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

@@ -25,6 +25,32 @@ label_source = "fixture_golden"
 rationale = "A same-pointer NonNull::new question-mark guard discharges the non-null obligation before NonNull::new_unchecked."
 
 [[samples]]
+id = "nonnull-if-let-new-guard-present"
+fixture = "nonnull_if_let_new_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "non-null"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A same-pointer if-let NonNull::new branch that contains NonNull::new_unchecked discharges the non-null obligation."
+
+[[samples]]
+id = "nonnull-let-else-new-guard-present"
+fixture = "nonnull_let_else_new_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "non-null"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A same-pointer let-else NonNull::new early return before NonNull::new_unchecked discharges the non-null obligation."
+
+[[samples]]
 id = "nonnull-other-guard-not-evidence"
 fixture = "nonnull_other_guard_not_evidence"
 kind = "false_positive_control"
@@ -75,3 +101,29 @@ expected_obligation_key = "non-null"
 expected_discharge_state = "missing"
 label_source = "fixture_golden"
 rationale = "A nullability check after NonNull::new_unchecked does not discharge evidence needed before construction."
+
+[[samples]]
+id = "nonnull-if-let-new-reassigned-ptr-not-guard"
+fixture = "nonnull_if_let_new_reassigned_ptr_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "non-null"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "If-let NonNull::new evidence becomes stale when the checked pointer is reassigned before NonNull::new_unchecked."
+
+[[samples]]
+id = "nonnull-let-else-new-reassigned-ptr-not-guard"
+fixture = "nonnull_let_else_new_reassigned_ptr_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "non-null"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Let-else NonNull::new evidence becomes stale when the checked pointer is reassigned before NonNull::new_unchecked."

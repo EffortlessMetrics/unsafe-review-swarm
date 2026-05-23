@@ -1,0 +1,13 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,9 @@
++use core::ptr::NonNull;
++
++pub fn expose_nonnull_after_let_else(ptr: *mut u8) -> Option<NonNull<u8>> {
++    let Some(_) = NonNull::new(ptr) else {
++        return None;
++    };
++    // SAFETY: NonNull::new returned early on null, so ptr is non-null.
++    Some(unsafe { NonNull::new_unchecked(ptr) })
++}
