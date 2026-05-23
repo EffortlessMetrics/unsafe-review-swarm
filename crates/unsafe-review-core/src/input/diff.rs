@@ -94,7 +94,6 @@ impl DiffParserState {
     }
 }
 
-
 pub(crate) fn parse_unified_diff(input: &str) -> DiffIndex {
     let mut parser = DiffParserState::default();
 
@@ -208,7 +207,6 @@ index 1111111..2222222 100644
         assert!(!index.contains_near(&path, 28));
         assert!(!index.contains_near(&PathBuf::from("src/other.rs"), 21));
     }
-
 
     #[test]
     fn parse_unified_diff_counts_added_lines_that_start_with_plus_markers() {
