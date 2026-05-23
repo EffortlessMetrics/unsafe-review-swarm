@@ -214,6 +214,8 @@ trust_boundary
 
 `line` must be one-based and nonzero.
 
+Planned comments must not repeat a `card_id` or a `path`/`line` inline anchor.
+
 Each body must include the trust boundary.
 
 #### 3.5 `witness-plan.md`

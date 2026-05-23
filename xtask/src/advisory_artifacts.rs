@@ -122,6 +122,8 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             comments.len()
         ));
     }
+    let mut comment_card_ids = BTreeSet::new();
+    let mut comment_locations = BTreeSet::new();
     for comment in comments {
         let Some(card_id) = comment.get("card_id").and_then(serde_json::Value::as_str) else {
             return Err("comment-plan.json comment is missing card_id".to_string());
@@ -129,6 +131,11 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         if !card_ids.contains(card_id) {
             return Err(format!(
                 "comment-plan.json references unknown card id `{card_id}`"
+            ));
+        }
+        if !comment_card_ids.insert(card_id.to_string()) {
+            return Err(format!(
+                "comment-plan.json repeats card id `{card_id}` in planned comments"
             ));
         }
         let Some(path) = comment.get("path").and_then(serde_json::Value::as_str) else {
@@ -142,6 +149,12 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         };
         if line == 0 {
             return Err("comment-plan.json comment line must be one-based".to_string());
+        }
+        let location_key = (path.to_string(), line);
+        if !comment_locations.insert(location_key) {
+            return Err(format!(
+                "comment-plan.json repeats inline location `{path}:{line}` in planned comments"
+            ));
         }
         super::json_array_at(comment, "/witness_routes", "comment-plan.json comment")?;
         super::json_array_at(comment, "/verify_commands", "comment-plan.json comment")?;

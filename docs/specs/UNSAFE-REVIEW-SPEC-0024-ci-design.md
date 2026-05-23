@@ -562,6 +562,7 @@ result counts stay internally consistent
 comment-plan is plan-only
 comment-plan has <= 3 candidates
 comment-plan references known cards
+comment-plan has no duplicate card IDs or duplicate path/line anchors
 comment-plan has renderable line/path fields
 comment-plan carries structured next action, actionability, and witness route fields
 comment-plan includes trust boundary

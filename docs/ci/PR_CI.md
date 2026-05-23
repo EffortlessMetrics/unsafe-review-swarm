@@ -147,6 +147,7 @@ The comment-plan contract is intentionally narrow:
 - at most three planned comments,
 - changed lines only,
 - high-confidence actionable cards only,
+- no duplicate card IDs or duplicate inline anchors,
 - no `static_unknown`, baseline-known, or suppressed cards,
 - no posting by default.
 

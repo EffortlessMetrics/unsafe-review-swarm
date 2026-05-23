@@ -129,6 +129,7 @@ The poster must not rerun analysis truth, run witness tools, edit source, or pos
 - over max comments
 - missing required fields
 - invalid/unknown `card_id`
+- duplicate `card_id` or duplicate `path`/`line` inline anchors
 - invalid line/path
 - missing `next_action`, `selection_reason`, `actionability`, or candidate
   `trust_boundary`
@@ -137,8 +138,8 @@ The poster must not rerun analysis truth, run witness tools, edit source, or pos
 - forbidden overclaim wording
 - forbidden classes (`static_unknown`, `baseline_known`, suppressed)
 
-Future hardening should also reject missing relevance metadata, duplicates, and
-overlong bodies.
+Future hardening should also reject missing relevance metadata and overlong
+bodies.
 
 ## 11. Acceptance examples
 
