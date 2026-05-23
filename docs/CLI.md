@@ -118,7 +118,7 @@ findings independently.
 | `markdown` | `unsafe-review check --diff change.diff --format markdown` | local report with operation and next-action context |
 | `pr-summary` | `unsafe-review check --base origin/main --format pr-summary --out target/unsafe-review/pr-summary.md` | sparse reviewer-facing PR artifact |
 | `sarif` | `unsafe-review check --base origin/main --format sarif --out target/unsafe-review/cards.sarif` | code-scanning-compatible artifact |
-| `comment-plan` | `unsafe-review check --base origin/main --format comment-plan --out target/unsafe-review/comment-plan.json` | artifact-only inline comment candidates with card ID, operation, routes, and verify commands |
+| `comment-plan` | `unsafe-review check --base origin/main --format comment-plan --out target/unsafe-review/comment-plan.json` | artifact-only inline comment candidates with card ID, operation, next action, actionability, routes, and verify commands |
 | `lsp` | `unsafe-review check --base origin/main --format lsp --out target/unsafe-review/lsp.json` | saved editor diagnostics and hovers |
 | `witness-plan` | `unsafe-review check --base origin/main --format witness-plan --out target/unsafe-review/witness-plan.md` | reviewer-facing witness route plan |
 
@@ -127,7 +127,8 @@ operation family, operation expression, obligation evidence, witness route, next
 action, verify commands, and trust boundary without executing witnesses.
 
 `comment-plan` is plan-only. It carries the concrete ReviewCard operation
-expression for each planned comment and does not post comments. When no changed
+expression, next action, actionability, routes, and verify commands for each
+planned comment and does not post comments. When no changed
 unsafe-review gaps are found, `comments` is empty and the artifact includes a
 `no_changed_gaps` message with the same no-proof limitation used by the terminal
 and Markdown surfaces.

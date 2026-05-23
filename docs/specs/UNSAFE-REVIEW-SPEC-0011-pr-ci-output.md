@@ -201,8 +201,13 @@ line
 class
 priority
 confidence
+operation
 operation_family
+next_action
+witness_routes
+verify_commands
 selection_reason
+actionability
 body
 trust_boundary
 ```

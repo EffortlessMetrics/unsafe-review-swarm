@@ -4,7 +4,7 @@ use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
 use crate::util::path_display;
 use serde::Serialize;
 
-use super::selection::{comment_body, selection_reason, should_plan_comment};
+use super::selection::{actionability, comment_body, selection_reason, should_plan_comment};
 
 const MAX_PLANNED_COMMENTS: usize = 3;
 pub(super) const TRUST_BOUNDARY: &str = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.";
@@ -61,8 +61,11 @@ pub(super) struct PlannedComment {
     operation: String,
     operation_family: &'static str,
     witness_routes: Vec<PlannedWitnessRoute>,
+    next_action: String,
     verify_commands: Vec<String>,
     selection_reason: &'static str,
+    actionability: &'static str,
+    trust_boundary: &'static str,
     body: String,
 }
 
@@ -78,8 +81,11 @@ impl From<&ReviewCard> for PlannedComment {
             operation: card.operation.expression.clone(),
             operation_family: card.operation.family.as_str(),
             witness_routes: card.routes.iter().map(PlannedWitnessRoute::from).collect(),
+            next_action: card.next_action.summary.clone(),
             verify_commands: card.next_action.verify_commands.clone(),
             selection_reason: selection_reason(card),
+            actionability: actionability(card),
+            trust_boundary: TRUST_BOUNDARY,
             body: comment_body(card),
         }
     }

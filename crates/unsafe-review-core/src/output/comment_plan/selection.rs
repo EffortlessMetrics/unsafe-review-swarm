@@ -1,4 +1,4 @@
-use crate::domain::{Confidence, Priority, ReviewCard};
+use crate::domain::{Confidence, Priority, ReviewCard, ReviewClass};
 
 const PLAN_BOUNDARY: &str = "Plan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision.";
 
@@ -13,6 +13,23 @@ pub(super) fn selection_reason(card: &ReviewCard) -> &'static str {
         "actionable high-confidence review card"
     } else {
         "actionable high-priority review card"
+    }
+}
+
+pub(super) fn actionability(card: &ReviewCard) -> &'static str {
+    match &card.class {
+        ReviewClass::GuardMissing => "specific_guard_missing",
+        ReviewClass::ContractMissing => "specific_contract_missing",
+        ReviewClass::GuardedUnwitnessed
+        | ReviewClass::ReachableUnwitnessed
+        | ReviewClass::RequiresLoom
+        | ReviewClass::RequiresSanitizer
+        | ReviewClass::RequiresKaniOrCrux
+        | ReviewClass::MiriUnsupported => "specific_witness_missing",
+        ReviewClass::WitnessMismatch => "specific_receipt_missing",
+        ReviewClass::UnsafeUnreached => "specific_reach_missing",
+        ReviewClass::StaticUnknown => "human_review_only",
+        _ => "not_actionable",
     }
 }
 

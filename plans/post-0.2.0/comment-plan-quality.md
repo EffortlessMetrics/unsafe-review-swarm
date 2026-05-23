@@ -12,7 +12,8 @@ plan without enabling automatic comment posting by default.
 ## Work item ladder
 
 1. Keep generated comment plans capped at three candidates.
-2. Add selection reasons and actionability metadata to every candidate.
+2. Add structured next actions, selection reasons, actionability metadata, and
+   candidate trust boundaries to every candidate.
 3. Reject duplicate card IDs, duplicate lines, and unsupported classes in the
    artifact verifier.
 4. Add fixture-backed examples for selected and not-selected cards.

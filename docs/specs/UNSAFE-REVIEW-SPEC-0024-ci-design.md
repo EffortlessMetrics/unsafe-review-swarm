@@ -563,6 +563,7 @@ comment-plan is plan-only
 comment-plan has <= 3 candidates
 comment-plan references known cards
 comment-plan has renderable line/path fields
+comment-plan carries structured next action, actionability, and witness route fields
 comment-plan includes trust boundary
 witness-plan includes route limits
 lsp.json contains read-only projections

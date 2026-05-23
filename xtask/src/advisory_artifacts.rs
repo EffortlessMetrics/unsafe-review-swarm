@@ -154,6 +154,43 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
                     .to_string(),
             );
         }
+        let class_name =
+            super::require_non_empty_json_str(comment, "class", "comment-plan.json comment")?;
+        if matches!(
+            class_name,
+            "static_unknown" | "baseline_known" | "suppressed"
+        ) {
+            return Err(format!(
+                "comment-plan.json comment class `{class_name}` must not be selected for inline comments"
+            ));
+        }
+        super::require_non_empty_json_str(comment, "priority", "comment-plan.json comment")?;
+        super::require_non_empty_json_str(comment, "confidence", "comment-plan.json comment")?;
+        super::require_non_empty_json_str(comment, "operation", "comment-plan.json comment")?;
+        super::require_non_empty_json_str(
+            comment,
+            "operation_family",
+            "comment-plan.json comment",
+        )?;
+        let next_action =
+            super::require_non_empty_json_str(comment, "next_action", "comment-plan.json comment")?;
+        super::require_non_empty_json_str(
+            comment,
+            "selection_reason",
+            "comment-plan.json comment",
+        )?;
+        super::require_non_empty_json_str(comment, "actionability", "comment-plan.json comment")?;
+        let comment_boundary = comment
+            .get("trust_boundary")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| "comment-plan.json comment is missing trust_boundary".to_string())?;
+        super::require_boundary_text(comment_boundary, "comment-plan.json comment")?;
+        if !body.contains(next_action) {
+            return Err(
+                "comment-plan.json comment body must include the structured next_action"
+                    .to_string(),
+            );
+        }
     }
     let comment_boundary = comment_plan
         .get("trust_boundary")

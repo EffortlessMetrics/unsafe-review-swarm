@@ -59,7 +59,8 @@ The goal is reviewer leverage, not commenting on every card.
 Each selected candidate includes required fields:
 
 - `card_id`, `path`, `line`
-- `operation_family`, `class`, `priority`, `confidence`
+- `operation`, `operation_family`, `class`, `priority`, `confidence`
+- `next_action`, `witness_routes`, `verify_commands`
 - `selection_reason`, `actionability`
 - `body`, `trust_boundary`
 
@@ -84,6 +85,7 @@ Actionability values:
 - `specific_contract_missing`
 - `specific_witness_missing`
 - `specific_receipt_missing`
+- `specific_reach_missing`
 - `specific_repair_available`
 - `human_review_only`
 - `not_actionable`
@@ -128,11 +130,15 @@ The poster must not rerun analysis truth, run witness tools, edit source, or pos
 - missing required fields
 - invalid/unknown `card_id`
 - invalid line/path
+- missing `next_action`, `selection_reason`, `actionability`, or candidate
+  `trust_boundary`
+- body text that drifts from the structured `next_action`
 - missing trust boundary in body
 - forbidden overclaim wording
 - forbidden classes (`static_unknown`, `baseline_known`, suppressed)
 
-Future hardening should also reject missing `selection_reason`, `actionability`, or relevance metadata, duplicates, and overlong bodies.
+Future hardening should also reject missing relevance metadata, duplicates, and
+overlong bodies.
 
 ## 11. Acceptance examples
 

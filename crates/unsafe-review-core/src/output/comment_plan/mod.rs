@@ -27,6 +27,24 @@ mod tests {
             "unsafe { ptr.cast::<Header>().read() }"
         );
         assert_eq!(value["comments"][0]["operation_family"], "raw_pointer_read");
+        assert_eq!(
+            value["comments"][0]["next_action"],
+            "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation."
+        );
+        assert_eq!(
+            value["comments"][0]["selection_reason"],
+            "actionable high-priority review card"
+        );
+        assert_eq!(
+            value["comments"][0]["actionability"],
+            "specific_guard_missing"
+        );
+        assert!(
+            value["comments"][0]["trust_boundary"]
+                .as_str()
+                .unwrap_or("")
+                .contains("not UB-free status")
+        );
         assert_eq!(value["comments"][0]["witness_routes"][0]["kind"], "miri");
         assert!(
             value["comments"][0]["verify_commands"][0]
