@@ -444,7 +444,18 @@ fn badges(root: &Path, out: &Path) -> Result<(), String> {
         .map_err(|err| format!("write badge failed: {err}"))?;
     fs::write(out.join("unsafe-review-plus.json"), plus)
         .map_err(|err| format!("write badge failed: {err}"))?;
-    println!("wrote badges to {}", out.display());
+    println!("wrote:");
+    println!("  {}", out.join("unsafe-review.json").display());
+    println!("  {}", out.join("unsafe-review-plus.json").display());
+    println!();
+    println!("next:");
+    println!("  git add {}", out.display());
+    println!("  add Shields endpoint badges for your own OWNER/REPO/BRANCH");
+    println!();
+    println!("trust boundary:");
+    println!(
+        "  badge JSON counts unsafe-review gaps; it is not safety, UB-free, or Miri-clean status."
+    );
     Ok(())
 }
 
