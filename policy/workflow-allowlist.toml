@@ -51,3 +51,17 @@ actions = [
 reason = "Editor extension packaging workflow. It installs npm dependencies, compiles TypeScript, runs unit tests, packages a VSIX for the read-only saved-lsp viewer, and uploads it as an artifact without publishing, witness execution, source edits, comment posting, or write permissions."
 created = "2026-05-23"
 review_after = "2026-07-23"
+
+[[workflow]]
+id = "workflow-0006"
+path = ".github/workflows/coverage.yml"
+permissions = "contents: read"
+actions = [
+  "actions/checkout@v6",
+  "dtolnay/rust-toolchain@1.95.0",
+  "codecov/codecov-action@v5",
+  "actions/upload-artifact@v7",
+]
+reason = "Advisory cargo-llvm-cov + Codecov telemetry workflow. It uploads LCOV as execution-surface telemetry without threshold gating, without PR comment posting, without witness execution, without coverage-based blocking, and without claiming memory safety, UB-free status, Miri-clean status, or site-execution proof."
+created = "2026-05-23"
+review_after = "2026-08-23"
