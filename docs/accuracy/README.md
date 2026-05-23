@@ -15,6 +15,10 @@ The current fixture-pinned slices are:
   obligation is discharged by visible initialization, shrink, zero-clear, or
   call-result patterns, while rejecting capacity-only, post-init, and unrelated
   initialization controls.
+- `MaybeUninit::assume_init` family initialized-memory evidence: checks that
+  `assume_init`, `assume_init_read`, `assume_init_ref`, `assume_init_mut`, and
+  `assume_init_drop` report missing initialized evidence and route to
+  Miri/cargo-careful witness suggestions.
 - `transmute::<u8, bool>` / `transmute_copy::<u8, bool>` valid-value evidence:
   checks whether the `valid-value` obligation is discharged by dominating
   bool-domain or invalid-byte early-return guards, while rejecting layout-only,

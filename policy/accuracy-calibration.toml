@@ -132,6 +132,39 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "maybeuninit-assume-init-initialized-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "maybe_uninit_assume_init"
+hazard = "initialized_memory"
+support_tier = "Core operation smoke slice"
+fixtures = [
+  "maybeuninit_assume_init",
+  "maybeuninit_assume_init_read",
+  "maybeuninit_assume_init_ref",
+  "maybeuninit_assume_init_mut",
+  "maybeuninit_assume_init_drop",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/maybeuninit-assume-init-initialized.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned MaybeUninit::assume_init family evidence reports missing
+initialized-memory discharge and routes the listed fixtures to Miri/cargo-careful
+witness suggestions.
+"""
+forbidden_claims = [
+  "broad MaybeUninit soundness",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+  "Miri-clean",
+]
+
+[[claim]]
 id = "transmute-bool-valid-value-evidence"
 status = "fixture_pinned"
 kind = "evidence_precision"

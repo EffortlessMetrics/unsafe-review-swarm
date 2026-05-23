@@ -1,0 +1,81 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "maybeuninit-assume-init-initialized-evidence"
+operation_family = "maybe_uninit_assume_init"
+hazard = "initialized_memory"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard initialized-memory evidence behavior; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "maybeuninit-assume-init-missing-initialized"
+fixture = "maybeuninit_assume_init"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "maybe_uninit_assume_init"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A bare MaybeUninit::assume_init does not prove the value has been initialized and valid."
+
+[[samples]]
+id = "maybeuninit-assume-init-read-missing-initialized"
+fixture = "maybeuninit_assume_init_read"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "maybe_uninit_assume_init"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "MaybeUninit::assume_init_read is classified as initialized-memory evidence, not a generic unsafe function call."
+
+[[samples]]
+id = "maybeuninit-assume-init-ref-missing-initialized"
+fixture = "maybeuninit_assume_init_ref"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "maybe_uninit_assume_init"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "MaybeUninit::assume_init_ref requires initialized-memory evidence before exposing a shared reference."
+
+[[samples]]
+id = "maybeuninit-assume-init-mut-missing-initialized"
+fixture = "maybeuninit_assume_init_mut"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "maybe_uninit_assume_init"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "MaybeUninit::assume_init_mut requires initialized-memory evidence before exposing a mutable reference."
+
+[[samples]]
+id = "maybeuninit-assume-init-drop-missing-initialized"
+fixture = "maybeuninit_assume_init_drop"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "maybe_uninit_assume_init"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "MaybeUninit::assume_init_drop requires initialized-memory evidence before dropping the initialized value."
