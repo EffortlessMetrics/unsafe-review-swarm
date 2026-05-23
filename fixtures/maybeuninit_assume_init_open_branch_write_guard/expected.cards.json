@@ -1,0 +1,79 @@
+[
+  {
+    "id": "UR-maybeuninit-assume-init-open-branch-write-guard-fixture-src-lib-rs-assume-inside-branch-operation-maybe_uninit_assume_init-maybe-uninit-assume-init-2cb61dcb90f3-initialized_memory-c1",
+    "class": "guarded_unwitnessed",
+    "priority": "medium",
+    "confidence": "medium",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 8,
+      "column": 9,
+      "kind": "operation",
+      "owner": "assume_inside_branch",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "Some(unsafe { slot.assume_init() })"
+    },
+    "operation": "Some(unsafe { slot.assume_init() })",
+    "operation_family": "maybe_uninit_assume_init",
+    "hazards": [
+      "initialized_memory",
+      "invalid_value"
+    ],
+    "obligations": [
+      "all fields/elements are initialized and valid before `assume_init`"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "initialized",
+        "description": "all fields/elements are initialized and valid before `assume_init`",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "MaybeUninit initialization evidence was detected before assume_init"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `assume_inside_branch`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "All inferred safety obligations have visible local discharge evidence",
+    "reach": "1 related test file(s) mention owner `assume_inside_branch`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test assume_inside_branch",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test assume_inside_branch",
+        "required": false
+      }
+    ],
+    "missing": [
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Attach a focused Miri or cargo-careful witness receipt or mark the static limitation explicitly.",
+    "verify_commands": [
+      "cargo +nightly miri test assume_inside_branch",
+      "cargo +nightly careful test assume_inside_branch"
+    ]
+  }
+]
