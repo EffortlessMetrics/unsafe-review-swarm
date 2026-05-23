@@ -40,6 +40,8 @@ The guard rejects:
 - fixture golden cards whose obligations and obligation_evidence are not
   one-to-one, description-aligned, and coherent across contract/discharge/reach/
   witness present-state fields.
+- fixture golden cards whose top-level missing summaries drift away from the
+  per-obligation evidence state.
 - fixture golden ReviewCard IDs that omit stable fixture/package, file, owner,
   site kind, operation family, operation path/callee, snippet hash, hazard, or
   counted suffix components.

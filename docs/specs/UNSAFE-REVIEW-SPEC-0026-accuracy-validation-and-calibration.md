@@ -54,6 +54,12 @@ stable key, and coherent `contract`, `discharge`, `reach`, and `witness`
 present/state/summary fields. This prevents top-level card classes or comments
 from standing in for per-obligation evidence.
 
+Fixture golden cards must keep the top-level `missing` summaries aligned with
+the per-obligation evidence rows: at least one summary is required when any
+contract, discharge, reach, or witness evidence is missing, and no missing
+summary is allowed when all obligation evidence is present. The summary remains
+reviewer-facing; it is not a replacement for obligation-level evidence.
+
 Fixture golden cards must preserve counted ReviewCard identity components:
 package/fixture, file, owner, site kind, operation family, operation path or
 callee token, normalized snippet hash, hazard, and count suffix. This keeps
@@ -99,6 +105,8 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
   report files, and public wording that stays inside the supported claim,
 - fixture golden obligations and obligation evidence are one-to-one,
   description-aligned, and carry coherent per-axis evidence states,
+- fixture golden missing summaries are non-empty exactly when at least one
+  obligation evidence axis is missing,
 - allowed public claim wording names the claim level, and forbidden claim lists
   include shared global precision, global recall, and memory-safety proof
   overclaim boundaries,

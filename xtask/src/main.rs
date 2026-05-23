@@ -2473,7 +2473,8 @@ fn check_fixture_card_identity(
         ));
     }
 
-    check_fixture_obligation_evidence(path, idx, card)?;
+    let has_missing_evidence = check_fixture_obligation_evidence(path, idx, card)?;
+    check_fixture_missing_summary(path, idx, card, has_missing_evidence)?;
 
     Ok(())
 }
@@ -2482,7 +2483,7 @@ fn check_fixture_obligation_evidence(
     path: &str,
     idx: usize,
     card: &serde_json::Value,
-) -> Result<(), String> {
+) -> Result<bool, String> {
     let card_context = format!("{path} card[{idx}]");
     let obligations = json_array_at(card, "/obligations", &card_context)?;
     if obligations.is_empty() {
@@ -2519,6 +2520,7 @@ fn check_fixture_obligation_evidence(
 
     let mut evidence_keys = BTreeSet::new();
     let mut evidence_descriptions = BTreeSet::new();
+    let mut has_missing_evidence = false;
     for (evidence_idx, entry) in evidence.iter().enumerate() {
         let Some(entry) = entry.as_object() else {
             return Err(format!(
@@ -2545,8 +2547,57 @@ fn check_fixture_obligation_evidence(
         }
 
         for axis in ["contract", "discharge", "reach", "witness"] {
-            check_fixture_evidence_state(&card_context, evidence_idx, key, axis, entry.get(axis))?;
+            if check_fixture_evidence_state(
+                &card_context,
+                evidence_idx,
+                key,
+                axis,
+                entry.get(axis),
+            )? {
+                has_missing_evidence = true;
+            }
         }
+    }
+
+    Ok(has_missing_evidence)
+}
+
+fn check_fixture_missing_summary(
+    path: &str,
+    idx: usize,
+    card: &serde_json::Value,
+    has_missing_evidence: bool,
+) -> Result<(), String> {
+    let card_context = format!("{path} card[{idx}]");
+    let missing = json_array_at(card, "/missing", &card_context)?;
+    let mut summaries = BTreeSet::new();
+    for (missing_idx, summary) in missing.iter().enumerate() {
+        let Some(summary) = summary.as_str() else {
+            return Err(format!(
+                "{card_context} missing[{missing_idx}] must be a string"
+            ));
+        };
+        if summary.trim().is_empty() {
+            return Err(format!(
+                "{card_context} missing[{missing_idx}] must not be empty"
+            ));
+        }
+        if !summaries.insert(summary) {
+            return Err(format!(
+                "{card_context} missing must not duplicate `{summary}`"
+            ));
+        }
+    }
+
+    if has_missing_evidence && missing.is_empty() {
+        return Err(format!(
+            "{card_context} missing must summarize at least one missing evidence item"
+        ));
+    }
+    if !has_missing_evidence && !missing.is_empty() {
+        return Err(format!(
+            "{card_context} missing must be empty when all obligation evidence is present"
+        ));
     }
 
     Ok(())
@@ -2578,7 +2629,7 @@ fn check_fixture_evidence_state(
     evidence_key: &str,
     axis: &str,
     value: Option<&serde_json::Value>,
-) -> Result<(), String> {
+) -> Result<bool, String> {
     let Some(state) = value.and_then(serde_json::Value::as_object) else {
         return Err(format!(
             "{card_context} obligation_evidence[{evidence_idx}] `{evidence_key}` is missing object key `{axis}`"
@@ -2615,7 +2666,7 @@ fn check_fixture_evidence_state(
             "{card_context} obligation_evidence[{evidence_idx}] `{evidence_key}` {axis}.present={present} must agree with state `{state_name}`"
         ));
     }
-    Ok(())
+    Ok(state_name == "missing")
 }
 
 fn required_fixture_state_str<'a>(
@@ -4906,6 +4957,57 @@ jobs:
     }
 
     #[test]
+    fn fixture_card_identity_rejects_empty_missing_summary_for_missing_evidence()
+    -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["missing"] = serde_json::Value::Array(Vec::new());
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err(
+                "card with missing evidence but empty missing summary should fail".to_string(),
+            );
+        };
+
+        assert!(err.contains("missing must summarize"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_stale_missing_summary_for_present_evidence()
+    -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["obligation_evidence"][0]["discharge"]["present"] = serde_json::Value::Bool(true);
+        card["obligation_evidence"][0]["discharge"]["state"] =
+            serde_json::Value::String("present".to_string());
+        card["obligation_evidence"][0]["witness"]["present"] = serde_json::Value::Bool(true);
+        card["obligation_evidence"][0]["witness"]["state"] =
+            serde_json::Value::String("present".to_string());
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err(
+                "card with present evidence but stale missing summary should fail".to_string(),
+            );
+        };
+
+        assert!(err.contains("missing must be empty"));
+        Ok(())
+    }
+
+    #[test]
     fn calibration_manifest_validates_current_fixture_contract() -> Result<(), String> {
         check_calibration()
     }
@@ -5144,6 +5246,10 @@ jobs:
         "summary": "No imported witness receipt was found"
       }}
     }}
+  ],
+  "missing": [
+    "Missing visible local guard for inferred safety obligations",
+    "No witness receipt imported for this card"
   ]
 }}"#
         )
