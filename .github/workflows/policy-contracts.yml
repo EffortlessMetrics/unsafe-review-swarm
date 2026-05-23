@@ -4,21 +4,32 @@ on:
   pull_request:
   push:
     branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   policy-contracts:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - name: Check doc artifacts
         run: cargo run --locked -p xtask -- check-doc-artifacts
+      - name: Check docs automation
+        run: cargo run --locked -p xtask -- check-docs-automation
       - name: Check active goals
         run: cargo run --locked -p xtask -- check-goals
       - name: Check package boundary
         run: cargo run --locked -p xtask -- check-package-boundary
       - name: Check CI lane ledger
         run: cargo run --locked -p xtask -- check-ci-lanes
+      - name: Check policy bundle
+        run: cargo run --locked -p xtask -- check-policy
