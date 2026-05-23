@@ -1,8 +1,9 @@
 # Objective audit
 
-Date: 2026-05-18
-Status: active objective partially achieved; dogfood-calibrated evidence lane
-closed experimentally; continue broader calibration before policy promotion
+Date: 2026-05-23
+Status: active objective partially achieved; fixture-pinned calibration rail is
+installed; dogfood-backed evidence remains experimental; continue broader
+calibration before support-tier or policy promotion
 
 This audit maps the current product objective to concrete repo evidence. It is a
 status artifact, not a support-tier promotion. `docs/status/SUPPORT_TIERS.md`
@@ -35,6 +36,23 @@ The latest closed execution lane is recorded in
 `docs/status/DOGFOOD_CALIBRATED_EVIDENCE_LANE.md` and
 `docs/handoffs/2026-05-18-dogfood-calibrated-evidence-v0.6.md`.
 
+The active calibration rail is now recorded in
+`docs/specs/UNSAFE-REVIEW-SPEC-0026-accuracy-validation-and-calibration.md`,
+`.unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md`,
+`policy/accuracy-calibration.toml`, and
+`docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 34
+fixture-pinned claims, 216 calibration cases, 34 label ledgers, and 223 label
+samples. It records zero dogfood-measured, labeled-calibrated, or
+policy-eligible claims. That is intentional: the current report is a
+claim-scoped fixture-pinned proof index, not a global precision/recall result
+or support-tier promotion.
+
+Recent PR artifact hardening also improved the comment-plan surface: planned
+comments stay capped and deduplicated, selected cards carry next actions, and
+card-present/no-inline-comment cases now explain why cards were not selected for
+inline comment planning. The trusted comment poster remains a future split-token
+design document only; no workflow posts comments by default.
+
 ## Objective
 
 `unsafe-review` should be the cheap PR-time unsafe contract reviewer for Rust:
@@ -53,7 +71,7 @@ witnesses by default.
 | Length guard does not discharge alignment; comments, operation names, and post-use checks do not count as guards | Raw-pointer alignment, comment-not-guard, and `NonNull::new_unchecked` fixture expectations are listed as proof in support tiers | Experimental | More real-world guard idioms need calibration |
 | Copy range evidence stays operation-specific | `copy_nonoverlapping_slice_range_guard`, `copy_nonoverlapping_slice_range_conjunctive_assert_guard`, `copy_nonoverlapping_slice_range_early_return_guard`, `copy_nonoverlapping_slice_range_disjunctive_early_return_guard`, `copy_nonoverlapping_slice_range_open_branch_guard`, `copy_nonoverlapping_slice_range_conjunctive_open_branch_guard`, `ptr_copy_slice_range_guard`, `ptr_copy_slice_range_conjunctive_assert_guard`, `ptr_copy_slice_range_early_return_guard`, `ptr_copy_slice_range_disjunctive_early_return_guard`, `ptr_copy_slice_range_open_branch_guard`, and `ptr_copy_slice_range_conjunctive_open_branch_guard` prove same-call source/destination slice length assertions, conjunctive assertions, early returns, disjunctive invalid-range early returns, or open branches discharge only `valid-range`, while `copy_nonoverlapping_slice_range_src_only_not_guard`, `copy_nonoverlapping_slice_range_dst_only_not_guard`, `ptr_copy_slice_range_src_only_not_guard`, `ptr_copy_slice_range_dst_only_not_guard`, `copy_nonoverlapping_slice_range_closed_branch_not_guard`, `ptr_copy_slice_range_closed_branch_not_guard`, `copy_nonoverlapping_slice_range_or_branch_not_guard`, `ptr_copy_slice_range_or_branch_not_guard`, `copy_nonoverlapping_slice_range_disjunctive_early_return_block_comment_not_guard`, `ptr_copy_slice_range_disjunctive_early_return_block_comment_not_guard`, `copy_nonoverlapping_slice_range_disjunctive_early_return_reassigned_count_not_guard`, `ptr_copy_slice_range_disjunctive_early_return_reassigned_count_not_guard`, `copy_nonoverlapping_slice_range_open_branch_reassigned_count_not_guard`, `copy_nonoverlapping_slice_range_open_branch_reassigned_src_not_guard`, `ptr_copy_slice_range_open_branch_reassigned_count_not_guard`, `ptr_copy_slice_range_open_branch_reassigned_dst_not_guard`, `copy_nonoverlapping_slice_range_reassigned_count_not_guard`, `copy_nonoverlapping_slice_range_reassigned_src_not_guard`, `ptr_copy_slice_range_reassigned_count_not_guard`, `ptr_copy_slice_range_reassigned_dst_not_guard`, `copy_nonoverlapping_other_len_not_guard`, and `ptr_copy_other_len_not_guard` prove one-sided, closed-branch, disjunctive positive-branch, comment-only early-return text, stale, or unrelated slice length assertions do not discharge copy source/destination range obligations | Experimental | Copy range evidence beyond same-call slice length guards remains limited |
 | Stable-first implementation; no mandatory MIR or `rustc_private` | Workspace uses stable source parsing and `ra_ap_syntax`; support tiers mark MIR/nightly facts as deferred | Met for current lanes | Optional adapters still need ADR before promotion |
-| Advisory PR artifact loop | Handoff `2026-05-18-advisory-pr-artifacts-v0.2.md` records cards JSON, PR summary, SARIF, and comment-plan artifact proof plus in-workflow artifact verification | Experimental/dogfoodable | No automatic comments or blocking policy by design |
+| Advisory PR artifact loop | Handoff `2026-05-18-advisory-pr-artifacts-v0.2.md` records cards JSON, PR summary, SARIF, and comment-plan artifact proof plus in-workflow artifact verification; current comment-plan checks cover capped planned comments, duplicate planned-entry rejection, selected-card next actions, and not-selected card reasons | Experimental/dogfoodable | No automatic comments or blocking policy by design; trusted poster architecture remains docs-only and future |
 | Saved IDE projection | Handoff `2026-05-18-lsp-agent-projection-v0.3.md` records `--format lsp` saved diagnostics, hovers, status data, copy-command data, and related-test open-command data | Experimental | No live LSP server or editor extension; static related-test mentions do not prove site execution |
 | Bounded LLM packet | Handoff `2026-05-18-lsp-agent-projection-v0.3.md` records `context <card-id> --json` bounded packet proof | Experimental | Copy-only; no automated repair or source edits |
 | Repo posture and badges count open review gaps, not raw unsafe or safety status | Handoff `2026-05-18-repo-policy-v0.4.md` and support tiers cover repo JSON, badge JSON, saved-snapshot outcome comparison, and first capped `memchr` outcome dogfood | Experimental | Not release-grade posture or calibrated governance |
@@ -84,6 +102,9 @@ These are not failures; they are the next unsupported or weakly verified areas:
 - Outcome comparison is saved-snapshot only. It now has first capped `memchr`
   repo snapshot dogfood, but needs more repos and PR snapshot pairs before
   dashboard-like posture claims.
+- Comment-plan output now explains selected and not-selected cards, but it
+  remains an artifact-only plan. The trusted poster design is intentionally
+  split from analyzer execution and is not implemented as a posting workflow.
 - `crossbeam#1187` now has fixture and dogfood-rerun coverage for the narrow
   `swap(ptr::null_mut(), Ordering::...)` atomic pointer state transition shape,
   but broader safe-looking atomic pointer state changes that affect
@@ -200,6 +221,10 @@ rtk cargo clippy --workspace --all-targets --locked -- -D warnings
 rtk cargo test --workspace --locked
 rtk cargo run --locked -p xtask -- check-pr
 rtk cargo run --locked -p xtask -- check-calibration
+rtk cargo run --locked -p xtask -- check-dogfood
+rtk cargo run --locked -p xtask -- check-doc-artifacts
+rtk cargo run --locked -p xtask -- check-goals
+rtk cargo run --locked -p xtask -- source-divergence
 rtk git diff --check
 ```
 
@@ -216,13 +241,14 @@ rtk cargo test -p unsafe-review --test e2e receipt_validate --locked
 
 ## Recommended Next Lane
 
-Continue dogfood measurement before policy promotion:
+Continue claim-scoped calibration before policy promotion:
 
-1. Run `unsafe-review` on more selected real unsafe-heavy crates and record
-   false-positive and false-negative notes.
-2. Measure card usefulness on more real PR diffs, not only repo snapshots.
-3. Dogfood explicit receipts and outcome comparison on more real unsafe-review
-   PRs.
+1. Keep `policy/accuracy-calibration.toml`, label ledgers, and fixture goldens
+   synchronized through `cargo xtask check-calibration`.
+2. Add selected real unsafe-heavy crates and PR diffs only with recorded limits,
+   false-positive notes, and false-negative notes.
+3. Dogfood explicit receipts, outcome comparison, comment-plan selection
+   reasons, and saved LSP/agent projections on more real unsafe-review PRs.
 4. Preserve exact-card matching, visible limitations, and advisory-only policy.
-5. Keep support tiers experimental until dogfood and calibration justify a
-   stronger claim.
+5. Keep support tiers experimental until labeled calibration and dogfood
+   evidence justify a stronger claim.
