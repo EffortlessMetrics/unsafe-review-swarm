@@ -1038,6 +1038,7 @@ fn has_get_unchecked_get_probe_guard(compact: &str, receiver: &str, index: &str)
         || has_get_unchecked_get_probe_early_return(compact, &probe, receiver, index)
         || has_get_unchecked_get_probe_if_let_branch(compact, &probe, receiver, index)
         || has_get_unchecked_get_probe_let_else(compact, &probe, receiver, index)
+        || has_get_unchecked_get_probe_match_branch(compact, &probe, receiver, index)
 }
 
 fn has_get_unchecked_get_probe_open_branch(
@@ -1132,6 +1133,31 @@ fn has_get_unchecked_get_probe_let_else(
             .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
         if guard_body.contains("return")
             && !has_get_unchecked_stale_assignment(after_guard_body, receiver, index)
+        {
+            return true;
+        }
+        let next = pos + marker.len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
+}
+
+fn has_get_unchecked_get_probe_match_branch(
+    compact: &str,
+    probe: &str,
+    receiver: &str,
+    index: &str,
+) -> bool {
+    let marker = format!("match{probe}{{");
+    let mut cursor = compact;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(&marker) {
+        let after_match_start = offset + pos + marker.len();
+        let after_match = &compact[after_match_start..];
+        if let Some(branch_after_marker) = match_some_branch_after_marker(after_match)
+            && branch_still_open_at_operation(branch_after_marker)
+            && !has_get_unchecked_stale_assignment(branch_after_marker, receiver, index)
         {
             return true;
         }
@@ -5642,6 +5668,12 @@ mod tests {
             "unsafe { values.get_unchecked_mut(index) }",
             vec![],
         );
+        let get_probe_match = site_with_family(
+            OperationFamily::GetUnchecked,
+            vec!["match values.get(index) {", "Some(_) => {"],
+            "unsafe { values.get_unchecked_mut(index) }",
+            vec!["}", "None => None,", "}"],
+        );
         let get_probe_if_let_reassigned_index = site_with_family(
             OperationFamily::GetUnchecked,
             vec![
@@ -5659,6 +5691,16 @@ mod tests {
             ],
             "unsafe { values.get_unchecked_mut(index) }",
             vec![],
+        );
+        let get_probe_match_reassigned_index = site_with_family(
+            OperationFamily::GetUnchecked,
+            vec![
+                "match values.get(index) {",
+                "Some(_) => {",
+                "index = values.len();",
+            ],
+            "unsafe { values.get_unchecked_mut(index) }",
+            vec!["}", "None => None,", "}"],
         );
 
         assert!(
@@ -5747,6 +5789,11 @@ mod tests {
                 .present
         );
         assert!(
+            obligation_evidence(&get_probe_match, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
             !obligation_evidence(
                 &get_probe_if_let_reassigned_index,
                 &obligations,
@@ -5759,6 +5806,16 @@ mod tests {
         assert!(
             !obligation_evidence(
                 &get_probe_let_else_reassigned_index,
+                &obligations,
+                &contract,
+                &reach
+            )[0]
+            .discharge
+            .present
+        );
+        assert!(
+            !obligation_evidence(
+                &get_probe_match_reassigned_index,
                 &obligations,
                 &contract,
                 &reach

@@ -1,0 +1,14 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,10 @@
++pub fn pick_after_stale_match_get(values: &mut [u8], mut index: usize) -> Option<&mut u8> {
++    match values.get(index) {
++        Some(_) => {
++            index = values.len();
++            // SAFETY: this fixture intentionally changes the checked index before use.
++            Some(unsafe { values.get_unchecked_mut(index) })
++        }
++        None => None,
++    }
++}

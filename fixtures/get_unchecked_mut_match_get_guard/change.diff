@@ -1,0 +1,13 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,9 @@
++pub fn pick_after_match_get(values: &mut [u8], index: usize) -> Option<&mut u8> {
++    match values.get(index) {
++        Some(_) => {
++            // SAFETY: the get probe matched Some, so `index` is in bounds for `values`.
++            Some(unsafe { values.get_unchecked_mut(index) })
++        }
++        None => None,
++    }
++}
