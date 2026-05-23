@@ -161,6 +161,52 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "raw-pointer-read-bounds-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "raw_pointer_read"
+hazard = "pointer_validity"
+support_tier = "Raw pointer card slice"
+fixtures = [
+  "raw_pointer_read_len_capacity_assert",
+  "raw_pointer_read_assert_shadowed_origin_not_guard",
+  "raw_pointer_read_len_capacity_assert_shadowed_origin_not_guard",
+  "raw_pointer_read_bounds_observed_not_guard",
+  "raw_pointer_read_len_capacity_observed_not_guard",
+  "raw_pointer_read_as_cast_origin_bounds_guard",
+  "raw_pointer_read_cast_origin_bounds_guard",
+  "raw_pointer_read_open_branch_bounds_guard",
+  "raw_pointer_read_open_branch_shadowed_origin_not_guard",
+  "raw_pointer_read_typed_shadowed_origin_not_guard",
+  "raw_pointer_read_other_len_not_guard",
+  "raw_pointer_read_reassigned_origin_not_guard",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/raw-pointer-read-bounds.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned raw pointer read bounds evidence distinguishes same-origin
+len/capacity assertions, typed casts, and open length branches from observed
+branches, shadowed origins, unrelated lengths, and reassigned origins in the
+listed fixtures.
+"""
+forbidden_claims = [
+  "broad raw pointer read soundness",
+  "pointer liveness proof",
+  "alignment proof",
+  "initialized-memory proof",
+  "same-allocation proof",
+  "witness execution proof",
+  "Miri-clean",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "public-unsafe-api-safety-docs-contract-evidence"
 status = "fixture_pinned"
 kind = "evidence_precision"

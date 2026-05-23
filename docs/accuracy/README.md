@@ -25,6 +25,10 @@ The current fixture-pinned slices are:
 - `raw_pointer_read` alignment evidence: checks whether the `alignment`
   obligation's discharge state is `present` or `missing` in the linked goldens,
   including a comment-only false-positive control.
+- `raw_pointer_read` bounds evidence: checks whether same-origin len/capacity
+  assertions, typed casts, and open length branches discharge the `bounds`
+  obligation, while rejecting observed branches, shadowed origins, unrelated
+  lengths, and reassigned origins.
 - Raw pointer write initialized evidence: checks whether the `initialized`
   obligation is discharged by `u8`, guarded `bool`, or `MaybeUninit` targets,
   while rejecting stale, closed-branch, wrong-target, and previous-operation

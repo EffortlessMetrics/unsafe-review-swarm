@@ -1,0 +1,191 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "raw-pointer-read-bounds-evidence"
+operation_family = "raw_pointer_read"
+hazard = "pointer_validity"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard bounds evidence behavior; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "raw-pointer-read-len-capacity-assert-present"
+fixture = "raw_pointer_read_len_capacity_assert"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "bounds"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-origin len/capacity equality assertion discharges the raw pointer read bounds obligation."
+
+[[samples]]
+id = "raw-pointer-read-assert-shadowed-origin-missing"
+fixture = "raw_pointer_read_assert_shadowed_origin_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "bounds"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Bounds assertions tied to a shadowed pointer origin must not discharge the later raw pointer read."
+
+[[samples]]
+id = "raw-pointer-read-len-capacity-shadowed-origin-missing"
+fixture = "raw_pointer_read_len_capacity_assert_shadowed_origin_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "bounds"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Len/capacity equality evidence for a shadowed origin must not discharge this raw pointer read."
+
+[[samples]]
+id = "raw-pointer-read-bounds-observed-missing"
+fixture = "raw_pointer_read_bounds_observed_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "bounds"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A closed bounds observation is not an open dominating guard for the raw pointer read."
+
+[[samples]]
+id = "raw-pointer-read-len-capacity-observed-missing"
+fixture = "raw_pointer_read_len_capacity_observed_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "bounds"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A closed len/capacity equality observation must not discharge the later raw pointer read."
+
+[[samples]]
+id = "raw-pointer-read-as-cast-origin-bounds-present"
+fixture = "raw_pointer_read_as_cast_origin_bounds_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "bounds"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Bounds evidence follows a same-origin pointer through an `as *const` cast to the raw read."
+
+[[samples]]
+id = "raw-pointer-read-cast-origin-bounds-present"
+fixture = "raw_pointer_read_cast_origin_bounds_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "bounds"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Bounds evidence follows a same-origin pointer through a typed cast to the raw read."
+
+[[samples]]
+id = "raw-pointer-read-open-branch-bounds-present"
+fixture = "raw_pointer_read_open_branch_bounds_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "bounds"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "An open positive same-origin length branch discharges the raw pointer read bounds obligation."
+
+[[samples]]
+id = "raw-pointer-read-open-branch-shadowed-origin-missing"
+fixture = "raw_pointer_read_open_branch_shadowed_origin_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "bounds"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Open-branch length evidence for a shadowed origin must not discharge this raw pointer read."
+
+[[samples]]
+id = "raw-pointer-read-typed-shadowed-origin-missing"
+fixture = "raw_pointer_read_typed_shadowed_origin_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "bounds"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Typed pointer evidence for a shadowed origin must not discharge the later raw pointer read."
+
+[[samples]]
+id = "raw-pointer-read-other-len-missing"
+fixture = "raw_pointer_read_other_len_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "bounds"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Length evidence for another buffer must not discharge this raw pointer read bounds obligation."
+
+[[samples]]
+id = "raw-pointer-read-reassigned-origin-missing"
+fixture = "raw_pointer_read_reassigned_origin_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "bounds"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Bounds evidence for an earlier pointer origin becomes stale after the pointer is reassigned."

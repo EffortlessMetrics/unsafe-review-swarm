@@ -38,6 +38,8 @@ Current ledgers:
   for public unsafe API `# Safety` contract evidence.
 - `raw-pointer-read-alignment.toml`: fixture-pinned obligation-level labels for
   raw pointer read alignment evidence.
+- `raw-pointer-read-bounds.toml`: fixture-pinned obligation-level labels for
+  raw pointer read bounds evidence.
 - `raw-pointer-write-initialized-evidence.toml`: fixture-pinned
   obligation-level labels for raw pointer write initialized evidence.
 - `slice-from-raw-parts-mut-initialized.toml`: fixture-pinned
