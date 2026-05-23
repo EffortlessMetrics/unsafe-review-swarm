@@ -1,0 +1,23 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,18 @@
++pub fn extract(result: Result<u8, &'static str>) -> u8 {
++    let Ok(_) = result.as_ref() else {
++        return 0;
++    };
++
++    // SAFETY: the let-else above returns before this point when the result is Err.
++    unsafe { result.unwrap_unchecked() }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::extract;
++
++    #[test]
++    fn extracts_ok_value() {
++        assert_eq!(extract(Ok(7)), 7);
++        assert_eq!(extract(Err("no value")), 0);
++    }
++}

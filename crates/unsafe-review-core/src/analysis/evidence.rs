@@ -2331,6 +2331,7 @@ fn has_unwrap_unchecked_receiver_state_evidence(lower: &str) -> bool {
         || has_receiver_if_let_as_ref_guard(before_call, receiver, "some")
         || has_receiver_let_else_as_ref_guard(before_call, receiver, "some")
         || has_receiver_if_let_as_ref_guard(before_call, receiver, "ok")
+        || has_receiver_let_else_as_ref_guard(before_call, receiver, "ok")
         || has_receiver_early_return_guard(before_call, receiver, "is_none")
         || has_receiver_early_return_guard(before_call, receiver, "is_err")
 }
@@ -6294,6 +6295,12 @@ mod tests {
             "unsafe { result.unwrap_unchecked() }",
             vec!["}"],
         );
+        let result_let_else = site_with_family(
+            OperationFamily::UnwrapUnchecked,
+            vec!["let Ok(_) = result.as_ref() else {", "    return 0;", "};"],
+            "unsafe { result.unwrap_unchecked() }",
+            vec![],
+        );
 
         let option_evidence = obligation_evidence(&option, &obligations, &contract, &reach);
         let option_if_let_evidence =
@@ -6303,12 +6310,15 @@ mod tests {
         let result_evidence = obligation_evidence(&result, &obligations, &contract, &reach);
         let result_if_let_evidence =
             obligation_evidence(&result_if_let, &obligations, &contract, &reach);
+        let result_let_else_evidence =
+            obligation_evidence(&result_let_else, &obligations, &contract, &reach);
 
         assert!(option_evidence[0].discharge.present);
         assert!(option_if_let_evidence[0].discharge.present);
         assert!(option_let_else_evidence[0].discharge.present);
         assert!(result_evidence[0].discharge.present);
         assert!(result_if_let_evidence[0].discharge.present);
+        assert!(result_let_else_evidence[0].discharge.present);
     }
 
     #[test]
@@ -6346,6 +6356,12 @@ mod tests {
             "unsafe { result.unwrap_unchecked() }",
             vec!["}"],
         );
+        let other_result_let_else = site_with_family(
+            OperationFamily::UnwrapUnchecked,
+            vec!["let Ok(_) = other.as_ref() else {", "    return 0;", "};"],
+            "unsafe { result.unwrap_unchecked() }",
+            vec![],
+        );
         let let_else_then_reassigned = site_with_family(
             OperationFamily::UnwrapUnchecked,
             vec![
@@ -6357,6 +6373,17 @@ mod tests {
             "unsafe { option.unwrap_unchecked() }",
             vec![],
         );
+        let result_let_else_then_reassigned = site_with_family(
+            OperationFamily::UnwrapUnchecked,
+            vec![
+                "let Ok(_) = result.as_ref() else {",
+                "    return 0;",
+                "};",
+                "result = Err(\"reset\");",
+            ],
+            "unsafe { result.unwrap_unchecked() }",
+            vec![],
+        );
 
         let evidence = obligation_evidence(&unchecked, &obligations, &contract, &reach);
         let if_let_evidence = obligation_evidence(&other_if_let, &obligations, &contract, &reach);
@@ -6364,14 +6391,28 @@ mod tests {
             obligation_evidence(&other_let_else, &obligations, &contract, &reach);
         let result_if_let_evidence =
             obligation_evidence(&other_result_if_let, &obligations, &contract, &reach);
+        let result_let_else_evidence =
+            obligation_evidence(&other_result_let_else, &obligations, &contract, &reach);
         let let_else_then_reassigned_evidence =
             obligation_evidence(&let_else_then_reassigned, &obligations, &contract, &reach);
+        let result_let_else_then_reassigned_evidence = obligation_evidence(
+            &result_let_else_then_reassigned,
+            &obligations,
+            &contract,
+            &reach,
+        );
 
         assert!(!evidence[0].discharge.present);
         assert!(!if_let_evidence[0].discharge.present);
         assert!(!let_else_evidence[0].discharge.present);
         assert!(!result_if_let_evidence[0].discharge.present);
+        assert!(!result_let_else_evidence[0].discharge.present);
         assert!(!let_else_then_reassigned_evidence[0].discharge.present);
+        assert!(
+            !result_let_else_then_reassigned_evidence[0]
+                .discharge
+                .present
+        );
     }
 
     #[test]

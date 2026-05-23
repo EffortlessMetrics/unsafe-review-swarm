@@ -49,7 +49,7 @@ The active calibration rail is now recorded in
 `.unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md`,
 `policy/accuracy-calibration.toml`, and
 `docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 34
-fixture-pinned claims, 253 calibration cases, 34 label ledgers, and 264 label
+fixture-pinned claims, 255 calibration cases, 34 label ledgers, and 266 label
 samples. It records zero dogfood-measured, labeled-calibrated, or
 policy-eligible claims. That is intentional: the current report is a
 claim-scoped fixture-pinned proof index, not a global precision/recall result
@@ -185,9 +185,10 @@ These are not failures; they are the next unsupported or weakly verified areas:
 - The `hashbrown#693` `unwrap_unchecked` sites are labeled as invalid-value
   operation cards, and local `Fallibility::Infallible`, same-receiver
   enclosing `is_some` / `is_ok` branches, early-return, narrow
-  `if let ... as_ref()`, and `let Some(_) = ...as_ref() else { return ... }`
-  state evidence is recognized for `unwrap_unchecked()`; bare state
-  observations, comment-only early-return text, and stale receiver-state
+  `if let ... as_ref()`, `let Some(_) = ...as_ref() else { return ... }`,
+  and `let Ok(_) = ...as_ref() else { return ... }` state evidence is
+  recognized for `unwrap_unchecked()`; bare state observations,
+  comment-only early-return text, and stale receiver-state
   evidence after reassignment remain guard-missing
   false-positive controls. Broader option/result state proof inference remains
   future work.

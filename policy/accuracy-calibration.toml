@@ -827,6 +827,8 @@ fixtures = [
   "unwrap_unchecked_if_let_ok_guard",
   "unwrap_unchecked_let_else_some_guard",
   "unwrap_unchecked_let_else_some_reassigned_not_guard",
+  "unwrap_unchecked_let_else_ok_guard",
+  "unwrap_unchecked_let_else_ok_reassigned_not_guard",
   "unwrap_unchecked_other_if_let_not_guard",
   "unwrap_unchecked_other_if_let_ok_not_guard",
   "unwrap_unchecked_post_check_not_guard",
