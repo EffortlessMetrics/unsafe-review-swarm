@@ -114,3 +114,10 @@ name = "public product surfaces"
 path = ".unsafe-review-spec/lanes/public-product-surfaces/tracker.toml"
 status = "proposed"
 owner = "release/public-surface"
+
+[[lane]]
+id = "marketplace-first-hour-ux"
+name = "marketplace and first-hour UX"
+path = ".unsafe-review-spec/lanes/marketplace-first-hour-ux/tracker.toml"
+status = "active"
+owner = "product / cli"

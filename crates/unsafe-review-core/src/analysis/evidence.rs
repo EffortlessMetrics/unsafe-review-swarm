@@ -2175,7 +2175,7 @@ fn has_infallible_assignment_to_receiver(before_call: &str, receiver: &str) -> b
 }
 
 fn has_unwrap_unchecked_receiver_state_evidence(lower: &str) -> bool {
-    let compact = compact_code(lower);
+    let compact = compact_code(&strip_block_comments_and_literals(lower));
     let Some((before_call, receiver)) = unwrap_unchecked_receiver_context(&compact) else {
         return false;
     };
@@ -5507,10 +5507,31 @@ mod tests {
             "unsafe { option.unwrap_unchecked() }",
             vec![],
         );
+        let comment_return = site_with_family(
+            OperationFamily::UnwrapUnchecked,
+            vec!["if option.is_none() {", "    /* return 0; */", "}"],
+            "unsafe { option.unwrap_unchecked() }",
+            vec![],
+        );
+        let string_return = site_with_family(
+            OperationFamily::UnwrapUnchecked,
+            vec![
+                "if option.is_none() {",
+                "    let _note = \"return 0\";",
+                "}",
+            ],
+            "unsafe { option.unwrap_unchecked() }",
+            vec![],
+        );
 
         let evidence = obligation_evidence(&unchecked, &obligations, &contract, &reach);
+        let comment_evidence =
+            obligation_evidence(&comment_return, &obligations, &contract, &reach);
+        let string_evidence = obligation_evidence(&string_return, &obligations, &contract, &reach);
 
         assert!(!evidence[0].discharge.present);
+        assert!(!comment_evidence[0].discharge.present);
+        assert!(!string_evidence[0].discharge.present);
     }
 
     #[test]
