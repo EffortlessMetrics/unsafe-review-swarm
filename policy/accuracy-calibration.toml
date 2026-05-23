@@ -95,6 +95,37 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "drop-in-place-witness-routes"
+status = "fixture_pinned"
+kind = "route_quality"
+owner = "calibration"
+operation_family = "drop_in_place"
+hazard = "drop_or_deallocation"
+support_tier = "Witness routing"
+fixtures = [
+  "drop_in_place_deallocation",
+  "drop_in_place_box_origin",
+  "drop_in_place_reassigned_origin_not_guard",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/drop-in-place-witness-routes.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned ptr::drop_in_place witness routing sends drop/deallocation
+hazards to Miri/cargo-careful route suggestions in the listed fixtures.
+"""
+forbidden_claims = [
+  "ptr::drop_in_place soundness proof",
+  "witness execution proof",
+  "Miri-clean",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "raw-pointer-read-alignment-evidence"
 status = "fixture_pinned"
 kind = "evidence_precision"

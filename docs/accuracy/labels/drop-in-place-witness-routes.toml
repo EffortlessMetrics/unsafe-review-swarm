@@ -1,0 +1,53 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "drop-in-place-witness-routes"
+operation_family = "drop_in_place"
+hazard = "drop_or_deallocation"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard witness routing behavior for ptr::drop_in_place; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "drop-in-place-deallocation-routes-miri-careful"
+fixture = "drop_in_place_deallocation"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "drop_in_place"
+expected_hazard = "drop_or_deallocation"
+expected_obligation_key = "ownership"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Bare ptr::drop_in_place deallocation hazards should route to concrete-execution Miri/cargo-careful witnesses without claiming the witnesses ran."
+
+[[samples]]
+id = "drop-in-place-box-origin-routes-miri-careful"
+fixture = "drop_in_place_box_origin"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "drop_in_place"
+expected_hazard = "drop_or_deallocation"
+expected_obligation_key = "ownership"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Even when Box::into_raw origin evidence is present, ptr::drop_in_place remains unwitnessed and routes to Miri/cargo-careful."
+
+[[samples]]
+id = "drop-in-place-reassigned-origin-routes-miri-careful"
+fixture = "drop_in_place_reassigned_origin_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "drop_in_place"
+expected_hazard = "drop_or_deallocation"
+expected_obligation_key = "ownership"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Stale Box::into_raw origin evidence should not suppress ptr::drop_in_place routing to Miri/cargo-careful witnesses."
