@@ -30,10 +30,12 @@ family's registry row, and a card must not duplicate a hazard entry. Top-level
 evidence summaries remain for compatibility and human scanning. Cards also
 expose the ReviewCard's structured witness routes and next-action summary so
 JSON consumers can route the same reviewer action as PR summaries, SARIF, LSP
-hovers, and agent packets without reclassifying findings. The next-action
-summary is a reviewer instruction, not a verdict: it must be non-empty,
-concrete, operation-aware when it names a safety obligation, and free of "all
-clear", safety-proof, UB-free, Miri-clean, or site-execution claims.
+hovers, and agent packets without reclassifying findings. Command-bearing
+witness routes must name the matching witness tool; manual or unsupported
+route kinds stay commandless by default. The next-action summary is a reviewer
+instruction, not a verdict: it must be non-empty, concrete, operation-aware
+when it names a safety obligation, and free of "all clear", safety-proof,
+UB-free, Miri-clean, or site-execution claims.
 
 Card `class`, `priority`, and `confidence` values must use the canonical
 ReviewCard vocabulary. Fixture goldens pin the expected signal for supported
@@ -61,7 +63,8 @@ contract gap to a weaker or unknown PR-review signal.
   the site snippet.
 - The card's operation family and hazards use canonical domain vocabulary,
   hazards, obligation evidence keys, and witness route kinds belong to the
-  operation family registry row, and hazards are not duplicated.
+  operation family registry row, command-bearing witness routes name their
+  matching tool, and hazards are not duplicated.
 - The card's class, priority, and confidence are known ReviewCard values and
   match the fixture-pinned classification signal.
 - The card includes missing evidence and a next action.

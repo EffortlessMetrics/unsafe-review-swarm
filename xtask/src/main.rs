@@ -2877,6 +2877,7 @@ fn check_fixture_witness_routes(
             ));
         }
         let command = optional_fixture_route_command(route, &card_context, route_idx)?;
+        check_fixture_route_command_matches_kind(&card_context, route_idx, kind, command)?;
         let route_key = format!("{kind}\0{}", command.unwrap_or(""));
         if !route_keys.insert(route_key) {
             return Err(format!(
@@ -2941,6 +2942,78 @@ fn required_fixture_route_str<'a>(
     } else {
         Ok(value)
     }
+}
+
+fn check_fixture_route_command_matches_kind(
+    card_context: &str,
+    route_idx: usize,
+    kind: &str,
+    command: Option<&str>,
+) -> Result<(), String> {
+    let Some(command) = command else {
+        if fixture_route_kind_requires_command(kind) {
+            return Err(format!(
+                "{card_context} witness_routes[{route_idx}] kind `{kind}` must include a matching command"
+            ));
+        }
+        return Ok(());
+    };
+
+    let command_matches_kind = match kind {
+        "miri" => command_has_token(command, "miri"),
+        "cargo-careful" => command_has_token(command, "careful"),
+        "asan" => {
+            command_contains_ascii(command, "sanitizer=address")
+                || command_has_token(command, "asan")
+        }
+        "msan" => {
+            command_contains_ascii(command, "sanitizer=memory")
+                || command_has_token(command, "msan")
+        }
+        "tsan" => {
+            command_contains_ascii(command, "sanitizer=thread")
+                || command_has_token(command, "tsan")
+        }
+        "lsan" => {
+            command_contains_ascii(command, "sanitizer=leak") || command_has_token(command, "lsan")
+        }
+        "loom" => command_has_token(command, "loom"),
+        "shuttle" => command_has_token(command, "shuttle"),
+        "kani" => command_has_token(command, "kani"),
+        "crux" => command_has_token(command, "crux"),
+        "human-deep-review" | "unsupported" => {
+            return Err(format!(
+                "{card_context} witness_routes[{route_idx}] kind `{kind}` must not include a command by default"
+            ));
+        }
+        _ => false,
+    };
+
+    if !command_matches_kind {
+        return Err(format!(
+            "{card_context} witness_routes[{route_idx}] kind `{kind}` command `{command}` must name the matching witness tool"
+        ));
+    }
+
+    Ok(())
+}
+
+fn fixture_route_kind_requires_command(kind: &str) -> bool {
+    matches!(
+        kind,
+        "miri" | "cargo-careful" | "asan" | "msan" | "tsan" | "lsan" | "kani" | "crux"
+    )
+}
+
+fn command_contains_ascii(command: &str, needle: &str) -> bool {
+    command.to_ascii_lowercase().contains(needle)
+}
+
+fn command_has_token(command: &str, needle: &str) -> bool {
+    command
+        .to_ascii_lowercase()
+        .split(|ch: char| !ch.is_ascii_alphanumeric() && ch != '-')
+        .any(|token| token == needle)
 }
 
 fn optional_fixture_route_command<'a>(
@@ -5865,6 +5938,55 @@ jobs:
         assert!(err.contains("verify_commands[0]"));
         assert!(err.contains("must be backed by a witness route command"));
         Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_route_command_wrong_tool() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["witness_routes"][0]["command"] =
+            serde_json::Value::String("cargo +nightly careful test read_header".to_string());
+        card["verify_commands"] = serde_json::json!(["cargo +nightly careful test read_header"]);
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("wrong witness tool command should fail".to_string());
+        };
+
+        assert!(err.contains("witness_routes[0] kind `miri`"));
+        assert!(err.contains("matching witness tool"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_route_command_rejects_commandless_manual_route_kind() -> Result<(), String> {
+        let Err(err) = check_fixture_route_command_matches_kind(
+            "fixtures/manual/expected.cards.json card[0]",
+            0,
+            "human-deep-review",
+            Some("cargo test manual_review"),
+        ) else {
+            return Err("manual route command should fail".to_string());
+        };
+
+        assert!(err.contains("witness_routes[0] kind `human-deep-review`"));
+        assert!(err.contains("must not include a command by default"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_route_command_allows_manual_route_without_command() -> Result<(), String> {
+        check_fixture_route_command_matches_kind(
+            "fixtures/manual/expected.cards.json card[0]",
+            0,
+            "human-deep-review",
+            None,
+        )
     }
 
     #[test]

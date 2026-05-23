@@ -62,9 +62,9 @@ reviewer-facing; it is not a replacement for obligation-level evidence.
 
 Fixture golden cards must keep witness routes and verify commands aligned. Each
 card needs at least one advisory route, route kinds must belong to the operation
-family registry row, command-bearing routes must be mirrored in
-`verify_commands`, unbacked verify commands are rejected, and routes must not be
-marked required by default.
+family registry row, command-bearing routes must name the matching witness tool
+and be mirrored in `verify_commands`, unbacked verify commands are rejected, and
+routes must not be marked required by default.
 
 Fixture golden cards must preserve counted ReviewCard identity components:
 package/fixture, file, owner, site kind, operation family, operation path or
@@ -118,9 +118,9 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - fixture golden next actions are non-empty reviewer actions, avoid overclaim
   wording, and name the matching operation family when they refer to a safety
   obligation,
-- fixture golden witness routes are advisory, non-empty, and command-aligned
-  with verify commands, and route kinds belong to the operation family registry
-  row,
+- fixture golden witness routes are advisory, non-empty, command-kind coherent,
+  and command-aligned with verify commands, and route kinds belong to the
+  operation family registry row,
 - allowed public claim wording names the claim level, and forbidden claim lists
   include shared global precision, global recall, and memory-safety proof
   overclaim boundaries,
@@ -165,6 +165,8 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
   operation family registry row.
 - A fixture card cannot introduce a witness route kind outside the operation
   family registry row.
+- A fixture card cannot attach a cargo-careful command to a Miri route or attach
+  a concrete command to a manual-only route by default.
 - A fixture card cannot introduce an unknown class, priority, or confidence, or
   pair a supported class with a stale priority/confidence signal.
 - An allowed public claim cannot contain global precision/recall, policy-ready,
