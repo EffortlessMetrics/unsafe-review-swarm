@@ -23,6 +23,10 @@ The current fixture-pinned slices are:
   checks whether the `valid-value` obligation is discharged by dominating
   bool-domain or invalid-byte early-return guards, while rejecting layout-only,
   observed, closed-branch, and stale-byte controls.
+- `str::from_utf8_unchecked` UTF-8 validation evidence: checks whether the
+  `utf8` obligation is discharged by same-buffer validation before conversion,
+  while rejecting post-validation, wrong-buffer, observed-only, and stale-buffer
+  controls.
 - Unsafe impl Send/Sync witness routing: checks that thread-safety invariants
   route to Loom/Shuttle witness suggestions.
 - FFI witness routing: checks that unsafe extern C boundaries route away from

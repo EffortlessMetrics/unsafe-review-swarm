@@ -1,0 +1,128 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "str-from-utf8-unchecked-validation-evidence"
+operation_family = "str_from_utf8_unchecked"
+hazard = "invalid_value"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard UTF-8 validation evidence behavior; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "utf8-unchecked-missing-validation"
+fixture = "str_from_utf8_unchecked"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "utf8"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A bare str::from_utf8_unchecked call does not prove the bytes are valid UTF-8."
+
+[[samples]]
+id = "utf8-unchecked-is-ok-validation-present"
+fixture = "str_from_utf8_unchecked_is_ok_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "utf8"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A same-buffer from_utf8 is_ok guard before the unchecked conversion discharges UTF-8 evidence."
+
+[[samples]]
+id = "utf8-unchecked-is-err-return-validation-present"
+fixture = "str_from_utf8_unchecked_is_err_return_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "utf8"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "An early return on same-buffer from_utf8 is_err discharges UTF-8 evidence for the unchecked conversion."
+
+[[samples]]
+id = "utf8-unchecked-question-mark-validation-present"
+fixture = "str_from_utf8_unchecked_question_mark_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "utf8"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "Question-mark propagation from same-buffer UTF-8 validation discharges the unchecked conversion obligation."
+
+[[samples]]
+id = "utf8-unchecked-match-return-validation-present"
+fixture = "str_from_utf8_unchecked_match_return_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "utf8"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A match-return path that rejects same-buffer UTF-8 errors discharges the unchecked conversion obligation."
+
+[[samples]]
+id = "utf8-unchecked-post-validation-not-guard"
+fixture = "str_from_utf8_unchecked_post_validation_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "utf8"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "UTF-8 validation after from_utf8_unchecked does not discharge evidence needed before conversion."
+
+[[samples]]
+id = "utf8-unchecked-other-buffer-not-guard"
+fixture = "str_from_utf8_unchecked_other_buffer_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "utf8"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "UTF-8 validation of another buffer does not discharge the target buffer's unchecked conversion."
+
+[[samples]]
+id = "utf8-unchecked-observed-not-guard"
+fixture = "str_from_utf8_unchecked_is_ok_observed_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "utf8"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A bare observed is_ok value is not a dominating guard for the later unchecked conversion."
+
+[[samples]]
+id = "utf8-unchecked-reassigned-buffer-not-guard"
+fixture = "str_from_utf8_unchecked_guard_then_reassigned_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "utf8"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Same-buffer UTF-8 evidence becomes stale when the buffer is reassigned before from_utf8_unchecked."

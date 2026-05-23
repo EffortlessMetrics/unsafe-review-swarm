@@ -16,6 +16,8 @@ Current ledgers:
   for public unsafe API `# Safety` contract evidence.
 - `raw-pointer-read-alignment.toml`: fixture-pinned obligation-level labels for
   raw pointer read alignment evidence.
+- `str-from-utf8-unchecked-validation.toml`: fixture-pinned obligation-level
+  labels for `str::from_utf8_unchecked` UTF-8 validation evidence.
 - `transmute-bool-valid-value.toml`: fixture-pinned obligation-level labels for
   transmute bool valid-value evidence.
 - `unsafe-impl-send-sync-witness-routes.toml`: fixture-pinned route-quality
