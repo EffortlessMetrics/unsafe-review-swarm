@@ -231,6 +231,15 @@ fn discharge_state_for(
                 && has_set_len_initialization_evidence(init_scope)
             {
                 EvidenceState::present("Initialization evidence was detected")
+            } else if family == &OperationFamily::MaybeUninitAssumeInit
+                && has_maybeuninit_assume_init_initialization_evidence(
+                    &site.operation.expression,
+                    lower,
+                )
+            {
+                EvidenceState::present(
+                    "MaybeUninit initialization evidence was detected before assume_init",
+                )
             } else if family == &OperationFamily::SliceFromRawParts
                 && has_maybeuninit_slice_context(lower)
             {
@@ -2778,6 +2787,121 @@ fn maybeuninit_slice_return_type(before_call: &str) -> bool {
         })
 }
 
+fn has_maybeuninit_assume_init_initialization_evidence(expression: &str, lower: &str) -> bool {
+    let Some(receiver) = maybeuninit_assume_init_receiver(expression) else {
+        return false;
+    };
+    let Some(before_operation) = code_before_operation(lower, expression) else {
+        return false;
+    };
+    let compact = compact_code(&strip_block_comments_and_literals(&before_operation));
+    let receiver = compact_code(&receiver);
+    if receiver.is_empty() {
+        return false;
+    }
+
+    has_maybeuninit_write_for_receiver(&compact, &receiver)
+        || has_maybeuninit_new_binding_for_receiver(&compact, &receiver)
+}
+
+fn maybeuninit_assume_init_receiver(expression: &str) -> Option<String> {
+    let compact = compact_code(&expression.to_ascii_lowercase());
+    [
+        ".assume_init(",
+        ".assume_init_read(",
+        ".assume_init_ref(",
+        ".assume_init_mut(",
+        ".assume_init_drop(",
+    ]
+    .into_iter()
+    .find_map(|marker| receiver_before_marker(&compact, marker))
+    .map(str::to_string)
+}
+
+fn has_maybeuninit_write_for_receiver(compact: &str, receiver: &str) -> bool {
+    let marker = format!("{receiver}.write(");
+    let mut cursor = compact;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(&marker) {
+        let marker_start = offset + pos;
+        let after_marker = &compact[marker_start + marker.len()..];
+        if maybeuninit_evidence_scope_reaches_operation(compact, marker_start)
+            && !contains_simple_assignment_to(after_marker, receiver)
+        {
+            return true;
+        }
+        let next = pos + marker.len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
+}
+
+fn has_maybeuninit_new_binding_for_receiver(compact: &str, receiver: &str) -> bool {
+    let mut cursor = compact;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find("::new(") {
+        let call_pos = offset + pos;
+        let statement_start = compact[..call_pos]
+            .rfind([';', '{', '}'])
+            .map_or(0, |idx| idx + 1);
+        let before_call = &compact[statement_start..call_pos];
+        let Some((left, right)) = before_call.rsplit_once('=') else {
+            let next = pos + "::new(".len();
+            offset += next;
+            cursor = &cursor[next..];
+            continue;
+        };
+        let after_call = &compact[call_pos + "::new(".len()..];
+        if right.contains("maybeuninit")
+            && maybeuninit_binding_left_declares_receiver(left, receiver)
+            && maybeuninit_evidence_scope_reaches_operation(compact, call_pos)
+            && !contains_simple_assignment_to(after_call, receiver)
+        {
+            return true;
+        }
+        let next = pos + "::new(".len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
+}
+
+fn maybeuninit_binding_left_declares_receiver(left: &str, receiver: &str) -> bool {
+    left == format!("let{receiver}")
+        || left == format!("letmut{receiver}")
+        || left.starts_with(&format!("let{receiver}:"))
+        || left.starts_with(&format!("letmut{receiver}:"))
+}
+
+fn maybeuninit_evidence_scope_reaches_operation(compact: &str, evidence_pos: usize) -> bool {
+    let mut depth_at_evidence = 0usize;
+    for ch in compact[..evidence_pos].chars() {
+        match ch {
+            '{' => depth_at_evidence += 1,
+            '}' => depth_at_evidence = depth_at_evidence.saturating_sub(1),
+            _ => {}
+        }
+    }
+    if depth_at_evidence == 0 {
+        return true;
+    }
+    let mut depth = depth_at_evidence;
+    for ch in compact[evidence_pos..].chars() {
+        match ch {
+            '{' => depth += 1,
+            '}' => {
+                depth = depth.saturating_sub(1);
+                if depth < depth_at_evidence {
+                    return false;
+                }
+            }
+            _ => {}
+        }
+    }
+    true
+}
+
 fn has_maybeuninit_raw_write_context(site: &ScannedSite, lower: &str) -> bool {
     let compact_expression = compact_code(&site.operation.expression.to_ascii_lowercase());
     has_maybeuninit_write_bytes_target_context(site, lower, &compact_expression)
@@ -3887,6 +4011,117 @@ mod tests {
 
         assert!(with_contract[0].discharge.present);
         assert!(!without_contract[0].discharge.present);
+    }
+
+    #[test]
+    fn maybeuninit_assume_init_accepts_same_slot_initialization_evidence() {
+        let obligations = vec![SafetyObligation::new(
+            "initialized",
+            "all fields/elements are initialized and valid before `assume_init`",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let write_before_assume = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "let mut slot = MaybeUninit::<u32>::uninit();",
+                "slot.write(7);",
+            ],
+            "unsafe { slot.assume_init() }",
+            vec![],
+        );
+        let new_before_assume = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec!["let slot = MaybeUninit::new(7_u32);"],
+            "unsafe { slot.assume_init() }",
+            vec![],
+        );
+        let typed_new_before_assume = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec!["let mut slot: MaybeUninit<u32> = MaybeUninit::<u32>::new(7);"],
+            "unsafe { slot.assume_init_read() }",
+            vec![],
+        );
+
+        let write_evidence =
+            obligation_evidence(&write_before_assume, &obligations, &contract, &reach);
+        let new_evidence = obligation_evidence(&new_before_assume, &obligations, &contract, &reach);
+        let typed_new_evidence =
+            obligation_evidence(&typed_new_before_assume, &obligations, &contract, &reach);
+
+        assert!(write_evidence[0].discharge.present);
+        assert!(new_evidence[0].discharge.present);
+        assert!(typed_new_evidence[0].discharge.present);
+    }
+
+    #[test]
+    fn maybeuninit_assume_init_rejects_conditional_other_and_stale_initialization() {
+        let obligations = vec![SafetyObligation::new(
+            "initialized",
+            "all fields/elements are initialized and valid before `assume_init`",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let closed_branch_write = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "let mut slot = MaybeUninit::<u32>::uninit();",
+                "if init {",
+                "    slot.write(7);",
+                "}",
+            ],
+            "unsafe { slot.assume_init() }",
+            vec![],
+        );
+        let other_slot_write = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "let mut slot = MaybeUninit::<u32>::uninit();",
+                "let mut other = MaybeUninit::<u32>::uninit();",
+                "other.write(7);",
+            ],
+            "unsafe { slot.assume_init() }",
+            vec![],
+        );
+        let stale_slot = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "let mut slot = MaybeUninit::<u32>::uninit();",
+                "slot.write(7);",
+                "slot = MaybeUninit::uninit();",
+            ],
+            "unsafe { slot.assume_init() }",
+            vec![],
+        );
+        let open_branch_write = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "let mut slot = MaybeUninit::<u32>::uninit();",
+                "if init {",
+                "    slot.write(7);",
+            ],
+            "unsafe { slot.assume_init() }",
+            vec!["}"],
+        );
+
+        let closed_evidence =
+            obligation_evidence(&closed_branch_write, &obligations, &contract, &reach);
+        let other_evidence =
+            obligation_evidence(&other_slot_write, &obligations, &contract, &reach);
+        let stale_evidence = obligation_evidence(&stale_slot, &obligations, &contract, &reach);
+        let open_evidence =
+            obligation_evidence(&open_branch_write, &obligations, &contract, &reach);
+
+        assert!(!closed_evidence[0].discharge.present);
+        assert!(!other_evidence[0].discharge.present);
+        assert!(!stale_evidence[0].discharge.present);
+        assert!(open_evidence[0].discharge.present);
     }
 
     #[test]

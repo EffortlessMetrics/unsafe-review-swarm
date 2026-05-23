@@ -62,8 +62,9 @@ The current fixture-pinned slices are:
   same-origin ManuallyDrop raw parts, while rejecting observed, closed-branch,
   comment-only early-return, wrong-capacity, and stale-cap controls.
 - `MaybeUninit::assume_init` family initialized-memory evidence: checks that
-  `assume_init`, `assume_init_read`, `assume_init_ref`, `assume_init_mut`, and
-  `assume_init_drop` report missing initialized evidence and route to
+  same-slot `write` and `MaybeUninit::new` discharge initialized evidence,
+  stale writes remain missing evidence, and `assume_init`, `assume_init_read`,
+  `assume_init_ref`, `assume_init_mut`, and `assume_init_drop` route to
   Miri/cargo-careful witness suggestions.
 - `transmute::<u8, bool>` / `transmute_copy::<u8, bool>` valid-value evidence:
   checks whether the `valid-value` obligation is discharged by dominating
