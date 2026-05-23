@@ -36,9 +36,10 @@ It is registered in `policy/workflow-allowlist.toml` (`workflow-0006`) and
 in `policy/ci-lane-whitelist.toml` (`coverage` lane).
 
 Codecov's own project / patch status checks are made **informational** via
-[`codecov.yml`](../../codecov.yml). Codecov surfaces a coverage report but
-never reports a failing required check on a PR. Lowering coverage on a PR
-does not block merge.
+[`codecov.yml`](../../codecov.yml). Codecov surfaces coverage telemetry, but
+project / patch coverage status is informational and is not a required
+branch-protection gate. Lowering coverage on a PR does not block merge by
+default.
 
 Behavior:
 

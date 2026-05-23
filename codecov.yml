@@ -3,7 +3,8 @@
 # Coverage is advisory execution-surface telemetry only. It is not a
 # memory-safety, UB-free, Miri-clean, site-execution, or unsafe-correctness
 # signal. The lane's own boundary statement in docs/ci/coverage.md is
-# authoritative: failures never block, and there is no coverage threshold.
+# authoritative: coverage status is informational, not a merge gate, and no
+# coverage threshold is enforced as a branch-protection requirement.
 #
 # This file makes Codecov's default project/patch status checks
 # informational so they do not appear as failing required checks on PRs.
