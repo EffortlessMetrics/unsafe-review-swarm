@@ -1,0 +1,30 @@
+# Codecov configuration for unsafe-review-swarm.
+#
+# Coverage is advisory execution-surface telemetry only. It is not a
+# memory-safety, UB-free, Miri-clean, site-execution, or unsafe-correctness
+# signal. The lane's own boundary statement in docs/ci/coverage.md is
+# authoritative: failures never block, and there is no coverage threshold.
+#
+# This file makes Codecov's default project/patch status checks
+# informational so they do not appear as failing required checks on PRs.
+
+codecov:
+  require_ci_to_pass: false
+  notify:
+    wait_for_ci: false
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        informational: true
+    patch:
+      default:
+        target: auto
+        informational: true
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: false
