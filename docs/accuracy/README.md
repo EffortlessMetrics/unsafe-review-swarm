@@ -79,11 +79,13 @@ The current fixture-pinned slices are:
   route to Loom/Shuttle witness suggestions.
 - Generic unsafe function call callee-contract evidence: checks whether
   remaining-capacity and availability guards discharge generic unsafe callee
-  preconditions, while rejecting wrong-receiver, observed-only, and
-  closed-branch controls.
+  preconditions, while rejecting wrong-receiver, observed-only, closed-branch,
+  and FFI-looking local-wrapper controls.
 - FFI witness routing: checks that unsafe extern C boundaries, unsafe calls to
   same-file extern declarations, and unsafe `libc::` path calls route away from
-  Miri-first review to sanitizer/cargo-careful witness suggestions.
+  Miri-first review to sanitizer/cargo-careful witness suggestions without
+  treating local Rust wrappers as FFI merely because their module names resemble
+  libc.
 - FFI boundary obligation evidence: checks that ABI/layout compatibility and
   ownership/lifetime/nullability contracts are tracked as separate obligations
   for unsafe extern C declarations and calls.

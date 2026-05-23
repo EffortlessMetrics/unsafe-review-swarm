@@ -451,6 +451,7 @@ mod tests {
         "ffi_sanitizer_route",
         "ffi_call_sanitizer_route",
         "ffi_libc_call_sanitizer_route",
+        "ffi_non_libc_wrapper_call_not_route",
         "get_unchecked_mut_bounds",
         "get_unchecked_mut_len_guard",
         "get_unchecked_mut_get_probe_guard",

@@ -53,6 +53,20 @@ label_source = "fixture_golden"
 rationale = "Visible remaining-capacity argument evidence discharges the encode_utf8 callee-contract obligation without importing a witness receipt."
 
 [[samples]]
+id = "ffi-looking-local-wrapper-remains-unsafe-fn-call"
+fixture = "ffi_non_libc_wrapper_call_not_route"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+expected_obligation_key = "callee-contract"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A local Rust wrapper whose module name only resembles libc should keep generic unsafe-call review instead of gaining FFI sanitizer routing."
+
+[[samples]]
 id = "unchecked-constructor-availability-guard-present"
 fixture = "unchecked_constructor_availability_guard"
 kind = "positive"
