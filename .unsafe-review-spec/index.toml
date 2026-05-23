@@ -31,6 +31,13 @@ owner = "repo-infra"
 linked_proposal = "UNSAFE-REVIEW-PROP-0002"
 
 [[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0023"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0023-first-hour-experience.md"
+status = "draft"
+owner = "product / cli"
+
+[[artifact]]
 id = "UNSAFE-REVIEW-SPEC-0024"
 kind = "spec"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-0024-ci-design.md"
@@ -60,8 +67,22 @@ status = "active"
 owner = "repo-infra"
 
 [[lane]]
+id = "ci-design-rail"
+name = "CI design contract"
+path = ".unsafe-review-spec/goals/active.toml"
+status = "active"
+owner = "repo-infra"
+
+[[lane]]
 id = "editor-extension"
 name = "VS Code and Open VSX editor adapter"
 path = ".unsafe-review-spec/lanes/editor-extension/tracker.toml"
 status = "active"
 owner = "editor/extension"
+
+[[lane]]
+id = "public-product-surfaces"
+name = "public product surfaces"
+path = ".unsafe-review-spec/lanes/public-product-surfaces/tracker.toml"
+status = "proposed"
+owner = "release/public-surface"
