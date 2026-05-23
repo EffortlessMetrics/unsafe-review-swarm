@@ -1,0 +1,167 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "transmute-bool-valid-value-evidence"
+operation_family = "transmute"
+hazard = "invalid_value"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard valid-value evidence behavior; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "transmute-bool-missing-valid-value"
+fixture = "transmute_invalid_value"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A bare transmute from `u8` to `bool` does not prove the destination value satisfies bool validity."
+
+[[samples]]
+id = "transmute-bool-layout-only-missing-valid-value"
+fixture = "transmute_layout_size_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A layout-size guard does not discharge the bool valid-value obligation."
+
+[[samples]]
+id = "transmute-bool-domain-guard-present"
+fixture = "transmute_bool_valid_value_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A dominating same-value bool-domain guard discharges the valid-value obligation."
+
+[[samples]]
+id = "transmute-bool-invalid-return-guard-present"
+fixture = "transmute_bool_invalid_return_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "An early return on invalid bool byte values discharges the valid-value obligation."
+
+[[samples]]
+id = "transmute-bool-observed-not-guard"
+fixture = "transmute_bool_value_observed_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A bare observed bool-domain expression is not a dominating guard for the transmute."
+
+[[samples]]
+id = "transmute-bool-closed-branch-not-guard"
+fixture = "transmute_bool_closed_if_observed_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A closed positive bool-domain branch does not dominate the later transmute."
+
+[[samples]]
+id = "transmute-bool-reassigned-not-guard"
+fixture = "transmute_bool_guard_then_reassigned_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Bool-domain evidence becomes stale when the transmuted byte is reassigned before use."
+
+[[samples]]
+id = "transmute-copy-bool-missing-valid-value"
+fixture = "transmute_copy_invalid_value"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A bare transmute_copy from referenced `u8` to `bool` does not prove destination validity."
+
+[[samples]]
+id = "transmute-copy-bool-domain-guard-present"
+fixture = "transmute_copy_bool_valid_value_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A dominating referenced-byte bool-domain guard discharges transmute_copy valid-value evidence."
+
+[[samples]]
+id = "transmute-copy-bool-invalid-return-guard-present"
+fixture = "transmute_copy_bool_invalid_return_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "An early return on invalid referenced-byte values discharges transmute_copy valid-value evidence."
+
+[[samples]]
+id = "transmute-copy-bool-observed-not-guard"
+fixture = "transmute_copy_bool_value_observed_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A bare referenced-byte bool-domain observation is not a dominating guard for transmute_copy."
+
+[[samples]]
+id = "transmute-copy-bool-reassigned-not-guard"
+fixture = "transmute_copy_bool_guard_then_reassigned_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Referenced-byte bool-domain evidence becomes stale when the byte is reassigned before transmute_copy."

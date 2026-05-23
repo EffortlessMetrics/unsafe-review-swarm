@@ -8,6 +8,8 @@ Current ledgers:
   for public unsafe API `# Safety` contract evidence.
 - `raw-pointer-read-alignment.toml`: fixture-pinned obligation-level labels for
   raw pointer read alignment evidence.
+- `transmute-bool-valid-value.toml`: fixture-pinned obligation-level labels for
+  transmute bool valid-value evidence.
 - `vec-set-len-initialized-range.toml`: fixture-pinned obligation-level labels
   for `Vec::set_len` initialized-range evidence.
 

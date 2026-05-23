@@ -14,6 +14,10 @@ The current fixture-pinned slices are:
   obligation is discharged by visible initialization, shrink, zero-clear, or
   call-result patterns, while rejecting capacity-only, post-init, and unrelated
   initialization controls.
+- `transmute::<u8, bool>` / `transmute_copy::<u8, bool>` valid-value evidence:
+  checks whether the `valid-value` obligation is discharged by dominating
+  bool-domain or invalid-byte early-return guards, while rejecting layout-only,
+  observed, closed-branch, and stale-byte controls.
 
 This remains experimental/advisory until human-adjudicated calibration and
 report checks are landed.

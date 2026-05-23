@@ -129,3 +129,42 @@ forbidden_claims = [
   "global recall",
   "memory-safety proof",
 ]
+
+[[claim]]
+id = "transmute-bool-valid-value-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "transmute"
+hazard = "invalid_value"
+support_tier = "Core operation smoke slice"
+fixtures = [
+  "transmute_invalid_value",
+  "transmute_layout_size_guard",
+  "transmute_bool_valid_value_guard",
+  "transmute_bool_invalid_return_guard",
+  "transmute_bool_value_observed_not_guard",
+  "transmute_bool_closed_if_observed_not_guard",
+  "transmute_bool_guard_then_reassigned_not_guard",
+  "transmute_copy_invalid_value",
+  "transmute_copy_bool_valid_value_guard",
+  "transmute_copy_bool_invalid_return_guard",
+  "transmute_copy_bool_value_observed_not_guard",
+  "transmute_copy_bool_guard_then_reassigned_not_guard",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/transmute-bool-valid-value.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned transmute bool valid-value evidence distinguishes dominating
+bool-domain and invalid-byte early-return guards from layout-only, observed,
+closed-branch, and stale-byte controls in the listed fixtures.
+"""
+forbidden_claims = [
+  "broad transmute soundness",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
