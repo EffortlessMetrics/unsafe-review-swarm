@@ -150,6 +150,12 @@ Marketplace publication only happens after a successful VSIX install round
 trip and an explicit `workflow_dispatch` publish workflow. Manifests and the
 publisher identifier are scoped to `effortlessmetrics`.
 
+The owner-facing checklist for marketplace publication and the
+`workflow_dispatch`-only publish workflow are documented in
+[docs/editor/marketplace-publication.md](marketplace-publication.md). That
+workflow defaults to `dry_run=true`; publication never happens on PR merge
+or push to main.
+
 ## Acceptance examples
 
 The MVP is acceptable when:

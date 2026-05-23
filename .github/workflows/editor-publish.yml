@@ -1,0 +1,192 @@
+name: editor-publish
+
+# Manual, owner-driven extension publish workflow.
+#
+# This workflow does NOT trigger on pull requests or push events.
+# Publication is gated behind explicit workflow_dispatch inputs:
+#
+#   - dry_run (default true): when true, only package and report.
+#   - publish_to_vs_marketplace (default false): publish to VS Marketplace
+#     when both dry_run is false and this is true.
+#   - publish_to_open_vsx (default false): publish to Open VSX when both
+#     dry_run is false and this is true.
+#
+# The workflow must be dispatched from main. Non-dry-run publication also
+# requires at least one explicit publish target.
+#
+# Secrets required for non-dry-run mode:
+#   - VSCE_PAT   (Azure DevOps PAT with Marketplace: Manage scope)
+#   - OVSX_PAT   (Open VSX access token for the effortlessmetrics namespace)
+#
+# See docs/editor/marketplace-publication.md for the full pre-publication
+# checklist.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Extension version to publish (must match editors/vscode/package.json)"
+        required: true
+        type: string
+      dry_run:
+        description: "Dry run: package and report, do not publish"
+        required: true
+        type: boolean
+        default: true
+      publish_to_vs_marketplace:
+        description: "Publish to VS Marketplace (requires VSCE_PAT)"
+        required: true
+        type: boolean
+        default: false
+      publish_to_open_vsx:
+        description: "Publish to Open VSX (requires OVSX_PAT)"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: editor-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: editor extension publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: editors/vscode
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: editors/vscode/package-lock.json
+
+      - name: Validate dispatch inputs
+        env:
+          DRY_RUN: ${{ inputs.dry_run }}
+          PUBLISH_VSMP: ${{ inputs.publish_to_vs_marketplace }}
+          PUBLISH_OVSX: ${{ inputs.publish_to_open_vsx }}
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::editor-publish must be dispatched from refs/heads/main; got ${GITHUB_REF}"
+            exit 1
+          fi
+          if [ "$DRY_RUN" != "true" ] && [ "$PUBLISH_VSMP" != "true" ] && [ "$PUBLISH_OVSX" != "true" ]; then
+            echo "::error::dry_run=false requires publish_to_vs_marketplace=true and/or publish_to_open_vsx=true"
+            exit 1
+          fi
+
+      - name: Verify package identity
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          pkg_name=$(node -p "require('./package.json').name")
+          pkg_publisher=$(node -p "require('./package.json').publisher")
+          pkg_version=$(node -p "require('./package.json').version")
+          if [ "$pkg_name" != "unsafe-review" ]; then
+            echo "::error::editors/vscode/package.json name ($pkg_name) is not unsafe-review"
+            exit 1
+          fi
+          if [ "$pkg_publisher" != "effortlessmetrics" ]; then
+            echo "::error::editors/vscode/package.json publisher ($pkg_publisher) is not effortlessmetrics"
+            exit 1
+          fi
+          if [ "$pkg_version" != "$INPUT_VERSION" ]; then
+            echo "::error::version input ($INPUT_VERSION) does not match editors/vscode/package.json version ($pkg_version)"
+            exit 1
+          fi
+
+      - name: Install extension dependencies
+        run: npm ci
+
+      - name: Compile TypeScript
+        run: npm run compile
+
+      - name: Run extension unit tests
+        run: npm test
+
+      - name: Package VSIX
+        run: |
+          mkdir -p ../../target
+          npx --yes @vscode/vsce@2.32.0 package --out ../../target/unsafe-review-vscode.vsix --allow-missing-repository
+
+      - name: Report dry run
+        if: ${{ inputs.dry_run }}
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          PUBLISH_VSMP: ${{ inputs.publish_to_vs_marketplace }}
+          PUBLISH_OVSX: ${{ inputs.publish_to_open_vsx }}
+        run: |
+          {
+            echo "## editor-publish dry run"
+            echo
+            echo "- version: \`${INPUT_VERSION}\`"
+            echo "- VSIX artifact: \`target/unsafe-review-vscode.vsix\` (uploaded by this run)"
+            echo "- publish_to_vs_marketplace requested: \`${PUBLISH_VSMP}\` (ignored in dry_run)"
+            echo "- publish_to_open_vsx requested: \`${PUBLISH_OVSX}\` (ignored in dry_run)"
+            echo
+            echo "Dry run did not publish. Re-run with dry_run=false to publish."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish to VS Marketplace
+        if: ${{ !inputs.dry_run && inputs.publish_to_vs_marketplace }}
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${VSCE_PAT:-}" ]; then
+            echo "::error::VSCE_PAT secret is not configured"
+            exit 1
+          fi
+          npx --yes @vscode/vsce@2.32.0 publish \
+            --packagePath ../../target/unsafe-review-vscode.vsix \
+            --pat "$VSCE_PAT"
+
+      - name: Publish to Open VSX
+        if: ${{ !inputs.dry_run && inputs.publish_to_open_vsx }}
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${OVSX_PAT:-}" ]; then
+            echo "::error::OVSX_PAT secret is not configured"
+            exit 1
+          fi
+          npx --yes ovsx@0.10.1 publish \
+            ../../target/unsafe-review-vscode.vsix \
+            -p "$OVSX_PAT"
+
+      - name: Report published targets
+        if: ${{ !inputs.dry_run }}
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+          PUBLISH_VSMP: ${{ inputs.publish_to_vs_marketplace }}
+          PUBLISH_OVSX: ${{ inputs.publish_to_open_vsx }}
+        run: |
+          {
+            echo "## editor-publish completed"
+            echo
+            echo "- version: \`${INPUT_VERSION}\`"
+            echo "- published to VS Marketplace: \`${PUBLISH_VSMP}\`"
+            echo "- published to Open VSX: \`${PUBLISH_OVSX}\`"
+            echo
+            echo "> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: unsafe-review-vscode
+          path: target/unsafe-review-vscode.vsix
+          if-no-files-found: error
