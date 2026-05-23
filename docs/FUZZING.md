@@ -12,8 +12,8 @@ cargo fuzz run analyze
 ```
 
 The `analyze` target treats fuzz bytes as a temporary `src/lib.rs`, synthesizes a
-unified diff that adds that file, runs the core analyzer with byte-selected scope/mode/max-card settings,
-and checks that rendered JSON remains parseable.
+unified diff that adds that file, runs the core analyzer with byte-selected
+scope/mode/max-card settings, and checks that rendered JSON remains parseable.
 
 The first two input bytes are interpreted as a small config header:
 
@@ -25,7 +25,7 @@ The first two input bytes are interpreted as a small config header:
 
 The remaining bytes are UTF-8-lossy text input for source/diff synthesis.
 
-Inputs can optionally include this marker on its own line:
+Inputs can optionally include this marker on its own line (LF or CRLF line endings are both accepted):
 
 ```text
 ---DIFF---
