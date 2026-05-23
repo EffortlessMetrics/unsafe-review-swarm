@@ -30,6 +30,29 @@ pub(super) fn selection_reason(card: &ReviewCard) -> &'static str {
     }
 }
 
+/// Transparent reviewer-noise control signal, never a policy gate.
+///
+/// `relevance` summarizes the priority + confidence signal that already
+/// drives selection so reviewers can sort the inline comment plan without
+/// having to re-derive it. It is informational only: skipping a `medium`
+/// relevance card does not change unsafe-review's analysis or the trust
+/// boundary.
+pub(super) fn relevance(card: &ReviewCard) -> &'static str {
+    let high_priority = matches!(card.priority, Priority::High);
+    let high_confidence = matches!(card.confidence, Confidence::High);
+    let low_confidence = matches!(card.confidence, Confidence::Low | Confidence::Unknown);
+
+    if low_confidence {
+        "low"
+    } else if high_priority && high_confidence {
+        "high"
+    } else if high_priority || high_confidence {
+        "medium"
+    } else {
+        "low"
+    }
+}
+
 pub(super) fn actionability(card: &ReviewCard) -> &'static str {
     match &card.class {
         ReviewClass::GuardMissing => "specific_guard_missing",

@@ -57,6 +57,7 @@ Representative fields:
       "class": "guard_missing",
       "operation_family": "raw_pointer_read",
       "actionability": "specific_guard_missing",
+      "relevance": "medium",
       "selection_reason": "actionable high-priority review card",
       "next_action": "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.",
       "verify_commands": [
@@ -90,6 +91,7 @@ the call site. The plan keeps the comment specific:
       "class": "guard_missing",
       "operation_family": "copy_nonoverlapping",
       "actionability": "specific_guard_missing",
+      "relevance": "medium",
       "selection_reason": "actionable high-priority review card",
       "next_action": "Add or expose the local guard that discharges the `copy_nonoverlapping` safety obligation."
     }
@@ -115,6 +117,7 @@ the caller obligations the function relies on:
       "class": "contract_missing",
       "operation_family": "unknown",
       "actionability": "specific_contract_missing",
+      "relevance": "high",
       "selection_reason": "actionable high-confidence review card",
       "next_action": "Add a precise public `# Safety` section that names the required caller obligations."
     }
@@ -144,6 +147,7 @@ Representative fields:
       "class": "miri_unsupported",
       "operation_family": "ffi",
       "actionability": "specific_witness_missing",
+      "relevance": "low",
       "reason": "priority/confidence below inline comment threshold"
     }
   ]
@@ -184,4 +188,6 @@ The verifier treats these as artifact contract rules:
 - every planned body stays at or below 220 words;
 - `not_selected` entries must reference known cards and cannot repeat planned
   comment cards;
+- every selected and not-selected entry carries `actionability` and
+  `relevance` (`high` / `medium` / `low`);
 - trust-boundary text remains present.
