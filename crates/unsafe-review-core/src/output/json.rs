@@ -448,6 +448,7 @@ mod tests {
         "unsafe_impl_send",
         "unsafe_impl_send_generic_owner",
         "unsafe_impl_sync_generic_bound",
+        "unsafe_impl_custom_trait_not_send_sync",
         "ffi_sanitizer_route",
         "ffi_call_sanitizer_route",
         "ffi_libc_call_sanitizer_route",

@@ -229,6 +229,7 @@ required_core_fixtures = [
   "unsafe_impl_send",
   "unsafe_impl_send_generic_owner",
   "unsafe_impl_sync_generic_bound",
+  "unsafe_impl_custom_trait_not_send_sync",
   "ffi_sanitizer_route",
   "ffi_call_sanitizer_route",
   "ffi_libc_call_sanitizer_route",
@@ -2537,6 +2538,16 @@ expected_cards = 1
 expected_class = "requires_loom"
 expected_operation_family = "unsafe_impl_send_sync"
 expected_hazard = "send_sync_invariant"
+
+[[cases]]
+fixture = "unsafe_impl_custom_trait_not_send_sync"
+kind = "false_positive_control"
+claim = "custom unsafe trait impls do not receive Send/Sync concurrency witness routing"
+support_tier = "Witness routing"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
 
 [[cases]]
 fixture = "ffi_sanitizer_route"

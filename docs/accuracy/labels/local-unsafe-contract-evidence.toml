@@ -54,3 +54,20 @@ expected_discharge_state = "missing"
 expected_witness_route_kinds = ["human-deep-review"]
 label_source = "fixture_golden"
 rationale = "Local Safety-colon prose counts as unsafe-call contract evidence but does not discharge the callee contract."
+
+[[samples]]
+id = "custom-unsafe-impl-contract-present-not-send-sync"
+fixture = "unsafe_impl_custom_trait_not_send_sync"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+expected_owner = "Token"
+expected_site_kind = "unsafe_impl"
+expected_obligation_key = "unknown"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A custom unsafe trait impl can carry local contract evidence while staying out of Send/Sync concurrency routing."

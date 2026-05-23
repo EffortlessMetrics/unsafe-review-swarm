@@ -76,7 +76,8 @@ The current fixture-pinned slices are:
   `Ok` validation, and match `Ok` arm validation, while rejecting
   post-validation, wrong-buffer, observed-only, and stale-buffer controls.
 - Unsafe impl Send/Sync witness routing: checks that thread-safety invariants
-  route to Loom/Shuttle witness suggestions.
+  route to Loom/Shuttle witness suggestions while custom unsafe trait impls
+  remain human-review cards.
 - Generic unsafe function call callee-contract evidence: checks whether
   remaining-capacity and availability guards discharge generic unsafe callee
   preconditions, while rejecting wrong-receiver, observed-only, closed-branch,
