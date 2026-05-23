@@ -153,8 +153,16 @@ fn summarize(rust_files: usize, changed_rust_files: usize, cards: &[ReviewCard])
     summary
 }
 
-fn next_action_summary(class: &crate::domain::ReviewClass, operation: &str) -> String {
+fn next_action_summary(
+    class: &crate::domain::ReviewClass,
+    operation: &str,
+    public_api_surface: bool,
+) -> String {
     match class {
+        crate::domain::ReviewClass::ContractMissing if public_api_surface => {
+            "Add a precise public `# Safety` section that names the required caller obligations."
+                .to_string()
+        }
         crate::domain::ReviewClass::ContractMissing => "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.".to_string(),
         crate::domain::ReviewClass::GuardMissing => format!("Add or expose the local guard that discharges the `{operation}` safety obligation."),
         crate::domain::ReviewClass::RequiresLoom => "Add or update a Loom/Shuttle model for the changed concurrency invariant.".to_string(),
@@ -862,6 +870,11 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
                 card.missing.iter().any(|missing| missing.kind == "contract"
                     && missing.message.contains("public `# Safety`")),
                 "{fixture} should not accept local SAFETY prose as public API docs"
+            );
+            assert!(
+                card.next_action.summary.contains("public `# Safety`")
+                    && !card.next_action.summary.contains("SAFETY:"),
+                "{fixture} next action should require public safety docs, not a local SAFETY comment"
             );
             assert!(
                 card.site.owner.is_some(),

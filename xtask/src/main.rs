@@ -2900,6 +2900,22 @@ fn check_fixture_next_action(
             ));
         }
     }
+    let has_public_safety_missing = json_array_at(card, "/missing", &card_context)?
+        .iter()
+        .filter_map(serde_json::Value::as_str)
+        .any(|missing| missing.contains("Missing public `# Safety` documentation"));
+    if has_public_safety_missing {
+        if !normalized.contains("public `# safety`") && !normalized.contains("public # safety") {
+            return Err(format!(
+                "{card_context} next_action for public unsafe API contract evidence must ask for public `# Safety` documentation"
+            ));
+        }
+        if normalized.contains("`safety:`") || normalized.contains(" safety:") {
+            return Err(format!(
+                "{card_context} next_action for public unsafe API contract evidence must not suggest a `SAFETY:` comment as a substitute for public `# Safety` documentation"
+            ));
+        }
+    }
 
     Ok(())
 }
@@ -6621,6 +6637,34 @@ jobs:
 
         assert!(err.contains("next_action"));
         assert!(err.contains("operation_family"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_public_safety_comment_next_action() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["missing"] = serde_json::json!([
+            "Missing public `# Safety` documentation for unsafe API",
+            "No witness receipt imported for this card"
+        ]);
+        card["next_action"] = serde_json::Value::String(
+            "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions."
+                .to_string(),
+        );
+
+        let Err(err) = check_fixture_next_action(
+            "fixtures/public_unsafe_fn_missing_safety/expected.cards.json",
+            0,
+            &card,
+            "unknown",
+        ) else {
+            return Err("public-safety comment next_action should fail".to_string());
+        };
+
+        assert!(err.contains("public unsafe API"));
+        assert!(err.contains("public `# Safety`"));
         Ok(())
     }
 

@@ -144,6 +144,9 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - fixture golden next actions are non-empty reviewer actions, avoid overclaim
   wording, and name the matching operation family when they refer to a safety
   obligation,
+- fixture golden next actions for public unsafe API contract evidence require
+  public `# Safety` documentation and do not offer a `SAFETY:` comment as a
+  substitute,
 - fixture golden witness routes are advisory, non-empty, command-kind coherent,
   and command-aligned with verify commands, and route kinds belong to the
   operation family registry row,
@@ -206,6 +209,8 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
   UB-free, Miri-clean, or memory-safety proof wording.
 - A fixture card next action cannot say "all clear" or name the wrong operation
   family for safety-obligation repair guidance.
+- A public unsafe API contract card next action cannot say that a `SAFETY:`
+  comment resolves missing public `# Safety` documentation.
 - An allowed public claim cannot omit its claim level, such as
   `Fixture-pinned`.
 - A forbidden claim list cannot omit the shared global precision, global recall,

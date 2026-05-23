@@ -77,7 +77,11 @@ pub(super) fn build_card(
     }
 
     let next_action = NextAction {
-        summary: super::next_action_summary(&class, scanned_site.operation.family.as_str()),
+        summary: super::next_action_summary(
+            &class,
+            scanned_site.operation.family.as_str(),
+            scanned_site.site.public_api_surface,
+        ),
         verify_commands,
     };
 

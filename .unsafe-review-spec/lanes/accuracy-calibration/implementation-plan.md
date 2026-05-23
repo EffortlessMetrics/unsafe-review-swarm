@@ -54,6 +54,8 @@ The guard rejects:
 - fixture golden cards whose next_action is missing, non-actionable,
   overclaiming, or names a different operation family for safety-obligation
   repair guidance.
+- fixture golden cards whose public unsafe API contract next_action suggests a
+  `SAFETY:` comment as a substitute for public `# Safety` documentation.
 - fixture golden cards whose site metadata has unknown kind or visibility,
   invalid source coordinates, invalid file paths, incoherent public API flags,
   or operation/snippet drift.

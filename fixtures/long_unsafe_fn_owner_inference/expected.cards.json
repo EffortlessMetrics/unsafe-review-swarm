@@ -65,7 +65,7 @@
       "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+    "next_action": "Add a precise public `# Safety` section that names the required caller obligations.",
     "verify_commands": []
   },
   {
