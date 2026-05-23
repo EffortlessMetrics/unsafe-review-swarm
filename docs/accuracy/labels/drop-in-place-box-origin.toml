@@ -1,0 +1,77 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "drop-in-place-box-origin-evidence"
+operation_family = "drop_in_place"
+hazard = "drop_or_deallocation"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard Box::into_raw origin evidence behavior for ptr::drop_in_place; they
+are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "drop-in-place-missing-ownership"
+fixture = "drop_in_place_deallocation"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "drop_in_place"
+expected_hazard = "drop_or_deallocation"
+expected_obligation_key = "ownership"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A bare ptr::drop_in_place call does not prove the value came from Box::into_raw or will avoid double-drop ownership hazards."
+
+[[samples]]
+id = "drop-in-place-box-origin-pointer-live-present"
+fixture = "drop_in_place_box_origin"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "drop_in_place"
+expected_hazard = "drop_or_deallocation"
+expected_obligation_key = "pointer-live"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A same-pointer Box::into_raw origin discharges ptr::drop_in_place pointer-liveness evidence without importing a witness receipt."
+
+[[samples]]
+id = "drop-in-place-box-origin-initialized-present"
+fixture = "drop_in_place_box_origin"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "drop_in_place"
+expected_hazard = "drop_or_deallocation"
+expected_obligation_key = "initialized"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A same-pointer Box::into_raw origin discharges initialized-value evidence for ptr::drop_in_place in the fixture."
+
+[[samples]]
+id = "drop-in-place-box-origin-ownership-present"
+fixture = "drop_in_place_box_origin"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "drop_in_place"
+expected_hazard = "drop_or_deallocation"
+expected_obligation_key = "ownership"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A same-pointer Box::into_raw origin discharges ptr::drop_in_place ownership evidence without importing a witness receipt."
+
+[[samples]]
+id = "drop-in-place-reassigned-origin-not-guard"
+fixture = "drop_in_place_reassigned_origin_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "drop_in_place"
+expected_hazard = "drop_or_deallocation"
+expected_obligation_key = "ownership"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Box::into_raw origin evidence becomes stale when the raw pointer is reassigned before ptr::drop_in_place."

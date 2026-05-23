@@ -62,6 +62,39 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "drop-in-place-box-origin-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "drop_in_place"
+hazard = "drop_or_deallocation"
+support_tier = "Core operation smoke slice"
+fixtures = [
+  "drop_in_place_deallocation",
+  "drop_in_place_box_origin",
+  "drop_in_place_reassigned_origin_not_guard",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/drop-in-place-box-origin.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned ptr::drop_in_place Box-origin evidence distinguishes
+same-pointer Box::into_raw origin evidence from bare and reassigned-origin
+controls in the listed fixtures.
+"""
+forbidden_claims = [
+  "broad ptr::drop_in_place soundness",
+  "allocator proof",
+  "pointer validity proof",
+  "drop correctness proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "raw-pointer-read-alignment-evidence"
 status = "fixture_pinned"
 kind = "evidence_precision"

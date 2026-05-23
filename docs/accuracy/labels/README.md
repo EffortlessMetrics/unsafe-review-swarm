@@ -6,6 +6,8 @@ Current ledgers:
 
 - `box-from-raw-ownership.toml`: fixture-pinned obligation-level labels for
   `Box::from_raw` ownership evidence.
+- `drop-in-place-box-origin.toml`: fixture-pinned obligation-level labels for
+  `ptr::drop_in_place` Box-origin evidence.
 - `copy-nonoverlapping-valid-range.toml`: fixture-pinned
   obligation-level labels for `copy_nonoverlapping` valid-range evidence.
 - `ffi-boundary-obligations.toml`: fixture-pinned obligation-level labels for

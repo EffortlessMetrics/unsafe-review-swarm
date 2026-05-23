@@ -8,6 +8,9 @@ The current fixture-pinned slices are:
 - `Box::from_raw` ownership evidence: checks whether the `ownership`
   obligation is discharged by same-pointer `Box::into_raw` origin evidence,
   while rejecting bare and reassigned-origin controls.
+- `ptr::drop_in_place` Box-origin evidence: checks whether same-pointer
+  `Box::into_raw` origin evidence discharges pointer-liveness, initialized, and
+  ownership obligations, while rejecting bare and reassigned-origin controls.
 - `copy_nonoverlapping` valid-range evidence: checks whether the `valid-range`
   obligation is discharged by same-call source and destination length checks,
   while preserving missing non-overlap evidence and rejecting stale, partial,
