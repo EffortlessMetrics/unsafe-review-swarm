@@ -371,12 +371,20 @@ fn check_ci_routing_contract() -> Result<(), String> {
         "toolchain: 1.95.0",
         "Rust Small on CX43",
         "Rust Small on CX53",
+        "dtolnay/rust-toolchain@1.95.0",
         "Rust Small on GitHub Hosted",
         "Unsafe Review Rust Small Result",
     ] {
         if !text.contains(needle) {
             return Err(format!(
                 "{path} missing required routed CI contract marker: {needle}"
+            ));
+        }
+    }
+    for forbidden in ["em-ci-rust:1.95", "docker run --rm"] {
+        if text.contains(forbidden) {
+            return Err(format!(
+                "{path} must not depend on broken Docker Rust Small marker: {forbidden}"
             ));
         }
     }

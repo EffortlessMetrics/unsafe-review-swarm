@@ -147,12 +147,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          fetch-depth: 1
           persist-credentials: false
-      - name: Run Rust small gate in docker
-        run: |
-          set -euo pipefail
-          docker image inspect em-ci-rust:1.95 >/dev/null
-          docker run --rm -v "$PWD:/work" -w /work em-ci-rust:1.95 bash -lc 'cargo run --locked -p xtask -- check-pr'
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
+      - name: Run Rust small gate
+        run: cargo run --locked -p xtask -- check-pr
 
   rust-small-cx53:
     name: Rust Small on CX53
@@ -164,12 +165,13 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          fetch-depth: 1
           persist-credentials: false
-      - name: Run Rust small gate in docker
-        run: |
-          set -euo pipefail
-          docker image inspect em-ci-rust:1.95 >/dev/null
-          docker run --rm -v "$PWD:/work" -w /work em-ci-rust:1.95 bash -lc 'cargo run --locked -p xtask -- check-pr'
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
+      - name: Run Rust small gate
+        run: cargo run --locked -p xtask -- check-pr
 
   rust-small-github:
     name: Rust Small on GitHub Hosted
