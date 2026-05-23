@@ -794,8 +794,11 @@ fixtures = [
   "unwrap_unchecked_is_some_guard",
   "unwrap_unchecked_is_ok_guard",
   "unwrap_unchecked_is_some_observed_not_guard",
+  "unwrap_unchecked_is_ok_observed_not_guard",
   "unwrap_unchecked_if_let_some_guard",
+  "unwrap_unchecked_if_let_ok_guard",
   "unwrap_unchecked_other_if_let_not_guard",
+  "unwrap_unchecked_other_if_let_ok_not_guard",
   "unwrap_unchecked_post_check_not_guard",
   "unwrap_unchecked_guard_then_reassigned_not_guard",
   "unwrap_unchecked_is_none_return_guard",
@@ -808,9 +811,9 @@ label_ledgers = [
 labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned unwrap_unchecked valid-value evidence distinguishes
-same-receiver Option/Result state, local infallible results, and early-return
-guards from bare observations, wrong receivers, post-checks, and stale guards
-in the listed fixtures.
+same-receiver Option/Result state, local infallible results, if-let guards, and
+early-return guards from bare observations, wrong receivers, post-checks, and
+stale guards in the listed fixtures.
 """
 forbidden_claims = [
   "broad unwrap_unchecked soundness",

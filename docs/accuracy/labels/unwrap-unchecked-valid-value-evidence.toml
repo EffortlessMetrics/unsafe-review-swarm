@@ -86,6 +86,21 @@ label_source = "fixture_golden"
 rationale = "A same-receiver is_ok guard discharges Result unwrap_unchecked valid-value evidence."
 
 [[samples]]
+id = "unwrap-unchecked-is-ok-observed-missing"
+fixture = "unwrap_unchecked_is_ok_observed_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A bare observed is_ok value is not a dominating guard for the later Result unwrap_unchecked operation."
+
+[[samples]]
 id = "unwrap-unchecked-is-some-observed-missing"
 fixture = "unwrap_unchecked_is_some_observed_not_guard"
 kind = "false_positive_control"
@@ -116,6 +131,21 @@ label_source = "fixture_golden"
 rationale = "A same-receiver if-let Some as_ref guard discharges Option unwrap_unchecked valid-value evidence."
 
 [[samples]]
+id = "unwrap-unchecked-if-let-ok-present"
+fixture = "unwrap_unchecked_if_let_ok_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-receiver if-let Ok as_ref guard discharges Result unwrap_unchecked valid-value evidence."
+
+[[samples]]
 id = "unwrap-unchecked-other-if-let-some-missing"
 fixture = "unwrap_unchecked_other_if_let_not_guard"
 kind = "false_positive_control"
@@ -129,6 +159,21 @@ expected_discharge_state = "missing"
 expected_witness_route_kinds = ["miri", "cargo-careful"]
 label_source = "fixture_golden"
 rationale = "If-let Some evidence for another receiver must not discharge this unwrap_unchecked operation."
+
+[[samples]]
+id = "unwrap-unchecked-other-if-let-ok-missing"
+fixture = "unwrap_unchecked_other_if_let_ok_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unwrap_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "If-let Ok evidence for another receiver must not discharge this Result unwrap_unchecked operation."
 
 [[samples]]
 id = "unwrap-unchecked-post-check-missing"
