@@ -18,6 +18,7 @@ const REQUIRED_COMMANDS: &[&str] = &[
 const REQUIRED_ARTIFACT_PATHS: &[&str] = &[
     "target/unsafe-review/pr-summary.md",
     "target/unsafe-review/cards.json",
+    "target/unsafe-review/cards.sarif",
     "target/unsafe-review/comment-plan.json",
     "target/unsafe-review/witness-plan.md",
     "target/unsafe-review/lsp.json",
@@ -25,19 +26,11 @@ const REQUIRED_ARTIFACT_PATHS: &[&str] = &[
 
 const REQUIRED_FIXTURE_PATH: &str = "fixtures/raw_pointer_alignment";
 
-const REQUIRED_TRUST_BOUNDARY_PHRASES: &[&str] = &[
-    "does not prove memory safety",
-    "does not",
-    "advisory",
-];
+const REQUIRED_TRUST_BOUNDARY_PHRASES: &[&str] =
+    &["does not prove memory safety", "does not", "advisory"];
 
 const REQUIRED_NEGATIVE_BOUNDARY_TOPICS: &[&str] = &[
-    "miri",
-    "ub-free",
-    "blocking",
-    "witness",
-    "comments",
-    "source",
+    "miri", "ub-free", "blocking", "witness", "comments", "source",
 ];
 
 const FORBIDDEN_PHRASES: &[&str] = &[
@@ -137,22 +130,20 @@ fn require_no_overclaims(text: &str) -> Result<(), String> {
 }
 
 fn is_negated_use(lower: &str, offset: usize, len: usize) -> bool {
-    let window_start = offset.saturating_sub(80);
+    let mut window_start = offset.saturating_sub(80);
+    while window_start > 0 && !lower.is_char_boundary(window_start) {
+        window_start -= 1;
+    }
     let context_before = &lower[window_start..offset];
     let after_offset = offset + len;
-    let context_after_end = (after_offset + 40).min(lower.len());
+    let mut context_after_end = (after_offset + 40).min(lower.len());
+    while context_after_end < lower.len() && !lower.is_char_boundary(context_after_end) {
+        context_after_end += 1;
+    }
     let context_after = &lower[after_offset..context_after_end];
 
     let negative_markers = [
-        "not ",
-        "no ",
-        "does not",
-        "doesn't",
-        "without",
-        "never",
-        "cannot",
-        "can't",
-        "isn't",
+        "not ", "no ", "does not", "doesn't", "without", "never", "cannot", "can't", "isn't",
         "is not",
     ];
     if negative_markers
@@ -224,5 +215,11 @@ mod tests {
         let text = "This is guaranteed safe.";
         let result = require_no_overclaims(text);
         assert!(result.is_err(), "expected overclaim error, got {result:?}");
+    }
+
+    #[test]
+    fn overclaim_detection_handles_non_ascii_context() -> Result<(), String> {
+        let text = "Step 1 — install. This does not mean unsafe-review proves memory safety.";
+        require_no_overclaims(text)
     }
 }
