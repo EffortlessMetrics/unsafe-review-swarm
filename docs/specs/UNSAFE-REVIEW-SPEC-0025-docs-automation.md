@@ -25,6 +25,7 @@ The repo MUST provide docs automation that checks or generates:
 
 - source-of-truth artifact graph,
 - active goal and work-item proof commands,
+- lane trackers and implementation plans,
 - spec lifecycle dashboard,
 - agent operating contract,
 - docs map,
@@ -61,6 +62,8 @@ git diff --check
 - `AGENTS.md` must preserve source/swarm routing, source-divergence preflight,
   source-of-truth stack, SPEC-0024 CI routing, and no-`.codex` durable-state
   wording.
+- Active lane plans must preserve guardrail wording that matches the checked
+  policy/verifier behavior they describe.
 - If a public README claims a product boundary, it must include no-proof/no-UB-free/no-Miri-clean wording.
 - If a crate README references a local asset, `cargo package --list` must include it.
 - If a doc-artifact ledger references a file, that file must exist.

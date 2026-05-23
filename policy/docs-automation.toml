@@ -73,6 +73,24 @@ must_include = [
 ]
 
 [[generated_or_checked]]
+id = "accuracy-calibration-plan"
+kind = "lane_plan"
+path = ".unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md"
+mode = "check"
+sources = [
+  "policy/accuracy-calibration.toml",
+  "docs/specs/UNSAFE-REVIEW-SPEC-0026-accuracy-validation-and-calibration.md",
+  "xtask/src/main.rs",
+]
+must_include = [
+  "allowed public claim wording that omits the claim level",
+  "forbidden claim lists that omit shared global precision, global recall, and",
+  "memory-safety proof overclaim boundaries",
+  "fixture-pinned claims",
+  "allowed public claim wording that contains global precision/recall",
+]
+
+[[generated_or_checked]]
 id = "docs-map"
 kind = "docs_map"
 path = "docs/README.md"

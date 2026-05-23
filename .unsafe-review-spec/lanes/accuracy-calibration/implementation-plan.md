@@ -28,9 +28,9 @@ The guard rejects:
 - label samples outside the claim's fixture list, or claim fixtures without
   label samples,
 - duplicate fixture/obligation/evidence samples within a claim,
-- allowed public claim wording that names the claim level,
-- forbidden claim lists that include shared global precision, global recall,
-  and memory-safety proof overclaims,
+- allowed public claim wording that omits the claim level,
+- forbidden claim lists that omit shared global precision, global recall, and
+  memory-safety proof overclaim boundaries,
 - fixture-pinned claims that carry dogfood targets or labeled reports,
 - dogfood-measured claims without known dogfood target IDs,
 - labeled-calibrated or policy-eligible claims without checked report files,
