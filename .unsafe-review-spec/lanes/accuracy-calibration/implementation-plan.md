@@ -54,6 +54,10 @@ The guard rejects:
 - fixture golden cards whose next_action is missing, non-actionable,
   overclaiming, or names a different operation family for safety-obligation
   repair guidance.
+- fixture golden cards whose class-specific next_action drifts away from the
+  ReviewCard class route, including Loom/Shuttle, sanitizer/cargo-careful,
+  unreached safe-wrapper test paths, witness receipt/static limitation,
+  baseline ledger, or suppression-owner evidence guidance.
 - fixture golden `guard_missing` cards whose next_action suggests
   documentation or comments as a substitute for concrete guard evidence.
 - fixture golden cards whose public unsafe API contract next_action suggests a

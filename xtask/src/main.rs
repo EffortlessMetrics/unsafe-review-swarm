@@ -2933,6 +2933,50 @@ fn check_fixture_next_action(
             ));
         }
     }
+    match class_name {
+        "requires_loom" if !normalized.contains("loom") || !normalized.contains("shuttle") => {
+            return Err(format!(
+                "{card_context} requires_loom next_action must route reviewers to Loom/Shuttle model evidence"
+            ));
+        }
+        "miri_unsupported"
+            if !normalized.contains("sanitizer") || !normalized.contains("cargo-careful") =>
+        {
+            return Err(format!(
+                "{card_context} miri_unsupported next_action must route reviewers to sanitizer/cargo-careful evidence"
+            ));
+        }
+        "unsafe_unreached"
+            if !normalized.contains("test path") || !normalized.contains("safe wrapper") =>
+        {
+            return Err(format!(
+                "{card_context} unsafe_unreached next_action must ask for a focused test path to the safe wrapper"
+            ));
+        }
+        "guarded_unwitnessed"
+            if !normalized.contains("witness receipt")
+                || !normalized.contains("static limitation") =>
+        {
+            return Err(format!(
+                "{card_context} guarded_unwitnessed next_action must ask for a witness receipt or explicit static limitation"
+            ));
+        }
+        "baseline_known" if !normalized.contains("baseline") || !normalized.contains("ledger") => {
+            return Err(format!(
+                "{card_context} baseline_known next_action must keep baseline ledger review evidence current"
+            ));
+        }
+        "suppressed"
+            if !normalized.contains("suppressed")
+                || !normalized.contains("owner")
+                || !normalized.contains("reason") =>
+        {
+            return Err(format!(
+                "{card_context} suppressed next_action must keep suppression owner and reason evidence current"
+            ));
+        }
+        _ => {}
+    }
 
     Ok(())
 }
@@ -6677,6 +6721,64 @@ jobs:
 
         assert!(err.contains("guard_missing"));
         assert!(err.contains("guard evidence"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_stale_class_next_actions() -> Result<(), String> {
+        for (class_name, stale_action, expected) in [
+            (
+                "requires_loom",
+                "Add or expose the local guard for this concurrency invariant.",
+                "Loom/Shuttle",
+            ),
+            (
+                "miri_unsupported",
+                "Run Miri for this FFI seam.",
+                "sanitizer/cargo-careful",
+            ),
+            (
+                "unsafe_unreached",
+                "Attach a witness receipt for this card.",
+                "safe wrapper",
+            ),
+            (
+                "guarded_unwitnessed",
+                "Add or expose the local guard for this card.",
+                "witness receipt",
+            ),
+            (
+                "baseline_known",
+                "Mark this card as reviewed.",
+                "baseline ledger",
+            ),
+            (
+                "suppressed",
+                "Mark this card as reviewed.",
+                "suppression owner",
+            ),
+        ] {
+            let mut card = test_fixture_card(
+                "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+            )?;
+            card["class"] = serde_json::Value::String(class_name.to_string());
+            card["next_action"] = serde_json::Value::String(stale_action.to_string());
+
+            let Err(err) = check_fixture_next_action(
+                "fixtures/raw_pointer_alignment/expected.cards.json",
+                0,
+                &card,
+                "raw_pointer_read",
+            ) else {
+                return Err(format!("{class_name} stale next_action should fail"));
+            };
+
+            assert!(err.contains(class_name));
+            assert!(
+                err.contains(expected),
+                "expected `{err}` to mention `{expected}`"
+            );
+        }
         Ok(())
     }
 

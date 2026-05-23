@@ -144,6 +144,11 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - fixture golden next actions are non-empty reviewer actions, avoid overclaim
   wording, and name the matching operation family when they refer to a safety
   obligation,
+- fixture golden next actions stay aligned with class-specific reviewer routes:
+  Loom/Shuttle for `requires_loom`, sanitizer/cargo-careful for
+  `miri_unsupported`, safe-wrapper test paths for `unsafe_unreached`, witness
+  receipts or static limitations for `guarded_unwitnessed`, and ledger evidence
+  for baseline/suppression classes,
 - fixture golden `guard_missing` next actions ask for concrete guard evidence
   and do not offer documentation or comments as a substitute,
 - fixture golden next actions for public unsafe API contract evidence require
@@ -211,6 +216,9 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
   UB-free, Miri-clean, or memory-safety proof wording.
 - A fixture card next action cannot say "all clear" or name the wrong operation
   family for safety-obligation repair guidance.
+- A fixture card next action cannot drift away from the ReviewCard class route,
+  such as asking for a guard when the class requires Loom/Shuttle, sanitizer,
+  safe-wrapper reach, witness receipt, baseline, or suppression evidence.
 - A `guard_missing` fixture card next action cannot say a `SAFETY:` comment or
   documentation resolves missing guard evidence.
 - A public unsafe API contract card next action cannot say that a `SAFETY:`
