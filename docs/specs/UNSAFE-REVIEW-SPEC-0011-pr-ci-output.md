@@ -192,6 +192,12 @@ comments[]
 trust_boundary
 ```
 
+May include:
+
+```text
+not_selected[]
+```
+
 Each comment candidate must include:
 
 ```text
@@ -215,6 +221,10 @@ trust_boundary
 `line` must be one-based and nonzero.
 
 Planned comments must not repeat a `card_id` or a `path`/`line` inline anchor.
+
+Each `not_selected` entry must reference a known card, must not repeat a
+planned comment card, and must include a reason for staying out of the inline
+comment budget.
 
 Each body must include the trust boundary.
 

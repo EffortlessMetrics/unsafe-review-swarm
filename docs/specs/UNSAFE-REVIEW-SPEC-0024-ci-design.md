@@ -562,6 +562,8 @@ result counts stay internally consistent
 comment-plan is plan-only
 comment-plan has <= 3 candidates
 comment-plan references known cards
+comment-plan not_selected entries reference known cards
+comment-plan not_selected entries do not repeat planned comments
 comment-plan has no duplicate card IDs or duplicate path/line anchors
 comment-plan has renderable line/path fields
 comment-plan carries structured next action, actionability, and witness route fields
@@ -693,6 +695,8 @@ If comment-plan verification fails, CI may fail because the artifact contract is
 broken.
 
 If comment-plan contains zero candidates, CI should still pass.
+When review cards exist but no inline candidate is selected, `not_selected`
+entries should explain why the card stayed out of the inline comment budget.
 
 ## 12. Witness tool policy
 

@@ -117,6 +117,8 @@ proof that the changed code is memory-safe.
 
 The comment-plan artifact is a plan of candidate high-signal inline comments.
 It is not posted by default.
+Fixture-backed selected and not-selected examples are in
+[COMMENT_PLAN_EXAMPLES.md](COMMENT_PLAN_EXAMPLES.md).
 
 The saved `lsp.json` artifact is a read-only projection for diagnostics,
 hovers, and command-only actions. It must not include `WorkspaceEdit`, source
@@ -156,6 +158,9 @@ A future trusted poster must consume `comment-plan.json` and keep the same
 ReviewCard identity, next action, actionability, witness route, verify-command,
 and trust-boundary fields.
 It must not rerun analysis and create a second comment truth.
+Card-present/no-comment cases should be represented through `not_selected`
+entries in `comment-plan.json`, so reviewers can see why a card stayed out of
+the inline comment budget without opening a second analyzer truth.
 
 ## Witness posture
 

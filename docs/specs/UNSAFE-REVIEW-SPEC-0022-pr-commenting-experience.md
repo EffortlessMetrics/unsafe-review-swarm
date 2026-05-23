@@ -53,6 +53,8 @@ The goal is reviewer leverage, not commenting on every card.
 
 - Mode is plan-only and policy is advisory.
 - Default candidate count is 0-3; hard max is 3.
+- Cards that are present but not selected for inline comments should appear in
+  `not_selected[]` with a reason.
 - Candidate locations must be renderable (`path` + one-based non-zero `line`).
 - Candidate bodies must include a trust boundary statement.
 
@@ -63,6 +65,13 @@ Each selected candidate includes required fields:
 - `next_action`, `witness_routes`, `verify_commands`
 - `selection_reason`, `actionability`
 - `body`, `trust_boundary`
+
+Each `not_selected` entry includes:
+
+- `card_id`, `path`, `line`
+- `class`, `priority`, `confidence`, `operation_family`
+- `actionability`
+- `reason`
 
 ## 5. Selection rules
 
@@ -129,6 +138,8 @@ The poster must not rerun analysis truth, run witness tools, edit source, or pos
 - over max comments
 - missing required fields
 - invalid/unknown `card_id`
+- invalid/unknown `not_selected.card_id`
+- a `not_selected` card that is also present in `comments[]`
 - duplicate `card_id` or duplicate `path`/`line` inline anchors
 - invalid line/path
 - missing `next_action`, `selection_reason`, `actionability`, or candidate
@@ -146,8 +157,11 @@ Future hardening should also reject missing relevance metadata.
 Representative outcomes:
 
 - changed raw pointer read with missing alignment evidence -> one `guard_missing` candidate with concrete repair and trust boundary.
-- `static_unknown`, `baseline_known`, or no changed-line anchor -> no inline comment, with explicit `not_selected` reason.
+- `static_unknown`, `baseline_known`, low-signal witness-only cards, or no changed-line anchor -> no inline comment, with explicit `not_selected` reason.
 - malformed overclaim comment text -> verifier failure.
+
+Fixture-backed selected, card-present/not-selected, and no-card examples are in
+[docs/ci/COMMENT_PLAN_EXAMPLES.md](../ci/COMMENT_PLAN_EXAMPLES.md).
 
 ## 12. CI proof
 

@@ -8679,6 +8679,53 @@ impl WitnessKind {
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_unknown_not_selected_card_id() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-comment-not-selected-unknown")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        fs::write(
+            dir.join("comment-plan.json"),
+            r#"{"mode":"plan_only","policy":"advisory","comments":[],"not_selected":[{"card_id":"missing","path":"src/lib.rs","line":7,"class":"miri_unsupported","priority":"medium","confidence":"medium","operation_family":"ffi","actionability":"specific_witness_missing","reason":"priority/confidence below inline comment threshold"}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
+        )
+        .map_err(|err| format!("write comment plan failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("not_selected references unknown card id")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn advisory_artifact_checker_rejects_planned_card_repeated_as_not_selected()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-comment-not-selected-repeat")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        fs::write(
+            dir.join("comment-plan.json"),
+            r#"{"mode":"plan_only","policy":"advisory","comments":[{"card_id":"card-1","path":"src/lib.rs","line":7,"class":"guard_missing","priority":"high","confidence":"medium","operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verify_commands":["cargo +nightly miri test card"],"selection_reason":"actionable high-priority review card","actionability":"specific_guard_missing","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","body":"Next action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n\nPlan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision."}],"not_selected":[{"card_id":"card-1","path":"src/lib.rs","line":7,"class":"guard_missing","priority":"high","confidence":"medium","operation_family":"raw_pointer_read","actionability":"specific_guard_missing","reason":"comment-plan max of three candidates reached"}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
+        )
+        .map_err(|err| format!("write comment plan failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("not_selected repeats planned comment card id")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn advisory_artifact_checker_rejects_duplicate_comment_card_ids() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-artifacts-comment-duplicate-card")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;

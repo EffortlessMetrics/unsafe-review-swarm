@@ -8,6 +8,20 @@ pub(super) fn should_plan_comment(card: &ReviewCard) -> bool {
         && !matches!(card.confidence, Confidence::Low | Confidence::Unknown)
 }
 
+pub(super) fn non_selection_reason(card: &ReviewCard) -> &'static str {
+    if !card.class.is_actionable() {
+        "class not eligible for inline comments"
+    } else if matches!(card.confidence, Confidence::Low | Confidence::Unknown) {
+        "confidence below inline comment threshold"
+    } else if !(matches!(card.priority, Priority::High)
+        || matches!(card.confidence, Confidence::High))
+    {
+        "priority/confidence below inline comment threshold"
+    } else {
+        "not selected by current inline comment policy"
+    }
+}
+
 pub(super) fn selection_reason(card: &ReviewCard) -> &'static str {
     if matches!(card.confidence, Confidence::High) {
         "actionable high-confidence review card"

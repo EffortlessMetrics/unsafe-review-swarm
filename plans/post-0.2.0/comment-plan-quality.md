@@ -17,7 +17,8 @@ plan without enabling automatic comment posting by default.
 3. Reject duplicate card IDs, duplicate lines, and unsupported classes in the
    artifact verifier.
 4. Enforce the hard 220-word body limit in the artifact verifier.
-5. Add fixture-backed examples for selected and not-selected cards.
+5. Add fixture-backed examples for selected and not-selected cards, with
+   `not_selected` reasons in the plan artifact.
 6. Document a future trusted poster workflow that consumes verified artifacts
    without rerunning analysis truth.
 

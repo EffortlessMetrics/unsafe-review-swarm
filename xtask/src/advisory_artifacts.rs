@@ -213,6 +213,62 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             );
         }
     }
+    if let Some(not_selected) = comment_plan.get("not_selected") {
+        let Some(not_selected) = not_selected.as_array() else {
+            return Err("comment-plan.json not_selected must be an array".to_string());
+        };
+        let mut not_selected_card_ids = BTreeSet::new();
+        for card in not_selected {
+            let Some(card_id) = card.get("card_id").and_then(serde_json::Value::as_str) else {
+                return Err("comment-plan.json not_selected entry is missing card_id".to_string());
+            };
+            if !card_ids.contains(card_id) {
+                return Err(format!(
+                    "comment-plan.json not_selected references unknown card id `{card_id}`"
+                ));
+            }
+            if comment_card_ids.contains(card_id) {
+                return Err(format!(
+                    "comment-plan.json not_selected repeats planned comment card id `{card_id}`"
+                ));
+            }
+            if !not_selected_card_ids.insert(card_id.to_string()) {
+                return Err(format!(
+                    "comment-plan.json not_selected repeats card id `{card_id}`"
+                ));
+            }
+            let Some(path) = card.get("path").and_then(serde_json::Value::as_str) else {
+                return Err("comment-plan.json not_selected entry is missing path".to_string());
+            };
+            if path.trim().is_empty() {
+                return Err("comment-plan.json not_selected path must not be empty".to_string());
+            }
+            let Some(line) = card.get("line").and_then(serde_json::Value::as_u64) else {
+                return Err("comment-plan.json not_selected entry is missing line".to_string());
+            };
+            if line == 0 {
+                return Err("comment-plan.json not_selected line must be one-based".to_string());
+            }
+            super::require_non_empty_json_str(card, "class", "comment-plan.json not_selected")?;
+            super::require_non_empty_json_str(card, "priority", "comment-plan.json not_selected")?;
+            super::require_non_empty_json_str(
+                card,
+                "confidence",
+                "comment-plan.json not_selected",
+            )?;
+            super::require_non_empty_json_str(
+                card,
+                "operation_family",
+                "comment-plan.json not_selected",
+            )?;
+            super::require_non_empty_json_str(
+                card,
+                "actionability",
+                "comment-plan.json not_selected",
+            )?;
+            super::require_non_empty_json_str(card, "reason", "comment-plan.json not_selected")?;
+        }
+    }
     let comment_boundary = comment_plan
         .get("trust_boundary")
         .and_then(serde_json::Value::as_str)

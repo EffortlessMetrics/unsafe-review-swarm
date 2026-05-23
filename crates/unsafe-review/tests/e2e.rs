@@ -703,6 +703,46 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
 }
 
 #[test]
+fn first_pr_comment_plan_explains_not_selected_cards() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("ffi_sanitizer_route");
+    let temp = TempDir::new("unsafe-review-first-pr-comment-not-selected-e2e")?;
+    let out_dir = temp.path().join("unsafe-review");
+
+    run_success([
+        os("first-pr"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--out-dir"),
+        out_dir.as_os_str().to_os_string(),
+    ])?;
+
+    let cards = parse_json(&fs::read_to_string(out_dir.join("cards.json"))?)?;
+    let card_id = json_str(&cards["cards"][0]["id"], "cards[0].id")?;
+
+    let comment_plan = parse_json(&fs::read_to_string(out_dir.join("comment-plan.json"))?)?;
+    assert_eq!(comment_plan["comments"].as_array().map_or(1, Vec::len), 0);
+    assert_eq!(
+        comment_plan["not_selected"].as_array().map_or(0, Vec::len),
+        1
+    );
+    assert_eq!(comment_plan["not_selected"][0]["card_id"], card_id);
+    assert_eq!(comment_plan["not_selected"][0]["class"], "miri_unsupported");
+    assert_eq!(comment_plan["not_selected"][0]["operation_family"], "ffi");
+    assert_eq!(
+        comment_plan["not_selected"][0]["actionability"],
+        "specific_witness_missing"
+    );
+    assert_eq!(
+        comment_plan["not_selected"][0]["reason"],
+        "priority/confidence below inline comment threshold"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn help_reports_first_run_trust_boundary_without_overclaims() -> Result<(), Box<dyn Error>> {
     let output = run_success([os("--help")])?;
     let text = stdout_text(&output)?;

@@ -85,6 +85,7 @@ mod tests {
         let value = parse_json(&render(&output))?;
 
         assert_eq!(value["comments"].as_array().map_or(1, Vec::len), 0);
+        assert!(value.get("not_selected").is_none());
         assert_eq!(value["no_changed_gaps"]["message"], NO_CHANGED_GAPS_MESSAGE);
         assert_eq!(
             value["no_changed_gaps"]["limitation"],
@@ -125,6 +126,33 @@ mod tests {
                 .ok_or_else(|| "comments should be an array".to_string())?
                 .len(),
             3
+        );
+        assert_eq!(
+            value["not_selected"]
+                .as_array()
+                .ok_or_else(|| "not_selected should be an array".to_string())?
+                .len(),
+            2
+        );
+        assert_eq!(
+            value["not_selected"][0]["reason"],
+            "comment-plan max of three candidates reached"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn comment_plan_explains_card_present_but_not_selected() -> Result<(), String> {
+        let output = fixture_output("ffi_sanitizer_route")?;
+        let value = parse_json(&render(&output))?;
+
+        assert_eq!(value["comments"].as_array().map_or(1, Vec::len), 0);
+        assert_eq!(value["not_selected"].as_array().map_or(0, Vec::len), 1);
+        assert_eq!(value["not_selected"][0]["class"], "miri_unsupported");
+        assert_eq!(value["not_selected"][0]["operation_family"], "ffi");
+        assert_eq!(
+            value["not_selected"][0]["reason"],
+            "priority/confidence below inline comment threshold"
         );
         Ok(())
     }
