@@ -47,7 +47,11 @@ Status per work item below; PR receipts are listed where applicable.
 - Continues under `plans/post-0.2.0/comment-plan-quality.md`.
 - Documentation surface extended in #364 with copy-range and
   public-unsafe-fn-missing-safety fixture-backed examples.
-- Analyzer-side ranking / metadata work is deeper and tracked separately.
+- #368 added `relevance` metadata to selected and not-selected
+  `comment-plan.json` entries and made `check-first-pr-artifacts` reject
+  missing or unknown relevance values.
+- Deeper analyzer-side selection and ranking work remains tracked
+  separately.
 
 ## Extension MVP spec — done (#358)
 

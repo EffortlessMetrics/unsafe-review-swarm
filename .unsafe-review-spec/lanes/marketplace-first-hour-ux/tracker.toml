@@ -117,7 +117,10 @@ spec = "UNSAFE-REVIEW-SPEC-0022"
 plan = "plans/post-0.2.0/comment-plan-quality.md"
 description = """
 Continue the comment-plan-quality plan: selection_reason, actionability,
-relevance, not_selected[] reasons, capped bodies, no duplicates. No posting.
+relevance, not_selected[] reasons, capped bodies, no duplicates. #364
+expanded fixture-backed examples and #368 added relevance metadata plus
+artifact-verifier enforcement. Deeper analyzer-side selection and ranking
+work remains in scope. No posting.
 """
 proof = [
   "cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review",
