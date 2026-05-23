@@ -27,6 +27,11 @@ verdict: it must be non-empty, concrete, operation-aware when it names a safety
 obligation, and free of "all clear", safety-proof, UB-free, Miri-clean, or
 site-execution claims.
 
+Card `class`, `priority`, and `confidence` values must use the canonical
+ReviewCard vocabulary. Fixture goldens pin the expected signal for supported
+classification states so a card cannot silently drift from a high-confidence
+contract gap to a weaker or unknown PR-review signal.
+
 ## Non-goals
 
 - no soundness claim
@@ -43,6 +48,8 @@ site-execution claims.
 ## Acceptance examples
 
 - A changed unsafe seam produces one review card with stable identity.
+- The card's class, priority, and confidence are known ReviewCard values and
+  match the fixture-pinned classification signal.
 - The card includes missing evidence and a next action.
 - The card's next action names a concrete review step without implying safety,
   UB-free status, Miri-clean status, or site execution.

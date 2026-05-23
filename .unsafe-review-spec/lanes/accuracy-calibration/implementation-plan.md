@@ -45,6 +45,8 @@ The guard rejects:
 - fixture golden cards whose next_action is missing, non-actionable,
   overclaiming, or names a different operation family for safety-obligation
   repair guidance.
+- fixture golden cards whose class, priority, or confidence are unknown or
+  inconsistent with the fixture-pinned classification signal.
 - fixture golden cards whose witness routes are missing, required by default,
   or out of sync with verify_commands.
 - fixture golden ReviewCard IDs that omit stable fixture/package, file, owner,

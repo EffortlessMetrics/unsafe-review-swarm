@@ -2473,12 +2473,86 @@ fn check_fixture_card_identity(
         ));
     }
 
+    check_fixture_card_classification(path, idx, card)?;
     let has_missing_evidence = check_fixture_obligation_evidence(path, idx, card)?;
     check_fixture_missing_summary(path, idx, card, has_missing_evidence)?;
     check_fixture_next_action(path, idx, card, operation_family)?;
     check_fixture_witness_routes(path, idx, card)?;
 
     Ok(())
+}
+
+fn check_fixture_card_classification(
+    path: &str,
+    idx: usize,
+    card: &serde_json::Value,
+) -> Result<(), String> {
+    let card_context = format!("{path} card[{idx}]");
+    let class_name = require_non_empty_json_str(card, "class", &card_context)?;
+    let priority = require_non_empty_json_str(card, "priority", &card_context)?;
+    let confidence = require_non_empty_json_str(card, "confidence", &card_context)?;
+
+    if !fixture_known_review_class(class_name) {
+        return Err(format!(
+            "{card_context} class `{class_name}` must be a known ReviewClass string"
+        ));
+    }
+    if !matches!(priority, "high" | "medium" | "low") {
+        return Err(format!(
+            "{card_context} priority `{priority}` must be `high`, `medium`, or `low`"
+        ));
+    }
+    if !matches!(confidence, "high" | "medium" | "low" | "unknown") {
+        return Err(format!(
+            "{card_context} confidence `{confidence}` must be `high`, `medium`, `low`, or `unknown`"
+        ));
+    }
+
+    let Some((expected_priority, expected_confidence)) =
+        fixture_expected_classification_signal(class_name)
+    else {
+        return Ok(());
+    };
+    if priority != expected_priority || confidence != expected_confidence {
+        return Err(format!(
+            "{card_context} class `{class_name}` must use priority `{expected_priority}` and confidence `{expected_confidence}`, got priority `{priority}` and confidence `{confidence}`"
+        ));
+    }
+
+    Ok(())
+}
+
+fn fixture_known_review_class(class_name: &str) -> bool {
+    matches!(
+        class_name,
+        "guarded_and_witnessed"
+            | "guarded_unwitnessed"
+            | "contract_missing"
+            | "guard_missing"
+            | "reachable_unwitnessed"
+            | "unsafe_unreached"
+            | "witness_mismatch"
+            | "requires_loom"
+            | "requires_sanitizer"
+            | "requires_kani_or_crux"
+            | "miri_unsupported"
+            | "static_unknown"
+            | "baseline_known"
+            | "suppressed"
+    )
+}
+
+fn fixture_expected_classification_signal(
+    class_name: &str,
+) -> Option<(&'static str, &'static str)> {
+    match class_name {
+        "contract_missing" => Some(("high", "high")),
+        "guard_missing" | "requires_loom" => Some(("high", "medium")),
+        "guarded_unwitnessed" | "miri_unsupported" | "unsafe_unreached" => {
+            Some(("medium", "medium"))
+        }
+        _ => None,
+    }
 }
 
 fn check_fixture_next_action(
@@ -5118,6 +5192,69 @@ jobs:
     }
 
     #[test]
+    fn fixture_card_identity_rejects_unknown_class() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["class"] = serde_json::Value::String("maybe_safe".to_string());
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("unknown class should fail".to_string());
+        };
+
+        assert!(err.contains("class `maybe_safe`"));
+        assert!(err.contains("known ReviewClass"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_unknown_priority() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["priority"] = serde_json::Value::String("urgent".to_string());
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("unknown priority should fail".to_string());
+        };
+
+        assert!(err.contains("priority `urgent`"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_stale_classification_signal() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["class"] = serde_json::Value::String("contract_missing".to_string());
+        card["confidence"] = serde_json::Value::String("medium".to_string());
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("stale classification signal should fail".to_string());
+        };
+
+        assert!(err.contains("contract_missing"));
+        assert!(err.contains("confidence `high`"));
+        Ok(())
+    }
+
+    #[test]
     fn fixture_card_identity_rejects_orphan_obligation_evidence() -> Result<(), String> {
         let mut card = test_fixture_card(
             "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
@@ -5548,6 +5685,9 @@ jobs:
         format!(
             r#"{{
   "id": "{id}",
+  "class": "guard_missing",
+  "priority": "high",
+  "confidence": "medium",
   "site": {{
     "file": "src/lib.rs",
     "owner": "read_header",
