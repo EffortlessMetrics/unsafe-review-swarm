@@ -50,7 +50,9 @@ jobs:
         run: npm test
 
       - name: Package VSIX
-        run: npx --yes @vscode/vsce@^2.32.0 package --out ../../target/unsafe-review-vscode.vsix --allow-missing-repository
+        run: |
+          mkdir -p ../../target
+          npx --yes @vscode/vsce@2.32.0 package --out ../../target/unsafe-review-vscode.vsix --allow-missing-repository
 
       - uses: actions/upload-artifact@v7
         if: always()
