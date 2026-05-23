@@ -234,6 +234,39 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "slice-from-raw-parts-mut-initialized-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "slice_from_raw_parts"
+hazard = "initialized_memory"
+support_tier = "Core operation smoke slice"
+fixtures = [
+  "slice_from_raw_parts_mut",
+  "slice_from_raw_parts_mut_maybeuninit",
+  "slice_from_raw_parts_mut_other_maybeuninit_not_guard",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/slice-from-raw-parts-mut-initialized.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned slice::from_raw_parts_mut initialized-memory evidence
+distinguishes MaybeUninit element slices from bare and unrelated MaybeUninit
+controls in the listed fixtures.
+"""
+forbidden_claims = [
+  "broad slice::from_raw_parts_mut soundness",
+  "pointer validity proof",
+  "alignment proof",
+  "allocation proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "copy-nonoverlapping-valid-range-evidence"
 status = "fixture_pinned"
 kind = "evidence_precision"

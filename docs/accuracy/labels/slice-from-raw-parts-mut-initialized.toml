@@ -1,0 +1,53 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "slice-from-raw-parts-mut-initialized-evidence"
+operation_family = "slice_from_raw_parts"
+hazard = "initialized_memory"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard initialized-memory evidence behavior for slice::from_raw_parts_mut; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "slice-from-raw-parts-mut-missing-initialized"
+fixture = "slice_from_raw_parts_mut"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "slice_from_raw_parts"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A bare mutable raw slice construction does not prove the exposed memory range is initialized."
+
+[[samples]]
+id = "slice-from-raw-parts-mut-maybeuninit-present"
+fixture = "slice_from_raw_parts_mut_maybeuninit"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "slice_from_raw_parts"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A MaybeUninit element slice discharges initialized-memory evidence for the mutable raw slice while pointer, alignment, and allocation obligations remain separate."
+
+[[samples]]
+id = "slice-from-raw-parts-mut-other-maybeuninit-not-guard"
+fixture = "slice_from_raw_parts_mut_other_maybeuninit_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "slice_from_raw_parts"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Unrelated MaybeUninit mentions do not discharge initialized-memory evidence for the mutable raw slice."

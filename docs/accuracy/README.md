@@ -29,6 +29,10 @@ The current fixture-pinned slices are:
   obligation is discharged by `u8`, guarded `bool`, or `MaybeUninit` targets,
   while rejecting stale, closed-branch, wrong-target, and previous-operation
   controls.
+- `slice::from_raw_parts_mut` initialized-memory evidence: checks whether
+  `MaybeUninit` element slices discharge the initialized-memory obligation,
+  while rejecting unrelated `MaybeUninit` mentions and keeping pointer,
+  alignment, and allocation obligations separate.
 - Public unsafe API contract evidence: checks whether the public caller-contract
   obligation has `# Safety` / documented `Safety:` contract evidence, while
   keeping local `SAFETY:` comments from satisfying public API documentation.
