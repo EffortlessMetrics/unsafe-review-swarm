@@ -148,10 +148,13 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
   unknown operation-family cards must ask for manual unsafe-site review and
   obligation-specific guard evidence,
 - fixture golden next actions stay aligned with class-specific reviewer routes:
-  Loom/Shuttle for `requires_loom`, sanitizer/cargo-careful for
-  `miri_unsupported`, safe-wrapper test paths for `unsafe_unreached`, witness
-  receipts or static limitations for `guarded_unwitnessed`, and ledger evidence
-  for baseline/suppression classes,
+  Loom/Shuttle for `requires_loom`, sanitizer receipts for
+  `requires_sanitizer`, Kani/Crux receipts for `requires_kani_or_crux`,
+  sanitizer/cargo-careful for `miri_unsupported`, safe-wrapper test paths for
+  `unsafe_unreached`, witness receipts or static limitations for
+  `reachable_unwitnessed` and `guarded_unwitnessed`, matching receipts for
+  `witness_mismatch`, manual contract and witness-route identification for
+  `static_unknown`, and ledger evidence for baseline/suppression classes,
 - fixture golden `guard_missing` next actions ask for concrete guard evidence
   and do not offer documentation or comments as a substitute,
 - fixture golden next actions for public unsafe API contract evidence require
@@ -224,7 +227,8 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
   review and obligation-specific guard evidence.
 - A fixture card next action cannot drift away from the ReviewCard class route,
   such as asking for a guard when the class requires Loom/Shuttle, sanitizer,
-  safe-wrapper reach, witness receipt, baseline, or suppression evidence.
+  Kani/Crux, safe-wrapper reach, witness receipt, matching receipt, manual
+  contract routing, baseline, or suppression evidence.
 - A `guard_missing` fixture card next action cannot say a `SAFETY:` comment or
   documentation resolves missing guard evidence.
 - A public unsafe API contract card next action cannot say that a `SAFETY:`

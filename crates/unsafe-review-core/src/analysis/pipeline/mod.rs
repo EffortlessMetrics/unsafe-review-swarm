@@ -166,8 +166,13 @@ fn next_action_summary(
         crate::domain::ReviewClass::ContractMissing => "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.".to_string(),
         crate::domain::ReviewClass::GuardMissing if operation == "unknown" => "Review the unsafe site manually and add the missing obligation-specific guard once the contract is identified.".to_string(),
         crate::domain::ReviewClass::GuardMissing => format!("Add or expose the local guard that discharges the `{operation}` safety obligation."),
+        crate::domain::ReviewClass::ReachableUnwitnessed => "Attach a focused witness receipt for the reached unsafe seam or mark the static limitation explicitly.".to_string(),
+        crate::domain::ReviewClass::WitnessMismatch => "Review the witness identity or tool mismatch and attach a matching receipt for this card.".to_string(),
         crate::domain::ReviewClass::RequiresLoom => "Add or update a Loom/Shuttle model for the changed concurrency invariant.".to_string(),
+        crate::domain::ReviewClass::RequiresSanitizer => "Run a focused sanitizer or cargo-careful witness and attach the receipt with limitations.".to_string(),
+        crate::domain::ReviewClass::RequiresKaniOrCrux => "Run a bounded Kani/Crux proof harness or attach the receipt with limitations.".to_string(),
         crate::domain::ReviewClass::MiriUnsupported => "Use sanitizer/cargo-careful or an explicit FFI boundary contract; Miri may not exercise this seam.".to_string(),
+        crate::domain::ReviewClass::StaticUnknown => "Review the unsafe site manually; identify the missing contract, guard, test, or witness route before claiming progress.".to_string(),
         crate::domain::ReviewClass::UnsafeUnreached => "Add or identify a focused test path that reaches the safe wrapper around this unsafe seam.".to_string(),
         crate::domain::ReviewClass::BaselineKnown => "Known baseline card; keep the ledger owner and review date current.".to_string(),
         crate::domain::ReviewClass::Suppressed => "Suppressed card; keep the owner, reason, evidence, and review or expiry date current.".to_string(),
@@ -748,6 +753,24 @@ mod tests {
         assert_eq!(card.operation.family, OperationFamily::Unknown);
         assert_eq!(card.class, ReviewClass::ContractMissing);
         Ok(())
+    }
+
+    #[test]
+    fn specialist_review_classes_get_routed_next_actions() {
+        for (class, expected) in [
+            (ReviewClass::RequiresSanitizer, "sanitizer"),
+            (ReviewClass::RequiresKaniOrCrux, "Kani/Crux"),
+            (ReviewClass::ReachableUnwitnessed, "witness receipt"),
+            (ReviewClass::WitnessMismatch, "matching receipt"),
+            (ReviewClass::StaticUnknown, "witness route"),
+        ] {
+            let summary = next_action_summary(&class, "raw_pointer_read", false);
+            assert!(
+                summary.contains(expected),
+                "`{}` next action `{summary}` should mention `{expected}`",
+                class.as_str()
+            );
+        }
     }
 
     #[test]

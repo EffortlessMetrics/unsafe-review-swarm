@@ -2947,11 +2947,35 @@ fn check_fixture_next_action(
                 "{card_context} requires_loom next_action must route reviewers to Loom/Shuttle model evidence"
             ));
         }
+        "requires_sanitizer"
+            if !normalized.contains("sanitizer") || !normalized.contains("receipt") =>
+        {
+            return Err(format!(
+                "{card_context} requires_sanitizer next_action must route reviewers to sanitizer receipt evidence"
+            ));
+        }
+        "requires_kani_or_crux"
+            if !normalized.contains("kani")
+                || !normalized.contains("crux")
+                || !normalized.contains("receipt") =>
+        {
+            return Err(format!(
+                "{card_context} requires_kani_or_crux next_action must route reviewers to Kani/Crux proof receipt evidence"
+            ));
+        }
         "miri_unsupported"
             if !normalized.contains("sanitizer") || !normalized.contains("cargo-careful") =>
         {
             return Err(format!(
                 "{card_context} miri_unsupported next_action must route reviewers to sanitizer/cargo-careful evidence"
+            ));
+        }
+        "reachable_unwitnessed"
+            if !normalized.contains("witness receipt")
+                || !normalized.contains("static limitation") =>
+        {
+            return Err(format!(
+                "{card_context} reachable_unwitnessed next_action must ask for a witness receipt or explicit static limitation"
             ));
         }
         "unsafe_unreached"
@@ -2967,6 +2991,24 @@ fn check_fixture_next_action(
         {
             return Err(format!(
                 "{card_context} guarded_unwitnessed next_action must ask for a witness receipt or explicit static limitation"
+            ));
+        }
+        "witness_mismatch"
+            if !normalized.contains("witness")
+                || !normalized.contains("mismatch")
+                || !normalized.contains("matching receipt") =>
+        {
+            return Err(format!(
+                "{card_context} witness_mismatch next_action must ask for a matching receipt after reviewing the mismatch"
+            ));
+        }
+        "static_unknown"
+            if !normalized.contains("manual")
+                || !normalized.contains("contract")
+                || !normalized.contains("witness route") =>
+        {
+            return Err(format!(
+                "{card_context} static_unknown next_action must route reviewers to manual contract and witness-route identification"
             ));
         }
         "baseline_known" if !normalized.contains("baseline") || !normalized.contains("ledger") => {
@@ -6741,9 +6783,24 @@ jobs:
                 "Loom/Shuttle",
             ),
             (
+                "requires_sanitizer",
+                "Run Miri for this sanitizer-routed card.",
+                "sanitizer receipt",
+            ),
+            (
+                "requires_kani_or_crux",
+                "Attach a Miri receipt for this proof-routed card.",
+                "Kani/Crux",
+            ),
+            (
                 "miri_unsupported",
                 "Run Miri for this FFI seam.",
                 "sanitizer/cargo-careful",
+            ),
+            (
+                "reachable_unwitnessed",
+                "Add or expose the local guard for this card.",
+                "witness receipt",
             ),
             (
                 "unsafe_unreached",
@@ -6754,6 +6811,16 @@ jobs:
                 "guarded_unwitnessed",
                 "Add or expose the local guard for this card.",
                 "witness receipt",
+            ),
+            (
+                "witness_mismatch",
+                "Mark this card as reviewed.",
+                "matching receipt",
+            ),
+            (
+                "static_unknown",
+                "Attach a focused witness receipt for this card.",
+                "manual contract",
             ),
             (
                 "baseline_known",

@@ -55,9 +55,10 @@ The guard rejects:
   overclaiming, or names a different operation family for safety-obligation
   repair guidance.
 - fixture golden cards whose class-specific next_action drifts away from the
-  ReviewCard class route, including Loom/Shuttle, sanitizer/cargo-careful,
-  unreached safe-wrapper test paths, witness receipt/static limitation,
-  baseline ledger, or suppression-owner evidence guidance.
+  ReviewCard class route, including Loom/Shuttle, sanitizer receipt,
+  Kani/Crux proof receipt, sanitizer/cargo-careful, unreached safe-wrapper test
+  paths, witness receipt/static limitation, witness mismatch, static-unknown
+  manual review, baseline ledger, or suppression-owner evidence guidance.
 - fixture golden cards whose next_action asks reviewers to discharge an
   `unknown` obligation instead of routing unknown operation families to manual
   unsafe-site review and obligation-specific guard evidence.
