@@ -1,0 +1,4 @@
+[package]
+name = "get-unchecked-mut-if-let-get-reassigned-index-not-guard-fixture"
+version = "0.0.0"
+edition = "2024"

@@ -431,6 +431,8 @@ mod tests {
         "get_unchecked_mut_len_guard",
         "get_unchecked_mut_get_probe_guard",
         "get_unchecked_mut_get_probe_early_return_guard",
+        "get_unchecked_mut_if_let_get_guard",
+        "get_unchecked_mut_let_else_get_guard",
         "get_unchecked_mut_other_len_not_guard",
         "get_unchecked_mut_post_check_not_guard",
         "get_unchecked_mut_bounds_observed_not_guard",
@@ -439,6 +441,8 @@ mod tests {
         "get_unchecked_mut_reassigned_index_not_guard",
         "get_unchecked_mut_get_probe_reassigned_index_not_guard",
         "get_unchecked_mut_get_probe_early_return_reassigned_index_not_guard",
+        "get_unchecked_mut_if_let_get_reassigned_index_not_guard",
+        "get_unchecked_mut_let_else_get_reassigned_index_not_guard",
         "pin_new_unchecked",
     ];
 

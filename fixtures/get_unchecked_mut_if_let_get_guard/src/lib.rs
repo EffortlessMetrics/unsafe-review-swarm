@@ -1,0 +1,20 @@
+pub fn pick_after_if_let_get(values: &mut [u8], index: usize) -> Option<&mut u8> {
+    if let Some(_) = values.get(index) {
+        // SAFETY: the get probe above proves `index` is in bounds for `values`.
+        Some(unsafe { values.get_unchecked_mut(index) })
+    } else {
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::pick_after_if_let_get;
+
+    #[test]
+    fn picks_after_if_let_get() {
+        let mut values = [1_u8, 2, 3];
+        let picked = pick_after_if_let_get(&mut values, 1).expect("in bounds");
+        *picked = 9;
+    }
+}

@@ -99,9 +99,10 @@ The current fixture-pinned slices are:
   `#[target_feature]` caller-contract sites route to human deep review for
   hardware availability and dispatch correctness without implying witness proof.
 - `get_unchecked_mut` bounds evidence: checks whether same-receiver len guards
-  and `get(index)` probe guards discharge the bounds obligation, while
-  rejecting other-receiver, post-check, observed-only, closed-branch,
-  comment-only early-return, and stale-index controls.
+  and `get(index)` probe guards, including if-let and let-else forms,
+  discharge the bounds obligation, while rejecting other-receiver, post-check,
+  observed-only, closed-branch, comment-only early-return, and stale-index
+  controls.
 - Pointer arithmetic bounds evidence: checks whether `index < num_ctrl_bytes`
   and same-slice end-pointer patterns discharge pointer-arithmetic bounds
   evidence while preserving witness/provenance limits.

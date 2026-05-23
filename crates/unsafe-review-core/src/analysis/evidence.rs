@@ -1036,6 +1036,8 @@ fn has_get_unchecked_get_probe_guard(compact: &str, receiver: &str, index: &str)
     let probe = format!("{receiver}.get({index})");
     has_get_unchecked_get_probe_open_branch(compact, &probe, receiver, index)
         || has_get_unchecked_get_probe_early_return(compact, &probe, receiver, index)
+        || has_get_unchecked_get_probe_if_let_branch(compact, &probe, receiver, index)
+        || has_get_unchecked_get_probe_let_else(compact, &probe, receiver, index)
 }
 
 fn has_get_unchecked_get_probe_open_branch(
@@ -1069,6 +1071,57 @@ fn has_get_unchecked_get_probe_early_return(
     index: &str,
 ) -> bool {
     let marker = format!("if{probe}.is_none(){{");
+    let mut cursor = compact;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(&marker) {
+        let proof_start = offset + pos + marker.len();
+        let after_guard = &compact[proof_start..];
+        let (guard_body, after_guard_body) = after_guard
+            .split_once('}')
+            .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
+        if guard_body.contains("return")
+            && !has_get_unchecked_stale_assignment(after_guard_body, receiver, index)
+        {
+            return true;
+        }
+        let next = pos + marker.len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
+}
+
+fn has_get_unchecked_get_probe_if_let_branch(
+    compact: &str,
+    probe: &str,
+    receiver: &str,
+    index: &str,
+) -> bool {
+    let marker = format!("ifletsome(_)={probe}{{");
+    let mut cursor = compact;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(&marker) {
+        let proof_end = offset + pos + marker.len();
+        let after_guard = &compact[proof_end..];
+        if branch_still_open_at_operation(after_guard)
+            && !has_get_unchecked_stale_assignment(after_guard, receiver, index)
+        {
+            return true;
+        }
+        let next = pos + marker.len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
+}
+
+fn has_get_unchecked_get_probe_let_else(
+    compact: &str,
+    probe: &str,
+    receiver: &str,
+    index: &str,
+) -> bool {
+    let marker = format!("letsome(_)={probe}else{{");
     let mut cursor = compact;
     let mut offset = 0usize;
     while let Some(pos) = cursor.find(&marker) {
@@ -5411,6 +5464,36 @@ mod tests {
             "unsafe { values.get_unchecked_mut(index) }",
             vec!["}"],
         );
+        let get_probe_if_let = site_with_family(
+            OperationFamily::GetUnchecked,
+            vec!["if let Some(_) = values.get(index) {"],
+            "unsafe { values.get_unchecked_mut(index) }",
+            vec!["}"],
+        );
+        let get_probe_let_else = site_with_family(
+            OperationFamily::GetUnchecked,
+            vec!["let Some(_) = values.get(index) else { return None; };"],
+            "unsafe { values.get_unchecked_mut(index) }",
+            vec![],
+        );
+        let get_probe_if_let_reassigned_index = site_with_family(
+            OperationFamily::GetUnchecked,
+            vec![
+                "if let Some(_) = values.get(index) {",
+                "index = values.len();",
+            ],
+            "unsafe { values.get_unchecked_mut(index) }",
+            vec!["}"],
+        );
+        let get_probe_let_else_reassigned_index = site_with_family(
+            OperationFamily::GetUnchecked,
+            vec![
+                "let Some(_) = values.get(index) else { return None; };",
+                "index = values.len();",
+            ],
+            "unsafe { values.get_unchecked_mut(index) }",
+            vec![],
+        );
 
         assert!(
             !obligation_evidence(&other_receiver_guard, &obligations, &contract, &reach)[0]
@@ -5486,6 +5569,36 @@ mod tests {
             !obligation_evidence(&get_probe_reassigned_index, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
+        );
+        assert!(
+            obligation_evidence(&get_probe_if_let, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            obligation_evidence(&get_probe_let_else, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(
+                &get_probe_if_let_reassigned_index,
+                &obligations,
+                &contract,
+                &reach
+            )[0]
+            .discharge
+            .present
+        );
+        assert!(
+            !obligation_evidence(
+                &get_probe_let_else_reassigned_index,
+                &obligations,
+                &contract,
+                &reach
+            )[0]
+            .discharge
+            .present
         );
     }
 

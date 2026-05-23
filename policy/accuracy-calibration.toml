@@ -1132,6 +1132,8 @@ fixtures = [
   "get_unchecked_mut_len_guard",
   "get_unchecked_mut_get_probe_guard",
   "get_unchecked_mut_get_probe_early_return_guard",
+  "get_unchecked_mut_if_let_get_guard",
+  "get_unchecked_mut_let_else_get_guard",
   "get_unchecked_mut_other_len_not_guard",
   "get_unchecked_mut_post_check_not_guard",
   "get_unchecked_mut_bounds_observed_not_guard",
@@ -1140,6 +1142,8 @@ fixtures = [
   "get_unchecked_mut_reassigned_index_not_guard",
   "get_unchecked_mut_get_probe_reassigned_index_not_guard",
   "get_unchecked_mut_get_probe_early_return_reassigned_index_not_guard",
+  "get_unchecked_mut_if_let_get_reassigned_index_not_guard",
+  "get_unchecked_mut_let_else_get_reassigned_index_not_guard",
 ]
 dogfood_targets = []
 label_ledgers = [
@@ -1148,9 +1152,9 @@ label_ledgers = [
 labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned get_unchecked_mut bounds evidence distinguishes same-receiver
-len guards and same-receiver get-probe guards from missing, other-receiver,
-post-check, observed-only, closed-branch, comment-only early-return, and
-stale-index controls in the listed fixtures.
+len guards and same-receiver get-probe guards, including if-let and let-else
+forms, from missing, other-receiver, post-check, observed-only, closed-branch,
+comment-only early-return, and stale-index controls in the listed fixtures.
 """
 forbidden_claims = [
   "broad get_unchecked soundness",
