@@ -139,4 +139,7 @@ slice length assertions do not discharge the source/destination range obligation
 Recent proof-index additions that are tracked by the calibration ledger but not
 expanded inline in the long table row above include
 `str_from_utf8_unchecked_if_let_ok_guard` for same-buffer if-let `Ok` UTF-8
-validation before `str::from_utf8_unchecked`.
+validation before `str::from_utf8_unchecked`,
+`str_from_utf8_unchecked_match_ok_guard` for same-buffer match `Ok` arm
+validation, and `str_from_utf8_unchecked_match_ok_reassigned_not_guard` for
+stale-buffer rejection after reassignment inside that arm.

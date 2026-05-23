@@ -358,6 +358,8 @@ mod tests {
         "copy_nonoverlapping_other_len_not_guard",
         "str_from_utf8_unchecked",
         "str_from_utf8_unchecked_if_let_ok_guard",
+        "str_from_utf8_unchecked_match_ok_guard",
+        "str_from_utf8_unchecked_match_ok_reassigned_not_guard",
         "zeroed_invalid_value",
         "inline_asm_human_review",
         "pointer_arithmetic_num_ctrl_bytes_guard",

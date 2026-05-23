@@ -2443,6 +2443,7 @@ fn has_from_utf8_unchecked_validation_evidence(lower: &str) -> bool {
 
     has_validation_is_ok_branch_guard(before_call, &validation, argument_identifier)
         || has_validation_if_let_ok_branch_guard(before_call, &validation, argument_identifier)
+        || has_validation_match_ok_branch_guard(before_call, &validation, argument_identifier)
         || has_validation_early_return_guard(
             before_call,
             &validation,
@@ -2569,6 +2570,57 @@ fn has_validation_if_let_ok_branch_guard(
         }
         search_from = validation_start + validation.len();
     }
+    false
+}
+
+fn has_validation_match_ok_branch_guard(
+    before_call: &str,
+    validation: &str,
+    argument: &str,
+) -> bool {
+    let mut search_from = 0usize;
+    while let Some(relative_validation_pos) = before_call[search_from..].find(validation) {
+        let validation_pos = search_from + relative_validation_pos;
+        let prefix = &before_call[..validation_pos];
+        let Some(match_pos) = prefix.rfind("match") else {
+            search_from = validation_pos + validation.len();
+            continue;
+        };
+        let after_match = &prefix[match_pos + "match".len()..];
+        if !(after_match.is_empty() || after_match.ends_with("::")) {
+            search_from = validation_pos + validation.len();
+            continue;
+        }
+
+        let after_validation = &before_call[validation_pos + validation.len()..];
+        let Some(after_open) = after_validation.strip_prefix('{') else {
+            search_from = validation_pos + validation.len();
+            continue;
+        };
+        if matching_code_block_end(after_open).is_some() {
+            search_from = validation_pos + validation.len();
+            continue;
+        }
+
+        let Some(ok_pos) = after_open.rfind("ok(") else {
+            search_from = validation_pos + validation.len();
+            continue;
+        };
+        if after_open
+            .rfind("err(")
+            .is_some_and(|err_pos| err_pos > ok_pos)
+        {
+            search_from = validation_pos + validation.len();
+            continue;
+        }
+        let current_arm = &after_open[ok_pos..];
+        if current_arm.contains("=>") && !has_assignment_to_identifier(current_arm, argument) {
+            return true;
+        }
+
+        search_from = validation_pos + validation.len();
+    }
+
     false
 }
 
@@ -6311,6 +6363,12 @@ mod tests {
             "unsafe { core::str::from_utf8_unchecked(bytes) }",
             vec!["}"],
         );
+        let match_ok = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec!["match core::str::from_utf8(bytes) {", "    Ok(_) => {"],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec!["}", "Err(_) => \"\",", "}"],
+        );
 
         let checked_evidence = obligation_evidence(&checked, &obligations, &contract, &reach);
         let return_evidence = obligation_evidence(&early_return, &obligations, &contract, &reach);
@@ -6319,12 +6377,14 @@ mod tests {
         let match_return_evidence =
             obligation_evidence(&match_return, &obligations, &contract, &reach);
         let if_let_ok_evidence = obligation_evidence(&if_let_ok, &obligations, &contract, &reach);
+        let match_ok_evidence = obligation_evidence(&match_ok, &obligations, &contract, &reach);
 
         assert!(checked_evidence[0].discharge.present);
         assert!(return_evidence[0].discharge.present);
         assert!(question_mark_evidence[0].discharge.present);
         assert!(match_return_evidence[0].discharge.present);
         assert!(if_let_ok_evidence[0].discharge.present);
+        assert!(match_ok_evidence[0].discharge.present);
     }
 
     #[test]
@@ -6443,6 +6503,16 @@ mod tests {
             "unsafe { core::str::from_utf8_unchecked(bytes) }",
             vec!["}"],
         );
+        let reassigned_in_match_ok = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec![
+                "match core::str::from_utf8(bytes) {",
+                "    Ok(_) => {",
+                "        bytes = b\"\\xff\";",
+            ],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec!["}", "Err(_) => \"\",", "}"],
+        );
 
         let wrong_buffer_evidence =
             obligation_evidence(&wrong_buffer, &obligations, &contract, &reach);
@@ -6480,6 +6550,8 @@ mod tests {
         );
         let reassigned_after_if_let_evidence =
             obligation_evidence(&reassigned_after_if_let, &obligations, &contract, &reach);
+        let reassigned_in_match_ok_evidence =
+            obligation_evidence(&reassigned_in_match_ok, &obligations, &contract, &reach);
 
         assert!(!wrong_buffer_evidence[0].discharge.present);
         assert!(!wrong_buffer_question_mark_evidence[0].discharge.present);
@@ -6493,6 +6565,7 @@ mod tests {
         assert!(!reassigned_after_early_return_evidence[0].discharge.present);
         assert!(!reassigned_after_match_return_evidence[0].discharge.present);
         assert!(!reassigned_after_if_let_evidence[0].discharge.present);
+        assert!(!reassigned_in_match_ok_evidence[0].discharge.present);
     }
 
     #[test]

@@ -72,8 +72,9 @@ The current fixture-pinned slices are:
   observed, closed-branch, stale-byte, and multiline `transmute_copy` controls.
 - `str::from_utf8_unchecked` UTF-8 validation evidence: checks whether the
   `utf8` obligation is discharged by same-buffer validation before conversion,
-  including if-let `Ok` branch validation, while rejecting post-validation,
-  wrong-buffer, observed-only, and stale-buffer controls.
+  including if-let `Ok` branch validation and match `Ok` arm validation, while
+  rejecting post-validation, wrong-buffer, observed-only, and stale-buffer
+  controls.
 - Unsafe impl Send/Sync witness routing: checks that thread-safety invariants
   route to Loom/Shuttle witness suggestions.
 - Generic unsafe function call callee-contract evidence: checks whether

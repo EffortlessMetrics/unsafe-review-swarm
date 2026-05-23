@@ -1,0 +1,19 @@
+pub fn decode(bytes: &[u8]) -> &str {
+    match core::str::from_utf8(bytes) {
+        Ok(_) => {
+            // SAFETY: this arm only runs after the same byte slice is accepted as UTF-8.
+            unsafe { core::str::from_utf8_unchecked(bytes) }
+        }
+        Err(_) => "",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode;
+
+    #[test]
+    fn decodes_ascii() {
+        assert_eq!(decode(b"ok"), "ok");
+    }
+}

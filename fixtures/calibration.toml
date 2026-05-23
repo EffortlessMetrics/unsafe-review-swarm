@@ -155,10 +155,12 @@ required_core_fixtures = [
   "str_from_utf8_unchecked_is_err_return_guard",
   "str_from_utf8_unchecked_question_mark_guard",
   "str_from_utf8_unchecked_match_return_guard",
+  "str_from_utf8_unchecked_match_ok_guard",
   "str_from_utf8_unchecked_post_validation_not_guard",
   "str_from_utf8_unchecked_other_buffer_not_guard",
   "str_from_utf8_unchecked_is_ok_observed_not_guard",
   "str_from_utf8_unchecked_guard_then_reassigned_not_guard",
+  "str_from_utf8_unchecked_match_ok_reassigned_not_guard",
   "zeroed_invalid_value",
   "zeroed_valid_u32",
   "inline_asm_human_review",
@@ -1780,6 +1782,16 @@ expected_operation_family = "str_from_utf8_unchecked"
 expected_hazard = "invalid_value"
 
 [[cases]]
+fixture = "str_from_utf8_unchecked_match_ok_guard"
+kind = "positive"
+claim = "str::from_utf8_unchecked recognizes same-buffer from_utf8 match Ok-arm evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+
+[[cases]]
 fixture = "str_from_utf8_unchecked_post_validation_not_guard"
 kind = "false_positive_control"
 claim = "str::from_utf8_unchecked does not accept validation after the unchecked conversion as UTF-8 evidence"
@@ -1813,6 +1825,16 @@ expected_hazard = "invalid_value"
 fixture = "str_from_utf8_unchecked_guard_then_reassigned_not_guard"
 kind = "false_positive_control"
 claim = "str::from_utf8_unchecked does not accept UTF-8 validation evidence that is stale after buffer reassignment"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "str_from_utf8_unchecked_match_ok_reassigned_not_guard"
+kind = "false_positive_control"
+claim = "str::from_utf8_unchecked does not accept match Ok-arm UTF-8 evidence after buffer reassignment"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
