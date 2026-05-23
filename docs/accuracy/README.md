@@ -40,6 +40,10 @@ The current fixture-pinned slices are:
 - Public unsafe API contract evidence: checks whether the public caller-contract
   obligation has `# Safety` / documented `Safety:` contract evidence, while
   keeping local `SAFETY:` comments from satisfying public API documentation.
+- Raw pointer operation-family smoke: checks that raw pointer deref, unaligned
+  reads/writes, volatile reads/writes, pointer replacement, assignment syntax,
+  and split read-call syntax remain concrete ReviewCard operation families
+  instead of falling back to generic unsafe-block classification.
 - `Vec::set_len` initialized-range evidence: checks whether the `initialized`
   obligation is discharged by visible initialization, shrink, zero-clear, or
   call-result patterns, while rejecting capacity-only, post-init, and unrelated

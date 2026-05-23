@@ -207,6 +207,45 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "raw-pointer-operation-family-smoke"
+status = "fixture_pinned"
+kind = "operation_family"
+owner = "calibration"
+support_tier = "Raw pointer card slice"
+fixtures = [
+  "raw_pointer_deref",
+  "raw_pointer_read_unaligned",
+  "raw_pointer_write_assignment",
+  "raw_pointer_write_unaligned",
+  "raw_pointer_read_volatile",
+  "raw_pointer_write_volatile",
+  "ptr_replace_value",
+  "split_raw_pointer_read_call",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/raw-pointer-operation-family-smoke.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned raw pointer operation-family smoke keeps deref, unaligned
+read/write, volatile read/write, pointer replacement, assignment syntax, and
+split read-call syntax mapped to concrete ReviewCards in the listed fixtures.
+"""
+forbidden_claims = [
+  "complete raw pointer operation coverage",
+  "broad raw pointer soundness",
+  "pointer validity proof",
+  "alignment proof",
+  "initialized-memory proof",
+  "witness execution proof",
+  "Miri-clean",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "public-unsafe-api-safety-docs-contract-evidence"
 status = "fixture_pinned"
 kind = "evidence_precision"

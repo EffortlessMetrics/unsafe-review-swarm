@@ -1,0 +1,123 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "raw-pointer-operation-family-smoke"
+operation_family = "mixed"
+hazard = "mixed"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard operation-family behavior; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "raw-pointer-deref-family"
+fixture = "raw_pointer_deref"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_deref"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "pointer-live"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A raw pointer dereference should stay classified as a concrete raw_pointer_deref ReviewCard."
+
+[[samples]]
+id = "raw-pointer-read-unaligned-family"
+fixture = "raw_pointer_read_unaligned"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read_unaligned"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "bounds"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "read_unaligned should stay classified as raw_pointer_read_unaligned with concrete pointer-validity obligations."
+
+[[samples]]
+id = "raw-pointer-write-assignment-family"
+fixture = "raw_pointer_write_assignment"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "pointer-live"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A raw pointer assignment should stay classified as raw_pointer_write instead of a generic unsafe block."
+
+[[samples]]
+id = "raw-pointer-write-unaligned-family"
+fixture = "raw_pointer_write_unaligned"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write_unaligned"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "bounds"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "write_unaligned should stay classified as raw_pointer_write_unaligned with concrete pointer-validity obligations."
+
+[[samples]]
+id = "raw-pointer-read-volatile-family"
+fixture = "raw_pointer_read_volatile"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "pointer-live"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "read_volatile method syntax should stay classified as a raw_pointer_read ReviewCard."
+
+[[samples]]
+id = "raw-pointer-write-volatile-family"
+fixture = "raw_pointer_write_volatile"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "pointer-live"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "write_volatile method syntax should stay classified as a raw_pointer_write ReviewCard."
+
+[[samples]]
+id = "ptr-replace-family"
+fixture = "ptr_replace_value"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_replace"
+expected_hazard = "drop_or_deallocation"
+expected_obligation_key = "pointer-live"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "ptr::replace should stay classified as ptr_replace with drop/deallocation hazard context."
+
+[[samples]]
+id = "split-raw-pointer-read-family"
+fixture = "split_raw_pointer_read_call"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+expected_obligation_key = "bounds"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Split raw pointer read call syntax should normalize to one concrete raw_pointer_read ReviewCard."

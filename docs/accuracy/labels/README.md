@@ -36,6 +36,8 @@ Current ledgers:
   `ptr::copy` valid-range evidence.
 - `public-unsafe-api-safety-docs.toml`: fixture-pinned obligation-level labels
   for public unsafe API `# Safety` contract evidence.
+- `raw-pointer-operation-family-smoke.toml`: fixture-pinned
+  operation-family labels for raw pointer deref/read/write variants.
 - `raw-pointer-read-alignment.toml`: fixture-pinned obligation-level labels for
   raw pointer read alignment evidence.
 - `raw-pointer-read-bounds.toml`: fixture-pinned obligation-level labels for
