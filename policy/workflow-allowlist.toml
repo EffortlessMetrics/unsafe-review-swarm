@@ -61,6 +61,6 @@ actions = [
   "actions/setup-node@v5",
   "actions/upload-artifact@v7",
 ]
-reason = "Manual editor extension publish workflow. workflow_dispatch only with dry_run default true; publication to VS Marketplace requires VSCE_PAT secret and explicit publish_to_vs_marketplace=true, publication to Open VSX requires OVSX_PAT secret and explicit publish_to_open_vsx=true. No witness execution, no source edits, no comment posting, no automatic publication on PR or push."
+reason = "Manual editor extension publish workflow. workflow_dispatch only from main with dry_run default true; non-dry-run requires at least one explicit publish target and validated package identity; publication to VS Marketplace requires VSCE_PAT secret and explicit publish_to_vs_marketplace=true, publication to Open VSX requires OVSX_PAT secret and explicit publish_to_open_vsx=true. No witness execution, no source edits, no comment posting, no automatic publication on PR or push."
 created = "2026-05-23"
 review_after = "2026-07-23"

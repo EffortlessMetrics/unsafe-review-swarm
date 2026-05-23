@@ -181,7 +181,9 @@ boolean inputs and dedicated secrets. No PR-triggered publication. Lands as
 .github/workflows/editor-publish.yml plus the editor-extension-publish CI
 lane in policy/ci-lane-whitelist.toml. Owner-side prerequisites
 (publisher accounts, VSCE_PAT and OVSX_PAT secrets, Open VSX namespace)
-are documented in docs/editor/marketplace-publication.md.
+are documented in docs/editor/marketplace-publication.md. Publication is
+restricted to manual dispatch from main, and non-dry-run publication must
+select at least one marketplace target.
 """
 proof = [
   "cargo run --locked -p xtask -- check-ci-lanes",

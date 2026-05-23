@@ -106,24 +106,27 @@ Once the checklist passes, run the manual publish workflow:
 #   publish_to_open_vsx         (default false)
 ```
 
-The default invocation is a dry run: build, test, package, and report what
-would be published. Publishing only happens when both `dry_run=false` and
-the relevant publish boolean is `true`.
+The workflow must be dispatched from `main`. The default invocation is a dry
+run: build, test, package, and report what would be published. Publishing only
+happens when `dry_run=false`, at least one publish target boolean is `true`,
+and the matching token secret is configured.
 
 Example invocations:
 
 ```bash
 # Dry run (default; no publish): just package and report
-gh workflow run editor-publish.yml -f version=0.1.0
+gh workflow run editor-publish.yml --ref main -f version=0.1.0
 
 # VS Marketplace only
 gh workflow run editor-publish.yml \
+  --ref main \
   -f version=0.1.0 \
   -f dry_run=false \
   -f publish_to_vs_marketplace=true
 
 # Open VSX only
 gh workflow run editor-publish.yml \
+  --ref main \
   -f version=0.1.0 \
   -f dry_run=false \
   -f publish_to_open_vsx=true
@@ -132,7 +135,10 @@ gh workflow run editor-publish.yml \
 The workflow:
 
 - runs only on `workflow_dispatch`; no PR or push trigger can invoke it,
+- fails when dispatched from any ref other than `main`,
 - never publishes if `dry_run=true` (the default),
+- never treats `dry_run=false` with no selected publish target as a
+  successful publish,
 - requires `VSCE_PAT` to publish to VS Marketplace and `OVSX_PAT` for Open
   VSX; missing tokens fail the relevant step rather than silently skip,
 - uploads the VSIX as a workflow artifact regardless of publish mode,
