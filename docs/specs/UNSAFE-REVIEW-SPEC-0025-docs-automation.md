@@ -62,6 +62,9 @@ git diff --check
 - `AGENTS.md` must preserve source/swarm routing, source-divergence preflight,
   source-of-truth stack, SPEC-0024 CI routing, and no-`.codex` durable-state
   wording.
+- `AGENTS.md` must preserve the active improvement runway, expected generated
+  PR batches, spec rails as forward drive, missing-rail alignment, and
+  configuration-obstacle handling for single-contributor review gates.
 - Active lane plans must preserve guardrail wording that matches the checked
   policy/verifier behavior they describe.
 - If a public README claims a product boundary, it must include no-proof/no-UB-free/no-Miri-clean wording.
