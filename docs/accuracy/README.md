@@ -40,6 +40,9 @@ The current fixture-pinned slices are:
 - Public unsafe API contract evidence: checks whether the public caller-contract
   obligation has `# Safety` / documented `Safety:` contract evidence, while
   keeping local `SAFETY:` comments from satisfying public API documentation.
+- Private/local unsafe contract evidence: checks whether private unsafe
+  functions and local `SAFETY:` / `Safety:` prose provide contract evidence
+  without turning comment text into guard/discharge evidence.
 - Raw pointer operation-family smoke: checks that raw pointer deref, unaligned
   reads/writes, volatile reads/writes, pointer replacement, assignment syntax,
   and split read-call syntax remain concrete ReviewCard operation families

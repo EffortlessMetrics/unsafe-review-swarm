@@ -1,0 +1,56 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "local-unsafe-contract-evidence"
+operation_family = "mixed"
+hazard = "mixed"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard contract evidence behavior; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+"""
+
+[[samples]]
+id = "documented-private-unsafe-fn-contract-present"
+fixture = "documented_private_unsafe_fn"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+expected_obligation_key = "unknown"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A private unsafe function with a documented safety contract has local contract evidence and remains advisory."
+
+[[samples]]
+id = "private-unsafe-helper-safety-comment-contract-only"
+fixture = "private_unsafe_helper_safety_comment"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+expected_obligation_key = "unknown"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A local SAFETY comment can provide contract evidence while still leaving guard evidence missing."
+
+[[samples]]
+id = "local-safety-colon-comment-contract-only"
+fixture = "local_safety_colon_comment"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+expected_obligation_key = "callee-contract"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "Local Safety-colon prose counts as unsafe-call contract evidence but does not discharge the callee contract."

@@ -279,6 +279,38 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "local-unsafe-contract-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+support_tier = "Contract evidence mining"
+fixtures = [
+  "documented_private_unsafe_fn",
+  "private_unsafe_helper_safety_comment",
+  "local_safety_colon_comment",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/local-unsafe-contract-evidence.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned private/local unsafe contract evidence distinguishes documented
+private unsafe contracts and local SAFETY/Safety prose from actual guard
+discharge evidence in the listed fixtures.
+"""
+forbidden_claims = [
+  "complete unsafe contract audit",
+  "comment proves safety",
+  "guard proof from comments",
+  "witness execution proof",
+  "Miri-clean",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "raw-pointer-write-initialized-evidence"
 status = "fixture_pinned"
 kind = "evidence_precision"
