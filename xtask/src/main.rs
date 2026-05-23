@@ -2916,6 +2916,23 @@ fn check_fixture_next_action(
             ));
         }
     }
+    let class_name = require_non_empty_json_str(card, "class", &card_context)?;
+    if class_name == "guard_missing" {
+        if !normalized.contains("guard") {
+            return Err(format!(
+                "{card_context} guard_missing next_action must ask for concrete guard evidence"
+            ));
+        }
+        if normalized.contains("# safety")
+            || normalized.contains("`safety:`")
+            || normalized.contains(" safety:")
+            || normalized.contains("comment")
+        {
+            return Err(format!(
+                "{card_context} guard_missing next_action must not suggest documentation or comments as a substitute for guard evidence"
+            ));
+        }
+    }
 
     Ok(())
 }
@@ -6637,6 +6654,29 @@ jobs:
 
         assert!(err.contains("next_action"));
         assert!(err.contains("operation_family"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_guard_missing_comment_next_action() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["next_action"] = serde_json::Value::String(
+            "Add a `SAFETY:` comment that explains why the guard is unnecessary.".to_string(),
+        );
+
+        let Err(err) = check_fixture_next_action(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            &card,
+            "raw_pointer_read",
+        ) else {
+            return Err("guard-missing comment next_action should fail".to_string());
+        };
+
+        assert!(err.contains("guard_missing"));
+        assert!(err.contains("guard evidence"));
         Ok(())
     }
 

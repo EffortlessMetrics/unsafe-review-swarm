@@ -144,6 +144,8 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - fixture golden next actions are non-empty reviewer actions, avoid overclaim
   wording, and name the matching operation family when they refer to a safety
   obligation,
+- fixture golden `guard_missing` next actions ask for concrete guard evidence
+  and do not offer documentation or comments as a substitute,
 - fixture golden next actions for public unsafe API contract evidence require
   public `# Safety` documentation and do not offer a `SAFETY:` comment as a
   substitute,
@@ -209,6 +211,8 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
   UB-free, Miri-clean, or memory-safety proof wording.
 - A fixture card next action cannot say "all clear" or name the wrong operation
   family for safety-obligation repair guidance.
+- A `guard_missing` fixture card next action cannot say a `SAFETY:` comment or
+  documentation resolves missing guard evidence.
 - A public unsafe API contract card next action cannot say that a `SAFETY:`
   comment resolves missing public `# Safety` documentation.
 - An allowed public claim cannot omit its claim level, such as
