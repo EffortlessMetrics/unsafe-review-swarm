@@ -1,0 +1,4 @@
+[package]
+name = "str-from-utf8-unchecked-let-else-ok-reassigned-not-guard-fixture"
+version = "0.0.0"
+edition = "2024"
