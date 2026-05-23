@@ -14,6 +14,13 @@ Linked plan: ../../plans/0.1.0/implementation-plan.md
 
 Route hazards to Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, Crux, or human deep review.
 
+ReviewCards carry witness routes as advisory next steps. A route must name the
+route kind and rationale. If a concrete command is available, the same command
+must appear in `verify_commands`; if `verify_commands` names a command, that
+command must come from a witness route. Routes are never required by default:
+they identify the cheapest credible next witness, not proof that the witness
+has run.
+
 ## Non-goals
 
 - no soundness claim
@@ -32,6 +39,9 @@ Route hazards to Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, Crux, or 
 - A changed unsafe seam produces one review card with stable identity.
 - The card includes missing evidence and a next action.
 - If evidence is not knowable statically, the card names the limitation instead of overclaiming.
+- A card with a Miri route command exposes that command in `verify_commands`.
+- A human deep review route may have no command and therefore no verify command.
+- A fixture cannot mark a witness route as required by default.
 
 ## CI proof
 

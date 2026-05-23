@@ -42,6 +42,8 @@ The guard rejects:
   witness present-state fields.
 - fixture golden cards whose top-level missing summaries drift away from the
   per-obligation evidence state.
+- fixture golden cards whose witness routes are missing, required by default,
+  or out of sync with verify_commands.
 - fixture golden ReviewCard IDs that omit stable fixture/package, file, owner,
   site kind, operation family, operation path/callee, snippet hash, hazard, or
   counted suffix components.

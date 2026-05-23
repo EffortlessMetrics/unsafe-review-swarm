@@ -2475,8 +2475,136 @@ fn check_fixture_card_identity(
 
     let has_missing_evidence = check_fixture_obligation_evidence(path, idx, card)?;
     check_fixture_missing_summary(path, idx, card, has_missing_evidence)?;
+    check_fixture_witness_routes(path, idx, card)?;
 
     Ok(())
+}
+
+fn check_fixture_witness_routes(
+    path: &str,
+    idx: usize,
+    card: &serde_json::Value,
+) -> Result<(), String> {
+    let card_context = format!("{path} card[{idx}]");
+    let routes = json_array_at(card, "/witness_routes", &card_context)?;
+    if routes.is_empty() {
+        return Err(format!(
+            "{card_context} witness_routes must include at least one route"
+        ));
+    }
+
+    let mut route_keys = BTreeSet::new();
+    let mut route_commands = BTreeSet::new();
+    for (route_idx, route) in routes.iter().enumerate() {
+        let Some(route) = route.as_object() else {
+            return Err(format!(
+                "{card_context} witness_routes[{route_idx}] must be an object"
+            ));
+        };
+        let kind = required_fixture_route_str(route, "kind", &card_context, route_idx)?;
+        let _reason = required_fixture_route_str(route, "reason", &card_context, route_idx)?;
+        let Some(required) = route.get("required").and_then(serde_json::Value::as_bool) else {
+            return Err(format!(
+                "{card_context} witness_routes[{route_idx}] required must be a boolean"
+            ));
+        };
+        if required {
+            return Err(format!(
+                "{card_context} witness_routes[{route_idx}] required must remain false; unsafe-review routes witnesses but does not require execution by default"
+            ));
+        }
+        let command = optional_fixture_route_command(route, &card_context, route_idx)?;
+        let route_key = format!("{kind}\0{}", command.unwrap_or(""));
+        if !route_keys.insert(route_key) {
+            return Err(format!(
+                "{card_context} witness_routes must not duplicate kind `{kind}` with the same command"
+            ));
+        }
+        if let Some(command) = command {
+            route_commands.insert(command);
+        }
+    }
+
+    let verify_commands = json_array_at(card, "/verify_commands", &card_context)?;
+    let mut verify_command_set = BTreeSet::new();
+    for (cmd_idx, command) in verify_commands.iter().enumerate() {
+        let Some(command) = command.as_str() else {
+            return Err(format!(
+                "{card_context} verify_commands[{cmd_idx}] must be a string"
+            ));
+        };
+        if command.trim().is_empty() {
+            return Err(format!(
+                "{card_context} verify_commands[{cmd_idx}] must not be empty"
+            ));
+        }
+        if !verify_command_set.insert(command) {
+            return Err(format!(
+                "{card_context} verify_commands must not duplicate `{command}`"
+            ));
+        }
+        if !route_commands.contains(command) {
+            return Err(format!(
+                "{card_context} verify_commands[{cmd_idx}] `{command}` must be backed by a witness route command"
+            ));
+        }
+    }
+    for command in route_commands {
+        if !verify_command_set.contains(command) {
+            return Err(format!(
+                "{card_context} witness route command `{command}` must appear in verify_commands"
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn required_fixture_route_str<'a>(
+    object: &'a serde_json::Map<String, serde_json::Value>,
+    key: &str,
+    card_context: &str,
+    route_idx: usize,
+) -> Result<&'a str, String> {
+    let Some(value) = object.get(key).and_then(serde_json::Value::as_str) else {
+        return Err(format!(
+            "{card_context} witness_routes[{route_idx}] is missing string key `{key}`"
+        ));
+    };
+    if value.trim().is_empty() {
+        Err(format!(
+            "{card_context} witness_routes[{route_idx}] string key `{key}` is empty"
+        ))
+    } else {
+        Ok(value)
+    }
+}
+
+fn optional_fixture_route_command<'a>(
+    object: &'a serde_json::Map<String, serde_json::Value>,
+    card_context: &str,
+    route_idx: usize,
+) -> Result<Option<&'a str>, String> {
+    let Some(value) = object.get("command") else {
+        return Err(format!(
+            "{card_context} witness_routes[{route_idx}] is missing key `command`"
+        ));
+    };
+    if value.is_null() {
+        return Ok(None);
+    }
+    let Some(command) = value.as_str() else {
+        return Err(format!(
+            "{card_context} witness_routes[{route_idx}] command must be null or a string"
+        ));
+    };
+    if command.trim().is_empty() {
+        Err(format!(
+            "{card_context} witness_routes[{route_idx}] command must not be empty"
+        ))
+    } else {
+        Ok(Some(command))
+    }
 }
 
 fn check_fixture_obligation_evidence(
@@ -5008,6 +5136,70 @@ jobs:
     }
 
     #[test]
+    fn fixture_card_identity_rejects_route_command_missing_from_verify_commands()
+    -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["verify_commands"] = serde_json::Value::Array(Vec::new());
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("route command missing from verify_commands should fail".to_string());
+        };
+
+        assert!(err.contains("witness route command"));
+        assert!(err.contains("verify_commands"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_unbacked_verify_command() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["verify_commands"] = serde_json::json!(["cargo test unrelated"]);
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("unbacked verify command should fail".to_string());
+        };
+
+        assert!(err.contains("verify_commands[0]"));
+        assert!(err.contains("must be backed by a witness route command"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_required_witness_route() -> Result<(), String> {
+        let mut card = test_fixture_card(
+            "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        )?;
+        card["witness_routes"][0]["required"] = serde_json::Value::Bool(true);
+
+        let Err(err) = check_fixture_card_identity(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            0,
+            "raw_pointer_alignment",
+            &card,
+        ) else {
+            return Err("required witness route should fail".to_string());
+        };
+
+        assert!(err.contains("required must remain false"));
+        assert!(err.contains("does not require execution by default"));
+        Ok(())
+    }
+
+    #[test]
     fn calibration_manifest_validates_current_fixture_contract() -> Result<(), String> {
         check_calibration()
     }
@@ -5250,6 +5442,17 @@ jobs:
   "missing": [
     "Missing visible local guard for inferred safety obligations",
     "No witness receipt imported for this card"
+  ],
+  "witness_routes": [
+    {{
+      "kind": "miri",
+      "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+      "command": "cargo +nightly miri test read_header",
+      "required": false
+    }}
+  ],
+  "verify_commands": [
+    "cargo +nightly miri test read_header"
   ]
 }}"#
         )

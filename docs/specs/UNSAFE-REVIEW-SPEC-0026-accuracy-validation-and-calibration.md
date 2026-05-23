@@ -60,6 +60,11 @@ contract, discharge, reach, or witness evidence is missing, and no missing
 summary is allowed when all obligation evidence is present. The summary remains
 reviewer-facing; it is not a replacement for obligation-level evidence.
 
+Fixture golden cards must keep witness routes and verify commands aligned. Each
+card needs at least one advisory route, command-bearing routes must be mirrored
+in `verify_commands`, unbacked verify commands are rejected, and routes must not
+be marked required by default.
+
 Fixture golden cards must preserve counted ReviewCard identity components:
 package/fixture, file, owner, site kind, operation family, operation path or
 callee token, normalized snippet hash, hazard, and count suffix. This keeps
@@ -107,6 +112,8 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
   description-aligned, and carry coherent per-axis evidence states,
 - fixture golden missing summaries are non-empty exactly when at least one
   obligation evidence axis is missing,
+- fixture golden witness routes are advisory, non-empty, and command-aligned
+  with verify commands,
 - allowed public claim wording names the claim level, and forbidden claim lists
   include shared global precision, global recall, and memory-safety proof
   overclaim boundaries,
