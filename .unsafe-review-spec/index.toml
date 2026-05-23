@@ -45,6 +45,20 @@ status = "draft"
 owner = "repo-infra"
 
 [[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0025"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0025-docs-automation.md"
+status = "draft"
+owner = "repo-infra"
+
+[[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0026"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0026-accuracy-validation-and-calibration.md"
+status = "draft"
+owner = "calibration"
+
+[[artifact]]
 id = "UNSAFE-REVIEW-SPEC-0021"
 kind = "spec"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-0021-vscode-openvsx-extension.md"
@@ -72,6 +86,20 @@ name = "CI design contract"
 path = ".unsafe-review-spec/goals/active.toml"
 status = "active"
 owner = "repo-infra"
+
+[[lane]]
+id = "docs-automation-control-plane"
+name = "docs automation control plane"
+path = ".unsafe-review-spec/goals/active.toml"
+status = "active"
+owner = "repo-infra"
+
+[[lane]]
+id = "accuracy-calibration-rail"
+name = "accuracy calibration rail"
+path = ".unsafe-review-spec/goals/active.toml"
+status = "active"
+owner = "calibration"
 
 [[lane]]
 id = "editor-extension"

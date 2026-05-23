@@ -78,6 +78,7 @@ const DOCS_AUTOMATION_LEDGER: &str = "policy/docs-automation.toml";
 const PUBLIC_SURFACES_LEDGER: &str = "policy/public-surfaces.toml";
 const CI_LANE_LEDGER: &str = "policy/ci-lane-whitelist.toml";
 const PACKAGE_BOUNDARY_LEDGER: &str = "policy/package-boundary.toml";
+const SOURCE_OF_TRUTH_INDEX: &str = ".unsafe-review-spec/index.toml";
 const ACTIVE_GOAL_MANIFEST: &str = ".unsafe-review-spec/goals/active.toml";
 const DOC_ARTIFACT_KINDS: &[&str] = &["proposal", "spec", "adr", "plan", "goal"];
 const DOC_ARTIFACT_STATUSES: &[&str] = &["proposed", "accepted", "active", "done", "deferred"];
@@ -653,6 +654,9 @@ fn require_existing_repo_path(path: &str, ledger: &str, field: &str) -> Result<(
 
 fn check_goals() -> Result<(), String> {
     let artifact_ids = check_doc_artifacts_impl()?;
+    let source_index = parse_toml_file(Path::new(SOURCE_OF_TRUTH_INDEX))?;
+    let indexed_artifact_ids = source_truth_index_ids(&source_index, "artifact")?;
+    let indexed_lane_ids = source_truth_index_ids(&source_index, "lane")?;
     let value = parse_toml_file(Path::new(ACTIVE_GOAL_MANIFEST))?;
     require_toml_string(&value, "schema_version", ACTIVE_GOAL_MANIFEST)?;
     for key in ["id", "title", "status", "owner", "created", "objective"] {
@@ -709,6 +713,18 @@ fn check_goals() -> Result<(), String> {
                     "{ACTIVE_GOAL_MANIFEST} work_item `{id}` references {key} `{linked_id}` not listed in {DOC_ARTIFACT_LEDGER}"
                 ));
             }
+            if let Some(linked_id) = table.get(key).and_then(toml::Value::as_str)
+                && !indexed_artifact_ids.contains(linked_id)
+            {
+                return Err(format!(
+                    "{ACTIVE_GOAL_MANIFEST} work_item `{id}` references {key} `{linked_id}` not listed in {SOURCE_OF_TRUTH_INDEX}"
+                ));
+            }
+        }
+        if !indexed_lane_ids.contains(id) {
+            return Err(format!(
+                "{ACTIVE_GOAL_MANIFEST} work_item `{id}` is not listed as a lane in {SOURCE_OF_TRUTH_INDEX}"
+            ));
         }
         let plan = required_table_string(table, "plan", ACTIVE_GOAL_MANIFEST, "work_item", idx)?;
         require_file(plan)?;
@@ -724,6 +740,25 @@ fn check_goals() -> Result<(), String> {
     }
     println!("check-goals: ok ({} work items)", ids.len());
     Ok(())
+}
+
+fn source_truth_index_ids(value: &toml::Value, kind: &str) -> Result<BTreeSet<String>, String> {
+    let entries = toml_array(value, kind, SOURCE_OF_TRUTH_INDEX)?;
+    let mut ids = BTreeSet::new();
+    for (idx, entry) in entries.iter().enumerate() {
+        let table = toml_table(entry, SOURCE_OF_TRUTH_INDEX, kind, idx)?;
+        let id = required_table_string(table, "id", SOURCE_OF_TRUTH_INDEX, kind, idx)?;
+        if !ids.insert(id.to_string()) {
+            return Err(format!(
+                "{SOURCE_OF_TRUTH_INDEX} contains duplicate {kind} id `{id}`"
+            ));
+        }
+        let path = required_table_string(table, "path", SOURCE_OF_TRUTH_INDEX, kind, idx)?;
+        require_file(path)?;
+        required_table_string(table, "status", SOURCE_OF_TRUTH_INDEX, kind, idx)?;
+        required_table_string(table, "owner", SOURCE_OF_TRUTH_INDEX, kind, idx)?;
+    }
+    Ok(ids)
 }
 
 fn check_package_boundary() -> Result<(), String> {
