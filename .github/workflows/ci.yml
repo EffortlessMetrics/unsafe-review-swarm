@@ -25,7 +25,7 @@ env:
 jobs:
   route-rust-small:
     name: Route Rust Small
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     outputs:
       router_target: ${{ steps.route.outputs.router_target }}
       router_reason: ${{ steps.route.outputs.router_reason }}
@@ -177,7 +177,7 @@ jobs:
     name: Rust Small on GitHub Hosted
     needs: route-rust-small
     if: needs.route-rust-small.outputs.router_target == 'github'
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: actions/checkout@v6
         with:
@@ -188,7 +188,7 @@ jobs:
 
   rust-small-result:
     name: Unsafe Review Rust Small Result
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     needs: [route-rust-small, rust-small-cpx42, rust-small-cx43, rust-small-cx53, rust-small-github]
     if: always()
     steps:

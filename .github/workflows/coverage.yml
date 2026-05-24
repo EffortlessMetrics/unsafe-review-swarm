@@ -31,7 +31,7 @@ concurrency:
 jobs:
   llvm_cov:
     name: cargo-llvm-cov advisory upload
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
