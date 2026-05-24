@@ -30,6 +30,8 @@ jobs:
       router_target: ${{ steps.route.outputs.router_target }}
       router_reason: ${{ steps.route.outputs.router_reason }}
       router_error: ${{ steps.route.outputs.router_error }}
+      fallback_allowed: ${{ steps.route.outputs.fallback_allowed }}
+      fallback_mode: ${{ steps.route.outputs.fallback_mode }}
     steps:
       - name: Route trusted Rust Small lane
         id: route
@@ -42,12 +44,22 @@ jobs:
             echo "router_target=github" >> "$GITHUB_OUTPUT"
             echo "router_reason=fork_pr" >> "$GITHUB_OUTPUT"
             echo "router_error=false" >> "$GITHUB_OUTPUT"
+            echo "fallback_allowed=true" >> "$GITHUB_OUTPUT"
+            echo "fallback_mode=tiny" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          LABELS='${{ toJson(github.event.pull_request.labels.*.name) }}'
+          if jq -e 'index("allow-github-hosted") or index("ci-budget-ack") or index("full-ci")' <<<"$LABELS" >/dev/null 2>&1; then
+            FALLBACK_ALLOWED=true
+          else
+            FALLBACK_ALLOWED=false
+          fi
           if [[ -z "${GH_TOKEN:-}" ]]; then
-            echo "router_target=github" >> "$GITHUB_OUTPUT"
+            echo "router_target=blocked" >> "$GITHUB_OUTPUT"
             echo "router_reason=runner_token_missing" >> "$GITHUB_OUTPUT"
             echo "router_error=true" >> "$GITHUB_OUTPUT"
+            echo "fallback_allowed=${FALLBACK_ALLOWED}" >> "$GITHUB_OUTPUT"
+            echo "fallback_mode=none" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           set +e
@@ -59,9 +71,11 @@ jobs:
             REASON="runner_api_failed"
             if [[ "$ERR" == *"401"* ]]; then REASON="runner_token_unauthorized"; fi
             if [[ "$ERR" == *"403"* ]]; then REASON="runner_token_forbidden"; fi
-            echo "router_target=github" >> "$GITHUB_OUTPUT"
+            echo "router_target=blocked" >> "$GITHUB_OUTPUT"
             echo "router_reason=${REASON}" >> "$GITHUB_OUTPUT"
             echo "router_error=true" >> "$GITHUB_OUTPUT"
+            echo "fallback_allowed=${FALLBACK_ALLOWED}" >> "$GITHUB_OUTPUT"
+            echo "fallback_mode=none" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           pick_target() {
@@ -88,9 +102,17 @@ jobs:
             echo "router_reason=cx53_idle" >> "$GITHUB_OUTPUT"
             echo "router_error=false" >> "$GITHUB_OUTPUT"
           else
-            echo "router_target=github" >> "$GITHUB_OUTPUT"
             echo "router_reason=no_idle_runner" >> "$GITHUB_OUTPUT"
             echo "router_error=false" >> "$GITHUB_OUTPUT"
+            if [[ "$FALLBACK_ALLOWED" == "true" ]]; then
+              echo "router_target=github" >> "$GITHUB_OUTPUT"
+              echo "fallback_allowed=true" >> "$GITHUB_OUTPUT"
+              echo "fallback_mode=tiny" >> "$GITHUB_OUTPUT"
+            else
+              echo "router_target=blocked" >> "$GITHUB_OUTPUT"
+              echo "fallback_allowed=false" >> "$GITHUB_OUTPUT"
+              echo "fallback_mode=none" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
   rust-small-cpx42:
@@ -174,22 +196,35 @@ jobs:
         run: cargo run --locked -p xtask -- check-pr
 
   rust-small-github:
-    name: Rust Small on GitHub Hosted
+    name: Rust Tiny Fallback on GitHub Hosted
     needs: route-rust-small
-    if: needs.route-rust-small.outputs.router_target == 'github'
+    if: needs.route-rust-small.outputs.router_target == 'github' && needs.route-rust-small.outputs.fallback_allowed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@1.95.0
-      - name: Run Rust small gate
-        run: cargo run --locked -p xtask -- check-pr
+      - name: Run tiny fallback gate
+        run: cargo check --workspace --locked --all-targets
+
+  rust-small-blocked:
+    name: Rust Small Blocked (capacity/config)
+    needs: route-rust-small
+    if: needs.route-rust-small.outputs.router_target == 'blocked'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain blocked route
+        run: |
+          echo "Route blocked with reason: ${{ needs.route-rust-small.outputs.router_reason }}"
+          echo "No GitHub-hosted full fallback is allowed by default."
+          echo "Add label allow-github-hosted, ci-budget-ack, or full-ci to permit tiny fallback."
+          exit 1
 
   rust-small-result:
     name: Unsafe Review Rust Small Result
     runs-on: ubuntu-latest
-    needs: [route-rust-small, rust-small-cpx42, rust-small-cx43, rust-small-cx53, rust-small-github]
+    needs: [route-rust-small, rust-small-cpx42, rust-small-cx43, rust-small-cx53, rust-small-github, rust-small-blocked]
     if: always()
     steps:
       - name: Assert selected lane succeeded
@@ -201,6 +236,7 @@ jobs:
             cx43) status='${{ needs.rust-small-cx43.result }}' ;;
             cx53) status='${{ needs.rust-small-cx53.result }}' ;;
             github) status='${{ needs.rust-small-github.result }}' ;;
+            blocked) status='${{ needs.rust-small-blocked.result }}' ;;
             *) echo "unknown target: $target"; exit 1 ;;
           esac
           echo "router_target=$target"
