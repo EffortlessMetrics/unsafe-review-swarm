@@ -5,6 +5,7 @@ what not to do next. Do not put active specs here.
 
 | Handoff | Date | Scope |
 |---|---|---|
+| [Swarm roadmap](2026-05-24-swarm-roadmap.md) | 2026-05-24 | swarm-internal roadmap posture, operating rule, trust-boundary reminders, and active execution pointer |
 | [Release 0.2.0 publication receipt](2026-05-21-release-0.2.0-publication.md) | 2026-05-21 | published 0.2.0 crates, publish commands, install smoke, docs.rs checks, tag, trust boundary, and next lane |
 | [Release 0.2.0 preparation](2026-05-21-release-0.2.0-preparation.md) | 2026-05-21 | version bumps for the three public crates, public-usability release framing, validation checklist, and manual publish order |
 | [Source promotion 0.2 sync checkpoint](2026-05-21-source-promotion-0.2-sync.md) | 2026-05-21 | acknowledges source #487 as a swarm-originated 0.2 public-usability promotion and updates the source-sync checkpoint |
