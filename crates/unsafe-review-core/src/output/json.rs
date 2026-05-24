@@ -391,6 +391,7 @@ mod tests {
         "target_feature_missing_safety_docs",
         "split_raw_pointer_read_call",
         "maybeuninit_assume_init",
+        "maybeuninit_assume_init_comment_not_guard",
         "maybeuninit_assume_init_write_guard",
         "maybeuninit_assume_init_open_branch_write_guard",
         "maybeuninit_assume_init_closed_branch_write_not_guard",

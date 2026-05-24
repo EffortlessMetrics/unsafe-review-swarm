@@ -25,6 +25,20 @@ label_source = "fixture_golden"
 rationale = "A bare MaybeUninit::assume_init does not prove the value has been initialized and valid."
 
 [[samples]]
+id = "maybeuninit-assume-init-comment-not-initialized"
+fixture = "maybeuninit_assume_init_comment_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "maybe_uninit_assume_init"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A SAFETY comment that says the slot was initialized is contract prose only; it does not create local initialized-memory discharge evidence."
+
+[[samples]]
 id = "maybeuninit-assume-init-write-initialized"
 fixture = "maybeuninit_assume_init_write_guard"
 kind = "positive"

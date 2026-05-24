@@ -31,6 +31,7 @@ required_core_fixtures = [
   "private_unsafe_helper_safety_comment",
   "local_safety_colon_comment",
   "maybeuninit_assume_init",
+  "maybeuninit_assume_init_comment_not_guard",
   "maybeuninit_assume_init_write_guard",
   "maybeuninit_assume_init_open_branch_write_guard",
   "maybeuninit_assume_init_closed_branch_write_not_guard",
@@ -555,6 +556,16 @@ expected_hazard = "unknown"
 fixture = "maybeuninit_assume_init"
 kind = "positive"
 claim = "MaybeUninit::assume_init reports missing initialization evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "maybe_uninit_assume_init"
+expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "maybeuninit_assume_init_comment_not_guard"
+kind = "false_positive_control"
+claim = "MaybeUninit::assume_init treats SAFETY prose as contract evidence only, not initialized-memory discharge evidence"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

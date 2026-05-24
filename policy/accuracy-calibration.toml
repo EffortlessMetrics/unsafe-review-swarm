@@ -624,6 +624,7 @@ hazard = "initialized_memory"
 support_tier = "Core operation smoke slice"
 fixtures = [
   "maybeuninit_assume_init",
+  "maybeuninit_assume_init_comment_not_guard",
   "maybeuninit_assume_init_write_guard",
   "maybeuninit_assume_init_open_branch_write_guard",
   "maybeuninit_assume_init_closed_branch_write_not_guard",
@@ -642,8 +643,8 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned MaybeUninit::assume_init family evidence reports missing
 initialized-memory discharge, recognizes narrow same-slot write and
-MaybeUninit::new evidence, rejects stale write evidence, and routes the listed
-fixtures to Miri/cargo-careful witness suggestions.
+MaybeUninit::new evidence, rejects comment-only and stale write evidence, and
+routes the listed fixtures to Miri/cargo-careful witness suggestions.
 """
 forbidden_claims = [
   "broad MaybeUninit soundness",
