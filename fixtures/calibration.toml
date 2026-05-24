@@ -164,6 +164,7 @@ required_core_fixtures = [
   "copy_nonoverlapping_slice_range_reassigned_src_not_guard",
   "copy_nonoverlapping_other_len_not_guard",
   "str_from_utf8_unchecked",
+  "str_from_utf8_unchecked_comment_not_guard",
   "str_from_utf8_unchecked_is_ok_guard",
   "str_from_utf8_unchecked_if_let_ok_guard",
   "str_from_utf8_unchecked_if_let_err_return_guard",
@@ -1888,6 +1889,16 @@ expected_hazard = "drop_or_deallocation"
 fixture = "str_from_utf8_unchecked"
 kind = "positive"
 claim = "str::from_utf8_unchecked reports UTF-8 validity obligations instead of a generic unsafe function call"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "str_from_utf8_unchecked_comment_not_guard"
+kind = "false_positive_control"
+claim = "str::from_utf8_unchecked treats SAFETY prose as contract evidence only, not UTF-8 validation evidence"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

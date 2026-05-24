@@ -76,7 +76,8 @@ The current fixture-pinned slices are:
   `utf8` obligation is discharged by same-buffer validation before conversion,
   including if-let `Ok` branch validation, if-let `Err` early returns, let-else
   `Ok` validation, and match `Ok` arm validation, while rejecting
-  post-validation, wrong-buffer, observed-only, and stale-buffer controls.
+  comment-only, post-validation, wrong-buffer, observed-only, and stale-buffer
+  controls.
 - Unsafe impl Send/Sync witness routing: checks that thread-safety invariants
   route to Loom/Shuttle witness suggestions while custom unsafe trait impls
   remain human-review cards.

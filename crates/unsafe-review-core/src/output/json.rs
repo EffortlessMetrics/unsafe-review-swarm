@@ -357,6 +357,7 @@ mod tests {
         "copy_nonoverlapping_slice_range_reassigned_src_not_guard",
         "copy_nonoverlapping_other_len_not_guard",
         "str_from_utf8_unchecked",
+        "str_from_utf8_unchecked_comment_not_guard",
         "str_from_utf8_unchecked_if_let_ok_guard",
         "str_from_utf8_unchecked_if_let_err_return_guard",
         "str_from_utf8_unchecked_if_let_err_reassigned_not_guard",
