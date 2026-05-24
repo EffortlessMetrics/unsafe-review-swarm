@@ -402,6 +402,7 @@ mod tests {
         "maybeuninit_assume_init_mut",
         "maybeuninit_assume_init_drop",
         "vec_set_len",
+        "vec_set_len_comment_not_guard",
         "vec_set_len_initialized_loop",
         "vec_set_len_capacity_observed_not_guard",
         "vec_set_len_unrelated_capacity_comparison_not_guard",
