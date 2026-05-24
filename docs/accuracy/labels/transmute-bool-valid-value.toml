@@ -37,6 +37,21 @@ label_source = "fixture_golden"
 rationale = "A layout-size guard does not discharge the bool valid-value obligation."
 
 [[samples]]
+id = "transmute-bool-comment-not-valid-value"
+fixture = "transmute_bool_comment_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A SAFETY comment that claims the source byte is bool-valid is contract prose only; it does not create executable valid-value evidence."
+
+[[samples]]
 id = "transmute-bool-domain-guard-present"
 fixture = "transmute_bool_valid_value_guard"
 kind = "positive"
