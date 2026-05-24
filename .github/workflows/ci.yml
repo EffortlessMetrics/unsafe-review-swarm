@@ -120,6 +120,7 @@ jobs:
         with:
           toolchain: 1.95.0
           components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
       - name: Preflight disk and toolchain
         run: |
           set -euo pipefail
@@ -152,6 +153,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.95.0
         with:
           components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
       - name: Run Rust small gate
         run: cargo run --locked -p xtask -- check-pr
 
@@ -170,6 +172,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.95.0
         with:
           components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
       - name: Run Rust small gate
         run: cargo run --locked -p xtask -- check-pr
 
@@ -183,6 +186,7 @@ jobs:
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2
       - name: Run Rust small gate
         run: cargo run --locked -p xtask -- check-pr
 
