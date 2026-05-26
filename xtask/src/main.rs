@@ -9252,6 +9252,29 @@ Snapshot reports:
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_sarif_duplicate_card_id() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-sarif-duplicate-card")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_two_card_artifacts(&dir)?;
+        fs::write(
+            dir.join("cards.sarif"),
+            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"},{"id":"contract_missing"}]}},"results":[{"ruleId":"guard_missing","properties":{"cardId":"card-1","class":"guard_missing","witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}},{"ruleId":"guard_missing","properties":{"cardId":"card-1","class":"guard_missing","witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
+        )
+        .map_err(|err| format!("write sarif failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("results repeat card id `card-1`")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn advisory_artifact_checker_rejects_comment_plan_without_route_details() -> Result<(), String>
     {
         let dir = unique_temp_dir("unsafe-review-artifacts-comment-routes")?;

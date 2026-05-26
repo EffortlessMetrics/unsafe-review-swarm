@@ -197,6 +197,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             sarif_results.len()
         ));
     }
+    let mut sarif_card_ids = BTreeSet::new();
     for result in sarif_results {
         let Some(card_id) = result
             .pointer("/properties/cardId")
@@ -208,6 +209,9 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             return Err(format!(
                 "cards.sarif result references unknown card id `{card_id}`"
             ));
+        }
+        if !sarif_card_ids.insert(card_id.to_string()) {
+            return Err(format!("cards.sarif results repeat card id `{card_id}`"));
         }
         let Some(card_projection) = card_projections.get(card_id) else {
             return Err(format!(
@@ -239,6 +243,11 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             "cards.sarif result",
         )?;
         super::json_array_at(result, "/properties/verifyCommands", "cards.sarif result")?;
+    }
+    for card_id in &card_ids {
+        if !sarif_card_ids.contains(card_id) {
+            return Err(format!("cards.sarif results missing card id `{card_id}`"));
+        }
     }
     let sarif_boundary = sarif
         .pointer("/runs/0/properties/trustBoundary")
