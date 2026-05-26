@@ -832,6 +832,7 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
         }
     }
 
+    let mut code_action_commands = BTreeSet::new();
     for action in super::json_array_at(&lsp, "/code_actions", "lsp.json")? {
         let action_card_id = require_known_card_id(action, "lsp.json code_action", card_ids)?;
         let Some(command) = action.get("command").and_then(serde_json::Value::as_str) else {
@@ -840,10 +841,28 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
         if command.trim().is_empty() {
             return Err("lsp.json code_action command must not be empty".to_string());
         }
+        let action_key = (action_card_id.to_string(), command.to_string());
+        if !code_action_commands.insert(action_key) {
+            return Err(format!(
+                "lsp.json code_actions repeat command `{command}` for card id `{action_card_id}`"
+            ));
+        }
         super::json_array_at(action, "/arguments", "lsp.json code_action")?;
         check_lsp_code_action_payload(action, action_card_id, command, card_ids)?;
         if action.get("edit").is_some() || action.get("workspace_edit").is_some() {
             return Err("lsp.json code_action must not contain source edits".to_string());
+        }
+    }
+    for card_id in card_ids {
+        for command in [
+            "unsafe-review.copyAgentPacket",
+            "unsafe-review.explainWitnessRoute",
+        ] {
+            if !code_action_commands.contains(&(card_id.to_string(), command.to_string())) {
+                return Err(format!(
+                    "lsp.json code_actions missing command `{command}` for card id `{card_id}`"
+                ));
+            }
         }
     }
     Ok(())
