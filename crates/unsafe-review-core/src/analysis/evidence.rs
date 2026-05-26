@@ -2524,21 +2524,20 @@ fn has_from_utf8_unchecked_validation_evidence(lower: &str) -> bool {
     let Some(argument_identifier) = source_value_identifier(argument) else {
         return false;
     };
-    let validation = format!("from_utf8({argument})");
+    let context = Utf8ValidationContext {
+        before_call,
+        validation: format!("from_utf8({argument})"),
+        argument_identifier,
+    };
 
-    has_validation_is_ok_branch_guard(before_call, &validation, argument_identifier)
-        || has_validation_if_let_ok_branch_guard(before_call, &validation, argument_identifier)
-        || has_validation_let_else_ok_guard(before_call, &validation, argument_identifier)
-        || has_validation_match_ok_branch_guard(before_call, &validation, argument_identifier)
-        || has_validation_if_let_err_return_guard(before_call, &validation, argument_identifier)
-        || has_validation_early_return_guard(
-            before_call,
-            &validation,
-            "is_err",
-            argument_identifier,
-        )
-        || has_validation_question_mark_guard(before_call, &validation, argument_identifier)
-        || has_validation_match_return_guard(before_call, &validation, argument_identifier)
+    has_validation_is_ok_branch_guard(&context)
+        || has_validation_if_let_ok_branch_guard(&context)
+        || has_validation_let_else_ok_guard(&context)
+        || has_validation_match_ok_branch_guard(&context)
+        || has_validation_if_let_err_return_guard(&context)
+        || has_validation_early_return_guard(&context, "is_err")
+        || has_validation_question_mark_guard(&context)
+        || has_validation_match_return_guard(&context)
 }
 
 fn from_utf8_unchecked_argument_context(compact: &str) -> Option<(&str, &str)> {
@@ -2549,6 +2548,18 @@ fn from_utf8_unchecked_argument_context(compact: &str) -> Option<(&str, &str)> {
     let argument_end = matching_call_argument_end(after_marker)?;
     let argument = &after_marker[..argument_end];
     (!argument.is_empty()).then_some((before_call, argument))
+}
+
+struct Utf8ValidationContext<'a> {
+    before_call: &'a str,
+    validation: String,
+    argument_identifier: &'a str,
+}
+
+impl Utf8ValidationContext<'_> {
+    fn has_argument_assignment(&self, text: &str) -> bool {
+        has_assignment_to_identifier(text, self.argument_identifier)
+    }
 }
 
 fn matching_call_argument_end(text: &str) -> Option<usize> {
@@ -2577,8 +2588,9 @@ fn matching_code_block_end(text_after_open: &str) -> Option<usize> {
     None
 }
 
-fn has_validation_is_ok_branch_guard(before_call: &str, validation: &str, argument: &str) -> bool {
-    let guard = format!("{validation}.is_ok(){{");
+fn has_validation_is_ok_branch_guard(context: &Utf8ValidationContext<'_>) -> bool {
+    let before_call = context.before_call;
+    let guard = format!("{}.is_ok(){{", context.validation);
     let mut search_from = 0;
     while let Some(offset) = before_call[search_from..].find(&guard) {
         let guard_start = search_from + offset;
@@ -2596,7 +2608,7 @@ fn has_validation_is_ok_branch_guard(before_call: &str, validation: &str, argume
                 _ => {}
             }
         }
-        if depth > 0 && !has_assignment_to_identifier(after_guard, argument) {
+        if depth > 0 && !context.has_argument_assignment(after_guard) {
             return true;
         }
         search_from = guard_start + guard.len();
@@ -2604,22 +2616,19 @@ fn has_validation_is_ok_branch_guard(before_call: &str, validation: &str, argume
     false
 }
 
-fn has_validation_if_let_ok_branch_guard(
-    before_call: &str,
-    validation: &str,
-    argument: &str,
-) -> bool {
+fn has_validation_if_let_ok_branch_guard(context: &Utf8ValidationContext<'_>) -> bool {
+    let before_call = context.before_call;
     let mut search_from = 0;
-    while let Some(offset) = before_call[search_from..].find(validation) {
+    while let Some(offset) = before_call[search_from..].find(&context.validation) {
         let validation_start = search_from + offset;
         let before_validation = &before_call[..validation_start];
         let Some(if_let_start) = before_validation.rfind("ifletok(") else {
-            search_from = validation_start + validation.len();
+            search_from = validation_start + context.validation.len();
             continue;
         };
         let pattern = &before_validation[if_let_start + "ifletok(".len()..];
         let Some(pattern_end) = pattern.find(")=") else {
-            search_from = validation_start + validation.len();
+            search_from = validation_start + context.validation.len();
             continue;
         };
         let binding = &pattern[..pattern_end];
@@ -2631,12 +2640,12 @@ fn has_validation_if_let_ok_branch_guard(
                 .chars()
                 .all(|ch| is_receiver_path_char(ch) || ch == ':')
         {
-            search_from = validation_start + validation.len();
+            search_from = validation_start + context.validation.len();
             continue;
         }
-        let after_validation = &before_call[validation_start + validation.len()..];
+        let after_validation = &before_call[validation_start + context.validation.len()..];
         let Some(after_open) = after_validation.strip_prefix('{') else {
-            search_from = validation_start + validation.len();
+            search_from = validation_start + context.validation.len();
             continue;
         };
         let mut depth = 1usize;
@@ -2652,26 +2661,27 @@ fn has_validation_if_let_ok_branch_guard(
                 _ => {}
             }
         }
-        if depth > 0 && !has_assignment_to_identifier(after_open, argument) {
+        if depth > 0 && !context.has_argument_assignment(after_open) {
             return true;
         }
-        search_from = validation_start + validation.len();
+        search_from = validation_start + context.validation.len();
     }
     false
 }
 
-fn has_validation_let_else_ok_guard(before_call: &str, validation: &str, argument: &str) -> bool {
+fn has_validation_let_else_ok_guard(context: &Utf8ValidationContext<'_>) -> bool {
+    let before_call = context.before_call;
     let mut search_from = 0usize;
-    while let Some(offset) = before_call[search_from..].find(validation) {
+    while let Some(offset) = before_call[search_from..].find(&context.validation) {
         let validation_start = search_from + offset;
         let before_validation = &before_call[..validation_start];
         let Some(let_start) = before_validation.rfind("letok(") else {
-            search_from = validation_start + validation.len();
+            search_from = validation_start + context.validation.len();
             continue;
         };
         let pattern = &before_validation[let_start + "letok(".len()..];
         let Some(pattern_end) = pattern.find(")=") else {
-            search_from = validation_start + validation.len();
+            search_from = validation_start + context.validation.len();
             continue;
         };
         let binding = &pattern[..pattern_end];
@@ -2683,43 +2693,39 @@ fn has_validation_let_else_ok_guard(before_call: &str, validation: &str, argumen
                 .chars()
                 .all(|ch| is_receiver_path_char(ch) || ch == ':')
         {
-            search_from = validation_start + validation.len();
+            search_from = validation_start + context.validation.len();
             continue;
         }
-        let after_validation = &before_call[validation_start + validation.len()..];
+        let after_validation = &before_call[validation_start + context.validation.len()..];
         let Some(after_else) = after_validation.strip_prefix("else{") else {
-            search_from = validation_start + validation.len();
+            search_from = validation_start + context.validation.len();
             continue;
         };
         let (else_body, after_else_body) = matching_code_block_end(after_else)
             .map_or((after_else, ""), |else_end| {
                 (&after_else[..else_end], &after_else[else_end + 1..])
             });
-        if else_body.contains("return") && !has_assignment_to_identifier(after_else_body, argument)
-        {
+        if else_body.contains("return") && !context.has_argument_assignment(after_else_body) {
             return true;
         }
-        search_from = validation_start + validation.len();
+        search_from = validation_start + context.validation.len();
     }
     false
 }
 
-fn has_validation_if_let_err_return_guard(
-    before_call: &str,
-    validation: &str,
-    argument: &str,
-) -> bool {
+fn has_validation_if_let_err_return_guard(context: &Utf8ValidationContext<'_>) -> bool {
+    let before_call = context.before_call;
     let mut search_from = 0usize;
-    while let Some(offset) = before_call[search_from..].find(validation) {
+    while let Some(offset) = before_call[search_from..].find(&context.validation) {
         let validation_start = search_from + offset;
         let before_validation = &before_call[..validation_start];
         let Some(if_let_start) = before_validation.rfind("ifleterr(") else {
-            search_from = validation_start + validation.len();
+            search_from = validation_start + context.validation.len();
             continue;
         };
         let pattern = &before_validation[if_let_start + "ifleterr(".len()..];
         let Some(pattern_end) = pattern.find(")=") else {
-            search_from = validation_start + validation.len();
+            search_from = validation_start + context.validation.len();
             continue;
         };
         let binding = &pattern[..pattern_end];
@@ -2731,86 +2737,77 @@ fn has_validation_if_let_err_return_guard(
                 .chars()
                 .all(|ch| is_receiver_path_char(ch) || ch == ':')
         {
-            search_from = validation_start + validation.len();
+            search_from = validation_start + context.validation.len();
             continue;
         }
-        let after_validation = &before_call[validation_start + validation.len()..];
+        let after_validation = &before_call[validation_start + context.validation.len()..];
         let Some(after_open) = after_validation.strip_prefix('{') else {
-            search_from = validation_start + validation.len();
+            search_from = validation_start + context.validation.len();
             continue;
         };
         let (guard_body, after_guard_body) = matching_code_block_end(after_open)
             .map_or((after_open, ""), |body_end| {
                 (&after_open[..body_end], &after_open[body_end + 1..])
             });
-        if guard_body.contains("return")
-            && !has_assignment_to_identifier(after_guard_body, argument)
-        {
+        if guard_body.contains("return") && !context.has_argument_assignment(after_guard_body) {
             return true;
         }
-        search_from = validation_start + validation.len();
+        search_from = validation_start + context.validation.len();
     }
     false
 }
 
-fn has_validation_match_ok_branch_guard(
-    before_call: &str,
-    validation: &str,
-    argument: &str,
-) -> bool {
+fn has_validation_match_ok_branch_guard(context: &Utf8ValidationContext<'_>) -> bool {
+    let before_call = context.before_call;
     let mut search_from = 0usize;
-    while let Some(relative_validation_pos) = before_call[search_from..].find(validation) {
+    while let Some(relative_validation_pos) = before_call[search_from..].find(&context.validation) {
         let validation_pos = search_from + relative_validation_pos;
         let prefix = &before_call[..validation_pos];
         let Some(match_pos) = prefix.rfind("match") else {
-            search_from = validation_pos + validation.len();
+            search_from = validation_pos + context.validation.len();
             continue;
         };
         let after_match = &prefix[match_pos + "match".len()..];
         if !(after_match.is_empty() || after_match.ends_with("::")) {
-            search_from = validation_pos + validation.len();
+            search_from = validation_pos + context.validation.len();
             continue;
         }
 
-        let after_validation = &before_call[validation_pos + validation.len()..];
+        let after_validation = &before_call[validation_pos + context.validation.len()..];
         let Some(after_open) = after_validation.strip_prefix('{') else {
-            search_from = validation_pos + validation.len();
+            search_from = validation_pos + context.validation.len();
             continue;
         };
         if matching_code_block_end(after_open).is_some() {
-            search_from = validation_pos + validation.len();
+            search_from = validation_pos + context.validation.len();
             continue;
         }
 
         let Some(ok_pos) = after_open.rfind("ok(") else {
-            search_from = validation_pos + validation.len();
+            search_from = validation_pos + context.validation.len();
             continue;
         };
         if after_open
             .rfind("err(")
             .is_some_and(|err_pos| err_pos > ok_pos)
         {
-            search_from = validation_pos + validation.len();
+            search_from = validation_pos + context.validation.len();
             continue;
         }
         let current_arm = &after_open[ok_pos..];
-        if current_arm.contains("=>") && !has_assignment_to_identifier(current_arm, argument) {
+        if current_arm.contains("=>") && !context.has_argument_assignment(current_arm) {
             return true;
         }
 
-        search_from = validation_pos + validation.len();
+        search_from = validation_pos + context.validation.len();
     }
 
     false
 }
 
-fn has_validation_early_return_guard(
-    before_call: &str,
-    validation: &str,
-    predicate: &str,
-    argument: &str,
-) -> bool {
-    let guard = format!("{validation}.{predicate}(){{");
+fn has_validation_early_return_guard(context: &Utf8ValidationContext<'_>, predicate: &str) -> bool {
+    let before_call = context.before_call;
+    let guard = format!("{}.{predicate}(){{", context.validation);
     let mut search_from = 0;
     while let Some(offset) = before_call[search_from..].find(&guard) {
         let guard_start = search_from + offset;
@@ -2818,7 +2815,7 @@ fn has_validation_early_return_guard(
         let guard_end = after_guard.find('}').unwrap_or(after_guard.len());
         let guard_body = &after_guard[..guard_end];
         let after_branch = &after_guard[guard_end..];
-        if guard_body.contains("return") && !has_assignment_to_identifier(after_branch, argument) {
+        if guard_body.contains("return") && !context.has_argument_assignment(after_branch) {
             return true;
         }
         search_from = guard_start + guard.len();
@@ -2826,28 +2823,33 @@ fn has_validation_early_return_guard(
     false
 }
 
-fn has_validation_question_mark_guard(before_call: &str, validation: &str, argument: &str) -> bool {
-    has_fresh_guard_pattern(before_call, &format!("{validation}?;"), argument)
+fn has_validation_question_mark_guard(context: &Utf8ValidationContext<'_>) -> bool {
+    has_fresh_guard_pattern(
+        context.before_call,
+        &format!("{}?;", context.validation),
+        context.argument_identifier,
+    )
 }
 
-fn has_validation_match_return_guard(before_call: &str, validation: &str, argument: &str) -> bool {
+fn has_validation_match_return_guard(context: &Utf8ValidationContext<'_>) -> bool {
+    let before_call = context.before_call;
     let mut search_from = 0usize;
-    while let Some(relative_validation_pos) = before_call[search_from..].find(validation) {
+    while let Some(relative_validation_pos) = before_call[search_from..].find(&context.validation) {
         let validation_pos = search_from + relative_validation_pos;
         let prefix = &before_call[..validation_pos];
         let Some(match_pos) = prefix.rfind("match") else {
-            search_from = validation_pos + validation.len();
+            search_from = validation_pos + context.validation.len();
             continue;
         };
         let after_match = &prefix[match_pos + "match".len()..];
         if !(after_match.is_empty() || after_match.ends_with("::")) {
-            search_from = validation_pos + validation.len();
+            search_from = validation_pos + context.validation.len();
             continue;
         }
 
-        let after_validation = &before_call[validation_pos + validation.len()..];
+        let after_validation = &before_call[validation_pos + context.validation.len()..];
         let Some(after_open) = after_validation.strip_prefix('{') else {
-            search_from = validation_pos + validation.len();
+            search_from = validation_pos + context.validation.len();
             continue;
         };
         let Some(body_end) = matching_code_block_end(after_open) else {
@@ -2856,17 +2858,17 @@ fn has_validation_match_return_guard(before_call: &str, validation: &str, argume
         let body = &after_open[..body_end];
         let after_block = after_open.get(body_end + 1..).unwrap_or("");
         let Some(err_arm) = body.find("err(").map(|err_pos| &body[err_pos..]) else {
-            search_from = validation_pos + validation.len();
+            search_from = validation_pos + context.validation.len();
             continue;
         };
         if body.contains("ok(")
             && err_arm.contains("=>return")
-            && !has_assignment_to_identifier(after_block, argument)
+            && !context.has_argument_assignment(after_block)
         {
             return true;
         }
 
-        search_from = validation_pos + validation.len();
+        search_from = validation_pos + context.validation.len();
     }
 
     false
