@@ -867,6 +867,7 @@ fn check_lsp_artifact(
             "lsp.json diagnostic",
             "/range/start/line",
         )?;
+        require_lsp_diagnostic_card_projection(diagnostic, card_projection)?;
         super::json_array_at(
             diagnostic,
             "/required_safety_conditions",
@@ -1008,6 +1009,25 @@ fn check_lsp_projection_location(
     }
 
     Ok(())
+}
+
+fn require_lsp_diagnostic_card_projection(
+    diagnostic: &serde_json::Value,
+    card: &CardProjection,
+) -> Result<(), String> {
+    require_projected_str(diagnostic, "code", &card.class_name, "lsp.json diagnostic")?;
+    require_projected_str(
+        diagnostic,
+        "operation",
+        &card.operation,
+        "lsp.json diagnostic",
+    )?;
+    require_projected_str(
+        diagnostic,
+        "operation_family",
+        &card.operation_family,
+        "lsp.json diagnostic",
+    )
 }
 
 fn check_lsp_diagnostic_evidence(diagnostic: &serde_json::Value) -> Result<(), String> {
