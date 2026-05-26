@@ -2,6 +2,13 @@ name: Policy Contracts
 
 on:
   pull_request:
+    paths:
+      - "policy/**"
+      - ".unsafe-review-spec/**"
+      - "docs/specs/**"
+      - "docs/status/**"
+      - ".github/workflows/**"
+      - "xtask/**"
   push:
     branches: [main, master]
   workflow_dispatch:

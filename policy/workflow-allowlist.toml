@@ -37,7 +37,7 @@ permissions = "contents: read"
 actions = [
   "actions/checkout@v6",
 ]
-reason = "Source-of-truth scaffold workflow. It validates document, goal, package-boundary, and CI-lane ledgers without publishing, witness execution, source edits, or policy blocking."
+reason = "Path-scoped source-of-truth scaffold workflow. It validates document, goal, package-boundary, and CI-lane ledgers when policy/spec/status/workflow/xtask rails change, without publishing, witness execution, source edits, or policy blocking."
 created = "2026-05-20"
 review_after = "2026-07-01"
 
@@ -50,7 +50,7 @@ actions = [
   "actions/setup-node@v5",
   "actions/upload-artifact@v7",
 ]
-reason = "Editor extension packaging workflow. It installs npm dependencies, compiles TypeScript, runs unit tests, packages a VSIX for the read-only saved-lsp viewer, and uploads it as an artifact without publishing, witness execution, source edits, comment posting, or write permissions."
+reason = "Path-scoped editor extension packaging workflow. It installs npm dependencies, compiles TypeScript, runs unit tests, packages a VSIX for the read-only saved-lsp viewer, and uploads it as an artifact only for editor workflow/code changes, without publishing, witness execution, source edits, comment posting, or write permissions."
 created = "2026-05-23"
 review_after = "2026-07-23"
 

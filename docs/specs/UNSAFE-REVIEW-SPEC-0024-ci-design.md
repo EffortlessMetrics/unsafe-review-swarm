@@ -213,6 +213,22 @@ check-ci-lanes
 check-policy
 ```
 
+During the swarm CI budget window, pull-request runs are path-scoped to
+source-of-truth rails:
+
+```text
+policy/**
+.unsafe-review-spec/**
+docs/specs/**
+docs/status/**
+.github/workflows/**
+xtask/**
+```
+
+The default `check-pr` lane still covers the policy bundle on ordinary PRs, so
+policy-contracts is a focused duplicate-proof lane rather than a second default
+PR cost center.
+
 May fail on malformed or drifting source-of-truth rails. It must not run
 first-pr analysis, witnesses, coverage, publishing, comment posting, or source
 mutation.

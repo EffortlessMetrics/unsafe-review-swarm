@@ -86,6 +86,35 @@ This lane may fail on malformed or drifting source-of-truth ledgers. It must not
 run witnesses, post comments, publish, edit source, or turn unsafe-review
 findings into a default blocking policy.
 
+During the swarm CI budget window, policy-contracts runs on pull requests only
+when source-of-truth rails change:
+
+```text
+policy/**
+.unsafe-review-spec/**
+docs/specs/**
+docs/status/**
+.github/workflows/**
+xtask/**
+```
+
+The default workspace gate still runs `check-pr`, so policy checks remain
+covered on ordinary PRs without paying for a duplicate workflow every time.
+
+## Editor extension packaging lane
+
+The editor extension packaging lane is path-scoped to the saved-LSP viewer and
+its workflow:
+
+```text
+editors/vscode/**
+.github/workflows/editor-extension.yml
+```
+
+Policy or ledger-only changes should not package the extension. The lane still
+has read-only permissions, uploads only the VSIX artifact, and does not publish,
+run witnesses, post comments, or edit source.
+
 ## Advisory first-pr packet lane
 
 The first-pr lane produces the user-facing unsafe-review packet:

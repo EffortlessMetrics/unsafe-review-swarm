@@ -5,8 +5,6 @@ on:
     paths:
       - "editors/vscode/**"
       - ".github/workflows/editor-extension.yml"
-      - "policy/workflow-allowlist.toml"
-      - "policy/ci-lane-whitelist.toml"
   push:
     branches: [main, master]
     paths:
