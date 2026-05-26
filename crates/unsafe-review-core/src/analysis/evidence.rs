@@ -3748,30 +3748,52 @@ fn has_nullability_guard(site: &ScannedSite, lower: &str) -> bool {
         let guard_scope = code_before_operation(lower, &site.operation.expression)
             .unwrap_or_else(|| lower.to_string());
         let guard_compact = compact_code(&guard_scope);
-        return has_nonnull_new_question_mark_guard(&guard_compact, &arg)
-            || has_nonnull_new_if_let_guard(&guard_compact, &arg)
-            || has_nonnull_new_let_else_guard(&guard_compact, &arg)
-            || has_nonnull_new_match_some_guard(&guard_compact, &arg)
-            || has_null_early_return_guard(&guard_compact, &arg);
+        let context = NonNullPointerContext::new(&guard_compact, arg);
+        return has_nonnull_new_question_mark_guard(&context)
+            || has_nonnull_new_if_let_guard(&context)
+            || has_nonnull_new_let_else_guard(&context)
+            || has_nonnull_new_match_some_guard(&context)
+            || has_null_early_return_guard(&context);
     }
     lower.contains("is_null") || compact.contains("nonnull::new(")
 }
 
-fn has_nonnull_new_question_mark_guard(compact: &str, arg: &str) -> bool {
-    compact.contains(&format!("nonnull::new({arg})?"))
+struct NonNullPointerContext<'a> {
+    compact: &'a str,
+    arg: String,
+    new_probe: String,
 }
 
-fn has_nonnull_new_if_let_guard(compact: &str, arg: &str) -> bool {
-    let marker = format!("=nonnull::new({arg}){{");
-    let mut cursor = compact;
+impl<'a> NonNullPointerContext<'a> {
+    fn new(compact: &'a str, arg: String) -> Self {
+        let new_probe = format!("nonnull::new({arg})");
+        Self {
+            compact,
+            arg,
+            new_probe,
+        }
+    }
+
+    fn has_arg_assignment(&self, text: &str) -> bool {
+        contains_simple_assignment_to(text, &self.arg)
+    }
+}
+
+fn has_nonnull_new_question_mark_guard(context: &NonNullPointerContext<'_>) -> bool {
+    context.compact.contains(&format!("{}?", context.new_probe))
+}
+
+fn has_nonnull_new_if_let_guard(context: &NonNullPointerContext<'_>) -> bool {
+    let marker = format!("={}{{", context.new_probe);
+    let mut cursor = context.compact;
     let mut offset = 0usize;
     while let Some(pos) = cursor.find(&marker) {
         let marker_start = offset + pos;
         let proof_end = marker_start + marker.len();
-        if ends_with_some_pattern(&compact[..marker_start], "iflet") {
-            let after_guard = &compact[proof_end..];
+        if ends_with_some_pattern(&context.compact[..marker_start], "iflet") {
+            let after_guard = &context.compact[proof_end..];
             if branch_still_open_at_operation(after_guard)
-                && !contains_simple_assignment_to(after_guard, arg)
+                && !context.has_arg_assignment(after_guard)
             {
                 return true;
             }
@@ -3783,21 +3805,19 @@ fn has_nonnull_new_if_let_guard(compact: &str, arg: &str) -> bool {
     false
 }
 
-fn has_nonnull_new_let_else_guard(compact: &str, arg: &str) -> bool {
-    let marker = format!("=nonnull::new({arg})else{{");
-    let mut cursor = compact;
+fn has_nonnull_new_let_else_guard(context: &NonNullPointerContext<'_>) -> bool {
+    let marker = format!("={}else{{", context.new_probe);
+    let mut cursor = context.compact;
     let mut offset = 0usize;
     while let Some(pos) = cursor.find(&marker) {
         let marker_start = offset + pos;
         let proof_start = marker_start + marker.len();
-        if ends_with_some_pattern(&compact[..marker_start], "let") {
-            let after_guard = &compact[proof_start..];
+        if ends_with_some_pattern(&context.compact[..marker_start], "let") {
+            let after_guard = &context.compact[proof_start..];
             let (guard_body, after_guard_body) = after_guard
                 .split_once('}')
                 .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
-            if guard_body.contains("return")
-                && !contains_simple_assignment_to(after_guard_body, arg)
-            {
+            if guard_body.contains("return") && !context.has_arg_assignment(after_guard_body) {
                 return true;
             }
         }
@@ -3808,16 +3828,16 @@ fn has_nonnull_new_let_else_guard(compact: &str, arg: &str) -> bool {
     false
 }
 
-fn has_nonnull_new_match_some_guard(compact: &str, arg: &str) -> bool {
-    let marker = format!("matchnonnull::new({arg}){{");
-    let mut cursor = compact;
+fn has_nonnull_new_match_some_guard(context: &NonNullPointerContext<'_>) -> bool {
+    let marker = format!("match{}{{", context.new_probe);
+    let mut cursor = context.compact;
     let mut offset = 0usize;
     while let Some(pos) = cursor.find(&marker) {
         let after_match_start = offset + pos + marker.len();
-        let after_match = &compact[after_match_start..];
+        let after_match = &context.compact[after_match_start..];
         if let Some(branch_after_marker) = match_some_branch_after_marker(after_match)
             && branch_still_open_at_operation(branch_after_marker)
-            && !contains_simple_assignment_to(branch_after_marker, arg)
+            && !context.has_arg_assignment(branch_after_marker)
         {
             return true;
         }
@@ -3855,9 +3875,9 @@ fn is_some_binding(binding: &str) -> bool {
                 .all(|ch| ch == '_' || ch.is_ascii_alphanumeric()))
 }
 
-fn has_null_early_return_guard(compact: &str, arg: &str) -> bool {
-    let guard = format!("if{arg}.is_null(){{");
-    let Some((_prefix, after_guard)) = compact.split_once(&guard) else {
+fn has_null_early_return_guard(context: &NonNullPointerContext<'_>) -> bool {
+    let guard = format!("if{}.is_null(){{", context.arg);
+    let Some((_prefix, after_guard)) = context.compact.split_once(&guard) else {
         return false;
     };
     after_guard
