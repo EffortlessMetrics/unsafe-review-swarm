@@ -288,13 +288,13 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
         lsp["hovers"][0]["contents"]
             .as_str()
             .unwrap_or("")
-            .contains("operation `unsafe { ptr.cast::<Header>().read() }`")
+            .contains("Operation: `unsafe { ptr.cast::<Header>().read() }`")
     );
     assert!(
         lsp["hovers"][0]["contents"]
             .as_str()
             .unwrap_or("")
-            .contains("Evidence summary")
+            .contains("Evidence found")
     );
     assert!(
         lsp["hovers"][0]["contents"]
@@ -318,7 +318,13 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
         lsp["hovers"][0]["contents"]
             .as_str()
             .unwrap_or("")
-            .contains("Next action")
+            .contains("What would resolve this")
+    );
+    assert!(
+        lsp["hovers"][0]["contents"]
+            .as_str()
+            .unwrap_or("")
+            .contains("What would not resolve this")
     );
     assert!(
         lsp["hovers"][0]["contents"]
