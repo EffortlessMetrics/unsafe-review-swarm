@@ -16,6 +16,11 @@ pub(crate) struct ReceiptIndex {
 
 impl ReceiptIndex {
     pub(crate) fn load(root: &Path) -> Result<Self, String> {
+        let audit_date = current_utc_date()?;
+        Self::load_with_date(root, &audit_date)
+    }
+
+    fn load_with_date(root: &Path, audit_date: &str) -> Result<Self, String> {
         let dir = root.join(".unsafe-review").join("receipts");
         if !dir.is_dir() {
             return Ok(Self::default());
@@ -30,6 +35,9 @@ impl ReceiptIndex {
                 continue;
             }
             let receipt = parse_receipt_file(&path)?;
+            if receipt.expires_at.as_str() < audit_date {
+                continue;
+            }
             if by_card_id
                 .insert(receipt.card_id.clone(), receipt.evidence)
                 .is_some()
@@ -54,7 +62,24 @@ impl ReceiptIndex {
 }
 
 pub(crate) fn validate_receipts(root: &Path) -> Result<usize, String> {
-    ReceiptIndex::load(root).map(|index| index.len())
+    let dir = root.join(".unsafe-review").join("receipts");
+    if !dir.is_dir() {
+        return Ok(0);
+    }
+    let mut count = 0;
+    let mut card_ids = BTreeSet::new();
+    for path in receipt_files(&dir)? {
+        let receipt = parse_receipt_file(&path)?;
+        if !card_ids.insert(receipt.card_id.clone()) {
+            return Err(format!(
+                "{} imports duplicate receipt for card_id `{}`",
+                path.display(),
+                receipt.card_id
+            ));
+        }
+        count += 1;
+    }
+    Ok(count)
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -179,6 +204,7 @@ struct AuditReceiptRecord {
 struct ParsedReceipt {
     card_id: String,
     evidence: WitnessEvidence,
+    expires_at: String,
 }
 
 fn parse_receipt_file(path: &Path) -> Result<ParsedReceipt, String> {
@@ -192,6 +218,7 @@ fn parse_receipt_file(path: &Path) -> Result<ParsedReceipt, String> {
     Ok(ParsedReceipt {
         card_id: receipt.card_id.clone(),
         evidence: WitnessEvidence::present(receipt.evidence_summary()),
+        expires_at: receipt.expires_at.clone().unwrap_or_default(),
     })
 }
 
@@ -484,6 +511,32 @@ mod tests {
         assert!(evidence.summary.contains("core/fixtures"));
         assert!(evidence.summary.contains("2026-08-18"));
         assert!(evidence.summary.contains("fixture only"));
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_index_skips_expired_receipts_for_witness_evidence() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-expired-receipt-index")?;
+        let receipts = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipts).map_err(|err| format!("create receipt dir failed: {err}"))?;
+        let card_id =
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+        write_receipt(
+            &receipts,
+            "expired.json",
+            card_id,
+            "miri",
+            "ran",
+            "2026-05-17",
+        )?;
+
+        let index = ReceiptIndex::load_with_date(&root, "2026-05-18")?;
+        let validated = validate_receipts(&root)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+        assert_eq!(validated, 1);
+        assert_eq!(index.len(), 0);
+        assert!(index.evidence_for(&CardId(card_id.to_string())).is_none());
         Ok(())
     }
 
