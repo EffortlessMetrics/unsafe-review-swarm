@@ -818,12 +818,14 @@ fn require_not_selected_card_projection(
     require_projected_str(card, "confidence", &projection.confidence, context)?;
     require_projected_str(card, "path", &projection.path, context)?;
     require_projected_u64(card, "line", projection.line, context)?;
+    require_projected_str(card, "operation", &projection.operation, context)?;
     require_projected_str(
         card,
         "operation_family",
         &projection.operation_family,
         context,
-    )
+    )?;
+    require_projected_str(card, "next_action", &projection.next_action, context)
 }
 
 fn require_projected_str(

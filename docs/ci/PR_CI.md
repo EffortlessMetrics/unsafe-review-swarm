@@ -189,7 +189,8 @@ verify-command, and trust-boundary fields.
 It must not rerun analysis and create a second comment truth.
 Card-present/no-comment cases should be represented through `not_selected`
 entries in `comment-plan.json`, so reviewers can see why a card stayed out of
-the inline comment budget without opening a second analyzer truth.
+the inline comment budget, including its operation and next-action context,
+without opening a second analyzer truth.
 The trusted poster architecture is specified in
 [TRUSTED_COMMENT_POSTER.md](TRUSTED_COMMENT_POSTER.md); it remains future
 infrastructure and is not a default workflow.

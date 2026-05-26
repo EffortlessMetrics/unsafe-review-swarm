@@ -149,7 +149,15 @@ mod tests {
         assert_eq!(value["comments"].as_array().map_or(1, Vec::len), 0);
         assert_eq!(value["not_selected"].as_array().map_or(0, Vec::len), 1);
         assert_eq!(value["not_selected"][0]["class"], "miri_unsupported");
+        assert_eq!(
+            value["not_selected"][0]["operation"],
+            "unsafe extern \"C\" {"
+        );
         assert_eq!(value["not_selected"][0]["operation_family"], "ffi");
+        assert_eq!(
+            value["not_selected"][0]["next_action"],
+            "Use sanitizer/cargo-careful or an explicit FFI boundary contract; Miri may not exercise this seam."
+        );
         assert_eq!(
             value["not_selected"][0]["reason"],
             "priority/confidence below inline comment threshold"
@@ -165,7 +173,15 @@ mod tests {
         assert_eq!(value["comments"].as_array().map_or(1, Vec::len), 0);
         assert_eq!(value["not_selected"].as_array().map_or(0, Vec::len), 1);
         assert_eq!(value["not_selected"][0]["class"], "contract_missing");
+        assert_eq!(
+            value["not_selected"][0]["operation"],
+            "pub unsafe fn caller_must_uphold_contract() {"
+        );
         assert_eq!(value["not_selected"][0]["operation_family"], "unknown");
+        assert_eq!(
+            value["not_selected"][0]["next_action"],
+            "Add a precise public `# Safety` section that names the required caller obligations."
+        );
         assert_eq!(
             value["not_selected"][0]["reason"],
             "operation family unknown"

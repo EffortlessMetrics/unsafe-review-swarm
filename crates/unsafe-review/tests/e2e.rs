@@ -735,7 +735,15 @@ fn first_pr_comment_plan_explains_not_selected_cards() -> Result<(), Box<dyn Err
     );
     assert_eq!(comment_plan["not_selected"][0]["card_id"], card_id);
     assert_eq!(comment_plan["not_selected"][0]["class"], "miri_unsupported");
+    assert_eq!(
+        comment_plan["not_selected"][0]["operation"],
+        cards["cards"][0]["operation"]
+    );
     assert_eq!(comment_plan["not_selected"][0]["operation_family"], "ffi");
+    assert_eq!(
+        comment_plan["not_selected"][0]["next_action"],
+        cards["cards"][0]["next_action"]
+    );
     assert_eq!(
         comment_plan["not_selected"][0]["actionability"],
         "specific_witness_missing"

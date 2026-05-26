@@ -118,7 +118,9 @@ changed unsafe operation. The card remains visible in the bundle.
   "not_selected": [
     {
       "class": "contract_missing",
+      "operation": "pub unsafe fn caller_must_uphold_contract() {",
       "operation_family": "unknown",
+      "next_action": "Add a precise public `# Safety` section that names the required caller obligations.",
       "actionability": "specific_contract_missing",
       "relevance": "high",
       "reason": "operation family unknown"
@@ -147,7 +149,9 @@ Representative fields:
   "not_selected": [
     {
       "class": "miri_unsupported",
+      "operation": "unsafe extern \"C\" {",
       "operation_family": "ffi",
+      "next_action": "Use sanitizer/cargo-careful or an explicit FFI boundary contract; Miri may not exercise this seam.",
       "actionability": "specific_witness_missing",
       "relevance": "low",
       "reason": "priority/confidence below inline comment threshold"

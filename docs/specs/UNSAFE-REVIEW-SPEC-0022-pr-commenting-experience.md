@@ -69,7 +69,8 @@ Each selected candidate includes required fields:
 Each `not_selected` entry includes:
 
 - `card_id`, `path`, `line`
-- `class`, `priority`, `confidence`, `operation_family`
+- `operation`, `operation_family`, `class`, `priority`, `confidence`
+- `next_action`
 - `actionability`, `relevance`
 - `reason`
 
@@ -158,6 +159,7 @@ document is a future-lane contract, not a live workflow.
 - invalid line/path
 - missing `next_action`, `selection_reason`, `actionability`, `relevance`, or
   candidate `trust_boundary`
+- drift between `not_selected` review context and the referenced ReviewCard
 - `relevance` outside the documented set (`high`, `medium`, `low`)
 - body text that drifts from the structured `next_action`
 - missing trust boundary in body
