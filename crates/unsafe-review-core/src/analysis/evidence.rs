@@ -1963,10 +1963,10 @@ fn set_len_capacity_stale_identifiers<'a>(
 
 fn has_set_len_const_cap_evidence(lower: &str) -> bool {
     let compact = compact_code(lower);
-    let Some((_, new_len)) = set_len_receiver_and_argument(&compact) else {
+    let Some(context) = set_len_call_context(&compact) else {
         return false;
     };
-    new_len == "cap" && (compact.contains("maybeuninit::uninit();cap") || compact.contains(";cap]"))
+    context.has_const_capacity_evidence()
 }
 
 fn has_set_len_with_capacity_evidence(lower: &str) -> bool {
@@ -2087,6 +2087,12 @@ impl<'a> SetLenApplicabilityContext<'a> {
 
     fn has_capacity_relation(&self, capacity: &str) -> bool {
         has_set_len_capacity_relation(self.before_call, self.new_len, capacity, self.receiver)
+    }
+
+    fn has_const_capacity_evidence(&self) -> bool {
+        self.new_len == "cap"
+            && (self.before_call.contains("maybeuninit::uninit();cap")
+                || self.before_call.contains(";cap]"))
     }
 
     fn has_reserve_capacity_evidence(&self) -> bool {
