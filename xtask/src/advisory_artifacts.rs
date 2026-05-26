@@ -107,7 +107,7 @@ fn require_text_mentions_all_card_ids(
     Ok(())
 }
 
-fn require_github_summary_card_identity(
+fn require_markdown_top_card_identity(
     text: &str,
     path: &Path,
     card_classes: &BTreeMap<String, String>,
@@ -801,6 +801,7 @@ fn check_first_pr_markdown_card_identity(
     let pr_summary_path = dir.join("pr-summary.md");
     let pr_summary = super::read_to_string(&pr_summary_path)?;
     require_text_mentions_all_card_ids(&pr_summary, &pr_summary_path, card_ids)?;
+    require_markdown_top_card_identity(&pr_summary, &pr_summary_path, card_classes)?;
 
     let witness_plan_path = dir.join("witness-plan.md");
     let witness_plan = super::read_to_string(&witness_plan_path)?;
@@ -808,7 +809,7 @@ fn check_first_pr_markdown_card_identity(
 
     let github_summary_path = dir.join("github-summary.md");
     let github_summary = super::read_to_string(&github_summary_path)?;
-    require_github_summary_card_identity(&github_summary, &github_summary_path, card_classes)
+    require_markdown_top_card_identity(&github_summary, &github_summary_path, card_classes)
 }
 
 fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), String> {

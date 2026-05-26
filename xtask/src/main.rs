@@ -9046,6 +9046,53 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_pr_summary_unknown_top_card_identity() -> Result<(), String>
+    {
+        let dir = unique_temp_dir("unsafe-review-first-pr-summary-card-id")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        fs::write(
+            dir.join("pr-summary.md"),
+            "- Review cards: 1\n\n## Top card\n\n- ID: `missing`\n- Class: `guard_missing`\n\nKnown ReviewCard: `card-1`\n\nThis artifact is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
+        )
+        .map_err(|err| format!("write pr summary failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("top card id `missing` is not present in cards.json")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_pr_summary_top_card_class_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-summary-card-class")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        fs::write(
+            dir.join("pr-summary.md"),
+            "- Review cards: 1\n\n## Top card\n\n- ID: `card-1`\n- Class: `contract_missing`\n\nThis artifact is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
+        )
+        .map_err(|err| format!("write pr summary failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("top card `card-1` class must be `guard_missing`")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_github_summary_unknown_top_card_identity()
     -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-github-card-id")?;
@@ -9728,7 +9775,7 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write cards failed: {err}"))?;
         fs::write(
             dir.join("pr-summary.md"),
-            "- Review cards: 1\n\n- ID: `card-1`\n\nThis artifact is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
+            "- Review cards: 1\n\n## Top card\n\n- ID: `card-1`\n- Class: `guard_missing`\n\nThis artifact is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
         )
         .map_err(|err| format!("write pr summary failed: {err}"))?;
         fs::write(
