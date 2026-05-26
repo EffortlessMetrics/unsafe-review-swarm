@@ -19,6 +19,7 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
     check_witness_plan_artifact(dir, summary.card_count)?;
     check_lsp_artifact(dir, &summary.card_ids)?;
     check_github_summary_artifact(dir, summary.card_count)?;
+    check_first_pr_markdown_card_identity(dir, &summary.card_ids)?;
     check_first_pr_artifact_overclaims(dir)?;
 
     println!("check-first-pr-artifacts: ok ({})", dir.display());
@@ -77,6 +78,36 @@ fn check_github_summary_artifact(dir: &Path, card_count: usize) -> Result<(), St
     }
 
     Ok(())
+}
+
+fn require_text_mentions_all_card_ids(
+    text: &str,
+    path: &Path,
+    card_ids: &BTreeSet<String>,
+) -> Result<(), String> {
+    for card_id in card_ids {
+        if !text.contains(card_id) {
+            return Err(format!(
+                "{} must mention ReviewCard id `{card_id}`",
+                path.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn require_text_mentions_known_card_id(
+    text: &str,
+    path: &Path,
+    card_ids: &BTreeSet<String>,
+) -> Result<(), String> {
+    if card_ids.is_empty() || card_ids.iter().any(|card_id| text.contains(card_id)) {
+        return Ok(());
+    }
+    Err(format!(
+        "{} must mention at least one known ReviewCard id",
+        path.display()
+    ))
 }
 
 fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, String> {
@@ -419,6 +450,23 @@ fn check_witness_plan_artifact(dir: &Path, card_count: usize) -> Result<(), Stri
         )?;
     }
     Ok(())
+}
+
+fn check_first_pr_markdown_card_identity(
+    dir: &Path,
+    card_ids: &BTreeSet<String>,
+) -> Result<(), String> {
+    let pr_summary_path = dir.join("pr-summary.md");
+    let pr_summary = super::read_to_string(&pr_summary_path)?;
+    require_text_mentions_all_card_ids(&pr_summary, &pr_summary_path, card_ids)?;
+
+    let witness_plan_path = dir.join("witness-plan.md");
+    let witness_plan = super::read_to_string(&witness_plan_path)?;
+    require_text_mentions_all_card_ids(&witness_plan, &witness_plan_path, card_ids)?;
+
+    let github_summary_path = dir.join("github-summary.md");
+    let github_summary = super::read_to_string(&github_summary_path)?;
+    require_text_mentions_known_card_id(&github_summary, &github_summary_path, card_ids)
 }
 
 fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), String> {
