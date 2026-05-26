@@ -924,53 +924,66 @@ fn has_get_unchecked_bounds_guard(lower: &str, receiver: &str, index: &str) -> b
     if receiver.is_empty() || index.is_empty() {
         return false;
     }
-    let context = GetUncheckedBoundsContext::new(&compact, receiver, index);
+    let context = GetUncheckedBoundsApplicability::from_before_operation(&compact, receiver, index);
 
-    has_get_unchecked_bounds_predicate(&context, &format!("{}<{}", context.index, context.len))
-        || has_get_unchecked_bounds_predicate(
-            &context,
-            &format!("{}>{}", context.len, context.index),
-        )
-        || has_get_unchecked_bounds_early_return(
-            &context,
-            &format!("{}>={}", context.index, context.len),
-        )
-        || has_get_unchecked_bounds_early_return(
-            &context,
-            &format!("{}<={}", context.len, context.index),
-        )
+    has_get_unchecked_bounds_predicate(&context, &context.index_lt_len_predicate())
+        || has_get_unchecked_bounds_predicate(&context, &context.len_gt_index_predicate())
+        || has_get_unchecked_bounds_early_return(&context, &context.index_gte_len_predicate())
+        || has_get_unchecked_bounds_early_return(&context, &context.len_lte_index_predicate())
         || has_get_unchecked_get_probe_guard(&context)
 }
 
-struct GetUncheckedBoundsContext<'a> {
-    compact: &'a str,
-    receiver: String,
-    index: String,
-    len: String,
-    probe: String,
+// Bounds evidence for get_unchecked must target the same receiver and index
+// as the unsafe operation, and those targets must stay fresh until the call.
+struct GetUncheckedBoundsApplicability<'a> {
+    before_operation: &'a str,
+    operation_receiver: String,
+    operation_index: String,
+    same_receiver_len: String,
+    same_receiver_get_probe: String,
 }
 
-impl<'a> GetUncheckedBoundsContext<'a> {
-    fn new(compact: &'a str, receiver: String, index: String) -> Self {
-        let len = format!("{receiver}.len()");
-        let probe = format!("{receiver}.get({index})");
+impl<'a> GetUncheckedBoundsApplicability<'a> {
+    fn from_before_operation(
+        before_operation: &'a str,
+        operation_receiver: String,
+        operation_index: String,
+    ) -> Self {
+        let same_receiver_len = format!("{operation_receiver}.len()");
+        let same_receiver_get_probe = format!("{operation_receiver}.get({operation_index})");
         Self {
-            compact,
-            receiver,
-            index,
-            len,
-            probe,
+            before_operation,
+            operation_receiver,
+            operation_index,
+            same_receiver_len,
+            same_receiver_get_probe,
         }
     }
 
-    fn has_stale_assignment(&self, text: &str) -> bool {
-        contains_simple_assignment_to(text, &self.receiver)
-            || contains_simple_assignment_to(text, &self.index)
+    fn index_lt_len_predicate(&self) -> String {
+        format!("{}<{}", self.operation_index, self.same_receiver_len)
+    }
+
+    fn len_gt_index_predicate(&self) -> String {
+        format!("{}>{}", self.same_receiver_len, self.operation_index)
+    }
+
+    fn index_gte_len_predicate(&self) -> String {
+        format!("{}>={}", self.operation_index, self.same_receiver_len)
+    }
+
+    fn len_lte_index_predicate(&self) -> String {
+        format!("{}<={}", self.same_receiver_len, self.operation_index)
+    }
+
+    fn has_stale_target_assignment(&self, text: &str) -> bool {
+        contains_simple_assignment_to(text, &self.operation_receiver)
+            || contains_simple_assignment_to(text, &self.operation_index)
     }
 }
 
 fn has_get_unchecked_bounds_predicate(
-    context: &GetUncheckedBoundsContext<'_>,
+    context: &GetUncheckedBoundsApplicability<'_>,
     predicate: &str,
 ) -> bool {
     has_get_unchecked_open_bounds_branch(context, predicate)
@@ -978,17 +991,18 @@ fn has_get_unchecked_bounds_predicate(
 }
 
 fn has_get_unchecked_open_bounds_branch(
-    context: &GetUncheckedBoundsContext<'_>,
+    context: &GetUncheckedBoundsApplicability<'_>,
     predicate: &str,
 ) -> bool {
-    let compact = context.compact;
+    let compact = context.before_operation;
     let marker = format!("if{predicate}{{");
     let mut cursor = compact;
     let mut offset = 0usize;
     while let Some(pos) = cursor.find(&marker) {
         let proof_end = offset + pos + marker.len();
         let after_guard = &compact[proof_end..];
-        if branch_still_open_at_operation(after_guard) && !context.has_stale_assignment(after_guard)
+        if branch_still_open_at_operation(after_guard)
+            && !context.has_stale_target_assignment(after_guard)
         {
             return true;
         }
@@ -1000,17 +1014,17 @@ fn has_get_unchecked_open_bounds_branch(
 }
 
 fn has_get_unchecked_bounds_assertion(
-    context: &GetUncheckedBoundsContext<'_>,
+    context: &GetUncheckedBoundsApplicability<'_>,
     predicate: &str,
 ) -> bool {
     ["assert!(", "debug_assert!("].into_iter().any(|prefix| {
         let marker = format!("{prefix}{predicate}");
-        let mut cursor = context.compact;
+        let mut cursor = context.before_operation;
         let mut offset = 0usize;
         while let Some(pos) = cursor.find(&marker) {
             let proof_end = offset + pos + marker.len();
-            let after_assertion = &context.compact[proof_end..];
-            if !context.has_stale_assignment(after_assertion) {
+            let after_assertion = &context.before_operation[proof_end..];
+            if !context.has_stale_target_assignment(after_assertion) {
                 return true;
             }
             let next = pos + marker.len();
@@ -1022,19 +1036,19 @@ fn has_get_unchecked_bounds_assertion(
 }
 
 fn has_get_unchecked_bounds_early_return(
-    context: &GetUncheckedBoundsContext<'_>,
+    context: &GetUncheckedBoundsApplicability<'_>,
     predicate: &str,
 ) -> bool {
     let guard = format!("if{predicate}{{");
-    let mut cursor = context.compact;
+    let mut cursor = context.before_operation;
     let mut offset = 0usize;
     while let Some(pos) = cursor.find(&guard) {
         let proof_start = offset + pos + guard.len();
-        let after_guard = &context.compact[proof_start..];
+        let after_guard = &context.before_operation[proof_start..];
         let (guard_body, after_guard_body) = after_guard
             .split_once('}')
             .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
-        if guard_body.contains("return") && !context.has_stale_assignment(after_guard_body) {
+        if guard_body.contains("return") && !context.has_stale_target_assignment(after_guard_body) {
             return true;
         }
         let next = pos + guard.len();
@@ -1044,7 +1058,7 @@ fn has_get_unchecked_bounds_early_return(
     false
 }
 
-fn has_get_unchecked_get_probe_guard(context: &GetUncheckedBoundsContext<'_>) -> bool {
+fn has_get_unchecked_get_probe_guard(context: &GetUncheckedBoundsApplicability<'_>) -> bool {
     has_get_unchecked_get_probe_open_branch(context)
         || has_get_unchecked_get_probe_early_return(context)
         || has_get_unchecked_get_probe_if_let_branch(context)
@@ -1052,14 +1066,15 @@ fn has_get_unchecked_get_probe_guard(context: &GetUncheckedBoundsContext<'_>) ->
         || has_get_unchecked_get_probe_match_branch(context)
 }
 
-fn has_get_unchecked_get_probe_open_branch(context: &GetUncheckedBoundsContext<'_>) -> bool {
-    let marker = format!("if{}.is_some(){{", context.probe);
-    let mut cursor = context.compact;
+fn has_get_unchecked_get_probe_open_branch(context: &GetUncheckedBoundsApplicability<'_>) -> bool {
+    let marker = format!("if{}.is_some(){{", context.same_receiver_get_probe);
+    let mut cursor = context.before_operation;
     let mut offset = 0usize;
     while let Some(pos) = cursor.find(&marker) {
         let proof_end = offset + pos + marker.len();
-        let after_guard = &context.compact[proof_end..];
-        if branch_still_open_at_operation(after_guard) && !context.has_stale_assignment(after_guard)
+        let after_guard = &context.before_operation[proof_end..];
+        if branch_still_open_at_operation(after_guard)
+            && !context.has_stale_target_assignment(after_guard)
         {
             return true;
         }
@@ -1070,17 +1085,17 @@ fn has_get_unchecked_get_probe_open_branch(context: &GetUncheckedBoundsContext<'
     false
 }
 
-fn has_get_unchecked_get_probe_early_return(context: &GetUncheckedBoundsContext<'_>) -> bool {
-    let marker = format!("if{}.is_none(){{", context.probe);
-    let mut cursor = context.compact;
+fn has_get_unchecked_get_probe_early_return(context: &GetUncheckedBoundsApplicability<'_>) -> bool {
+    let marker = format!("if{}.is_none(){{", context.same_receiver_get_probe);
+    let mut cursor = context.before_operation;
     let mut offset = 0usize;
     while let Some(pos) = cursor.find(&marker) {
         let proof_start = offset + pos + marker.len();
-        let after_guard = &context.compact[proof_start..];
+        let after_guard = &context.before_operation[proof_start..];
         let (guard_body, after_guard_body) = after_guard
             .split_once('}')
             .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
-        if guard_body.contains("return") && !context.has_stale_assignment(after_guard_body) {
+        if guard_body.contains("return") && !context.has_stale_target_assignment(after_guard_body) {
             return true;
         }
         let next = pos + marker.len();
@@ -1090,14 +1105,17 @@ fn has_get_unchecked_get_probe_early_return(context: &GetUncheckedBoundsContext<
     false
 }
 
-fn has_get_unchecked_get_probe_if_let_branch(context: &GetUncheckedBoundsContext<'_>) -> bool {
-    let marker = format!("ifletsome(_)={}{{", context.probe);
-    let mut cursor = context.compact;
+fn has_get_unchecked_get_probe_if_let_branch(
+    context: &GetUncheckedBoundsApplicability<'_>,
+) -> bool {
+    let marker = format!("ifletsome(_)={}{{", context.same_receiver_get_probe);
+    let mut cursor = context.before_operation;
     let mut offset = 0usize;
     while let Some(pos) = cursor.find(&marker) {
         let proof_end = offset + pos + marker.len();
-        let after_guard = &context.compact[proof_end..];
-        if branch_still_open_at_operation(after_guard) && !context.has_stale_assignment(after_guard)
+        let after_guard = &context.before_operation[proof_end..];
+        if branch_still_open_at_operation(after_guard)
+            && !context.has_stale_target_assignment(after_guard)
         {
             return true;
         }
@@ -1108,17 +1126,17 @@ fn has_get_unchecked_get_probe_if_let_branch(context: &GetUncheckedBoundsContext
     false
 }
 
-fn has_get_unchecked_get_probe_let_else(context: &GetUncheckedBoundsContext<'_>) -> bool {
-    let marker = format!("letsome(_)={}else{{", context.probe);
-    let mut cursor = context.compact;
+fn has_get_unchecked_get_probe_let_else(context: &GetUncheckedBoundsApplicability<'_>) -> bool {
+    let marker = format!("letsome(_)={}else{{", context.same_receiver_get_probe);
+    let mut cursor = context.before_operation;
     let mut offset = 0usize;
     while let Some(pos) = cursor.find(&marker) {
         let proof_start = offset + pos + marker.len();
-        let after_guard = &context.compact[proof_start..];
+        let after_guard = &context.before_operation[proof_start..];
         let (guard_body, after_guard_body) = after_guard
             .split_once('}')
             .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
-        if guard_body.contains("return") && !context.has_stale_assignment(after_guard_body) {
+        if guard_body.contains("return") && !context.has_stale_target_assignment(after_guard_body) {
             return true;
         }
         let next = pos + marker.len();
@@ -1128,16 +1146,16 @@ fn has_get_unchecked_get_probe_let_else(context: &GetUncheckedBoundsContext<'_>)
     false
 }
 
-fn has_get_unchecked_get_probe_match_branch(context: &GetUncheckedBoundsContext<'_>) -> bool {
-    let marker = format!("match{}{{", context.probe);
-    let mut cursor = context.compact;
+fn has_get_unchecked_get_probe_match_branch(context: &GetUncheckedBoundsApplicability<'_>) -> bool {
+    let marker = format!("match{}{{", context.same_receiver_get_probe);
+    let mut cursor = context.before_operation;
     let mut offset = 0usize;
     while let Some(pos) = cursor.find(&marker) {
         let after_match_start = offset + pos + marker.len();
-        let after_match = &context.compact[after_match_start..];
+        let after_match = &context.before_operation[after_match_start..];
         if let Some(branch_after_marker) = match_some_branch_after_marker(after_match)
             && branch_still_open_at_operation(branch_after_marker)
-            && !context.has_stale_assignment(branch_after_marker)
+            && !context.has_stale_target_assignment(branch_after_marker)
         {
             return true;
         }
