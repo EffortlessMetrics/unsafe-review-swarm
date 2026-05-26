@@ -856,8 +856,18 @@ mod tests {
             return Err("fixture should emit one card".to_string());
         };
         let value = parse_json(&render(card))?;
+        let allowed_repairs = serde_json::to_string(&value["allowed_repairs"])
+            .map_err(|err| format!("render allowed repairs failed: {err}"))?;
 
         assert_eq!(value["context"]["operation_family"], "inline_asm");
+        assert!(allowed_repairs.contains("register, memory, clobber, options"));
+        assert!(allowed_repairs.contains("target-feature invariants"));
+        assert!(allowed_repairs.contains("safe intrinsic"));
+        assert!(allowed_repairs.contains("narrower wrapper"));
+        assert!(allowed_repairs.contains("witness receipt"));
+        assert!(!allowed_repairs.contains("same raw pointer"));
+        assert!(!allowed_repairs.contains("all-zero bit pattern"));
+        assert!(!allowed_repairs.contains("static mut"));
         assert_eq!(value["agent_readiness"]["ready"], false);
         assert_eq!(value["agent_readiness"]["state"], "needs_human_review");
         let reasons = serde_json::to_string(&value["agent_readiness"]["reasons"])

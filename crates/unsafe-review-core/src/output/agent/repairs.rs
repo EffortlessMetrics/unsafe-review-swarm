@@ -85,6 +85,10 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
             repairs.push("show the global state invariant avoids aliased mutable references and data races".to_string());
             repairs.push("prefer an `UnsafeCell`, atomic, lock, or one-time initialization owner when the invariant cannot be localized".to_string());
         }
+        OperationFamily::InlineAsm if missing_discharge(card, "asm") => {
+            repairs.push("document the register, memory, clobber, options, and target-feature invariants for this `asm!` block".to_string());
+            repairs.push("prefer a safe intrinsic or narrower wrapper when the assembly invariant cannot be reviewed locally".to_string());
+        }
         _ => {}
     }
     if missing_kind(card, "contract") {
