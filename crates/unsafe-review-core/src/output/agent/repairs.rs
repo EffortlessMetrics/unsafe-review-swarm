@@ -77,6 +77,23 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
                 repairs.push("show the `ptr..ptr+len` range stays inside one live allocation".to_string());
             }
         }
+        OperationFamily::VecFromRawParts => {
+            if missing_discharge(card, "pointer-live") {
+                repairs.push("prove the same pointer was allocated by a compatible allocator for `capacity` elements before `Vec::from_raw_parts`".to_string());
+            }
+            if missing_discharge(card, "alignment") {
+                repairs.push("prove the pointer is aligned for the Vec element type".to_string());
+            }
+            if missing_discharge(card, "initialized") {
+                repairs.push("show the first `len` elements are initialized before reconstructing the Vec".to_string());
+            }
+            if missing_discharge(card, "capacity") {
+                repairs.push("add or expose a same-value guard proving `len <= capacity`".to_string());
+            }
+            if missing_discharge(card, "ownership") {
+                repairs.push("show the reconstructed Vec receives unique ownership and the raw parts will not be reused or double-freed".to_string());
+            }
+        }
         OperationFamily::PinUnchecked if missing_discharge(card, "pin") => {
             repairs.push("prove the value will not move after `Pin::new_unchecked`".to_string());
             repairs.push("show projections preserve the same pinning invariant for this value".to_string());
