@@ -1,0 +1,35 @@
+use core::mem::MaybeUninit;
+
+pub fn extend_from_bytes(
+    values: &mut Vec<MaybeUninit<u8>>,
+    other: &Vec<MaybeUninit<u8>>,
+    bytes: &[u8],
+) {
+    if bytes.len() > other.capacity() - other.len() {
+        return;
+    }
+    let old_len = values.len();
+    let new_len = old_len + bytes.len();
+
+    let dst = &mut values[old_len..new_len];
+    for (dst, src) in dst.iter_mut().zip(bytes.iter()) {
+        *dst = MaybeUninit::new(*src);
+    }
+
+    // SAFETY: this fixture checks that another vector's remaining capacity is not enough.
+    unsafe {
+        values.set_len(new_len);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::extend_from_bytes;
+
+    #[test]
+    fn mentions_extend_from_bytes() {
+        let mut values = Vec::with_capacity(0);
+        let other = Vec::with_capacity(0);
+        extend_from_bytes(&mut values, &other, b"");
+    }
+}

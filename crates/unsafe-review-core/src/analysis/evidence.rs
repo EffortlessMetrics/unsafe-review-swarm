@@ -1721,6 +1721,10 @@ fn has_capacity_bound_guard(lower: &str) -> bool {
     let Some(context) = set_len_call_context(&compact) else {
         return false;
     };
+    if has_set_len_remaining_capacity_guard(context.before_call, context.receiver, context.new_len)
+    {
+        return true;
+    }
     for capacity in [
         format!("{}.capacity()", context.receiver),
         format!("{}.cap()", context.receiver),
@@ -1758,6 +1762,163 @@ fn set_len_capacity_bindings<'a>(before_call: &'a str, receiver: &str) -> Vec<&'
             .then_some(binding)
         })
         .collect()
+}
+
+fn has_set_len_remaining_capacity_guard(before_call: &str, receiver: &str, new_len: &str) -> bool {
+    if !is_simple_identifier(new_len) {
+        return false;
+    }
+    let receiver_len = format!("{receiver}.len()");
+    let mut receiver_len_bindings = Vec::new();
+    let mut consumed = 0usize;
+    for statement in before_call.split_inclusive(';') {
+        let statement_without_semicolon = statement.trim_end_matches(';');
+        let Some((left, right)) = statement_without_semicolon.split_once('=') else {
+            consumed += statement.len();
+            continue;
+        };
+        let Some(binding) = let_binding_name(left) else {
+            consumed += statement.len();
+            continue;
+        };
+        let right = right.trim();
+        if right == receiver_len {
+            receiver_len_bindings.push(binding);
+        }
+        if binding == new_len
+            && let Some((len_term, additional)) =
+                set_len_growth_terms(right, &receiver_len, &receiver_len_bindings)
+        {
+            let before_new_len_binding = &before_call[..consumed];
+            let after_new_len_binding =
+                &before_call[(consumed + statement.len()).min(before_call.len())..];
+            if has_fresh_remaining_capacity_early_return(
+                before_new_len_binding,
+                receiver,
+                &receiver_len,
+                additional,
+            ) && set_len_growth_terms_stay_fresh(
+                after_new_len_binding,
+                receiver,
+                new_len,
+                len_term,
+                additional,
+            ) {
+                return true;
+            }
+        }
+        consumed += statement.len();
+    }
+    false
+}
+
+fn set_len_growth_terms<'a>(
+    expression: &'a str,
+    receiver_len: &str,
+    receiver_len_bindings: &[&str],
+) -> Option<(&'a str, &'a str)> {
+    let (left, right) = expression.split_once('+')?;
+    let left = left.trim();
+    let right = right.trim();
+    if set_len_growth_len_term_matches(left, receiver_len, receiver_len_bindings) {
+        return Some((left, right));
+    }
+    if set_len_growth_len_term_matches(right, receiver_len, receiver_len_bindings) {
+        return Some((right, left));
+    }
+    None
+}
+
+fn set_len_growth_len_term_matches(
+    term: &str,
+    receiver_len: &str,
+    receiver_len_bindings: &[&str],
+) -> bool {
+    term == receiver_len || receiver_len_bindings.iter().any(|binding| term == *binding)
+}
+
+fn has_fresh_remaining_capacity_early_return(
+    before_new_len_binding: &str,
+    receiver: &str,
+    receiver_len: &str,
+    additional: &str,
+) -> bool {
+    let Some(additional_stale_identifier) = expression_base_identifier(additional) else {
+        return false;
+    };
+    for capacity in [
+        format!("{receiver}.capacity()"),
+        format!("{receiver}.cap()"),
+    ] {
+        let remaining = format!("{capacity}-{receiver_len}");
+        for predicate in [
+            format!("{additional}>{remaining}"),
+            format!("{remaining}<{additional}"),
+        ] {
+            if remaining_capacity_early_return_matches(
+                before_new_len_binding,
+                &predicate,
+                receiver,
+                additional_stale_identifier,
+            ) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn remaining_capacity_early_return_matches(
+    before_new_len_binding: &str,
+    predicate: &str,
+    receiver: &str,
+    additional_stale_identifier: &str,
+) -> bool {
+    let guard = format!("if{predicate}{{");
+    let mut search_from = 0usize;
+    while let Some(offset) = before_new_len_binding[search_from..].find(&guard) {
+        let guard_start = search_from + offset;
+        let after_guard = &before_new_len_binding[guard_start + guard.len()..];
+        let guard_end = after_guard.find('}').unwrap_or(after_guard.len());
+        let guard_body = &after_guard[..guard_end];
+        let after_branch = &after_guard[guard_end..];
+        if guard_body.contains("return")
+            && !has_assignment_to_any_identifier(
+                after_branch,
+                &[receiver, additional_stale_identifier],
+            )
+        {
+            return true;
+        }
+        search_from = guard_start + guard.len();
+    }
+    false
+}
+
+fn set_len_growth_terms_stay_fresh(
+    after_new_len_binding: &str,
+    receiver: &str,
+    new_len: &str,
+    len_term: &str,
+    additional: &str,
+) -> bool {
+    let mut identifiers = vec![receiver, new_len];
+    if is_simple_identifier(len_term) {
+        identifiers.push(len_term);
+    }
+    if let Some(identifier) = expression_base_identifier(additional) {
+        identifiers.push(identifier);
+    }
+    !has_assignment_to_any_identifier(after_new_len_binding, &identifiers)
+}
+
+fn expression_base_identifier(expression: &str) -> Option<&str> {
+    if is_simple_identifier(expression) {
+        return Some(expression);
+    }
+    let base_end = expression.find('.')?;
+    let base = &expression[..base_end];
+    is_simple_identifier(base).then_some(base)
 }
 
 fn has_set_len_capacity_relation(
@@ -5690,6 +5851,60 @@ mod tests {
         let evidence = obligation_evidence(&set_len, &obligations, &contract, &reach);
 
         assert!(evidence.iter().all(|item| item.discharge.present));
+    }
+
+    #[test]
+    fn set_len_remaining_capacity_guard_discharges_capacity_obligation() {
+        let obligations = vec![SafetyObligation::new(
+            "capacity",
+            "new length is at most capacity",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let guarded = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "if s.len() > self.capacity() - self.len() { return; }",
+                "let old_len = self.len();",
+                "let new_len = old_len + s.len();",
+            ],
+            "self.set_len(new_len);",
+            vec![],
+        );
+        let other_receiver_guard = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "if s.len() > other.capacity() - other.len() { return; }",
+                "let old_len = self.len();",
+                "let new_len = old_len + s.len();",
+            ],
+            "self.set_len(new_len);",
+            vec![],
+        );
+        let stale_after_guard = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "if s.len() > self.capacity() - self.len() { return; }",
+                "let old_len = self.len();",
+                "let new_len = old_len + s.len();",
+                "s = replacement;",
+            ],
+            "self.set_len(new_len);",
+            vec![],
+        );
+
+        let guarded_evidence = obligation_evidence(&guarded, &obligations, &contract, &reach);
+        let other_receiver_evidence =
+            obligation_evidence(&other_receiver_guard, &obligations, &contract, &reach);
+        let stale_evidence =
+            obligation_evidence(&stale_after_guard, &obligations, &contract, &reach);
+
+        assert!(guarded_evidence[0].discharge.present);
+        assert!(!other_receiver_evidence[0].discharge.present);
+        assert!(!stale_evidence[0].discharge.present);
     }
 
     #[test]

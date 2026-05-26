@@ -1,0 +1,5 @@
+[package]
+name = "vec-set-len-remaining-capacity-guard"
+version = "0.0.0"
+edition = "2024"
+publish = false
