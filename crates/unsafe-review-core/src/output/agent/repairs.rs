@@ -63,6 +63,20 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
                 repairs.push("show ownership of the pointee so it will not be dropped again or observed after `drop_in_place`".to_string());
             }
         }
+        OperationFamily::SliceFromRawParts => {
+            if missing_discharge(card, "pointer-live") {
+                repairs.push("prove the same pointer is non-null and valid for `len` elements before `from_raw_parts`".to_string());
+            }
+            if missing_discharge(card, "alignment") {
+                repairs.push("prove the pointer is aligned for the slice element type".to_string());
+            }
+            if missing_discharge(card, "initialized") {
+                repairs.push("show the entire `ptr..ptr+len` range is initialized before constructing the slice".to_string());
+            }
+            if missing_discharge(card, "allocation") {
+                repairs.push("show the `ptr..ptr+len` range stays inside one live allocation".to_string());
+            }
+        }
         OperationFamily::PinUnchecked if missing_discharge(card, "pin") => {
             repairs.push("prove the value will not move after `Pin::new_unchecked`".to_string());
             repairs.push("show projections preserve the same pinning invariant for this value".to_string());

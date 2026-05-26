@@ -700,6 +700,32 @@ mod tests {
     }
 
     #[test]
+    fn agent_packet_scopes_slice_from_raw_parts_repairs_to_pointer_len_range() -> Result<(), String>
+    {
+        let output = fixture_output("slice_from_raw_parts_mut")?;
+        let Some(card) = output.cards.first() else {
+            return Err("fixture should emit one card".to_string());
+        };
+        let value = parse_json(&render(card))?;
+        let allowed_repairs = serde_json::to_string(&value["allowed_repairs"])
+            .map_err(|err| format!("render allowed repairs failed: {err}"))?;
+
+        assert_eq!(value["context"]["operation_family"], "slice_from_raw_parts");
+        assert!(allowed_repairs.contains("same pointer"));
+        assert!(allowed_repairs.contains("valid for `len` elements"));
+        assert!(allowed_repairs.contains("aligned for the slice element type"));
+        assert!(allowed_repairs.contains("`ptr..ptr+len` range is initialized"));
+        assert!(allowed_repairs.contains("inside one live allocation"));
+        assert!(allowed_repairs.contains("witness receipt"));
+        assert!(!allowed_repairs.contains("Box::into_raw"));
+        assert!(!allowed_repairs.contains("all-zero bit pattern"));
+        assert!(!allowed_repairs.contains("callee safety contract"));
+        assert_eq!(value["agent_readiness"]["ready"], true);
+        assert_eq!(value["agent_readiness"]["state"], "ready");
+        Ok(())
+    }
+
+    #[test]
     fn agent_packet_scopes_pin_unchecked_repairs_to_pin_invariant() -> Result<(), String> {
         let output = fixture_output("pin_new_unchecked")?;
         let Some(card) = output.cards.first() else {
