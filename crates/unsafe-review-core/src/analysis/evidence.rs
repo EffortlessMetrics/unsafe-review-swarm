@@ -1718,25 +1718,32 @@ fn has_set_len_capacity_evidence(lower: &str) -> bool {
 
 fn has_capacity_bound_guard(lower: &str) -> bool {
     let compact = compact_code(lower);
-    let Some((receiver, new_len)) = set_len_receiver_and_argument(&compact) else {
+    let Some(context) = set_len_call_context(&compact) else {
         return false;
     };
-    let marker = format!("{receiver}.set_len(");
-    let Some(call_pos) = compact.find(&marker) else {
-        return false;
-    };
-    let before_call = &compact[..call_pos];
     for capacity in [
-        format!("{receiver}.capacity()"),
-        format!("{receiver}.cap()"),
+        format!("{}.capacity()", context.receiver),
+        format!("{}.cap()", context.receiver),
     ] {
-        if has_set_len_capacity_relation(before_call, new_len, &capacity, receiver) {
+        if has_set_len_capacity_relation(
+            context.before_call,
+            context.new_len,
+            &capacity,
+            context.receiver,
+        ) {
             return true;
         }
     }
-    set_len_capacity_bindings(before_call, receiver)
+    set_len_capacity_bindings(context.before_call, context.receiver)
         .into_iter()
-        .any(|capacity| has_set_len_capacity_relation(before_call, new_len, capacity, receiver))
+        .any(|capacity| {
+            has_set_len_capacity_relation(
+                context.before_call,
+                context.new_len,
+                capacity,
+                context.receiver,
+            )
+        })
 }
 
 fn set_len_capacity_bindings<'a>(before_call: &'a str, receiver: &str) -> Vec<&'a str> {
@@ -1946,6 +1953,23 @@ fn set_len_receiver_and_argument(compact: &str) -> Option<(&str, &str)> {
     (!receiver.is_empty() && !argument.is_empty()).then_some((receiver, argument))
 }
 
+struct SetLenCallContext<'a> {
+    before_call: &'a str,
+    receiver: &'a str,
+    new_len: &'a str,
+}
+
+fn set_len_call_context(compact: &str) -> Option<SetLenCallContext<'_>> {
+    let (receiver, new_len) = set_len_receiver_and_argument(compact)?;
+    let marker = format!("{receiver}.set_len(");
+    let call_pos = compact.find(&marker)?;
+    Some(SetLenCallContext {
+        before_call: &compact[..call_pos],
+        receiver,
+        new_len,
+    })
+}
+
 fn let_binding_name(left_side: &str) -> Option<&str> {
     let let_pos = left_side.rfind("let")?;
     let rest = &left_side[let_pos + "let".len()..];
@@ -2152,14 +2176,10 @@ fn has_set_len_initialization_evidence(lower: &str) -> bool {
         return true;
     }
     let compact = compact_code(lower);
-    let Some((receiver, _new_len)) = set_len_receiver_and_argument(&compact) else {
+    let Some(context) = set_len_call_context(&compact) else {
         return false;
     };
-    let marker = format!("{receiver}.set_len(");
-    let Some(call_pos) = compact.find(&marker) else {
-        return false;
-    };
-    has_set_len_receiver_initialization_evidence(&compact[..call_pos], receiver)
+    has_set_len_receiver_initialization_evidence(context.before_call, context.receiver)
 }
 
 fn has_set_len_receiver_initialization_evidence(before_call: &str, receiver: &str) -> bool {
