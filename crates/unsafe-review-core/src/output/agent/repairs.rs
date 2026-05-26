@@ -14,6 +14,20 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
             if missing_discharge(card, "valid-range") { repairs.push("add guards proving `count` fits both source and destination ranges before this copy".to_string()); }
             if missing_discharge(card, "initialized") { repairs.push("show that the source range is initialized for the copied element count".to_string()); }
         }
+        OperationFamily::PtrReplace => {
+            if missing_discharge(card, "pointer-live") {
+                repairs.push("prove the destination pointer is valid for both read and write before `ptr::replace`".to_string());
+            }
+            if missing_discharge(card, "alignment") {
+                repairs.push("prove the destination pointer is aligned for the replaced value type".to_string());
+            }
+            if missing_discharge(card, "initialized") {
+                repairs.push("show the destination slot contains an initialized old value before replacement".to_string());
+            }
+            if missing_discharge(card, "ownership") {
+                repairs.push("show the returned old value and replacement value preserve drop ownership without double-drop or leak".to_string());
+            }
+        }
         OperationFamily::VecSetLen => {
             if missing_discharge(card, "capacity") { repairs.push("add a same-vector capacity guard before `set_len` for the requested length".to_string()); }
             if missing_discharge(card, "initialized") { repairs.push("initialize the extended element range before calling `set_len`".to_string()); }
