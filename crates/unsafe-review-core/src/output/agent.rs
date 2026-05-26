@@ -683,6 +683,31 @@ mod tests {
     }
 
     #[test]
+    fn agent_packet_marks_loom_routed_cards_as_not_ready_for_repair_delegation()
+    -> Result<(), String> {
+        let output = fixture_output("atomic_pointer_state_fetch_ops")?;
+        let Some(card) = output.cards.first() else {
+            return Err("fixture should emit at least one card".to_string());
+        };
+        let value = parse_json(&render(card))?;
+        let routes = serde_json::to_string(&value["witness_routes"])
+            .map_err(|err| format!("render routes failed: {err}"))?;
+
+        assert_eq!(value["context"]["operation_family"], "atomic_pointer_state");
+        assert_eq!(value["card"]["class"], "requires_loom");
+        assert!(routes.contains("loom"));
+        assert!(routes.contains("shuttle"));
+        assert!(!routes.contains("\"miri\""));
+        assert_eq!(value["agent_readiness"]["ready"], false);
+        assert_eq!(value["agent_readiness"]["state"], "needs_human_review");
+        let reasons = serde_json::to_string(&value["agent_readiness"]["reasons"])
+            .map_err(|err| format!("render readiness reasons failed: {err}"))?;
+        assert!(reasons.contains("requires_loom"));
+        assert!(reasons.contains("external witness routing"));
+        Ok(())
+    }
+
+    #[test]
     fn agent_packet_marks_inline_asm_as_not_ready_for_repair_delegation() -> Result<(), String> {
         let output = fixture_output("inline_asm_human_review")?;
         let Some(card) = output.cards.first() else {
