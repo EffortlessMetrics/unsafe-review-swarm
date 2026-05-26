@@ -63,7 +63,7 @@ Root commits:
 | `crossbeam-pr1226` | changed atomic unsafe blocks | `actionable` | The original snapshot had six generic `unknown` cards for atomic pointer/state fetch operations; the focused rerun now reports six `atomic_pointer_state` `requires_loom` cards. | Keep the existing fixtures as regression coverage; add another fixture only if a future rerun exposes a still-missing concrete atomic pointer/state shape. |
 | `memchr-capped` | `unknown` unsafe-fn owner cards | `noise` | Twenty-four `unknown` cards make the capped run inventory-like rather than PR-review focused. | Use this target for capped regression scans and ranking pressure, not precision claims. |
 | `memchr-capped` | `target_feature` | `actionable` | Target-feature cards preserve contract evidence while leaving witness evidence absent. | Keep `target_feature_safety_docs` as the guardrail; do not turn docs into availability proof. |
-| `mio-pr1388` | FFI/platform layout cluster | `needs-route` | The FFI card is correctly `miri_unsupported`, but surrounding layout cards need human-review-heavy wording. | Improve route wording only with a focused fixture or projection rail. |
+| `mio-pr1388` | FFI/platform layout cluster | `needs-route` | The FFI card is correctly `miri_unsupported`, but surrounding layout cards need human-review-heavy wording. | The focused [FFI route wording follow-up](2026-05-26-mio-ffi-route-wording.md) adds a fixture verifier for FFI boundary contract wording and Miri limitation text. |
 | selected corpus | safe/no-unsafe control | `needs-doc` | The sampled real-crate corpus has no explicit zero-card/no-unsafe target; the separate [`no-card fixture smoke`](2026-05-26-no-card-control.md) records the fixture-level false-positive control. | Keep the fixture control linked from the dogfood README; do not treat it as real-crate precision evidence. |
 | `arrayvec-pr137` | soundness-fix card count | `needs-doc` | The PR can look worse by card count even when it is a soundness-oriented upstream change. | Keep docs/reports centered on actionability rather than raw gap deltas. |
 
@@ -160,7 +160,7 @@ result exists.
 3. Factor same-buffer/staleness helpers for UTF-8 validation.
 4. Add one atomic pointer/state fixture/control only if future dogfood exposes a
    still-missing concrete shape.
-5. Keep FFI/layout route wording human-review-heavy.
+5. Keep FFI/layout route wording human-review-heavy; the focused [mio FFI route wording follow-up](2026-05-26-mio-ffi-route-wording.md) now guards the `miri_unsupported` next-action wording.
 
 ## Reproduction commands
 

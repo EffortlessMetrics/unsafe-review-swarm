@@ -18,6 +18,7 @@ Snapshot reports:
 - [2026-05-26 post-burst analyzer snapshot](reports/2026-05-26-post-burst.md)
 - [2026-05-26 arrayvec Vec::set_len rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md)
 - [2026-05-26 crossbeam atomic pointer rerun](reports/2026-05-26-crossbeam-atomic-pointer-rerun.md)
+- [2026-05-26 mio FFI route wording](reports/2026-05-26-mio-ffi-route-wording.md)
 - [2026-05-26 no-card fixture smoke](reports/2026-05-26-no-card-control.md)
 
 ## PR Diff Targets
