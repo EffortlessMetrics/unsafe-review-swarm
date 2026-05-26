@@ -3214,17 +3214,17 @@ impl<'a> TransmuteCallContext<'a> {
     }
 
     fn value_domain_context(&self) -> Option<TransmuteValueDomainContext<'a>> {
-        if !self.is_supported_value_domain() {
-            return None;
-        }
+        let domain = self.value_domain()?;
         Some(TransmuteValueDomainContext {
             before_call: self.before_call,
             argument: source_value_identifier(self.argument)?,
+            domain,
         })
     }
 
-    fn is_supported_value_domain(&self) -> bool {
-        self.source_type == "u8" && self.destination_type == "bool"
+    fn value_domain(&self) -> Option<TransmuteValueDomain> {
+        (self.source_type == "u8" && self.destination_type == "bool")
+            .then_some(TransmuteValueDomain::U8ToBool)
     }
 }
 
@@ -3244,11 +3244,20 @@ impl TransmuteLayoutContext<'_> {
 struct TransmuteValueDomainContext<'a> {
     before_call: &'a str,
     argument: &'a str,
+    domain: TransmuteValueDomain,
+}
+
+enum TransmuteValueDomain {
+    U8ToBool,
 }
 
 impl TransmuteValueDomainContext<'_> {
     fn has_valid_value_evidence(&self) -> bool {
-        has_u8_bool_value_guard(self.before_call, self.argument)
+        match self.domain {
+            TransmuteValueDomain::U8ToBool => {
+                has_u8_bool_value_guard(self.before_call, self.argument)
+            }
+        }
     }
 }
 
