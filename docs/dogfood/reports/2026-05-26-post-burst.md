@@ -6,8 +6,9 @@ Artifact status: local, untracked under `target/dogfood-work/`
 
 This report samples the post-burst analyzer behavior after
 [the analyzer audit](../../handoffs/2026-05-26-post-burst-analyzer-audit.md).
-Future dogfood reports should classify notable observations with the
-[dogfood triage taxonomy](../triage-taxonomy.md).
+Notable observations are classified with the
+[dogfood triage taxonomy](../triage-taxonomy.md) so follow-up work starts from
+reviewer usefulness instead of raw card counts.
 It is not a support-tier promotion, calibration report, release readiness
 proof, policy decision, safety proof, UB-free claim, Miri-clean claim, or site
 execution proof.
@@ -53,6 +54,18 @@ Root commits:
 | `memchr-capped` | 50 | `unknown`, `unsafe_fn_call`, `target_feature`, `pointer_arithmetic` | `target_feature` cards remain `guarded_unwitnessed`, preserving the "contract exists, witness still absent" posture. | 24 `unknown` owner/unsafe-fn cards make the capped snapshot inventory-like. | Useful as a capped target-feature regression check, not as precision evidence. |
 | `crossbeam-pr1226` | 6 | `unknown` | The cards point at changed atomic unsafe blocks in `fetch_and`, `fetch_or`, and `fetch_xor`. | All six are generic `unknown` `contract_missing`; they do not yet expose an atomic-pointer operation family or route. | Strong seed for atomic pointer/state operation modeling, not for broad analyzer support claims. |
 | `mio-pr1388` | 18 | `unsafe_fn_call`, `zeroed`, `raw_pointer_deref`, `raw_pointer_write`, `ffi` | Layout/zeroed/raw-pointer cards point to concrete socket-address conversion review work. | The mix of `contract_missing`, `guard_missing`, and one `miri_unsupported` FFI card needs reviewer wording to avoid implying Miri coverage. | Good platform/layout target for human-review-heavy route wording. |
+
+## Triage observations
+
+| Target | Card or family | Primary label | Evidence | Follow-up |
+|---|---|---|---|---|
+| `arrayvec-pr288` | `vec_set_len` `try_push_str` card | `needs-fixture` | One remaining `guard_missing` may be real initialized-range debt or a missed same-vector initialization shape. | Add a focused fixture only after manual review confirms the dogfood shape. |
+| `crossbeam-pr1226` | changed atomic unsafe blocks | `needs-analyzer` | Six cards are generic `unknown` despite the changed blocks being atomic pointer/state operations. | Continue atomic pointer/state classification with fixture-backed controls; keep concurrency proof out of scope. |
+| `memchr-capped` | `unknown` unsafe-fn owner cards | `noise` | Twenty-four `unknown` cards make the capped run inventory-like rather than PR-review focused. | Use this target for capped regression scans and ranking pressure, not precision claims. |
+| `memchr-capped` | `target_feature` | `actionable` | Target-feature cards preserve contract evidence while leaving witness evidence absent. | Keep `target_feature_safety_docs` as the guardrail; do not turn docs into availability proof. |
+| `mio-pr1388` | FFI/platform layout cluster | `needs-route` | The FFI card is correctly `miri_unsupported`, but surrounding layout cards need human-review-heavy wording. | Improve route wording only with a focused fixture or projection rail. |
+| selected corpus | safe/no-unsafe control | `needs-fixture` | The sampled corpus has no explicit zero-card/no-unsafe control target. | Add a no-unsafe dogfood control target or separate false-positive control report. |
+| `arrayvec-pr137` | soundness-fix card count | `needs-doc` | The PR can look worse by card count even when it is a soundness-oriented upstream change. | Keep docs/reports centered on actionability rather than raw gap deltas. |
 
 ## Findings by family
 
