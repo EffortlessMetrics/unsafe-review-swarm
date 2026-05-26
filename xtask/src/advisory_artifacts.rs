@@ -788,6 +788,8 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
         if !diagnostic_card_ids.insert(card_id.to_string()) {
             return Err(format!("lsp.json diagnostics repeat card id `{card_id}`"));
         }
+        super::require_non_empty_json_str(diagnostic, "path", "lsp.json diagnostic")?;
+        check_lsp_range(diagnostic, "lsp.json diagnostic")?;
         super::json_array_at(
             diagnostic,
             "/required_safety_conditions",
