@@ -179,6 +179,7 @@ const SUPPORT_SUMMARY_REQUIRED_PHRASES: &[&str] = &[
 ];
 const DOGFOOD_MANIFEST: &str = "docs/dogfood/corpus.toml";
 const DOGFOOD_INDEX: &str = "docs/dogfood/index.json";
+const DOGFOOD_README: &str = "docs/dogfood/README.md";
 const DOGFOOD_REPORT_DIR: &str = "docs/dogfood/reports";
 const ACCURACY_CALIBRATION_POLICY: &str = "policy/accuracy-calibration.toml";
 const ACCURACY_CALIBRATION_REPORT: &str = "docs/accuracy/CALIBRATION_REPORT.md";
@@ -2011,12 +2012,55 @@ fn check_dogfood() -> Result<(), String> {
         &artifact_status_counts,
     )?;
     check_dogfood_report_triage_labels()?;
+    check_dogfood_reports_indexed()?;
 
     println!(
         "check-dogfood: ok ({} targets, {} repositories)",
         targets.len(),
         repositories.len()
     );
+    Ok(())
+}
+
+fn check_dogfood_reports_indexed() -> Result<(), String> {
+    let readme = read_to_string(&workspace_path(DOGFOOD_README))?;
+    let report_dir = workspace_path(DOGFOOD_REPORT_DIR);
+    let mut reports = Vec::new();
+    for entry in fs::read_dir(&report_dir)
+        .map_err(|err| format!("read {DOGFOOD_REPORT_DIR} failed: {err}"))?
+    {
+        let entry =
+            entry.map_err(|err| format!("read {DOGFOOD_REPORT_DIR} entry failed: {err}"))?;
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("md") {
+            continue;
+        }
+        let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+            return Err(format!(
+                "{} report has non-UTF-8 file name: {}",
+                DOGFOOD_REPORT_DIR,
+                path.display()
+            ));
+        };
+        reports.push(file_name.to_string());
+    }
+    check_dogfood_report_index_text(DOGFOOD_README, &readme, &reports)
+}
+
+fn check_dogfood_report_index_text(
+    path: &str,
+    text: &str,
+    reports: &[String],
+) -> Result<(), String> {
+    if reports.is_empty() {
+        return Err(format!("{DOGFOOD_REPORT_DIR} has no Markdown reports"));
+    }
+    for report in reports {
+        let link = format!("reports/{report}");
+        if !text.contains(&link) {
+            return Err(format!("{path} must link dogfood report `{link}`"));
+        }
+    }
     Ok(())
 }
 
@@ -8442,6 +8486,41 @@ impl WitnessKind {
 
         assert!(err.contains("unknown dogfood triage label"));
         assert!(err.contains("probably-actionable"));
+    }
+
+    #[test]
+    fn dogfood_report_index_requires_every_report_link() -> Result<(), String> {
+        let reports = vec![
+            "2026-05-26-post-burst.md".to_string(),
+            "2026-05-26-no-card-control.md".to_string(),
+        ];
+        let text = r#"
+Snapshot reports:
+
+- [post burst](reports/2026-05-26-post-burst.md)
+- [no-card control](reports/2026-05-26-no-card-control.md)
+"#;
+
+        check_dogfood_report_index_text("docs/dogfood/README.md", text, &reports)
+    }
+
+    #[test]
+    fn dogfood_report_index_rejects_missing_report_link() {
+        let reports = vec![
+            "2026-05-26-post-burst.md".to_string(),
+            "2026-05-26-no-card-control.md".to_string(),
+        ];
+        let text = r#"
+Snapshot reports:
+
+- [post burst](reports/2026-05-26-post-burst.md)
+"#;
+
+        let err =
+            check_dogfood_report_index_text("docs/dogfood/README.md", text, &reports).unwrap_err();
+
+        assert!(err.contains("must link dogfood report"));
+        assert!(err.contains("reports/2026-05-26-no-card-control.md"));
     }
 
     #[test]

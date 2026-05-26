@@ -16,6 +16,7 @@ in the [`triage taxonomy`](triage-taxonomy.md).
 Snapshot reports:
 
 - [2026-05-26 post-burst analyzer snapshot](reports/2026-05-26-post-burst.md)
+- [2026-05-26 no-card fixture smoke](reports/2026-05-26-no-card-control.md)
 
 ## PR Diff Targets
 

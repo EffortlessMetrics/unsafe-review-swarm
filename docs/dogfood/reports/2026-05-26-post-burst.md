@@ -64,7 +64,7 @@ Root commits:
 | `memchr-capped` | `unknown` unsafe-fn owner cards | `noise` | Twenty-four `unknown` cards make the capped run inventory-like rather than PR-review focused. | Use this target for capped regression scans and ranking pressure, not precision claims. |
 | `memchr-capped` | `target_feature` | `actionable` | Target-feature cards preserve contract evidence while leaving witness evidence absent. | Keep `target_feature_safety_docs` as the guardrail; do not turn docs into availability proof. |
 | `mio-pr1388` | FFI/platform layout cluster | `needs-route` | The FFI card is correctly `miri_unsupported`, but surrounding layout cards need human-review-heavy wording. | Improve route wording only with a focused fixture or projection rail. |
-| selected corpus | safe/no-unsafe control | `needs-fixture` | The sampled corpus has no explicit zero-card/no-unsafe control target. | Add a no-unsafe dogfood control target or separate false-positive control report. |
+| selected corpus | safe/no-unsafe control | `needs-doc` | The sampled real-crate corpus has no explicit zero-card/no-unsafe target; the separate [`no-card fixture smoke`](2026-05-26-no-card-control.md) records the fixture-level false-positive control. | Keep the fixture control linked from the dogfood README; do not treat it as real-crate precision evidence. |
 | `arrayvec-pr137` | soundness-fix card count | `needs-doc` | The PR can look worse by card count even when it is a soundness-oriented upstream change. | Keep docs/reports centered on actionability rather than raw gap deltas. |
 
 ## Findings by family
@@ -124,7 +124,9 @@ result exists.
 
 ## Possible false negatives
 
-- No safe/no-unsafe dogfood control exists in the corpus yet.
+- The sampled real-crate corpus still has no safe/no-unsafe target; the separate
+  fixture-level [no-card control](2026-05-26-no-card-control.md) records the
+  current false-positive smoke without becoming real-crate precision evidence.
 - Crossbeam atomic-pointer state is not classified beyond `unknown` in this
   sampled PR.
 - UTF-8 unchecked validation was not sampled in this report; use
@@ -134,8 +136,8 @@ result exists.
 
 ## Fixture follow-ups
 
-- Add a no-unsafe dogfood control target or separate false-positive control
-  report.
+- Keep the no-card fixture control report linked from the dogfood README, and add
+  a real-crate no-unsafe target only if a suitable corpus candidate appears.
 - Add or verify an atomic pointer/state fixture from the `crossbeam-pr1226`
   shape.
 - Add a `Vec::set_len` initialized-range fixture for the `arrayvec-pr288`
