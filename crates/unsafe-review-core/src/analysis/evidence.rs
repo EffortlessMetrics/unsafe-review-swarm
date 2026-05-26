@@ -3256,7 +3256,7 @@ impl<'a> TransmuteCallContext<'a> {
         let domain = self.value_domain()?;
         Some(TransmuteValueDomainContext {
             before_call: self.before_call,
-            argument: source_value_identifier(self.argument)?,
+            source_value_target: source_value_identifier(self.argument)?,
             domain,
         })
     }
@@ -3282,7 +3282,7 @@ impl TransmuteLayoutContext<'_> {
 
 struct TransmuteValueDomainContext<'a> {
     before_call: &'a str,
-    argument: &'a str,
+    source_value_target: &'a str,
     domain: TransmuteValueDomain,
 }
 
@@ -3293,10 +3293,18 @@ enum TransmuteValueDomain {
 impl TransmuteValueDomainContext<'_> {
     fn has_valid_value_evidence(&self) -> bool {
         match self.domain {
-            TransmuteValueDomain::U8ToBool => {
-                has_u8_bool_value_guard(self.before_call, self.argument)
-            }
+            TransmuteValueDomain::U8ToBool => self.has_u8_to_bool_valid_value_evidence(),
         }
+    }
+
+    fn has_u8_to_bool_valid_value_evidence(&self) -> bool {
+        self.u8_to_bool_valid_predicates().iter().any(|predicate| {
+            has_u8_bool_value_predicate_guard(self.before_call, predicate, self.source_value_target)
+        }) || has_u8_bool_invalid_early_return_guard(self.before_call, self.source_value_target)
+    }
+
+    fn u8_to_bool_valid_predicates(&self) -> [String; 8] {
+        u8_bool_valid_value_predicates(self.source_value_target)
     }
 }
 
@@ -3345,19 +3353,23 @@ fn has_size_assert_eq(compact: &str, left: &str, right: &str) -> bool {
 }
 
 fn has_u8_bool_value_guard(before_call: &str, argument: &str) -> bool {
-    [
-        format!("{argument}<=1"),
-        format!("1>={argument}"),
-        format!("{argument}<2"),
-        format!("2>{argument}"),
-        format!("matches!({argument},0|1)"),
-        format!("matches!({argument},1|0)"),
-        format!("{argument}==0||{argument}==1"),
-        format!("{argument}==1||{argument}==0"),
-    ]
-    .iter()
-    .any(|predicate| has_u8_bool_value_predicate_guard(before_call, predicate, argument))
+    u8_bool_valid_value_predicates(argument)
+        .iter()
+        .any(|predicate| has_u8_bool_value_predicate_guard(before_call, predicate, argument))
         || has_u8_bool_invalid_early_return_guard(before_call, argument)
+}
+
+fn u8_bool_valid_value_predicates(target: &str) -> [String; 8] {
+    [
+        format!("{target}<=1"),
+        format!("1>={target}"),
+        format!("{target}<2"),
+        format!("2>{target}"),
+        format!("matches!({target},0|1)"),
+        format!("matches!({target},1|0)"),
+        format!("{target}==0||{target}==1"),
+        format!("{target}==1||{target}==0"),
+    ]
 }
 
 fn has_u8_bool_value_predicate_guard(before_call: &str, predicate: &str, argument: &str) -> bool {
