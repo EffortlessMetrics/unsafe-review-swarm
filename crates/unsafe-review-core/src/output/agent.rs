@@ -521,6 +521,26 @@ mod tests {
     }
 
     #[test]
+    fn agent_packet_scopes_get_unchecked_repairs_to_same_slice_and_index() -> Result<(), String> {
+        let output = fixture_output("get_unchecked_mut_bounds")?;
+        let Some(card) = output.cards.first() else {
+            return Err("fixture should emit one card".to_string());
+        };
+        let value = parse_json(&render(card))?;
+        let allowed_repairs = serde_json::to_string(&value["allowed_repairs"])
+            .map_err(|err| format!("render allowed repairs failed: {err}"))?;
+
+        assert_eq!(value["context"]["operation_family"], "get_unchecked");
+        assert!(allowed_repairs.contains("same-slice length/range guard"));
+        assert!(allowed_repairs.contains("same index value"));
+        assert!(allowed_repairs.contains("witness receipt"));
+        assert!(!allowed_repairs.contains("alignment guard"));
+        assert_eq!(value["agent_readiness"]["ready"], true);
+        assert_eq!(value["agent_readiness"]["state"], "ready");
+        Ok(())
+    }
+
+    #[test]
     fn agent_packet_routes_non_miri_cards_without_overclaiming() -> Result<(), String> {
         let output = fixture_output("ffi_sanitizer_route")?;
         let Some(card) = output.cards.first() else {

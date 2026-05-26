@@ -20,6 +20,10 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
         }
         OperationFamily::StrFromUtf8Unchecked if missing_discharge(card, "utf8") => repairs.push("validate the same byte buffer as UTF-8 on an open path before calling `from_utf8_unchecked`".to_string()),
         OperationFamily::NonNullUnchecked if missing_discharge(card, "non-null") => repairs.push("add a same-pointer non-null guard before `NonNull::new_unchecked`".to_string()),
+        OperationFamily::GetUnchecked if missing_discharge(card, "bounds") => {
+            repairs.push("add a same-slice length/range guard before `get_unchecked` for the same index".to_string());
+            repairs.push("preserve the same index value between the guard and unchecked access".to_string());
+        }
         OperationFamily::UnsafeImplSendSync => {
             repairs.push("document or add evidence for the thread-safety invariant of this unsafe impl".to_string());
             repairs.push("route concurrency-sensitive evidence through Loom or Shuttle when the invariant depends on interleavings".to_string());
