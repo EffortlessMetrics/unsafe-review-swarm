@@ -61,7 +61,8 @@ pub(crate) fn scan_file(
         if kind == UnsafeSiteKind::UnsafeBlock
             && family == OperationFamily::Unknown
             && (syntax_operation_lines.contains(&line_no)
-                || syntax_operation_block_lines.contains(&line_no))
+                || syntax_operation_block_lines.contains(&line_no)
+                || fallback_unsafe_block_contains_specific_operation(&lines, idx))
         {
             continue;
         }
@@ -792,6 +793,63 @@ fn syntax_operation_covers_fallback(
             && site.line <= line
             && line <= site.end_line
     })
+}
+
+fn fallback_unsafe_block_contains_specific_operation(lines: &[&str], start_idx: usize) -> bool {
+    let mut line_comment_state = LineCommentState::default();
+    let mut entered = false;
+    let mut saw_open = false;
+    let mut depth = 0usize;
+    let mut block_text = String::new();
+
+    for (idx, raw) in lines.iter().enumerate().skip(start_idx).take(80) {
+        let detection_line = line_for_text_detection(raw, &mut line_comment_state);
+        let trimmed = detection_line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if !entered {
+            if trimmed.contains("unsafe {") || trimmed == "unsafe" {
+                entered = true;
+            } else {
+                continue;
+            }
+        } else if fallback_line_is_specific_operation(trimmed) {
+            return true;
+        } else {
+            if !block_text.is_empty() {
+                block_text.push(' ');
+            }
+            block_text.push_str(trimmed);
+            if fallback_line_is_specific_operation(&block_text) {
+                return true;
+            }
+        }
+
+        for ch in trimmed.chars() {
+            match ch {
+                '{' => {
+                    saw_open = true;
+                    depth += 1;
+                }
+                '}' => depth = depth.saturating_sub(1),
+                _ => {}
+            }
+        }
+        if idx > start_idx && saw_open && depth == 0 {
+            return false;
+        }
+    }
+    false
+}
+
+fn fallback_line_is_specific_operation(trimmed: &str) -> bool {
+    matches!(
+        detect_site(trimmed),
+        Some((UnsafeSiteKind::Operation, family))
+            if !matches!(family, OperationFamily::Unknown | OperationFamily::UnsafeFnCall)
+    )
 }
 
 fn syntax_site_uses_exact_range(kind: &UnsafeSiteKind) -> bool {
@@ -2222,6 +2280,49 @@ mod tests {
         assert_eq!(sites[0].site.kind, UnsafeSiteKind::Operation);
         assert_eq!(sites[0].operation.family, OperationFamily::RawPointerDeref);
         assert_eq!(sites[0].site.owner, Some("read_byte".to_string()));
+        Ok(())
+    }
+
+    #[test]
+    fn scan_file_suppresses_multiline_unknown_wrapper_when_specific_operation_exists()
+    -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "use core::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};\n\
+pub struct Shared<T>(*mut T);\n\
+impl<T> Shared<T> { fn from_ptr(ptr: *mut T) -> Self { Self(ptr) } }\n\
+pub struct Tagged<T> { data: AtomicPtr<T> }\n\
+impl<T> Tagged<T> {\n\
+    pub fn fetch_and_tag(&self, val: usize, order: Ordering) -> Shared<T> {\n\
+        unsafe {\n\
+            Shared::from_ptr(\n\
+                (*(&self.data as *const AtomicPtr<_> as *const AtomicUsize))\n\
+                    .fetch_and(val, order) as *mut T,\n\
+            )\n\
+        }\n\
+    }\n\
+}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+
+        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let atomic_sites = sites
+            .iter()
+            .filter(|site| site.operation.family == OperationFamily::AtomicPointerState)
+            .collect::<Vec<_>>();
+        assert_eq!(atomic_sites.len(), 1, "unexpected sites: {sites:#?}");
+        assert!(
+            sites.iter().all(|site| {
+                !(site.site.kind == UnsafeSiteKind::UnsafeBlock
+                    && site.operation.family == OperationFamily::Unknown)
+            }),
+            "specific operation should suppress wrapper unknown unsafe block"
+        );
         Ok(())
     }
 
