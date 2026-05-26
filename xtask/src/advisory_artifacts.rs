@@ -835,6 +835,10 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
     let mut code_action_commands = BTreeSet::new();
     for action in super::json_array_at(&lsp, "/code_actions", "lsp.json")? {
         let action_card_id = require_known_card_id(action, "lsp.json code_action", card_ids)?;
+        super::require_non_empty_json_str(action, "path", "lsp.json code_action")?;
+        check_lsp_range(action, "lsp.json code_action")?;
+        super::require_non_empty_json_str(action, "title", "lsp.json code_action")?;
+        super::require_json_str(action, "kind", "quickfix", "lsp.json code_action")?;
         let Some(command) = action.get("command").and_then(serde_json::Value::as_str) else {
             return Err("lsp.json code_action is missing command".to_string());
         };
@@ -865,6 +869,19 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
             }
         }
     }
+    Ok(())
+}
+
+fn check_lsp_range(value: &serde_json::Value, context: &str) -> Result<(), String> {
+    let start_line = super::json_usize_at(value, "/range/start/line", context)?;
+    let start_character = super::json_usize_at(value, "/range/start/character", context)?;
+    let end_line = super::json_usize_at(value, "/range/end/line", context)?;
+    let end_character = super::json_usize_at(value, "/range/end/character", context)?;
+
+    if end_line < start_line || (end_line == start_line && end_character < start_character) {
+        return Err(format!("{context} range end must not precede start"));
+    }
+
     Ok(())
 }
 
