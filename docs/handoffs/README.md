@@ -7,6 +7,7 @@ what not to do next. Do not put active specs here.
 |---|---|---|
 | [Swarm roadmap](2026-05-24-swarm-roadmap.md) | 2026-05-24 | swarm-internal roadmap posture, operating rule, trust-boundary reminders, and active execution pointer |
 | [Post-burst analyzer audit](2026-05-26-post-burst-analyzer-audit.md) | 2026-05-26 | operation-family audit after analyzer/calibration burst, false-positive controls, missing controls, dogfood seeds, and no-promotion boundary |
+| [Source badge and README promotion sync](2026-05-26-source-badge-readme-promotion-sync.md) | 2026-05-26 | acknowledges source badge/README promotion PRs #492-#496, aligns remaining swarm README alt text, and updates the source-sync checkpoint |
 | [Source Dependabot sync](2026-05-26-source-dependabot-sync.md) | 2026-05-26 | mirrors source Dependabot PRs #490/#491 into swarm and updates the source-sync checkpoint |
 | [Release 0.2.0 publication receipt](2026-05-21-release-0.2.0-publication.md) | 2026-05-21 | published 0.2.0 crates, publish commands, install smoke, docs.rs checks, tag, trust boundary, and next lane |
 | [Release 0.2.0 preparation](2026-05-21-release-0.2.0-preparation.md) | 2026-05-21 | version bumps for the three public crates, public-usability release framing, validation checklist, and manual publish order |

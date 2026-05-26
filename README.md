@@ -16,7 +16,7 @@
 </p>
 
 <p align="center">
-  <a href="docs/BADGE_POLICY.md"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FEffortlessMetrics%2Funsafe-review%2Fmain%2Fbadges%2Funsafe-review.json" alt="unsafe-review open gaps" /></a>
+  <a href="docs/BADGE_POLICY.md"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FEffortlessMetrics%2Funsafe-review%2Fmain%2Fbadges%2Funsafe-review.json" alt="unsafe-review open actionable gap count" /></a>
   <a href="docs/BADGE_POLICY.md"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FEffortlessMetrics%2Funsafe-review%2Fmain%2Fbadges%2Funsafe-review-plus.json" alt="unsafe-review missing or weak evidence count" /></a>
 </p>
 
