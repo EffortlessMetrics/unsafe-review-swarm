@@ -11,7 +11,7 @@ actions = [
   "dtolnay/rust-toolchain@1.95.0",
   "dtolnay/rust-toolchain@v1",
 ]
-reason = "Routed Rust Small workflow with CPX42/CX43/CX53/GitHub-hosted lanes and normalized result validation."
+reason = "Routed Rust Small workflow with CPX42/CX43/CX53 self-hosted lanes, explicit tiny GitHub-hosted fallback, capacity/config blocking, and normalized result validation."
 created = "2026-05-18"
 review_after = "2026-06-18"
 

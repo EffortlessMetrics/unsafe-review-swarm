@@ -377,7 +377,13 @@ fn check_ci_routing_contract() -> Result<(), String> {
         "Rust Small on CX43",
         "Rust Small on CX53",
         "dtolnay/rust-toolchain@1.95.0",
-        "Rust Small on GitHub Hosted",
+        "Rust Tiny Fallback on GitHub Hosted",
+        "Rust Small Blocked (capacity/config)",
+        "fallback_allowed=",
+        "fallback_mode=",
+        "allow-github-hosted",
+        "ci-budget-ack",
+        "full-ci",
         "Unsafe Review Rust Small Result",
     ] {
         if !text.contains(needle) {

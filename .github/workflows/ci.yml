@@ -49,17 +49,25 @@ jobs:
             exit 0
           fi
           LABELS='${{ toJson(github.event.pull_request.labels.*.name) }}'
-          if jq -e 'index("allow-github-hosted") or index("ci-budget-ack") or index("full-ci")' <<<"$LABELS" >/dev/null 2>&1; then
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            FALLBACK_ALLOWED=true
+          elif jq -e 'index("allow-github-hosted") or index("ci-budget-ack") or index("full-ci")' <<<"$LABELS" >/dev/null 2>&1; then
             FALLBACK_ALLOWED=true
           else
             FALLBACK_ALLOWED=false
           fi
           if [[ -z "${GH_TOKEN:-}" ]]; then
-            echo "router_target=blocked" >> "$GITHUB_OUTPUT"
             echo "router_reason=runner_token_missing" >> "$GITHUB_OUTPUT"
             echo "router_error=true" >> "$GITHUB_OUTPUT"
-            echo "fallback_allowed=${FALLBACK_ALLOWED}" >> "$GITHUB_OUTPUT"
-            echo "fallback_mode=none" >> "$GITHUB_OUTPUT"
+            if [[ "$FALLBACK_ALLOWED" == "true" ]]; then
+              echo "router_target=github" >> "$GITHUB_OUTPUT"
+              echo "fallback_allowed=true" >> "$GITHUB_OUTPUT"
+              echo "fallback_mode=tiny" >> "$GITHUB_OUTPUT"
+            else
+              echo "router_target=blocked" >> "$GITHUB_OUTPUT"
+              echo "fallback_allowed=false" >> "$GITHUB_OUTPUT"
+              echo "fallback_mode=none" >> "$GITHUB_OUTPUT"
+            fi
             exit 0
           fi
           set +e
@@ -71,11 +79,17 @@ jobs:
             REASON="runner_api_failed"
             if [[ "$ERR" == *"401"* ]]; then REASON="runner_token_unauthorized"; fi
             if [[ "$ERR" == *"403"* ]]; then REASON="runner_token_forbidden"; fi
-            echo "router_target=blocked" >> "$GITHUB_OUTPUT"
             echo "router_reason=${REASON}" >> "$GITHUB_OUTPUT"
             echo "router_error=true" >> "$GITHUB_OUTPUT"
-            echo "fallback_allowed=${FALLBACK_ALLOWED}" >> "$GITHUB_OUTPUT"
-            echo "fallback_mode=none" >> "$GITHUB_OUTPUT"
+            if [[ "$FALLBACK_ALLOWED" == "true" ]]; then
+              echo "router_target=github" >> "$GITHUB_OUTPUT"
+              echo "fallback_allowed=true" >> "$GITHUB_OUTPUT"
+              echo "fallback_mode=tiny" >> "$GITHUB_OUTPUT"
+            else
+              echo "router_target=blocked" >> "$GITHUB_OUTPUT"
+              echo "fallback_allowed=false" >> "$GITHUB_OUTPUT"
+              echo "fallback_mode=none" >> "$GITHUB_OUTPUT"
+            fi
             exit 0
           fi
           pick_target() {
