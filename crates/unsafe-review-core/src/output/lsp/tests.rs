@@ -106,13 +106,19 @@ fn lsp_projection_is_parseable_and_read_only() -> Result<(), String> {
         value["hovers"][0]["contents"]
             .as_str()
             .unwrap_or("")
-            .contains("operation `unsafe { ptr.cast::<Header>().read() }`")
+            .contains("Why this card exists")
     );
     assert!(
         value["hovers"][0]["contents"]
             .as_str()
             .unwrap_or("")
-            .contains("Evidence summary")
+            .contains("Operation: `unsafe { ptr.cast::<Header>().read() }`")
+    );
+    assert!(
+        value["hovers"][0]["contents"]
+            .as_str()
+            .unwrap_or("")
+            .contains("Evidence found")
     );
     assert!(
         value["hovers"][0]["contents"]
@@ -136,7 +142,13 @@ fn lsp_projection_is_parseable_and_read_only() -> Result<(), String> {
         value["hovers"][0]["contents"]
             .as_str()
             .unwrap_or("")
-            .contains("Next action")
+            .contains("Evidence missing")
+    );
+    assert!(
+        value["hovers"][0]["contents"]
+            .as_str()
+            .unwrap_or("")
+            .contains("What would resolve this")
     );
     assert!(
         value["hovers"][0]["contents"]

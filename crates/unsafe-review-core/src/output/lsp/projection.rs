@@ -450,22 +450,23 @@ fn code_actions(card: &ReviewCard) -> Vec<LspCodeAction<'_>> {
 fn hover_contents(card: &ReviewCard) -> String {
     let mut text = String::new();
     text.push_str(&format!(
-        "unsafe-review `{}` for `{}` operation `{}`\n\n",
-        card.class.as_str(),
-        card.operation.family.as_str(),
-        card.operation.expression
-    ));
-    text.push_str(&format!(
         "Card: `{}`; priority `{}`; confidence `{}`\n\n",
         card.id,
         card.priority.as_str(),
         card.confidence.as_str()
     ));
+    text.push_str("Why this card exists:\n");
+    text.push_str(&format!(
+        "- The changed code contains a `{}` unsafe operation that unsafe-review classifies as `{}`.\n",
+        card.operation.family.as_str(),
+        card.class.as_str()
+    ));
+    text.push_str(&format!("- Operation: `{}`\n\n", card.operation.expression));
     text.push_str("Required safety conditions:\n");
     for obligation in &card.obligations {
         text.push_str(&format!("- {}\n", obligation.description));
     }
-    text.push_str("\nEvidence summary:\n");
+    text.push_str("\nEvidence found:\n");
     text.push_str(&format!(
         "- Contract [{}]: {}\n",
         present_label(card.contract.present),
@@ -485,7 +486,7 @@ fn hover_contents(card: &ReviewCard) -> String {
         present_label(card.witness.present),
         card.witness.summary
     ));
-    text.push_str("\nMissing evidence:\n");
+    text.push_str("\nEvidence missing:\n");
     if card.missing.is_empty() {
         text.push_str("- none recorded\n");
     } else {
@@ -493,7 +494,7 @@ fn hover_contents(card: &ReviewCard) -> String {
             text.push_str(&format!("- {}\n", missing.message));
         }
     }
-    text.push_str("\nNext action:\n");
+    text.push_str("\nWhat would resolve this:\n");
     text.push_str(&format!("- {}\n", card.next_action.summary));
     if !card.next_action.verify_commands.is_empty() {
         text.push_str("\nVerify commands:\n");
