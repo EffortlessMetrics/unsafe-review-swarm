@@ -2140,6 +2140,11 @@ impl<'a> SetLenApplicabilityContext<'a> {
         })
     }
 
+    fn has_call_result_initialization_evidence(&self) -> bool {
+        self.before_call.contains("encode_utf8(")
+            && (self.new_len == "len+n" || self.new_len == "old_len+n")
+    }
+
     fn has_initialized_range_evidence(&self) -> bool {
         self.before_call.split([';', '}']).any(|statement| {
             contains_receiver_path(statement, self.receiver) && has_initialization_marker(statement)
@@ -2464,8 +2469,10 @@ fn has_initialization_marker(statement: &str) -> bool {
 
 fn has_set_len_call_result_initialization_evidence(lower: &str) -> bool {
     let compact = compact_code(lower);
-    compact.contains("encode_utf8(")
-        && (compact.contains(".set_len(len+n)") || compact.contains(".set_len(old_len+n)"))
+    let Some(context) = set_len_call_context(&compact) else {
+        return false;
+    };
+    context.has_call_result_initialization_evidence()
 }
 
 fn has_encode_utf8_remaining_capacity_evidence(lower: &str) -> bool {
