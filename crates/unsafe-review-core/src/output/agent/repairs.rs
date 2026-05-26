@@ -126,8 +126,14 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
             }
         }
         OperationFamily::Ffi => {
-            repairs.push("document the ABI, ownership, and lifetime contract for this FFI boundary".to_string());
-            repairs.push("attach sanitizer or cargo-careful receipt evidence after running the scoped command outside unsafe-review".to_string());
+            repairs.push(
+                "document the ABI, ownership, and lifetime contract for this same FFI boundary or call path"
+                    .to_string(),
+            );
+            repairs.push(
+                "attach sanitizer or cargo-careful receipt evidence only after running the scoped command against this boundary; the receipt does not replace ABI or lifetime contract evidence"
+                    .to_string(),
+            );
         }
         OperationFamily::TargetFeature if missing_discharge(card, "target-feature") => {
             repairs.push("prove callers reach this `target_feature` path only after a matching runtime or compile-time feature check".to_string());
