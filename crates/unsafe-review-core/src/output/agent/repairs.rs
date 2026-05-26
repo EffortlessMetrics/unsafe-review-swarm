@@ -48,6 +48,10 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
             repairs.push("add a same-slice length/range guard before `get_unchecked` for the same index".to_string());
             repairs.push("preserve the same index value between the guard and unchecked access".to_string());
         }
+        OperationFamily::BoxFromRaw if missing_discharge(card, "ownership") => {
+            repairs.push("prove the same raw pointer came from `Box::into_raw` with a compatible allocator before `Box::from_raw`".to_string());
+            repairs.push("show unique ownership of that pointer so it will not be double-freed or reused after reconstruction".to_string());
+        }
         OperationFamily::UnsafeImplSendSync => {
             repairs.push("document or add evidence for the thread-safety invariant of this unsafe impl".to_string());
             repairs.push("route concurrency-sensitive evidence through Loom or Shuttle when the invariant depends on interleavings".to_string());
