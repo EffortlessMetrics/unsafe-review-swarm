@@ -8626,6 +8626,35 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_github_summary_no_card_overclaim() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-zero-card-github-overclaim")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_zero_card_first_pr_artifacts(&dir)?;
+        let path = dir.join("github-summary.md");
+        let summary = fs::read_to_string(&path)
+            .map_err(|err| format!("read github summary failed: {err}"))?;
+        fs::write(
+            &path,
+            summary.replace(
+                "This does not prove the repo safe, UB-free, Miri-clean, or that any unsafe site executed.\n\n",
+                "",
+            ),
+        )
+        .map_err(|err| format!("write github summary failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("This does not prove the repo safe")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_missing_witness_plan() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-missing-witness")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;

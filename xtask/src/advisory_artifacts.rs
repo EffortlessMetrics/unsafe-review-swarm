@@ -93,6 +93,8 @@ fn check_github_summary_artifact(
 
     if card_count == 0 {
         super::require_text_contains(&text, "No changed unsafe-review gaps were found.", &path)?;
+        super::require_text_contains(&text, "This does not prove the repo safe", &path)?;
+        super::require_text_contains(&text, "unsafe site executed", &path)?;
     } else {
         require_markdown_top_card_projection(&text, &path, card_projections)?;
     }
