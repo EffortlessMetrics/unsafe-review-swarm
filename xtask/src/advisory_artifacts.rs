@@ -116,6 +116,38 @@ fn require_text_mentions_all_card_ids(
     Ok(())
 }
 
+fn require_witness_plan_headings_known(
+    text: &str,
+    path: &Path,
+    card_ids: &BTreeSet<String>,
+) -> Result<(), String> {
+    for line in text.lines() {
+        let trimmed = line.trim();
+        let Some(rest) = trimmed.strip_prefix("#### `") else {
+            continue;
+        };
+        let Some((card_id, suffix)) = rest.split_once('`') else {
+            return Err(format!(
+                "{} witness-plan route heading must close its ReviewCard id backtick",
+                path.display()
+            ));
+        };
+        if !suffix.trim().is_empty() {
+            return Err(format!(
+                "{} witness-plan route heading for `{card_id}` must contain only a ReviewCard id",
+                path.display()
+            ));
+        }
+        if !card_ids.contains(card_id) {
+            return Err(format!(
+                "{} witness-plan route heading references unknown card id `{card_id}`",
+                path.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn require_markdown_top_card_projection(
     text: &str,
     path: &Path,
@@ -1022,6 +1054,7 @@ fn check_first_pr_markdown_card_identity(
 
     let witness_plan_path = dir.join("witness-plan.md");
     let witness_plan = super::read_to_string(&witness_plan_path)?;
+    require_witness_plan_headings_known(&witness_plan, &witness_plan_path, card_ids)?;
     require_text_mentions_all_card_ids(&witness_plan, &witness_plan_path, card_ids)
 }
 
