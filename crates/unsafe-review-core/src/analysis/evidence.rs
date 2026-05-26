@@ -2968,8 +2968,7 @@ fn has_transmute_layout_size_evidence(lower: &str) -> bool {
     let Some(context) = TransmuteCallContext::parse(&compact) else {
         return false;
     };
-    let normalized = normalize_size_of_paths(context.before_call);
-    has_size_of_equality(&normalized, context.source_type, context.destination_type)
+    context.layout_context().has_size_evidence()
 }
 
 fn has_transmute_u8_bool_valid_value_evidence(lower: &str) -> bool {
@@ -2977,13 +2976,9 @@ fn has_transmute_u8_bool_valid_value_evidence(lower: &str) -> bool {
     let Some(context) = TransmuteCallContext::parse(&compact) else {
         return false;
     };
-    if !context.is_u8_to_bool() {
-        return false;
-    }
-    let Some(argument) = context.value_identifier() else {
-        return false;
-    };
-    has_u8_bool_value_guard(context.before_call, argument)
+    context
+        .value_domain_context()
+        .is_some_and(|value_domain| value_domain.has_valid_value_evidence())
 }
 
 struct TransmuteCallContext<'a> {
@@ -3020,12 +3015,50 @@ impl<'a> TransmuteCallContext<'a> {
         None
     }
 
-    fn is_u8_to_bool(&self) -> bool {
-        self.source_type == "u8" && self.destination_type == "bool"
+    fn layout_context(&self) -> TransmuteLayoutContext<'a> {
+        TransmuteLayoutContext {
+            before_call: self.before_call,
+            source_type: self.source_type,
+            destination_type: self.destination_type,
+        }
     }
 
-    fn value_identifier(&self) -> Option<&'a str> {
-        source_value_identifier(self.argument)
+    fn value_domain_context(&self) -> Option<TransmuteValueDomainContext<'a>> {
+        if !self.is_supported_value_domain() {
+            return None;
+        }
+        Some(TransmuteValueDomainContext {
+            before_call: self.before_call,
+            argument: source_value_identifier(self.argument)?,
+        })
+    }
+
+    fn is_supported_value_domain(&self) -> bool {
+        self.source_type == "u8" && self.destination_type == "bool"
+    }
+}
+
+struct TransmuteLayoutContext<'a> {
+    before_call: &'a str,
+    source_type: &'a str,
+    destination_type: &'a str,
+}
+
+impl TransmuteLayoutContext<'_> {
+    fn has_size_evidence(&self) -> bool {
+        let normalized = normalize_size_of_paths(self.before_call);
+        has_size_of_equality(&normalized, self.source_type, self.destination_type)
+    }
+}
+
+struct TransmuteValueDomainContext<'a> {
+    before_call: &'a str,
+    argument: &'a str,
+}
+
+impl TransmuteValueDomainContext<'_> {
+    fn has_valid_value_evidence(&self) -> bool {
+        has_u8_bool_value_guard(self.before_call, self.argument)
     }
 }
 
