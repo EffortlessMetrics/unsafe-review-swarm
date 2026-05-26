@@ -4,6 +4,7 @@ use std::path::Path;
 struct AdvisoryArtifactSummary {
     card_ids: BTreeSet<String>,
     card_classes: BTreeMap<String, String>,
+    card_projections: BTreeMap<String, CardProjection>,
     card_count: usize,
 }
 
@@ -28,7 +29,7 @@ pub(crate) fn check_advisory_artifacts(dir: &Path) -> Result<(), String> {
 pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
     let summary = check_advisory_artifact_set(dir)?;
     check_witness_plan_artifact(dir, summary.card_count)?;
-    check_lsp_artifact(dir, &summary.card_ids)?;
+    check_lsp_artifact(dir, &summary.card_projections)?;
     check_github_summary_artifact(dir, summary.card_count)?;
     check_first_pr_markdown_card_identity(dir, &summary.card_ids, &summary.card_classes)?;
     check_first_pr_artifact_overclaims(dir)?;
@@ -536,6 +537,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
     Ok(AdvisoryArtifactSummary {
         card_ids,
         card_classes,
+        card_projections,
         card_count,
     })
 }
@@ -812,9 +814,13 @@ fn check_first_pr_markdown_card_identity(
     require_markdown_top_card_identity(&github_summary, &github_summary_path, card_classes)
 }
 
-fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), String> {
+fn check_lsp_artifact(
+    dir: &Path,
+    card_projections: &BTreeMap<String, CardProjection>,
+) -> Result<(), String> {
     let path = dir.join("lsp.json");
     let lsp = super::parse_json_file(&path)?;
+    let card_ids = card_projections.keys().cloned().collect::<BTreeSet<_>>();
     super::require_json_str(&lsp, "tool", "unsafe-review", "lsp.json")?;
     super::require_json_str(&lsp, "mode", "read_only_projection", "lsp.json")?;
     super::require_json_str(&lsp, "policy", "advisory", "lsp.json")?;
@@ -848,8 +854,19 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
         if !diagnostic_card_ids.insert(card_id.to_string()) {
             return Err(format!("lsp.json diagnostics repeat card id `{card_id}`"));
         }
+        let Some(card_projection) = card_projections.get(card_id) else {
+            return Err(format!(
+                "lsp.json diagnostic references unknown card id `{card_id}`"
+            ));
+        };
         super::require_non_empty_json_str(diagnostic, "path", "lsp.json diagnostic")?;
         check_lsp_range(diagnostic, "lsp.json diagnostic")?;
+        check_lsp_projection_location(
+            diagnostic,
+            card_projection,
+            "lsp.json diagnostic",
+            "/range/start/line",
+        )?;
         super::json_array_at(
             diagnostic,
             "/required_safety_conditions",
@@ -865,7 +882,7 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
             .ok_or_else(|| "lsp.json diagnostic is missing trust_boundary".to_string())?;
         super::require_boundary_text(boundary, "lsp.json diagnostic")?;
     }
-    for card_id in card_ids {
+    for card_id in &card_ids {
         if !diagnostic_card_ids.contains(card_id) {
             return Err(format!("lsp.json diagnostics missing card id `{card_id}`"));
         }
@@ -873,13 +890,19 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
 
     let mut hover_card_ids = BTreeSet::new();
     for hover in super::json_array_at(&lsp, "/hovers", "lsp.json")? {
-        let hover_card_id = require_known_card_id(hover, "lsp.json hover", card_ids)?;
+        let hover_card_id = require_known_card_id(hover, "lsp.json hover", &card_ids)?;
         if !hover_card_ids.insert(hover_card_id.to_string()) {
             return Err(format!("lsp.json hovers repeat card id `{hover_card_id}`"));
         }
+        let Some(card_projection) = card_projections.get(hover_card_id) else {
+            return Err(format!(
+                "lsp.json hover references unknown card id `{hover_card_id}`"
+            ));
+        };
         super::require_non_empty_json_str(hover, "path", "lsp.json hover")?;
         super::json_usize_at(hover, "/position/line", "lsp.json hover")?;
         super::json_usize_at(hover, "/position/character", "lsp.json hover")?;
+        check_lsp_projection_location(hover, card_projection, "lsp.json hover", "/position/line")?;
         let contents = hover
             .get("contents")
             .and_then(serde_json::Value::as_str)
@@ -896,7 +919,7 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
             .ok_or_else(|| "lsp.json hover is missing trust_boundary".to_string())?;
         super::require_boundary_text(boundary, "lsp.json hover")?;
     }
-    for card_id in card_ids {
+    for card_id in &card_ids {
         if !hover_card_ids.contains(card_id) {
             return Err(format!("lsp.json hovers missing card id `{card_id}`"));
         }
@@ -904,7 +927,7 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
 
     let mut code_action_commands = BTreeSet::new();
     for action in super::json_array_at(&lsp, "/code_actions", "lsp.json")? {
-        let action_card_id = require_known_card_id(action, "lsp.json code_action", card_ids)?;
+        let action_card_id = require_known_card_id(action, "lsp.json code_action", &card_ids)?;
         super::require_non_empty_json_str(action, "path", "lsp.json code_action")?;
         check_lsp_range(action, "lsp.json code_action")?;
         super::require_non_empty_json_str(action, "title", "lsp.json code_action")?;
@@ -915,6 +938,17 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
         if command.trim().is_empty() {
             return Err("lsp.json code_action command must not be empty".to_string());
         }
+        let Some(card_projection) = card_projections.get(action_card_id) else {
+            return Err(format!(
+                "lsp.json code_action references unknown card id `{action_card_id}`"
+            ));
+        };
+        check_lsp_projection_location(
+            action,
+            card_projection,
+            "lsp.json code_action",
+            "/range/start/line",
+        )?;
         let action_key = (action_card_id.to_string(), command.to_string());
         if !code_action_commands.insert(action_key) {
             return Err(format!(
@@ -922,12 +956,12 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
             ));
         }
         let arguments = super::json_array_at(action, "/arguments", "lsp.json code_action")?;
-        check_lsp_code_action_payload(action, action_card_id, command, card_ids, arguments)?;
+        check_lsp_code_action_payload(action, action_card_id, command, &card_ids, arguments)?;
         if action.get("edit").is_some() || action.get("workspace_edit").is_some() {
             return Err("lsp.json code_action must not contain source edits".to_string());
         }
     }
-    for card_id in card_ids {
+    for card_id in &card_ids {
         for command in [
             "unsafe-review.copyAgentPacket",
             "unsafe-review.explainWitnessRoute",
@@ -950,6 +984,27 @@ fn check_lsp_range(value: &serde_json::Value, context: &str) -> Result<(), Strin
 
     if end_line < start_line || (end_line == start_line && end_character < start_character) {
         return Err(format!("{context} range end must not precede start"));
+    }
+
+    Ok(())
+}
+
+fn check_lsp_projection_location(
+    value: &serde_json::Value,
+    card: &CardProjection,
+    context: &str,
+    line_pointer: &str,
+) -> Result<(), String> {
+    let path = super::require_non_empty_json_str(value, "path", context)?;
+    require_expected_value(path, &card.path, &format!("{context} path"))?;
+
+    let zero_based_line = super::json_usize_at(value, line_pointer, context)?;
+    let one_based_line = zero_based_line + 1;
+    if one_based_line as u64 != card.line {
+        return Err(format!(
+            "{context} line must point at ReviewCard site line {}; got {}",
+            card.line, one_based_line
+        ));
     }
 
     Ok(())

@@ -8734,6 +8734,36 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_lsp_diagnostic_location_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-lsp-diagnostic-location-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let lsp_path = dir.join("lsp.json");
+        let mut lsp: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&lsp_path).map_err(|err| format!("read lsp failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse lsp failed: {err}"))?;
+        let first_diagnostic = lsp
+            .get_mut("diagnostics")
+            .and_then(serde_json::Value::as_array_mut)
+            .and_then(|diagnostics| diagnostics.first_mut())
+            .ok_or_else(|| "test lsp missing first diagnostic".to_string())?;
+        first_diagnostic["path"] = serde_json::json!("src/other.rs");
+        fs::write(&lsp_path, lsp.to_string()).map_err(|err| format!("write lsp failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("lsp.json diagnostic path must be `src/lib.rs`")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_lsp_diagnostic_reversed_range() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-lsp-diagnostic-reversed-range")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -8918,6 +8948,36 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_lsp_hover_location_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-lsp-hover-location-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let lsp_path = dir.join("lsp.json");
+        let mut lsp: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&lsp_path).map_err(|err| format!("read lsp failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse lsp failed: {err}"))?;
+        let first_hover = lsp
+            .get_mut("hovers")
+            .and_then(serde_json::Value::as_array_mut)
+            .and_then(|hovers| hovers.first_mut())
+            .ok_or_else(|| "test lsp missing first hover".to_string())?;
+        first_hover["position"]["line"] = serde_json::json!(7);
+        fs::write(&lsp_path, lsp.to_string()).map_err(|err| format!("write lsp failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("lsp.json hover line must point at ReviewCard site line 7")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_lsp_missing_required_code_action() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-lsp-missing-action")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -9019,6 +9079,36 @@ Snapshot reports:
                 .err()
                 .unwrap_or_default()
                 .contains("missing string key `path`")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_lsp_code_action_location_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-lsp-action-location-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let lsp_path = dir.join("lsp.json");
+        let mut lsp: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&lsp_path).map_err(|err| format!("read lsp failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse lsp failed: {err}"))?;
+        let first_action = lsp
+            .get_mut("code_actions")
+            .and_then(serde_json::Value::as_array_mut)
+            .and_then(|actions| actions.first_mut())
+            .ok_or_else(|| "test lsp missing first code action".to_string())?;
+        first_action["path"] = serde_json::json!("src/other.rs");
+        fs::write(&lsp_path, lsp.to_string()).map_err(|err| format!("write lsp failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("lsp.json code_action path must be `src/lib.rs`")
         );
         Ok(())
     }
