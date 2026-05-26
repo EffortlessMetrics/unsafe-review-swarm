@@ -1027,10 +1027,12 @@ mod tests {
             .map_err(|err| format!("render allowed repairs failed: {err}"))?;
 
         assert_eq!(value["context"]["operation_family"], "inline_asm");
+        assert!(allowed_repairs.contains("same `asm!` block"));
         assert!(allowed_repairs.contains("register, memory, clobber, options"));
         assert!(allowed_repairs.contains("target-feature invariants"));
         assert!(allowed_repairs.contains("safe intrinsic"));
         assert!(allowed_repairs.contains("narrower wrapper"));
+        assert!(allowed_repairs.contains("this assembly invariant"));
         assert!(allowed_repairs.contains("witness receipt"));
         assert!(!allowed_repairs.contains("same raw pointer"));
         assert!(!allowed_repairs.contains("all-zero bit pattern"));

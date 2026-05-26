@@ -145,8 +145,14 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
             repairs.push("prefer an `UnsafeCell`, atomic, lock, or one-time initialization owner when the invariant cannot be localized".to_string());
         }
         OperationFamily::InlineAsm if missing_discharge(card, "asm") => {
-            repairs.push("document the register, memory, clobber, options, and target-feature invariants for this `asm!` block".to_string());
-            repairs.push("prefer a safe intrinsic or narrower wrapper when the assembly invariant cannot be reviewed locally".to_string());
+            repairs.push(
+                "document the register, memory, clobber, options, and target-feature invariants for this same `asm!` block"
+                    .to_string(),
+            );
+            repairs.push(
+                "prefer a safe intrinsic or narrower wrapper when this assembly invariant cannot be reviewed locally"
+                    .to_string(),
+            );
         }
         OperationFamily::UnsafeFnCall if missing_discharge(card, "callee-contract") => {
             repairs.push("quote or link the callee safety contract and prove each precondition at this call site".to_string());
