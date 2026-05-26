@@ -3202,9 +3202,10 @@ fn has_maybeuninit_assume_init_initialization_evidence(expression: &str, lower: 
     if receiver.is_empty() {
         return false;
     }
+    let context = MaybeUninitSlotContext::new(&compact, receiver);
 
-    has_maybeuninit_write_for_receiver(&compact, &receiver)
-        || has_maybeuninit_new_binding_for_receiver(&compact, &receiver)
+    has_maybeuninit_write_for_receiver(&context)
+        || has_maybeuninit_new_binding_for_receiver(&context)
 }
 
 fn maybeuninit_assume_init_receiver(expression: &str) -> Option<String> {
@@ -3221,45 +3222,69 @@ fn maybeuninit_assume_init_receiver(expression: &str) -> Option<String> {
     .map(str::to_string)
 }
 
-fn has_maybeuninit_write_for_receiver(compact: &str, receiver: &str) -> bool {
-    let marker = format!("{receiver}.write(");
-    let mut cursor = compact;
+struct MaybeUninitSlotContext<'a> {
+    compact: &'a str,
+    receiver: String,
+    write_marker: String,
+}
+
+impl<'a> MaybeUninitSlotContext<'a> {
+    fn new(compact: &'a str, receiver: String) -> Self {
+        let write_marker = format!("{receiver}.write(");
+        Self {
+            compact,
+            receiver,
+            write_marker,
+        }
+    }
+
+    fn evidence_reaches_operation(&self, evidence_pos: usize) -> bool {
+        maybeuninit_evidence_scope_reaches_operation(self.compact, evidence_pos)
+    }
+
+    fn has_slot_assignment(&self, text: &str) -> bool {
+        contains_simple_assignment_to(text, &self.receiver)
+    }
+}
+
+fn has_maybeuninit_write_for_receiver(context: &MaybeUninitSlotContext<'_>) -> bool {
+    let mut cursor = context.compact;
     let mut offset = 0usize;
-    while let Some(pos) = cursor.find(&marker) {
+    while let Some(pos) = cursor.find(&context.write_marker) {
         let marker_start = offset + pos;
-        let after_marker = &compact[marker_start + marker.len()..];
-        if maybeuninit_evidence_scope_reaches_operation(compact, marker_start)
-            && !contains_simple_assignment_to(after_marker, receiver)
+        let after_marker = &context.compact[marker_start + context.write_marker.len()..];
+        if context.evidence_reaches_operation(marker_start)
+            && !context.has_slot_assignment(after_marker)
         {
             return true;
         }
-        let next = pos + marker.len();
+        let next = pos + context.write_marker.len();
         offset += next;
         cursor = &cursor[next..];
     }
     false
 }
 
-fn has_maybeuninit_new_binding_for_receiver(compact: &str, receiver: &str) -> bool {
-    let mut cursor = compact;
+fn has_maybeuninit_new_binding_for_receiver(context: &MaybeUninitSlotContext<'_>) -> bool {
+    let mut cursor = context.compact;
     let mut offset = 0usize;
     while let Some(pos) = cursor.find("::new(") {
         let call_pos = offset + pos;
-        let statement_start = compact[..call_pos]
+        let statement_start = context.compact[..call_pos]
             .rfind([';', '{', '}'])
             .map_or(0, |idx| idx + 1);
-        let before_call = &compact[statement_start..call_pos];
+        let before_call = &context.compact[statement_start..call_pos];
         let Some((left, right)) = before_call.rsplit_once('=') else {
             let next = pos + "::new(".len();
             offset += next;
             cursor = &cursor[next..];
             continue;
         };
-        let after_call = &compact[call_pos + "::new(".len()..];
+        let after_call = &context.compact[call_pos + "::new(".len()..];
         if right.contains("maybeuninit")
-            && maybeuninit_binding_left_declares_receiver(left, receiver)
-            && maybeuninit_evidence_scope_reaches_operation(compact, call_pos)
-            && !contains_simple_assignment_to(after_call, receiver)
+            && maybeuninit_binding_left_declares_receiver(left, &context.receiver)
+            && context.evidence_reaches_operation(call_pos)
+            && !context.has_slot_assignment(after_call)
         {
             return true;
         }
