@@ -772,6 +772,7 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
         .ok_or_else(|| "lsp.json is missing /status/trust_boundary".to_string())?;
     super::require_boundary_text(status_boundary, "lsp.json status")?;
 
+    let mut diagnostic_card_ids = BTreeSet::new();
     for diagnostic in super::json_array_at(&lsp, "/diagnostics", "lsp.json")? {
         let Some(card_id) = diagnostic
             .get("card_id")
@@ -783,6 +784,9 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
             return Err(format!(
                 "lsp.json diagnostic references unknown card id `{card_id}`"
             ));
+        }
+        if !diagnostic_card_ids.insert(card_id.to_string()) {
+            return Err(format!("lsp.json diagnostics repeat card id `{card_id}`"));
         }
         super::json_array_at(
             diagnostic,
@@ -798,6 +802,11 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
             .and_then(serde_json::Value::as_str)
             .ok_or_else(|| "lsp.json diagnostic is missing trust_boundary".to_string())?;
         super::require_boundary_text(boundary, "lsp.json diagnostic")?;
+    }
+    for card_id in card_ids {
+        if !diagnostic_card_ids.contains(card_id) {
+            return Err(format!("lsp.json diagnostics missing card id `{card_id}`"));
+        }
     }
 
     for hover in super::json_array_at(&lsp, "/hovers", "lsp.json")? {

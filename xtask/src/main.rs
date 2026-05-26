@@ -8565,6 +8565,65 @@ impl WitnessKind {
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_lsp_missing_card_diagnostic() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-lsp-missing-diagnostic")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let mut lsp: serde_json::Value = serde_json::from_str(&valid_lsp_json(
+            r#"[{"card_id":"card-1","command":"unsafe-review.copyAgentPacket","payload":{"kind":"unsafe-review.agent_packet","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]}]"#,
+        ))
+        .map_err(|err| format!("parse lsp failed: {err}"))?;
+        *lsp.get_mut("diagnostics")
+            .ok_or_else(|| "test lsp missing diagnostics".to_string())? = serde_json::json!([]);
+        fs::write(dir.join("lsp.json"), lsp.to_string())
+            .map_err(|err| format!("write lsp failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("diagnostics missing card id `card-1`")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_lsp_duplicate_card_diagnostic() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-lsp-duplicate-diagnostic")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let mut lsp: serde_json::Value = serde_json::from_str(&valid_lsp_json(
+            r#"[{"card_id":"card-1","command":"unsafe-review.copyAgentPacket","payload":{"kind":"unsafe-review.agent_packet","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]}]"#,
+        ))
+        .map_err(|err| format!("parse lsp failed: {err}"))?;
+        let diagnostics = lsp
+            .get_mut("diagnostics")
+            .and_then(serde_json::Value::as_array_mut)
+            .ok_or_else(|| "test lsp missing diagnostics".to_string())?;
+        let duplicate = diagnostics
+            .first()
+            .cloned()
+            .ok_or_else(|| "test lsp diagnostics empty".to_string())?;
+        diagnostics.push(duplicate);
+        fs::write(dir.join("lsp.json"), lsp.to_string())
+            .map_err(|err| format!("write lsp failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("diagnostics repeat card id `card-1`")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_markdown_missing_card_identity() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-markdown-card-id")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
