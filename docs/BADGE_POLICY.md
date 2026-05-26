@@ -15,7 +15,7 @@
 | Badge | Meaning | Not meaning |
 |---|---|---|
 | CI | Current GitHub CI status. | Analyzer correctness proof. |
-| `unsafe-review` | Open static review gaps. | Safety or unsafety status. |
+| `unsafe-review` | Numeric open static review gap count. | Safety or unsafety status. |
 | `unsafe-review+` | Contract/guard/witness gap summary. | Miri-clean or UB-free status. |
 | VS Code planned | Editor surface is planned. | Published VS Marketplace extension. |
 | Open VSX planned | Editor surface is planned. | Published Open VSX extension. |

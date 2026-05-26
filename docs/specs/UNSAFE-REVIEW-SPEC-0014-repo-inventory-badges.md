@@ -54,7 +54,7 @@ unsafe usage as safety posture.
 Badge JSON is a small serde-backed open-gap summary for shields-compatible
 consumers:
 
-- `unsafe-review.json` reports `<n> open gaps`
+- `unsafe-review.json` reports the numeric open-gap count as `<n>`
 - `unsafe-review-plus.json` reports contract, guard, and current
   guarded-unwitnessed summary counts
 

@@ -943,7 +943,7 @@ fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<()
 
     let main_badge = parse_json(&fs::read_to_string(badge_dir.join("unsafe-review.json"))?)?;
     assert_eq!(main_badge["label"], "unsafe-review");
-    assert_eq!(main_badge["message"], "1 open gaps");
+    assert_eq!(main_badge["message"], "1");
     assert_ne!(main_badge["message"], "safe");
 
     let plus_badge = parse_json(&fs::read_to_string(
