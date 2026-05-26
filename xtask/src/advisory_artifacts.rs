@@ -30,7 +30,7 @@ pub(crate) fn check_advisory_artifacts(dir: &Path) -> Result<(), String> {
 
 pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
     let summary = check_advisory_artifact_set(dir)?;
-    check_witness_plan_artifact(dir, summary.card_count)?;
+    check_witness_plan_artifact(dir, summary.card_count, &summary.card_projections)?;
     check_lsp_artifact(dir, &summary.card_projections)?;
     check_github_summary_artifact(dir, summary.card_count, &summary.card_projections)?;
     check_first_pr_markdown_card_identity(dir, &summary.card_ids, &summary.card_projections)?;
@@ -942,7 +942,11 @@ fn require_relevance_value(value: &str, context: &str) -> Result<(), String> {
     }
 }
 
-fn check_witness_plan_artifact(dir: &Path, card_count: usize) -> Result<(), String> {
+fn check_witness_plan_artifact(
+    dir: &Path,
+    card_count: usize,
+    card_projections: &BTreeMap<String, CardProjection>,
+) -> Result<(), String> {
     let path = dir.join("witness-plan.md");
     let text = super::read_to_string(&path)?;
     let review_cards_line = format!("- Review cards: {card_count}");
@@ -971,6 +975,7 @@ fn check_witness_plan_artifact(dir: &Path, card_count: usize) -> Result<(), Stri
                 "Receipt hint",
             ],
         )?;
+        require_witness_plan_verify_commands(&text, &path, card_projections)?;
     } else {
         super::require_text_contains_all(
             &text,
@@ -980,6 +985,24 @@ fn check_witness_plan_artifact(dir: &Path, card_count: usize) -> Result<(), Stri
                 "unsafe site executed",
             ],
         )?;
+    }
+    Ok(())
+}
+
+fn require_witness_plan_verify_commands(
+    text: &str,
+    path: &Path,
+    card_projections: &BTreeMap<String, CardProjection>,
+) -> Result<(), String> {
+    for (card_id, card) in card_projections {
+        for command in &card.verify_commands {
+            if !text.contains(command) {
+                return Err(format!(
+                    "{} must include verify command `{command}` for ReviewCard `{card_id}`",
+                    path.display()
+                ));
+            }
+        }
     }
     Ok(())
 }

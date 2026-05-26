@@ -8626,6 +8626,32 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_witness_plan_verify_command_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-witness-command-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("witness-plan.md");
+        let witness_plan =
+            fs::read_to_string(&path).map_err(|err| format!("read witness plan failed: {err}"))?;
+        fs::write(
+            &path,
+            witness_plan.replace(
+                "cargo +nightly miri test card",
+                "cargo +nightly miri test unrelated_card",
+            ),
+        )
+        .map_err(|err| format!("write witness plan failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(result.err().unwrap_or_default().contains(
+            "must include verify command `cargo +nightly miri test card` for ReviewCard `card-1`"
+        ));
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_lsp_unknown_card_id() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-bad-lsp")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -9638,7 +9664,7 @@ Snapshot reports:
         write_valid_first_pr_artifacts(&dir)?;
         fs::write(
             dir.join("witness-plan.md"),
-            "# unsafe-review witness plan\n\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Route groups\n\n### Miri / cargo-careful\n\n- Limit: Concrete runtime evidence is path-specific.\n\n#### `card-1`\n\n- Route: `miri`\n  - Reason: route\n  - What it can show: a focused run\n  - What it cannot prove: arbitrary callers\n  - Receipt hint: unsafe-review receipt import-miri card-1\n\nAll clear.\n\n## Trust boundary\n\nThis artifact is static unsafe contract review. It routes reviewers to credible witnesses but does not run Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux. It is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
+            "# unsafe-review witness plan\n\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Route groups\n\n### Miri / cargo-careful\n\n- Limit: Concrete runtime evidence is path-specific.\n\n#### `card-1`\n\n- Route: `miri`\n  - Reason: route\n  - What it can show: a focused run\n  - What it cannot prove: arbitrary callers\n  - Command:\n\n```bash\ncargo +nightly miri test card\n```\n  - Receipt hint: unsafe-review receipt import-miri card-1\n\nAll clear.\n\n## Trust boundary\n\nThis artifact is static unsafe contract review. It routes reviewers to credible witnesses but does not run Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux. It is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
         )
         .map_err(|err| format!("write witness plan failed: {err}"))?;
 
