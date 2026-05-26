@@ -3533,8 +3533,7 @@ fn has_maybeuninit_assume_init_initialization_evidence(expression: &str, lower: 
     }
     let context = MaybeUninitSlotContext::new(&compact, receiver);
 
-    has_maybeuninit_write_for_receiver(&context)
-        || has_maybeuninit_new_binding_for_receiver(&context)
+    context.has_write_evidence() || context.has_new_binding_evidence()
 }
 
 fn maybeuninit_assume_init_receiver(expression: &str) -> Option<String> {
@@ -3578,54 +3577,54 @@ impl<'a> MaybeUninitSlotContext<'a> {
     fn slot_stays_initialized_after(&self, text: &str) -> bool {
         !self.has_slot_assignment(text)
     }
-}
 
-fn has_maybeuninit_write_for_receiver(context: &MaybeUninitSlotContext<'_>) -> bool {
-    let mut cursor = context.compact;
-    let mut offset = 0usize;
-    while let Some(pos) = cursor.find(&context.write_marker) {
-        let marker_start = offset + pos;
-        let after_marker = &context.compact[marker_start + context.write_marker.len()..];
-        if context.evidence_reaches_operation(marker_start)
-            && context.slot_stays_initialized_after(after_marker)
-        {
-            return true;
+    fn has_write_evidence(&self) -> bool {
+        let mut cursor = self.compact;
+        let mut offset = 0usize;
+        while let Some(pos) = cursor.find(&self.write_marker) {
+            let marker_start = offset + pos;
+            let after_marker = &self.compact[marker_start + self.write_marker.len()..];
+            if self.evidence_reaches_operation(marker_start)
+                && self.slot_stays_initialized_after(after_marker)
+            {
+                return true;
+            }
+            let next = pos + self.write_marker.len();
+            offset += next;
+            cursor = &cursor[next..];
         }
-        let next = pos + context.write_marker.len();
-        offset += next;
-        cursor = &cursor[next..];
+        false
     }
-    false
-}
 
-fn has_maybeuninit_new_binding_for_receiver(context: &MaybeUninitSlotContext<'_>) -> bool {
-    let mut cursor = context.compact;
-    let mut offset = 0usize;
-    while let Some(pos) = cursor.find("::new(") {
-        let call_pos = offset + pos;
-        let statement_start = context.compact[..call_pos]
-            .rfind([';', '{', '}'])
-            .map_or(0, |idx| idx + 1);
-        let before_call = &context.compact[statement_start..call_pos];
-        let Some((left, right)) = before_call.rsplit_once('=') else {
+    fn has_new_binding_evidence(&self) -> bool {
+        let mut cursor = self.compact;
+        let mut offset = 0usize;
+        while let Some(pos) = cursor.find("::new(") {
+            let call_pos = offset + pos;
+            let statement_start = self.compact[..call_pos]
+                .rfind([';', '{', '}'])
+                .map_or(0, |idx| idx + 1);
+            let before_call = &self.compact[statement_start..call_pos];
+            let Some((left, right)) = before_call.rsplit_once('=') else {
+                let next = pos + "::new(".len();
+                offset += next;
+                cursor = &cursor[next..];
+                continue;
+            };
+            let after_call = &self.compact[call_pos + "::new(".len()..];
+            if right.contains("maybeuninit")
+                && maybeuninit_binding_left_declares_receiver(left, &self.receiver)
+                && self.evidence_reaches_operation(call_pos)
+                && self.slot_stays_initialized_after(after_call)
+            {
+                return true;
+            }
             let next = pos + "::new(".len();
             offset += next;
             cursor = &cursor[next..];
-            continue;
-        };
-        let after_call = &context.compact[call_pos + "::new(".len()..];
-        if right.contains("maybeuninit")
-            && maybeuninit_binding_left_declares_receiver(left, &context.receiver)
-            && context.evidence_reaches_operation(call_pos)
-            && context.slot_stays_initialized_after(after_call)
-        {
-            return true;
         }
-        let next = pos + "::new(".len();
-        offset += next;
-        cursor = &cursor[next..];
+        false
     }
-    false
 }
 
 fn maybeuninit_binding_left_declares_receiver(left: &str, receiver: &str) -> bool {
