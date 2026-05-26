@@ -30,6 +30,10 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
                 repairs.push("prove the source value is in the destination type's valid-value domain before this transmute".to_string());
             }
         }
+        OperationFamily::Zeroed if missing_discharge(card, "valid-zero") => {
+            repairs.push("prove the all-zero bit pattern is valid for this target type before `zeroed`".to_string());
+            repairs.push("prefer an explicit constructor or `MaybeUninit` path when zero is not a valid value".to_string());
+        }
         OperationFamily::UnwrapUnchecked if missing_discharge(card, "valid-value") => {
             repairs.push("add a same-receiver `Some` or `Ok` guard on an open path before `unwrap_unchecked`".to_string());
             repairs.push("preserve the same receiver value between the guard and `unwrap_unchecked`".to_string());
