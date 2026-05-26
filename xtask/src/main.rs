@@ -9046,14 +9046,14 @@ Snapshot reports:
     }
 
     #[test]
-    fn first_pr_artifact_checker_rejects_github_summary_without_known_card_identity()
+    fn first_pr_artifact_checker_rejects_github_summary_unknown_top_card_identity()
     -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-github-card-id")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
         write_valid_first_pr_artifacts(&dir)?;
         fs::write(
             dir.join("github-summary.md"),
-            "## unsafe-review advisory summary\n\n- Scope: `diff`\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Top card\n\n- ID: `missing`\n- Class: `guard_missing`\n- Next action: add an alignment guard\n\n---\n\nFull advisory bundle (cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json) is attached as the workflow artifact.\n\n> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",
+            "## unsafe-review advisory summary\n\n- Scope: `diff`\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Top card\n\n- ID: `missing`\n- Class: `guard_missing`\n- Next action: add an alignment guard\n\nKnown ReviewCard: `card-1`\n\n---\n\nFull advisory bundle (cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json) is attached as the workflow artifact.\n\n> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",
         )
         .map_err(|err| format!("write github summary failed: {err}"))?;
 
@@ -9064,7 +9064,7 @@ Snapshot reports:
             result
                 .err()
                 .unwrap_or_default()
-                .contains("must mention at least one known ReviewCard id")
+                .contains("top card id `missing` is not present in cards.json")
         );
         Ok(())
     }

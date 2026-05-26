@@ -106,16 +106,38 @@ fn require_text_mentions_all_card_ids(
     Ok(())
 }
 
-fn require_text_mentions_known_card_id(
+fn require_github_summary_card_identity(
     text: &str,
     path: &Path,
     card_ids: &BTreeSet<String>,
 ) -> Result<(), String> {
-    if card_ids.is_empty() || card_ids.iter().any(|card_id| text.contains(card_id)) {
+    if card_ids.is_empty() {
         return Ok(());
     }
+
+    let mut saw_top_card_id = false;
+    for line in text.lines() {
+        let Some(rest) = line.trim().strip_prefix("- ID: `") else {
+            continue;
+        };
+        let Some((card_id, _)) = rest.split_once('`') else {
+            continue;
+        };
+        saw_top_card_id = true;
+        if !card_ids.contains(card_id) {
+            return Err(format!(
+                "{} top card id `{card_id}` is not present in cards.json",
+                path.display()
+            ));
+        }
+    }
+
+    if saw_top_card_id {
+        return Ok(());
+    }
+
     Err(format!(
-        "{} must mention at least one known ReviewCard id",
+        "{} must include a top ReviewCard id line",
         path.display()
     ))
 }
@@ -758,7 +780,7 @@ fn check_first_pr_markdown_card_identity(
 
     let github_summary_path = dir.join("github-summary.md");
     let github_summary = super::read_to_string(&github_summary_path)?;
-    require_text_mentions_known_card_id(&github_summary, &github_summary_path, card_ids)
+    require_github_summary_card_identity(&github_summary, &github_summary_path, card_ids)
 }
 
 fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), String> {
