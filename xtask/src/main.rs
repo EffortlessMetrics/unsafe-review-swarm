@@ -3123,6 +3123,14 @@ fn check_fixture_next_action(
                 "{card_context} miri_unsupported next_action must route reviewers to sanitizer/cargo-careful evidence"
             ));
         }
+        "miri_unsupported"
+            if !normalized.contains("ffi boundary contract")
+                || !normalized.contains("miri may not exercise") =>
+        {
+            return Err(format!(
+                "{card_context} miri_unsupported next_action must name the FFI boundary contract and Miri non-execution limitation"
+            ));
+        }
         "reachable_unwitnessed"
             if !normalized.contains("witness receipt")
                 || !normalized.contains("static limitation") =>
@@ -6981,6 +6989,11 @@ jobs:
                 "miri_unsupported",
                 "Run Miri for this FFI seam.",
                 "sanitizer/cargo-careful",
+            ),
+            (
+                "miri_unsupported",
+                "Use sanitizer/cargo-careful evidence for this FFI seam.",
+                "FFI boundary contract",
             ),
             (
                 "reachable_unwitnessed",
