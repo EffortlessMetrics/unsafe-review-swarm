@@ -875,8 +875,7 @@ fn check_lsp_artifact(
         )?;
         super::json_array_at(diagnostic, "/obligation_evidence", "lsp.json diagnostic")?;
         check_lsp_diagnostic_evidence(diagnostic)?;
-        super::json_array_at(diagnostic, "/witness_routes", "lsp.json diagnostic")?;
-        super::json_array_at(diagnostic, "/verify_commands", "lsp.json diagnostic")?;
+        check_lsp_diagnostic_witness_commands(diagnostic)?;
         let boundary = diagnostic
             .get("trust_boundary")
             .and_then(serde_json::Value::as_str)
@@ -1134,6 +1133,87 @@ fn check_lsp_diagnostic_evidence(diagnostic: &serde_json::Value) -> Result<(), S
                 "summary",
                 &format!("lsp.json diagnostic obligation_evidence.{key}"),
             )?;
+        }
+    }
+
+    Ok(())
+}
+
+fn check_lsp_diagnostic_witness_commands(diagnostic: &serde_json::Value) -> Result<(), String> {
+    let mut route_commands = BTreeSet::new();
+    for (idx, route) in super::json_array_at(diagnostic, "/witness_routes", "lsp.json diagnostic")?
+        .iter()
+        .enumerate()
+    {
+        super::require_non_empty_json_str(
+            route,
+            "kind",
+            &format!("lsp.json diagnostic witness_routes[{idx}]"),
+        )?;
+        super::require_non_empty_json_str(
+            route,
+            "reason",
+            &format!("lsp.json diagnostic witness_routes[{idx}]"),
+        )?;
+        let Some(required) = route.get("required").and_then(serde_json::Value::as_bool) else {
+            return Err(format!(
+                "lsp.json diagnostic witness_routes[{idx}] required must be a boolean"
+            ));
+        };
+        if required {
+            return Err(format!(
+                "lsp.json diagnostic witness_routes[{idx}] required must remain false; unsafe-review routes witnesses but does not require execution by default"
+            ));
+        }
+        if let Some(command) = route.get("command")
+            && !command.is_null()
+        {
+            let Some(command) = command.as_str() else {
+                return Err(format!(
+                    "lsp.json diagnostic witness_routes[{idx}] command must be null or a string"
+                ));
+            };
+            if command.trim().is_empty() {
+                return Err(format!(
+                    "lsp.json diagnostic witness_routes[{idx}] command must not be empty"
+                ));
+            }
+            route_commands.insert(command.to_string());
+        }
+    }
+
+    let mut verify_commands = BTreeSet::new();
+    for (idx, command) in
+        super::json_array_at(diagnostic, "/verify_commands", "lsp.json diagnostic")?
+            .iter()
+            .enumerate()
+    {
+        let Some(command) = command.as_str() else {
+            return Err(format!(
+                "lsp.json diagnostic verify_commands[{idx}] must be a string"
+            ));
+        };
+        if command.trim().is_empty() {
+            return Err(format!(
+                "lsp.json diagnostic verify_commands[{idx}] must not be empty"
+            ));
+        }
+        if !verify_commands.insert(command.to_string()) {
+            return Err(format!(
+                "lsp.json diagnostic verify_commands[{idx}] repeats command `{command}`"
+            ));
+        }
+        if !route_commands.contains(command) {
+            return Err(format!(
+                "lsp.json diagnostic verify_commands[{idx}] `{command}` must be backed by a witness route command"
+            ));
+        }
+    }
+    for command in route_commands {
+        if !verify_commands.contains(&command) {
+            return Err(format!(
+                "lsp.json diagnostic witness route command `{command}` must appear in verify_commands"
+            ));
         }
     }
 
