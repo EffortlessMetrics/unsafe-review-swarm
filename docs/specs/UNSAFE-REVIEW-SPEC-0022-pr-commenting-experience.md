@@ -82,7 +82,9 @@ Selection is sparse and changed-line only:
 - one comment per line unless explicitly justified
 - no duplicate card IDs
 
-Never select suppressed, `baseline_known`, or `static_unknown` cards. Prefer actionable changed unsafe operations that name specific missing evidence and a concrete next action.
+Never select suppressed, `baseline_known`, `static_unknown`, or
+`operation_family: "unknown"` cards. Prefer actionable changed unsafe
+operations that name specific missing evidence and a concrete next action.
 
 ## 6. Relevance and actionability
 
@@ -162,13 +164,14 @@ document is a future-lane contract, not a live workflow.
 - body text over 220 words
 - forbidden overclaim wording
 - forbidden classes (`static_unknown`, `baseline_known`, suppressed)
+- forbidden unknown operation-family comments
 
 ## 11. Acceptance examples
 
 Representative outcomes:
 
 - changed raw pointer read with missing alignment evidence -> one `guard_missing` candidate with concrete repair and trust boundary.
-- `static_unknown`, `baseline_known`, low-signal witness-only cards, or no changed-line anchor -> no inline comment, with explicit `not_selected` reason.
+- `static_unknown`, `operation_family: "unknown"`, `baseline_known`, low-signal witness-only cards, or no changed-line anchor -> no inline comment, with explicit `not_selected` reason.
 - malformed overclaim comment text -> verifier failure.
 
 Fixture-backed selected, card-present/not-selected, and no-card examples are in

@@ -857,6 +857,7 @@ fn require_expected_value(actual: &str, expected: &str, context: &str) -> Result
 
 fn should_project_planned_comment(card: &CardProjection) -> bool {
     class_is_actionable(&card.class_name)
+        && card.operation_family != "unknown"
         && (card.priority == "high" || card.confidence == "high")
         && !matches!(card.confidence.as_str(), "low" | "unknown")
 }
@@ -872,6 +873,8 @@ fn expected_selection_reason(card: &CardProjection) -> &'static str {
 fn expected_non_selection_reason(card: &CardProjection, planned_count: usize) -> &'static str {
     if !class_is_actionable(&card.class_name) {
         "class not eligible for inline comments"
+    } else if card.operation_family == "unknown" {
+        "operation family unknown"
     } else if matches!(card.confidence.as_str(), "low" | "unknown") {
         "confidence below inline comment threshold"
     } else if !(card.priority == "high" || card.confidence == "high") {

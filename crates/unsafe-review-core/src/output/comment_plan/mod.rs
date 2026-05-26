@@ -157,6 +157,22 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn comment_plan_skips_unknown_operation_family_cards() -> Result<(), String> {
+        let output = fixture_output("public_unsafe_fn_missing_safety")?;
+        let value = parse_json(&render(&output))?;
+
+        assert_eq!(value["comments"].as_array().map_or(1, Vec::len), 0);
+        assert_eq!(value["not_selected"].as_array().map_or(0, Vec::len), 1);
+        assert_eq!(value["not_selected"][0]["class"], "contract_missing");
+        assert_eq!(value["not_selected"][0]["operation_family"], "unknown");
+        assert_eq!(
+            value["not_selected"][0]["reason"],
+            "operation family unknown"
+        );
+        Ok(())
+    }
+
     fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures")

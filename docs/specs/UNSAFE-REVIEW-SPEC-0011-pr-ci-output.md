@@ -415,6 +415,7 @@ changed lines only
 actionable cards only
 high-confidence or high-priority only
 no static_unknown
+no operation_family unknown
 no baseline_known
 no suppressed
 no unchanged repo-inventory cards
@@ -434,6 +435,7 @@ Selection should avoid:
 ```text
 weak reach-only cards
 static_unknown cards
+operation_family unknown cards
 cards without changed-line location
 cards with ambiguous macro site
 cards already baseline_known or suppressed

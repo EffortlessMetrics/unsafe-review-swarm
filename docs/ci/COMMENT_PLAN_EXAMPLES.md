@@ -102,24 +102,26 @@ the call site. The plan keeps the comment specific:
 The candidate body asks for the missing length / overlap guard explicitly; it
 does not say "copy is unsafe" or "this is UB".
 
-## Selected candidate — public unsafe fn missing `# Safety`
+## Card present, not selected — public unsafe fn missing `# Safety`
 
 Fixture: `public_unsafe_fn_missing_safety`
 
-When a changed `pub unsafe fn` lacks a precise public `# Safety` section, the
-plan promotes the card as `contract_missing` and asks the author to document
-the caller obligations the function relies on:
+When a changed `pub unsafe fn` lacks a precise public `# Safety` section,
+`unsafe-review` still emits a `contract_missing` card. The inline comment plan
+keeps it out of `comments[]` because the operation family is `unknown`, which
+is often an owner-contract or inventory-like surface rather than a precise
+changed unsafe operation. The card remains visible in the bundle.
 
 ```json
 {
-  "comments": [
+  "comments": [],
+  "not_selected": [
     {
       "class": "contract_missing",
       "operation_family": "unknown",
       "actionability": "specific_contract_missing",
       "relevance": "high",
-      "selection_reason": "actionable high-confidence review card",
-      "next_action": "Add a precise public `# Safety` section that names the required caller obligations."
+      "reason": "operation family unknown"
     }
   ]
 }
@@ -127,7 +129,7 @@ the caller obligations the function relies on:
 
 `operation_family` is `unknown` because the unsafe contract obligation lives
 on the `unsafe fn` declaration itself, not on a single unsafe operation. The
-plan body asks for explicit caller obligations rather than for safety prose.
+bundle still asks for explicit caller obligations rather than for safety prose.
 
 ## Card present, not selected — human-review-only FFI
 
@@ -185,6 +187,7 @@ The verifier treats these as artifact contract rules:
 - one planned comment per `path`/`line`;
 - changed-line, renderable locations only;
 - no `static_unknown`, baseline-known, or suppressed planned comments;
+- no `operation_family: "unknown"` planned comments;
 - every planned body stays at or below 220 words;
 - `not_selected` entries must reference known cards and cannot repeat planned
   comment cards;

@@ -1,9 +1,10 @@
-use crate::domain::{Confidence, Priority, ReviewCard, ReviewClass};
+use crate::domain::{Confidence, OperationFamily, Priority, ReviewCard, ReviewClass};
 
 const PLAN_BOUNDARY: &str = "Plan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision.";
 
 pub(super) fn should_plan_comment(card: &ReviewCard) -> bool {
     card.class.is_actionable()
+        && !matches!(card.operation.family, OperationFamily::Unknown)
         && (matches!(card.priority, Priority::High) || matches!(card.confidence, Confidence::High))
         && !matches!(card.confidence, Confidence::Low | Confidence::Unknown)
 }
@@ -11,6 +12,8 @@ pub(super) fn should_plan_comment(card: &ReviewCard) -> bool {
 pub(super) fn non_selection_reason(card: &ReviewCard) -> &'static str {
     if !card.class.is_actionable() {
         "class not eligible for inline comments"
+    } else if matches!(card.operation.family, OperationFamily::Unknown) {
+        "operation family unknown"
     } else if matches!(card.confidence, Confidence::Low | Confidence::Unknown) {
         "confidence below inline comment threshold"
     } else if !(matches!(card.priority, Priority::High)
