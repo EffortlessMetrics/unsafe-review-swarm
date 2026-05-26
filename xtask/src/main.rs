@@ -8646,7 +8646,7 @@ impl WitnessKind {
         write_valid_artifacts(&dir)?;
         fs::write(
             dir.join("cards.sarif"),
-            r#"{"version":"2.1.0","runs":[{"results":[{"properties":{"cardId":"card-1","verifyCommands":["cargo test"]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
+            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"}]}},"results":[{"ruleId":"guard_missing","properties":{"cardId":"card-1","class":"guard_missing","verifyCommands":["cargo test"]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
         )
         .map_err(|err| format!("write sarif failed: {err}"))?;
 
@@ -8659,6 +8659,24 @@ impl WitnessKind {
                 .unwrap_or_default()
                 .contains("witnessRouteDetails")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn advisory_artifact_checker_rejects_sarif_rule_id_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-sarif-rule-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        fs::write(
+            dir.join("cards.sarif"),
+            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"},{"id":"contract_missing"}]}},"results":[{"ruleId":"contract_missing","properties":{"cardId":"card-1","class":"guard_missing","witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
+        )
+        .map_err(|err| format!("write sarif failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(result.err().unwrap_or_default().contains("ruleId"));
         Ok(())
     }
 
@@ -9097,7 +9115,7 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write pr summary failed: {err}"))?;
         fs::write(
             dir.join("cards.sarif"),
-            r#"{"version":"2.1.0","runs":[{"results":[{"properties":{"cardId":"card-1","witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
+            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"}]}},"results":[{"ruleId":"guard_missing","properties":{"cardId":"card-1","class":"guard_missing","witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
         )
         .map_err(|err| format!("write sarif failed: {err}"))?;
         fs::write(
@@ -9122,7 +9140,7 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write pr summary failed: {err}"))?;
         fs::write(
             dir.join("cards.sarif"),
-            r#"{"version":"2.1.0","runs":[{"results":[{"properties":{"cardId":"card-1","witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}},{"properties":{"cardId":"card-2","witnessRouteDetails":[{"kind":"human-deep-review","reason":"route","command":null,"required":false}],"verifyCommands":[]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
+            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"},{"id":"contract_missing"}]}},"results":[{"ruleId":"guard_missing","properties":{"cardId":"card-1","class":"guard_missing","witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}},{"ruleId":"contract_missing","properties":{"cardId":"card-2","class":"contract_missing","witnessRouteDetails":[{"kind":"human-deep-review","reason":"route","command":null,"required":false}],"verifyCommands":[]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
         )
         .map_err(|err| format!("write sarif failed: {err}"))?;
         Ok(())
@@ -9169,7 +9187,7 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write pr summary failed: {err}"))?;
         fs::write(
             dir.join("cards.sarif"),
-            r#"{"version":"2.1.0","runs":[{"results":[],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
+            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[]}},"results":[],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
         )
         .map_err(|err| format!("write sarif failed: {err}"))?;
         fs::write(

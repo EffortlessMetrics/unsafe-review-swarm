@@ -178,6 +178,18 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
     let sarif = super::parse_json_file(&dir.join("cards.sarif"))?;
     super::require_json_str(&sarif, "version", "2.1.0", "cards.sarif")?;
     super::require_json_array(&sarif, "runs", "cards.sarif")?;
+    let sarif_rule_ids = sarif_rule_ids(&sarif)?;
+    let card_classes = card_projections
+        .values()
+        .map(|projection| projection.class_name.as_str())
+        .collect::<BTreeSet<_>>();
+    for class_name in card_classes {
+        if !sarif_rule_ids.contains(class_name) {
+            return Err(format!(
+                "cards.sarif is missing rule id `{class_name}` for cards.json class"
+            ));
+        }
+    }
     let sarif_results = super::json_array_at(&sarif, "/runs/0/results", "cards.sarif")?;
     if sarif_results.len() != card_count {
         return Err(format!(
@@ -197,6 +209,30 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
                 "cards.sarif result references unknown card id `{card_id}`"
             ));
         }
+        let Some(card_projection) = card_projections.get(card_id) else {
+            return Err(format!(
+                "cards.sarif result references unknown card id `{card_id}`"
+            ));
+        };
+        let rule_id = super::require_non_empty_json_str(result, "ruleId", "cards.sarif result")?;
+        require_expected_value(
+            rule_id,
+            &card_projection.class_name,
+            "cards.sarif result ruleId",
+        )?;
+        if !sarif_rule_ids.contains(rule_id) {
+            return Err(format!(
+                "cards.sarif result ruleId `{rule_id}` is not declared in tool.driver.rules"
+            ));
+        }
+        require_projected_str(
+            result
+                .pointer("/properties")
+                .ok_or_else(|| "cards.sarif result is missing properties".to_string())?,
+            "class",
+            &card_projection.class_name,
+            "cards.sarif result properties",
+        )?;
         super::json_array_at(
             result,
             "/properties/witnessRouteDetails",
@@ -444,6 +480,21 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         card_ids,
         card_count,
     })
+}
+
+fn sarif_rule_ids(sarif: &serde_json::Value) -> Result<BTreeSet<&str>, String> {
+    let mut rule_ids = BTreeSet::new();
+    for rule in super::json_array_at(
+        sarif,
+        "/runs/0/tool/driver/rules",
+        "cards.sarif tool.driver",
+    )? {
+        let id = super::require_non_empty_json_str(rule, "id", "cards.sarif rule")?;
+        if !rule_ids.insert(id) {
+            return Err(format!("cards.sarif repeats rule id `{id}`"));
+        }
+    }
+    Ok(rule_ids)
 }
 
 fn advisory_card_projections(
