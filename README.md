@@ -21,7 +21,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/EffortlessMetrics/unsafe-review/releases"><img src="https://img.shields.io/github/v/release/EffortlessMetrics/unsafe-review?sort=semver&label=release" alt="GitHub release" /></a>
+  <a href="https://github.com/EffortlessMetrics/unsafe-review/releases/latest"><img src="https://img.shields.io/github/v/release/EffortlessMetrics/unsafe-review?sort=semver&label=release" alt="GitHub release" /></a>
   <a href="https://crates.io/crates/unsafe-review"><img src="https://img.shields.io/crates/d/unsafe-review.svg?label=crates.io%20downloads" alt="crates.io downloads" /></a>
   <a href="https://docs.rs/unsafe-review"><img src="https://docs.rs/unsafe-review/badge.svg" alt="docs.rs" /></a>
 </p>
