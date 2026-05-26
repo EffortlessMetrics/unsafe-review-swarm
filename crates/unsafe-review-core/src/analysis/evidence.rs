@@ -2068,8 +2068,8 @@ fn set_len_receiver_and_argument(compact: &str) -> Option<(&str, &str)> {
 
 struct SetLenApplicabilityContext<'a> {
     before_call: &'a str,
-    receiver: &'a str,
-    new_len: &'a str,
+    same_vec_target: &'a str,
+    set_len_argument: &'a str,
 }
 
 impl<'a> SetLenApplicabilityContext<'a> {
@@ -2089,8 +2089,8 @@ impl<'a> SetLenApplicabilityContext<'a> {
 
     fn capacity_terms(&self) -> [String; 2] {
         [
-            format!("{}.capacity()", self.receiver),
-            format!("{}.cap()", self.receiver),
+            format!("{}.capacity()", self.same_vec_target),
+            format!("{}.cap()", self.same_vec_target),
         ]
     }
 
@@ -2101,8 +2101,8 @@ impl<'a> SetLenApplicabilityContext<'a> {
                 let (left, right) = statement.split_once('=')?;
                 let binding = let_binding_name(left)?;
                 let right = right.trim();
-                ((right == format!("{}.capacity()", self.receiver)
-                    || right == format!("{}.cap()", self.receiver))
+                ((right == format!("{}.capacity()", self.same_vec_target)
+                    || right == format!("{}.cap()", self.same_vec_target))
                     && !binding.is_empty())
                 .then_some(binding)
             })
@@ -2110,21 +2110,30 @@ impl<'a> SetLenApplicabilityContext<'a> {
     }
 
     fn has_remaining_capacity_guard(&self) -> bool {
-        has_set_len_remaining_capacity_guard(self.before_call, self.receiver, self.new_len)
+        has_set_len_remaining_capacity_guard(
+            self.before_call,
+            self.same_vec_target,
+            self.set_len_argument,
+        )
     }
 
     fn has_capacity_relation(&self, capacity: &str) -> bool {
-        has_set_len_capacity_relation(self.before_call, self.new_len, capacity, self.receiver)
+        has_set_len_capacity_relation(
+            self.before_call,
+            self.set_len_argument,
+            capacity,
+            self.same_vec_target,
+        )
     }
 
     fn has_const_capacity_evidence(&self) -> bool {
-        self.new_len == "cap"
+        self.set_len_argument == "cap"
             && (self.before_call.contains("maybeuninit::uninit();cap")
                 || self.before_call.contains(";cap]"))
     }
 
     fn has_reserve_capacity_evidence(&self) -> bool {
-        if !is_simple_identifier(self.new_len) {
+        if !is_simple_identifier(self.set_len_argument) {
             return false;
         }
         let mut consumed = 0usize;
@@ -2133,19 +2142,20 @@ impl<'a> SetLenApplicabilityContext<'a> {
                 consumed += statement.len();
                 continue;
             };
-            if let_binding_name(left) != Some(self.new_len) {
+            if let_binding_name(left) != Some(self.set_len_argument) {
                 consumed += statement.len();
                 continue;
             }
-            let Some(additional) = len_plus_additional_argument(right.trim(), self.receiver) else {
+            let Some(additional) = len_plus_additional_argument(right.trim(), self.same_vec_target)
+            else {
                 consumed += statement.len();
                 continue;
             };
             let after_len_binding = &self.before_call[consumed + statement.len()..];
             if has_fresh_set_len_reserve_call(
                 after_len_binding,
-                self.receiver,
-                self.new_len,
+                self.same_vec_target,
+                self.set_len_argument,
                 additional,
             ) {
                 return true;
@@ -2163,19 +2173,20 @@ impl<'a> SetLenApplicabilityContext<'a> {
             let Some(binding) = let_binding_name(left) else {
                 return false;
             };
-            binding == self.receiver
-                && with_capacity_argument(right).is_some_and(|arg| arg == self.new_len)
+            binding == self.same_vec_target
+                && with_capacity_argument(right).is_some_and(|arg| arg == self.set_len_argument)
         })
     }
 
     fn has_call_result_initialization_evidence(&self) -> bool {
         self.before_call.contains("encode_utf8(")
-            && (self.new_len == "len+n" || self.new_len == "old_len+n")
+            && (self.set_len_argument == "len+n" || self.set_len_argument == "old_len+n")
     }
 
     fn has_initialized_range_evidence(&self) -> bool {
         self.before_call.split([';', '}']).any(|statement| {
-            contains_receiver_path(statement, self.receiver) && has_initialization_marker(statement)
+            contains_receiver_path(statement, self.same_vec_target)
+                && has_initialization_marker(statement)
         }) || self.has_initialization_loop()
     }
 
@@ -2207,10 +2218,10 @@ impl<'a> SetLenApplicabilityContext<'a> {
             let right = right.trim();
             let after_binding =
                 &self.before_call[(consumed + statement.len()).min(self.before_call.len())..];
-            if set_len_slice_binding_references_receiver(right, self.receiver)
+            if set_len_slice_binding_references_receiver(right, self.same_vec_target)
                 && right.contains('[')
                 && right.contains("..")
-                && !contains_simple_assignment_to(after_binding, self.receiver)
+                && !contains_simple_assignment_to(after_binding, self.same_vec_target)
                 && !contains_direct_binding_assignment_to(after_binding, binding)
             {
                 bindings.push(binding);
@@ -2221,8 +2232,8 @@ impl<'a> SetLenApplicabilityContext<'a> {
     }
 
     fn loop_iterates_receiver(&self, head: &str, slice_bindings: &[&str]) -> bool {
-        contains_receiver_path(head, self.receiver)
-            || head.contains(&format!("in{}.", self.receiver))
+        contains_receiver_path(head, self.same_vec_target)
+            || head.contains(&format!("in{}.", self.same_vec_target))
             || slice_bindings.iter().any(|binding| {
                 contains_receiver_path(head, binding) || head.contains(&format!("in{binding}."))
             })
@@ -2235,8 +2246,8 @@ fn set_len_call_context(compact: &str) -> Option<SetLenApplicabilityContext<'_>>
     let call_pos = compact.find(&marker)?;
     Some(SetLenApplicabilityContext {
         before_call: &compact[..call_pos],
-        receiver,
-        new_len,
+        same_vec_target: receiver,
+        set_len_argument: new_len,
     })
 }
 
