@@ -9574,7 +9574,7 @@ Snapshot reports:
         write_valid_artifacts(&dir)?;
         fs::write(
             dir.join("cards.sarif"),
-            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"}]}},"results":[{"ruleId":"guard_missing","properties":{"cardId":"card-1","class":"guard_missing","verifyCommands":["cargo test"]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
+            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"}]}},"results":[{"ruleId":"guard_missing","locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":7,"startColumn":5}}}],"properties":{"cardId":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operationFamily":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","nextAction":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verifyCommands":["cargo +nightly miri test card"]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
         )
         .map_err(|err| format!("write sarif failed: {err}"))?;
 
@@ -9615,7 +9615,7 @@ Snapshot reports:
         write_two_card_artifacts(&dir)?;
         fs::write(
             dir.join("cards.sarif"),
-            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"},{"id":"contract_missing"}]}},"results":[{"ruleId":"guard_missing","properties":{"cardId":"card-1","class":"guard_missing","witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}},{"ruleId":"guard_missing","properties":{"cardId":"card-1","class":"guard_missing","witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
+            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"},{"id":"contract_missing"}]}},"results":[{"ruleId":"guard_missing","locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":7,"startColumn":5}}}],"properties":{"cardId":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operationFamily":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","nextAction":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}},{"ruleId":"guard_missing","locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":7,"startColumn":5}}}],"properties":{"cardId":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operationFamily":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","nextAction":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
         )
         .map_err(|err| format!("write sarif failed: {err}"))?;
 
@@ -9627,6 +9627,59 @@ Snapshot reports:
                 .err()
                 .unwrap_or_default()
                 .contains("results repeat card id `card-1`")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn advisory_artifact_checker_rejects_sarif_location_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-sarif-location-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        let sarif_path = dir.join("cards.sarif");
+        let mut sarif: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&sarif_path).map_err(|err| format!("read sarif failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse sarif failed: {err}"))?;
+        sarif["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"]["startLine"] =
+            serde_json::json!(8);
+        fs::write(&sarif_path, sarif.to_string())
+            .map_err(|err| format!("write sarif failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("location startLine must project cards.json value")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn advisory_artifact_checker_rejects_sarif_operation_projection_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-sarif-operation-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        let sarif_path = dir.join("cards.sarif");
+        let mut sarif: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&sarif_path).map_err(|err| format!("read sarif failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse sarif failed: {err}"))?;
+        sarif["runs"][0]["results"][0]["properties"]["operationFamily"] = serde_json::json!("ffi");
+        fs::write(&sarif_path, sarif.to_string())
+            .map_err(|err| format!("write sarif failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("operationFamily must be `raw_pointer_read`")
         );
         Ok(())
     }
@@ -10056,7 +10109,7 @@ review_after = "2026-08-01"
     fn write_valid_artifacts(dir: &Path) -> Result<(), String> {
         fs::write(
             dir.join("cards.json"),
-            r#"{"tool":"unsafe-review","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"cards":1},"cards":[{"id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","site":{"file":"src/lib.rs","line":7},"operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read"}]}"#,
+            r#"{"tool":"unsafe-review","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"cards":1},"cards":[{"id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","site":{"file":"src/lib.rs","line":7,"column":5},"operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verify_commands":["cargo +nightly miri test card"]}]}"#,
         )
         .map_err(|err| format!("write cards failed: {err}"))?;
         fs::write(
@@ -10066,7 +10119,7 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write pr summary failed: {err}"))?;
         fs::write(
             dir.join("cards.sarif"),
-            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"}]}},"results":[{"ruleId":"guard_missing","properties":{"cardId":"card-1","class":"guard_missing","witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
+            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"}]}},"results":[{"ruleId":"guard_missing","locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":7,"startColumn":5}}}],"properties":{"cardId":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operationFamily":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","nextAction":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
         )
         .map_err(|err| format!("write sarif failed: {err}"))?;
         fs::write(
@@ -10081,7 +10134,7 @@ review_after = "2026-08-01"
         write_valid_artifacts(dir)?;
         fs::write(
             dir.join("cards.json"),
-            r#"{"tool":"unsafe-review","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"cards":2},"cards":[{"id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","site":{"file":"src/lib.rs","line":7},"operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read"},{"id":"card-2","class":"contract_missing","priority":"high","confidence":"high","site":{"file":"src/lib.rs","line":7},"operation":"unsafe fn read_header(ptr: *const u8)","operation_family":"unknown"}]}"#,
+            r#"{"tool":"unsafe-review","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"cards":2},"cards":[{"id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","site":{"file":"src/lib.rs","line":7,"column":5},"operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verify_commands":["cargo +nightly miri test card"]},{"id":"card-2","class":"contract_missing","priority":"high","confidence":"high","site":{"file":"src/lib.rs","line":7,"column":1},"operation":"unsafe fn read_header(ptr: *const u8)","operation_family":"unknown","next_action":"Add a precise public `# Safety` section that names the required caller obligations.","verify_commands":[]}]}"#,
         )
         .map_err(|err| format!("write cards failed: {err}"))?;
         fs::write(
@@ -10091,7 +10144,7 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write pr summary failed: {err}"))?;
         fs::write(
             dir.join("cards.sarif"),
-            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"},{"id":"contract_missing"}]}},"results":[{"ruleId":"guard_missing","properties":{"cardId":"card-1","class":"guard_missing","witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}},{"ruleId":"contract_missing","properties":{"cardId":"card-2","class":"contract_missing","witnessRouteDetails":[{"kind":"human-deep-review","reason":"route","command":null,"required":false}],"verifyCommands":[]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
+            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"},{"id":"contract_missing"}]}},"results":[{"ruleId":"guard_missing","locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":7,"startColumn":5}}}],"properties":{"cardId":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operationFamily":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","nextAction":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}},{"ruleId":"contract_missing","locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":7,"startColumn":1}}}],"properties":{"cardId":"card-2","class":"contract_missing","priority":"high","confidence":"high","operationFamily":"unknown","operation":"unsafe fn read_header(ptr: *const u8)","nextAction":"Add a precise public `# Safety` section that names the required caller obligations.","witnessRouteDetails":[{"kind":"human-deep-review","reason":"route","command":null,"required":false}],"verifyCommands":[]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
         )
         .map_err(|err| format!("write sarif failed: {err}"))?;
         Ok(())

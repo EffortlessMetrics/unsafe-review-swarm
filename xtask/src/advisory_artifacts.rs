@@ -14,8 +14,11 @@ struct CardProjection {
     confidence: String,
     path: String,
     line: u64,
+    column: u64,
     operation: String,
     operation_family: String,
+    next_action: String,
+    verify_commands: Vec<String>,
 }
 
 const COMMENT_PLAN_BODY_WORD_LIMIT: usize = 220;
@@ -284,6 +287,46 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
                 .ok_or_else(|| "cards.sarif result is missing properties".to_string())?,
             "class",
             &card_projection.class_name,
+            "cards.sarif result properties",
+        )?;
+        let properties = result
+            .pointer("/properties")
+            .ok_or_else(|| "cards.sarif result is missing properties".to_string())?;
+        require_sarif_location_projection(result, card_projection)?;
+        require_projected_str(
+            properties,
+            "priority",
+            &card_projection.priority,
+            "cards.sarif result properties",
+        )?;
+        require_projected_str(
+            properties,
+            "confidence",
+            &card_projection.confidence,
+            "cards.sarif result properties",
+        )?;
+        require_projected_str(
+            properties,
+            "operationFamily",
+            &card_projection.operation_family,
+            "cards.sarif result properties",
+        )?;
+        require_projected_str(
+            properties,
+            "operation",
+            &card_projection.operation,
+            "cards.sarif result properties",
+        )?;
+        require_projected_str(
+            properties,
+            "nextAction",
+            &card_projection.next_action,
+            "cards.sarif result properties",
+        )?;
+        require_projected_string_array(
+            properties,
+            "verifyCommands",
+            &card_projection.verify_commands,
             "cards.sarif result properties",
         )?;
         super::json_array_at(
@@ -577,11 +620,23 @@ fn advisory_card_projections(
         )?
         .to_string();
         let line = super::json_usize_at(card, "/site/line", "cards.json card")? as u64;
+        let column = super::json_usize_at(card, "/site/column", "cards.json card")? as u64;
         let operation =
             super::require_non_empty_json_str(card, "operation", "cards.json card")?.to_string();
         let operation_family =
             super::require_non_empty_json_str(card, "operation_family", "cards.json card")?
                 .to_string();
+        let next_action =
+            super::require_non_empty_json_str(card, "next_action", "cards.json card")?.to_string();
+        let verify_commands = super::json_array_at(card, "/verify_commands", "cards.json card")?
+            .iter()
+            .map(|command| {
+                command
+                    .as_str()
+                    .map(str::to_string)
+                    .ok_or_else(|| "cards.json card verify_commands must be strings".to_string())
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         projections.insert(
             id,
             CardProjection {
@@ -590,12 +645,50 @@ fn advisory_card_projections(
                 confidence,
                 path,
                 line,
+                column,
                 operation,
                 operation_family,
+                next_action,
+                verify_commands,
             },
         );
     }
     Ok(projections)
+}
+
+fn require_sarif_location_projection(
+    result: &serde_json::Value,
+    card: &CardProjection,
+) -> Result<(), String> {
+    let Some(location) = result.pointer("/locations/0/physicalLocation") else {
+        return Err("cards.sarif result is missing primary physicalLocation".to_string());
+    };
+    let uri = location
+        .pointer("/artifactLocation/uri")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "cards.sarif result is missing artifactLocation.uri".to_string())?;
+    require_expected_value(uri, &card.path, "cards.sarif result location uri")?;
+    let start_line = location
+        .pointer("/region/startLine")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or_else(|| "cards.sarif result is missing region.startLine".to_string())?;
+    if start_line != card.line {
+        return Err(format!(
+            "cards.sarif result location startLine must project cards.json value `{}`; got `{start_line}`",
+            card.line
+        ));
+    }
+    let start_column = location
+        .pointer("/region/startColumn")
+        .and_then(serde_json::Value::as_u64)
+        .ok_or_else(|| "cards.sarif result is missing region.startColumn".to_string())?;
+    if start_column != card.column {
+        return Err(format!(
+            "cards.sarif result location startColumn must project cards.json value `{}`; got `{start_column}`",
+            card.column
+        ));
+    }
+    Ok(())
 }
 
 fn require_comment_card_projection(
@@ -654,6 +747,33 @@ fn require_projected_u64(
     } else {
         Err(format!(
             "{context} {field} must project cards.json value `{expected}`; got `{actual}`"
+        ))
+    }
+}
+
+fn require_projected_string_array(
+    value: &serde_json::Value,
+    field: &str,
+    expected: &[String],
+    context: &str,
+) -> Result<(), String> {
+    let Some(actual) = value.get(field).and_then(serde_json::Value::as_array) else {
+        return Err(format!("{context} is missing array field `{field}`"));
+    };
+    let actual = actual
+        .iter()
+        .map(|item| {
+            item.as_str()
+                .map(str::to_string)
+                .ok_or_else(|| format!("{context} {field} values must be strings"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(format!(
+            "{context} {field} must project cards.json value {:?}; got {:?}",
+            expected, actual
         ))
     }
 }
