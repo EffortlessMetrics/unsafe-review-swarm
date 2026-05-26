@@ -11,11 +11,7 @@ pub(crate) fn render(output: &AnalyzeOutput) -> (String, String) {
     let weak_evidence_gaps = output.summary.contract_missing
         + output.summary.guard_missing
         + output.summary.guarded_unwitnessed;
-    let plus = badge(
-        "unsafe-review+",
-        weak_evidence_gaps.to_string(),
-        color,
-    );
+    let plus = badge("unsafe-review+", weak_evidence_gaps.to_string(), color);
     (render_pretty(&main), render_pretty(&plus))
 }
 
