@@ -3351,6 +3351,10 @@ impl<'a> MaybeUninitSlotContext<'a> {
     fn has_slot_assignment(&self, text: &str) -> bool {
         contains_simple_assignment_to(text, &self.receiver)
     }
+
+    fn slot_stays_initialized_after(&self, text: &str) -> bool {
+        !self.has_slot_assignment(text)
+    }
 }
 
 fn has_maybeuninit_write_for_receiver(context: &MaybeUninitSlotContext<'_>) -> bool {
@@ -3360,7 +3364,7 @@ fn has_maybeuninit_write_for_receiver(context: &MaybeUninitSlotContext<'_>) -> b
         let marker_start = offset + pos;
         let after_marker = &context.compact[marker_start + context.write_marker.len()..];
         if context.evidence_reaches_operation(marker_start)
-            && !context.has_slot_assignment(after_marker)
+            && context.slot_stays_initialized_after(after_marker)
         {
             return true;
         }
@@ -3390,7 +3394,7 @@ fn has_maybeuninit_new_binding_for_receiver(context: &MaybeUninitSlotContext<'_>
         if right.contains("maybeuninit")
             && maybeuninit_binding_left_declares_receiver(left, &context.receiver)
             && context.evidence_reaches_operation(call_pos)
-            && !context.has_slot_assignment(after_call)
+            && context.slot_stays_initialized_after(after_call)
         {
             return true;
         }
@@ -4862,6 +4866,15 @@ mod tests {
             "unsafe { slot.assume_init() }",
             vec![],
         );
+        let stale_new_slot = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "let mut slot = MaybeUninit::new(7_u32);",
+                "slot = MaybeUninit::uninit();",
+            ],
+            "unsafe { slot.assume_init() }",
+            vec![],
+        );
         let open_branch_write = site_with_family(
             OperationFamily::MaybeUninitAssumeInit,
             vec![
@@ -4878,12 +4891,15 @@ mod tests {
         let other_evidence =
             obligation_evidence(&other_slot_write, &obligations, &contract, &reach);
         let stale_evidence = obligation_evidence(&stale_slot, &obligations, &contract, &reach);
+        let stale_new_evidence =
+            obligation_evidence(&stale_new_slot, &obligations, &contract, &reach);
         let open_evidence =
             obligation_evidence(&open_branch_write, &obligations, &contract, &reach);
 
         assert!(!closed_evidence[0].discharge.present);
         assert!(!other_evidence[0].discharge.present);
         assert!(!stale_evidence[0].discharge.present);
+        assert!(!stale_new_evidence[0].discharge.present);
         assert!(open_evidence[0].discharge.present);
     }
 
