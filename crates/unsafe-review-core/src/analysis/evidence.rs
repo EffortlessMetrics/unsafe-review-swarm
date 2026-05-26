@@ -4150,26 +4150,38 @@ fn has_nullability_guard(site: &ScannedSite, lower: &str) -> bool {
 
 struct NonNullPointerContext<'a> {
     compact: &'a str,
-    arg: String,
-    new_probe: String,
+    same_pointer_target: String,
+    same_pointer_new_probe: String,
 }
 
 impl<'a> NonNullPointerContext<'a> {
     fn new(compact: &'a str, arg: String) -> Self {
-        let new_probe = format!("nonnull::new({arg})");
+        let same_pointer_new_probe = format!("nonnull::new({arg})");
         Self {
             compact,
-            arg,
-            new_probe,
+            same_pointer_target: arg,
+            same_pointer_new_probe,
         }
     }
 
-    fn has_arg_assignment(&self, text: &str) -> bool {
-        contains_simple_assignment_to(text, &self.arg)
+    fn has_stale_pointer_assignment(&self, text: &str) -> bool {
+        contains_simple_assignment_to(text, &self.same_pointer_target)
     }
 
-    fn arg_stays_same_after(&self, text: &str) -> bool {
-        !self.has_arg_assignment(text)
+    fn pointer_stays_fresh_after(&self, evidence: &str) -> bool {
+        !self.has_stale_pointer_assignment(evidence)
+    }
+
+    fn open_branch_preserves_applicability(&self, after_guard: &str) -> bool {
+        branch_still_open_at_operation(after_guard) && self.pointer_stays_fresh_after(after_guard)
+    }
+
+    fn returning_guard_preserves_applicability(
+        &self,
+        guard_body: &str,
+        after_guard_body: &str,
+    ) -> bool {
+        guard_body.contains("return") && self.pointer_stays_fresh_after(after_guard_body)
     }
 
     fn has_nullability_guard(&self) -> bool {
@@ -4181,7 +4193,7 @@ impl<'a> NonNullPointerContext<'a> {
     }
 
     fn has_question_mark_guard(&self) -> bool {
-        let marker = format!("{}?", self.new_probe);
+        let marker = format!("{}?", self.same_pointer_new_probe);
         let mut cursor = self.compact;
         let mut offset = 0usize;
         while let Some(pos) = cursor.find(&marker) {
@@ -4191,7 +4203,7 @@ impl<'a> NonNullPointerContext<'a> {
                 .map_or(&self.compact[proof_end..], |end| {
                     &self.compact[proof_end + end..]
                 });
-            if self.arg_stays_same_after(after_statement) {
+            if self.pointer_stays_fresh_after(after_statement) {
                 return true;
             }
             let next = pos + marker.len();
@@ -4202,7 +4214,7 @@ impl<'a> NonNullPointerContext<'a> {
     }
 
     fn has_if_let_guard(&self) -> bool {
-        let marker = format!("={}{{", self.new_probe);
+        let marker = format!("={}{{", self.same_pointer_new_probe);
         let mut cursor = self.compact;
         let mut offset = 0usize;
         while let Some(pos) = cursor.find(&marker) {
@@ -4210,9 +4222,7 @@ impl<'a> NonNullPointerContext<'a> {
             let proof_end = marker_start + marker.len();
             if ends_with_some_pattern(&self.compact[..marker_start], "iflet") {
                 let after_guard = &self.compact[proof_end..];
-                if branch_still_open_at_operation(after_guard)
-                    && self.arg_stays_same_after(after_guard)
-                {
+                if self.open_branch_preserves_applicability(after_guard) {
                     return true;
                 }
             }
@@ -4224,7 +4234,7 @@ impl<'a> NonNullPointerContext<'a> {
     }
 
     fn has_let_else_guard(&self) -> bool {
-        let marker = format!("={}else{{", self.new_probe);
+        let marker = format!("={}else{{", self.same_pointer_new_probe);
         let mut cursor = self.compact;
         let mut offset = 0usize;
         while let Some(pos) = cursor.find(&marker) {
@@ -4235,7 +4245,7 @@ impl<'a> NonNullPointerContext<'a> {
                 let (guard_body, after_guard_body) = after_guard
                     .split_once('}')
                     .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
-                if guard_body.contains("return") && self.arg_stays_same_after(after_guard_body) {
+                if self.returning_guard_preserves_applicability(guard_body, after_guard_body) {
                     return true;
                 }
             }
@@ -4247,15 +4257,14 @@ impl<'a> NonNullPointerContext<'a> {
     }
 
     fn has_match_some_guard(&self) -> bool {
-        let marker = format!("match{}{{", self.new_probe);
+        let marker = format!("match{}{{", self.same_pointer_new_probe);
         let mut cursor = self.compact;
         let mut offset = 0usize;
         while let Some(pos) = cursor.find(&marker) {
             let after_match_start = offset + pos + marker.len();
             let after_match = &self.compact[after_match_start..];
             if let Some(branch_after_marker) = match_some_branch_after_marker(after_match)
-                && branch_still_open_at_operation(branch_after_marker)
-                && self.arg_stays_same_after(branch_after_marker)
+                && self.open_branch_preserves_applicability(branch_after_marker)
             {
                 return true;
             }
@@ -4267,14 +4276,14 @@ impl<'a> NonNullPointerContext<'a> {
     }
 
     fn has_null_early_return_guard(&self) -> bool {
-        let guard = format!("if{}.is_null(){{", self.arg);
+        let guard = format!("if{}.is_null(){{", self.same_pointer_target);
         let Some((_prefix, after_guard)) = self.compact.split_once(&guard) else {
             return false;
         };
         let (guard_body, after_guard_body) = after_guard
             .split_once('}')
             .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
-        guard_body.contains("return") && self.arg_stays_same_after(after_guard_body)
+        self.returning_guard_preserves_applicability(guard_body, after_guard_body)
     }
 }
 
