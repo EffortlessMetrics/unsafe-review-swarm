@@ -884,6 +884,11 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
             .get("contents")
             .and_then(serde_json::Value::as_str)
             .ok_or_else(|| "lsp.json hover is missing contents".to_string())?;
+        if !contents.contains(&format!("Card: `{hover_card_id}`")) {
+            return Err(format!(
+                "lsp.json hover contents must mention card id `{hover_card_id}`"
+            ));
+        }
         super::require_text_contains(contents, "Trust boundary", &path)?;
         let boundary = hover
             .get("trust_boundary")
