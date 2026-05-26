@@ -114,8 +114,8 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
             repairs.push("prefer a safe `Pin::new` or pinned-owner construction path when the invariant cannot be shown locally".to_string());
         }
         OperationFamily::UnsafeImplSendSync => {
-            repairs.push("document or add evidence for the thread-safety invariant of this unsafe impl".to_string());
-            repairs.push("route concurrency-sensitive evidence through Loom or Shuttle when the invariant depends on interleavings".to_string());
+            repairs.push("document or add evidence for the thread-safety invariant of this same unsafe impl owner and type-parameter bounds".to_string());
+            repairs.push("route concurrency-sensitive evidence through Loom or Shuttle when the invariant depends on interleavings, and attach only a matching witness receipt after that run".to_string());
         }
         OperationFamily::AtomicPointerState => {
             if missing_discharge(card, "state-transition") {

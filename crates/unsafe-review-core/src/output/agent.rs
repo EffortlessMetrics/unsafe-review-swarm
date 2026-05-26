@@ -973,6 +973,38 @@ mod tests {
     }
 
     #[test]
+    fn agent_packet_scopes_unsafe_impl_repairs_to_same_impl_owner() -> Result<(), String> {
+        let output = fixture_output("unsafe_impl_sync_generic_bound")?;
+        let Some(card) = output.cards.first() else {
+            return Err("fixture should emit one card".to_string());
+        };
+        let value = parse_json(&render(card))?;
+        let allowed_repairs = serde_json::to_string(&value["allowed_repairs"])
+            .map_err(|err| format!("render allowed repairs failed: {err}"))?;
+        let routes = serde_json::to_string(&value["witness_routes"])
+            .map_err(|err| format!("render routes failed: {err}"))?;
+
+        assert_eq!(
+            value["context"]["operation_family"],
+            "unsafe_impl_send_sync"
+        );
+        assert_eq!(value["card"]["class"], "requires_loom");
+        assert!(allowed_repairs.contains("same unsafe impl owner"));
+        assert!(allowed_repairs.contains("type-parameter bounds"));
+        assert!(allowed_repairs.contains("thread-safety invariant"));
+        assert!(allowed_repairs.contains("Loom or Shuttle"));
+        assert!(allowed_repairs.contains("matching witness receipt"));
+        assert!(!allowed_repairs.contains("same raw pointer"));
+        assert!(!allowed_repairs.contains("all-zero bit pattern"));
+        assert!(!allowed_repairs.contains("target_feature"));
+        assert_eq!(value["agent_readiness"]["ready"], false);
+        assert_eq!(value["agent_readiness"]["state"], "needs_human_review");
+        assert!(routes.contains("loom"));
+        assert!(routes.contains("shuttle"));
+        Ok(())
+    }
+
+    #[test]
     fn agent_packet_marks_inline_asm_as_not_ready_for_repair_delegation() -> Result<(), String> {
         let output = fixture_output("inline_asm_human_review")?;
         let Some(card) = output.cards.first() else {
