@@ -18,6 +18,10 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
             if missing_discharge(card, "capacity") { repairs.push("add a same-vector capacity guard before `set_len` for the requested length".to_string()); }
             if missing_discharge(card, "initialized") { repairs.push("initialize the extended element range before calling `set_len`".to_string()); }
         }
+        OperationFamily::MaybeUninitAssumeInit if missing_discharge(card, "initialized") => {
+            repairs.push("write or construct the same `MaybeUninit` slot before `assume_init`".to_string());
+            repairs.push("keep the initialization branch open to the unsafe site and do not reassign the slot afterward".to_string());
+        }
         OperationFamily::StrFromUtf8Unchecked if missing_discharge(card, "utf8") => repairs.push("validate the same byte buffer as UTF-8 on an open path before calling `from_utf8_unchecked`".to_string()),
         OperationFamily::NonNullUnchecked if missing_discharge(card, "non-null") => repairs.push("add a same-pointer non-null guard before `NonNull::new_unchecked`".to_string()),
         OperationFamily::GetUnchecked if missing_discharge(card, "bounds") => {
