@@ -912,9 +912,20 @@ mod tests {
         let value = parse_json(&render(card))?;
         let routes = serde_json::to_string(&value["witness_routes"])
             .map_err(|err| format!("render routes failed: {err}"))?;
+        let allowed_repairs = serde_json::to_string(&value["allowed_repairs"])
+            .map_err(|err| format!("render allowed repairs failed: {err}"))?;
 
         assert_eq!(value["context"]["operation_family"], "atomic_pointer_state");
         assert_eq!(value["card"]["class"], "requires_loom");
+        assert!(allowed_repairs.contains("same atomic pointer state transition"));
+        assert!(allowed_repairs.contains("ownership invariant"));
+        assert!(allowed_repairs.contains("Loom or Shuttle test"));
+        assert!(allowed_repairs.contains("atomic ordering"));
+        assert!(allowed_repairs.contains("readers, writers, and drop paths"));
+        assert!(allowed_repairs.contains("witness receipt"));
+        assert!(!allowed_repairs.contains("same raw pointer"));
+        assert!(!allowed_repairs.contains("all-zero bit pattern"));
+        assert!(!allowed_repairs.contains("target_feature"));
         assert!(routes.contains("loom"));
         assert!(routes.contains("shuttle"));
         assert!(!routes.contains("\"miri\""));

@@ -117,6 +117,14 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
             repairs.push("document or add evidence for the thread-safety invariant of this unsafe impl".to_string());
             repairs.push("route concurrency-sensitive evidence through Loom or Shuttle when the invariant depends on interleavings".to_string());
         }
+        OperationFamily::AtomicPointerState => {
+            if missing_discharge(card, "state-transition") {
+                repairs.push("model the same atomic pointer state transition and ownership invariant in a focused Loom or Shuttle test".to_string());
+            }
+            if missing_discharge(card, "ordering") {
+                repairs.push("show the chosen atomic ordering is strong enough for readers, writers, and drop paths".to_string());
+            }
+        }
         OperationFamily::Ffi => {
             repairs.push("document the ABI, ownership, and lifetime contract for this FFI boundary".to_string());
             repairs.push("attach sanitizer or cargo-careful receipt evidence after running the scoped command outside unsafe-review".to_string());
