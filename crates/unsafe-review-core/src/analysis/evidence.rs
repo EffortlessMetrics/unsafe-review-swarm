@@ -1721,47 +1721,7 @@ fn has_capacity_bound_guard(lower: &str) -> bool {
     let Some(context) = set_len_call_context(&compact) else {
         return false;
     };
-    if has_set_len_remaining_capacity_guard(context.before_call, context.receiver, context.new_len)
-    {
-        return true;
-    }
-    for capacity in [
-        format!("{}.capacity()", context.receiver),
-        format!("{}.cap()", context.receiver),
-    ] {
-        if has_set_len_capacity_relation(
-            context.before_call,
-            context.new_len,
-            &capacity,
-            context.receiver,
-        ) {
-            return true;
-        }
-    }
-    set_len_capacity_bindings(context.before_call, context.receiver)
-        .into_iter()
-        .any(|capacity| {
-            has_set_len_capacity_relation(
-                context.before_call,
-                context.new_len,
-                capacity,
-                context.receiver,
-            )
-        })
-}
-
-fn set_len_capacity_bindings<'a>(before_call: &'a str, receiver: &str) -> Vec<&'a str> {
-    before_call
-        .split(';')
-        .filter_map(|statement| {
-            let (left, right) = statement.split_once('=')?;
-            let binding = let_binding_name(left)?;
-            let right = right.trim();
-            ((right == format!("{receiver}.capacity()") || right == format!("{receiver}.cap()"))
-                && !binding.is_empty())
-            .then_some(binding)
-        })
-        .collect()
+    context.has_capacity_bound_guard()
 }
 
 fn has_set_len_remaining_capacity_guard(before_call: &str, receiver: &str, new_len: &str) -> bool {
@@ -2121,6 +2081,50 @@ struct SetLenApplicabilityContext<'a> {
 }
 
 impl<'a> SetLenApplicabilityContext<'a> {
+    fn has_capacity_bound_guard(&self) -> bool {
+        if self.has_remaining_capacity_guard() {
+            return true;
+        }
+        for capacity in self.capacity_terms() {
+            if self.has_capacity_relation(&capacity) {
+                return true;
+            }
+        }
+        self.capacity_bindings()
+            .into_iter()
+            .any(|capacity| self.has_capacity_relation(capacity))
+    }
+
+    fn capacity_terms(&self) -> [String; 2] {
+        [
+            format!("{}.capacity()", self.receiver),
+            format!("{}.cap()", self.receiver),
+        ]
+    }
+
+    fn capacity_bindings(&self) -> Vec<&'a str> {
+        self.before_call
+            .split(';')
+            .filter_map(|statement| {
+                let (left, right) = statement.split_once('=')?;
+                let binding = let_binding_name(left)?;
+                let right = right.trim();
+                ((right == format!("{}.capacity()", self.receiver)
+                    || right == format!("{}.cap()", self.receiver))
+                    && !binding.is_empty())
+                .then_some(binding)
+            })
+            .collect()
+    }
+
+    fn has_remaining_capacity_guard(&self) -> bool {
+        has_set_len_remaining_capacity_guard(self.before_call, self.receiver, self.new_len)
+    }
+
+    fn has_capacity_relation(&self, capacity: &str) -> bool {
+        has_set_len_capacity_relation(self.before_call, self.new_len, capacity, self.receiver)
+    }
+
     fn has_initialized_range_evidence(&self) -> bool {
         self.before_call.split([';', '}']).any(|statement| {
             contains_receiver_path(statement, self.receiver) && has_initialization_marker(statement)
