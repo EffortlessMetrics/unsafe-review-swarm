@@ -2897,50 +2897,68 @@ fn has_zeroed_known_valid_zero_type(lower: &str) -> bool {
 
 fn has_transmute_layout_size_evidence(lower: &str) -> bool {
     let compact = compact_code(lower);
-    let Some((before_call, source_type, destination_type, _argument)) =
-        transmute_call_context(&compact)
-    else {
+    let Some(context) = TransmuteCallContext::parse(&compact) else {
         return false;
     };
-    let normalized = normalize_size_of_paths(before_call);
-    has_size_of_equality(&normalized, source_type, destination_type)
+    let normalized = normalize_size_of_paths(context.before_call);
+    has_size_of_equality(&normalized, context.source_type, context.destination_type)
 }
 
 fn has_transmute_u8_bool_valid_value_evidence(lower: &str) -> bool {
     let compact = compact_code(lower);
-    let Some((before_call, source_type, destination_type, argument)) =
-        transmute_call_context(&compact)
-    else {
+    let Some(context) = TransmuteCallContext::parse(&compact) else {
         return false;
     };
-    let Some(argument) = source_value_identifier(argument) else {
-        return false;
-    };
-    if source_type != "u8" || destination_type != "bool" {
+    if !context.is_u8_to_bool() {
         return false;
     }
-    has_u8_bool_value_guard(before_call, argument)
+    let Some(argument) = context.value_identifier() else {
+        return false;
+    };
+    has_u8_bool_value_guard(context.before_call, argument)
 }
 
-fn transmute_call_context(compact: &str) -> Option<(&str, &str, &str, &str)> {
-    for marker in ["transmute::<", "transmute_copy::<"] {
-        let Some(marker_start) = compact.find(marker) else {
-            continue;
-        };
-        let before_call = &compact[..marker_start];
-        let start = marker_start + marker.len();
-        let after_marker = &compact[start..];
-        let end = matching_generic_argument_end(after_marker)?;
-        let arguments = &after_marker[..end];
-        let after_arguments = after_marker.get(end + 1..)?;
-        let after_open = after_arguments.strip_prefix('(')?;
-        let argument_end = matching_call_argument_end(after_open)?;
-        let argument = &after_open[..argument_end];
-        if let Some((source_type, destination_type)) = split_top_level_pair(arguments) {
-            return Some((before_call, source_type, destination_type, argument));
+struct TransmuteCallContext<'a> {
+    before_call: &'a str,
+    source_type: &'a str,
+    destination_type: &'a str,
+    argument: &'a str,
+}
+
+impl<'a> TransmuteCallContext<'a> {
+    fn parse(compact: &'a str) -> Option<Self> {
+        for marker in ["transmute::<", "transmute_copy::<"] {
+            let Some(marker_start) = compact.find(marker) else {
+                continue;
+            };
+            let before_call = &compact[..marker_start];
+            let start = marker_start + marker.len();
+            let after_marker = &compact[start..];
+            let end = matching_generic_argument_end(after_marker)?;
+            let arguments = &after_marker[..end];
+            let after_arguments = after_marker.get(end + 1..)?;
+            let after_open = after_arguments.strip_prefix('(')?;
+            let argument_end = matching_call_argument_end(after_open)?;
+            let argument = &after_open[..argument_end];
+            if let Some((source_type, destination_type)) = split_top_level_pair(arguments) {
+                return Some(Self {
+                    before_call,
+                    source_type,
+                    destination_type,
+                    argument,
+                });
+            }
         }
+        None
     }
-    None
+
+    fn is_u8_to_bool(&self) -> bool {
+        self.source_type == "u8" && self.destination_type == "bool"
+    }
+
+    fn value_identifier(&self) -> Option<&'a str> {
+        source_value_identifier(self.argument)
+    }
 }
 
 fn split_top_level_pair(text: &str) -> Option<(&str, &str)> {
