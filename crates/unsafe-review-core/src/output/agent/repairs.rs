@@ -80,6 +80,11 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
             repairs.push("prove callers reach this `target_feature` path only after a matching runtime or compile-time feature check".to_string());
             repairs.push("route unsupported callers to a non-`target_feature` fallback or keep dispatch behind explicit cfg/feature gating".to_string());
         }
+        OperationFamily::StaticMut if missing_discharge(card, "global-state") => {
+            repairs.push("prove all access to this `static mut` is synchronized or constrained to one execution context".to_string());
+            repairs.push("show the global state invariant avoids aliased mutable references and data races".to_string());
+            repairs.push("prefer an `UnsafeCell`, atomic, lock, or one-time initialization owner when the invariant cannot be localized".to_string());
+        }
         _ => {}
     }
     if missing_kind(card, "contract") {

@@ -816,6 +816,40 @@ mod tests {
     }
 
     #[test]
+    fn agent_packet_scopes_static_mut_repairs_to_global_state_invariant() -> Result<(), String> {
+        let output = fixture_output("static_mut_global_state")?;
+        let Some(card) = output.cards.first() else {
+            return Err("fixture should emit one card".to_string());
+        };
+        let value = parse_json(&render(card))?;
+        let allowed_repairs = serde_json::to_string(&value["allowed_repairs"])
+            .map_err(|err| format!("render allowed repairs failed: {err}"))?;
+        let reasons = serde_json::to_string(&value["agent_readiness"]["reasons"])
+            .map_err(|err| format!("render readiness reasons failed: {err}"))?;
+        let routes = serde_json::to_string(&value["witness_routes"])
+            .map_err(|err| format!("render routes failed: {err}"))?;
+
+        assert_eq!(value["context"]["operation_family"], "static_mut");
+        assert_eq!(value["card"]["class"], "requires_loom");
+        assert!(allowed_repairs.contains("synchronized"));
+        assert!(allowed_repairs.contains("one execution context"));
+        assert!(allowed_repairs.contains("aliased mutable references"));
+        assert!(allowed_repairs.contains("data races"));
+        assert!(allowed_repairs.contains("UnsafeCell"));
+        assert!(allowed_repairs.contains("witness receipt"));
+        assert!(!allowed_repairs.contains("same raw pointer"));
+        assert!(!allowed_repairs.contains("all-zero bit pattern"));
+        assert!(!allowed_repairs.contains("target_feature"));
+        assert_eq!(value["agent_readiness"]["ready"], false);
+        assert_eq!(value["agent_readiness"]["state"], "needs_human_review");
+        assert!(reasons.contains("requires_loom"));
+        assert!(reasons.contains("external witness routing"));
+        assert!(routes.contains("loom"));
+        assert!(routes.contains("shuttle"));
+        Ok(())
+    }
+
+    #[test]
     fn agent_packet_marks_inline_asm_as_not_ready_for_repair_delegation() -> Result<(), String> {
         let output = fixture_output("inline_asm_human_review")?;
         let Some(card) = output.cards.first() else {
