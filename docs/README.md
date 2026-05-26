@@ -19,7 +19,7 @@
 | Releases | release targets, readiness notes, and publication receipts | `docs/releases/` |
 | Specs | behavior contracts | `docs/specs/` |
 | ADRs | durable architecture decisions | `docs/adr/` |
-| Templates | reusable proposal, spec, plan, closeout, and publication receipt skeletons | `docs/templates/` |
+| Templates | reusable proposal, spec, plan, closeout, swarm digest, and publication receipt skeletons | `docs/templates/` |
 | Contribution process | swarm-to-main routing and source PR requirements | `docs/contributing/SWARM_TO_MAIN.md` |
 | Spec style | durable source-of-truth ownership boundaries and artifact role split | `docs/spec-style.md` |
 | Spec rails guide | contributor workflow for source-of-truth rails and tool-state boundaries | `docs/contributing/spec-rails.md` |

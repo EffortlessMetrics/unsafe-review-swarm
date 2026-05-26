@@ -36,7 +36,7 @@ These directories may exist for external tools, but this lane does not migrate, 
 - `docs/proposals/`: why a workstream exists, alternatives, and success criteria.
 - `docs/specs/`: behavior and evidence requirements.
 - `docs/adr/`: durable architecture decisions.
-- `docs/templates/`: reusable proposal, spec, plan, closeout, and receipt skeletons.
+- `docs/templates/`: reusable proposal, spec, plan, closeout, swarm digest, and receipt skeletons.
 - `docs/status/`: support posture, objective audits, dogfood lane status, and closeout-facing status notes.
 - `policy/`: live baselines, suppressions, ledgers, and policy references.
 
