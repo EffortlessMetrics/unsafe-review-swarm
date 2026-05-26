@@ -847,8 +847,8 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
                 "lsp.json code_actions repeat command `{command}` for card id `{action_card_id}`"
             ));
         }
-        super::json_array_at(action, "/arguments", "lsp.json code_action")?;
-        check_lsp_code_action_payload(action, action_card_id, command, card_ids)?;
+        let arguments = super::json_array_at(action, "/arguments", "lsp.json code_action")?;
+        check_lsp_code_action_payload(action, action_card_id, command, card_ids, arguments)?;
         if action.get("edit").is_some() || action.get("workspace_edit").is_some() {
             return Err("lsp.json code_action must not contain source edits".to_string());
         }
@@ -983,6 +983,7 @@ fn check_lsp_code_action_payload(
     action_card_id: &str,
     command: &str,
     card_ids: &BTreeSet<String>,
+    arguments: &[serde_json::Value],
 ) -> Result<(), String> {
     let Some(payload) = action.get("payload") else {
         return Err("lsp.json code_action is missing payload".to_string());
@@ -997,19 +998,42 @@ fn check_lsp_code_action_payload(
         ));
     }
     let expected_kind = match command {
-        "unsafe-review.copyAgentPacket" => "unsafe-review.agent_packet",
-        "unsafe-review.explainWitnessRoute" => "unsafe-review.witness_route",
+        "unsafe-review.copyAgentPacket" => {
+            require_lsp_code_action_arguments(command, arguments, &[action_card_id.to_string()])?;
+            "unsafe-review.agent_packet"
+        }
+        "unsafe-review.explainWitnessRoute" => {
+            require_lsp_code_action_arguments(command, arguments, &[action_card_id.to_string()])?;
+            "unsafe-review.witness_route"
+        }
         "unsafe-review.openRelatedTest" => {
-            super::require_non_empty_json_str(payload, "file", "lsp.json code_action payload")?;
+            let file =
+                super::require_non_empty_json_str(payload, "file", "lsp.json code_action payload")?;
             let line = super::json_usize_at(payload, "/line", "lsp.json code_action payload")?;
             if line == 0 {
                 return Err("lsp.json code_action payload line must be one-based".to_string());
             }
-            super::require_non_empty_json_str(payload, "name", "lsp.json code_action payload")?;
+            let name =
+                super::require_non_empty_json_str(payload, "name", "lsp.json code_action payload")?;
+            require_lsp_code_action_arguments(
+                command,
+                arguments,
+                &[
+                    action_card_id.to_string(),
+                    file.to_string(),
+                    line.to_string(),
+                    name.to_string(),
+                ],
+            )?;
             "unsafe-review.related_test"
         }
         "unsafe-review.copyWitnessCommand" => {
-            super::require_non_empty_json_str(payload, "command", "lsp.json code_action payload")?;
+            let witness_command = super::require_non_empty_json_str(
+                payload,
+                "command",
+                "lsp.json code_action payload",
+            )?;
+            require_lsp_code_action_arguments(command, arguments, &[witness_command.to_string()])?;
             "unsafe-review.witness_command"
         }
         _ => {
@@ -1029,6 +1053,34 @@ fn check_lsp_code_action_payload(
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| "lsp.json code_action payload is missing trust_boundary".to_string())?;
     super::require_boundary_text(boundary, "lsp.json code_action payload")?;
+    Ok(())
+}
+
+fn require_lsp_code_action_arguments(
+    command: &str,
+    arguments: &[serde_json::Value],
+    expected: &[String],
+) -> Result<(), String> {
+    if arguments.len() != expected.len() {
+        return Err(format!(
+            "lsp.json code_action `{command}` arguments length must be {}; got {}",
+            expected.len(),
+            arguments.len()
+        ));
+    }
+    for (idx, expected) in expected.iter().enumerate() {
+        let actual = arguments
+            .get(idx)
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| {
+                format!("lsp.json code_action `{command}` arguments[{idx}] must be a string")
+            })?;
+        if actual != expected {
+            return Err(format!(
+                "lsp.json code_action `{command}` arguments[{idx}] must be `{expected}`; got `{actual}`"
+            ));
+        }
+    }
     Ok(())
 }
 
