@@ -3589,44 +3589,51 @@ fn maybeuninit_assume_init_receiver(expression: &str) -> Option<String> {
 
 struct MaybeUninitSlotContext<'a> {
     compact: &'a str,
-    receiver: String,
-    write_marker: String,
+    same_slot_target: String,
+    same_slot_write_marker: String,
 }
 
 impl<'a> MaybeUninitSlotContext<'a> {
     fn new(compact: &'a str, receiver: String) -> Self {
-        let write_marker = format!("{receiver}.write(");
+        let same_slot_write_marker = format!("{receiver}.write(");
         Self {
             compact,
-            receiver,
-            write_marker,
+            same_slot_target: receiver,
+            same_slot_write_marker,
         }
     }
 
-    fn evidence_reaches_operation(&self, evidence_pos: usize) -> bool {
+    fn slot_evidence_reaches_operation(&self, evidence_pos: usize) -> bool {
         maybeuninit_evidence_scope_reaches_operation(self.compact, evidence_pos)
     }
 
-    fn has_slot_assignment(&self, text: &str) -> bool {
-        contains_simple_assignment_to(text, &self.receiver)
+    fn has_stale_slot_assignment(&self, text: &str) -> bool {
+        contains_simple_assignment_to(text, &self.same_slot_target)
     }
 
-    fn slot_stays_initialized_after(&self, text: &str) -> bool {
-        !self.has_slot_assignment(text)
+    fn slot_stays_initialized_after(&self, evidence: &str) -> bool {
+        !self.has_stale_slot_assignment(evidence)
+    }
+
+    fn slot_evidence_preserves_applicability(
+        &self,
+        evidence_pos: usize,
+        after_evidence: &str,
+    ) -> bool {
+        self.slot_evidence_reaches_operation(evidence_pos)
+            && self.slot_stays_initialized_after(after_evidence)
     }
 
     fn has_write_evidence(&self) -> bool {
         let mut cursor = self.compact;
         let mut offset = 0usize;
-        while let Some(pos) = cursor.find(&self.write_marker) {
+        while let Some(pos) = cursor.find(&self.same_slot_write_marker) {
             let marker_start = offset + pos;
-            let after_marker = &self.compact[marker_start + self.write_marker.len()..];
-            if self.evidence_reaches_operation(marker_start)
-                && self.slot_stays_initialized_after(after_marker)
-            {
+            let after_marker = &self.compact[marker_start + self.same_slot_write_marker.len()..];
+            if self.slot_evidence_preserves_applicability(marker_start, after_marker) {
                 return true;
             }
-            let next = pos + self.write_marker.len();
+            let next = pos + self.same_slot_write_marker.len();
             offset += next;
             cursor = &cursor[next..];
         }
@@ -3650,9 +3657,8 @@ impl<'a> MaybeUninitSlotContext<'a> {
             };
             let after_call = &self.compact[call_pos + "::new(".len()..];
             if right.contains("maybeuninit")
-                && maybeuninit_binding_left_declares_receiver(left, &self.receiver)
-                && self.evidence_reaches_operation(call_pos)
-                && self.slot_stays_initialized_after(after_call)
+                && maybeuninit_binding_left_declares_receiver(left, &self.same_slot_target)
+                && self.slot_evidence_preserves_applicability(call_pos, after_call)
             {
                 return true;
             }
