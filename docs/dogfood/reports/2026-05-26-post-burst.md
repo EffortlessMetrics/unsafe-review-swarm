@@ -6,6 +6,8 @@ Artifact status: local, untracked under `target/dogfood-work/`
 
 This report samples the post-burst analyzer behavior after
 [the analyzer audit](../../handoffs/2026-05-26-post-burst-analyzer-audit.md).
+Future dogfood reports should classify notable observations with the
+[dogfood triage taxonomy](../triage-taxonomy.md).
 It is not a support-tier promotion, calibration report, release readiness
 proof, policy decision, safety proof, UB-free claim, Miri-clean claim, or site
 execution proof.
