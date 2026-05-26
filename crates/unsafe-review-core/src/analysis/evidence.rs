@@ -2189,18 +2189,86 @@ fn has_set_len_receiver_initialization_evidence(before_call: &str, receiver: &st
 }
 
 fn has_set_len_receiver_initialization_loop(before_call: &str, receiver: &str) -> bool {
+    let slice_bindings = set_len_receiver_slice_bindings(before_call, receiver);
     before_call.split('}').any(|block| {
         let Some((head, body)) = block.rsplit_once('{') else {
             return false;
         };
-        set_len_loop_iterates_receiver(head, receiver)
+        set_len_loop_iterates_receiver(head, receiver, &slice_bindings)
             && head.contains(".iter_mut(")
             && has_initialization_marker(body)
     })
 }
 
-fn set_len_loop_iterates_receiver(head: &str, receiver: &str) -> bool {
-    contains_receiver_path(head, receiver) || head.contains(&format!("in{receiver}."))
+fn set_len_receiver_slice_bindings<'a>(before_call: &'a str, receiver: &str) -> Vec<&'a str> {
+    let mut bindings = Vec::new();
+    let mut consumed = 0usize;
+    for statement in before_call.split_inclusive(';') {
+        let statement_without_semicolon = statement.trim_end_matches(';');
+        let Some((left, right)) = statement_without_semicolon.split_once('=') else {
+            consumed += statement.len();
+            continue;
+        };
+        let Some(binding) = let_binding_name(left) else {
+            consumed += statement.len();
+            continue;
+        };
+        let right = right.trim();
+        let after_binding = &before_call[(consumed + statement.len()).min(before_call.len())..];
+        if set_len_slice_binding_references_receiver(right, receiver)
+            && right.contains('[')
+            && right.contains("..")
+            && !contains_simple_assignment_to(after_binding, receiver)
+            && !contains_direct_binding_assignment_to(after_binding, binding)
+        {
+            bindings.push(binding);
+        }
+        consumed += statement.len();
+    }
+    bindings
+}
+
+fn set_len_slice_binding_references_receiver(right: &str, receiver: &str) -> bool {
+    let right = right
+        .strip_prefix("&mut")
+        .or_else(|| right.strip_prefix('&'))
+        .unwrap_or(right);
+    contains_receiver_path(right, receiver)
+}
+
+fn set_len_loop_iterates_receiver(head: &str, receiver: &str, slice_bindings: &[&str]) -> bool {
+    contains_receiver_path(head, receiver)
+        || head.contains(&format!("in{receiver}."))
+        || slice_bindings.iter().any(|binding| {
+            contains_receiver_path(head, binding) || head.contains(&format!("in{binding}."))
+        })
+}
+
+fn contains_direct_binding_assignment_to(compact: &str, name: &str) -> bool {
+    if compact.contains(&format!("let{name}="))
+        || compact.contains(&format!("letmut{name}="))
+        || compact.contains(&format!("let{name}:"))
+        || compact.contains(&format!("letmut{name}:"))
+    {
+        return true;
+    }
+    let marker = format!("{name}=");
+    let mut cursor = compact;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(&marker) {
+        let start = offset + pos;
+        let before = compact[..start].chars().next_back();
+        let after_equals = compact[start + marker.len()..].chars().next();
+        if before.is_none_or(|ch| ch != '*' && !is_receiver_path_char(ch))
+            && after_equals != Some('=')
+        {
+            return true;
+        }
+        let next = pos + marker.len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
 }
 
 fn has_initialization_marker(statement: &str) -> bool {
@@ -5530,6 +5598,64 @@ mod tests {
         let evidence = obligation_evidence(&set_len, &obligations, &contract, &reach);
 
         assert!(evidence.iter().all(|item| item.discharge.present));
+    }
+
+    #[test]
+    fn set_len_slice_binding_loop_discharges_initialized_obligation() {
+        let obligations = vec![
+            SafetyObligation::new("capacity", "new length is at most capacity"),
+            SafetyObligation::new(
+                "initialized",
+                "elements in the extended range are initialized",
+            ),
+        ];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let set_len = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "let old_len = self.len();",
+                "let new_len = old_len + s.len();",
+                "if new_len > self.capacity() { return; }",
+                "let dst = &mut self.xs[old_len..new_len];",
+                "for (dst, src) in dst.iter_mut().zip(s.as_bytes().iter()) {",
+                "    *dst = MaybeUninit::new(*src);",
+                "}",
+            ],
+            "self.set_len(new_len);",
+            vec![],
+        );
+        let wrong_target = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "let old_len = self.len();",
+                "let new_len = old_len + s.len();",
+                "if new_len > self.capacity() { return; }",
+                "let dst = &mut other[old_len..new_len];",
+                "for item in dst.iter_mut() {",
+                "    *item = MaybeUninit::new(0);",
+                "}",
+            ],
+            "self.set_len(new_len);",
+            vec![],
+        );
+
+        let evidence = obligation_evidence(&set_len, &obligations, &contract, &reach);
+        let wrong_target_evidence =
+            obligation_evidence(&wrong_target, &obligations, &contract, &reach);
+
+        assert!(evidence.iter().all(|item| item.discharge.present));
+        assert!(
+            !wrong_target_evidence
+                .iter()
+                .find(|item| item.obligation.key == "initialized")
+                .unwrap()
+                .discharge
+                .present
+        );
     }
 
     #[test]

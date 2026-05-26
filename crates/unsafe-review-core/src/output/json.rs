@@ -405,6 +405,8 @@ mod tests {
         "vec_set_len",
         "vec_set_len_comment_not_guard",
         "vec_set_len_initialized_loop",
+        "vec_set_len_slice_binding_initialized_loop",
+        "vec_set_len_other_slice_binding_not_guard",
         "vec_set_len_capacity_observed_not_guard",
         "vec_set_len_unrelated_capacity_comparison_not_guard",
         "vec_set_len_cap_argument_not_guard",

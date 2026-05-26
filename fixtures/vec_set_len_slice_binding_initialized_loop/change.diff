@@ -1,0 +1,32 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,25 @@
++use core::mem::MaybeUninit;
++
++pub fn extend_from_bytes(values: &mut Vec<MaybeUninit<u8>>, bytes: &[u8]) {
++    let old_len = values.len();
++    let new_len = old_len + bytes.len();
++    if new_len > values.capacity() {
++        return;
++    }
++    let dst = &mut values[old_len..new_len];
++    for (dst, src) in dst.iter_mut().zip(bytes.iter()) {
++        *dst = MaybeUninit::new(*src);
++    }
++    // SAFETY: capacity is checked above, and the loop initializes the extended range.
++    unsafe {
++        values.set_len(new_len);
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::extend_from_bytes;
++
++    #[test]
++    fn mentions_extend_from_bytes() {
++        let mut values = Vec::with_capacity(0);
++        extend_from_bytes(&mut values, b"");
++    }
++}
