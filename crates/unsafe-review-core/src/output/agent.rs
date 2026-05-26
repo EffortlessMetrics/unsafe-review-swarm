@@ -791,6 +791,37 @@ mod tests {
     }
 
     #[test]
+    fn agent_packet_scopes_unsafe_fn_call_repairs_to_callee_contract() -> Result<(), String> {
+        let output = fixture_output("unsafe_fn_call_wrapper")?;
+        let Some(card) = output.cards.first() else {
+            return Err("fixture should emit one card".to_string());
+        };
+        let value = parse_json(&render(card))?;
+        let allowed_repairs = serde_json::to_string(&value["allowed_repairs"])
+            .map_err(|err| format!("render allowed repairs failed: {err}"))?;
+        let reasons = serde_json::to_string(&value["agent_readiness"]["reasons"])
+            .map_err(|err| format!("render readiness reasons failed: {err}"))?;
+        let routes = serde_json::to_string(&value["witness_routes"])
+            .map_err(|err| format!("render routes failed: {err}"))?;
+
+        assert_eq!(value["context"]["operation_family"], "unsafe_fn_call");
+        assert!(allowed_repairs.contains("callee safety contract"));
+        assert!(allowed_repairs.contains("precondition"));
+        assert!(allowed_repairs.contains("same arguments and receiver"));
+        assert!(allowed_repairs.contains("safe wrapper"));
+        assert!(allowed_repairs.contains("witness receipt"));
+        assert!(!allowed_repairs.contains("all-zero bit pattern"));
+        assert!(!allowed_repairs.contains("target_feature"));
+        assert!(!allowed_repairs.contains("static mut"));
+        assert_eq!(value["agent_readiness"]["ready"], false);
+        assert_eq!(value["agent_readiness"]["state"], "needs_human_review");
+        assert!(reasons.contains("human deep review"));
+        assert!(reasons.contains("no verify command"));
+        assert!(routes.contains("human-deep-review"));
+        Ok(())
+    }
+
+    #[test]
     fn agent_packet_marks_loom_routed_cards_as_not_ready_for_repair_delegation()
     -> Result<(), String> {
         let output = fixture_output("atomic_pointer_state_fetch_ops")?;

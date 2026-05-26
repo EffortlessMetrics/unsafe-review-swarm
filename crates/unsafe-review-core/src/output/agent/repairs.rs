@@ -89,6 +89,11 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
             repairs.push("document the register, memory, clobber, options, and target-feature invariants for this `asm!` block".to_string());
             repairs.push("prefer a safe intrinsic or narrower wrapper when the assembly invariant cannot be reviewed locally".to_string());
         }
+        OperationFamily::UnsafeFnCall if missing_discharge(card, "callee-contract") => {
+            repairs.push("quote or link the callee safety contract and prove each precondition at this call site".to_string());
+            repairs.push("preserve the same arguments and receiver between local guards and the unsafe function call".to_string());
+            repairs.push("prefer a safe wrapper that enforces the callee preconditions before reaching this call".to_string());
+        }
         _ => {}
     }
     if missing_kind(card, "contract") {
