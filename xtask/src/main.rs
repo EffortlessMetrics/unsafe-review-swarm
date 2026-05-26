@@ -9396,6 +9396,65 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_github_summary_operation_family_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-github-operation-family")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("github-summary.md");
+        let summary = fs::read_to_string(&path)
+            .map_err(|err| format!("read github summary failed: {err}"))?;
+        fs::write(
+            &path,
+            summary.replace(
+                "- Operation family: `raw_pointer_read`",
+                "- Operation family: `nonnull`",
+            ),
+        )
+        .map_err(|err| format!("write github summary failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("top card `card-1` operation family must be `raw_pointer_read`")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_github_summary_next_action_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-github-next-action")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("github-summary.md");
+        let summary = fs::read_to_string(&path)
+            .map_err(|err| format!("read github summary failed: {err}"))?;
+        fs::write(
+            &path,
+            summary.replace(
+                "- Next action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.",
+                "- Next action: Ask the author for unrelated evidence.",
+            ),
+        )
+        .map_err(|err| format!("write github summary failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("top card `card-1` next action must be `Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.`")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_lsp_without_obligation_evidence() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-lsp-obligation-evidence")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -10211,7 +10270,7 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write lsp failed: {err}"))?;
         fs::write(
             dir.join("github-summary.md"),
-            "## unsafe-review advisory summary\n\n- Scope: `diff`\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Top card\n\n- ID: `card-1`\n- Class: `guard_missing`\n- Next action: add an alignment guard\n\n---\n\nFull advisory bundle (cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json) is attached as the workflow artifact.\n\n> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",
+            "## unsafe-review advisory summary\n\n- Scope: `diff`\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Top card\n\n- ID: `card-1`\n- Class: `guard_missing`\n- Location: src/lib.rs:7\n- Operation: `unsafe { ptr.cast::<Header>().read() }`\n- Operation family: `raw_pointer_read`\n- Next action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n\n---\n\nFull advisory bundle (cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json) is attached as the workflow artifact.\n\n> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",
         )
         .map_err(|err| format!("write github summary failed: {err}"))?;
         Ok(())

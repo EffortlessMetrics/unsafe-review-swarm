@@ -33,7 +33,7 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
     let summary = check_advisory_artifact_set(dir)?;
     check_witness_plan_artifact(dir, summary.card_count)?;
     check_lsp_artifact(dir, &summary.card_projections)?;
-    check_github_summary_artifact(dir, summary.card_count)?;
+    check_github_summary_artifact(dir, summary.card_count, &summary.card_projections)?;
     check_first_pr_markdown_card_identity(dir, &summary.card_ids, &summary.card_classes)?;
     check_first_pr_artifact_overclaims(dir)?;
 
@@ -43,7 +43,11 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
 
 const GITHUB_SUMMARY_WORD_LIMIT: usize = 600;
 
-fn check_github_summary_artifact(dir: &Path, card_count: usize) -> Result<(), String> {
+fn check_github_summary_artifact(
+    dir: &Path,
+    card_count: usize,
+    card_projections: &BTreeMap<String, CardProjection>,
+) -> Result<(), String> {
     let path = dir.join("github-summary.md");
     let text = super::read_to_string(&path)?;
 
@@ -90,6 +94,8 @@ fn check_github_summary_artifact(dir: &Path, card_count: usize) -> Result<(), St
 
     if card_count == 0 {
         super::require_text_contains(&text, "No changed unsafe-review gaps were found.", &path)?;
+    } else {
+        require_github_summary_top_card_projection(&text, &path, card_projections)?;
     }
 
     Ok(())
@@ -165,6 +171,128 @@ fn require_markdown_top_card_identity(
         &actual_class,
         expected_class,
         &format!("{} top card `{card_id}` class", path.display()),
+    )
+}
+
+fn require_github_summary_top_card_projection(
+    text: &str,
+    path: &Path,
+    card_projections: &BTreeMap<String, CardProjection>,
+) -> Result<(), String> {
+    let mut top_card_id = None;
+    let mut top_card_class = None;
+    let mut top_card_location = None;
+    let mut top_card_operation = None;
+    let mut top_card_operation_family = None;
+    let mut top_card_next_action = None;
+
+    for line in text.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("- ID: `") {
+            let Some((card_id, _)) = rest.split_once('`') else {
+                continue;
+            };
+            if !card_projections.contains_key(card_id) {
+                return Err(format!(
+                    "{} top card id `{card_id}` is not present in cards.json",
+                    path.display()
+                ));
+            }
+            top_card_id = Some(card_id.to_string());
+        } else if let Some(rest) = trimmed.strip_prefix("- Class: `") {
+            let Some((class_name, _)) = rest.split_once('`') else {
+                continue;
+            };
+            top_card_class = Some(class_name.to_string());
+        } else if let Some(location) = trimmed.strip_prefix("- Location: ") {
+            top_card_location = Some(location.to_string());
+        } else if let Some(rest) = trimmed.strip_prefix("- Operation: `") {
+            let Some((operation, _)) = rest.split_once('`') else {
+                continue;
+            };
+            top_card_operation = Some(operation.to_string());
+        } else if let Some(rest) = trimmed.strip_prefix("- Operation family: `") {
+            let Some((operation_family, _)) = rest.split_once('`') else {
+                continue;
+            };
+            top_card_operation_family = Some(operation_family.to_string());
+        } else if let Some(next_action) = trimmed.strip_prefix("- Next action: ") {
+            top_card_next_action = Some(next_action.to_string());
+        }
+    }
+
+    let Some(card_id) = top_card_id else {
+        return Err(format!(
+            "{} must include a top ReviewCard id line",
+            path.display()
+        ));
+    };
+    let card = card_projections.get(&card_id).ok_or_else(|| {
+        format!(
+            "{} top card id `{card_id}` is not present in cards.json",
+            path.display()
+        )
+    })?;
+
+    let Some(actual_class) = top_card_class else {
+        return Err(format!(
+            "{} must include a top ReviewCard class line",
+            path.display()
+        ));
+    };
+    require_expected_value(
+        &actual_class,
+        &card.class_name,
+        &format!("{} top card `{card_id}` class", path.display()),
+    )?;
+
+    let Some(actual_location) = top_card_location else {
+        return Err(format!(
+            "{} must include a top ReviewCard location line",
+            path.display()
+        ));
+    };
+    let expected_location = format!("{}:{}", card.path, card.line);
+    require_expected_value(
+        &actual_location,
+        &expected_location,
+        &format!("{} top card `{card_id}` location", path.display()),
+    )?;
+
+    let Some(actual_operation) = top_card_operation else {
+        return Err(format!(
+            "{} must include a top ReviewCard operation line",
+            path.display()
+        ));
+    };
+    require_expected_value(
+        &actual_operation,
+        &card.operation,
+        &format!("{} top card `{card_id}` operation", path.display()),
+    )?;
+
+    let Some(actual_operation_family) = top_card_operation_family else {
+        return Err(format!(
+            "{} must include a top ReviewCard operation family line",
+            path.display()
+        ));
+    };
+    require_expected_value(
+        &actual_operation_family,
+        &card.operation_family,
+        &format!("{} top card `{card_id}` operation family", path.display()),
+    )?;
+
+    let Some(actual_next_action) = top_card_next_action else {
+        return Err(format!(
+            "{} must include a top ReviewCard next action line",
+            path.display()
+        ));
+    };
+    require_expected_value(
+        &actual_next_action,
+        &card.next_action,
+        &format!("{} top card `{card_id}` next action", path.display()),
     )
 }
 
