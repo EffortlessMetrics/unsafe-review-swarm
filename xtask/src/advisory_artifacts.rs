@@ -817,6 +817,9 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
         if !hover_card_ids.insert(hover_card_id.to_string()) {
             return Err(format!("lsp.json hovers repeat card id `{hover_card_id}`"));
         }
+        super::require_non_empty_json_str(hover, "path", "lsp.json hover")?;
+        super::json_usize_at(hover, "/position/line", "lsp.json hover")?;
+        super::json_usize_at(hover, "/position/character", "lsp.json hover")?;
         let contents = hover
             .get("contents")
             .and_then(serde_json::Value::as_str)
