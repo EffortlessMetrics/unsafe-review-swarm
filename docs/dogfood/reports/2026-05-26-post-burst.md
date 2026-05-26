@@ -52,7 +52,7 @@ Root commits:
 | `arrayvec-pr288` | 8 | `vec_set_len`, `unsafe_fn_call` | `Vec::set_len` cards mostly moved to `guarded_unwitnessed`, which gives the reviewer a witness/action route instead of a generic missing-guard complaint. | One `try_push_str` `vec_set_len` card remains `guard_missing`; verify whether this is real initialized-range debt or missing loop/init recognition. | Best small target for initialized-range applicability work. |
 | `hashbrown-pr693` | 15 | `unwrap_unchecked`, `unsafe_fn_call`, `nonnull_unchecked`, `raw_pointer_read` | `unwrap_unchecked` cards include `guarded_unwitnessed` local infallibility evidence, which is exactly the intended reviewer note shape. | Nearby unsafe-call and `NonNull` cards remain mixed with the unwrap cards; ranking/summary should keep the unwrap evidence easy to find. | Good target for same-receiver and open-branch checks. |
 | `memchr-capped` | 50 | `unknown`, `unsafe_fn_call`, `target_feature`, `pointer_arithmetic` | `target_feature` cards remain `guarded_unwitnessed`, preserving the "contract exists, witness still absent" posture. | 24 `unknown` owner/unsafe-fn cards make the capped snapshot inventory-like. | Useful as a capped target-feature regression check, not as precision evidence. |
-| `crossbeam-pr1226` | 6 | `unknown` | The original snapshot pointed at changed atomic unsafe blocks in `fetch_and`, `fetch_or`, and `fetch_xor`. | The snapshot cards were generic `unknown` `contract_missing`; current main now has fixture-backed atomic pointer/state classification for those fetch operations, so this target needs a rerun before more analyzer work. | Rerun as an atomic pointer/state regression target; do not turn the fixture-backed classifier into a concurrency proof. |
+| `crossbeam-pr1226` | 6 | `unknown` | The original snapshot pointed at changed atomic unsafe blocks in `fetch_and`, `fetch_or`, and `fetch_xor`. | The snapshot cards were generic `unknown` `contract_missing`; a focused [atomic pointer rerun](2026-05-26-crossbeam-atomic-pointer-rerun.md) now classifies those operations as `atomic_pointer_state`. | Keep it as an atomic pointer/state regression target; do not turn the classifier into a concurrency proof. |
 | `mio-pr1388` | 18 | `unsafe_fn_call`, `zeroed`, `raw_pointer_deref`, `raw_pointer_write`, `ffi` | Layout/zeroed/raw-pointer cards point to concrete socket-address conversion review work. | The mix of `contract_missing`, `guard_missing`, and one `miri_unsupported` FFI card needs reviewer wording to avoid implying Miri coverage. | Good platform/layout target for human-review-heavy route wording. |
 
 ## Triage observations
@@ -60,7 +60,7 @@ Root commits:
 | Target | Card or family | Primary label | Evidence | Follow-up |
 |---|---|---|---|---|
 | `arrayvec-pr288` | `vec_set_len` `try_push_str` card | `needs-fixture` | One remaining `guard_missing` may be real initialized-range debt or a missed same-vector initialization shape. | Add a focused fixture only after manual review confirms the dogfood shape. |
-| `crossbeam-pr1226` | changed atomic unsafe blocks | `needs-fixture` | The original snapshot had six generic `unknown` cards for atomic pointer/state fetch operations; current fixtures now cover `fetch_and`, `fetch_or`, `fetch_xor`, and null-swap state transitions. | Rerun this dogfood target before adding more analyzer breadth; add another fixture only if the rerun still exposes a concrete atomic pointer/state shape. |
+| `crossbeam-pr1226` | changed atomic unsafe blocks | `actionable` | The original snapshot had six generic `unknown` cards for atomic pointer/state fetch operations; the focused rerun now reports six `atomic_pointer_state` `requires_loom` cards. | Keep the existing fixtures as regression coverage; add another fixture only if a future rerun exposes a still-missing concrete atomic pointer/state shape. |
 | `memchr-capped` | `unknown` unsafe-fn owner cards | `noise` | Twenty-four `unknown` cards make the capped run inventory-like rather than PR-review focused. | Use this target for capped regression scans and ranking pressure, not precision claims. |
 | `memchr-capped` | `target_feature` | `actionable` | Target-feature cards preserve contract evidence while leaving witness evidence absent. | Keep `target_feature_safety_docs` as the guardrail; do not turn docs into availability proof. |
 | `mio-pr1388` | FFI/platform layout cluster | `needs-route` | The FFI card is correctly `miri_unsupported`, but surrounding layout cards need human-review-heavy wording. | Improve route wording only with a focused fixture or projection rail. |
@@ -102,8 +102,10 @@ post-burst noise pocket. `memchr-capped` has broad owner/unsafe-fn cards that
 are useful as inventory, while `crossbeam-pr1226` exposed changed atomic unsafe
 blocks without a specific atomic-pointer operation family. Current main now has
 fixture-backed `atomic_pointer_state` classification for the observed
-`fetch_and`, `fetch_or`, and `fetch_xor` shapes, so the next work for this
-target is a rerun and any new fixture should come from a still-missing shape.
+`fetch_and`, `fetch_or`, and `fetch_xor` shapes, and the focused
+[crossbeam rerun](2026-05-26-crossbeam-atomic-pointer-rerun.md) now reports
+those cards as `requires_loom`. Any new fixture should come from a future
+still-missing atomic pointer/state shape.
 
 ### Layout, FFI, and platform routes
 
@@ -115,8 +117,8 @@ result exists.
 ## Possible false positives
 
 - The original `crossbeam-pr1226` generic `unknown` cards were too broad for
-  reviewers; rerun the target against current atomic pointer/state
-  classification before deciding whether any remaining cards are noise.
+  reviewers; the focused rerun moves them to atomic pointer/state route cards.
+  Treat those as concurrency-review prompts, not proof that a model was run.
 - `memchr-capped` capped inventory contains many `unknown` unsafe-fn owner cards;
   use it for regression scans, not precision claims.
 - `arrayvec-pr137` can look worse by card count even though the upstream PR is a
@@ -131,8 +133,8 @@ result exists.
   fixture-level [no-card control](2026-05-26-no-card-control.md) records the
   current false-positive smoke without becoming real-crate precision evidence.
 - Crossbeam atomic-pointer state was not classified beyond `unknown` in this
-  sampled PR. Current fixture-backed classification covers the observed fetch
-  operations, but this report has not been remeasured.
+  sampled PR. The focused rerun now covers the observed fetch operations as
+  `atomic_pointer_state` `requires_loom` cards.
 - UTF-8 unchecked validation was not sampled in this report; use
   `arrayvec-pr138` for that follow-up.
 - `NonNull::new_unchecked` stale-pointer controls were not sampled here; use
@@ -142,8 +144,8 @@ result exists.
 
 - Keep the no-card fixture control report linked from the dogfood README, and add
   a real-crate no-unsafe target only if a suitable corpus candidate appears.
-- Rerun `crossbeam-pr1226` against current atomic pointer/state fixtures before
-  adding more analyzer breadth.
+- Keep the focused `crossbeam-pr1226` atomic pointer/state rerun linked as a
+  regression report.
 - Add a `Vec::set_len` initialized-range fixture for the `arrayvec-pr288`
   `try_push_str` shape if manual review says the remaining `guard_missing` is
   noisy.
@@ -155,8 +157,8 @@ result exists.
 1. Define the evidence applicability model before adding new recognizers.
 2. Factor same-receiver/staleness helpers for `unwrap_unchecked`.
 3. Factor same-buffer/staleness helpers for UTF-8 validation.
-4. Rerun `crossbeam-pr1226` against current atomic pointer/state classification
-   and add one fixture/control only for a still-missing concrete shape.
+4. Add one atomic pointer/state fixture/control only if future dogfood exposes a
+   still-missing concrete shape.
 5. Keep FFI/layout route wording human-review-heavy.
 
 ## Reproduction commands
