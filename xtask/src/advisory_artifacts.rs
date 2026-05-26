@@ -3,6 +3,7 @@ use std::path::Path;
 
 struct AdvisoryArtifactSummary {
     card_ids: BTreeSet<String>,
+    card_classes: BTreeMap<String, String>,
     card_count: usize,
 }
 
@@ -29,7 +30,7 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
     check_witness_plan_artifact(dir, summary.card_count)?;
     check_lsp_artifact(dir, &summary.card_ids)?;
     check_github_summary_artifact(dir, summary.card_count)?;
-    check_first_pr_markdown_card_identity(dir, &summary.card_ids)?;
+    check_first_pr_markdown_card_identity(dir, &summary.card_ids, &summary.card_classes)?;
     check_first_pr_artifact_overclaims(dir)?;
 
     println!("check-first-pr-artifacts: ok ({})", dir.display());
@@ -109,37 +110,58 @@ fn require_text_mentions_all_card_ids(
 fn require_github_summary_card_identity(
     text: &str,
     path: &Path,
-    card_ids: &BTreeSet<String>,
+    card_classes: &BTreeMap<String, String>,
 ) -> Result<(), String> {
-    if card_ids.is_empty() {
+    if card_classes.is_empty() {
         return Ok(());
     }
 
-    let mut saw_top_card_id = false;
+    let mut top_card_id = None;
+    let mut top_card_class = None;
     for line in text.lines() {
-        let Some(rest) = line.trim().strip_prefix("- ID: `") else {
-            continue;
-        };
-        let Some((card_id, _)) = rest.split_once('`') else {
-            continue;
-        };
-        saw_top_card_id = true;
-        if !card_ids.contains(card_id) {
-            return Err(format!(
-                "{} top card id `{card_id}` is not present in cards.json",
-                path.display()
-            ));
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("- ID: `") {
+            let Some((card_id, _)) = rest.split_once('`') else {
+                continue;
+            };
+            if !card_classes.contains_key(card_id) {
+                return Err(format!(
+                    "{} top card id `{card_id}` is not present in cards.json",
+                    path.display()
+                ));
+            }
+            top_card_id = Some(card_id.to_string());
+        } else if let Some(rest) = trimmed.strip_prefix("- Class: `") {
+            let Some((class_name, _)) = rest.split_once('`') else {
+                continue;
+            };
+            top_card_class = Some(class_name.to_string());
         }
     }
 
-    if saw_top_card_id {
-        return Ok(());
-    }
-
-    Err(format!(
-        "{} must include a top ReviewCard id line",
-        path.display()
-    ))
+    let Some(card_id) = top_card_id else {
+        return Err(format!(
+            "{} must include a top ReviewCard id line",
+            path.display()
+        ));
+    };
+    let expected_class = card_classes.get(&card_id).ok_or_else(|| {
+        format!(
+            "{} top card id `{card_id}` is not present in cards.json",
+            path.display()
+        )
+    })?;
+    let Some(actual_class) = top_card_class else {
+        return Err(format!(
+            "{} must include a top ReviewCard class line",
+            path.display()
+        ));
+    };
+    require_expected_value(
+        &actual_class,
+        expected_class,
+        &format!("{} top card `{card_id}` class", path.display()),
+    )
 }
 
 fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, String> {
@@ -161,6 +183,10 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
     super::require_boundary_text(cards_boundary, "cards.json")?;
     let card_ids = super::advisory_card_ids(&cards)?;
     let card_projections = advisory_card_projections(&cards)?;
+    let card_classes = card_projections
+        .iter()
+        .map(|(card_id, projection)| (card_id.clone(), projection.class_name.clone()))
+        .collect::<BTreeMap<_, _>>();
     let card_count = card_ids.len();
     let summary_cards = super::json_usize_at(&cards, "/summary/cards", "cards.json")?;
     if summary_cards != card_count {
@@ -201,11 +227,11 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
     super::require_json_str(&sarif, "version", "2.1.0", "cards.sarif")?;
     super::require_json_array(&sarif, "runs", "cards.sarif")?;
     let sarif_rule_ids = sarif_rule_ids(&sarif)?;
-    let card_classes = card_projections
+    let card_class_names = card_projections
         .values()
         .map(|projection| projection.class_name.as_str())
         .collect::<BTreeSet<_>>();
-    for class_name in card_classes {
+    for class_name in card_class_names {
         if !sarif_rule_ids.contains(class_name) {
             return Err(format!(
                 "cards.sarif is missing rule id `{class_name}` for cards.json class"
@@ -509,6 +535,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
 
     Ok(AdvisoryArtifactSummary {
         card_ids,
+        card_classes,
         card_count,
     })
 }
@@ -769,6 +796,7 @@ fn check_witness_plan_artifact(dir: &Path, card_count: usize) -> Result<(), Stri
 fn check_first_pr_markdown_card_identity(
     dir: &Path,
     card_ids: &BTreeSet<String>,
+    card_classes: &BTreeMap<String, String>,
 ) -> Result<(), String> {
     let pr_summary_path = dir.join("pr-summary.md");
     let pr_summary = super::read_to_string(&pr_summary_path)?;
@@ -780,7 +808,7 @@ fn check_first_pr_markdown_card_identity(
 
     let github_summary_path = dir.join("github-summary.md");
     let github_summary = super::read_to_string(&github_summary_path)?;
-    require_github_summary_card_identity(&github_summary, &github_summary_path, card_ids)
+    require_github_summary_card_identity(&github_summary, &github_summary_path, card_classes)
 }
 
 fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), String> {
