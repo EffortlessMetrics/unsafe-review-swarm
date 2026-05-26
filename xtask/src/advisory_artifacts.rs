@@ -809,8 +809,12 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
         }
     }
 
+    let mut hover_card_ids = BTreeSet::new();
     for hover in super::json_array_at(&lsp, "/hovers", "lsp.json")? {
-        require_known_card_id(hover, "lsp.json hover", card_ids)?;
+        let hover_card_id = require_known_card_id(hover, "lsp.json hover", card_ids)?;
+        if !hover_card_ids.insert(hover_card_id.to_string()) {
+            return Err(format!("lsp.json hovers repeat card id `{hover_card_id}`"));
+        }
         let contents = hover
             .get("contents")
             .and_then(serde_json::Value::as_str)
@@ -821,6 +825,11 @@ fn check_lsp_artifact(dir: &Path, card_ids: &BTreeSet<String>) -> Result<(), Str
             .and_then(serde_json::Value::as_str)
             .ok_or_else(|| "lsp.json hover is missing trust_boundary".to_string())?;
         super::require_boundary_text(boundary, "lsp.json hover")?;
+    }
+    for card_id in card_ids {
+        if !hover_card_ids.contains(card_id) {
+            return Err(format!("lsp.json hovers missing card id `{card_id}`"));
+        }
     }
 
     for action in super::json_array_at(&lsp, "/code_actions", "lsp.json")? {
