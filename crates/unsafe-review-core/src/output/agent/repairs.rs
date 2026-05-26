@@ -52,6 +52,17 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
             repairs.push("prove the same raw pointer came from `Box::into_raw` with a compatible allocator before `Box::from_raw`".to_string());
             repairs.push("show unique ownership of that pointer so it will not be double-freed or reused after reconstruction".to_string());
         }
+        OperationFamily::DropInPlace => {
+            if missing_discharge(card, "pointer-live") {
+                repairs.push("prove the pointer is live and valid for dropping one value before `drop_in_place`".to_string());
+            }
+            if missing_discharge(card, "initialized") {
+                repairs.push("show the pointed-to value is initialized before `drop_in_place`".to_string());
+            }
+            if missing_discharge(card, "ownership") {
+                repairs.push("show ownership of the pointee so it will not be dropped again or observed after `drop_in_place`".to_string());
+            }
+        }
         OperationFamily::UnsafeImplSendSync => {
             repairs.push("document or add evidence for the thread-safety invariant of this unsafe impl".to_string());
             repairs.push("route concurrency-sensitive evidence through Loom or Shuttle when the invariant depends on interleavings".to_string());
