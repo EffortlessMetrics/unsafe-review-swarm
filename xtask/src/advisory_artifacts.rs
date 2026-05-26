@@ -1,9 +1,19 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 struct AdvisoryArtifactSummary {
     card_ids: BTreeSet<String>,
     card_count: usize,
+}
+
+struct CardProjection {
+    class_name: String,
+    priority: String,
+    confidence: String,
+    path: String,
+    line: u64,
+    operation: String,
+    operation_family: String,
 }
 
 const COMMENT_PLAN_BODY_WORD_LIMIT: usize = 220;
@@ -128,6 +138,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         .ok_or_else(|| "cards.json is missing trust_boundary".to_string())?;
     super::require_boundary_text(cards_boundary, "cards.json")?;
     let card_ids = super::advisory_card_ids(&cards)?;
+    let card_projections = advisory_card_projections(&cards)?;
     let card_count = card_ids.len();
     let summary_cards = super::json_usize_at(&cards, "/summary/cards", "cards.json")?;
     if summary_cards != card_count {
@@ -216,11 +227,11 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         let Some(card_id) = comment.get("card_id").and_then(serde_json::Value::as_str) else {
             return Err("comment-plan.json comment is missing card_id".to_string());
         };
-        if !card_ids.contains(card_id) {
+        let Some(card_projection) = card_projections.get(card_id) else {
             return Err(format!(
                 "comment-plan.json references unknown card id `{card_id}`"
             ));
-        }
+        };
         if !comment_card_ids.insert(card_id.to_string()) {
             return Err(format!(
                 "comment-plan.json repeats card id `{card_id}` in planned comments"
@@ -238,6 +249,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         if line == 0 {
             return Err("comment-plan.json comment line must be one-based".to_string());
         }
+        require_comment_card_projection(comment, card_projection, "comment-plan.json comment")?;
         let location_key = (path.to_string(), line);
         if !comment_locations.insert(location_key) {
             return Err(format!(
@@ -263,6 +275,11 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         }
         let class_name =
             super::require_non_empty_json_str(comment, "class", "comment-plan.json comment")?;
+        if !should_project_planned_comment(card_projection) {
+            return Err(format!(
+                "comment-plan.json planned comment `{card_id}` is not eligible under the current inline comment policy"
+            ));
+        }
         if matches!(
             class_name,
             "static_unknown" | "baseline_known" | "suppressed"
@@ -281,15 +298,34 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         )?;
         let next_action =
             super::require_non_empty_json_str(comment, "next_action", "comment-plan.json comment")?;
-        super::require_non_empty_json_str(
+        let selection_reason = super::require_non_empty_json_str(
             comment,
             "selection_reason",
             "comment-plan.json comment",
         )?;
-        super::require_non_empty_json_str(comment, "actionability", "comment-plan.json comment")?;
+        require_expected_value(
+            selection_reason,
+            expected_selection_reason(card_projection),
+            "comment-plan.json comment selection_reason",
+        )?;
+        let actionability = super::require_non_empty_json_str(
+            comment,
+            "actionability",
+            "comment-plan.json comment",
+        )?;
+        require_expected_value(
+            actionability,
+            expected_actionability(&card_projection.class_name),
+            "comment-plan.json comment actionability",
+        )?;
         let relevance =
             super::require_non_empty_json_str(comment, "relevance", "comment-plan.json comment")?;
         require_relevance_value(relevance, "comment-plan.json comment")?;
+        require_expected_value(
+            relevance,
+            expected_relevance(card_projection),
+            "comment-plan.json comment relevance",
+        )?;
         let comment_boundary = comment
             .get("trust_boundary")
             .and_then(serde_json::Value::as_str)
@@ -311,11 +347,11 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             let Some(card_id) = card.get("card_id").and_then(serde_json::Value::as_str) else {
                 return Err("comment-plan.json not_selected entry is missing card_id".to_string());
             };
-            if !card_ids.contains(card_id) {
+            let Some(card_projection) = card_projections.get(card_id) else {
                 return Err(format!(
                     "comment-plan.json not_selected references unknown card id `{card_id}`"
                 ));
-            }
+            };
             if comment_card_ids.contains(card_id) {
                 return Err(format!(
                     "comment-plan.json not_selected repeats planned comment card id `{card_id}`"
@@ -338,22 +374,20 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             if line == 0 {
                 return Err("comment-plan.json not_selected line must be one-based".to_string());
             }
-            super::require_non_empty_json_str(card, "class", "comment-plan.json not_selected")?;
-            super::require_non_empty_json_str(card, "priority", "comment-plan.json not_selected")?;
-            super::require_non_empty_json_str(
+            require_not_selected_card_projection(
                 card,
-                "confidence",
+                card_projection,
                 "comment-plan.json not_selected",
             )?;
-            super::require_non_empty_json_str(
-                card,
-                "operation_family",
-                "comment-plan.json not_selected",
-            )?;
-            super::require_non_empty_json_str(
+            let actionability = super::require_non_empty_json_str(
                 card,
                 "actionability",
                 "comment-plan.json not_selected",
+            )?;
+            require_expected_value(
+                actionability,
+                expected_actionability(&card_projection.class_name),
+                "comment-plan.json not_selected actionability",
             )?;
             let relevance = super::require_non_empty_json_str(
                 card,
@@ -361,7 +395,21 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
                 "comment-plan.json not_selected",
             )?;
             require_relevance_value(relevance, "comment-plan.json not_selected")?;
-            super::require_non_empty_json_str(card, "reason", "comment-plan.json not_selected")?;
+            require_expected_value(
+                relevance,
+                expected_relevance(card_projection),
+                "comment-plan.json not_selected relevance",
+            )?;
+            let reason = super::require_non_empty_json_str(
+                card,
+                "reason",
+                "comment-plan.json not_selected",
+            )?;
+            require_expected_value(
+                reason,
+                expected_non_selection_reason(card_projection, comments.len()),
+                "comment-plan.json not_selected reason",
+            )?;
         }
     }
     let comment_boundary = comment_plan
@@ -396,6 +444,190 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         card_ids,
         card_count,
     })
+}
+
+fn advisory_card_projections(
+    cards: &serde_json::Value,
+) -> Result<BTreeMap<String, CardProjection>, String> {
+    let mut projections = BTreeMap::new();
+    for card in super::json_array_at(cards, "/cards", "cards.json")? {
+        let id = super::require_non_empty_json_str(card, "id", "cards.json card")?.to_string();
+        let class_name =
+            super::require_non_empty_json_str(card, "class", "cards.json card")?.to_string();
+        let priority =
+            super::require_non_empty_json_str(card, "priority", "cards.json card")?.to_string();
+        let confidence =
+            super::require_non_empty_json_str(card, "confidence", "cards.json card")?.to_string();
+        let path = super::require_non_empty_json_str(
+            card.pointer("/site")
+                .ok_or_else(|| "cards.json card is missing site".to_string())?,
+            "file",
+            "cards.json card site",
+        )?
+        .to_string();
+        let line = super::json_usize_at(card, "/site/line", "cards.json card")? as u64;
+        let operation =
+            super::require_non_empty_json_str(card, "operation", "cards.json card")?.to_string();
+        let operation_family =
+            super::require_non_empty_json_str(card, "operation_family", "cards.json card")?
+                .to_string();
+        projections.insert(
+            id,
+            CardProjection {
+                class_name,
+                priority,
+                confidence,
+                path,
+                line,
+                operation,
+                operation_family,
+            },
+        );
+    }
+    Ok(projections)
+}
+
+fn require_comment_card_projection(
+    comment: &serde_json::Value,
+    card: &CardProjection,
+    context: &str,
+) -> Result<(), String> {
+    require_projected_str(comment, "class", &card.class_name, context)?;
+    require_projected_str(comment, "priority", &card.priority, context)?;
+    require_projected_str(comment, "confidence", &card.confidence, context)?;
+    require_projected_str(comment, "path", &card.path, context)?;
+    require_projected_u64(comment, "line", card.line, context)?;
+    require_projected_str(comment, "operation", &card.operation, context)?;
+    require_projected_str(comment, "operation_family", &card.operation_family, context)
+}
+
+fn require_not_selected_card_projection(
+    card: &serde_json::Value,
+    projection: &CardProjection,
+    context: &str,
+) -> Result<(), String> {
+    require_projected_str(card, "class", &projection.class_name, context)?;
+    require_projected_str(card, "priority", &projection.priority, context)?;
+    require_projected_str(card, "confidence", &projection.confidence, context)?;
+    require_projected_str(card, "path", &projection.path, context)?;
+    require_projected_u64(card, "line", projection.line, context)?;
+    require_projected_str(
+        card,
+        "operation_family",
+        &projection.operation_family,
+        context,
+    )
+}
+
+fn require_projected_str(
+    value: &serde_json::Value,
+    field: &str,
+    expected: &str,
+    context: &str,
+) -> Result<(), String> {
+    let actual = super::require_non_empty_json_str(value, field, context)?;
+    require_expected_value(actual, expected, &format!("{context} {field}"))
+}
+
+fn require_projected_u64(
+    value: &serde_json::Value,
+    field: &str,
+    expected: u64,
+    context: &str,
+) -> Result<(), String> {
+    let Some(actual) = value.get(field).and_then(serde_json::Value::as_u64) else {
+        return Err(format!("{context} is missing {field}"));
+    };
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(format!(
+            "{context} {field} must project cards.json value `{expected}`; got `{actual}`"
+        ))
+    }
+}
+
+fn require_expected_value(actual: &str, expected: &str, context: &str) -> Result<(), String> {
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(format!("{context} must be `{expected}`; got `{actual}`"))
+    }
+}
+
+fn should_project_planned_comment(card: &CardProjection) -> bool {
+    class_is_actionable(&card.class_name)
+        && (card.priority == "high" || card.confidence == "high")
+        && !matches!(card.confidence.as_str(), "low" | "unknown")
+}
+
+fn expected_selection_reason(card: &CardProjection) -> &'static str {
+    if card.confidence == "high" {
+        "actionable high-confidence review card"
+    } else {
+        "actionable high-priority review card"
+    }
+}
+
+fn expected_non_selection_reason(card: &CardProjection, planned_count: usize) -> &'static str {
+    if !class_is_actionable(&card.class_name) {
+        "class not eligible for inline comments"
+    } else if matches!(card.confidence.as_str(), "low" | "unknown") {
+        "confidence below inline comment threshold"
+    } else if !(card.priority == "high" || card.confidence == "high") {
+        "priority/confidence below inline comment threshold"
+    } else if planned_count >= 3 {
+        "comment-plan max of three candidates reached"
+    } else {
+        "not selected by current inline comment policy"
+    }
+}
+
+fn expected_relevance(card: &CardProjection) -> &'static str {
+    let high_priority = card.priority == "high";
+    let high_confidence = card.confidence == "high";
+    if matches!(card.confidence.as_str(), "low" | "unknown") {
+        "low"
+    } else if high_priority && high_confidence {
+        "high"
+    } else if high_priority || high_confidence {
+        "medium"
+    } else {
+        "low"
+    }
+}
+
+fn expected_actionability(class_name: &str) -> &'static str {
+    match class_name {
+        "guard_missing" => "specific_guard_missing",
+        "contract_missing" => "specific_contract_missing",
+        "guarded_unwitnessed"
+        | "reachable_unwitnessed"
+        | "requires_loom"
+        | "requires_sanitizer"
+        | "requires_kani_or_crux"
+        | "miri_unsupported" => "specific_witness_missing",
+        "witness_mismatch" => "specific_receipt_missing",
+        "unsafe_unreached" => "specific_reach_missing",
+        "static_unknown" => "human_review_only",
+        _ => "not_actionable",
+    }
+}
+
+fn class_is_actionable(class_name: &str) -> bool {
+    matches!(
+        class_name,
+        "guarded_unwitnessed"
+            | "contract_missing"
+            | "guard_missing"
+            | "reachable_unwitnessed"
+            | "unsafe_unreached"
+            | "requires_loom"
+            | "requires_sanitizer"
+            | "requires_kani_or_crux"
+            | "miri_unsupported"
+            | "static_unknown"
+    )
 }
 
 const KNOWN_RELEVANCE_VALUES: &[&str] = &["high", "medium", "low"];
