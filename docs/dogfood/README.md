@@ -12,6 +12,10 @@ The manifest is [`corpus.toml`](corpus.toml). The human-facing index is
 [`index.json`](index.json). Reviewer usefulness notes live in
 [`usefulness-notes.md`](usefulness-notes.md).
 
+Snapshot reports:
+
+- [2026-05-26 post-burst analyzer snapshot](reports/2026-05-26-post-burst.md)
+
 ## PR Diff Targets
 
 `pr-diff` targets are repeatable only when the `root` checkout matches the
