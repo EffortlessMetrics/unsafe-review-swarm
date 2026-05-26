@@ -1971,18 +1971,10 @@ fn has_set_len_const_cap_evidence(lower: &str) -> bool {
 
 fn has_set_len_with_capacity_evidence(lower: &str) -> bool {
     let compact = compact_code(lower);
-    let Some((receiver, new_len)) = set_len_receiver_and_argument(&compact) else {
+    let Some(context) = set_len_call_context(&compact) else {
         return false;
     };
-    compact.split(';').any(|statement| {
-        let Some((left, right)) = statement.split_once('=') else {
-            return false;
-        };
-        let Some(binding) = let_binding_name(left) else {
-            return false;
-        };
-        binding == receiver && with_capacity_argument(right).is_some_and(|arg| arg == new_len)
-    })
+    context.has_with_capacity_evidence()
 }
 
 fn has_set_len_reserve_capacity_evidence(lower: &str) -> bool {
@@ -2127,6 +2119,19 @@ impl<'a> SetLenApplicabilityContext<'a> {
             consumed += statement.len();
         }
         false
+    }
+
+    fn has_with_capacity_evidence(&self) -> bool {
+        self.before_call.split(';').any(|statement| {
+            let Some((left, right)) = statement.split_once('=') else {
+                return false;
+            };
+            let Some(binding) = let_binding_name(left) else {
+                return false;
+            };
+            binding == self.receiver
+                && with_capacity_argument(right).is_some_and(|arg| arg == self.new_len)
+        })
     }
 
     fn has_initialized_range_evidence(&self) -> bool {
