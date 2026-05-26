@@ -179,6 +179,7 @@ const SUPPORT_SUMMARY_REQUIRED_PHRASES: &[&str] = &[
 ];
 const DOGFOOD_MANIFEST: &str = "docs/dogfood/corpus.toml";
 const DOGFOOD_INDEX: &str = "docs/dogfood/index.json";
+const DOGFOOD_REPORT_DIR: &str = "docs/dogfood/reports";
 const ACCURACY_CALIBRATION_POLICY: &str = "policy/accuracy-calibration.toml";
 const ACCURACY_CALIBRATION_REPORT: &str = "docs/accuracy/CALIBRATION_REPORT.md";
 const ACCURACY_CLAIM_STATUSES: &[&str] = &[
@@ -215,6 +216,15 @@ const ACCURACY_REQUIRED_FORBIDDEN_CLAIMS: &[&str] =
 const DOGFOOD_TARGET_KINDS: &[&str] = &["repo-snapshot", "pr-diff"];
 const DOGFOOD_TARGET_STATUSES: &[&str] = &["active", "parked", "retired"];
 const DOGFOOD_ARTIFACT_STATUSES: &[&str] = &["checked_in", "local_untracked", "remote_manual"];
+const DOGFOOD_TRIAGE_LABELS: &[&str] = &[
+    "actionable",
+    "noise",
+    "missed",
+    "needs-fixture",
+    "needs-doc",
+    "needs-route",
+    "needs-analyzer",
+];
 const FUZZ_REQUIRED_FILES: &[&str] = &[
     "docs/FUZZING.md",
     "fuzz/.gitignore",
@@ -2000,6 +2010,7 @@ fn check_dogfood() -> Result<(), String> {
         &repositories,
         &artifact_status_counts,
     )?;
+    check_dogfood_report_triage_labels()?;
 
     println!(
         "check-dogfood: ok ({} targets, {} repositories)",
@@ -2007,6 +2018,74 @@ fn check_dogfood() -> Result<(), String> {
         repositories.len()
     );
     Ok(())
+}
+
+fn check_dogfood_report_triage_labels() -> Result<(), String> {
+    let report_dir = workspace_path(DOGFOOD_REPORT_DIR);
+    if !report_dir.is_dir() {
+        return Err(format!("{DOGFOOD_REPORT_DIR} is missing"));
+    }
+    for entry in fs::read_dir(&report_dir)
+        .map_err(|err| format!("read {DOGFOOD_REPORT_DIR} failed: {err}"))?
+    {
+        let entry =
+            entry.map_err(|err| format!("read {DOGFOOD_REPORT_DIR} entry failed: {err}"))?;
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("md") {
+            continue;
+        }
+        let report_path = path.to_string_lossy().replace('\\', "/");
+        let text = read_to_string(&path)?;
+        check_dogfood_report_triage_labels_text(&report_path, &text)?;
+    }
+    Ok(())
+}
+
+fn check_dogfood_report_triage_labels_text(path: &str, text: &str) -> Result<usize, String> {
+    let mut in_triage_table = false;
+    let mut rows = 0usize;
+    for (line_idx, line) in text.lines().enumerate() {
+        if !in_triage_table {
+            if line.contains("| Primary label |") {
+                in_triage_table = true;
+            }
+            continue;
+        }
+        if !line.trim_start().starts_with('|') {
+            break;
+        }
+        if line.contains("|---") {
+            continue;
+        }
+        let columns = line
+            .trim()
+            .trim_matches('|')
+            .split('|')
+            .map(str::trim)
+            .collect::<Vec<_>>();
+        if columns.len() < 3 {
+            return Err(format!(
+                "{path}:{} dogfood triage row must include a Primary label column",
+                line_idx + 1
+            ));
+        }
+        let label = markdown_code_cell_value(columns[2]);
+        if !DOGFOOD_TRIAGE_LABELS.contains(&label.as_str()) {
+            return Err(format!(
+                "{path}:{} unknown dogfood triage label `{label}`",
+                line_idx + 1
+            ));
+        }
+        rows += 1;
+    }
+    if in_triage_table && rows == 0 {
+        return Err(format!("{path} has a dogfood triage table with no rows"));
+    }
+    Ok(rows)
+}
+
+fn markdown_code_cell_value(cell: &str) -> String {
+    cell.trim().trim_matches('`').trim().to_string()
 }
 
 mod dogfood_checks {
@@ -8329,6 +8408,40 @@ impl WitnessKind {
         ));
         assert!(!is_forbidden_generated_path("Cargo.lock"));
         assert!(!is_forbidden_generated_path("docs/status/SUPPORT_TIERS.md"));
+    }
+
+    #[test]
+    fn dogfood_triage_report_accepts_known_labels() -> Result<(), String> {
+        let text = r#"
+## Triage observations
+
+| Target | Card or family | Primary label | Evidence | Follow-up |
+|---|---|---|---|---|
+| `target` | `family` | `needs-fixture` | grounded observation | add a fixture |
+| `target` | `family` | `noise` | broad card cluster | add ranking pressure |
+"#;
+
+        let rows = check_dogfood_report_triage_labels_text("docs/dogfood/reports/test.md", text)?;
+
+        assert_eq!(rows, 2);
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_triage_report_rejects_unknown_labels() {
+        let text = r#"
+## Triage observations
+
+| Target | Card or family | Primary label | Evidence | Follow-up |
+|---|---|---|---|---|
+| `target` | `family` | `probably-actionable` | grounded observation | none |
+"#;
+
+        let err = check_dogfood_report_triage_labels_text("docs/dogfood/reports/test.md", text)
+            .unwrap_err();
+
+        assert!(err.contains("unknown dogfood triage label"));
+        assert!(err.contains("probably-actionable"));
     }
 
     #[test]
