@@ -34,6 +34,10 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
             repairs.push("add a same-receiver `Some` or `Ok` guard on an open path before `unwrap_unchecked`".to_string());
             repairs.push("preserve the same receiver value between the guard and `unwrap_unchecked`".to_string());
         }
+        OperationFamily::UnreachableUnchecked if missing_discharge(card, "unreachable") => {
+            repairs.push("prove the same control-flow path is unreachable before `unreachable_unchecked`".to_string());
+            repairs.push("prefer a safe return, error, or panic path if reachability is uncertain".to_string());
+        }
         OperationFamily::StrFromUtf8Unchecked if missing_discharge(card, "utf8") => repairs.push("validate the same byte buffer as UTF-8 on an open path before calling `from_utf8_unchecked`".to_string()),
         OperationFamily::NonNullUnchecked if missing_discharge(card, "non-null") => repairs.push("add a same-pointer non-null guard before `NonNull::new_unchecked`".to_string()),
         OperationFamily::GetUnchecked if missing_discharge(card, "bounds") => {
