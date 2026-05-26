@@ -700,6 +700,37 @@ mod tests {
     }
 
     #[test]
+    fn agent_packet_scopes_pin_unchecked_repairs_to_pin_invariant() -> Result<(), String> {
+        let output = fixture_output("pin_new_unchecked")?;
+        let Some(card) = output.cards.first() else {
+            return Err("fixture should emit one card".to_string());
+        };
+        let value = parse_json(&render(card))?;
+        let allowed_repairs = serde_json::to_string(&value["allowed_repairs"])
+            .map_err(|err| format!("render allowed repairs failed: {err}"))?;
+        let reasons = serde_json::to_string(&value["agent_readiness"]["reasons"])
+            .map_err(|err| format!("render readiness reasons failed: {err}"))?;
+        let routes = serde_json::to_string(&value["witness_routes"])
+            .map_err(|err| format!("render routes failed: {err}"))?;
+
+        assert_eq!(value["context"]["operation_family"], "pin_unchecked");
+        assert!(allowed_repairs.contains("will not move"));
+        assert!(allowed_repairs.contains("pinning invariant"));
+        assert!(allowed_repairs.contains("safe `Pin::new`"));
+        assert!(allowed_repairs.contains("pinned-owner"));
+        assert!(allowed_repairs.contains("witness receipt"));
+        assert!(!allowed_repairs.contains("same raw pointer"));
+        assert!(!allowed_repairs.contains("all-zero bit pattern"));
+        assert!(!allowed_repairs.contains("same control-flow path"));
+        assert_eq!(value["agent_readiness"]["ready"], false);
+        assert_eq!(value["agent_readiness"]["state"], "needs_human_review");
+        assert!(reasons.contains("human deep review"));
+        assert!(reasons.contains("no verify command"));
+        assert!(routes.contains("human-deep-review"));
+        Ok(())
+    }
+
+    #[test]
     fn agent_packet_routes_non_miri_cards_without_overclaiming() -> Result<(), String> {
         let output = fixture_output("ffi_sanitizer_route")?;
         let Some(card) = output.cards.first() else {

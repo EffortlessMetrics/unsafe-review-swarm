@@ -63,6 +63,11 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
                 repairs.push("show ownership of the pointee so it will not be dropped again or observed after `drop_in_place`".to_string());
             }
         }
+        OperationFamily::PinUnchecked if missing_discharge(card, "pin") => {
+            repairs.push("prove the value will not move after `Pin::new_unchecked`".to_string());
+            repairs.push("show projections preserve the same pinning invariant for this value".to_string());
+            repairs.push("prefer a safe `Pin::new` or pinned-owner construction path when the invariant cannot be shown locally".to_string());
+        }
         OperationFamily::UnsafeImplSendSync => {
             repairs.push("document or add evidence for the thread-safety invariant of this unsafe impl".to_string());
             repairs.push("route concurrency-sensitive evidence through Loom or Shuttle when the invariant depends on interleavings".to_string());
