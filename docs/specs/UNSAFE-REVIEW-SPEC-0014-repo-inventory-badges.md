@@ -55,8 +55,8 @@ Badge JSON is a small serde-backed open-gap summary for shields-compatible
 consumers:
 
 - `unsafe-review.json` reports the numeric open-gap count as `<n>`
-- `unsafe-review-plus.json` reports contract, guard, and current
-  guarded-unwitnessed summary counts
+- `unsafe-review-plus.json` reports the numeric missing-or-weak evidence count
+  as `<contract_missing + guard_missing + guarded_unwitnessed>`
 
 Badges count unresolved review evidence. They never claim the repository is
 safe, UB-free, Miri-clean, or policy-compliant.
@@ -92,7 +92,7 @@ posture and do not certify repository safety.
 Badge meanings are fixed:
 
 - `unsafe-review`: open unsafe-review gap count
-- `unsafe-review+`: contract, guard, and guarded-unwitnessed evidence mix
+- `unsafe-review+`: missing-or-weak evidence count
 
 Badges must never imply that the repo is sound, memory-safe, UB-free,
 Miri-clean, verified, all clear, policy-ready, or that any unsafe site executed.

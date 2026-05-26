@@ -950,7 +950,7 @@ fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<()
         badge_dir.join("unsafe-review-plus.json"),
     )?)?;
     assert_eq!(plus_badge["label"], "unsafe-review+");
-    assert_eq!(plus_badge["message"], "0 contract / 1 guard / 0 witness");
+    assert_eq!(plus_badge["message"], "1");
     assert_ne!(plus_badge["message"], "UB-free");
 
     let repo_markdown = run_success([

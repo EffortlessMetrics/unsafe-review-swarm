@@ -16,7 +16,7 @@
 |---|---|---|
 | CI | Current GitHub CI status. | Analyzer correctness proof. |
 | `unsafe-review` | Numeric open static review gap count. | Safety or unsafety status. |
-| `unsafe-review+` | Contract/guard/witness gap summary. | Miri-clean or UB-free status. |
+| `unsafe-review+` | Numeric missing-or-weak evidence count. | Miri-clean or UB-free status. |
 | VS Code planned | Editor surface is planned. | Published VS Marketplace extension. |
 | Open VSX planned | Editor surface is planned. | Published Open VSX extension. |
 | GitHub release | Latest published GitHub release tag. | crates.io availability or release quality proof. |
