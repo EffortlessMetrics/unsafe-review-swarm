@@ -154,6 +154,18 @@ fn lsp_projection_is_parseable_and_read_only() -> Result<(), String> {
         value["hovers"][0]["contents"]
             .as_str()
             .unwrap_or("")
+            .contains("What would not resolve this")
+    );
+    assert!(
+        value["hovers"][0]["contents"]
+            .as_str()
+            .unwrap_or("")
+            .contains("SAFETY:` comment alone does not discharge missing guard evidence")
+    );
+    assert!(
+        value["hovers"][0]["contents"]
+            .as_str()
+            .unwrap_or("")
             .contains("Verify commands")
     );
     assert!(

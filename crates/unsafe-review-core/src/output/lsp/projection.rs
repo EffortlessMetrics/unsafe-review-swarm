@@ -502,6 +502,11 @@ fn hover_contents(card: &ReviewCard) -> String {
             text.push_str(&format!("- `{command}`\n"));
         }
     }
+    text.push_str("\nWhat would not resolve this:\n");
+    text.push_str("- A `SAFETY:` comment alone does not discharge missing guard evidence.\n");
+    text.push_str("- A related test mention is not proof that this unsafe site executed.\n");
+    text.push_str("- Do not claim witness proof unless a matching receipt exists.\n");
+    text.push_str("- Do not widen unsafe scope, suppress the card, or change unrelated unsafe code to silence this review item.\n");
     if let Some(route) = card.routes.first() {
         text.push_str(&format!(
             "\nWitness route: `{}` because {}.\n",
