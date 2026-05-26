@@ -1,0 +1,21 @@
+use core::ptr::NonNull;
+
+pub fn expose_nonnull_after_stale_question_mark(
+    mut ptr: *mut u8,
+    other: *mut u8,
+) -> Option<NonNull<u8>> {
+    NonNull::new(ptr)?;
+    ptr = other;
+    // SAFETY: this fixture intentionally changes the checked pointer before use.
+    Some(unsafe { NonNull::new_unchecked(ptr) })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::expose_nonnull_after_stale_question_mark;
+
+    #[test]
+    fn mentions_expose_nonnull_after_stale_question_mark() {
+        let _ = stringify!(expose_nonnull_after_stale_question_mark);
+    }
+}

@@ -3908,10 +3908,31 @@ impl<'a> NonNullPointerContext<'a> {
     fn has_arg_assignment(&self, text: &str) -> bool {
         contains_simple_assignment_to(text, &self.arg)
     }
+
+    fn arg_stays_same_after(&self, text: &str) -> bool {
+        !self.has_arg_assignment(text)
+    }
 }
 
 fn has_nonnull_new_question_mark_guard(context: &NonNullPointerContext<'_>) -> bool {
-    context.compact.contains(&format!("{}?", context.new_probe))
+    let marker = format!("{}?", context.new_probe);
+    let mut cursor = context.compact;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(&marker) {
+        let proof_end = offset + pos + marker.len();
+        let after_statement = context.compact[proof_end..]
+            .find(';')
+            .map_or(&context.compact[proof_end..], |end| {
+                &context.compact[proof_end + end..]
+            });
+        if context.arg_stays_same_after(after_statement) {
+            return true;
+        }
+        let next = pos + marker.len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
 }
 
 fn has_nonnull_new_if_let_guard(context: &NonNullPointerContext<'_>) -> bool {
@@ -3924,7 +3945,7 @@ fn has_nonnull_new_if_let_guard(context: &NonNullPointerContext<'_>) -> bool {
         if ends_with_some_pattern(&context.compact[..marker_start], "iflet") {
             let after_guard = &context.compact[proof_end..];
             if branch_still_open_at_operation(after_guard)
-                && !context.has_arg_assignment(after_guard)
+                && context.arg_stays_same_after(after_guard)
             {
                 return true;
             }
@@ -3948,7 +3969,7 @@ fn has_nonnull_new_let_else_guard(context: &NonNullPointerContext<'_>) -> bool {
             let (guard_body, after_guard_body) = after_guard
                 .split_once('}')
                 .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
-            if guard_body.contains("return") && !context.has_arg_assignment(after_guard_body) {
+            if guard_body.contains("return") && context.arg_stays_same_after(after_guard_body) {
                 return true;
             }
         }
@@ -3968,7 +3989,7 @@ fn has_nonnull_new_match_some_guard(context: &NonNullPointerContext<'_>) -> bool
         let after_match = &context.compact[after_match_start..];
         if let Some(branch_after_marker) = match_some_branch_after_marker(after_match)
             && branch_still_open_at_operation(branch_after_marker)
-            && !context.has_arg_assignment(branch_after_marker)
+            && context.arg_stays_same_after(branch_after_marker)
         {
             return true;
         }
@@ -4011,10 +4032,10 @@ fn has_null_early_return_guard(context: &NonNullPointerContext<'_>) -> bool {
     let Some((_prefix, after_guard)) = context.compact.split_once(&guard) else {
         return false;
     };
-    after_guard
+    let (guard_body, after_guard_body) = after_guard
         .split_once('}')
-        .map_or(after_guard, |(guard_body, _after)| guard_body)
-        .contains("return")
+        .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
+    guard_body.contains("return") && context.arg_stays_same_after(after_guard_body)
 }
 
 fn nonnull_new_unchecked_argument(expression: &str) -> Option<String> {
@@ -4510,6 +4531,12 @@ mod tests {
             "NonNull::new_unchecked(ptr)",
             vec![],
         );
+        let stale_question_mark_guard = site_with_family(
+            OperationFamily::NonNullUnchecked,
+            vec!["NonNull::new(ptr)?;", "ptr = other;"],
+            "NonNull::new_unchecked(ptr)",
+            vec![],
+        );
         let if_let_guard = site_with_family(
             OperationFamily::NonNullUnchecked,
             vec!["if let Some(_) = NonNull::new(ptr) {"],
@@ -4570,6 +4597,11 @@ mod tests {
 
         assert!(
             obligation_evidence(&matching_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&stale_question_mark_guard, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
         );
@@ -4643,6 +4675,12 @@ mod tests {
             "NonNull::new_unchecked(ptr)",
             vec![],
         );
+        let stale_returning_guard = site_with_family(
+            OperationFamily::NonNullUnchecked,
+            vec!["if ptr.is_null() { return None; }", "ptr = other;"],
+            "NonNull::new_unchecked(ptr)",
+            vec![],
+        );
         let post_returning_guard = site_with_family(
             OperationFamily::NonNullUnchecked,
             vec![],
@@ -4657,6 +4695,11 @@ mod tests {
         );
         assert!(
             obligation_evidence(&returning_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&stale_returning_guard, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
         );
