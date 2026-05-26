@@ -43,7 +43,7 @@ default.
 
 Behavior:
 
-- triggers on `pull_request`, `push` to main, and `workflow_dispatch`,
+- triggers on `push` to main and `workflow_dispatch`,
 - skips for docs-only and editor-only changes via `paths-ignore`,
 - `permissions: contents: read`; no write tokens,
 - runs `cargo llvm-cov --workspace --all-targets --locked --lcov`,
@@ -52,6 +52,11 @@ Behavior:
 - also uploads the LCOV as a workflow artifact for offline inspection,
 - never enforces a coverage threshold,
 - is not a required branch-protection gate.
+
+During the swarm CI budget window, coverage does not run on pull requests by
+default. A PR that needs coverage telemetry should use an explicit manual run or
+a later accepted full-CI lane rather than making every routine PR pay the
+coverage cost.
 
 ## README badge
 

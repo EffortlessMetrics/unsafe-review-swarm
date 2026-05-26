@@ -8,11 +8,6 @@ name: coverage
 # enforce a coverage threshold and must not become a required PR gate.
 
 on:
-  pull_request:
-    paths-ignore:
-      - "docs/**"
-      - "**/*.md"
-      - "editors/vscode/**"
   push:
     branches: [main, master]
     paths-ignore:

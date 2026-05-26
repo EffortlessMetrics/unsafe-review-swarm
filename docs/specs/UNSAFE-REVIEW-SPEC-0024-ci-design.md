@@ -310,12 +310,16 @@ Initial posture:
 ```text
 advisory
 no coverage threshold gate
+no default PR run during the swarm CI budget window
 no default PR failure on Codecov upload failure
 no release readiness claim
 no unsafe correctness claim
 no Miri-clean claim
 no README badge until the first successful upload
 ```
+
+The live swarm coverage lane is push/manual only while CI budget mode is active.
+Coverage remains telemetry; it is not part of the ordinary PR gate.
 
 ### 4.5 `release-readiness.yml` - manual release proof lane
 
