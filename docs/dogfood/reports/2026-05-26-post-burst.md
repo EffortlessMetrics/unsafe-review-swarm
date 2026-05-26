@@ -49,7 +49,7 @@ Root commits:
 | Target | Cards | Families | Obvious useful cards | Obvious noise | Notes |
 |---|---:|---|---|---|---|
 | `arrayvec-pr137` | 16 | `raw_pointer_read`, `vec_set_len`, `pointer_arithmetic`, `raw_pointer_write`, `drop_in_place`, `ptr_copy`, `slice_from_raw_parts`, `unknown` | Soundness-fix PR produces concrete raw-pointer and `Vec::set_len` review cards instead of a raw unsafe count. | One `unknown` unsafe-fn card and broad `contract_missing` cards can be noisy without reviewer context. | Good target for "same receiver / same pointer" applicability and for reminding docs that unsafe count can rise during a fix. |
-| `arrayvec-pr288` | 8 | `vec_set_len`, `unsafe_fn_call` | `Vec::set_len` cards mostly moved to `guarded_unwitnessed`, which gives the reviewer a witness/action route instead of a generic missing-guard complaint. | One `try_push_str` `vec_set_len` card remains `guard_missing`; verify whether this is real initialized-range debt or missing loop/init recognition. | Best small target for initialized-range applicability work. |
+| `arrayvec-pr288` | 8 | `vec_set_len`, `unsafe_fn_call` | `Vec::set_len` cards mostly moved to `guarded_unwitnessed`, which gives the reviewer a witness/action route instead of a generic missing-guard complaint. | One `try_push_str` `vec_set_len` card remained `guard_missing` in this snapshot; a focused [Vec::set_len rerun](2026-05-26-arrayvec-vec-set-len-rerun.md) now moves it to `guarded_unwitnessed`. | Keep it as an initialized-range regression target; add new fixtures only for future stale or wrong-target shapes. |
 | `hashbrown-pr693` | 15 | `unwrap_unchecked`, `unsafe_fn_call`, `nonnull_unchecked`, `raw_pointer_read` | `unwrap_unchecked` cards include `guarded_unwitnessed` local infallibility evidence, which is exactly the intended reviewer note shape. | Nearby unsafe-call and `NonNull` cards remain mixed with the unwrap cards; ranking/summary should keep the unwrap evidence easy to find. | Good target for same-receiver and open-branch checks. |
 | `memchr-capped` | 50 | `unknown`, `unsafe_fn_call`, `target_feature`, `pointer_arithmetic` | `target_feature` cards remain `guarded_unwitnessed`, preserving the "contract exists, witness still absent" posture. | 24 `unknown` owner/unsafe-fn cards make the capped snapshot inventory-like. | Useful as a capped target-feature regression check, not as precision evidence. |
 | `crossbeam-pr1226` | 6 | `unknown` | The original snapshot pointed at changed atomic unsafe blocks in `fetch_and`, `fetch_or`, and `fetch_xor`. | The snapshot cards were generic `unknown` `contract_missing`; a focused [atomic pointer rerun](2026-05-26-crossbeam-atomic-pointer-rerun.md) now classifies those operations as `atomic_pointer_state`. | Keep it as an atomic pointer/state regression target; do not turn the classifier into a concurrency proof. |
@@ -59,7 +59,7 @@ Root commits:
 
 | Target | Card or family | Primary label | Evidence | Follow-up |
 |---|---|---|---|---|
-| `arrayvec-pr288` | `vec_set_len` `try_push_str` card | `needs-fixture` | One remaining `guard_missing` may be real initialized-range debt or a missed same-vector initialization shape. | Add a focused fixture only after manual review confirms the dogfood shape. |
+| `arrayvec-pr288` | `vec_set_len` `try_push_str` card | `actionable` | The focused rerun moves the remaining `guard_missing` to `guarded_unwitnessed`, preserving a witness/action route instead of a missing-guard prompt. | Keep the existing applicability refactors as regression pressure; add a fixture only for a future stale or wrong-target initialized-range shape. |
 | `crossbeam-pr1226` | changed atomic unsafe blocks | `actionable` | The original snapshot had six generic `unknown` cards for atomic pointer/state fetch operations; the focused rerun now reports six `atomic_pointer_state` `requires_loom` cards. | Keep the existing fixtures as regression coverage; add another fixture only if a future rerun exposes a still-missing concrete atomic pointer/state shape. |
 | `memchr-capped` | `unknown` unsafe-fn owner cards | `noise` | Twenty-four `unknown` cards make the capped run inventory-like rather than PR-review focused. | Use this target for capped regression scans and ranking pressure, not precision claims. |
 | `memchr-capped` | `target_feature` | `actionable` | Target-feature cards preserve contract evidence while leaving witness evidence absent. | Keep `target_feature_safety_docs` as the guardrail; do not turn docs into availability proof. |
@@ -72,10 +72,12 @@ Root commits:
 ### `Vec::set_len`
 
 `arrayvec-pr288` is the most useful target. It produced seven `vec_set_len`
-cards: most are `guarded_unwitnessed`, with one remaining `guard_missing`
-around `try_push_str`. That is a good next audit point because it is narrow:
-either initialized-range evidence is truly missing, or the recognizer needs a
-same-buffer/loop-init control.
+cards: most were `guarded_unwitnessed`, with one remaining `guard_missing`
+around `try_push_str`. The focused
+[Vec::set_len rerun](2026-05-26-arrayvec-vec-set-len-rerun.md) now moves that
+card to `guarded_unwitnessed`, so the next fixture should come from a future
+stale or wrong-target initialized-range shape rather than this already-covered
+dogfood shape.
 
 `arrayvec-pr137` produced four `vec_set_len` `contract_missing` cards in a PR
 that intentionally changes unsafe internals. Treat those as reviewer prompts,
@@ -146,9 +148,8 @@ result exists.
   a real-crate no-unsafe target only if a suitable corpus candidate appears.
 - Keep the focused `crossbeam-pr1226` atomic pointer/state rerun linked as a
   regression report.
-- Add a `Vec::set_len` initialized-range fixture for the `arrayvec-pr288`
-  `try_push_str` shape if manual review says the remaining `guard_missing` is
-  noisy.
+- Keep the focused `arrayvec-pr288` `Vec::set_len` rerun linked as initialized
+  range regression evidence.
 - Keep `target_feature_safety_docs` as the guardrail for `memchr-capped`; do not
   turn target-feature docs into availability evidence.
 
