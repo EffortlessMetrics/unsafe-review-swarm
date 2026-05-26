@@ -2114,17 +2114,74 @@ fn set_len_receiver_and_argument(compact: &str) -> Option<(&str, &str)> {
     (!receiver.is_empty() && !argument.is_empty()).then_some((receiver, argument))
 }
 
-struct SetLenCallContext<'a> {
+struct SetLenApplicabilityContext<'a> {
     before_call: &'a str,
     receiver: &'a str,
     new_len: &'a str,
 }
 
-fn set_len_call_context(compact: &str) -> Option<SetLenCallContext<'_>> {
+impl<'a> SetLenApplicabilityContext<'a> {
+    fn has_initialized_range_evidence(&self) -> bool {
+        self.before_call.split([';', '}']).any(|statement| {
+            contains_receiver_path(statement, self.receiver) && has_initialization_marker(statement)
+        }) || self.has_initialization_loop()
+    }
+
+    fn has_initialization_loop(&self) -> bool {
+        let slice_bindings = self.slice_bindings();
+        self.before_call.split('}').any(|block| {
+            let Some((head, body)) = block.rsplit_once('{') else {
+                return false;
+            };
+            self.loop_iterates_receiver(head, &slice_bindings)
+                && head.contains(".iter_mut(")
+                && has_initialization_marker(body)
+        })
+    }
+
+    fn slice_bindings(&self) -> Vec<&'a str> {
+        let mut bindings = Vec::new();
+        let mut consumed = 0usize;
+        for statement in self.before_call.split_inclusive(';') {
+            let statement_without_semicolon = statement.trim_end_matches(';');
+            let Some((left, right)) = statement_without_semicolon.split_once('=') else {
+                consumed += statement.len();
+                continue;
+            };
+            let Some(binding) = let_binding_name(left) else {
+                consumed += statement.len();
+                continue;
+            };
+            let right = right.trim();
+            let after_binding =
+                &self.before_call[(consumed + statement.len()).min(self.before_call.len())..];
+            if set_len_slice_binding_references_receiver(right, self.receiver)
+                && right.contains('[')
+                && right.contains("..")
+                && !contains_simple_assignment_to(after_binding, self.receiver)
+                && !contains_direct_binding_assignment_to(after_binding, binding)
+            {
+                bindings.push(binding);
+            }
+            consumed += statement.len();
+        }
+        bindings
+    }
+
+    fn loop_iterates_receiver(&self, head: &str, slice_bindings: &[&str]) -> bool {
+        contains_receiver_path(head, self.receiver)
+            || head.contains(&format!("in{}.", self.receiver))
+            || slice_bindings.iter().any(|binding| {
+                contains_receiver_path(head, binding) || head.contains(&format!("in{binding}."))
+            })
+    }
+}
+
+fn set_len_call_context(compact: &str) -> Option<SetLenApplicabilityContext<'_>> {
     let (receiver, new_len) = set_len_receiver_and_argument(compact)?;
     let marker = format!("{receiver}.set_len(");
     let call_pos = compact.find(&marker)?;
-    Some(SetLenCallContext {
+    Some(SetLenApplicabilityContext {
         before_call: &compact[..call_pos],
         receiver,
         new_len,
@@ -2340,53 +2397,7 @@ fn has_set_len_initialization_evidence(lower: &str) -> bool {
     let Some(context) = set_len_call_context(&compact) else {
         return false;
     };
-    has_set_len_receiver_initialization_evidence(context.before_call, context.receiver)
-}
-
-fn has_set_len_receiver_initialization_evidence(before_call: &str, receiver: &str) -> bool {
-    before_call.split([';', '}']).any(|statement| {
-        contains_receiver_path(statement, receiver) && has_initialization_marker(statement)
-    }) || has_set_len_receiver_initialization_loop(before_call, receiver)
-}
-
-fn has_set_len_receiver_initialization_loop(before_call: &str, receiver: &str) -> bool {
-    let slice_bindings = set_len_receiver_slice_bindings(before_call, receiver);
-    before_call.split('}').any(|block| {
-        let Some((head, body)) = block.rsplit_once('{') else {
-            return false;
-        };
-        set_len_loop_iterates_receiver(head, receiver, &slice_bindings)
-            && head.contains(".iter_mut(")
-            && has_initialization_marker(body)
-    })
-}
-
-fn set_len_receiver_slice_bindings<'a>(before_call: &'a str, receiver: &str) -> Vec<&'a str> {
-    let mut bindings = Vec::new();
-    let mut consumed = 0usize;
-    for statement in before_call.split_inclusive(';') {
-        let statement_without_semicolon = statement.trim_end_matches(';');
-        let Some((left, right)) = statement_without_semicolon.split_once('=') else {
-            consumed += statement.len();
-            continue;
-        };
-        let Some(binding) = let_binding_name(left) else {
-            consumed += statement.len();
-            continue;
-        };
-        let right = right.trim();
-        let after_binding = &before_call[(consumed + statement.len()).min(before_call.len())..];
-        if set_len_slice_binding_references_receiver(right, receiver)
-            && right.contains('[')
-            && right.contains("..")
-            && !contains_simple_assignment_to(after_binding, receiver)
-            && !contains_direct_binding_assignment_to(after_binding, binding)
-        {
-            bindings.push(binding);
-        }
-        consumed += statement.len();
-    }
-    bindings
+    context.has_initialized_range_evidence()
 }
 
 fn set_len_slice_binding_references_receiver(right: &str, receiver: &str) -> bool {
@@ -2395,14 +2406,6 @@ fn set_len_slice_binding_references_receiver(right: &str, receiver: &str) -> boo
         .or_else(|| right.strip_prefix('&'))
         .unwrap_or(right);
     contains_receiver_path(right, receiver)
-}
-
-fn set_len_loop_iterates_receiver(head: &str, receiver: &str, slice_bindings: &[&str]) -> bool {
-    contains_receiver_path(head, receiver)
-        || head.contains(&format!("in{receiver}."))
-        || slice_bindings.iter().any(|binding| {
-            contains_receiver_path(head, binding) || head.contains(&format!("in{binding}."))
-        })
 }
 
 fn contains_direct_binding_assignment_to(compact: &str, name: &str) -> bool {
