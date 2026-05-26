@@ -4979,6 +4979,7 @@ fn check_public_badge_endpoints() -> Result<(), String> {
         }
         require_json_str(&value, "label", label, path)?;
         let message = require_non_empty_json_str(&value, "message", path)?;
+        require_numeric_badge_message(path, message)?;
         for forbidden in ["safe", "sound", "ub-free", "miri-clean", "proof"] {
             if text_contains_ignore_ascii_case(message, forbidden) {
                 return Err(format!(
@@ -4989,6 +4990,16 @@ fn check_public_badge_endpoints() -> Result<(), String> {
         require_non_empty_json_str(&value, "color", path)?;
     }
     Ok(())
+}
+
+fn require_numeric_badge_message(path: &str, message: &str) -> Result<(), String> {
+    if message.chars().all(|ch| ch.is_ascii_digit()) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{path} badge message must be a numeric count; got `{message}`"
+        ))
+    }
 }
 
 fn public_badge_endpoint_url(path: &str) -> String {
@@ -8323,6 +8334,24 @@ impl WitnessKind {
     #[test]
     fn public_badge_endpoints_match_readme_and_json() -> Result<(), String> {
         check_public_badge_endpoints()
+    }
+
+    #[test]
+    fn public_badge_messages_must_be_numeric_counts() {
+        assert!(require_numeric_badge_message("badges/unsafe-review.json", "294").is_ok());
+        assert!(
+            require_numeric_badge_message("badges/unsafe-review.json", "294 open gaps")
+                .unwrap_err()
+                .contains("numeric count")
+        );
+        assert!(
+            require_numeric_badge_message(
+                "badges/unsafe-review-plus.json",
+                "19 contract / 111 guard / 37 witness"
+            )
+            .unwrap_err()
+            .contains("numeric count")
+        );
     }
 
     #[test]
