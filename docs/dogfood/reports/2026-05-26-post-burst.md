@@ -61,7 +61,7 @@ Root commits:
 |---|---|---|---|---|
 | `arrayvec-pr288` | `vec_set_len` `try_push_str` card | `actionable` | The focused rerun moves the remaining `guard_missing` to `guarded_unwitnessed`, preserving a witness/action route instead of a missing-guard prompt. | Keep the existing applicability refactors as regression pressure; add a fixture only for a future stale or wrong-target initialized-range shape. |
 | `crossbeam-pr1226` | changed atomic unsafe blocks | `actionable` | The original snapshot had six generic `unknown` cards for atomic pointer/state fetch operations; the focused rerun now reports six `atomic_pointer_state` `requires_loom` cards. | Keep the existing fixtures as regression coverage; add another fixture only if a future rerun exposes a still-missing concrete atomic pointer/state shape. |
-| `memchr-capped` | `unknown` unsafe-fn owner cards | `noise` | Twenty-four `unknown` cards make the capped run inventory-like rather than PR-review focused. | Use this target for capped regression scans and ranking pressure, not precision claims. |
+| `memchr-capped` | `unknown` unsafe-fn owner cards | `noise` | Twenty-four `unknown` cards make the capped run inventory-like rather than PR-review focused. | The focused [comment-plan follow-up](2026-05-26-memchr-unknown-comment-plan.md) keeps unknown-family cards out of inline comment candidates while preserving them in the advisory bundle. |
 | `memchr-capped` | `target_feature` | `actionable` | Target-feature cards preserve contract evidence while leaving witness evidence absent. | Keep `target_feature_safety_docs` as the guardrail; do not turn docs into availability proof. |
 | `mio-pr1388` | FFI/platform layout cluster | `needs-route` | The FFI card is correctly `miri_unsupported`, but surrounding layout cards need human-review-heavy wording. | The focused [FFI route wording follow-up](2026-05-26-mio-ffi-route-wording.md) adds a fixture verifier for FFI boundary contract wording and Miri limitation text. |
 | selected corpus | safe/no-unsafe control | `needs-doc` | The sampled real-crate corpus has no explicit zero-card/no-unsafe target; the separate [`no-card fixture smoke`](2026-05-26-no-card-control.md) records the fixture-level false-positive control. | Keep the fixture control linked from the dogfood README; do not treat it as real-crate precision evidence. |
@@ -122,7 +122,9 @@ result exists.
   reviewers; the focused rerun moves them to atomic pointer/state route cards.
   Treat those as concurrency-review prompts, not proof that a model was run.
 - `memchr-capped` capped inventory contains many `unknown` unsafe-fn owner cards;
-  use it for regression scans, not precision claims.
+  the focused [comment-plan follow-up](2026-05-26-memchr-unknown-comment-plan.md)
+  keeps those cards out of inline comment candidates while preserving them in
+  the advisory bundle.
 - `arrayvec-pr137` can look worse by card count even though the upstream PR is a
   soundness-oriented change. Reviewer usefulness should be judged by actionability,
   not by raw card count.
