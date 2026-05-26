@@ -64,6 +64,7 @@ required_core_fixtures = [
   "drop_in_place_box_origin",
   "drop_in_place_reassigned_origin_not_guard",
   "atomic_pointer_state_swap",
+  "atomic_pointer_state_fetch_ops",
   "unwrap_unchecked_result",
   "unwrap_unchecked_infallible_result",
   "unwrap_unchecked_other_infallible_not_guard",
@@ -891,6 +892,16 @@ kind = "positive"
 claim = "atomic pointer null swap state transitions are classified as unsafe-adjacent review cards"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
+expected_class = "requires_loom"
+expected_operation_family = "atomic_pointer_state"
+expected_hazard = "atomic_ordering"
+
+[[cases]]
+fixture = "atomic_pointer_state_fetch_ops"
+kind = "positive"
+claim = "atomic pointer fetch-and/or/xor state transitions from crossbeam dogfood are classified as unsafe-adjacent review cards"
+support_tier = "Core operation smoke slice"
+expected_cards = 3
 expected_class = "requires_loom"
 expected_operation_family = "atomic_pointer_state"
 expected_hazard = "atomic_ordering"

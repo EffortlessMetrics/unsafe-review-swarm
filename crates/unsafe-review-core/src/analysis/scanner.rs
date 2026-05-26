@@ -618,6 +618,15 @@ fn is_atomic_pointer_state_transition(line: &str) -> bool {
     contains_call_name(line, "swap")
         && line.contains("ptr::null_mut")
         && line.contains("Ordering::")
+        || is_atomic_pointer_fetch_state_transition(line)
+}
+
+fn is_atomic_pointer_fetch_state_transition(line: &str) -> bool {
+    let compact = compact_whitespace(line);
+    compact.contains("from_ptr(")
+        && ["fetch_and", "fetch_or", "fetch_xor"]
+            .iter()
+            .any(|name| contains_call_name(line, name))
 }
 
 fn is_incomplete_multiline_transmute_copy(line: &str) -> bool {
@@ -1903,6 +1912,25 @@ mod tests {
             detect_site("block = self.head.block.load(Ordering::Acquire);"),
             None
         );
+    }
+
+    #[test]
+    fn text_detection_classifies_atomic_pointer_fetch_state_transitions() {
+        for line in [
+            "Shared::from_ptr(self.data.fetch_and(val, order))",
+            "Shared::from_ptr(self.data.fetch_or(val, order))",
+            "Shared::from_ptr(self.data.fetch_xor(val, order) as *mut ())",
+        ] {
+            assert_eq!(
+                detect_site(line),
+                Some((
+                    UnsafeSiteKind::Operation,
+                    OperationFamily::AtomicPointerState
+                )),
+                "{line} should be classified as an atomic pointer state transition"
+            );
+        }
+        assert_eq!(detect_site("bits.fetch_and(mask, Ordering::AcqRel);"), None);
     }
 
     #[test]
