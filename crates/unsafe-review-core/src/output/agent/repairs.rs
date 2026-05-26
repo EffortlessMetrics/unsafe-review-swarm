@@ -22,6 +22,14 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
             repairs.push("write or construct the same `MaybeUninit` slot before `assume_init`".to_string());
             repairs.push("keep the initialization branch open to the unsafe site and do not reassign the slot afterward".to_string());
         }
+        OperationFamily::Transmute => {
+            if missing_discharge(card, "layout") {
+                repairs.push("prove the source and destination layouts are compatible before this transmute".to_string());
+            }
+            if missing_discharge(card, "valid-value") {
+                repairs.push("prove the source value is in the destination type's valid-value domain before this transmute".to_string());
+            }
+        }
         OperationFamily::StrFromUtf8Unchecked if missing_discharge(card, "utf8") => repairs.push("validate the same byte buffer as UTF-8 on an open path before calling `from_utf8_unchecked`".to_string()),
         OperationFamily::NonNullUnchecked if missing_discharge(card, "non-null") => repairs.push("add a same-pointer non-null guard before `NonNull::new_unchecked`".to_string()),
         OperationFamily::GetUnchecked if missing_discharge(card, "bounds") => {
