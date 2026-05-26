@@ -196,7 +196,7 @@ fn add_raw_pointer_repairs(card: &ReviewCard, repairs: &mut Vec<String>, alignme
     }
     if missing_discharge(card, "initialized") {
         repairs.push(
-            "show that memory is initialized for the accessed type before this operation"
+            "show that the same pointer or buffer range is initialized for the accessed type before this operation"
                 .to_string(),
         );
     }

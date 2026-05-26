@@ -505,6 +505,29 @@ mod tests {
     }
 
     #[test]
+    fn agent_packet_scopes_raw_pointer_repairs_to_pointer_and_range() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let Some(card) = output.cards.first() else {
+            return Err("fixture should emit one card".to_string());
+        };
+        let value = parse_json(&render(card))?;
+        let allowed_repairs = serde_json::to_string(&value["allowed_repairs"])
+            .map_err(|err| format!("render allowed repairs failed: {err}"))?;
+
+        assert_eq!(value["context"]["operation_family"], "raw_pointer_read");
+        assert!(allowed_repairs.contains("same-pointer live/nullability guard"));
+        assert!(allowed_repairs.contains("same-pointer alignment guard"));
+        assert!(allowed_repairs.contains("same pointer or buffer range is initialized"));
+        assert!(allowed_repairs.contains("one live allocation for this pointer"));
+        assert!(allowed_repairs.contains("witness receipt"));
+        assert!(!allowed_repairs.contains("same-slice length/range guard"));
+        assert!(!allowed_repairs.contains("all-zero bit pattern"));
+        assert_eq!(value["agent_readiness"]["ready"], true);
+        assert_eq!(value["agent_readiness"]["state"], "ready");
+        Ok(())
+    }
+
+    #[test]
     fn agent_packet_does_not_suggest_alignment_for_unaligned_read() -> Result<(), String> {
         let output = fixture_output("raw_pointer_read_unaligned")?;
         let Some(card) = output.cards.first() else {
