@@ -51,7 +51,7 @@ jobs:
             --lcov \
             --output-path target/llvm-cov/lcov.info
 
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
         if: always()
         with:
           files: target/llvm-cov/lcov.info
