@@ -1063,12 +1063,7 @@ fn check_lsp_artifact(
                 "lsp.json code_action references unknown card id `{action_card_id}`"
             ));
         };
-        check_lsp_projection_location(
-            action,
-            card_projection,
-            "lsp.json code_action",
-            "/range/start/line",
-        )?;
+        check_lsp_code_action_location(action, card_projection, command)?;
         let action_key = (action_card_id.to_string(), command.to_string());
         if !code_action_commands.insert(action_key) {
             return Err(format!(
@@ -1128,6 +1123,41 @@ fn check_lsp_projection_location(
     }
 
     Ok(())
+}
+
+fn check_lsp_code_action_location(
+    action: &serde_json::Value,
+    card: &CardProjection,
+    command: &str,
+) -> Result<(), String> {
+    if command == "unsafe-review.openRelatedTest" {
+        let payload = action
+            .get("payload")
+            .ok_or_else(|| "lsp.json code_action is missing payload".to_string())?;
+        let file = super::require_non_empty_json_str(
+            payload,
+            "file",
+            "lsp.json code_action related_test payload",
+        )?;
+        let line = super::json_usize_at(
+            payload,
+            "/line",
+            "lsp.json code_action related_test payload",
+        )?;
+        let path = super::require_non_empty_json_str(action, "path", "lsp.json code_action")?;
+        require_expected_value(path, file, "lsp.json code_action related_test path")?;
+        let zero_based_line =
+            super::json_usize_at(action, "/range/start/line", "lsp.json code_action")?;
+        let one_based_line = zero_based_line + 1;
+        if one_based_line != line {
+            return Err(format!(
+                "lsp.json code_action related_test line must point at payload line {line}; got {one_based_line}"
+            ));
+        }
+        return Ok(());
+    }
+
+    check_lsp_projection_location(action, card, "lsp.json code_action", "/range/start/line")
 }
 
 fn require_lsp_diagnostic_card_projection(
