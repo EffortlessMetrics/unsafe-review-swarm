@@ -1987,38 +1987,10 @@ fn has_set_len_with_capacity_evidence(lower: &str) -> bool {
 
 fn has_set_len_reserve_capacity_evidence(lower: &str) -> bool {
     let compact = compact_code(lower);
-    let Some((receiver, new_len)) = set_len_receiver_and_argument(&compact) else {
+    let Some(context) = set_len_call_context(&compact) else {
         return false;
     };
-    if !is_simple_identifier(new_len) {
-        return false;
-    }
-    let marker = format!("{receiver}.set_len(");
-    let Some(call_pos) = compact.find(&marker) else {
-        return false;
-    };
-    let before_call = &compact[..call_pos];
-    let mut consumed = 0usize;
-    for statement in before_call.split_inclusive(';') {
-        let Some((left, right)) = statement.trim_end_matches(';').split_once('=') else {
-            consumed += statement.len();
-            continue;
-        };
-        if let_binding_name(left) != Some(new_len) {
-            consumed += statement.len();
-            continue;
-        }
-        let Some(additional) = len_plus_additional_argument(right.trim(), receiver) else {
-            consumed += statement.len();
-            continue;
-        };
-        let after_len_binding = &before_call[consumed + statement.len()..];
-        if has_fresh_set_len_reserve_call(after_len_binding, receiver, new_len, additional) {
-            return true;
-        }
-        consumed += statement.len();
-    }
-    false
+    context.has_reserve_capacity_evidence()
 }
 
 fn len_plus_additional_argument<'a>(expression: &'a str, receiver: &str) -> Option<&'a str> {
@@ -2123,6 +2095,38 @@ impl<'a> SetLenApplicabilityContext<'a> {
 
     fn has_capacity_relation(&self, capacity: &str) -> bool {
         has_set_len_capacity_relation(self.before_call, self.new_len, capacity, self.receiver)
+    }
+
+    fn has_reserve_capacity_evidence(&self) -> bool {
+        if !is_simple_identifier(self.new_len) {
+            return false;
+        }
+        let mut consumed = 0usize;
+        for statement in self.before_call.split_inclusive(';') {
+            let Some((left, right)) = statement.trim_end_matches(';').split_once('=') else {
+                consumed += statement.len();
+                continue;
+            };
+            if let_binding_name(left) != Some(self.new_len) {
+                consumed += statement.len();
+                continue;
+            }
+            let Some(additional) = len_plus_additional_argument(right.trim(), self.receiver) else {
+                consumed += statement.len();
+                continue;
+            };
+            let after_len_binding = &self.before_call[consumed + statement.len()..];
+            if has_fresh_set_len_reserve_call(
+                after_len_binding,
+                self.receiver,
+                self.new_len,
+                additional,
+            ) {
+                return true;
+            }
+            consumed += statement.len();
+        }
+        false
     }
 
     fn has_initialized_range_evidence(&self) -> bool {
