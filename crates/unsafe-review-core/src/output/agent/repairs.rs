@@ -76,6 +76,10 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
             repairs.push("document the ABI, ownership, and lifetime contract for this FFI boundary".to_string());
             repairs.push("attach sanitizer or cargo-careful receipt evidence after running the scoped command outside unsafe-review".to_string());
         }
+        OperationFamily::TargetFeature if missing_discharge(card, "target-feature") => {
+            repairs.push("prove callers reach this `target_feature` path only after a matching runtime or compile-time feature check".to_string());
+            repairs.push("route unsupported callers to a non-`target_feature` fallback or keep dispatch behind explicit cfg/feature gating".to_string());
+        }
         _ => {}
     }
     if missing_kind(card, "contract") {
