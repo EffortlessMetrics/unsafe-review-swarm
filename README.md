@@ -17,7 +17,7 @@
 
 <p align="center">
   <a href="docs/BADGE_POLICY.md"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FEffortlessMetrics%2Funsafe-review%2Fmain%2Fbadges%2Funsafe-review.json" alt="unsafe-review open gaps" /></a>
-  <a href="docs/BADGE_POLICY.md"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FEffortlessMetrics%2Funsafe-review%2Fmain%2Fbadges%2Funsafe-review-plus.json" alt="unsafe-review contract guard witness gaps" /></a>
+  <a href="docs/BADGE_POLICY.md"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FEffortlessMetrics%2Funsafe-review%2Fmain%2Fbadges%2Funsafe-review-plus.json" alt="unsafe-review missing or weak evidence count" /></a>
 </p>
 
 <p align="center">
@@ -92,6 +92,9 @@ unsafe-review first-pr --base origin/main
 
 # Explain one card
 unsafe-review explain <card-id>
+
+# Confirm support posture and limits
+unsafe-review support
 ```
 
 `first-pr` writes `cards.json`, `pr-summary.md`, `github-summary.md`,
@@ -113,6 +116,8 @@ document.
 > Do not copy this repository’s badge URLs. Badge endpoints are repo-scoped
 > static evidence projections and must point at your own `OWNER/REPO/BRANCH`
 > `badges/*.json` paths.
+> `unsafe-review` reports open review gaps; `unsafe-review+` reports a
+> missing-or-weak evidence count. Both are advisory evidence indicators only.
 
 Try the bundled smoke fixture:
 
