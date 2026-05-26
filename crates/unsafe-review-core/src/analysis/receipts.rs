@@ -55,10 +55,6 @@ impl ReceiptIndex {
     pub(crate) fn evidence_for(&self, id: &CardId) -> Option<WitnessEvidence> {
         self.by_card_id.get(&id.0).cloned()
     }
-
-    pub(crate) fn len(&self) -> usize {
-        self.by_card_id.len()
-    }
 }
 
 pub(crate) fn validate_receipts(root: &Path) -> Result<usize, String> {
@@ -535,7 +531,6 @@ mod tests {
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
         assert_eq!(validated, 1);
-        assert_eq!(index.len(), 0);
         assert!(index.evidence_for(&CardId(card_id.to_string())).is_none());
         Ok(())
     }
