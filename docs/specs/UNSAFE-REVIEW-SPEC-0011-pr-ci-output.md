@@ -275,7 +275,9 @@ Every ReviewCard must be accounted for by either `comments[]` or
 `not_selected[]`. A card may be absent from inline comments, but it must not be
 absent from the comment-plan projection.
 
-Each body must include the trust boundary.
+Each body must include the plan-only trust boundary: artifact-only candidate,
+unsafe-review did not post the comment, did not run witnesses, and did not make
+a policy decision.
 
 Each body must stay at or below 220 words.
 

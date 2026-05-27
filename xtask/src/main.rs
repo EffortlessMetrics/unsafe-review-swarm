@@ -10624,6 +10624,31 @@ Snapshot reports:
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_comment_plan_without_witness_boundary()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-comment-witness-boundary")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        let path = dir.join("comment-plan.json");
+        let comment_plan =
+            fs::read_to_string(&path).map_err(|err| format!("read comment plan failed: {err}"))?;
+        fs::write(
+            &path,
+            comment_plan.replace(
+                "unsafe-review did not post this comment, run witnesses, or make a policy decision",
+                "unsafe-review did not post this comment or make a policy decision",
+            ),
+        )
+        .map_err(|err| format!("write comment plan failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(result.err().unwrap_or_default().contains("run witnesses"));
+        Ok(())
+    }
+
+    #[test]
     fn advisory_artifact_checker_rejects_comment_plan_without_next_action() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-artifacts-comment-next-action")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;

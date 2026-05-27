@@ -679,12 +679,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         let Some(body) = comment.get("body").and_then(serde_json::Value::as_str) else {
             return Err("comment-plan.json comment is missing body".to_string());
         };
-        if !body.contains("unsafe-review did not post this comment") {
-            return Err(
-                "comment-plan.json comment body must state that unsafe-review did not post this comment"
-                    .to_string(),
-            );
-        }
+        require_comment_body_boundary(body)?;
         let body_word_count = body.split_whitespace().count();
         if body_word_count > COMMENT_PLAN_BODY_WORD_LIMIT {
             return Err(format!(
@@ -870,6 +865,22 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         card_projections,
         card_count,
     })
+}
+
+fn require_comment_body_boundary(body: &str) -> Result<(), String> {
+    for expected in [
+        "artifact-only inline comment candidate",
+        "unsafe-review did not post this comment",
+        "run witnesses",
+        "make a policy decision",
+    ] {
+        if !body.contains(expected) {
+            return Err(format!(
+                "comment-plan.json comment body must state `{expected}`"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn sarif_rule_ids(sarif: &serde_json::Value) -> Result<BTreeSet<&str>, String> {
