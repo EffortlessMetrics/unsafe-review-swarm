@@ -1,5 +1,6 @@
 use super::{
     branch_still_open_at_operation, compact_code, is_receiver_path_char, matching_code_block_end,
+    strip_block_comments_and_literals,
 };
 
 pub(super) fn has_encode_utf8_remaining_capacity_evidence(lower: &str) -> bool {
@@ -96,7 +97,7 @@ impl<'a> UncheckedConstructorAvailabilityContext<'a> {
         self.any_guard_tail(&guard, |after_guard| {
             let guard_body = matching_code_block_end(after_guard)
                 .map_or(after_guard, |body_end| &after_guard[..body_end]);
-            guard_body.contains("return")
+            guard_body_contains_return(guard_body)
         })
     }
 
@@ -112,6 +113,15 @@ impl<'a> UncheckedConstructorAvailabilityContext<'a> {
         }
         false
     }
+}
+
+fn guard_body_contains_return(guard_body: &str) -> bool {
+    let code = strip_block_comments_and_literals(guard_body);
+    code.starts_with("return")
+        || code.contains(";return")
+        || code.contains("{return")
+        || code.contains("}return")
+        || code.contains("=>return")
 }
 
 fn unchecked_constructor_receiver(compact_expression: &str) -> Option<&str> {

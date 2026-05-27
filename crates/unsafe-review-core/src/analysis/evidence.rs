@@ -2046,6 +2046,18 @@ mod tests {
             "unsafe { Some(One::new_unchecked(needle)) }",
             vec![],
         );
+        let comment_unavailable_return_guard = site_with_family(
+            OperationFamily::UnsafeFnCall,
+            vec!["if !One::is_available() { /* return None; */ }"],
+            "unsafe { Some(One::new_unchecked(needle)) }",
+            vec![],
+        );
+        let string_unavailable_return_guard = site_with_family(
+            OperationFamily::UnsafeFnCall,
+            vec!["if !One::is_available() { let _note = \"return None\"; }"],
+            "unsafe { Some(One::new_unchecked(needle)) }",
+            vec![],
+        );
         let unguarded = site_with_family(
             OperationFamily::UnsafeFnCall,
             vec![],
@@ -2064,12 +2076,26 @@ mod tests {
             &contract,
             &reach,
         );
+        let comment_unavailable_return_evidence = obligation_evidence(
+            &comment_unavailable_return_guard,
+            &obligations,
+            &contract,
+            &reach,
+        );
+        let string_unavailable_return_evidence = obligation_evidence(
+            &string_unavailable_return_guard,
+            &obligations,
+            &contract,
+            &reach,
+        );
         let unguarded_evidence = obligation_evidence(&unguarded, &obligations, &contract, &reach);
 
         assert!(guarded_evidence[0].discharge.present);
         assert!(assert_guarded_evidence[0].discharge.present);
         assert!(unavailable_return_evidence[0].discharge.present);
         assert!(nested_unavailable_return_evidence[0].discharge.present);
+        assert!(!comment_unavailable_return_evidence[0].discharge.present);
+        assert!(!string_unavailable_return_evidence[0].discharge.present);
         assert!(!unguarded_evidence[0].discharge.present);
     }
 
