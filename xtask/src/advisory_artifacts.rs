@@ -260,6 +260,8 @@ fn require_markdown_top_card_projection(
     let mut top_card_missing_evidence = None;
     let mut top_card_primary_route = None;
     let mut top_card_next_action = None;
+    let mut top_card_explain_command = None;
+    let mut top_card_agent_context_command = None;
 
     for line in text.lines() {
         let trimmed = line.trim();
@@ -303,6 +305,16 @@ fn require_markdown_top_card_projection(
             top_card_primary_route = Some((route_kind.to_string(), route_reason.to_string()));
         } else if let Some(next_action) = trimmed.strip_prefix("- Next action: ") {
             top_card_next_action = Some(next_action.to_string());
+        } else if let Some(rest) = trimmed.strip_prefix("- Explain: `") {
+            let Some((command, _)) = rest.split_once('`') else {
+                continue;
+            };
+            top_card_explain_command = Some(command.to_string());
+        } else if let Some(rest) = trimmed.strip_prefix("- Agent context: `") {
+            let Some((command, _)) = rest.split_once('`') else {
+                continue;
+            };
+            top_card_agent_context_command = Some(command.to_string());
         }
     }
 
@@ -422,6 +434,33 @@ fn require_markdown_top_card_projection(
         &actual_next_action,
         &card.next_action,
         &format!("{} top card `{card_id}` next action", path.display()),
+    )?;
+
+    let Some(actual_explain_command) = top_card_explain_command else {
+        return Err(format!(
+            "{} must include a top ReviewCard explain command line",
+            path.display()
+        ));
+    };
+    require_expected_value(
+        &actual_explain_command,
+        &format!("unsafe-review explain {card_id}"),
+        &format!("{} top card `{card_id}` explain command", path.display()),
+    )?;
+
+    let Some(actual_agent_context_command) = top_card_agent_context_command else {
+        return Err(format!(
+            "{} must include a top ReviewCard agent context command line",
+            path.display()
+        ));
+    };
+    require_expected_value(
+        &actual_agent_context_command,
+        &format!("unsafe-review context {card_id} --json"),
+        &format!(
+            "{} top card `{card_id}` agent context command",
+            path.display()
+        ),
     )
 }
 

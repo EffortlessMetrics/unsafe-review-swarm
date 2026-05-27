@@ -254,7 +254,12 @@ fn render_pr_summary_top_card(out: &mut String, output: &AnalyzeOutput) {
                 push_bash_block(out, command);
             }
         }
-        out.push_str(&format!("- Next action: {}\n\n", card.next_action.summary));
+        out.push_str(&format!("- Next action: {}\n", card.next_action.summary));
+        out.push_str(&format!("- Explain: `unsafe-review explain {}`\n", card.id));
+        out.push_str(&format!(
+            "- Agent context: `unsafe-review context {} --json`\n\n",
+            card.id
+        ));
     } else {
         render_no_changed_gaps(out);
     }
@@ -550,6 +555,10 @@ mod tests {
     fn pr_summary_projects_cards_with_witness_plan_and_trust_boundary() -> Result<(), String> {
         let output = fixture_output("raw_pointer_alignment")?;
         let rendered = render_pr_summary(&output);
+        let card = output
+            .cards
+            .first()
+            .ok_or_else(|| "raw pointer fixture should emit a card".to_string())?;
 
         assert!(rendered.contains("# unsafe-review PR summary"));
         assert!(rendered.contains("## Top card"));
@@ -563,6 +572,11 @@ mod tests {
         assert!(rendered.contains("Open actionable gaps: 1"));
         assert!(rendered.contains("Missing visible local guard"));
         assert!(rendered.contains("cargo +nightly miri test read_header"));
+        assert!(rendered.contains(&format!("- Explain: `unsafe-review explain {}`", card.id)));
+        assert!(rendered.contains(&format!(
+            "- Agent context: `unsafe-review context {} --json`",
+            card.id
+        )));
         assert!(rendered.contains("not a proof of memory safety"));
         assert!(rendered.contains("not a Miri result unless a witness receipt is attached"));
         Ok(())

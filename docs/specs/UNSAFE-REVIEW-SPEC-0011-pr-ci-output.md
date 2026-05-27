@@ -143,6 +143,8 @@ Must include:
 ```text
 card count
 top actionable card, when present
+  explain handoff command
+  bounded agent context handoff command
 compact card table
   rows project ReviewCard id, class, location, operation family, operation,
   missing evidence, primary route, and next action
@@ -185,6 +187,8 @@ top actionable card, when present:
   primary witness route, when present
   primary witness route command, when available
   next action
+  explain handoff command
+  bounded agent context handoff command
 full bundle artifact list
 trust boundary
 ```

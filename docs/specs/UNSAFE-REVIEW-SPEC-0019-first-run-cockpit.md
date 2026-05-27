@@ -53,6 +53,11 @@ Implementations MAY use equivalent install/open commands by platform, but behavi
 Bundle shape MUST pass
 `cargo run --locked -p xtask -- check-first-pr-artifacts <dir>`.
 
+When cards are present, `pr-summary.md` and `github-summary.md` MUST include
+top-card handoff commands for human explanation and bounded agent context:
+`unsafe-review explain <card-id>` and
+`unsafe-review context <card-id> --json`.
+
 ## 5. First-pr terminal summary contract
 
 On successful bundle write, terminal output MUST include:
