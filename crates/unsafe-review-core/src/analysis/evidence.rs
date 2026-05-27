@@ -933,6 +933,32 @@ fn has_get_unchecked_bounds_guard(lower: &str, receiver: &str, index: &str) -> b
         || has_get_unchecked_get_probe_guard(&context)
 }
 
+fn any_marker_occurrence(
+    text: &str,
+    marker: &str,
+    mut applies: impl FnMut(usize, &str) -> bool,
+) -> bool {
+    let mut cursor = text;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(marker) {
+        let marker_start = offset + pos;
+        let after_marker = &text[marker_start + marker.len()..];
+        if applies(marker_start, after_marker) {
+            return true;
+        }
+        let next = pos + marker.len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
+}
+
+fn any_marker_tail(text: &str, marker: &str, mut applies: impl FnMut(&str) -> bool) -> bool {
+    any_marker_occurrence(text, marker, |_marker_start, after_marker| {
+        applies(after_marker)
+    })
+}
+
 // Bounds evidence for get_unchecked must target the same slice receiver and
 // index as the unsafe operation, and those targets must stay fresh until the
 // call.
@@ -986,40 +1012,20 @@ impl<'a> GetUncheckedBoundsApplicability<'a> {
         !self.has_stale_target_assignment(evidence)
     }
 
-    fn any_marker_preserves_applicability(
-        &self,
-        marker: &str,
-        mut applies: impl FnMut(&str) -> bool,
-    ) -> bool {
-        let mut cursor = self.before_operation;
-        let mut offset = 0usize;
-        while let Some(pos) = cursor.find(marker) {
-            let proof_end = offset + pos + marker.len();
-            let after_marker = &self.before_operation[proof_end..];
-            if applies(after_marker) {
-                return true;
-            }
-            let next = pos + marker.len();
-            offset += next;
-            cursor = &cursor[next..];
-        }
-        false
-    }
-
     fn open_branch_marker_preserves_applicability(&self, marker: &str) -> bool {
-        self.any_marker_preserves_applicability(marker, |after_guard| {
+        any_marker_tail(self.before_operation, marker, |after_guard| {
             self.open_branch_preserves_applicability(after_guard)
         })
     }
 
     fn assertion_marker_preserves_applicability(&self, marker: &str) -> bool {
-        self.any_marker_preserves_applicability(marker, |after_assertion| {
+        any_marker_tail(self.before_operation, marker, |after_assertion| {
             self.target_stays_fresh_after(after_assertion)
         })
     }
 
     fn returning_marker_preserves_applicability(&self, marker: &str) -> bool {
-        self.any_marker_preserves_applicability(marker, |after_guard| {
+        any_marker_tail(self.before_operation, marker, |after_guard| {
             let (guard_body, after_guard_body) = after_guard
                 .split_once('}')
                 .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
@@ -1106,7 +1112,7 @@ fn has_get_unchecked_get_probe_let_else(context: &GetUncheckedBoundsApplicabilit
 
 fn has_get_unchecked_get_probe_match_branch(context: &GetUncheckedBoundsApplicability<'_>) -> bool {
     let marker = format!("match{}{{", context.same_slice_get_probe_expr);
-    context.any_marker_preserves_applicability(&marker, |after_match| {
+    any_marker_tail(context.before_operation, &marker, |after_match| {
         if let Some(branch_after_marker) = match_some_branch_after_marker(after_match)
             && context.open_branch_preserves_applicability(branch_after_marker)
         {
@@ -3625,26 +3631,6 @@ impl<'a> MaybeUninitSlotContext<'a> {
         !self.has_stale_slot_assignment(evidence)
     }
 
-    fn any_marker_preserves_applicability(
-        &self,
-        marker: &str,
-        mut applies: impl FnMut(usize, &str) -> bool,
-    ) -> bool {
-        let mut cursor = self.compact;
-        let mut offset = 0usize;
-        while let Some(pos) = cursor.find(marker) {
-            let marker_start = offset + pos;
-            let after_marker = &self.compact[marker_start + marker.len()..];
-            if applies(marker_start, after_marker) {
-                return true;
-            }
-            let next = pos + marker.len();
-            offset += next;
-            cursor = &cursor[next..];
-        }
-        false
-    }
-
     fn slot_evidence_preserves_applicability(
         &self,
         evidence_pos: usize,
@@ -3655,7 +3641,8 @@ impl<'a> MaybeUninitSlotContext<'a> {
     }
 
     fn has_write_evidence(&self) -> bool {
-        self.any_marker_preserves_applicability(
+        any_marker_occurrence(
+            self.compact,
             &self.same_slot_write_marker,
             |marker_start, after_marker| {
                 self.slot_evidence_preserves_applicability(marker_start, after_marker)
@@ -3664,7 +3651,7 @@ impl<'a> MaybeUninitSlotContext<'a> {
     }
 
     fn has_new_binding_evidence(&self) -> bool {
-        self.any_marker_preserves_applicability("::new(", |call_pos, after_call| {
+        any_marker_occurrence(self.compact, "::new(", |call_pos, after_call| {
             let statement_start = self.compact[..call_pos]
                 .rfind([';', '{', '}'])
                 .map_or(0, |idx| idx + 1);
@@ -4191,27 +4178,6 @@ impl<'a> NonNullPointerContext<'a> {
         !self.has_stale_pointer_assignment(evidence)
     }
 
-    fn any_marker_preserves_applicability(
-        &self,
-        marker: &str,
-        mut applies: impl FnMut(usize, &str) -> bool,
-    ) -> bool {
-        let mut cursor = self.compact;
-        let mut offset = 0usize;
-        while let Some(pos) = cursor.find(marker) {
-            let marker_start = offset + pos;
-            let proof_end = marker_start + marker.len();
-            let after_marker = &self.compact[proof_end..];
-            if applies(marker_start, after_marker) {
-                return true;
-            }
-            let next = pos + marker.len();
-            offset += next;
-            cursor = &cursor[next..];
-        }
-        false
-    }
-
     fn statement_after_marker_preserves_applicability(&self, after_marker: &str) -> bool {
         let after_statement = after_marker
             .find(';')
@@ -4248,14 +4214,14 @@ impl<'a> NonNullPointerContext<'a> {
 
     fn has_question_mark_guard(&self) -> bool {
         let marker = format!("{}?", self.same_pointer_new_probe);
-        self.any_marker_preserves_applicability(&marker, |_marker_start, after_marker| {
+        any_marker_tail(self.compact, &marker, |after_marker| {
             self.statement_after_marker_preserves_applicability(after_marker)
         })
     }
 
     fn has_if_let_guard(&self) -> bool {
         let marker = format!("={}{{", self.same_pointer_new_probe);
-        self.any_marker_preserves_applicability(&marker, |marker_start, after_guard| {
+        any_marker_occurrence(self.compact, &marker, |marker_start, after_guard| {
             ends_with_some_pattern(&self.compact[..marker_start], "iflet")
                 && self.open_branch_preserves_applicability(after_guard)
         })
@@ -4263,7 +4229,7 @@ impl<'a> NonNullPointerContext<'a> {
 
     fn has_let_else_guard(&self) -> bool {
         let marker = format!("={}else{{", self.same_pointer_new_probe);
-        self.any_marker_preserves_applicability(&marker, |marker_start, after_guard| {
+        any_marker_occurrence(self.compact, &marker, |marker_start, after_guard| {
             ends_with_some_pattern(&self.compact[..marker_start], "let")
                 && self.returning_after_marker_preserves_applicability(after_guard)
         })
@@ -4271,7 +4237,7 @@ impl<'a> NonNullPointerContext<'a> {
 
     fn has_match_some_guard(&self) -> bool {
         let marker = format!("match{}{{", self.same_pointer_new_probe);
-        self.any_marker_preserves_applicability(&marker, |_marker_start, after_match| {
+        any_marker_tail(self.compact, &marker, |after_match| {
             if let Some(branch_after_marker) = match_some_branch_after_marker(after_match)
                 && self.open_branch_preserves_applicability(branch_after_marker)
             {
