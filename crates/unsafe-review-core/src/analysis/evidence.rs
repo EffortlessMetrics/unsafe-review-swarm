@@ -15,6 +15,7 @@ mod freshness;
 mod generic_bounds;
 mod get_unchecked;
 mod identifier_syntax;
+mod initialized_discharge;
 mod layout_discharge;
 mod marker_scan;
 mod maybeuninit;
@@ -50,7 +51,6 @@ mod zeroed;
 use self::alignment_discharge::alignment_discharge_state;
 use self::assignment_syntax::contains_simple_assignment_to;
 use self::bounds_discharge::bounds_discharge_state;
-use self::box_raw_origin::has_drop_in_place_box_origin_evidence;
 use self::call_syntax::{
     matching_call_argument_end, matching_generic_argument_end, split_top_level_arguments,
     split_top_level_pair,
@@ -78,9 +78,9 @@ use self::freshness::{
 use self::generic_bounds::has_length_or_bounds_guard;
 use self::get_unchecked::{get_unchecked_receiver_and_index, has_get_unchecked_bounds_guard};
 use self::identifier_syntax::{is_simple_identifier, let_binding_name};
+use self::initialized_discharge::initialized_discharge_state;
 use self::layout_discharge::layout_discharge_state;
 use self::marker_scan::{any_marker_occurrence, any_marker_tail};
-use self::maybeuninit::maybeuninit_assume_init_discharge_state;
 use self::operation_scope::code_before_operation;
 use self::option_state::{ends_with_some_pattern, is_some_binding, match_some_branch_after_marker};
 use self::ownership_discharge::ownership_discharge_state;
@@ -99,11 +99,7 @@ use self::unreachable_discharge::unreachable_discharge_state;
 use self::utf8_discharge::utf8_discharge_state;
 use self::valid_value_discharge::valid_value_discharge_state;
 use self::valid_zero_discharge::valid_zero_discharge_state;
-use self::vec_from_raw_parts::has_vec_from_raw_parts_origin_initialized_evidence;
-use self::write_bytes::{
-    has_bool_write_bytes_value_evidence, has_maybeuninit_raw_write_context,
-    has_maybeuninit_slice_context, has_u8_write_bytes_context, has_write_bytes_bounds_evidence,
-};
+use self::write_bytes::has_write_bytes_bounds_evidence;
 use crate::analysis::scanner::ScannedSite;
 use crate::domain::{
     ContractEvidence, EvidenceState, ObligationEvidence, OperationFamily, ReachEvidence,
@@ -147,46 +143,7 @@ fn discharge_state_for(
         "alignment" => alignment_discharge_state(site, lower),
         "bounds" | "valid-range" => bounds_discharge_state(site, lower),
         "capacity" => capacity_discharge_state(site, lower),
-        "initialized" => {
-            if let Some(state) = set_len::set_len_initialized_discharge_state(site) {
-                state
-            } else if let Some(state) =
-                maybeuninit_assume_init_discharge_state(family, &site.operation.expression, lower)
-            {
-                state
-            } else if family == &OperationFamily::SliceFromRawParts
-                && has_maybeuninit_slice_context(lower)
-            {
-                EvidenceState::present("MaybeUninit slice element evidence was detected")
-            } else if family == &OperationFamily::RawPointerWrite
-                && has_maybeuninit_raw_write_context(site, lower)
-            {
-                EvidenceState::present("MaybeUninit raw write target evidence was detected")
-            } else if family == &OperationFamily::RawPointerWrite
-                && has_u8_write_bytes_context(site, lower)
-            {
-                EvidenceState::present("u8 write_bytes target evidence was detected")
-            } else if family == &OperationFamily::RawPointerWrite
-                && has_bool_write_bytes_value_evidence(site, lower)
-            {
-                EvidenceState::present("bool write_bytes value evidence was detected")
-            } else if family == &OperationFamily::VecFromRawParts
-                && has_vec_from_raw_parts_origin_initialized_evidence(
-                    &site.operation.expression,
-                    lower,
-                )
-            {
-                EvidenceState::present(
-                    "Vec::from_raw_parts same-origin initialized range evidence was detected",
-                )
-            } else if family == &OperationFamily::DropInPlace
-                && has_drop_in_place_box_origin_evidence(&site.operation.expression, lower)
-            {
-                EvidenceState::present("Box::into_raw origin evidence was detected")
-            } else {
-                EvidenceState::missing("No obligation-specific guard code was detected")
-            }
-        }
+        "initialized" => initialized_discharge_state(site, lower),
         "non-null" | "pointer-live" => pointer_live_discharge_state(site, lower),
         "ownership" => ownership_discharge_state(family, &site.operation.expression, lower),
         "callee-contract" => {
