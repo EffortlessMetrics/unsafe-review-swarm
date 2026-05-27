@@ -3616,6 +3616,26 @@ impl<'a> MaybeUninitSlotContext<'a> {
         !self.has_stale_slot_assignment(evidence)
     }
 
+    fn any_marker_preserves_applicability(
+        &self,
+        marker: &str,
+        mut applies: impl FnMut(usize, &str) -> bool,
+    ) -> bool {
+        let mut cursor = self.compact;
+        let mut offset = 0usize;
+        while let Some(pos) = cursor.find(marker) {
+            let marker_start = offset + pos;
+            let after_marker = &self.compact[marker_start + marker.len()..];
+            if applies(marker_start, after_marker) {
+                return true;
+            }
+            let next = pos + marker.len();
+            offset += next;
+            cursor = &cursor[next..];
+        }
+        false
+    }
+
     fn slot_evidence_preserves_applicability(
         &self,
         evidence_pos: usize,
@@ -3626,48 +3646,31 @@ impl<'a> MaybeUninitSlotContext<'a> {
     }
 
     fn has_write_evidence(&self) -> bool {
-        let mut cursor = self.compact;
-        let mut offset = 0usize;
-        while let Some(pos) = cursor.find(&self.same_slot_write_marker) {
-            let marker_start = offset + pos;
-            let after_marker = &self.compact[marker_start + self.same_slot_write_marker.len()..];
-            if self.slot_evidence_preserves_applicability(marker_start, after_marker) {
-                return true;
-            }
-            let next = pos + self.same_slot_write_marker.len();
-            offset += next;
-            cursor = &cursor[next..];
-        }
-        false
+        self.any_marker_preserves_applicability(
+            &self.same_slot_write_marker,
+            |marker_start, after_marker| {
+                self.slot_evidence_preserves_applicability(marker_start, after_marker)
+            },
+        )
     }
 
     fn has_new_binding_evidence(&self) -> bool {
-        let mut cursor = self.compact;
-        let mut offset = 0usize;
-        while let Some(pos) = cursor.find("::new(") {
-            let call_pos = offset + pos;
+        self.any_marker_preserves_applicability("::new(", |call_pos, after_call| {
             let statement_start = self.compact[..call_pos]
                 .rfind([';', '{', '}'])
                 .map_or(0, |idx| idx + 1);
             let before_call = &self.compact[statement_start..call_pos];
             let Some((left, right)) = before_call.rsplit_once('=') else {
-                let next = pos + "::new(".len();
-                offset += next;
-                cursor = &cursor[next..];
-                continue;
+                return false;
             };
-            let after_call = &self.compact[call_pos + "::new(".len()..];
             if right.contains("maybeuninit")
                 && maybeuninit_binding_left_declares_receiver(left, &self.same_slot_target)
                 && self.slot_evidence_preserves_applicability(call_pos, after_call)
             {
                 return true;
             }
-            let next = pos + "::new(".len();
-            offset += next;
-            cursor = &cursor[next..];
-        }
-        false
+            false
+        })
     }
 }
 
