@@ -178,6 +178,59 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn badge_endpoint_messages_are_numeric_and_overclaim_free() -> Result<(), String> {
+        for fixture in ["raw_pointer_alignment", "safe_code_no_cards"] {
+            let output = fixture_output(fixture)?;
+            let (main, plus) = render(&output);
+
+            assert_badge_endpoint_contract("unsafe-review", "unsafe_review", &main)?;
+            assert_badge_endpoint_contract("unsafe-review+", "unsafe_review_plus", &plus)?;
+        }
+
+        Ok(())
+    }
+
+    fn assert_badge_endpoint_contract(
+        expected_label: &str,
+        expected_kind: &str,
+        text: &str,
+    ) -> Result<(), String> {
+        let badge = parse_json(text)?;
+        assert_eq!(badge["schemaVersion"], 1);
+        assert_eq!(badge["contract_version"], "0.1");
+        assert_eq!(badge["kind"], expected_kind);
+        assert_eq!(badge["label"], expected_label);
+
+        let message = badge["message"]
+            .as_str()
+            .ok_or_else(|| "badge message must be a string".to_string())?;
+        assert!(
+            !message.is_empty() && message.chars().all(|ch| ch.is_ascii_digit()),
+            "badge message must be a numeric count, got {message:?}"
+        );
+
+        let lowercase = text.to_ascii_lowercase();
+        for forbidden in [
+            "all clear",
+            "ub-free",
+            "miri-clean",
+            "verified",
+            "proof",
+            "policy-ready",
+            "blocking-ready",
+            "site execution",
+            "memory-safety",
+        ] {
+            assert!(
+                !lowercase.contains(forbidden),
+                "badge endpoint JSON must not contain overclaim term {forbidden:?}: {text}"
+            );
+        }
+
+        Ok(())
+    }
+
     fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures")
