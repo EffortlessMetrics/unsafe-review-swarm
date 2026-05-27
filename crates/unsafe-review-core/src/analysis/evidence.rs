@@ -2,6 +2,7 @@ mod assignment_syntax;
 mod box_raw_origin;
 mod call_syntax;
 mod code_text;
+mod contract_discharge;
 mod contract_text;
 mod control_flow;
 mod copy_range;
@@ -42,6 +43,11 @@ use self::call_syntax::{
 };
 use self::code_text::{
     compact_code, compact_contains_identifier, strip_block_comments_and_literals,
+};
+use self::contract_discharge::{
+    DOCUMENTED_PRIVATE_UNSAFE_CONTRACT_DISCHARGE, PUBLIC_UNSAFE_API_CONTRACT_DISCHARGE,
+    TARGET_FEATURE_CONTRACT_DISCHARGE, is_documented_private_unsafe_contract_obligation,
+    is_public_unsafe_contract_obligation,
 };
 pub(crate) use self::contract_text::contract_evidence;
 use self::control_flow::{
@@ -97,14 +103,10 @@ use self::zeroed::has_zeroed_known_valid_zero_type;
 use crate::analysis::scanner::ScannedSite;
 use crate::domain::{
     ContractEvidence, DischargeEvidence, EvidenceState, ObligationEvidence, OperationFamily,
-    ReachEvidence, RelatedTest, SafetyObligation, UnsafeSiteKind,
+    ReachEvidence, RelatedTest, SafetyObligation,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
-
-const PUBLIC_UNSAFE_API_CONTRACT_DISCHARGE: &str = "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration";
-const DOCUMENTED_PRIVATE_UNSAFE_CONTRACT_DISCHARGE: &str = "Documented private unsafe declaration is a caller-contract site; local guard evidence is not expected at the declaration";
-const TARGET_FEATURE_CONTRACT_DISCHARGE: &str = "Documented target-feature declaration is a caller-contract site; local guard evidence is not expected at the attribute";
 
 pub(crate) fn obligation_evidence(
     site: &ScannedSite,
@@ -415,32 +417,6 @@ fn discharge_state_for(
         }
         _ => EvidenceState::missing("No obligation-specific guard code was detected"),
     }
-}
-
-fn is_public_unsafe_contract_obligation(site: &ScannedSite, key: &str) -> bool {
-    key == "unknown"
-        && site.site.public_api_surface
-        && site.operation.family == OperationFamily::Unknown
-        && matches!(
-            site.site.kind,
-            UnsafeSiteKind::UnsafeFn | UnsafeSiteKind::UnsafeTrait
-        )
-}
-
-fn is_documented_private_unsafe_contract_obligation(
-    site: &ScannedSite,
-    key: &str,
-    contract: &ContractEvidence,
-) -> bool {
-    key == "unknown"
-        && !site.site.public_api_surface
-        && contract.present
-        && contract.summary.contains("documentation")
-        && site.operation.family == OperationFamily::Unknown
-        && matches!(
-            site.site.kind,
-            UnsafeSiteKind::UnsafeFn | UnsafeSiteKind::UnsafeTrait
-        )
 }
 
 pub(crate) fn reach_evidence(
