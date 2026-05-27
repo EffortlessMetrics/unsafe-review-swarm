@@ -5,98 +5,92 @@ use super::{
 };
 
 pub(super) fn has_vec_from_raw_parts_capacity_evidence(expression: &str, lower: &str) -> bool {
-    let compact = compact_code(&strip_block_comments_and_literals(lower));
-    let compact_expression = compact_code(&expression.to_ascii_lowercase());
-    let Some((_ptr, len, cap)) = vec_from_raw_parts_arguments(&compact_expression) else {
-        return false;
-    };
-    let call_pos = compact
-        .find(&compact_expression)
-        .or_else(|| compact.find("vec::from_raw_parts("));
-    let Some(call_pos) = call_pos else {
-        return false;
-    };
-    let before_call = &compact[..call_pos];
-    has_len_cap_bound_guard(before_call, len, cap)
+    VecFromRawPartsCallContext::from_code(expression, &strip_block_comments_and_literals(lower))
+        .is_some_and(|context| context.has_len_cap_bound_guard())
 }
 
 pub(super) fn has_vec_from_raw_parts_origin_len_cap_evidence(
     expression: &str,
     lower: &str,
 ) -> bool {
-    let compact = compact_code(lower);
-    let compact_expression = compact_code(&expression.to_ascii_lowercase());
-    let Some((_ptr, len, cap)) = vec_from_raw_parts_arguments(&compact_expression) else {
-        return false;
-    };
-    let call_pos = compact
-        .find(&compact_expression)
-        .or_else(|| compact.find("vec::from_raw_parts("));
-    let Some(call_pos) = call_pos else {
-        return false;
-    };
-    has_vec_from_raw_parts_same_origin_len_cap(&compact[..call_pos], len, cap)
+    VecFromRawPartsCallContext::from_code(expression, lower)
+        .is_some_and(|context| context.has_same_origin_len_cap_evidence())
 }
 
 pub(super) fn has_vec_from_raw_parts_origin_initialized_evidence(
     expression: &str,
     lower: &str,
 ) -> bool {
-    let compact = compact_code(lower);
-    let compact_expression = compact_code(&expression.to_ascii_lowercase());
-    let Some((ptr, len, _cap)) = vec_from_raw_parts_arguments(&compact_expression) else {
-        return false;
-    };
-    let call_pos = compact
-        .find(&compact_expression)
-        .or_else(|| compact.find("vec::from_raw_parts("));
-    let Some(call_pos) = call_pos else {
-        return false;
-    };
-    let before_call = &compact[..call_pos];
-    let Some(ptr_receiver) = vec_raw_parts_pointer_origin_receiver_before(before_call, ptr) else {
-        return false;
-    };
-    vec_raw_parts_len_origin_receiver(before_call, len)
-        .is_some_and(|receiver| receiver == ptr_receiver)
+    VecFromRawPartsCallContext::from_code(expression, lower)
+        .is_some_and(|context| context.has_same_origin_initialized_evidence())
 }
 
 pub(super) fn has_vec_from_raw_parts_origin_pointer_live_evidence(
     expression: &str,
     lower: &str,
 ) -> bool {
-    let compact = compact_code(lower);
-    let compact_expression = compact_code(&expression.to_ascii_lowercase());
-    let Some((ptr, _len, cap)) = vec_from_raw_parts_arguments(&compact_expression) else {
-        return false;
-    };
-    let call_pos = compact
-        .find(&compact_expression)
-        .or_else(|| compact.find("vec::from_raw_parts("));
-    let Some(call_pos) = call_pos else {
-        return false;
-    };
-    let before_call = &compact[..call_pos];
-    let Some(ptr_receiver) = vec_raw_parts_pointer_origin_receiver_before(before_call, ptr) else {
-        return false;
-    };
-    vec_raw_parts_capacity_origin_receiver(before_call, cap)
-        .is_some_and(|receiver| receiver == ptr_receiver)
+    VecFromRawPartsCallContext::from_code(expression, lower)
+        .is_some_and(|context| context.has_same_origin_pointer_live_evidence())
 }
 
 pub(super) fn has_vec_from_raw_parts_origin_evidence(expression: &str, lower: &str) -> bool {
-    let compact = compact_code(lower);
-    let compact_expression = compact_code(&expression.to_ascii_lowercase());
-    let Some((ptr, _len, _cap)) = vec_from_raw_parts_arguments(&compact_expression) else {
-        return false;
-    };
-    let call_pos = compact
-        .find(&compact_expression)
-        .or_else(|| compact.find("vec::from_raw_parts("));
-    let Some(call_pos) = call_pos else {
-        return false;
-    };
-    has_same_pointer_vec_raw_parts_origin_before(&compact[..call_pos], ptr)
+    VecFromRawPartsCallContext::from_code(expression, lower)
+        .is_some_and(|context| context.has_same_pointer_origin_evidence())
+}
+
+struct VecFromRawPartsCallContext {
+    before_call: String,
+    pointer: String,
+    len: String,
+    cap: String,
+}
+
+impl VecFromRawPartsCallContext {
+    fn from_code(expression: &str, code: &str) -> Option<Self> {
+        let compact = compact_code(code);
+        let compact_expression = compact_code(&expression.to_ascii_lowercase());
+        let (pointer, len, cap) = vec_from_raw_parts_arguments(&compact_expression)?;
+        let call_pos = compact
+            .find(&compact_expression)
+            .or_else(|| compact.find("vec::from_raw_parts("))?;
+
+        Some(Self {
+            before_call: compact[..call_pos].to_string(),
+            pointer: pointer.to_string(),
+            len: len.to_string(),
+            cap: cap.to_string(),
+        })
+    }
+
+    fn has_len_cap_bound_guard(&self) -> bool {
+        has_len_cap_bound_guard(&self.before_call, &self.len, &self.cap)
+    }
+
+    fn has_same_origin_len_cap_evidence(&self) -> bool {
+        has_vec_from_raw_parts_same_origin_len_cap(&self.before_call, &self.len, &self.cap)
+    }
+
+    fn has_same_origin_initialized_evidence(&self) -> bool {
+        self.pointer_origin_receiver().is_some_and(|ptr_receiver| {
+            vec_raw_parts_len_origin_receiver(&self.before_call, &self.len)
+                .is_some_and(|receiver| receiver == ptr_receiver)
+        })
+    }
+
+    fn has_same_origin_pointer_live_evidence(&self) -> bool {
+        self.pointer_origin_receiver().is_some_and(|ptr_receiver| {
+            vec_raw_parts_capacity_origin_receiver(&self.before_call, &self.cap)
+                .is_some_and(|receiver| receiver == ptr_receiver)
+        })
+    }
+
+    fn has_same_pointer_origin_evidence(&self) -> bool {
+        self.pointer_origin_receiver().is_some()
+    }
+
+    fn pointer_origin_receiver(&self) -> Option<String> {
+        vec_raw_parts_pointer_origin_receiver_before(&self.before_call, &self.pointer)
+    }
 }
 
 fn vec_from_raw_parts_arguments(compact_expression: &str) -> Option<(&str, &str, &str)> {
@@ -197,10 +191,6 @@ fn has_vec_from_raw_parts_same_origin_len_cap(before_call: &str, len: &str, cap:
     vec_raw_parts_len_origin_receiver(before_call, len).is_some_and(|receiver| {
         vec_raw_parts_capacity_origin_receiver(before_call, cap) == Some(receiver)
     })
-}
-
-fn has_same_pointer_vec_raw_parts_origin_before(before_call: &str, pointer: &str) -> bool {
-    vec_raw_parts_pointer_origin_receiver_before(before_call, pointer).is_some()
 }
 
 fn vec_raw_parts_pointer_origin_receiver_before(
