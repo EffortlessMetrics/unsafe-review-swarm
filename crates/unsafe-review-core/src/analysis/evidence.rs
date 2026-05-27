@@ -2853,6 +2853,162 @@ mod tests {
     }
 
     #[test]
+    fn copy_range_bounds_require_same_source_destination_and_count() {
+        let obligations = vec![SafetyObligation::new(
+            "bounds",
+            "copy source and destination ranges are in bounds",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let matching = site_with_family(
+            OperationFamily::CopyNonOverlapping,
+            vec![
+                "fn copy(src: &[u8], dst: &mut [u8], count: usize) {",
+                "    assert!(count <= src.len());",
+                "    assert!(count <= dst.len());",
+            ],
+            "unsafe { core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count) }",
+            vec!["}"],
+        );
+        let ptr_copy_matching = site_with_family(
+            OperationFamily::PtrCopy,
+            vec![
+                "fn copy(src: &[u8], dst: &mut [u8], count: usize) {",
+                "    assert!(count <= src.len());",
+                "    assert!(count <= dst.len());",
+            ],
+            "unsafe { core::ptr::copy(src.as_ptr(), dst.as_mut_ptr(), count) }",
+            vec!["}"],
+        );
+        let generic_len_guard = site_with_family(
+            OperationFamily::CopyNonOverlapping,
+            vec![
+                "fn copy(src: &[u8], dst: &mut [u8], len: usize, count: usize) {",
+                "    assert!(count <= len);",
+            ],
+            "unsafe { core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count) }",
+            vec!["}"],
+        );
+        let wrong_destination = site_with_family(
+            OperationFamily::CopyNonOverlapping,
+            vec![
+                "fn copy(src: &[u8], dst: &mut [u8], other: &[u8], count: usize) {",
+                "    assert!(count <= src.len());",
+                "    assert!(count <= other.len());",
+            ],
+            "unsafe { core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count) }",
+            vec!["}"],
+        );
+        let stale_count = site_with_family(
+            OperationFamily::CopyNonOverlapping,
+            vec![
+                "fn copy(src: &[u8], dst: &mut [u8], mut count: usize) {",
+                "    assert!(count <= src.len());",
+                "    assert!(count <= dst.len());",
+                "    count = adjusted_count();",
+            ],
+            "unsafe { core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count) }",
+            vec!["}"],
+        );
+        let stale_source = site_with_family(
+            OperationFamily::CopyNonOverlapping,
+            vec![
+                "fn copy(mut src: &[u8], dst: &mut [u8], other: &[u8], count: usize) {",
+                "    assert!(count <= src.len());",
+                "    assert!(count <= dst.len());",
+                "    src = other;",
+            ],
+            "unsafe { core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count) }",
+            vec!["}"],
+        );
+        let stale_destination = site_with_family(
+            OperationFamily::CopyNonOverlapping,
+            vec![
+                "fn copy(src: &[u8], mut dst: &mut [u8], other: &mut [u8], count: usize) {",
+                "    assert!(count <= src.len());",
+                "    assert!(count <= dst.len());",
+                "    dst = other;",
+            ],
+            "unsafe { core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count) }",
+            vec!["}"],
+        );
+
+        let matching_evidence = obligation_evidence(&matching, &obligations, &contract, &reach);
+        let ptr_copy_matching_evidence =
+            obligation_evidence(&ptr_copy_matching, &obligations, &contract, &reach);
+        let generic_len_guard_evidence =
+            obligation_evidence(&generic_len_guard, &obligations, &contract, &reach);
+        let wrong_destination_evidence =
+            obligation_evidence(&wrong_destination, &obligations, &contract, &reach);
+        let stale_count_evidence =
+            obligation_evidence(&stale_count, &obligations, &contract, &reach);
+        let stale_source_evidence =
+            obligation_evidence(&stale_source, &obligations, &contract, &reach);
+        let stale_destination_evidence =
+            obligation_evidence(&stale_destination, &obligations, &contract, &reach);
+
+        assert!(matching_evidence[0].discharge.present);
+        assert!(ptr_copy_matching_evidence[0].discharge.present);
+        assert!(!generic_len_guard_evidence[0].discharge.present);
+        assert!(!wrong_destination_evidence[0].discharge.present);
+        assert!(!stale_count_evidence[0].discharge.present);
+        assert!(!stale_source_evidence[0].discharge.present);
+        assert!(!stale_destination_evidence[0].discharge.present);
+    }
+
+    #[test]
+    fn copy_range_early_return_bounds_are_applicable_when_targets_stay_fresh() {
+        let obligations = vec![SafetyObligation::new(
+            "bounds",
+            "copy source and destination ranges are in bounds",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let matching = site_with_family(
+            OperationFamily::CopyNonOverlapping,
+            vec![
+                "fn copy(src: &[u8], dst: &mut [u8], count: usize) {",
+                "    if count > src.len() {",
+                "        return;",
+                "    }",
+                "    if count > dst.len() {",
+                "        return;",
+                "    }",
+            ],
+            "unsafe { core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count) }",
+            vec!["}"],
+        );
+        let stale_after_return_guard = site_with_family(
+            OperationFamily::CopyNonOverlapping,
+            vec![
+                "fn copy(src: &[u8], dst: &mut [u8], mut count: usize) {",
+                "    if count > src.len() {",
+                "        return;",
+                "    }",
+                "    if count > dst.len() {",
+                "        return;",
+                "    }",
+                "    count = adjusted_count();",
+            ],
+            "unsafe { core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count) }",
+            vec!["}"],
+        );
+
+        let matching_evidence = obligation_evidence(&matching, &obligations, &contract, &reach);
+        let stale_after_return_guard_evidence =
+            obligation_evidence(&stale_after_return_guard, &obligations, &contract, &reach);
+
+        assert!(matching_evidence[0].discharge.present);
+        assert!(!stale_after_return_guard_evidence[0].discharge.present);
+    }
+
+    #[test]
     fn bool_write_bytes_value_guard_discharges_initialized_obligation() {
         let obligations = vec![SafetyObligation::new(
             "initialized",
