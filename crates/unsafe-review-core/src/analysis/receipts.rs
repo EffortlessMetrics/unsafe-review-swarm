@@ -875,6 +875,67 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn receipt_audit_reports_command_hash_mismatch_without_losing_card_context()
+    -> Result<(), String> {
+        let root = copy_fixture_to_temp(
+            "raw_pointer_alignment",
+            "unsafe-review-receipt-audit-command-hash-mismatch",
+        )?;
+        let output = analyze_fixture_root(&root)?;
+        let card_id = output
+            .cards
+            .first()
+            .ok_or_else(|| "fixture produced no card".to_string())?
+            .id
+            .0
+            .clone();
+        let receipt_dir = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipt_dir)
+            .map_err(|err| format!("create receipt dir failed: {err}"))?;
+        fs::write(
+            receipt_dir.join("bad-command-hash.json"),
+            format!(
+                r#"{{
+  "schema_version": "0.1",
+  "card_id": "{card_id}",
+  "tool": "miri",
+  "strength": "ran",
+  "author": "core/fixtures",
+  "recorded_at": "2025-12-18T00:00:00Z",
+  "expires_at": "2026-08-18",
+  "summary": "focused witness",
+  "command": "cargo test",
+  "command_hash": "0000000000000000",
+  "limitations": ["fixture only"]
+}}"#
+            ),
+        )
+        .map_err(|err| format!("write receipt failed: {err}"))?;
+
+        let report = audit_receipts_with_date(&output, "2026-05-18")?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+        assert_eq!(report.summary.receipts, 1);
+        assert_eq!(report.summary.matched, 1);
+        assert_eq!(report.summary.invalid, 1);
+        let entry = report
+            .receipts
+            .first()
+            .ok_or_else(|| "receipt audit entry missing".to_string())?;
+        assert_eq!(entry.command_hash.as_deref(), Some("0000000000000000"));
+        assert!(entry.statuses.iter().any(|status| status == "matched"));
+        assert!(entry.statuses.iter().any(|status| status == "invalid"));
+        assert!(entry.matched_card.is_some());
+        assert!(
+            entry
+                .issues
+                .iter()
+                .any(|issue| issue.contains("command_hash"))
+        );
+        Ok(())
+    }
+
     fn unique_temp_dir(prefix: &str) -> Result<PathBuf, String> {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
