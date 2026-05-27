@@ -222,6 +222,8 @@ trust boundary
 ```
 
 SARIF must not create a separate classification truth. It is a projection from ReviewCards.
+SARIF rule IDs are the stable `ReviewClass` string values; changing a rule ID is
+a code-scanning baseline contract change, not a wording-only edit.
 
 #### 3.5 `comment-plan.json`
 

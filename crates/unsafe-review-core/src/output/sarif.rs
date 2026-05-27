@@ -351,6 +351,51 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn sarif_rule_ids_and_levels_are_stable_review_class_contract() {
+        let cases = [
+            (
+                ReviewClass::GuardedAndWitnessed,
+                "guarded_and_witnessed",
+                "none",
+            ),
+            (
+                ReviewClass::GuardedUnwitnessed,
+                "guarded_unwitnessed",
+                "note",
+            ),
+            (ReviewClass::ContractMissing, "contract_missing", "warning"),
+            (ReviewClass::GuardMissing, "guard_missing", "warning"),
+            (
+                ReviewClass::ReachableUnwitnessed,
+                "reachable_unwitnessed",
+                "warning",
+            ),
+            (ReviewClass::UnsafeUnreached, "unsafe_unreached", "note"),
+            (ReviewClass::WitnessMismatch, "witness_mismatch", "warning"),
+            (ReviewClass::RequiresLoom, "requires_loom", "warning"),
+            (
+                ReviewClass::RequiresSanitizer,
+                "requires_sanitizer",
+                "warning",
+            ),
+            (
+                ReviewClass::RequiresKaniOrCrux,
+                "requires_kani_or_crux",
+                "warning",
+            ),
+            (ReviewClass::MiriUnsupported, "miri_unsupported", "warning"),
+            (ReviewClass::StaticUnknown, "static_unknown", "note"),
+            (ReviewClass::BaselineKnown, "baseline_known", "none"),
+            (ReviewClass::Suppressed, "suppressed", "none"),
+        ];
+
+        for (class, expected_rule_id, expected_level) in cases {
+            assert_eq!(class.as_str(), expected_rule_id);
+            assert_eq!(sarif_level(&class), expected_level);
+        }
+    }
+
     fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures")
