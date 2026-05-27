@@ -1175,6 +1175,12 @@ fn check_lsp_artifact(
         super::json_array_at(diagnostic, "/obligation_evidence", "lsp.json diagnostic")?;
         check_lsp_diagnostic_evidence(diagnostic)?;
         check_lsp_diagnostic_witness_commands(diagnostic)?;
+        require_projected_string_array(
+            diagnostic,
+            "verify_commands",
+            &card_projection.verify_commands,
+            "lsp.json diagnostic",
+        )?;
         let boundary = diagnostic
             .get("trust_boundary")
             .and_then(serde_json::Value::as_str)

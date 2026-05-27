@@ -8979,6 +8979,39 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_lsp_diagnostic_verify_command_drift() -> Result<(), String>
+    {
+        let dir = unique_temp_dir("unsafe-review-first-pr-lsp-diagnostic-verify-command-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let lsp_path = dir.join("lsp.json");
+        let mut lsp: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&lsp_path).map_err(|err| format!("read lsp failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse lsp failed: {err}"))?;
+        let first_diagnostic = lsp
+            .get_mut("diagnostics")
+            .and_then(serde_json::Value::as_array_mut)
+            .and_then(|diagnostics| diagnostics.first_mut())
+            .ok_or_else(|| "test lsp missing first diagnostic".to_string())?;
+        first_diagnostic["verify_commands"] = serde_json::json!(["cargo test unrelated"]);
+        first_diagnostic["witness_routes"][0]["command"] =
+            serde_json::json!("cargo test unrelated");
+        fs::write(&lsp_path, lsp.to_string()).map_err(|err| format!("write lsp failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("lsp.json diagnostic verify_commands must project cards.json value")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_lsp_diagnostic_reversed_range() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-lsp-diagnostic-reversed-range")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
