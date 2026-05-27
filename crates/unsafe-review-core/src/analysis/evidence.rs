@@ -2,6 +2,7 @@ mod assignment_syntax;
 mod box_raw_origin;
 mod call_syntax;
 mod code_text;
+mod contract_text;
 mod control_flow;
 mod copy_range;
 mod freshness;
@@ -42,6 +43,7 @@ use self::call_syntax::{
 use self::code_text::{
     compact_code, compact_contains_identifier, strip_block_comments_and_literals,
 };
+pub(crate) use self::contract_text::contract_evidence;
 use self::control_flow::{
     branch_still_open_at_operation, compact_if_guards, matching_code_block_end,
 };
@@ -103,63 +105,6 @@ use std::path::{Path, PathBuf};
 const PUBLIC_UNSAFE_API_CONTRACT_DISCHARGE: &str = "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration";
 const DOCUMENTED_PRIVATE_UNSAFE_CONTRACT_DISCHARGE: &str = "Documented private unsafe declaration is a caller-contract site; local guard evidence is not expected at the declaration";
 const TARGET_FEATURE_CONTRACT_DISCHARGE: &str = "Documented target-feature declaration is a caller-contract site; local guard evidence is not expected at the attribute";
-
-pub(crate) fn contract_evidence(site: &ScannedSite) -> ContractEvidence {
-    let context = site.context_before.join("\n");
-    if let Some(summary) = safety_doc_summary(&context) {
-        return ContractEvidence::present(summary);
-    }
-    if site.site.public_api_surface {
-        return ContractEvidence::missing_with(
-            "Public unsafe API is missing nearby `# Safety` documentation",
-        );
-    }
-    if let Some(summary) = safety_comment_summary(&context, &site.site.snippet) {
-        return ContractEvidence::present(summary);
-    }
-    ContractEvidence::missing()
-}
-
-fn safety_doc_summary(context: &str) -> Option<&'static str> {
-    for line in context.lines() {
-        let trimmed = line.trim_start();
-        if !(trimmed.starts_with("///")
-            || trimmed.starts_with("//!")
-            || trimmed.starts_with("#[doc"))
-        {
-            continue;
-        }
-        if trimmed.contains("# Safety") {
-            return Some("Nearby `# Safety` documentation was detected");
-        }
-        if trimmed.contains("Safety:") {
-            return Some("Nearby `Safety:` documentation was detected");
-        }
-    }
-    None
-}
-
-fn safety_comment_summary(context: &str, snippet: &str) -> Option<&'static str> {
-    for line in context.lines().chain(snippet.lines()) {
-        let trimmed = line.trim_start();
-        if trimmed.starts_with("///") || trimmed.starts_with("//!") {
-            continue;
-        }
-        if !(trimmed.starts_with("//")
-            || trimmed.contains("// SAFETY:")
-            || trimmed.contains("// Safety:"))
-        {
-            continue;
-        }
-        if trimmed.contains("SAFETY:") {
-            return Some("Nearby `SAFETY:` comment was detected");
-        }
-        if trimmed.contains("Safety:") {
-            return Some("Nearby `Safety:` comment was detected");
-        }
-    }
-    None
-}
 
 pub(crate) fn obligation_evidence(
     site: &ScannedSite,
