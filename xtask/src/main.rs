@@ -2148,6 +2148,7 @@ fn check_dogfood() -> Result<(), String> {
     check_dogfood_report_triage_labels()?;
     check_dogfood_reports_indexed()?;
     check_dogfood_report_trust_boundaries()?;
+    check_dogfood_report_overclaims()?;
 
     println!(
         "check-dogfood: ok ({} targets, {} repositories)",
@@ -2199,6 +2200,26 @@ fn check_dogfood_report_trust_boundary_text(path: &str, text: &str) -> Result<()
                 "{path} trust boundary must mention `{label}` limits"
             ));
         }
+    }
+    Ok(())
+}
+
+fn check_dogfood_report_overclaims() -> Result<(), String> {
+    let report_dir = workspace_path(DOGFOOD_REPORT_DIR);
+    if !report_dir.is_dir() {
+        return Err(format!("{DOGFOOD_REPORT_DIR} is missing"));
+    }
+    for entry in fs::read_dir(&report_dir)
+        .map_err(|err| format!("read {DOGFOOD_REPORT_DIR} failed: {err}"))?
+    {
+        let entry =
+            entry.map_err(|err| format!("read {DOGFOOD_REPORT_DIR} entry failed: {err}"))?;
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("md") {
+            continue;
+        }
+        let text = read_to_string(&path)?;
+        reject_positive_overclaims(&path, &text)?;
     }
     Ok(())
 }
@@ -8920,6 +8941,26 @@ precision or recall, or witness adequacy.
             .unwrap_err();
 
         assert!(err.contains("`policy` limits"));
+    }
+
+    #[test]
+    fn dogfood_report_overclaim_rejects_all_clear() {
+        let text = r#"
+# Dogfood report
+
+All clear.
+
+## Trust boundary
+
+This report records static advisory review evidence. It is not memory-safety
+proof, UB-free status, Miri-clean status, site-execution proof, calibrated
+precision or recall, witness adequacy, or policy readiness.
+"#;
+
+        let err = reject_positive_overclaims(Path::new("docs/dogfood/reports/test.md"), text)
+            .unwrap_err();
+
+        assert!(err.contains("all clear"));
     }
 
     #[test]
