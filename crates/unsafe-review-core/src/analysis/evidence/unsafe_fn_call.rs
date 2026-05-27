@@ -1,4 +1,6 @@
-use super::{branch_still_open_at_operation, compact_code, is_receiver_path_char};
+use super::{
+    branch_still_open_at_operation, compact_code, is_receiver_path_char, matching_code_block_end,
+};
 
 pub(super) fn has_encode_utf8_remaining_capacity_evidence(lower: &str) -> bool {
     let compact = compact_code(lower);
@@ -92,9 +94,8 @@ impl<'a> UncheckedConstructorAvailabilityContext<'a> {
     fn has_unavailable_early_return(&self) -> bool {
         let guard = format!("if!{}{{", self.predicate);
         self.any_guard_tail(&guard, |after_guard| {
-            let guard_body = after_guard
-                .split_once('}')
-                .map_or(after_guard, |(guard_body, _after)| guard_body);
+            let guard_body = matching_code_block_end(after_guard)
+                .map_or(after_guard, |body_end| &after_guard[..body_end]);
             guard_body.contains("return")
         })
     }

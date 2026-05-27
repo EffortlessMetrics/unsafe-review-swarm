@@ -1913,6 +1913,19 @@ mod tests {
             "unsafe { Some(One::new_unchecked(needle)) }",
             vec![],
         );
+        let nested_unavailable_return_guard = site_with_family(
+            OperationFamily::UnsafeFnCall,
+            vec![
+                "if !One::is_available() {",
+                "    if should_count() {",
+                "        record_unavailable();",
+                "    }",
+                "    return None;",
+                "}",
+            ],
+            "unsafe { Some(One::new_unchecked(needle)) }",
+            vec![],
+        );
         let unguarded = site_with_family(
             OperationFamily::UnsafeFnCall,
             vec![],
@@ -1925,11 +1938,18 @@ mod tests {
             obligation_evidence(&assert_guarded, &obligations, &contract, &reach);
         let unavailable_return_evidence =
             obligation_evidence(&unavailable_return_guard, &obligations, &contract, &reach);
+        let nested_unavailable_return_evidence = obligation_evidence(
+            &nested_unavailable_return_guard,
+            &obligations,
+            &contract,
+            &reach,
+        );
         let unguarded_evidence = obligation_evidence(&unguarded, &obligations, &contract, &reach);
 
         assert!(guarded_evidence[0].discharge.present);
         assert!(assert_guarded_evidence[0].discharge.present);
         assert!(unavailable_return_evidence[0].discharge.present);
+        assert!(nested_unavailable_return_evidence[0].discharge.present);
         assert!(!unguarded_evidence[0].discharge.present);
     }
 
