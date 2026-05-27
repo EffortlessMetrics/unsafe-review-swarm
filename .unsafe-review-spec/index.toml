@@ -55,7 +55,7 @@ owner = "repo-infra"
 id = "UNSAFE-REVIEW-SPEC-0026"
 kind = "spec"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-0026-accuracy-validation-and-calibration.md"
-status = "draft"
+status = "proposed"
 owner = "calibration"
 
 [[artifact]]

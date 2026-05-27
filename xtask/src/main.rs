@@ -239,6 +239,14 @@ const PUBLIC_BADGE_ENDPOINTS: &[(&str, &str)] = &[
     ("badges/unsafe-review-plus.json", "unsafe-review+"),
 ];
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct DocArtifactEntry {
+    kind: String,
+    path: String,
+    status: String,
+    owner: String,
+}
+
 fn main() {
     if let Err(err) = run(std::env::args().collect()) {
         eprintln!("xtask: {err}");
@@ -421,6 +429,8 @@ fn check_doc_artifacts() -> Result<(), String> {
 
 fn check_doc_artifacts_impl() -> Result<BTreeSet<String>, String> {
     let value = parse_toml_file(Path::new(DOC_ARTIFACT_LEDGER))?;
+    let source_index = parse_toml_file(Path::new(SOURCE_OF_TRUTH_INDEX))?;
+    let source_artifacts = source_truth_index_artifacts(&source_index)?;
     require_toml_string(&value, "schema_version", DOC_ARTIFACT_LEDGER)?;
     let artifacts = toml_array(&value, "artifact", DOC_ARTIFACT_LEDGER)?;
     if artifacts.is_empty() {
@@ -430,6 +440,7 @@ fn check_doc_artifacts_impl() -> Result<BTreeSet<String>, String> {
     }
 
     let mut ids = BTreeSet::new();
+    let mut ledger_artifacts = BTreeMap::new();
     let mut linked_ids = Vec::new();
     for (idx, artifact) in artifacts.iter().enumerate() {
         let table = toml_table(artifact, DOC_ARTIFACT_LEDGER, "artifact", idx)?;
@@ -437,7 +448,7 @@ fn check_doc_artifacts_impl() -> Result<BTreeSet<String>, String> {
         let kind = required_table_string(table, "kind", DOC_ARTIFACT_LEDGER, "artifact", idx)?;
         let path = required_table_string(table, "path", DOC_ARTIFACT_LEDGER, "artifact", idx)?;
         let status = required_table_string(table, "status", DOC_ARTIFACT_LEDGER, "artifact", idx)?;
-        required_table_string(table, "owner", DOC_ARTIFACT_LEDGER, "artifact", idx)?;
+        let owner = required_table_string(table, "owner", DOC_ARTIFACT_LEDGER, "artifact", idx)?;
 
         require_known(kind, DOC_ARTIFACT_KINDS, DOC_ARTIFACT_LEDGER, "kind")?;
         require_known(status, DOC_ARTIFACT_STATUSES, DOC_ARTIFACT_LEDGER, "status")?;
@@ -446,6 +457,15 @@ fn check_doc_artifacts_impl() -> Result<BTreeSet<String>, String> {
                 "{DOC_ARTIFACT_LEDGER} contains duplicate id `{id}`"
             ));
         }
+        ledger_artifacts.insert(
+            id.to_string(),
+            DocArtifactEntry {
+                kind: kind.to_string(),
+                path: path.to_string(),
+                status: status.to_string(),
+                owner: owner.to_string(),
+            },
+        );
         require_file(path)?;
         if let Some(linked_proposal) = table.get("linked_proposal").and_then(toml::Value::as_str) {
             linked_ids.push((
@@ -472,7 +492,33 @@ fn check_doc_artifacts_impl() -> Result<BTreeSet<String>, String> {
         }
     }
 
+    check_doc_artifacts_source_index_consistency(&ledger_artifacts, &source_artifacts)?;
+
     Ok(ids)
+}
+
+fn check_doc_artifacts_source_index_consistency(
+    ledger_artifacts: &BTreeMap<String, DocArtifactEntry>,
+    source_artifacts: &BTreeMap<String, DocArtifactEntry>,
+) -> Result<(), String> {
+    for (id, ledger) in ledger_artifacts {
+        let Some(indexed) = source_artifacts.get(id) else {
+            continue;
+        };
+        for (field, ledger_value, index_value) in [
+            ("kind", &ledger.kind, &indexed.kind),
+            ("path", &ledger.path, &indexed.path),
+            ("status", &ledger.status, &indexed.status),
+            ("owner", &ledger.owner, &indexed.owner),
+        ] {
+            if ledger_value != index_value {
+                return Err(format!(
+                    "{SOURCE_OF_TRUTH_INDEX} artifact `{id}` {field} `{index_value}` must match {DOC_ARTIFACT_LEDGER} `{ledger_value}`"
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn check_docs_automation() -> Result<(), String> {
@@ -1136,6 +1182,38 @@ fn source_truth_index_ids(value: &toml::Value, kind: &str) -> Result<BTreeSet<St
         required_table_string(table, "owner", SOURCE_OF_TRUTH_INDEX, kind, idx)?;
     }
     Ok(ids)
+}
+
+fn source_truth_index_artifacts(
+    value: &toml::Value,
+) -> Result<BTreeMap<String, DocArtifactEntry>, String> {
+    let entries = toml_array(value, "artifact", SOURCE_OF_TRUTH_INDEX)?;
+    let mut artifacts = BTreeMap::new();
+    for (idx, entry) in entries.iter().enumerate() {
+        let table = toml_table(entry, SOURCE_OF_TRUTH_INDEX, "artifact", idx)?;
+        let id = required_table_string(table, "id", SOURCE_OF_TRUTH_INDEX, "artifact", idx)?;
+        if artifacts.contains_key(id) {
+            return Err(format!(
+                "{SOURCE_OF_TRUTH_INDEX} contains duplicate artifact id `{id}`"
+            ));
+        }
+        let kind = required_table_string(table, "kind", SOURCE_OF_TRUTH_INDEX, "artifact", idx)?;
+        let path = required_table_string(table, "path", SOURCE_OF_TRUTH_INDEX, "artifact", idx)?;
+        let status =
+            required_table_string(table, "status", SOURCE_OF_TRUTH_INDEX, "artifact", idx)?;
+        let owner = required_table_string(table, "owner", SOURCE_OF_TRUTH_INDEX, "artifact", idx)?;
+        require_file(path)?;
+        artifacts.insert(
+            id.to_string(),
+            DocArtifactEntry {
+                kind: kind.to_string(),
+                path: path.to_string(),
+                status: status.to_string(),
+                owner: owner.to_string(),
+            },
+        );
+    }
+    Ok(artifacts)
 }
 
 fn check_package_boundary() -> Result<(), String> {
@@ -5907,6 +5985,16 @@ mod tests {
         }
     }
 
+    fn doc_artifact_entry(status: &str) -> DocArtifactEntry {
+        DocArtifactEntry {
+            kind: "spec".to_string(),
+            path: "docs/specs/UNSAFE-REVIEW-SPEC-0026-accuracy-validation-and-calibration.md"
+                .to_string(),
+            status: status.to_string(),
+            owner: "calibration".to_string(),
+        }
+    }
+
     #[test]
     fn xtask_rejects_unexpected_trailing_args() -> Result<(), String> {
         let args = vec![
@@ -8260,6 +8348,42 @@ OperationFamily::RawPointerRead => vec![
         assert_eq!(rows[0].status, "draft");
         assert_eq!(rows[0].last_touched, "2026-05-23");
         Ok(())
+    }
+
+    #[test]
+    fn doc_artifact_index_status_matches_policy_ledger() -> Result<(), String> {
+        let mut ledger = BTreeMap::new();
+        ledger.insert(
+            "UNSAFE-REVIEW-SPEC-0026".to_string(),
+            doc_artifact_entry("proposed"),
+        );
+        let mut index = BTreeMap::new();
+        index.insert(
+            "UNSAFE-REVIEW-SPEC-0026".to_string(),
+            doc_artifact_entry("proposed"),
+        );
+
+        check_doc_artifacts_source_index_consistency(&ledger, &index)
+    }
+
+    #[test]
+    fn doc_artifact_index_status_rejects_policy_ledger_drift() {
+        let mut ledger = BTreeMap::new();
+        ledger.insert(
+            "UNSAFE-REVIEW-SPEC-0026".to_string(),
+            doc_artifact_entry("proposed"),
+        );
+        let mut index = BTreeMap::new();
+        index.insert(
+            "UNSAFE-REVIEW-SPEC-0026".to_string(),
+            doc_artifact_entry("draft"),
+        );
+
+        let err = check_doc_artifacts_source_index_consistency(&ledger, &index).unwrap_err();
+
+        assert!(err.contains(".unsafe-review-spec/index.toml"));
+        assert!(err.contains("UNSAFE-REVIEW-SPEC-0026"));
+        assert!(err.contains("status `draft` must match"));
     }
 
     #[test]
