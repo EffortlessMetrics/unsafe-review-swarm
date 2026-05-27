@@ -3,6 +3,7 @@ mod maybeuninit;
 mod nonnull;
 mod set_len;
 mod transmute;
+mod unreachable_unchecked;
 mod unwrap_unchecked;
 mod utf8;
 
@@ -12,6 +13,7 @@ use self::nonnull::has_nullability_guard;
 use self::transmute::{
     has_transmute_layout_size_evidence, has_transmute_u8_bool_valid_value_evidence,
 };
+use self::unreachable_unchecked::has_unreachable_unchecked_infallible_path_evidence;
 use self::unwrap_unchecked::{
     has_unwrap_unchecked_infallible_result_evidence, has_unwrap_unchecked_receiver_state_evidence,
 };
@@ -1880,39 +1882,6 @@ fn unchecked_constructor_receiver(compact_expression: &str) -> Option<&str> {
         .unwrap_or(0);
     let receiver = &before_call[receiver_start..];
     (!receiver.is_empty()).then_some(receiver)
-}
-
-fn has_unreachable_unchecked_infallible_path_evidence(lower: &str) -> bool {
-    let compact = compact_code(lower);
-    let Some(call_pos) = compact.find("unreachable_unchecked(") else {
-        return false;
-    };
-    let before_call = &compact[..call_pos];
-    let Some(match_pos) = before_call.rfind("match") else {
-        return false;
-    };
-    let match_context = &before_call[match_pos..];
-    let Some((match_head, after_open)) = match_context.split_once('{') else {
-        return false;
-    };
-    if !match_head.contains("fallibility::infallible") {
-        return false;
-    }
-
-    let mut depth = 1usize;
-    for ch in after_open.chars() {
-        match ch {
-            '{' => depth += 1,
-            '}' => {
-                depth = depth.saturating_sub(1);
-                if depth == 0 {
-                    return false;
-                }
-            }
-            _ => {}
-        }
-    }
-    true
 }
 
 fn matching_call_argument_end(text: &str) -> Option<usize> {
