@@ -746,23 +746,31 @@ fn check_spec_status_dashboard_impl() -> Result<usize, String> {
                 row.spec_id
             ));
         }
-        if !spec_file_exists_for_id(&row.spec_id)? {
+        let Some(spec_file) = spec_file_path_for_id(&row.spec_id)? else {
             return Err(format!(
                 "{SPEC_STATUS_DASHBOARD} references `{}` but no matching docs/specs file exists",
                 row.spec_id
             ));
-        }
-        let status = row
-            .status
-            .split([',', ' '])
-            .next()
-            .unwrap_or_default()
-            .to_ascii_lowercase();
+        };
+        let status = spec_lifecycle_status(&row.status);
         require_known(
             &status,
             SPEC_STATUS_LIFECYCLE_STATUSES,
             SPEC_STATUS_DASHBOARD,
             "status",
+        )?;
+        let spec_status = spec_file_lifecycle_status(&spec_file)?;
+        require_known(
+            &spec_status,
+            SPEC_STATUS_LIFECYCLE_STATUSES,
+            &spec_file.display().to_string(),
+            "status",
+        )?;
+        check_spec_status_lifecycle_match(
+            &row.spec_id,
+            &status,
+            &spec_status,
+            &spec_file.display().to_string(),
         )?;
         if row.implementation_state.trim().is_empty() {
             return Err(format!(
@@ -880,16 +888,57 @@ fn spec_id_from_status_cell(cell: &str) -> Option<String> {
     Some(rest[..end].to_string())
 }
 
-fn spec_file_exists_for_id(spec_id: &str) -> Result<bool, String> {
+fn spec_file_path_for_id(spec_id: &str) -> Result<Option<PathBuf>, String> {
     for path in markdown_files(&workspace_path("docs/specs"))? {
         let Some(name) = path.file_name().and_then(|value| value.to_str()) else {
             return Err(format!("non-UTF-8 spec file path: {}", path.display()));
         };
         if name.starts_with(spec_id) && name.ends_with(".md") {
-            return Ok(true);
+            return Ok(Some(path));
         }
     }
-    Ok(false)
+    Ok(None)
+}
+
+fn spec_file_lifecycle_status(path: &Path) -> Result<String, String> {
+    let text = read_to_string(path)?;
+    spec_lifecycle_status_from_text(&text, &path.display().to_string())
+}
+
+fn spec_lifecycle_status_from_text(text: &str, source: &str) -> Result<String, String> {
+    for line in text.lines() {
+        let trimmed = line.trim();
+        let status = trimmed
+            .strip_prefix("Status:")
+            .or_else(|| trimmed.strip_prefix("- Status:"));
+        if let Some(status) = status {
+            return Ok(spec_lifecycle_status(status));
+        }
+    }
+    Err(format!("{source} must include a Status header"))
+}
+
+fn spec_lifecycle_status(status: &str) -> String {
+    status
+        .trim()
+        .split([',', ' '])
+        .next()
+        .unwrap_or_default()
+        .to_ascii_lowercase()
+}
+
+fn check_spec_status_lifecycle_match(
+    spec_id: &str,
+    dashboard_status: &str,
+    spec_status: &str,
+    source: &str,
+) -> Result<(), String> {
+    if dashboard_status == spec_status {
+        return Ok(());
+    }
+    Err(format!(
+        "{SPEC_STATUS_DASHBOARD} row `{spec_id}` status `{dashboard_status}` must match {source} Status lifecycle `{spec_status}`"
+    ))
 }
 
 fn check_spec_status_proof_commands(spec_id: &str, proof_commands: &str) -> Result<(), String> {
@@ -8348,6 +8397,34 @@ OperationFamily::RawPointerRead => vec![
         assert_eq!(rows[0].status, "draft");
         assert_eq!(rows[0].last_touched, "2026-05-23");
         Ok(())
+    }
+
+    #[test]
+    fn spec_status_lifecycle_header_accepts_plain_and_bulleted_status() -> Result<(), String> {
+        assert_eq!(
+            spec_lifecycle_status_from_text("Status: accepted, partial-runtime", "plain.md")?,
+            "accepted"
+        );
+        assert_eq!(
+            spec_lifecycle_status_from_text("- Status: Accepted", "bulleted.md")?,
+            "accepted"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn spec_status_lifecycle_match_rejects_dashboard_drift() {
+        let err = check_spec_status_lifecycle_match(
+            "UNSAFE-REVIEW-SPEC-0026",
+            "accepted",
+            "proposed",
+            "docs/specs/UNSAFE-REVIEW-SPEC-0026-accuracy-validation-and-calibration.md",
+        )
+        .unwrap_err();
+
+        assert!(err.contains("UNSAFE-REVIEW-SPEC-0026"));
+        assert!(err.contains("status `accepted` must match"));
+        assert!(err.contains("Status lifecycle `proposed`"));
     }
 
     #[test]
