@@ -10828,6 +10828,58 @@ Snapshot reports:
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_required_witness_routes() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-required-witness-route")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        let path = dir.join("cards.json");
+        let mut cards: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&path).map_err(|err| format!("read cards failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse cards failed: {err}"))?;
+        cards["cards"][0]["witness_routes"][0]["required"] = serde_json::json!(true);
+        fs::write(&path, cards.to_string()).map_err(|err| format!("write cards failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("witness_routes[] required must remain false")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn advisory_artifact_checker_rejects_comment_plan_witness_required_drift() -> Result<(), String>
+    {
+        let dir = unique_temp_dir("unsafe-review-artifacts-comment-witness-required-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        let path = dir.join("comment-plan.json");
+        let mut comment_plan: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&path).map_err(|err| format!("read comment plan failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse comment plan failed: {err}"))?;
+        comment_plan["comments"][0]["witness_routes"][0]["required"] = serde_json::json!(true);
+        fs::write(&path, comment_plan.to_string())
+            .map_err(|err| format!("write comment plan failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("comment-plan.json comment witness_routes[0] required must project cards.json value `false`; got `true`")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn advisory_artifact_checker_rejects_comment_plan_forbidden_class() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-artifacts-comment-forbidden-class")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;

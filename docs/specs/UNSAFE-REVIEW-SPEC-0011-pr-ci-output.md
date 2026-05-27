@@ -129,6 +129,7 @@ must include hazards
 must include obligation evidence
 must include missing evidence
 must include witness routes when available
+witness routes must keep `required = false` in the default advisory PR packet
 ```
 
 All other PR artifacts are projections from this card set.

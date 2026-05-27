@@ -27,6 +27,7 @@ struct WitnessRouteProjection {
     kind: String,
     reason: String,
     command: Option<String>,
+    required: bool,
 }
 
 const COMMENT_PLAN_BODY_WORD_LIMIT: usize = 220;
@@ -1000,10 +1001,21 @@ fn advisory_card_projections(
                             route,
                             "cards.json card witness_routes[]",
                         )?;
+                        let required = witness_route_required_projection(
+                            route,
+                            "cards.json card witness_routes[]",
+                        )?;
+                        if required {
+                            return Err(
+                                "cards.json card witness_routes[] required must remain false; unsafe-review routes witnesses but does not require execution by default"
+                                    .to_string(),
+                            );
+                        }
                         Ok::<WitnessRouteProjection, String>(WitnessRouteProjection {
                             kind,
                             reason,
                             command,
+                            required,
                         })
                     })
                     .collect::<Result<Vec<_>, _>>()
@@ -1232,8 +1244,25 @@ fn require_projected_witness_routes_field(
                 expected.command, actual_command
             ));
         }
+        let actual_required = witness_route_required_projection(actual, &route_context)?;
+        if actual_required != expected.required {
+            return Err(format!(
+                "{route_context} required must project cards.json value `{}`; got `{actual_required}`",
+                expected.required
+            ));
+        }
     }
     Ok(())
+}
+
+fn witness_route_required_projection(
+    route: &serde_json::Value,
+    context: &str,
+) -> Result<bool, String> {
+    let Some(required) = route.get("required").and_then(serde_json::Value::as_bool) else {
+        return Err(format!("{context} required must be a boolean"));
+    };
+    Ok(required)
 }
 
 fn witness_route_summaries(routes: &[WitnessRouteProjection]) -> Vec<String> {
