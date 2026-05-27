@@ -160,7 +160,7 @@ Current implementation checkpoint:
 | `get_unchecked` / `get_unchecked_mut` | `GetUncheckedBoundsApplicability` for same receiver/index, open branches, early returns, and stale targets | factored | Dogfood `arrayvec-pr137` or hashbrown targets before adding new probe shapes. |
 | `NonNull::new_unchecked` | `NonNullPointerContext` for same-pointer probes, open branches, early returns, and stale pointer checks | factored | Add cast/provenance or macro controls only from concrete fixtures. |
 | `MaybeUninit::assume_init` | `MaybeUninitSlotContext` for same-slot writes/new bindings, scope reach, and stale slot checks | factored | Add partial/field/array initialization controls only as separate fixture-backed slices. |
-| `Vec::set_len` | Set-len capacity and initialized-range contexts are split from generic bounds checks | in progress | Keep using `arrayvec-pr288` as regression pressure for stale or wrong-target initialized-range shapes. |
+| `Vec::set_len` | `SetLenApplicabilityContext` delegates initialized-range checks to `SetLenInitializedRangeContext` while capacity checks remain separate | factored | Keep using `arrayvec-pr288` as regression pressure for stale or wrong-target initialized-range shapes. |
 | `transmute` / `transmute_copy` | `TransmuteLayoutContext` and `TransmuteValueDomainContext` separate layout-size evidence from value-domain evidence | factored | Do not broaden valid-value domains without one positive and one false-positive control. |
 
 Original extraction sequence, retained as the preferred order for auditing or
