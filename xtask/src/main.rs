@@ -2013,12 +2013,59 @@ fn check_dogfood() -> Result<(), String> {
     )?;
     check_dogfood_report_triage_labels()?;
     check_dogfood_reports_indexed()?;
+    check_dogfood_report_trust_boundaries()?;
 
     println!(
         "check-dogfood: ok ({} targets, {} repositories)",
         targets.len(),
         repositories.len()
     );
+    Ok(())
+}
+
+fn check_dogfood_report_trust_boundaries() -> Result<(), String> {
+    let report_dir = workspace_path(DOGFOOD_REPORT_DIR);
+    if !report_dir.is_dir() {
+        return Err(format!("{DOGFOOD_REPORT_DIR} is missing"));
+    }
+    for entry in fs::read_dir(&report_dir)
+        .map_err(|err| format!("read {DOGFOOD_REPORT_DIR} failed: {err}"))?
+    {
+        let entry =
+            entry.map_err(|err| format!("read {DOGFOOD_REPORT_DIR} entry failed: {err}"))?;
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("md") {
+            continue;
+        }
+        let report_path = path.to_string_lossy().replace('\\', "/");
+        let text = read_to_string(&path)?;
+        check_dogfood_report_trust_boundary_text(&report_path, &text)?;
+    }
+    Ok(())
+}
+
+fn check_dogfood_report_trust_boundary_text(path: &str, text: &str) -> Result<(), String> {
+    let lower = text.to_ascii_lowercase();
+    if !lower.contains("## trust boundary") {
+        return Err(format!("{path} must include a `## Trust boundary` section"));
+    }
+    if !lower.contains("witness") {
+        return Err(format!("{path} trust boundary must mention witness limits"));
+    }
+    for (label, required) in [
+        ("safety", &["memory-safety", " safe", "safe,"][..]),
+        ("ub-free", &["ub-free"][..]),
+        ("miri-clean", &["miri-clean"][..]),
+        ("site-execution", &["site-execut"][..]),
+        ("calibration", &["calibrated", "precision", "recall"][..]),
+        ("policy", &["policy"][..]),
+    ] {
+        if !required.iter().any(|needle| lower.contains(needle)) {
+            return Err(format!(
+                "{path} trust boundary must mention `{label}` limits"
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -8523,6 +8570,51 @@ impl WitnessKind {
 
         assert!(err.contains("unknown dogfood triage label"));
         assert!(err.contains("probably-actionable"));
+    }
+
+    #[test]
+    fn dogfood_report_trust_boundary_accepts_advisory_limits() -> Result<(), String> {
+        let text = r#"
+## Trust boundary
+
+This report records static advisory review evidence. It is not memory-safety
+proof, UB-free status, Miri-clean status, site-execution proof, calibrated
+precision or recall, witness adequacy, or policy readiness.
+"#;
+
+        check_dogfood_report_trust_boundary_text("docs/dogfood/reports/test.md", text)
+    }
+
+    #[test]
+    fn dogfood_report_trust_boundary_rejects_missing_witness_limits() {
+        let text = r#"
+## Trust boundary
+
+This report records static advisory review evidence. It is not memory-safety
+proof, UB-free status, Miri-clean status, site-execution proof, calibrated
+precision or recall, or policy readiness.
+"#;
+
+        let err = check_dogfood_report_trust_boundary_text("docs/dogfood/reports/test.md", text)
+            .unwrap_err();
+
+        assert!(err.contains("witness limits"));
+    }
+
+    #[test]
+    fn dogfood_report_trust_boundary_rejects_missing_policy_limits() {
+        let text = r#"
+## Trust boundary
+
+This report records static advisory review evidence. It is not memory-safety
+proof, UB-free status, Miri-clean status, site-execution proof, calibrated
+precision or recall, or witness adequacy.
+"#;
+
+        let err = check_dogfood_report_trust_boundary_text("docs/dogfood/reports/test.md", text)
+            .unwrap_err();
+
+        assert!(err.contains("`policy` limits"));
     }
 
     #[test]
