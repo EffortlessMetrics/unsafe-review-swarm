@@ -986,6 +986,47 @@ impl<'a> GetUncheckedBoundsApplicability<'a> {
         !self.has_stale_target_assignment(evidence)
     }
 
+    fn any_marker_preserves_applicability(
+        &self,
+        marker: &str,
+        mut applies: impl FnMut(&str) -> bool,
+    ) -> bool {
+        let mut cursor = self.before_operation;
+        let mut offset = 0usize;
+        while let Some(pos) = cursor.find(marker) {
+            let proof_end = offset + pos + marker.len();
+            let after_marker = &self.before_operation[proof_end..];
+            if applies(after_marker) {
+                return true;
+            }
+            let next = pos + marker.len();
+            offset += next;
+            cursor = &cursor[next..];
+        }
+        false
+    }
+
+    fn open_branch_marker_preserves_applicability(&self, marker: &str) -> bool {
+        self.any_marker_preserves_applicability(marker, |after_guard| {
+            self.open_branch_preserves_applicability(after_guard)
+        })
+    }
+
+    fn assertion_marker_preserves_applicability(&self, marker: &str) -> bool {
+        self.any_marker_preserves_applicability(marker, |after_assertion| {
+            self.target_stays_fresh_after(after_assertion)
+        })
+    }
+
+    fn returning_marker_preserves_applicability(&self, marker: &str) -> bool {
+        self.any_marker_preserves_applicability(marker, |after_guard| {
+            let (guard_body, after_guard_body) = after_guard
+                .split_once('}')
+                .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
+            self.returning_guard_preserves_applicability(guard_body, after_guard_body)
+        })
+    }
+
     fn open_branch_preserves_applicability(&self, after_guard: &str) -> bool {
         branch_still_open_at_operation(after_guard) && self.target_stays_fresh_after(after_guard)
     }
@@ -1011,21 +1052,8 @@ fn has_get_unchecked_open_bounds_branch(
     context: &GetUncheckedBoundsApplicability<'_>,
     predicate: &str,
 ) -> bool {
-    let compact = context.before_operation;
     let marker = format!("if{predicate}{{");
-    let mut cursor = compact;
-    let mut offset = 0usize;
-    while let Some(pos) = cursor.find(&marker) {
-        let proof_end = offset + pos + marker.len();
-        let after_guard = &compact[proof_end..];
-        if context.open_branch_preserves_applicability(after_guard) {
-            return true;
-        }
-        let next = pos + marker.len();
-        offset += next;
-        cursor = &cursor[next..];
-    }
-    false
+    context.open_branch_marker_preserves_applicability(&marker)
 }
 
 fn has_get_unchecked_bounds_assertion(
@@ -1034,19 +1062,7 @@ fn has_get_unchecked_bounds_assertion(
 ) -> bool {
     ["assert!(", "debug_assert!("].into_iter().any(|prefix| {
         let marker = format!("{prefix}{predicate}");
-        let mut cursor = context.before_operation;
-        let mut offset = 0usize;
-        while let Some(pos) = cursor.find(&marker) {
-            let proof_end = offset + pos + marker.len();
-            let after_assertion = &context.before_operation[proof_end..];
-            if context.target_stays_fresh_after(after_assertion) {
-                return true;
-            }
-            let next = pos + marker.len();
-            offset += next;
-            cursor = &cursor[next..];
-        }
-        false
+        context.assertion_marker_preserves_applicability(&marker)
     })
 }
 
@@ -1055,22 +1071,7 @@ fn has_get_unchecked_bounds_early_return(
     predicate: &str,
 ) -> bool {
     let guard = format!("if{predicate}{{");
-    let mut cursor = context.before_operation;
-    let mut offset = 0usize;
-    while let Some(pos) = cursor.find(&guard) {
-        let proof_start = offset + pos + guard.len();
-        let after_guard = &context.before_operation[proof_start..];
-        let (guard_body, after_guard_body) = after_guard
-            .split_once('}')
-            .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
-        if context.returning_guard_preserves_applicability(guard_body, after_guard_body) {
-            return true;
-        }
-        let next = pos + guard.len();
-        offset += next;
-        cursor = &cursor[next..];
-    }
-    false
+    context.returning_marker_preserves_applicability(&guard)
 }
 
 fn has_get_unchecked_get_probe_guard(context: &GetUncheckedBoundsApplicability<'_>) -> bool {
@@ -1083,97 +1084,36 @@ fn has_get_unchecked_get_probe_guard(context: &GetUncheckedBoundsApplicability<'
 
 fn has_get_unchecked_get_probe_open_branch(context: &GetUncheckedBoundsApplicability<'_>) -> bool {
     let marker = format!("if{}.is_some(){{", context.same_slice_get_probe_expr);
-    let mut cursor = context.before_operation;
-    let mut offset = 0usize;
-    while let Some(pos) = cursor.find(&marker) {
-        let proof_end = offset + pos + marker.len();
-        let after_guard = &context.before_operation[proof_end..];
-        if context.open_branch_preserves_applicability(after_guard) {
-            return true;
-        }
-        let next = pos + marker.len();
-        offset += next;
-        cursor = &cursor[next..];
-    }
-    false
+    context.open_branch_marker_preserves_applicability(&marker)
 }
 
 fn has_get_unchecked_get_probe_early_return(context: &GetUncheckedBoundsApplicability<'_>) -> bool {
     let marker = format!("if{}.is_none(){{", context.same_slice_get_probe_expr);
-    let mut cursor = context.before_operation;
-    let mut offset = 0usize;
-    while let Some(pos) = cursor.find(&marker) {
-        let proof_start = offset + pos + marker.len();
-        let after_guard = &context.before_operation[proof_start..];
-        let (guard_body, after_guard_body) = after_guard
-            .split_once('}')
-            .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
-        if context.returning_guard_preserves_applicability(guard_body, after_guard_body) {
-            return true;
-        }
-        let next = pos + marker.len();
-        offset += next;
-        cursor = &cursor[next..];
-    }
-    false
+    context.returning_marker_preserves_applicability(&marker)
 }
 
 fn has_get_unchecked_get_probe_if_let_branch(
     context: &GetUncheckedBoundsApplicability<'_>,
 ) -> bool {
     let marker = format!("ifletsome(_)={}{{", context.same_slice_get_probe_expr);
-    let mut cursor = context.before_operation;
-    let mut offset = 0usize;
-    while let Some(pos) = cursor.find(&marker) {
-        let proof_end = offset + pos + marker.len();
-        let after_guard = &context.before_operation[proof_end..];
-        if context.open_branch_preserves_applicability(after_guard) {
-            return true;
-        }
-        let next = pos + marker.len();
-        offset += next;
-        cursor = &cursor[next..];
-    }
-    false
+    context.open_branch_marker_preserves_applicability(&marker)
 }
 
 fn has_get_unchecked_get_probe_let_else(context: &GetUncheckedBoundsApplicability<'_>) -> bool {
     let marker = format!("letsome(_)={}else{{", context.same_slice_get_probe_expr);
-    let mut cursor = context.before_operation;
-    let mut offset = 0usize;
-    while let Some(pos) = cursor.find(&marker) {
-        let proof_start = offset + pos + marker.len();
-        let after_guard = &context.before_operation[proof_start..];
-        let (guard_body, after_guard_body) = after_guard
-            .split_once('}')
-            .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
-        if context.returning_guard_preserves_applicability(guard_body, after_guard_body) {
-            return true;
-        }
-        let next = pos + marker.len();
-        offset += next;
-        cursor = &cursor[next..];
-    }
-    false
+    context.returning_marker_preserves_applicability(&marker)
 }
 
 fn has_get_unchecked_get_probe_match_branch(context: &GetUncheckedBoundsApplicability<'_>) -> bool {
     let marker = format!("match{}{{", context.same_slice_get_probe_expr);
-    let mut cursor = context.before_operation;
-    let mut offset = 0usize;
-    while let Some(pos) = cursor.find(&marker) {
-        let after_match_start = offset + pos + marker.len();
-        let after_match = &context.before_operation[after_match_start..];
+    context.any_marker_preserves_applicability(&marker, |after_match| {
         if let Some(branch_after_marker) = match_some_branch_after_marker(after_match)
             && context.open_branch_preserves_applicability(branch_after_marker)
         {
             return true;
         }
-        let next = pos + marker.len();
-        offset += next;
-        cursor = &cursor[next..];
-    }
-    false
+        false
+    })
 }
 
 fn branch_still_open_at_operation(after_guard: &str) -> bool {
