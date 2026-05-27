@@ -371,6 +371,7 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     assert!(lsp["code_actions"].as_array().is_some_and(|actions| {
         actions.iter().any(|action| {
             action["command"] == "unsafe-review.copyWitnessCommand"
+                && action["title"] == "Copy witness command (does not run)"
                 && action["payload"]["kind"] == "unsafe-review.witness_command"
                 && action["payload"]["card_id"].as_str() == Some(card_id)
                 && action["payload"]["command"]
