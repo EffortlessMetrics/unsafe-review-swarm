@@ -1084,6 +1084,7 @@ fn check_witness_plan_artifact(
             ],
         )?;
         require_witness_plan_verify_commands(&text, &path, card_projections)?;
+        require_witness_plan_card_projections(&text, &path, card_projections)?;
     } else {
         super::require_text_contains_all(
             &text,
@@ -1095,6 +1096,80 @@ fn check_witness_plan_artifact(
         )?;
     }
     Ok(())
+}
+
+fn require_witness_plan_card_projections(
+    text: &str,
+    path: &Path,
+    card_projections: &BTreeMap<String, CardProjection>,
+) -> Result<(), String> {
+    for (card_id, card) in card_projections {
+        let section = witness_plan_card_section(text, card_id).ok_or_else(|| {
+            format!(
+                "{} witness-plan must include a section for ReviewCard `{card_id}`",
+                path.display()
+            )
+        })?;
+        require_witness_plan_card_line(
+            section,
+            path,
+            card_id,
+            "class",
+            &format!("- Class: `{}`", card.class_name),
+        )?;
+        require_witness_plan_card_line(
+            section,
+            path,
+            card_id,
+            "location",
+            &format!("- Location: {}:{}", card.path, card.line),
+        )?;
+        require_witness_plan_card_line(
+            section,
+            path,
+            card_id,
+            "operation",
+            &format!("- Operation: `{}`", card.operation),
+        )?;
+        require_witness_plan_card_line(
+            section,
+            path,
+            card_id,
+            "next action",
+            &format!("- Next action: {}", card.next_action),
+        )?;
+    }
+    Ok(())
+}
+
+fn witness_plan_card_section<'a>(text: &'a str, card_id: &str) -> Option<&'a str> {
+    let heading = format!("#### `{card_id}`");
+    let start = text.find(&heading)?;
+    let body_start = start + heading.len();
+    let tail = &text[body_start..];
+    let end = [tail.find("\n#### `"), tail.find("\n## Trust boundary")]
+        .into_iter()
+        .flatten()
+        .min()
+        .unwrap_or(tail.len());
+    Some(&tail[..end])
+}
+
+fn require_witness_plan_card_line(
+    section: &str,
+    path: &Path,
+    card_id: &str,
+    field: &str,
+    expected: &str,
+) -> Result<(), String> {
+    if section.contains(expected) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{} witness-plan ReviewCard `{card_id}` {field} must include `{expected}`",
+            path.display()
+        ))
+    }
 }
 
 fn require_witness_plan_verify_commands(
