@@ -678,6 +678,11 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| "cards.sarif is missing /runs/0/properties/trustBoundary".to_string())?;
     super::require_boundary_text(sarif_boundary, "cards.sarif")?;
+    let sarif_scope = sarif
+        .pointer("/runs/0/properties/scope")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "cards.sarif is missing /runs/0/properties/scope".to_string())?;
+    require_expected_value(sarif_scope, &scope, "cards.sarif /runs/0/properties/scope")?;
 
     let comment_plan = super::parse_json_file(&dir.join("comment-plan.json"))?;
     super::require_json_str(&comment_plan, "mode", "plan_only", "comment-plan.json")?;
