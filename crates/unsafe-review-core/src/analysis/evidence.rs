@@ -2184,6 +2184,25 @@ impl<'a> SetLenApplicabilityContext<'a> {
     }
 
     fn has_initialized_range_evidence(&self) -> bool {
+        self.initialized_range_context()
+            .has_initialized_range_evidence()
+    }
+
+    fn initialized_range_context(&self) -> SetLenInitializedRangeContext<'a> {
+        SetLenInitializedRangeContext {
+            before_call: self.before_call,
+            same_vec_target: self.same_vec_target,
+        }
+    }
+}
+
+struct SetLenInitializedRangeContext<'a> {
+    before_call: &'a str,
+    same_vec_target: &'a str,
+}
+
+impl<'a> SetLenInitializedRangeContext<'a> {
+    fn has_initialized_range_evidence(&self) -> bool {
         self.before_call.split([';', '}']).any(|statement| {
             contains_receiver_path(statement, self.same_vec_target)
                 && has_initialization_marker(statement)
