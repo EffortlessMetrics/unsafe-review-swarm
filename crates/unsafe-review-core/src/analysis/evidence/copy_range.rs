@@ -6,18 +6,84 @@ use super::{
 };
 
 pub(super) fn has_copy_slice_range_evidence(expression: &str, before_call: &str) -> bool {
-    let Some((src, dst, count)) = copy_call_arguments(expression) else {
-        return false;
-    };
-    let Some(src_receiver) = copy_source_slice_receiver(&src) else {
-        return false;
-    };
-    let Some(dst_receiver) = copy_destination_slice_receiver(&dst) else {
-        return false;
-    };
+    CopyRangeApplicability::from_expression(expression)
+        .is_some_and(|context| context.has_applicable_range_evidence(before_call))
+}
 
-    has_slice_count_bound_guard(before_call, &src_receiver, &count)
-        && has_slice_count_bound_guard(before_call, &dst_receiver, &count)
+struct CopyRangeApplicability {
+    same_source_slice: SliceCountBoundTarget,
+    same_destination_slice: SliceCountBoundTarget,
+}
+
+impl CopyRangeApplicability {
+    fn from_expression(expression: &str) -> Option<Self> {
+        let (src, dst, count) = copy_call_arguments(expression)?;
+        let src_receiver = copy_source_slice_receiver(&src)?;
+        let dst_receiver = copy_destination_slice_receiver(&dst)?;
+
+        Some(Self {
+            same_source_slice: SliceCountBoundTarget::new(&src_receiver, &count)?,
+            same_destination_slice: SliceCountBoundTarget::new(&dst_receiver, &count)?,
+        })
+    }
+
+    fn has_applicable_range_evidence(&self, before_call: &str) -> bool {
+        self.same_source_slice.has_bound_guard(before_call)
+            && self.same_destination_slice.has_bound_guard(before_call)
+    }
+}
+
+struct SliceCountBoundTarget {
+    receiver: String,
+    count: String,
+    count_lte_len: String,
+    len_gte_count: String,
+    count_gt_len: String,
+    len_lt_count: String,
+}
+
+impl SliceCountBoundTarget {
+    fn new(receiver: &str, count: &str) -> Option<Self> {
+        let receiver = compact_code(receiver);
+        let count = compact_code(count);
+        if receiver.is_empty() || count.is_empty() {
+            return None;
+        }
+
+        let len = format!("{receiver}.len()");
+        Some(Self {
+            count_lte_len: format!("{count}<={len}"),
+            len_gte_count: format!("{len}>={count}"),
+            count_gt_len: format!("{count}>{len}"),
+            len_lt_count: format!("{len}<{count}"),
+            receiver,
+            count,
+        })
+    }
+
+    fn has_bound_guard(&self, before_call: &str) -> bool {
+        has_slice_count_bound_predicate(
+            before_call,
+            &self.count_lte_len,
+            &self.receiver,
+            &self.count,
+        ) || has_slice_count_bound_predicate(
+            before_call,
+            &self.len_gte_count,
+            &self.receiver,
+            &self.count,
+        ) || has_slice_count_early_return(
+            before_call,
+            &self.count_gt_len,
+            &self.receiver,
+            &self.count,
+        ) || has_slice_count_early_return(
+            before_call,
+            &self.len_lt_count,
+            &self.receiver,
+            &self.count,
+        )
+    }
 }
 
 fn copy_call_arguments(expression: &str) -> Option<(String, String, String)> {
@@ -48,23 +114,6 @@ fn copy_source_slice_receiver(argument: &str) -> Option<String> {
 
 fn copy_destination_slice_receiver(argument: &str) -> Option<String> {
     receiver_before_marker(argument, ".as_mut_ptr()").map(str::to_string)
-}
-
-fn has_slice_count_bound_guard(before_call: &str, receiver: &str, count: &str) -> bool {
-    let receiver = compact_code(receiver);
-    let count = compact_code(count);
-    if receiver.is_empty() || count.is_empty() {
-        return false;
-    }
-    let len = format!("{receiver}.len()");
-    let count_lte_len = format!("{count}<={len}");
-    let len_gte_count = format!("{len}>={count}");
-    let count_gt_len = format!("{count}>{len}");
-    let len_lt_count = format!("{len}<{count}");
-    has_slice_count_bound_predicate(before_call, &count_lte_len, &receiver, &count)
-        || has_slice_count_bound_predicate(before_call, &len_gte_count, &receiver, &count)
-        || has_slice_count_early_return(before_call, &count_gt_len, &receiver, &count)
-        || has_slice_count_early_return(before_call, &len_lt_count, &receiver, &count)
 }
 
 fn has_slice_count_bound_predicate(
