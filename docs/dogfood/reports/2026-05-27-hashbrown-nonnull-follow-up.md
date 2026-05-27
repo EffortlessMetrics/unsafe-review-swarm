@@ -63,14 +63,15 @@ The two `nonnull_unchecked` cards both report:
 
 This is useful dogfood pressure for preserving concrete `nonnull_unchecked`
 cards in nested iterator code. It is not a stale-pointer false-positive control;
-future stale, wrong-pointer, macro, or cast/provenance controls still need
-separate fixture or dogfood evidence.
+the stale-pointer and wrong-pointer controls remain fixture-pinned by the
+NonNull nullability label ledger. Future macro or cast/provenance controls
+still need separate fixture or dogfood evidence.
 
 ## Triage observation
 
 | Target | Card or family | Primary label | Evidence | Follow-up |
 |---|---|---|---|---|
-| `hashbrown-pr667` | `nonnull_unchecked` nested iterator operations | `actionable` | The rerun reports two concrete `NonNull::new_unchecked` cards with missing contract and nullability guard evidence. | Keep this as a regression target for concrete NonNull operation detection; add stale/wrong-pointer controls only from future fixture or dogfood pressure. |
+| `hashbrown-pr667` | `nonnull_unchecked` nested iterator operations | `actionable` | The rerun reports two concrete `NonNull::new_unchecked` cards with missing contract and nullability guard evidence. | Keep this as a regression target for concrete NonNull operation detection; use the existing fixture-pinned stale/wrong-pointer controls for nullability applicability, and add new controls only for future macro or cast/provenance pressure. |
 
 ## Trust boundary
 

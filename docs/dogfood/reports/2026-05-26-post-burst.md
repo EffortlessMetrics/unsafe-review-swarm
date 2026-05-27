@@ -146,8 +146,10 @@ result exists.
   `str::from_utf8_unchecked`.
 - `NonNull::new_unchecked` stale-pointer controls were not sampled here. The
   focused [`hashbrown-pr667` follow-up](2026-05-27-hashbrown-nonnull-follow-up.md)
-  records concrete nested NonNull cards, but stale or wrong-pointer controls
-  still need separate fixture or dogfood pressure.
+  records concrete nested NonNull cards. Stale and wrong-pointer applicability
+  controls are fixture-pinned by the NonNull nullability label ledger; future
+  macro or cast/provenance controls still need separate fixture or dogfood
+  pressure.
 
 ## Fixture follow-ups
 
