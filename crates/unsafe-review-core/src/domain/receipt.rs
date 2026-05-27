@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::util::stable_hash_hex;
+
 mod summary;
 
 pub const WITNESS_RECEIPT_SCHEMA_VERSION: &str = "0.1";
@@ -15,6 +17,7 @@ pub struct WitnessReceipt {
     pub expires_at: Option<String>,
     pub summary: Option<String>,
     pub command: Option<String>,
+    pub command_hash: Option<String>,
     pub limitations: Option<Vec<String>>,
 }
 
@@ -95,7 +98,12 @@ impl WitnessReceipt {
         if expires_at < &recorded_at[..10] {
             return Err("`expires_at` must be on or after the `recorded_at` date".to_string());
         }
+        self.validate_command_hash()?;
         Ok(())
+    }
+
+    pub fn command_hash(command: &str) -> String {
+        stable_hash_hex(command)
     }
 
     pub fn evidence_summary(&self) -> String {
@@ -117,6 +125,7 @@ impl WitnessReceipt {
         if !input.command.to_ascii_lowercase().contains("miri") {
             return Err("Miri receipt command must mention `miri`".to_string());
         }
+        let command_hash = Self::command_hash(&input.command);
         let mut limitations = vec![
             "saved-output adapter; unsafe-review did not run Miri".to_string(),
             "receipt strength is `ran`; site reach is not claimed".to_string(),
@@ -132,6 +141,7 @@ impl WitnessReceipt {
             expires_at: Some(input.expires_at),
             summary: Some("saved Miri output reported `test result: ok`".to_string()),
             command: Some(input.command),
+            command_hash: Some(command_hash),
             limitations: Some(limitations),
         };
         receipt.validate()?;
@@ -144,6 +154,7 @@ impl WitnessReceipt {
         if !input.command.to_ascii_lowercase().contains("careful") {
             return Err("cargo-careful receipt command must mention `careful`".to_string());
         }
+        let command_hash = Self::command_hash(&input.command);
         let mut limitations = vec![
             "saved-output adapter; unsafe-review did not run cargo-careful".to_string(),
             "receipt strength is `ran`; site reach is not claimed".to_string(),
@@ -159,6 +170,7 @@ impl WitnessReceipt {
             expires_at: Some(input.expires_at),
             summary: Some("saved cargo-careful output reported `test result: ok`".to_string()),
             command: Some(input.command),
+            command_hash: Some(command_hash),
             limitations: Some(limitations),
         };
         receipt.validate()?;
@@ -171,6 +183,7 @@ impl WitnessReceipt {
         validate_sanitizer_success_output(&input.output, &input.tool)?;
         validate_required(&input.command, "command")?;
         validate_sanitizer_command(&input.command)?;
+        let command_hash = Self::command_hash(&input.command);
         let mut limitations = vec![
             "saved-output adapter; unsafe-review did not run a sanitizer".to_string(),
             "receipt strength is `ran`; site reach is not claimed".to_string(),
@@ -189,6 +202,7 @@ impl WitnessReceipt {
                 input.tool
             )),
             command: Some(input.command),
+            command_hash: Some(command_hash),
             limitations: Some(limitations),
         };
         receipt.validate()?;
@@ -200,6 +214,7 @@ impl WitnessReceipt {
         validate_saved_success_output(&input.output, &input.tool)?;
         validate_required(&input.command, "command")?;
         validate_concurrency_command(&input.command)?;
+        let command_hash = Self::command_hash(&input.command);
         let mut limitations = vec![
             "saved-output adapter; unsafe-review did not run a concurrency witness".to_string(),
             "receipt strength is `ran`; site reach is not claimed".to_string(),
@@ -218,6 +233,7 @@ impl WitnessReceipt {
                 input.tool
             )),
             command: Some(input.command),
+            command_hash: Some(command_hash),
             limitations: Some(limitations),
         };
         receipt.validate()?;
@@ -229,6 +245,7 @@ impl WitnessReceipt {
         validate_saved_proof_success_output(&input.output, &input.tool)?;
         validate_required(&input.command, "command")?;
         validate_proof_command(&input.command)?;
+        let command_hash = Self::command_hash(&input.command);
         let mut limitations = vec![
             "saved-output adapter; unsafe-review did not run a proof tool".to_string(),
             "receipt strength is `ran`; site reach is not claimed".to_string(),
@@ -248,10 +265,25 @@ impl WitnessReceipt {
                 input.tool
             )),
             command: Some(input.command),
+            command_hash: Some(command_hash),
             limitations: Some(limitations),
         };
         receipt.validate()?;
         Ok(receipt)
+    }
+
+    fn validate_command_hash(&self) -> Result<(), String> {
+        let Some(command_hash) = self.command_hash.as_deref() else {
+            return Ok(());
+        };
+        validate_required(command_hash, "command_hash")?;
+        let command = validate_required_option(&self.command, "command")?;
+        let expected = Self::command_hash(command);
+        if command_hash == expected {
+            Ok(())
+        } else {
+            Err("`command_hash` does not match `command`".to_string())
+        }
     }
 }
 
@@ -580,6 +612,29 @@ mod tests {
         assert!(decoded.evidence_summary().contains("Imported miri receipt"));
         assert!(decoded.evidence_summary().contains("fixture only"));
         Ok(())
+    }
+
+    #[test]
+    fn witness_receipt_validation_accepts_missing_command_hash_for_compatibility()
+    -> Result<(), String> {
+        let mut receipt = fixture_receipt();
+        receipt.command_hash = None;
+
+        receipt.validate()
+    }
+
+    #[test]
+    fn witness_receipt_validation_rejects_command_hash_mismatch() {
+        let mut receipt = fixture_receipt();
+        receipt.command_hash = Some("0000000000000000".to_string());
+
+        assert!(
+            receipt
+                .validate()
+                .err()
+                .unwrap_or_default()
+                .contains("command_hash")
+        );
     }
 
     #[test]
@@ -1143,6 +1198,9 @@ mod tests {
             expires_at: Some("2026-08-18".to_string()),
             summary: Some("focused witness passed".to_string()),
             command: Some("cargo +nightly miri test read_header".to_string()),
+            command_hash: Some(WitnessReceipt::command_hash(
+                "cargo +nightly miri test read_header",
+            )),
             limitations: Some(vec!["fixture only".to_string()]),
         }
     }

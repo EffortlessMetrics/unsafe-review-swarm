@@ -1259,6 +1259,7 @@ fn receipt_template_writes_valid_receipt_json_without_running_witnesses()
     assert_eq!(receipt["expires_at"], "2026-08-18");
     assert_eq!(receipt["summary"], "focused witness passed");
     assert_eq!(receipt["command"], "cargo +nightly miri test read_header");
+    assert_eq!(receipt["command_hash"], "3e163b0bce29ff2e");
     assert_eq!(receipt["limitations"][0], "fixture only");
 
     Ok(())
@@ -1425,6 +1426,7 @@ fn receipt_import_miri_writes_receipt_from_saved_success_log() -> Result<(), Box
         "saved Miri output reported `test result: ok`"
     );
     assert_eq!(receipt["command"], "cargo +nightly miri test read_header");
+    assert_eq!(receipt["command_hash"], "3e163b0bce29ff2e");
     let limitations = receipt["limitations"]
         .as_array()
         .ok_or("receipt limitations should be an array")?;
@@ -1485,6 +1487,7 @@ fn receipt_import_careful_writes_receipt_from_saved_success_log() -> Result<(), 
         receipt["command"],
         "cargo +nightly careful test read_header"
     );
+    assert_eq!(receipt["command_hash"], "efd39ded576cc7d5");
     let limitations = receipt["limitations"]
         .as_array()
         .ok_or("receipt limitations should be an array")?;
@@ -1547,6 +1550,7 @@ fn receipt_import_sanitizer_writes_receipt_from_saved_success_log() -> Result<()
         receipt["command"],
         "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test read_header"
     );
+    assert_eq!(receipt["command_hash"], "a81457494b1bfe76");
     let limitations = receipt["limitations"]
         .as_array()
         .ok_or("receipt limitations should be an array")?;
@@ -1609,6 +1613,7 @@ fn receipt_import_concurrency_writes_receipt_from_saved_success_log() -> Result<
         receipt["command"],
         "cargo test shared_cell_loom -- --nocapture"
     );
+    assert_eq!(receipt["command_hash"], "4ce9d7c8eeb19a30");
     let limitations = receipt["limitations"]
         .as_array()
         .ok_or("receipt limitations should be an array")?;
@@ -1670,6 +1675,7 @@ fn receipt_import_proof_writes_receipt_from_saved_success_log() -> Result<(), Bo
         receipt["command"],
         "cargo kani --harness byte_to_bool_harness"
     );
+    assert_eq!(receipt["command_hash"], "c17a7978dc51122e");
     let limitations = receipt["limitations"]
         .as_array()
         .ok_or("receipt limitations should be an array")?;

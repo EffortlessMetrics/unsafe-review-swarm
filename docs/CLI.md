@@ -276,7 +276,9 @@ unsafe-review receipt template <card-id> \
 ```
 
 The template command validates the receipt shape and writes JSON. It still does
-not run the witness command.
+not run the witness command. When `--command` is present, the generated JSON also
+includes a stable `command_hash` for drift checks; the hash is not proof that the
+command ran.
 
 Import a receipt from saved Miri output after Miri has been run outside
 `unsafe-review`:

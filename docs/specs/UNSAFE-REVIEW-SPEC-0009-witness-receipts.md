@@ -28,6 +28,12 @@ The receipt shape is represented in the core SDK as the serde-backed
 `WitnessReceipt` DTO. Importers and future native adapters must use that same
 shape instead of inventing parallel receipt schemas.
 
+Receipt `command_hash` is an optional stable command-string fingerprint. It is
+for drift detection and reviewer comparison only; it is not cryptographic proof
+and does not prove that the command ran. Older receipts without `command_hash`
+remain importable. When `command_hash` is present, validation checks that it
+matches the exact `command` string in the same receipt.
+
 The CLI may render a receipt template from explicit user-provided metadata. That
 template output is only a JSON authoring aid; it must not run witness commands or
 claim that a witness succeeded.
@@ -97,6 +103,7 @@ Receipt JSON fields:
   "expires_at": "2026-08-18",
   "summary": "focused witness passed",
   "command": "cargo +nightly miri test read_header",
+  "command_hash": "3e163b0bce29ff2e",
   "limitations": ["fixture only"]
 }
 ```

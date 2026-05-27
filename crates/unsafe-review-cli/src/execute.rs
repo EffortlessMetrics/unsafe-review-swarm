@@ -439,6 +439,7 @@ fn context(root: &Path, id: &str) -> Result<(), String> {
 }
 
 fn receipt_template(options: ReceiptTemplateOptions) -> Result<(), String> {
+    let command_hash = options.command.as_deref().map(WitnessReceipt::command_hash);
     let receipt = WitnessReceipt {
         schema_version: WITNESS_RECEIPT_SCHEMA_VERSION.to_string(),
         card_id: options.card_id,
@@ -449,6 +450,7 @@ fn receipt_template(options: ReceiptTemplateOptions) -> Result<(), String> {
         expires_at: Some(options.expires_at),
         summary: options.summary,
         command: options.command,
+        command_hash,
         limitations: if options.limitations.is_empty() {
             None
         } else {
