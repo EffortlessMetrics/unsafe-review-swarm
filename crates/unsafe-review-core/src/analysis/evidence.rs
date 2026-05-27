@@ -11,6 +11,7 @@ mod freshness;
 mod generic_bounds;
 mod get_unchecked;
 mod identifier_syntax;
+mod layout_discharge;
 mod marker_scan;
 mod maybeuninit;
 mod nonnull;
@@ -66,6 +67,7 @@ use self::freshness::{
 use self::generic_bounds::has_length_or_bounds_guard;
 use self::get_unchecked::{get_unchecked_receiver_and_index, has_get_unchecked_bounds_guard};
 use self::identifier_syntax::{is_simple_identifier, let_binding_name};
+use self::layout_discharge::layout_discharge_state;
 use self::marker_scan::{any_marker_occurrence, any_marker_tail};
 use self::maybeuninit::has_maybeuninit_assume_init_initialization_evidence;
 use self::nonnull::has_nullability_guard;
@@ -82,7 +84,6 @@ use self::receiver_path::{
 };
 use self::site_context::{code_context, code_context_through_site};
 use self::source_value::source_value_identifier;
-use self::transmute::has_transmute_layout_size_evidence;
 use self::u8_bool_value::{has_u8_bool_value_guard, u8_bool_valid_value_predicates};
 use self::unreachable_unchecked::has_unreachable_unchecked_infallible_path_evidence;
 use self::unsafe_fn_call::{
@@ -305,13 +306,7 @@ fn discharge_state_for(
             }
         }
         "valid-value" => valid_value_discharge_state(family, lower),
-        "layout" => {
-            if family == &OperationFamily::Transmute && has_transmute_layout_size_evidence(lower) {
-                EvidenceState::present("Transmute layout size evidence was detected")
-            } else {
-                EvidenceState::missing("No obligation-specific guard code was detected")
-            }
-        }
+        "layout" => layout_discharge_state(family, lower),
         "unreachable" => {
             if family == &OperationFamily::UnreachableUnchecked
                 && has_unreachable_unchecked_infallible_path_evidence(lower)
