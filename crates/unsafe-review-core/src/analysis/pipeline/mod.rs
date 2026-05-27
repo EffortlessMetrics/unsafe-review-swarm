@@ -1856,6 +1856,58 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn maybeuninit_assume_init_accepts_same_slot_initialization_evidence() -> Result<(), String> {
+        for fixture in [
+            "maybeuninit_assume_init_write_guard",
+            "maybeuninit_assume_init_open_branch_write_guard",
+            "maybeuninit_assume_init_new_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+            assert_eq!(
+                card.operation.family,
+                OperationFamily::MaybeUninitAssumeInit
+            );
+            assert_eq!(card.class, ReviewClass::GuardedUnwitnessed);
+            assert!(obligation_discharge_present(card, "initialized"));
+            assert!(
+                card.missing.iter().all(|missing| missing.kind != "guard"),
+                "{fixture} should resolve the local initialized-memory guard prompt"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn maybeuninit_assume_init_rejects_non_dominating_or_stale_slot_evidence() -> Result<(), String>
+    {
+        for fixture in [
+            "maybeuninit_assume_init_comment_not_guard",
+            "maybeuninit_assume_init_closed_branch_write_not_guard",
+            "maybeuninit_assume_init_stale_write_not_guard",
+            "maybeuninit_assume_init_stale_new_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+            assert_eq!(
+                card.operation.family,
+                OperationFamily::MaybeUninitAssumeInit
+            );
+            assert_eq!(card.class, ReviewClass::GuardMissing);
+            assert!(!obligation_discharge_present(card, "initialized"));
+            assert!(
+                card.missing.iter().any(|missing| missing.kind == "guard"),
+                "{fixture} must not resolve the initialized-memory guard prompt"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn maybeuninit_assume_init_read_uses_assume_init_operation_family() -> Result<(), String> {
         let output = fixture_output("maybeuninit_assume_init_read")?;
         let card = single_card("maybeuninit_assume_init_read", &output)?;

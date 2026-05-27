@@ -22,7 +22,7 @@ It does not promote any claim to labeled calibration or policy readiness.
 - Policy-eligible claims: 0
 - Calibration cases: 279
 - Label ledgers: 34
-- Label samples: 284
+- Label samples: 285
 - Labeled reports: 0
 
 ## Current Claim Level
