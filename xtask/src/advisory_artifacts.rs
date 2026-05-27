@@ -953,6 +953,75 @@ fn require_lsp_hover_hazard_projection(
     Ok(())
 }
 
+fn require_lsp_hover_card_projection(
+    contents: &str,
+    card: &CardProjection,
+    context: &str,
+) -> Result<(), String> {
+    for required in [
+        "Why this card exists",
+        "Required safety conditions",
+        "Evidence found",
+        "Evidence missing",
+        "What would resolve this",
+        "What would not resolve this",
+        "Trust boundary",
+    ] {
+        if !contents.contains(required) {
+            return Err(format!("{context} contents must include `{required}`"));
+        }
+    }
+    for (field, expected) in [
+        ("class", format!("`{}`", card.class_name)),
+        (
+            "operation family",
+            format!("`{}` unsafe operation", card.operation_family),
+        ),
+        ("operation", format!("- Operation: `{}`", card.operation)),
+        ("next action", format!("- {}", card.next_action)),
+    ] {
+        if !contents.contains(&expected) {
+            return Err(format!(
+                "{context} contents must project ReviewCard {field} `{expected}`"
+            ));
+        }
+    }
+    if card.missing.is_empty() {
+        if !contents.contains("- none recorded") {
+            return Err(format!(
+                "{context} contents must state when ReviewCard missing evidence is empty"
+            ));
+        }
+    } else {
+        for missing in &card.missing {
+            let expected = format!("- {missing}");
+            if !contents.contains(&expected) {
+                return Err(format!(
+                    "{context} contents must project ReviewCard missing evidence `{missing}`"
+                ));
+            }
+        }
+    }
+    for command in &card.verify_commands {
+        let expected = format!("- `{command}`");
+        if !contents.contains(&expected) {
+            return Err(format!(
+                "{context} contents must project ReviewCard verify command `{command}`"
+            ));
+        }
+    }
+    if let Some(route) = card.witness_routes.first() {
+        let expected = format!("Witness route: `{}` because {}", route.kind, route.reason);
+        if !contents.contains(&expected) {
+            return Err(format!(
+                "{context} contents must project ReviewCard witness route `{}`",
+                route.kind
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn require_sarif_location_projection(
     result: &serde_json::Value,
     card: &CardProjection,
@@ -1547,6 +1616,7 @@ fn check_lsp_artifact(
                 "lsp.json hover contents must mention card id `{hover_card_id}`"
             ));
         }
+        require_lsp_hover_card_projection(contents, card_projection, "lsp.json hover")?;
         require_lsp_hover_hazard_projection(contents, card_projection, "lsp.json hover")?;
         super::require_text_contains(contents, "Trust boundary", &path)?;
         let boundary = hover
