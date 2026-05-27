@@ -401,6 +401,7 @@ mod tests {
         "maybeuninit_assume_init_new_guard",
         "maybeuninit_assume_init_stale_write_not_guard",
         "maybeuninit_assume_init_stale_new_not_guard",
+        "maybeuninit_assume_init_partial_field_not_guard",
         "maybeuninit_assume_init_read",
         "maybeuninit_assume_init_ref",
         "maybeuninit_assume_init_mut",

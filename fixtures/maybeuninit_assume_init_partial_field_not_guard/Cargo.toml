@@ -1,0 +1,6 @@
+[package]
+name = "maybeuninit-assume-init-partial-field-not-guard"
+version = "0.0.0"
+edition = "2024"
+publish = false
+

@@ -1,0 +1,10 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -11,0 +11,6 @@
++pub fn assume_partially_initialized(value: u32) -> Pair {
++    let mut slot = MaybeUninit::<Pair>::uninit();
++    partial::initialize_first_field(&mut slot, value);
++    // SAFETY: first field was initialized above.
++    unsafe { slot.assume_init() }
++}
