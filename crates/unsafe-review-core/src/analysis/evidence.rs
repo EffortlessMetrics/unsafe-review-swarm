@@ -8,6 +8,7 @@ mod freshness;
 mod generic_bounds;
 mod get_unchecked;
 mod identifier_syntax;
+mod marker_scan;
 mod maybeuninit;
 mod nonnull;
 mod option_state;
@@ -49,6 +50,7 @@ use self::freshness::{
 use self::generic_bounds::has_length_or_bounds_guard;
 use self::get_unchecked::{get_unchecked_receiver_and_index, has_get_unchecked_bounds_guard};
 use self::identifier_syntax::{is_simple_identifier, let_binding_name};
+use self::marker_scan::{any_marker_occurrence, any_marker_tail};
 use self::maybeuninit::has_maybeuninit_assume_init_initialization_evidence;
 use self::nonnull::has_nullability_guard;
 use self::option_state::{ends_with_some_pattern, is_some_binding, match_some_branch_after_marker};
@@ -560,32 +562,6 @@ fn code_before_operation(lower: &str, expression: &str) -> Option<String> {
     compact
         .find(&expression)
         .map(|operation_pos| compact[..operation_pos].to_string())
-}
-
-fn any_marker_occurrence(
-    text: &str,
-    marker: &str,
-    mut applies: impl FnMut(usize, &str) -> bool,
-) -> bool {
-    let mut cursor = text;
-    let mut offset = 0usize;
-    while let Some(pos) = cursor.find(marker) {
-        let marker_start = offset + pos;
-        let after_marker = &text[marker_start + marker.len()..];
-        if applies(marker_start, after_marker) {
-            return true;
-        }
-        let next = pos + marker.len();
-        offset += next;
-        cursor = &cursor[next..];
-    }
-    false
-}
-
-fn any_marker_tail(text: &str, marker: &str, mut applies: impl FnMut(&str) -> bool) -> bool {
-    any_marker_occurrence(text, marker, |_marker_start, after_marker| {
-        applies(after_marker)
-    })
 }
 
 fn has_capacity_guard(family: &OperationFamily, lower: &str) -> bool {
