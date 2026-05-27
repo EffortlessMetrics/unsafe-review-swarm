@@ -11,6 +11,7 @@ struct CardProjection {
     class_name: String,
     priority: String,
     confidence: String,
+    hazards: Vec<String>,
     path: String,
     line: u64,
     column: u64,
@@ -715,6 +716,31 @@ fn advisory_card_projections(
             super::require_non_empty_json_str(card, "priority", "cards.json card")?.to_string();
         let confidence =
             super::require_non_empty_json_str(card, "confidence", "cards.json card")?.to_string();
+        let hazards = card
+            .get("hazards")
+            .map(|hazards| {
+                let Some(hazards) = hazards.as_array() else {
+                    return Err("cards.json card hazards must be an array".to_string());
+                };
+                hazards
+                    .iter()
+                    .map(|hazard| {
+                        let Some(hazard) = hazard.as_str() else {
+                            return Err(
+                                "cards.json card hazards values must be strings".to_string()
+                            );
+                        };
+                        if hazard.trim().is_empty() {
+                            return Err(
+                                "cards.json card hazards values must not be empty".to_string()
+                            );
+                        }
+                        Ok(hazard.to_string())
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
         let path = super::require_non_empty_json_str(
             card.pointer("/site")
                 .ok_or_else(|| "cards.json card is missing site".to_string())?,
@@ -746,6 +772,7 @@ fn advisory_card_projections(
                 class_name,
                 priority,
                 confidence,
+                hazards,
                 path,
                 line,
                 column,
@@ -757,6 +784,30 @@ fn advisory_card_projections(
         );
     }
     Ok(projections)
+}
+
+fn require_lsp_hover_hazard_projection(
+    contents: &str,
+    card: &CardProjection,
+    context: &str,
+) -> Result<(), String> {
+    if card.hazards.is_empty() {
+        return Ok(());
+    }
+    if !contents.contains("Relevant hazard families") {
+        return Err(format!(
+            "{context} contents must include ReviewCard hazard families"
+        ));
+    }
+    for hazard in &card.hazards {
+        let marker = format!("`{hazard}`");
+        if !contents.contains(&marker) {
+            return Err(format!(
+                "{context} contents must include ReviewCard hazard `{hazard}`"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn require_sarif_location_projection(
@@ -1160,6 +1211,7 @@ fn check_lsp_artifact(
                 "lsp.json hover contents must mention card id `{hover_card_id}`"
             ));
         }
+        require_lsp_hover_hazard_projection(contents, card_projection, "lsp.json hover")?;
         super::require_text_contains(contents, "Trust boundary", &path)?;
         let boundary = hover
             .get("trust_boundary")
