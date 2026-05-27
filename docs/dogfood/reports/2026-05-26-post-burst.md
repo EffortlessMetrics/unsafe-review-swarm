@@ -139,8 +139,11 @@ result exists.
 - Crossbeam atomic-pointer state was not classified beyond `unknown` in this
   sampled PR. The focused rerun now covers the observed fetch operations as
   `atomic_pointer_state` `requires_loom` cards.
-- UTF-8 unchecked validation was not sampled in this report; use
-  `arrayvec-pr138` for that follow-up.
+- UTF-8 unchecked validation was not sampled in this report. The focused
+  [`arrayvec-pr138` follow-up](2026-05-27-arrayvec-pr138-utf8-follow-up.md)
+  shows that target is useful for `encode_utf8`, raw pointer, pointer
+  arithmetic, and `Vec::set_len` review prompts, but it does not exercise
+  `str::from_utf8_unchecked`.
 - `NonNull::new_unchecked` stale-pointer controls were not sampled here; use
   `hashbrown-pr667` or `memchr-capped` when that family changes.
 
