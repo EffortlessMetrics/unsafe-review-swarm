@@ -1,12 +1,14 @@
 # Evidence applicability model
 
-Status: design note
+Status: implementation-backed design rail
 Owner: analyzer / evidence
 Created: 2026-05-26
 
 This note defines the shared model for deciding when local code evidence applies
-to a specific unsafe operation and obligation. It is a design rail for future
-refactors; it does not change analyzer behavior by itself.
+to a specific unsafe operation and obligation. It is both a design rail and the
+current helper checkpoint for the implemented applicability refactors. It does
+not promote support tiers, calibration, policy readiness, or safety claims by
+itself.
 
 Linked evidence:
 
@@ -200,10 +202,22 @@ Do not add separate analyzer truth to output projections.
 
 ## Done criteria
 
-This model starts as a design note. It becomes implementation-backed only after:
+This model is implementation-backed for the initial helper sequence:
 
-- at least two family helpers are extracted,
-- each helper has accepted and rejected fixture coverage,
-- dogfood reports reference the helper where it changed reviewer usefulness,
+- `unwrap_unchecked` receiver/state applicability,
+- `str::from_utf8_unchecked` same-buffer validation applicability,
+- `get_unchecked` / `get_unchecked_mut` bounds applicability,
+- `NonNull::new_unchecked` pointer applicability,
+- `MaybeUninit::assume_init` slot applicability,
+- `Vec::set_len` range applicability,
+- `transmute` / `transmute_copy` layout and value-domain applicability.
+
+The rail remains advisory and maintenance-scoped. Future applicability work must
+still satisfy:
+
+- one family and one evidence shape per PR,
+- accepted and rejected fixture coverage for behavior changes,
+- dogfood notes where real-crate behavior changes reviewer usefulness,
 - `check-pr`, `check-calibration`, and `check-dogfood` remain green,
-- support-tier wording still avoids calibration and safety claims.
+- support-tier wording still avoids calibration, policy-readiness, and safety
+  claims unless a separate support-tier promotion justifies them.
