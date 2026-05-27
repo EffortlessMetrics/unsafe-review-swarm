@@ -114,13 +114,8 @@ what unsafe-review is not claiming
 not a UB-free claim, not a Miri result, not soundness evidence, and not evidence
 that any unsafe site executed.
 
-By default it does not:
-
-- run witnesses
-- post comments
-- edit source
-- enforce blocking policy
-- claim calibrated precision or recall
+By default it does not run witnesses, post comments, edit source, enforce
+blocking policy, or claim calibrated precision or recall.
 
 Findings are advisory unless you explicitly build a separate policy around the
 artifacts.

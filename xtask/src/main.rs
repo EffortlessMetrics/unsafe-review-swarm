@@ -2491,8 +2491,32 @@ fn reject_positive_overclaims(path: &Path, text: &str) -> Result<(), String> {
     for (line_no, line) in text.lines().enumerate() {
         let lower = normalize_claim_line(line);
         let context = format!("{previous} {lower}");
-        for forbidden in ["all clear", "safe to merge", "proved safe", "proven safe"] {
+        for forbidden in ["all clear", "safe to merge"] {
             if lower.contains(forbidden) {
+                return Err(format!(
+                    "{}:{} must not imply `{forbidden}`",
+                    path.display(),
+                    line_no + 1
+                ));
+            }
+        }
+        for forbidden in [
+            "proved safe",
+            "proven safe",
+            "verified safe",
+            "verified sound",
+            "proved sound",
+            "proven sound",
+            "proved memory safety",
+            "proven memory safety",
+            "proof of safety",
+            "safety verified",
+            "soundness verified",
+            "blocking-ready",
+            "calibrated precision",
+            "calibrated recall",
+        ] {
+            if lower.contains(forbidden) && !has_negative_claim_context(&context) {
                 return Err(format!(
                     "{}:{} must not imply `{forbidden}`",
                     path.display(),
@@ -8586,6 +8610,35 @@ Snapshot reports:
             public_badge_endpoint_url("badges/unsafe-review.json"),
             "https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FEffortlessMetrics%2Funsafe-review%2Fmain%2Fbadges%2Funsafe-review.json"
         );
+    }
+
+    #[test]
+    fn positive_overclaim_rejects_policy_and_calibration_claims() {
+        for forbidden in [
+            "verified safe",
+            "proved sound",
+            "proof of safety",
+            "blocking-ready",
+            "calibrated precision",
+            "calibrated recall",
+        ] {
+            let text = format!("This artifact is {forbidden}.");
+            let err = reject_positive_overclaims(Path::new("artifact.md"), &text)
+                .err()
+                .unwrap_or_default();
+            assert!(
+                err.contains(forbidden),
+                "expected `{forbidden}` rejection, got `{err}`"
+            );
+        }
+    }
+
+    #[test]
+    fn positive_overclaim_allows_explicit_negative_calibration_context() -> Result<(), String> {
+        reject_positive_overclaims(
+            Path::new("artifact.md"),
+            "This is not a calibrated precision claim.\nThis is not blocking-ready.",
+        )
     }
 
     #[test]
