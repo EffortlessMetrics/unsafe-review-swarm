@@ -51,6 +51,12 @@ Subsequent swarm status:
 
 ## Family audit
 
+The `Next action` column below records the action that was appropriate at the
+time of the PR #350-#396 burst audit. The current state is the "Subsequent
+swarm status" and "Analyzer follow-ups" sections: the initial applicability
+helper sequence has landed, so these table cells are historical seeds rather
+than the active queue.
+
 | Family | Accepted evidence | Rejected controls | Missing controls / risk | Dogfood status | Next action |
 |---|---|---|---|---|---|
 | `Vec::reserve` / `try_reserve` / capacity evidence | Same-receiver `reserve` and `try_reserve` capacity evidence for capacity-related obligations. | Comment-return claims, stale receiver evidence, stale capacity binding evidence, and receiver freshness regressions. | Capacity evidence still needs operation-specific applicability: same owner, same initialized range, no receiver reassignment, and no cross-branch drift. | Not dogfood-measured after burst. | Dogfood `smallvec-pr277`, `smallvec-pr64`, `smallvec-pr254`, and `arrayvec-pr288`; then factor same-receiver/staleness helpers. |
