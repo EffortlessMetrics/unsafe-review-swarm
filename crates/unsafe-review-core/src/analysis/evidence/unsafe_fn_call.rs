@@ -2,9 +2,38 @@ use super::{branch_still_open_at_operation, compact_code, is_receiver_path_char}
 
 pub(super) fn has_encode_utf8_remaining_capacity_evidence(lower: &str) -> bool {
     let compact = compact_code(lower);
-    compact.contains("encode_utf8(c,ptr,remaining_cap)")
-        && compact.contains("remaining_cap=self.capacity()-len")
-        && compact.contains("ptr")
+    let context = EncodeUtf8CapacityContext::new(&compact);
+    context.has_same_remaining_capacity_argument_evidence()
+}
+
+// encode_utf8 contract evidence is scoped to the call shape that passes the
+// local remaining capacity value through to the unsafe function.
+struct EncodeUtf8CapacityContext<'a> {
+    compact: &'a str,
+}
+
+impl<'a> EncodeUtf8CapacityContext<'a> {
+    fn new(compact: &'a str) -> Self {
+        Self { compact }
+    }
+
+    fn has_same_remaining_capacity_argument_evidence(&self) -> bool {
+        self.has_encode_utf8_remaining_capacity_call()
+            && self.has_remaining_capacity_binding()
+            && self.has_pointer_argument()
+    }
+
+    fn has_encode_utf8_remaining_capacity_call(&self) -> bool {
+        self.compact.contains("encode_utf8(c,ptr,remaining_cap)")
+    }
+
+    fn has_remaining_capacity_binding(&self) -> bool {
+        self.compact.contains("remaining_cap=self.capacity()-len")
+    }
+
+    fn has_pointer_argument(&self) -> bool {
+        self.compact.contains("ptr")
+    }
 }
 
 pub(super) fn has_unchecked_constructor_availability_evidence(

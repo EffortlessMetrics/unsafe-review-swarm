@@ -175,6 +175,7 @@ Current implementation checkpoint:
 | `write_bytes` | `WriteBytesCallContext` ties MaybeUninit, pointer-type, byte-value, and bounds evidence to the same receiver/value/count tuple | factored | Existing fixtures pin raw pointer write classification and valid-zero value evidence; add stale receiver/value controls only from concrete fixture pressure. |
 | `unreachable_unchecked` | `UnreachableUncheckedPathContext` ties infallible-path evidence to the same still-open match context as the unchecked call | factored | Existing fixtures pin wrong-match, post-operation, and closed-match false-positive controls. |
 | `new_unchecked` constructors | `UncheckedConstructorAvailabilityContext` ties availability evidence to the same constructor receiver type before the call | factored | Existing fixtures pin same receiver, other receiver, assert guards, unavailable early returns, observed-only availability, and closed branches. |
+| `encode_utf8` unsafe call | `EncodeUtf8CapacityContext` ties the unsafe call to the remaining-capacity binding passed as its length argument | factored | Existing fixtures pin the remaining-capacity call shape; use arrayvec dogfood for wording pressure, not broad UTF-8 unchecked detection. |
 
 Original extraction sequence, retained as the preferred order for auditing or
 extending these families:
