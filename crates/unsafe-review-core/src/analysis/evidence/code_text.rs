@@ -15,6 +15,16 @@ pub(super) fn strip_block_comments_and_literals(text: &str) -> String {
             }
             continue;
         }
+        if ch == '/' && chars.peek() == Some(&'/') {
+            chars.next();
+            for comment_ch in chars.by_ref() {
+                if comment_ch == '\n' {
+                    output.push('\n');
+                    break;
+                }
+            }
+            continue;
+        }
         if ch == '"' {
             output.push('"');
             let mut escaped = false;
@@ -60,4 +70,31 @@ pub(super) fn compact_code(lower: &str) -> String {
         .chars()
         .filter(|ch| !ch.is_ascii_whitespace())
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::strip_block_comments_and_literals;
+
+    #[test]
+    fn strips_line_comment_text_without_removing_later_code() {
+        let stripped = strip_block_comments_and_literals(
+            "if ptr.is_null() { // return None\n    return Some(ptr);\n}",
+        );
+
+        assert!(!stripped.contains("return None"));
+        assert!(stripped.contains("return Some(ptr);"));
+    }
+
+    #[test]
+    fn strips_block_comments_and_string_literals() {
+        let stripped = strip_block_comments_and_literals(
+            "if guard { /* return None */ let note = \"return None\"; return Some(()); }",
+        );
+
+        assert!(!stripped.contains("/* return None */"));
+        assert!(!stripped.contains("\"return None\""));
+        assert!(stripped.contains("\"\""));
+        assert!(stripped.contains("return Some(());"));
+    }
 }

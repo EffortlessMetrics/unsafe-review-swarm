@@ -700,6 +700,12 @@ mod tests {
             "NonNull::new_unchecked(ptr)",
             vec![],
         );
+        let line_comment_returning_guard = site_with_family(
+            OperationFamily::NonNullUnchecked,
+            vec!["if ptr.is_null() { // return None;", "    log_null();", "}"],
+            "NonNull::new_unchecked(ptr)",
+            vec![],
+        );
         let string_returning_guard = site_with_family(
             OperationFamily::NonNullUnchecked,
             vec!["if ptr.is_null() { let _note = \"return None\"; }"],
@@ -736,6 +742,16 @@ mod tests {
             !obligation_evidence(&comment_returning_guard, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
+        );
+        assert!(
+            !obligation_evidence(
+                &line_comment_returning_guard,
+                &obligations,
+                &contract,
+                &reach,
+            )[0]
+            .discharge
+            .present
         );
         assert!(
             !obligation_evidence(&string_returning_guard, &obligations, &contract, &reach)[0]
