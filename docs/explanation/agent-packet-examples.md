@@ -36,7 +36,8 @@ The useful fields for an agent handoff are:
 - `verify_commands`: suggested commands from the card. They are not executed by
   `unsafe-review`.
 - `do_not_do`: negative instructions that prevent broad unsafe rewrites,
-  suppressions, false witness claims, and unrelated edits.
+  suppressions, false witness claims, unrelated edits, and replacing executable
+  guard/discharge evidence with comments or docs.
 - `stop_conditions`: when the agent should stop and hand the result back.
 
 ## Raw Pointer Alignment

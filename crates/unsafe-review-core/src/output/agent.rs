@@ -92,6 +92,7 @@ impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
             do_not_do: &[
                 "do not widen unsafe code without reducing the missing evidence",
                 "do not add a broad suppression",
+                "do not replace executable guard or discharge evidence with comments or docs",
                 "do not claim Miri proof unless the witness command is run and attached",
                 "do not claim unsafe-review ran an agent, applied source edits, or posted comments",
                 "do not change unrelated unsafe code or public API behavior",
@@ -533,17 +534,7 @@ mod tests {
                 .unwrap_or("")
                 .contains("cargo +nightly miri test read_header")
         );
-        assert!(value["do_not_do"].is_array());
-        assert!(
-            serde_json::to_string(&value["do_not_do"])
-                .map_err(|err| format!("render do_not_do failed: {err}"))?
-                .contains("do not change unrelated unsafe code")
-        );
-        assert!(
-            serde_json::to_string(&value["do_not_do"])
-                .map_err(|err| format!("render do_not_do failed: {err}"))?
-                .contains("ran an agent, applied source edits, or posted comments")
-        );
+        assert_agent_boundary_rules(&value)?;
         assert!(value["stop_conditions"].is_array());
         assert!(
             serde_json::to_string(&value["stop_conditions"])
@@ -1240,6 +1231,27 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn agent_packet_do_not_do_preserves_copy_only_guard_boundary() -> Result<(), String> {
+        for fixture in [
+            "raw_pointer_alignment",
+            "str_from_utf8_unchecked",
+            "get_unchecked_mut_bounds",
+            "maybeuninit_assume_init",
+            "vec_set_len",
+            "atomic_pointer_state_fetch_ops",
+            "ffi_sanitizer_route",
+        ] {
+            let output = fixture_output(fixture)?;
+            let Some(card) = output.cards.first() else {
+                return Err(format!("fixture `{fixture}` should emit at least one card"));
+            };
+            let value = parse_json(&render(card))?;
+            assert_agent_boundary_rules(&value)?;
+        }
+        Ok(())
+    }
+
     fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures")
@@ -1257,6 +1269,36 @@ mod tests {
 
     fn parse_json(text: &str) -> Result<serde_json::Value, String> {
         serde_json::from_str(text).map_err(|err| format!("JSON parse failed: {err}"))
+    }
+
+    fn assert_agent_boundary_rules(value: &serde_json::Value) -> Result<(), String> {
+        let do_not_do = value["do_not_do"]
+            .as_array()
+            .ok_or("do_not_do should be an array")?;
+        for item in do_not_do {
+            let Some(text) = item.as_str() else {
+                return Err("do_not_do entries should be strings".to_string());
+            };
+            if !text.starts_with("do not ") {
+                return Err(format!("do_not_do entry must start with `do not`: {text}"));
+            }
+        }
+        let rules = serde_json::to_string(&value["do_not_do"])
+            .map_err(|err| format!("render do_not_do failed: {err}"))?;
+        for expected in [
+            "broad suppression",
+            "executable guard or discharge evidence",
+            "comments or docs",
+            "Miri proof",
+            "ran an agent, applied source edits, or posted comments",
+            "unrelated unsafe code",
+            "test mention as proof that the unsafe site executed",
+        ] {
+            if !rules.contains(expected) {
+                return Err(format!("do_not_do must include boundary `{expected}`"));
+            }
+        }
+        Ok(())
     }
 
     fn assert_evidence_projection(
