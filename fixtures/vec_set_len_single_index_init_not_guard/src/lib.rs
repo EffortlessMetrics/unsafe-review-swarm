@@ -1,0 +1,26 @@
+pub fn extend_one_slot(values: &mut Vec<u8>, bytes: &[u8]) {
+    let old_len = values.len();
+    let new_len = old_len + bytes.len();
+    if new_len > values.capacity() {
+        return;
+    }
+    if new_len == old_len {
+        return;
+    }
+    values.spare_capacity_mut()[0].write(bytes[0]);
+    // SAFETY: this fixture intentionally initializes only one element.
+    unsafe {
+        values.set_len(new_len);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::extend_one_slot;
+
+    #[test]
+    fn mentions_extend_one_slot() {
+        let mut values = Vec::with_capacity(1);
+        extend_one_slot(&mut values, b"x");
+    }
+}

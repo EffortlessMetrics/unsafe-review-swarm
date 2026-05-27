@@ -2170,15 +2170,7 @@ struct SetLenInitializedRangeContext<'a> {
 
 impl<'a> SetLenInitializedRangeContext<'a> {
     fn has_initialized_range_evidence(&self) -> bool {
-        self.before_call
-            .split([';', '}'])
-            .any(|statement| self.statement_initializes_same_vec(statement))
-            || self.has_initialization_loop()
-    }
-
-    fn statement_initializes_same_vec(&self, statement: &str) -> bool {
-        contains_receiver_path(statement, self.same_vec_target)
-            && has_initialization_marker(statement)
+        self.has_initialization_loop()
     }
 
     fn has_initialization_loop(&self) -> bool {
@@ -5184,6 +5176,10 @@ mod tests {
         ];
         let unrelated_context = vec!["let _other = MaybeUninit::new(0_u8);"];
         let prefixed_receiver_context = vec!["let other_out = MaybeUninit::new(0_u8);"];
+        let single_index_context = vec![
+            "if new_len > out.capacity() { return; }",
+            "out.spare_capacity_mut()[0].write(0_u8);",
+        ];
         let set_len = site_with_family(
             OperationFamily::VecSetLen,
             context.clone(),
@@ -5202,6 +5198,12 @@ mod tests {
             "out.set_len(CAP);",
             vec![],
         );
+        let single_index_set_len = site_with_family(
+            OperationFamily::VecSetLen,
+            single_index_context,
+            "out.set_len(new_len);",
+            vec![],
+        );
         let raw_read = site_with_family(
             OperationFamily::RawPointerRead,
             context,
@@ -5214,11 +5216,14 @@ mod tests {
             obligation_evidence(&unrelated_set_len, &obligations, &contract, &reach);
         let prefixed_receiver_set_len_evidence =
             obligation_evidence(&prefixed_receiver_set_len, &obligations, &contract, &reach);
+        let single_index_set_len_evidence =
+            obligation_evidence(&single_index_set_len, &obligations, &contract, &reach);
         let raw_read_evidence = obligation_evidence(&raw_read, &obligations, &contract, &reach);
 
         assert!(set_len_evidence[0].discharge.present);
         assert!(!unrelated_set_len_evidence[0].discharge.present);
         assert!(!prefixed_receiver_set_len_evidence[0].discharge.present);
+        assert!(!single_index_set_len_evidence[0].discharge.present);
         assert_eq!(
             raw_read_evidence[0].discharge.summary,
             "No obligation-specific guard code was detected"
