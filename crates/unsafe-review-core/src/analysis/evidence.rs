@@ -1345,7 +1345,7 @@ fn has_origin_len_size_assertion_guard(compact: &str, len: &str, origin: &str) -
 }
 
 fn has_origin_len_size_open_positive_branch_guard(compact: &str, len: &str, origin: &str) -> bool {
-    origin_len_size_if_guards(compact).any(|guard| {
+    compact_if_guards(compact).any(|guard| {
         origin_len_size_condition_is_positive(guard.condition, len)
             && branch_still_open_at_operation(guard.after_body_start)
             && !contains_simple_assignment_to(guard.after_body_start, origin)
@@ -1353,7 +1353,7 @@ fn has_origin_len_size_open_positive_branch_guard(compact: &str, len: &str, orig
 }
 
 fn has_origin_len_size_early_return_guard(compact: &str, len: &str, origin: &str) -> bool {
-    origin_len_size_if_guards(compact).any(|guard| {
+    compact_if_guards(compact).any(|guard| {
         if !origin_len_size_condition_is_negative(guard.condition, len) {
             return false;
         }
@@ -1379,38 +1379,6 @@ fn origin_len_size_condition_is_negative(condition: &str, len: &str) -> bool {
         && (condition.contains(&format!("{len}<"))
             || condition.contains(&format!(">{len}"))
             || condition.contains(&format!(">={len}")))
-}
-
-struct OriginLenSizeIfGuard<'a> {
-    condition: &'a str,
-    after_body_start: &'a str,
-}
-
-fn origin_len_size_if_guards(compact: &str) -> impl Iterator<Item = OriginLenSizeIfGuard<'_>> {
-    let mut guards = Vec::new();
-    let mut cursor = compact;
-    let mut offset = 0usize;
-    while let Some(pos) = cursor.find("if") {
-        let start = offset + pos;
-        let before = compact[..start].chars().next_back();
-        if before.is_some_and(is_receiver_path_char) {
-            let next = pos + 2;
-            offset += next;
-            cursor = &cursor[next..];
-            continue;
-        }
-        let after_if = &compact[start + 2..];
-        if let Some(brace_pos) = after_if.find('{') {
-            guards.push(OriginLenSizeIfGuard {
-                condition: &after_if[..brace_pos],
-                after_body_start: &after_if[brace_pos + 1..],
-            });
-        }
-        let next = pos + 2;
-        offset += next;
-        cursor = &cursor[next..];
-    }
-    guards.into_iter()
 }
 
 fn has_origin_len_capacity_equality_guard(compact: &str, origin: &str) -> bool {
@@ -1467,7 +1435,7 @@ fn has_origin_len_capacity_open_positive_branch_guard(
     cap: &str,
     origin: &str,
 ) -> bool {
-    origin_len_size_if_guards(compact).any(|guard| {
+    compact_if_guards(compact).any(|guard| {
         origin_len_capacity_condition_matches(guard.condition, len, capacity, cap)
             && guard.condition.contains("==")
             && branch_still_open_at_operation(guard.after_body_start)
@@ -4056,7 +4024,7 @@ fn has_alignment_assertion_guard(compact: &str, receiver: &str) -> bool {
 }
 
 fn has_alignment_open_positive_branch_guard(compact: &str, receiver: &str) -> bool {
-    alignment_if_guards(compact).any(|guard| {
+    compact_if_guards(compact).any(|guard| {
         alignment_condition_is_positive(guard.condition, receiver)
             && branch_still_open_at_operation(guard.after_body_start)
             && !contains_simple_assignment_to(guard.after_body_start, receiver)
@@ -4064,7 +4032,7 @@ fn has_alignment_open_positive_branch_guard(compact: &str, receiver: &str) -> bo
 }
 
 fn has_alignment_early_return_guard(compact: &str, receiver: &str) -> bool {
-    alignment_if_guards(compact).any(|guard| {
+    compact_if_guards(compact).any(|guard| {
         if !alignment_condition_is_negative(guard.condition, receiver) {
             return false;
         }
@@ -4078,12 +4046,12 @@ fn has_alignment_early_return_guard(compact: &str, receiver: &str) -> bool {
     })
 }
 
-struct AlignmentIfGuard<'a> {
+struct CompactIfGuard<'a> {
     condition: &'a str,
     after_body_start: &'a str,
 }
 
-fn alignment_if_guards(compact: &str) -> impl Iterator<Item = AlignmentIfGuard<'_>> {
+fn compact_if_guards(compact: &str) -> impl Iterator<Item = CompactIfGuard<'_>> {
     let mut guards = Vec::new();
     let mut cursor = compact;
     let mut offset = 0usize;
@@ -4098,7 +4066,7 @@ fn alignment_if_guards(compact: &str) -> impl Iterator<Item = AlignmentIfGuard<'
         }
         let after_if = &compact[start + 2..];
         if let Some(brace_pos) = after_if.find('{') {
-            guards.push(AlignmentIfGuard {
+            guards.push(CompactIfGuard {
                 condition: &after_if[..brace_pos],
                 after_body_start: &after_if[brace_pos + 1..],
             });
