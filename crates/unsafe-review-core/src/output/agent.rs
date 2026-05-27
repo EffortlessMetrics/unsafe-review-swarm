@@ -94,7 +94,7 @@ impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
                 "do not add a broad suppression",
                 "do not replace executable guard or discharge evidence with comments or docs",
                 "do not claim Miri proof unless the witness command is run and attached",
-                "do not claim unsafe-review ran an agent, applied source edits, or posted comments",
+                "do not claim unsafe-review ran an agent, ran witnesses, applied source edits, or posted comments",
                 "do not change unrelated unsafe code or public API behavior",
                 "do not treat a test mention as proof that the unsafe site executed",
             ],
@@ -1290,7 +1290,7 @@ mod tests {
             "executable guard or discharge evidence",
             "comments or docs",
             "Miri proof",
-            "ran an agent, applied source edits, or posted comments",
+            "ran an agent, ran witnesses, applied source edits, or posted comments",
             "unrelated unsafe code",
             "test mention as proof that the unsafe site executed",
         ] {
