@@ -2812,10 +2812,37 @@ mod tests {
             "unsafe { ptr.write_bytes(byte, len) }",
             vec!["}"],
         );
+        let comment_return = site_with_family(
+            OperationFamily::RawPointerWrite,
+            vec![
+                "pub fn fill_bools(ptr: *mut bool, len: usize, byte: u8) {",
+                "    if byte > 1 {",
+                "        /* return; */",
+                "    }",
+            ],
+            "unsafe { ptr.write_bytes(byte, len) }",
+            vec!["}"],
+        );
+        let string_return = site_with_family(
+            OperationFamily::RawPointerWrite,
+            vec![
+                "pub fn fill_bools(ptr: *mut bool, len: usize, byte: u8) {",
+                "    if byte > 1 {",
+                "        let _note = \"return\";",
+                "    }",
+            ],
+            "unsafe { ptr.write_bytes(byte, len) }",
+            vec!["}"],
+        );
 
         let evidence = obligation_evidence(&raw_write, &obligations, &contract, &reach);
+        let comment_evidence =
+            obligation_evidence(&comment_return, &obligations, &contract, &reach);
+        let string_evidence = obligation_evidence(&string_return, &obligations, &contract, &reach);
 
         assert!(evidence[0].discharge.present);
+        assert!(!comment_evidence[0].discharge.present);
+        assert!(!string_evidence[0].discharge.present);
     }
 
     #[test]
