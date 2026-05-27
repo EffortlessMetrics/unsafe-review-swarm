@@ -10251,7 +10251,7 @@ Snapshot reports:
         write_valid_artifacts(&dir)?;
         fs::write(
             dir.join("cards.sarif"),
-            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"},{"id":"contract_missing"}]}},"results":[{"ruleId":"contract_missing","properties":{"cardId":"card-1","class":"guard_missing","witnessRoutes":["miri: route"],"witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
+            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"}]}},"results":[{"ruleId":"contract_missing","properties":{"cardId":"card-1","class":"guard_missing","witnessRoutes":["miri: route"],"witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
         )
         .map_err(|err| format!("write sarif failed: {err}"))?;
 
@@ -10259,6 +10259,34 @@ Snapshot reports:
 
         fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert!(result.err().unwrap_or_default().contains("ruleId"));
+        Ok(())
+    }
+
+    #[test]
+    fn advisory_artifact_checker_rejects_sarif_unused_rule_id() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-sarif-unused-rule")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        let path = dir.join("cards.sarif");
+        let mut sarif: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&path).map_err(|err| format!("read sarif failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse sarif failed: {err}"))?;
+        sarif["runs"][0]["tool"]["driver"]["rules"]
+            .as_array_mut()
+            .ok_or_else(|| "sarif rules fixture must be an array".to_string())?
+            .push(serde_json::json!({"id":"contract_missing"}));
+        fs::write(&path, sarif.to_string()).map_err(|err| format!("write sarif failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("cards.sarif declares unused rule id `contract_missing`")
+        );
         Ok(())
     }
 

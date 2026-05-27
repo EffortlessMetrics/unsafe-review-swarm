@@ -348,10 +348,17 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         .values()
         .map(|projection| projection.class_name.as_str())
         .collect::<BTreeSet<_>>();
-    for class_name in card_class_names {
+    for class_name in &card_class_names {
         if !sarif_rule_ids.contains(class_name) {
             return Err(format!(
                 "cards.sarif is missing rule id `{class_name}` for cards.json class"
+            ));
+        }
+    }
+    for rule_id in &sarif_rule_ids {
+        if !card_class_names.contains(rule_id) {
+            return Err(format!(
+                "cards.sarif declares unused rule id `{rule_id}` not present in cards.json classes"
             ));
         }
     }
