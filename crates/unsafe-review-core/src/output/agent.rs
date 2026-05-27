@@ -398,6 +398,10 @@ mod tests {
         assert_eq!(value["card"]["id"], card.id.0);
         assert_eq!(value["card"]["class"], "guard_missing");
         assert_eq!(
+            value["task"].as_str(),
+            Some(card.next_action.summary.as_str())
+        );
+        assert_eq!(
             value["context"]["operation"],
             "unsafe { ptr.cast::<Header>().read() }"
         );
@@ -439,10 +443,52 @@ mod tests {
                 .unwrap_or("")
                 .contains("not proof")
         );
-        assert!(value["required_safety_conditions"].is_array());
-        assert!(value["obligation_evidence"].is_array());
-        assert!(value["missing"].is_array());
-        assert!(value["missing_evidence"].is_array());
+        let required_safety_conditions = value["required_safety_conditions"]
+            .as_array()
+            .ok_or("required_safety_conditions should be an array")?;
+        assert_eq!(required_safety_conditions.len(), card.obligations.len());
+        for (condition, obligation) in required_safety_conditions.iter().zip(&card.obligations) {
+            assert_eq!(condition.as_str(), Some(obligation.description.as_str()));
+        }
+
+        let obligation_evidence = value["obligation_evidence"]
+            .as_array()
+            .ok_or("obligation_evidence should be an array")?;
+        assert_eq!(obligation_evidence.len(), card.obligation_evidence.len());
+        for (projected, evidence) in obligation_evidence.iter().zip(&card.obligation_evidence) {
+            assert_eq!(
+                projected["key"].as_str(),
+                Some(evidence.obligation.key.as_str())
+            );
+            assert_eq!(
+                projected["description"].as_str(),
+                Some(evidence.obligation.description.as_str())
+            );
+            assert_evidence_projection(&projected["contract"], &evidence.contract)?;
+            assert_evidence_projection(&projected["discharge"], &evidence.discharge)?;
+            assert_evidence_projection(&projected["reach"], &evidence.reach)?;
+            assert_evidence_projection(&projected["witness"], &evidence.witness)?;
+        }
+
+        let missing = value["missing"]
+            .as_array()
+            .ok_or("missing should be an array")?;
+        assert_eq!(missing.len(), card.missing.len());
+        for (projected, missing_evidence) in missing.iter().zip(&card.missing) {
+            assert_eq!(projected.as_str(), Some(missing_evidence.message.as_str()));
+        }
+
+        let missing_evidence = value["missing_evidence"]
+            .as_array()
+            .ok_or("missing_evidence should be an array")?;
+        assert_eq!(missing_evidence.len(), card.missing.len());
+        for (projected, missing) in missing_evidence.iter().zip(&card.missing) {
+            assert_eq!(projected["kind"].as_str(), Some(missing.kind.as_str()));
+            assert_eq!(
+                projected["message"].as_str(),
+                Some(missing.message.as_str())
+            );
+        }
         assert!(value["allowed_repairs"].is_array());
         assert_eq!(value["agent_readiness"]["ready"], true);
         assert_eq!(value["agent_readiness"]["state"], "ready");
@@ -457,8 +503,29 @@ mod tests {
         assert!(allowed_repairs.contains("unaligned operation"));
         assert!(allowed_repairs.contains("witness receipt"));
         assert_eq!(value["repair_scope"], "this card only");
-        assert!(value["witness_routes"].is_array());
-        assert!(value["verify_commands"].is_array());
+        let witness_routes = value["witness_routes"]
+            .as_array()
+            .ok_or("witness_routes should be an array")?;
+        assert_eq!(witness_routes.len(), card.routes.len());
+        for (projected, route) in witness_routes.iter().zip(&card.routes) {
+            assert_eq!(projected["kind"].as_str(), Some(route.kind.as_str()));
+            assert_eq!(projected["reason"].as_str(), Some(route.reason.as_str()));
+            assert_eq!(projected["command"].as_str(), route.command.as_deref());
+            assert_eq!(projected["required"].as_bool(), Some(route.required));
+        }
+        let verify_commands = value["verify_commands"]
+            .as_array()
+            .ok_or("verify_commands should be an array")?;
+        assert_eq!(
+            verify_commands.len(),
+            card.next_action.verify_commands.len()
+        );
+        for (projected, command) in verify_commands
+            .iter()
+            .zip(&card.next_action.verify_commands)
+        {
+            assert_eq!(projected.as_str(), Some(command.as_str()));
+        }
         assert!(
             value["verify_commands"][0]
                 .as_str()
@@ -1184,5 +1251,18 @@ mod tests {
 
     fn parse_json(text: &str) -> Result<serde_json::Value, String> {
         serde_json::from_str(text).map_err(|err| format!("JSON parse failed: {err}"))
+    }
+
+    fn assert_evidence_projection(
+        projected: &serde_json::Value,
+        evidence: &EvidenceState,
+    ) -> Result<(), String> {
+        assert_eq!(projected["present"].as_bool(), Some(evidence.present));
+        assert_eq!(projected["state"].as_str(), Some(evidence.state.as_str()));
+        assert_eq!(
+            projected["summary"].as_str(),
+            Some(evidence.summary.as_str())
+        );
+        Ok(())
     }
 }
