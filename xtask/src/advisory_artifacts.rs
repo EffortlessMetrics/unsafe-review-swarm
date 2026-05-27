@@ -5,6 +5,8 @@ struct AdvisoryArtifactSummary {
     card_ids: BTreeSet<String>,
     card_projections: BTreeMap<String, CardProjection>,
     card_count: usize,
+    open_actionable_gaps: usize,
+    high_priority_cards: usize,
 }
 
 struct CardProjection {
@@ -48,7 +50,7 @@ pub(crate) fn check_advisory_artifacts(dir: &Path) -> Result<(), String> {
 pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
     let summary = check_advisory_artifact_set(dir)?;
     check_witness_plan_artifact(dir, summary.card_count, &summary.card_projections)?;
-    check_lsp_artifact(dir, &summary.card_projections)?;
+    check_lsp_artifact(dir, &summary)?;
     check_github_summary_artifact(
         dir,
         summary.card_count,
@@ -451,11 +453,17 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
     let card_projections = advisory_card_projections(&cards)?;
     let card_count = card_ids.len();
     let summary_cards = super::json_usize_at(&cards, "/summary/cards", "cards.json")?;
+    let open_actionable_gaps =
+        super::json_usize_at(&cards, "/summary/open_actionable_gaps", "cards.json")?;
     if summary_cards != card_count {
         return Err(format!(
             "cards.json summary.cards is {summary_cards}, but cards array has {card_count}"
         ));
     }
+    let high_priority_cards = card_projections
+        .values()
+        .filter(|card| card.priority == "high")
+        .count();
 
     let pr_summary_path = dir.join("pr-summary.md");
     let pr_summary = super::read_to_string(&pr_summary_path)?;
@@ -872,6 +880,8 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         card_ids,
         card_projections,
         card_count,
+        open_actionable_gaps,
+        high_priority_cards,
     })
 }
 
@@ -1834,12 +1844,10 @@ fn require_pr_summary_witness_line(
     }
 }
 
-fn check_lsp_artifact(
-    dir: &Path,
-    card_projections: &BTreeMap<String, CardProjection>,
-) -> Result<(), String> {
+fn check_lsp_artifact(dir: &Path, summary: &AdvisoryArtifactSummary) -> Result<(), String> {
     let path = dir.join("lsp.json");
     let lsp = super::parse_json_file(&path)?;
+    let card_projections = &summary.card_projections;
     let card_ids = card_projections.keys().cloned().collect::<BTreeSet<_>>();
     super::require_json_str(&lsp, "tool", "unsafe-review", "lsp.json")?;
     super::require_json_str(&lsp, "mode", "read_only_projection", "lsp.json")?;
@@ -1852,11 +1860,7 @@ fn check_lsp_artifact(
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| "lsp.json is missing trust_boundary".to_string())?;
     super::require_boundary_text(boundary, "lsp.json")?;
-    let status_boundary = lsp
-        .pointer("/status/trust_boundary")
-        .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| "lsp.json is missing /status/trust_boundary".to_string())?;
-    super::require_boundary_text(status_boundary, "lsp.json status")?;
+    require_lsp_status_projection(&lsp, summary)?;
 
     let mut diagnostic_card_ids = BTreeSet::new();
     for diagnostic in super::json_array_at(&lsp, "/diagnostics", "lsp.json")? {
@@ -2009,6 +2013,83 @@ fn check_lsp_artifact(
         }
     }
     Ok(())
+}
+
+fn require_lsp_status_projection(
+    lsp: &serde_json::Value,
+    summary: &AdvisoryArtifactSummary,
+) -> Result<(), String> {
+    let status = lsp
+        .get("status")
+        .ok_or_else(|| "lsp.json is missing status".to_string())?;
+    let status_boundary = status
+        .get("trust_boundary")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "lsp.json is missing /status/trust_boundary".to_string())?;
+    super::require_boundary_text(status_boundary, "lsp.json status")?;
+
+    let expected_state = expected_lsp_status_state(summary);
+    let actual_state = super::require_non_empty_json_str(status, "state", "lsp.json status")?;
+    require_expected_value(actual_state, expected_state, "lsp.json status state")?;
+
+    require_lsp_status_count(
+        status,
+        "cards",
+        summary.card_count,
+        "cards.json summary.cards",
+    )?;
+    require_lsp_status_count(
+        status,
+        "open_actionable_gaps",
+        summary.open_actionable_gaps,
+        "cards.json summary.open_actionable_gaps",
+    )?;
+    require_lsp_status_count(
+        status,
+        "high_priority_cards",
+        summary.high_priority_cards,
+        "cards.json ReviewCard priority",
+    )?;
+
+    let expected_message = expected_lsp_status_message(summary, expected_state);
+    let actual_message = super::require_non_empty_json_str(status, "message", "lsp.json status")?;
+    require_expected_value(actual_message, &expected_message, "lsp.json status message")
+}
+
+fn expected_lsp_status_state(summary: &AdvisoryArtifactSummary) -> &'static str {
+    if summary.card_count == 0 {
+        "quiet"
+    } else if summary.open_actionable_gaps > 0 {
+        "actionable"
+    } else {
+        "informational"
+    }
+}
+
+fn expected_lsp_status_message(summary: &AdvisoryArtifactSummary, state: &str) -> String {
+    match state {
+        "quiet" => "No unsafe-review cards for this scope".to_string(),
+        _ => format!(
+            "{} unsafe-review card(s), {} open actionable gap(s)",
+            summary.card_count, summary.open_actionable_gaps
+        ),
+    }
+}
+
+fn require_lsp_status_count(
+    status: &serde_json::Value,
+    field: &str,
+    expected: usize,
+    source: &str,
+) -> Result<(), String> {
+    let actual = super::json_usize_at(status, &format!("/{field}"), "lsp.json status")?;
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(format!(
+            "lsp.json status {field} must project {source} `{expected}`; got `{actual}`"
+        ))
+    }
 }
 
 fn require_lsp_code_action_title(
