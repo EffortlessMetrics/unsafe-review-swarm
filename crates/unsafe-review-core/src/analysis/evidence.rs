@@ -1,3 +1,4 @@
+mod assignment_syntax;
 mod box_raw_origin;
 mod call_syntax;
 mod code_text;
@@ -26,6 +27,7 @@ mod vec_from_raw_parts;
 mod write_bytes;
 mod zeroed;
 
+use self::assignment_syntax::contains_simple_assignment_to;
 use self::box_raw_origin::{
     has_box_from_raw_origin_evidence, has_drop_in_place_box_origin_evidence,
 };
@@ -584,34 +586,6 @@ fn any_marker_tail(text: &str, marker: &str, mut applies: impl FnMut(&str) -> bo
     any_marker_occurrence(text, marker, |_marker_start, after_marker| {
         applies(after_marker)
     })
-}
-
-fn contains_simple_assignment_to(compact: &str, name: &str) -> bool {
-    if !is_simple_identifier(name) {
-        return false;
-    }
-    if compact.contains(&format!("let{name}="))
-        || compact.contains(&format!("letmut{name}="))
-        || compact.contains(&format!("let{name}:"))
-        || compact.contains(&format!("letmut{name}:"))
-    {
-        return true;
-    }
-    let marker = format!("{name}=");
-    let mut cursor = compact;
-    let mut offset = 0usize;
-    while let Some(pos) = cursor.find(&marker) {
-        let start = offset + pos;
-        let before = compact[..start].chars().next_back();
-        let after_equals = compact[start + marker.len()..].chars().next();
-        if before.is_none_or(|ch| !is_receiver_path_char(ch)) && after_equals != Some('=') {
-            return true;
-        }
-        let next = pos + marker.len();
-        offset += next;
-        cursor = &cursor[next..];
-    }
-    false
 }
 
 fn has_capacity_guard(family: &OperationFamily, lower: &str) -> bool {
