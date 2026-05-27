@@ -1,6 +1,7 @@
 use super::{
-    has_assignment_to_identifier, matching_call_argument_end, matching_generic_argument_end,
-    source_value_identifier, split_top_level_pair, u8_bool_valid_value_predicates,
+    branch_still_open_at_operation, has_assignment_to_identifier, matching_call_argument_end,
+    matching_generic_argument_end, source_value_identifier, split_top_level_pair,
+    u8_bool_valid_value_predicates,
 };
 
 pub(super) fn has_transmute_layout_size_evidence(lower: &str) -> bool {
@@ -152,20 +153,9 @@ impl TransmuteValueDomainContext<'_> {
         while let Some(offset) = self.before_call[search_from..].find(&guard) {
             let guard_start = search_from + offset;
             let after_guard = &self.before_call[guard_start + guard.len()..];
-            let mut depth = 1usize;
-            for ch in after_guard.chars() {
-                match ch {
-                    '{' => depth += 1,
-                    '}' => {
-                        depth = depth.saturating_sub(1);
-                        if depth == 0 {
-                            break;
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            if depth > 0 && self.source_value_stays_fresh_after(after_guard) {
+            if branch_still_open_at_operation(after_guard)
+                && self.source_value_stays_fresh_after(after_guard)
+            {
                 return true;
             }
             search_from = guard_start + guard.len();
