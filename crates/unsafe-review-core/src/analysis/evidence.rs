@@ -21,6 +21,7 @@ mod operation_scope;
 mod option_state;
 mod ownership_discharge;
 mod pointer_arithmetic;
+mod pointer_live_discharge;
 mod raw_pointer_alignment;
 mod raw_pointer_bounds;
 mod reach_scan;
@@ -74,12 +75,12 @@ use self::identifier_syntax::{is_simple_identifier, let_binding_name};
 use self::layout_discharge::layout_discharge_state;
 use self::marker_scan::{any_marker_occurrence, any_marker_tail};
 use self::maybeuninit::has_maybeuninit_assume_init_initialization_evidence;
-use self::nonnull::has_nullability_guard;
 use self::obligation_guard::{has_bounds_guard, has_capacity_guard};
 use self::operation_scope::code_before_operation;
 use self::option_state::{ends_with_some_pattern, is_some_binding, match_some_branch_after_marker};
 use self::ownership_discharge::ownership_discharge_state;
 use self::pointer_arithmetic::has_slice_end_pointer_arithmetic_evidence;
+use self::pointer_live_discharge::pointer_live_discharge_state;
 use self::raw_pointer_alignment::has_alignment_guard;
 use self::raw_pointer_bounds::has_raw_pointer_read_bounds_evidence;
 pub(crate) use self::reach_scan::reach_evidence;
@@ -98,7 +99,6 @@ use self::valid_zero_discharge::valid_zero_discharge_state;
 use self::vec_from_raw_parts::{
     has_vec_from_raw_parts_capacity_evidence, has_vec_from_raw_parts_origin_initialized_evidence,
     has_vec_from_raw_parts_origin_len_cap_evidence,
-    has_vec_from_raw_parts_origin_pointer_live_evidence,
 };
 use self::write_bytes::{
     has_bool_write_bytes_pointer_context, has_bool_write_bytes_value_evidence,
@@ -248,30 +248,7 @@ fn discharge_state_for(
                 EvidenceState::missing("No obligation-specific guard code was detected")
             }
         }
-        "non-null" | "pointer-live" => {
-            if family == &OperationFamily::VecFromRawParts
-                && has_vec_from_raw_parts_origin_pointer_live_evidence(
-                    &site.operation.expression,
-                    lower,
-                )
-            {
-                EvidenceState::present(
-                    "Vec::from_raw_parts same-origin pointer/capacity evidence was detected",
-                )
-            } else if family == &OperationFamily::DropInPlace
-                && has_drop_in_place_box_origin_evidence(&site.operation.expression, lower)
-            {
-                EvidenceState::present("Box::into_raw origin evidence was detected")
-            } else if has_nullability_guard(site, lower) {
-                EvidenceState::present("Nullability guard code was detected")
-            } else if family == &OperationFamily::VecFromRawParts {
-                EvidenceState::missing(
-                    "No Vec::from_raw_parts same-origin pointer/capacity evidence was detected",
-                )
-            } else {
-                EvidenceState::missing("No nullability guard code was detected")
-            }
-        }
+        "non-null" | "pointer-live" => pointer_live_discharge_state(site, lower),
         "ownership" => ownership_discharge_state(family, &site.operation.expression, lower),
         "callee-contract" => {
             callee_contract_discharge_state(family, &site.operation.expression, lower)
