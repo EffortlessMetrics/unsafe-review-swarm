@@ -2382,8 +2382,40 @@ fn check_advisory_artifact_overclaims(dir: &Path) -> Result<(), String> {
     ] {
         let path = dir.join(name);
         if path.is_file() {
-            super::reject_positive_overclaims(&path, &super::read_to_string(&path)?)?;
+            if is_machine_json_artifact(name) {
+                let value = super::parse_json_file(&path)?;
+                reject_json_positive_overclaims(&path, &value)?;
+            } else {
+                super::reject_positive_overclaims(&path, &super::read_to_string(&path)?)?;
+            }
         }
     }
     Ok(())
+}
+
+fn is_machine_json_artifact(name: &str) -> bool {
+    matches!(
+        name,
+        "cards.json" | "cards.sarif" | "comment-plan.json" | "lsp.json"
+    )
+}
+
+fn reject_json_positive_overclaims(path: &Path, value: &serde_json::Value) -> Result<(), String> {
+    match value {
+        serde_json::Value::String(text) => super::reject_positive_overclaims(path, text),
+        serde_json::Value::Array(items) => {
+            for item in items {
+                reject_json_positive_overclaims(path, item)?;
+            }
+            Ok(())
+        }
+        serde_json::Value::Object(entries) => {
+            for (key, value) in entries {
+                super::reject_positive_overclaims(path, key)?;
+                reject_json_positive_overclaims(path, value)?;
+            }
+            Ok(())
+        }
+        _ => Ok(()),
+    }
 }
