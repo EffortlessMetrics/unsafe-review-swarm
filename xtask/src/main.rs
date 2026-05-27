@@ -10100,7 +10100,7 @@ Snapshot reports:
         write_valid_artifacts(&dir)?;
         fs::write(
             dir.join("cards.sarif"),
-            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"}]}},"results":[{"ruleId":"guard_missing","locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":7,"startColumn":5}}}],"properties":{"cardId":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operationFamily":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","nextAction":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verifyCommands":["cargo +nightly miri test card"]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
+            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"}]}},"results":[{"ruleId":"guard_missing","locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":7,"startColumn":5}}}],"properties":{"cardId":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operationFamily":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","nextAction":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verifyCommands":["cargo +nightly miri test card"],"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
         )
         .map_err(|err| format!("write sarif failed: {err}"))?;
 
@@ -10112,6 +10112,35 @@ Snapshot reports:
                 .err()
                 .unwrap_or_default()
                 .contains("witnessRouteDetails")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn advisory_artifact_checker_rejects_sarif_result_without_trust_boundary() -> Result<(), String>
+    {
+        let dir = unique_temp_dir("unsafe-review-artifacts-sarif-result-boundary")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        let path = dir.join("cards.sarif");
+        let mut sarif: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&path).map_err(|err| format!("read sarif failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse sarif failed: {err}"))?;
+        sarif["runs"][0]["results"][0]["properties"]
+            .as_object_mut()
+            .ok_or_else(|| "sarif result properties fixture must be an object".to_string())?
+            .remove("trustBoundary");
+        fs::write(&path, sarif.to_string()).map_err(|err| format!("write sarif failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("cards.sarif result properties is missing trustBoundary")
         );
         Ok(())
     }
@@ -10240,7 +10269,7 @@ Snapshot reports:
         write_two_card_artifacts(&dir)?;
         fs::write(
             dir.join("cards.sarif"),
-            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"},{"id":"contract_missing"}]}},"results":[{"ruleId":"guard_missing","locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":7,"startColumn":5}}}],"properties":{"cardId":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operationFamily":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","hazards":["alignment"],"missingEvidence":[],"nextAction":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","witnessRoutes":["miri: route"],"witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}},{"ruleId":"guard_missing","locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":7,"startColumn":5}}}],"properties":{"cardId":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operationFamily":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","hazards":["alignment"],"missingEvidence":[],"nextAction":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","witnessRoutes":["miri: route"],"witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
+            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"},{"id":"contract_missing"}]}},"results":[{"ruleId":"guard_missing","locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":7,"startColumn":5}}}],"properties":{"cardId":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operationFamily":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","hazards":["alignment"],"missingEvidence":[],"nextAction":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","witnessRoutes":["miri: route"],"witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"],"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}},{"ruleId":"guard_missing","locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":7,"startColumn":5}}}],"properties":{"cardId":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operationFamily":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","hazards":["alignment"],"missingEvidence":[],"nextAction":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","witnessRoutes":["miri: route"],"witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"],"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
         )
         .map_err(|err| format!("write sarif failed: {err}"))?;
 
@@ -10870,7 +10899,7 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write pr summary failed: {err}"))?;
         fs::write(
             dir.join("cards.sarif"),
-            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"}]}},"results":[{"ruleId":"guard_missing","locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":7,"startColumn":5}}}],"properties":{"cardId":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operationFamily":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","hazards":["alignment"],"missingEvidence":[],"nextAction":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","witnessRoutes":["miri: route"],"witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
+            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"}]}},"results":[{"ruleId":"guard_missing","locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":7,"startColumn":5}}}],"properties":{"cardId":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operationFamily":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","hazards":["alignment"],"missingEvidence":[],"nextAction":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","witnessRoutes":["miri: route"],"witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"],"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
         )
         .map_err(|err| format!("write sarif failed: {err}"))?;
         fs::write(
@@ -10895,7 +10924,7 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write pr summary failed: {err}"))?;
         fs::write(
             dir.join("cards.sarif"),
-            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"},{"id":"contract_missing"}]}},"results":[{"ruleId":"guard_missing","locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":7,"startColumn":5}}}],"properties":{"cardId":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operationFamily":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","hazards":["alignment"],"missingEvidence":[],"nextAction":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","witnessRoutes":["miri: route"],"witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"]}},{"ruleId":"contract_missing","locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":7,"startColumn":1}}}],"properties":{"cardId":"card-2","class":"contract_missing","priority":"high","confidence":"high","operationFamily":"unknown","operation":"unsafe fn read_header(ptr: *const u8)","hazards":["unknown"],"missingEvidence":[],"nextAction":"Add a precise public `# Safety` section that names the required caller obligations.","witnessRoutes":["human-deep-review: route"],"witnessRouteDetails":[{"kind":"human-deep-review","reason":"route","command":null,"required":false}],"verifyCommands":[]}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
+            r#"{"version":"2.1.0","runs":[{"tool":{"driver":{"rules":[{"id":"guard_missing"},{"id":"contract_missing"}]}},"results":[{"ruleId":"guard_missing","locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":7,"startColumn":5}}}],"properties":{"cardId":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operationFamily":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","hazards":["alignment"],"missingEvidence":[],"nextAction":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","witnessRoutes":["miri: route"],"witnessRouteDetails":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verifyCommands":["cargo +nightly miri test card"],"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}},{"ruleId":"contract_missing","locations":[{"physicalLocation":{"artifactLocation":{"uri":"src/lib.rs"},"region":{"startLine":7,"startColumn":1}}}],"properties":{"cardId":"card-2","class":"contract_missing","priority":"high","confidence":"high","operationFamily":"unknown","operation":"unsafe fn read_header(ptr: *const u8)","hazards":["unknown"],"missingEvidence":[],"nextAction":"Add a precise public `# Safety` section that names the required caller obligations.","witnessRoutes":["human-deep-review: route"],"witnessRouteDetails":[{"kind":"human-deep-review","reason":"route","command":null,"required":false}],"verifyCommands":[],"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}],"properties":{"trustBoundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}]}"#,
         )
         .map_err(|err| format!("write sarif failed: {err}"))?;
         Ok(())

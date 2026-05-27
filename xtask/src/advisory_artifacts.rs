@@ -466,6 +466,11 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             &card_projection.missing,
             "cards.sarif result properties",
         )?;
+        let result_boundary = properties
+            .get("trustBoundary")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| "cards.sarif result properties is missing trustBoundary".to_string())?;
+        super::require_boundary_text(result_boundary, "cards.sarif result properties")?;
         super::json_array_at(result, "/properties/verifyCommands", "cards.sarif result")?;
     }
     for card_id in &card_ids {
