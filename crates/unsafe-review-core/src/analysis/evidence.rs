@@ -5,6 +5,7 @@ mod copy_range;
 mod freshness;
 mod generic_bounds;
 mod get_unchecked;
+mod identifier_syntax;
 mod maybeuninit;
 mod nonnull;
 mod option_state;
@@ -41,6 +42,7 @@ use self::freshness::{
 };
 use self::generic_bounds::has_length_or_bounds_guard;
 use self::get_unchecked::{get_unchecked_receiver_and_index, has_get_unchecked_bounds_guard};
+use self::identifier_syntax::{is_simple_identifier, let_binding_name};
 use self::maybeuninit::has_maybeuninit_assume_init_initialization_evidence;
 use self::nonnull::has_nullability_guard;
 use self::option_state::{ends_with_some_pattern, is_some_binding, match_some_branch_after_marker};
@@ -671,26 +673,6 @@ fn has_capacity_guard(family: &OperationFamily, lower: &str) -> bool {
         return false;
     }
     lower.contains("capacity") || lower.contains("cap()")
-}
-
-pub(super) fn let_binding_name(left_side: &str) -> Option<&str> {
-    let let_pos = left_side.rfind("let")?;
-    let rest = &left_side[let_pos + "let".len()..];
-    let rest = rest.strip_prefix("mut").unwrap_or(rest);
-    let end = rest
-        .char_indices()
-        .find_map(|(idx, ch)| (!(ch == '_' || ch.is_ascii_alphanumeric())).then_some(idx))
-        .unwrap_or(rest.len());
-    (end > 0).then_some(&rest[..end])
-}
-
-fn is_simple_identifier(text: &str) -> bool {
-    let mut chars = text.chars();
-    let Some(first) = chars.next() else {
-        return false;
-    };
-    (first == '_' || first.is_ascii_alphabetic())
-        && chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
 }
 
 fn compact_code(lower: &str) -> String {
