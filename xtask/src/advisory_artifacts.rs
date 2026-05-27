@@ -34,6 +34,7 @@ const COMMENT_PLAN_BODY_WORD_LIMIT: usize = 220;
 
 pub(crate) fn check_advisory_artifacts(dir: &Path) -> Result<(), String> {
     check_advisory_artifact_set(dir)?;
+    check_advisory_artifact_overclaims(dir)?;
     println!("check-advisory-artifacts: ok ({})", dir.display());
     Ok(())
 }
@@ -49,7 +50,7 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         &summary.card_projections,
     )?;
     check_first_pr_markdown_card_identity(dir, &summary.card_ids, &summary.card_projections)?;
-    check_first_pr_artifact_overclaims(dir)?;
+    check_advisory_artifact_overclaims(dir)?;
 
     println!("check-first-pr-artifacts: ok ({})", dir.display());
     Ok(())
@@ -2363,7 +2364,7 @@ fn require_known_card_id<'a>(
     }
 }
 
-fn check_first_pr_artifact_overclaims(dir: &Path) -> Result<(), String> {
+fn check_advisory_artifact_overclaims(dir: &Path) -> Result<(), String> {
     for name in [
         "cards.json",
         "pr-summary.md",

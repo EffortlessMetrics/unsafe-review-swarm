@@ -163,8 +163,9 @@ cargo xtask check-advisory-artifacts target/unsafe-review
 ```
 
 That verifier checks parseability, advisory policy, plan-only comment mode,
-projected card identity consistency, result counts, and trust-boundary text. It
-does not prove the analyzer found every unsafe issue.
+projected card identity consistency, result counts, trust-boundary text, and
+absence of positive safety/proof overclaims. It does not prove the analyzer
+found every unsafe issue.
 
 For the full `first-pr` bundle, including `witness-plan.md` and saved
 `lsp.json`, use:

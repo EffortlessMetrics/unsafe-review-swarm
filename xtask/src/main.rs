@@ -8601,6 +8601,28 @@ Snapshot reports:
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_cards_json_positive_overclaim() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-cards-json-overclaim")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        let path = dir.join("cards.json");
+        let mut cards = parse_json_file(&path)?;
+        cards["note"] = serde_json::json!("safe to merge");
+        fs::write(
+            &path,
+            serde_json::to_string(&cards)
+                .map_err(|err| format!("serialize cards json failed: {err}"))?,
+        )
+        .map_err(|err| format!("write cards failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(result.err().unwrap_or_default().contains("safe to merge"));
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_accepts_expected_bundle() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-ok")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
