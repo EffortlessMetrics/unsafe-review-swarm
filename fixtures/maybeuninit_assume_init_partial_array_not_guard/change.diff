@@ -1,0 +1,10 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -5,0 +5,6 @@
++pub fn assume_partially_initialized_array(value: u8) -> [u8; 4] {
++    let mut slot = MaybeUninit::<[u8; 4]>::uninit();
++    partial::initialize_first_element(&mut slot, value);
++    // SAFETY: first element was initialized above.
++    unsafe { slot.assume_init() }
++}
