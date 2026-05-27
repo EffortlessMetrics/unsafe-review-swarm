@@ -146,7 +146,7 @@ The analyzer must not mix evidence kinds:
 | `unsafe impl Send` / `Sync` | Same impl owner and type parameters | Concurrency invariants route to review/witness plan; local syntax does not prove them. | Custom trait impl misroute, missing bound context, treating Loom route as receipt. |
 | `#[target_feature]` | Same annotated function/caller contract | Contract docs inform review; availability and dispatch remain unproven. | Cfg predicate treated as runtime availability, docs treated as witness. |
 | `static mut` | Same static owner | Alias/synchronization contracts route to concurrency review. | Nearby prose treated as synchronization guard. |
-| `transmute` / `zeroed` | Same source/destination type and value | Valid-value/valid-zero evidence is type-specific. | Layout-only prose, comment-only value claim, stale byte/value check. |
+| `transmute` / `zeroed` | Same source/destination type and value | Valid-value/valid-zero evidence is type-specific and must keep the source value fresh after the guard. | Layout-only prose, comment-only value claim, stale byte/value check. |
 
 ## Helper extraction order
 
@@ -163,7 +163,7 @@ Current implementation checkpoint:
 | `NonNull::new_unchecked` | `NonNullPointerContext` for same-pointer probes, open branches, early returns, and stale pointer checks | factored | Add cast/provenance or macro controls only from concrete fixtures. |
 | `MaybeUninit::assume_init` | `MaybeUninitSlotContext` for same-slot writes/new bindings, scope reach, and stale slot checks | factored | Partial-field and partial-array initialization are fixture-pinned as non-discharge evidence; add broader field-pattern recognition only as separate fixture-backed slices. |
 | `Vec::set_len` | `SetLenApplicabilityContext` delegates capacity checks to `SetLenCapacityContext`, initialized-range checks to `SetLenInitializedRangeContext`, and call-result initialization checks to `SetLenCallResultInitializationContext` | factored | Keep using `arrayvec-pr288` as regression pressure for stale or wrong-target capacity, initialized-range, and call-result shapes. |
-| `transmute` / `transmute_copy` | `TransmuteLayoutContext` and `TransmuteValueDomainContext` separate layout-size evidence from value-domain evidence | factored | Do not broaden valid-value domains without one positive and one false-positive control. |
+| `transmute` / `transmute_copy` | `TransmuteLayoutContext` and `TransmuteValueDomainContext` separate layout-size evidence from value-domain evidence; the value-domain context owns same-source-value and stale-reassignment checks | factored | Do not broaden valid-value domains without one positive and one false-positive control. |
 
 Original extraction sequence, retained as the preferred order for auditing or
 extending these families:
