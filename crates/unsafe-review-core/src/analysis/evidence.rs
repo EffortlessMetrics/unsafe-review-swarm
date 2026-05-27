@@ -327,6 +327,18 @@ mod tests {
             "ptr.cast::<Header>().read()",
             vec![],
         );
+        let nested_modulo_guard = site_with_context(
+            vec![
+                "if (ptr as usize) % core::mem::align_of::<Header>() != 0 {",
+                "    if should_count() {",
+                "        record_misaligned(ptr);",
+                "    }",
+                "    return None;",
+                "}",
+            ],
+            "ptr.cast::<Header>().read()",
+            vec![],
+        );
         let matching_modulo_assertion = site_with_context(
             vec!["assert!((ptr as usize) % core::mem::align_of::<Header>() == 0);"],
             "ptr.cast::<Header>().read()",
@@ -410,6 +422,11 @@ mod tests {
         );
         assert!(
             obligation_evidence(&matching_modulo_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            obligation_evidence(&nested_modulo_guard, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
         );
