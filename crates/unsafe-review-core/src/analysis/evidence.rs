@@ -4,6 +4,7 @@ mod generic_bounds;
 mod get_unchecked;
 mod maybeuninit;
 mod nonnull;
+mod option_state;
 mod pointer_arithmetic;
 mod raw_pointer_alignment;
 mod raw_pointer_bounds;
@@ -26,6 +27,7 @@ use self::generic_bounds::has_length_or_bounds_guard;
 use self::get_unchecked::{get_unchecked_receiver_and_index, has_get_unchecked_bounds_guard};
 use self::maybeuninit::has_maybeuninit_assume_init_initialization_evidence;
 use self::nonnull::has_nullability_guard;
+use self::option_state::{ends_with_some_pattern, is_some_binding, match_some_branch_after_marker};
 use self::pointer_arithmetic::has_slice_end_pointer_arithmetic_evidence;
 use self::raw_pointer_alignment::has_alignment_guard;
 use self::raw_pointer_bounds::has_raw_pointer_read_bounds_evidence;
@@ -973,33 +975,6 @@ fn receiver_before_marker<'a>(compact: &'a str, marker: &str) -> Option<&'a str>
         .unwrap_or(0);
     let receiver = &before_marker[receiver_start..];
     (!receiver.is_empty()).then_some(receiver)
-}
-
-fn match_some_branch_after_marker(after_match: &str) -> Option<&str> {
-    let some_pos = after_match.find("some(")?;
-    let after_some = &after_match[some_pos + "some(".len()..];
-    let (binding, after_binding) = after_some.split_once(")=>{")?;
-    is_some_binding(binding).then_some(after_binding)
-}
-
-fn ends_with_some_pattern(before_marker: &str, keyword: &str) -> bool {
-    let prefix = format!("{keyword}some(");
-    let Some(pattern_start) = before_marker.rfind(&prefix) else {
-        return false;
-    };
-    let binding_with_close = &before_marker[pattern_start + prefix.len()..];
-    let Some(binding) = binding_with_close.strip_suffix(')') else {
-        return false;
-    };
-    is_some_binding(binding)
-}
-
-fn is_some_binding(binding: &str) -> bool {
-    !binding.is_empty()
-        && (binding == "_"
-            || binding
-                .chars()
-                .all(|ch| ch == '_' || ch.is_ascii_alphanumeric()))
 }
 
 fn is_receiver_path_char(ch: char) -> bool {
