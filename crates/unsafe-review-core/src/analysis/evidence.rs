@@ -78,7 +78,7 @@ use self::get_unchecked::{get_unchecked_receiver_and_index, has_get_unchecked_bo
 use self::identifier_syntax::{is_simple_identifier, let_binding_name};
 use self::layout_discharge::layout_discharge_state;
 use self::marker_scan::{any_marker_occurrence, any_marker_tail};
-use self::maybeuninit::has_maybeuninit_assume_init_initialization_evidence;
+use self::maybeuninit::maybeuninit_assume_init_discharge_state;
 use self::obligation_guard::has_capacity_guard;
 use self::operation_scope::code_before_operation;
 use self::option_state::{ends_with_some_pattern, is_some_binding, match_some_branch_after_marker};
@@ -182,15 +182,10 @@ fn discharge_state_for(
                 && set_len::has_set_len_initialization_evidence(init_scope)
             {
                 EvidenceState::present("Initialization evidence was detected")
-            } else if family == &OperationFamily::MaybeUninitAssumeInit
-                && has_maybeuninit_assume_init_initialization_evidence(
-                    &site.operation.expression,
-                    lower,
-                )
+            } else if let Some(state) =
+                maybeuninit_assume_init_discharge_state(family, &site.operation.expression, lower)
             {
-                EvidenceState::present(
-                    "MaybeUninit initialization evidence was detected before assume_init",
-                )
+                state
             } else if family == &OperationFamily::SliceFromRawParts
                 && has_maybeuninit_slice_context(lower)
             {

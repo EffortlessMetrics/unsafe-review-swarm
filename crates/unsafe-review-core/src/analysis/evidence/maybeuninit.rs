@@ -2,6 +2,23 @@ use super::{
     any_marker_occurrence, code_before_operation, compact_code, contains_simple_assignment_to,
     receiver_before_marker, strip_block_comments_and_literals,
 };
+use crate::domain::{EvidenceState, OperationFamily};
+
+pub(super) fn maybeuninit_assume_init_discharge_state(
+    family: &OperationFamily,
+    expression: &str,
+    lower: &str,
+) -> Option<EvidenceState> {
+    if family == &OperationFamily::MaybeUninitAssumeInit
+        && has_maybeuninit_assume_init_initialization_evidence(expression, lower)
+    {
+        Some(EvidenceState::present(
+            "MaybeUninit initialization evidence was detected before assume_init",
+        ))
+    } else {
+        None
+    }
+}
 
 pub(super) fn has_maybeuninit_assume_init_initialization_evidence(
     expression: &str,
