@@ -146,14 +146,17 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
                 repairs.push("prove the same pointer is non-null and valid for `len` elements before `from_raw_parts`".to_string());
             }
             if missing_discharge(card, "alignment") {
-                repairs.push("prove the pointer is aligned for the slice element type".to_string());
+                repairs.push(
+                    "prove the same pointer is aligned for the slice element type".to_string(),
+                );
             }
             if missing_discharge(card, "initialized") {
-                repairs.push("show the entire `ptr..ptr+len` range is initialized before constructing the slice".to_string());
+                repairs.push("show the entire same `ptr..ptr+len` range is initialized before constructing the slice".to_string());
             }
             if missing_discharge(card, "allocation") {
                 repairs.push(
-                    "show the `ptr..ptr+len` range stays inside one live allocation".to_string(),
+                    "show the same `ptr..ptr+len` range stays inside one live allocation"
+                        .to_string(),
                 );
             }
         }

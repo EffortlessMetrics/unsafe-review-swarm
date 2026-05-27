@@ -857,9 +857,11 @@ mod tests {
         assert_eq!(value["context"]["operation_family"], "slice_from_raw_parts");
         assert!(allowed_repairs.contains("same pointer"));
         assert!(allowed_repairs.contains("valid for `len` elements"));
-        assert!(allowed_repairs.contains("aligned for the slice element type"));
-        assert!(allowed_repairs.contains("`ptr..ptr+len` range is initialized"));
-        assert!(allowed_repairs.contains("inside one live allocation"));
+        assert!(allowed_repairs.contains("same pointer is aligned"));
+        assert!(allowed_repairs.contains("same `ptr..ptr+len` range is initialized"));
+        assert!(
+            allowed_repairs.contains("same `ptr..ptr+len` range stays inside one live allocation")
+        );
         assert!(allowed_repairs.contains("witness receipt"));
         assert!(!allowed_repairs.contains("Box::into_raw"));
         assert!(!allowed_repairs.contains("all-zero bit pattern"));
