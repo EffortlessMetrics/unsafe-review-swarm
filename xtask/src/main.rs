@@ -10033,6 +10033,35 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_pr_summary_card_table_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-card-table-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("pr-summary.md");
+        let summary =
+            fs::read_to_string(&path).map_err(|err| format!("read pr summary failed: {err}"))?;
+        fs::write(
+            &path,
+            summary.replace(
+                "| `card-1` | `guard_missing` | src/lib.rs:7 | `raw_pointer_read` |",
+                "| `card-1` | `guard_missing` | src/lib.rs:7 | `nonnull` |",
+            ),
+        )
+        .map_err(|err| format!("write pr summary failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("card table row for `card-1` must include")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_lsp_without_obligation_evidence() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-lsp-obligation-evidence")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -11094,7 +11123,7 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write cards failed: {err}"))?;
         fs::write(
             dir.join("pr-summary.md"),
-            "- Review cards: 1\n\n## Top card\n\n- ID: `card-1`\n- Class: `guard_missing`\n- Location: src/lib.rs:7\n- Operation: `unsafe { ptr.cast::<Header>().read() }`\n- Operation family: `raw_pointer_read`\n- Missing evidence: No missing evidence recorded\n- Primary route: `miri` because route\n\n```bash\ncargo +nightly miri test card\n```\n- Next action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n\nThis artifact is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
+            "- Review cards: 1\n\n## Top card\n\n- ID: `card-1`\n- Class: `guard_missing`\n- Location: src/lib.rs:7\n- Operation: `unsafe { ptr.cast::<Header>().read() }`\n- Operation family: `raw_pointer_read`\n- Missing evidence: No missing evidence recorded\n- Primary route: `miri` because route\n\n```bash\ncargo +nightly miri test card\n```\n- Next action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n\n## Card table\n\n| ID | Class | Location | Operation family | Operation | Missing evidence | Route | Next action |\n|---|---|---|---|---|---|---|---|\n| `card-1` | `guard_missing` | src/lib.rs:7 | `raw_pointer_read` | `unsafe { ptr.cast::<Header>().read() }` | No missing evidence recorded | `miri` | Add or expose the local guard that discharges the `raw_pointer_read` safety obligation. |\n\nThis artifact is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
         )
         .map_err(|err| format!("write pr summary failed: {err}"))?;
         fs::write(

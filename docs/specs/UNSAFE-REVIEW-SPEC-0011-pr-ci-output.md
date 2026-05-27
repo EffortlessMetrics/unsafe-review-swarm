@@ -143,6 +143,8 @@ Must include:
 card count
 top actionable card, when present
 compact card table
+  rows project ReviewCard id, class, location, operation family, operation,
+  missing evidence, primary route, and next action
 missing evidence summary
 witness route summary
 artifact links or paths

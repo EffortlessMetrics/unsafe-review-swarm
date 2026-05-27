@@ -1590,12 +1590,54 @@ fn check_first_pr_markdown_card_identity(
     require_text_mentions_only_known_card_ids(&pr_summary, &pr_summary_path, card_ids)?;
     require_text_mentions_all_card_ids(&pr_summary, &pr_summary_path, card_ids)?;
     require_markdown_top_card_projection(&pr_summary, &pr_summary_path, card_projections)?;
+    require_pr_summary_card_table_projection(&pr_summary, &pr_summary_path, card_projections)?;
 
     let witness_plan_path = dir.join("witness-plan.md");
     let witness_plan = super::read_to_string(&witness_plan_path)?;
     require_text_mentions_only_known_card_ids(&witness_plan, &witness_plan_path, card_ids)?;
     require_witness_plan_headings_known(&witness_plan, &witness_plan_path, card_ids)?;
     require_text_mentions_all_card_ids(&witness_plan, &witness_plan_path, card_ids)
+}
+
+fn require_pr_summary_card_table_projection(
+    text: &str,
+    path: &Path,
+    card_projections: &BTreeMap<String, CardProjection>,
+) -> Result<(), String> {
+    if card_projections.is_empty() {
+        return Ok(());
+    }
+    super::require_text_contains(text, "## Card table", path)?;
+    for (card_id, card) in card_projections {
+        let expected = format!(
+            "| `{}` | `{}` | {} | `{}` | `{}` | {} | `{}` | {} |",
+            markdown_table_cell(card_id),
+            card.class_name,
+            markdown_table_cell(&format!("{}:{}", card.path, card.line)),
+            card.operation_family,
+            markdown_table_cell(&card.operation),
+            markdown_table_cell(&expected_missing_summary(card)),
+            card.witness_routes
+                .first()
+                .map_or("human", |route| route.kind.as_str()),
+            markdown_table_cell(&card.next_action)
+        );
+        if !text.contains(&expected) {
+            return Err(format!(
+                "{} card table row for `{card_id}` must include `{expected}`",
+                path.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn markdown_table_cell(value: &str) -> String {
+    value
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .replace('|', "\\|")
 }
 
 fn check_lsp_artifact(
