@@ -26,6 +26,7 @@ struct CardProjection {
 struct WitnessRouteProjection {
     kind: String,
     reason: String,
+    command: Option<String>,
 }
 
 const COMMENT_PLAN_BODY_WORD_LIMIT: usize = 220;
@@ -809,9 +810,11 @@ fn advisory_card_projections(
                             "cards.json card witness_routes[]",
                         )
                         .map(str::to_string)?;
+                        let command = witness_route_command_projection(route)?;
                         Ok::<WitnessRouteProjection, String>(WitnessRouteProjection {
                             kind,
                             reason,
+                            command,
                         })
                     })
                     .collect::<Result<Vec<_>, _>>()
@@ -1189,9 +1192,30 @@ fn require_witness_plan_card_projections(
                 "witness route reason",
                 &format!("  - Reason: {}", route.reason),
             )?;
+            if let Some(command) = &route.command {
+                require_witness_plan_route_command(section, path, card_id, command)?;
+            }
         }
     }
     Ok(())
+}
+
+fn witness_route_command_projection(route: &serde_json::Value) -> Result<Option<String>, String> {
+    let Some(command) = route.get("command") else {
+        return Ok(None);
+    };
+    if command.is_null() {
+        return Ok(None);
+    }
+    let Some(command) = command.as_str() else {
+        return Err(
+            "cards.json card witness_routes[] command must be null or a string".to_string(),
+        );
+    };
+    if command.trim().is_empty() {
+        return Err("cards.json card witness_routes[] command must not be empty".to_string());
+    }
+    Ok(Some(command.to_string()))
 }
 
 fn witness_plan_card_section<'a>(text: &'a str, card_id: &str) -> Option<&'a str> {
@@ -1219,6 +1243,23 @@ fn require_witness_plan_card_line(
     } else {
         Err(format!(
             "{} witness-plan ReviewCard `{card_id}` {field} must include `{expected}`",
+            path.display()
+        ))
+    }
+}
+
+fn require_witness_plan_route_command(
+    section: &str,
+    path: &Path,
+    card_id: &str,
+    command: &str,
+) -> Result<(), String> {
+    let expected = format!("```bash\n{command}\n```");
+    if section.contains(&expected) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{} witness-plan ReviewCard `{card_id}` witness route command must include fenced command `{command}`",
             path.display()
         ))
     }
