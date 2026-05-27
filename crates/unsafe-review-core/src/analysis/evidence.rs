@@ -2162,10 +2162,15 @@ struct SetLenInitializedRangeContext<'a> {
 
 impl<'a> SetLenInitializedRangeContext<'a> {
     fn has_initialized_range_evidence(&self) -> bool {
-        self.before_call.split([';', '}']).any(|statement| {
-            contains_receiver_path(statement, self.same_vec_target)
-                && has_initialization_marker(statement)
-        }) || self.has_initialization_loop()
+        self.before_call
+            .split([';', '}'])
+            .any(|statement| self.statement_initializes_same_vec(statement))
+            || self.has_initialization_loop()
+    }
+
+    fn statement_initializes_same_vec(&self, statement: &str) -> bool {
+        contains_receiver_path(statement, self.same_vec_target)
+            && has_initialization_marker(statement)
     }
 
     fn has_initialization_loop(&self) -> bool {
@@ -2174,10 +2179,14 @@ impl<'a> SetLenInitializedRangeContext<'a> {
             let Some((head, body)) = block.rsplit_once('{') else {
                 return false;
             };
-            self.loop_iterates_receiver(head, &slice_bindings)
-                && head.contains(".iter_mut(")
-                && has_initialization_marker(body)
+            self.loop_initializes_same_vec(head, body, &slice_bindings)
         })
+    }
+
+    fn loop_initializes_same_vec(&self, head: &str, body: &str, slice_bindings: &[&str]) -> bool {
+        self.loop_iterates_receiver(head, slice_bindings)
+            && head.contains(".iter_mut(")
+            && has_initialization_marker(body)
     }
 
     fn slice_bindings(&self) -> Vec<&'a str> {
@@ -2185,28 +2194,28 @@ impl<'a> SetLenInitializedRangeContext<'a> {
         let mut consumed = 0usize;
         for statement in self.before_call.split_inclusive(';') {
             let statement_without_semicolon = statement.trim_end_matches(';');
-            let Some((left, right)) = statement_without_semicolon.split_once('=') else {
-                consumed += statement.len();
-                continue;
-            };
-            let Some(binding) = let_binding_name(left) else {
-                consumed += statement.len();
-                continue;
-            };
-            let right = right.trim();
             let after_binding =
                 &self.before_call[(consumed + statement.len()).min(self.before_call.len())..];
-            if set_len_slice_binding_references_receiver(right, self.same_vec_target)
-                && right.contains('[')
-                && right.contains("..")
-                && !contains_simple_assignment_to(after_binding, self.same_vec_target)
-                && !contains_direct_binding_assignment_to(after_binding, binding)
+            if let Some(binding) =
+                self.fresh_slice_binding(statement_without_semicolon, after_binding)
             {
                 bindings.push(binding);
             }
             consumed += statement.len();
         }
         bindings
+    }
+
+    fn fresh_slice_binding(&self, statement: &'a str, after_binding: &str) -> Option<&'a str> {
+        let (left, right) = statement.split_once('=')?;
+        let binding = let_binding_name(left)?;
+        let right = right.trim();
+        (set_len_slice_binding_references_receiver(right, self.same_vec_target)
+            && right.contains('[')
+            && right.contains("..")
+            && !contains_simple_assignment_to(after_binding, self.same_vec_target)
+            && !contains_direct_binding_assignment_to(after_binding, binding))
+        .then_some(binding)
     }
 
     fn loop_iterates_receiver(&self, head: &str, slice_bindings: &[&str]) -> bool {
