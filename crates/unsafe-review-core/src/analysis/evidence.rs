@@ -1,4 +1,5 @@
 mod box_raw_origin;
+mod control_flow;
 mod copy_range;
 mod freshness;
 mod generic_bounds;
@@ -23,6 +24,9 @@ mod zeroed;
 
 use self::box_raw_origin::{
     has_box_from_raw_origin_evidence, has_drop_in_place_box_origin_evidence,
+};
+use self::control_flow::{
+    branch_still_open_at_operation, compact_if_guards, matching_code_block_end,
 };
 use self::copy_range::has_copy_slice_range_evidence;
 use self::freshness::{
@@ -621,23 +625,6 @@ fn any_marker_tail(text: &str, marker: &str, mut applies: impl FnMut(&str) -> bo
     })
 }
 
-fn branch_still_open_at_operation(after_guard: &str) -> bool {
-    let mut depth = 1usize;
-    for ch in after_guard.chars() {
-        match ch {
-            '{' => depth += 1,
-            '}' => {
-                depth -= 1;
-                if depth == 0 {
-                    return false;
-                }
-            }
-            _ => {}
-        }
-    }
-    true
-}
-
 fn contains_simple_assignment_to(compact: &str, name: &str) -> bool {
     if !is_simple_identifier(name) {
         return false;
@@ -732,19 +719,6 @@ fn matching_call_argument_end(text: &str) -> Option<usize> {
     None
 }
 
-fn matching_code_block_end(text_after_open: &str) -> Option<usize> {
-    let mut depth = 0usize;
-    for (idx, ch) in text_after_open.char_indices() {
-        match ch {
-            '{' => depth += 1,
-            '}' if depth == 0 => return Some(idx),
-            '}' => depth = depth.saturating_sub(1),
-            _ => {}
-        }
-    }
-    None
-}
-
 fn split_top_level_pair(text: &str) -> Option<(&str, &str)> {
     let mut angle_depth = 0usize;
     let mut paren_depth = 0usize;
@@ -795,38 +769,6 @@ fn compact_code(lower: &str) -> String {
         .chars()
         .filter(|ch| !ch.is_ascii_whitespace())
         .collect()
-}
-
-struct CompactIfGuard<'a> {
-    condition: &'a str,
-    after_body_start: &'a str,
-}
-
-fn compact_if_guards(compact: &str) -> impl Iterator<Item = CompactIfGuard<'_>> {
-    let mut guards = Vec::new();
-    let mut cursor = compact;
-    let mut offset = 0usize;
-    while let Some(pos) = cursor.find("if") {
-        let start = offset + pos;
-        let before = compact[..start].chars().next_back();
-        if before.is_some_and(is_receiver_path_char) {
-            let next = pos + 2;
-            offset += next;
-            cursor = &cursor[next..];
-            continue;
-        }
-        let after_if = &compact[start + 2..];
-        if let Some(brace_pos) = after_if.find('{') {
-            guards.push(CompactIfGuard {
-                condition: &after_if[..brace_pos],
-                after_body_start: &after_if[brace_pos + 1..],
-            });
-        }
-        let next = pos + 2;
-        offset += next;
-        cursor = &cursor[next..];
-    }
-    guards.into_iter()
 }
 
 fn contains_receiver_fragment(compact: &str, fragment: &str) -> bool {
