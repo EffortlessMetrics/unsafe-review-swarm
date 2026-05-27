@@ -1,6 +1,7 @@
 mod assignment_syntax;
 mod box_raw_origin;
 mod call_syntax;
+mod callee_contract_discharge;
 mod code_text;
 mod contract_discharge;
 mod contract_text;
@@ -49,6 +50,7 @@ use self::call_syntax::{
     matching_call_argument_end, matching_generic_argument_end, split_top_level_arguments,
     split_top_level_pair,
 };
+use self::callee_contract_discharge::callee_contract_discharge_state;
 use self::code_text::{
     compact_code, compact_contains_identifier, strip_block_comments_and_literals,
 };
@@ -90,9 +92,6 @@ use self::source_value::source_value_identifier;
 use self::target_feature_discharge::target_feature_discharge_state;
 use self::u8_bool_value::{has_u8_bool_value_guard, u8_bool_valid_value_predicates};
 use self::unreachable_discharge::unreachable_discharge_state;
-use self::unsafe_fn_call::{
-    has_encode_utf8_remaining_capacity_evidence, has_unchecked_constructor_availability_evidence,
-};
 use self::utf8_discharge::utf8_discharge_state;
 use self::valid_value_discharge::valid_value_discharge_state;
 use self::valid_zero_discharge::valid_zero_discharge_state;
@@ -294,20 +293,7 @@ fn discharge_state_for(
             }
         }
         "callee-contract" => {
-            if family == &OperationFamily::UnsafeFnCall
-                && has_encode_utf8_remaining_capacity_evidence(lower)
-            {
-                EvidenceState::present("Unsafe call argument guard code was detected")
-            } else if family == &OperationFamily::UnsafeFnCall
-                && has_unchecked_constructor_availability_evidence(
-                    &site.operation.expression,
-                    lower,
-                )
-            {
-                EvidenceState::present("Unchecked constructor availability guard code was detected")
-            } else {
-                EvidenceState::missing("No obligation-specific guard code was detected")
-            }
+            callee_contract_discharge_state(family, &site.operation.expression, lower)
         }
         "valid-value" => valid_value_discharge_state(family, lower),
         "layout" => layout_discharge_state(family, lower),
