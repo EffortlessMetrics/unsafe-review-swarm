@@ -1,5 +1,6 @@
 mod box_raw_origin;
 mod copy_range;
+mod freshness;
 mod generic_bounds;
 mod get_unchecked;
 mod maybeuninit;
@@ -24,6 +25,10 @@ use self::box_raw_origin::{
     has_box_from_raw_origin_evidence, has_drop_in_place_box_origin_evidence,
 };
 use self::copy_range::has_copy_slice_range_evidence;
+use self::freshness::{
+    has_assignment_to_any_identifier, has_assignment_to_identifier, has_fresh_guard_pattern,
+    has_fresh_guard_pattern_for_identifiers, has_open_positive_branch_guard_for_identifiers,
+};
 use self::generic_bounds::has_length_or_bounds_guard;
 use self::get_unchecked::{get_unchecked_receiver_and_index, has_get_unchecked_bounds_guard};
 use self::maybeuninit::has_maybeuninit_assume_init_initialization_evidence;
@@ -763,70 +768,6 @@ fn split_top_level_pair(text: &str) -> Option<(&str, &str)> {
     None
 }
 
-fn has_fresh_guard_pattern(before_call: &str, pattern: &str, argument: &str) -> bool {
-    has_fresh_guard_pattern_for_identifiers(before_call, pattern, &[argument])
-}
-
-fn has_fresh_guard_pattern_for_identifiers(
-    before_call: &str,
-    pattern: &str,
-    identifiers: &[&str],
-) -> bool {
-    let mut search_from = 0;
-    while let Some(offset) = before_call[search_from..].find(pattern) {
-        let pattern_start = search_from + offset;
-        let after_pattern = &before_call[pattern_start + pattern.len()..];
-        let after_guard = if pattern.ends_with(';') {
-            after_pattern
-        } else {
-            let statement_end = after_pattern.find(';').unwrap_or(after_pattern.len());
-            &after_pattern[statement_end..]
-        };
-        if !has_assignment_to_any_identifier(after_guard, identifiers) {
-            return true;
-        }
-        search_from = pattern_start + pattern.len();
-    }
-    false
-}
-
-fn has_open_positive_branch_guard_for_identifiers(
-    before_call: &str,
-    predicate: &str,
-    identifiers: &[&str],
-) -> bool {
-    let guard = format!("if{predicate}{{");
-    let mut search_from = 0;
-    while let Some(offset) = before_call[search_from..].find(&guard) {
-        let guard_start = search_from + offset;
-        let after_guard = &before_call[guard_start + guard.len()..];
-        let mut depth = 1usize;
-        for ch in after_guard.chars() {
-            match ch {
-                '{' => depth += 1,
-                '}' => {
-                    depth = depth.saturating_sub(1);
-                    if depth == 0 {
-                        break;
-                    }
-                }
-                _ => {}
-            }
-        }
-        if depth > 0 && !has_assignment_to_any_identifier(after_guard, identifiers) {
-            return true;
-        }
-        search_from = guard_start + guard.len();
-    }
-    false
-}
-
-fn has_assignment_to_any_identifier(compact: &str, identifiers: &[&str]) -> bool {
-    identifiers
-        .iter()
-        .any(|identifier| has_assignment_to_identifier(compact, identifier))
-}
-
 fn is_simple_identifier(text: &str) -> bool {
     let mut chars = text.chars();
     let Some(first) = chars.next() else {
@@ -834,41 +775,6 @@ fn is_simple_identifier(text: &str) -> bool {
     };
     (first == '_' || first.is_ascii_alphabetic())
         && chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
-}
-
-fn has_assignment_to_identifier(compact: &str, identifier: &str) -> bool {
-    let mut cursor = compact;
-    let mut offset = 0usize;
-    while let Some(pos) = cursor.find(identifier) {
-        let start = offset + pos;
-        let before = compact[..start].chars().next_back();
-        let after_start = start + identifier.len();
-        let after = &compact[after_start..];
-        let ends_on_boundary = after
-            .chars()
-            .next()
-            .is_none_or(|ch| !is_receiver_path_char(ch));
-        if before.is_none_or(|ch| !is_receiver_path_char(ch))
-            && ends_on_boundary
-            && starts_assignment_operator(after)
-        {
-            return true;
-        }
-        let next = pos + identifier.len();
-        offset += next;
-        cursor = &cursor[next..];
-    }
-    false
-}
-
-fn starts_assignment_operator(after_identifier: &str) -> bool {
-    if after_identifier.starts_with("==") || after_identifier.starts_with("=>") {
-        return false;
-    }
-    after_identifier.starts_with('=')
-        || ["+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>="]
-            .iter()
-            .any(|operator| after_identifier.starts_with(operator))
 }
 
 fn matching_generic_argument_end(text: &str) -> Option<usize> {
