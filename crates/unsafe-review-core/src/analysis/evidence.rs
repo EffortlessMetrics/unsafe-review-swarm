@@ -26,6 +26,7 @@ mod receiver_path;
 mod set_len;
 mod site_context;
 mod source_value;
+mod target_feature_discharge;
 mod transmute;
 mod u8_bool_value;
 mod unreachable_unchecked;
@@ -52,8 +53,7 @@ use self::code_text::{
 };
 use self::contract_discharge::{
     DOCUMENTED_PRIVATE_UNSAFE_CONTRACT_DISCHARGE, PUBLIC_UNSAFE_API_CONTRACT_DISCHARGE,
-    TARGET_FEATURE_CONTRACT_DISCHARGE, is_documented_private_unsafe_contract_obligation,
-    is_public_unsafe_contract_obligation,
+    is_documented_private_unsafe_contract_obligation, is_public_unsafe_contract_obligation,
 };
 pub(crate) use self::contract_text::contract_evidence;
 use self::control_flow::{
@@ -86,6 +86,7 @@ use self::receiver_path::{
 };
 use self::site_context::{code_context, code_context_through_site};
 use self::source_value::source_value_identifier;
+use self::target_feature_discharge::target_feature_discharge_state;
 use self::u8_bool_value::{has_u8_bool_value_guard, u8_bool_valid_value_predicates};
 use self::unreachable_unchecked::has_unreachable_unchecked_infallible_path_evidence;
 use self::unsafe_fn_call::{
@@ -320,13 +321,7 @@ fn discharge_state_for(
                 EvidenceState::missing("No obligation-specific guard code was detected")
             }
         }
-        "target-feature" => {
-            if family == &OperationFamily::TargetFeature && contract.present {
-                EvidenceState::present(TARGET_FEATURE_CONTRACT_DISCHARGE)
-            } else {
-                EvidenceState::missing("No obligation-specific guard code was detected")
-            }
-        }
+        "target-feature" => target_feature_discharge_state(family, contract),
         "utf8" => utf8_discharge_state(family, lower),
         "valid-zero" => valid_zero_discharge_state(family, lower),
         _ => EvidenceState::missing("No obligation-specific guard code was detected"),
