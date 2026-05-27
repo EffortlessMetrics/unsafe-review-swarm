@@ -49,11 +49,17 @@ pub(crate) fn check_advisory_artifacts(dir: &Path) -> Result<(), String> {
 
 pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
     let summary = check_advisory_artifact_set(dir)?;
-    check_witness_plan_artifact(dir, summary.card_count, &summary.card_projections)?;
+    check_witness_plan_artifact(
+        dir,
+        summary.card_count,
+        summary.open_actionable_gaps,
+        &summary.card_projections,
+    )?;
     check_lsp_artifact(dir, &summary)?;
     check_github_summary_artifact(
         dir,
         summary.card_count,
+        summary.open_actionable_gaps,
         &summary.card_ids,
         &summary.card_projections,
     )?;
@@ -69,6 +75,7 @@ const GITHUB_SUMMARY_WORD_LIMIT: usize = 600;
 fn check_github_summary_artifact(
     dir: &Path,
     card_count: usize,
+    open_actionable_gaps: usize,
     card_ids: &BTreeSet<String>,
     card_projections: &BTreeMap<String, CardProjection>,
 ) -> Result<(), String> {
@@ -78,6 +85,11 @@ fn check_github_summary_artifact(
 
     super::require_text_contains(&text, "## unsafe-review advisory summary", &path)?;
     super::require_text_contains(&text, &format!("- Review cards: {card_count}"), &path)?;
+    super::require_text_contains(
+        &text,
+        &format!("- Open actionable gaps: {open_actionable_gaps}"),
+        &path,
+    )?;
     super::require_text_contains(&text, "## Top card", &path)?;
     super::require_text_contains(&text, "static unsafe contract review", &path)?;
     super::require_text_contains(&text, "not memory-safety proof", &path)?;
@@ -470,6 +482,11 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
     super::require_text_contains(
         &pr_summary,
         &format!("- Review cards: {card_count}"),
+        &pr_summary_path,
+    )?;
+    super::require_text_contains(
+        &pr_summary,
+        &format!("- Open actionable gaps: {open_actionable_gaps}"),
         &pr_summary_path,
     )?;
     super::require_text_contains(
@@ -1521,17 +1538,20 @@ fn require_relevance_value(value: &str, context: &str) -> Result<(), String> {
 fn check_witness_plan_artifact(
     dir: &Path,
     card_count: usize,
+    open_actionable_gaps: usize,
     card_projections: &BTreeMap<String, CardProjection>,
 ) -> Result<(), String> {
     let path = dir.join("witness-plan.md");
     let text = super::read_to_string(&path)?;
     let review_cards_line = format!("- Review cards: {card_count}");
+    let open_actionable_line = format!("- Open actionable gaps: {open_actionable_gaps}");
     super::require_text_contains_all(
         &text,
         &path,
         &[
             "# unsafe-review witness plan",
             review_cards_line.as_str(),
+            open_actionable_line.as_str(),
             "does not run Miri",
             "cargo-careful",
             "not a proof of memory safety",
