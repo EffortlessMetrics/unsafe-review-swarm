@@ -1874,7 +1874,14 @@ fn check_lsp_artifact(
         }
         reject_lsp_code_action_edit_fields(action, "lsp.json code_action")?;
         let arguments = super::json_array_at(action, "/arguments", "lsp.json code_action")?;
-        check_lsp_code_action_payload(action, action_card_id, command, &card_ids, arguments)?;
+        check_lsp_code_action_payload(
+            action,
+            action_card_id,
+            command,
+            card_projection,
+            &card_ids,
+            arguments,
+        )?;
     }
     for card_id in &card_ids {
         for command in [
@@ -2200,6 +2207,7 @@ fn check_lsp_code_action_payload(
     action: &serde_json::Value,
     action_card_id: &str,
     command: &str,
+    card_projection: &CardProjection,
     card_ids: &BTreeSet<String>,
     arguments: &[serde_json::Value],
 ) -> Result<(), String> {
@@ -2251,6 +2259,15 @@ fn check_lsp_code_action_payload(
                 "command",
                 "lsp.json code_action payload",
             )?;
+            if !card_projection
+                .verify_commands
+                .iter()
+                .any(|expected| expected == witness_command)
+            {
+                return Err(format!(
+                    "lsp.json code_action copyWitnessCommand payload command `{witness_command}` must match a ReviewCard verify command for card id `{action_card_id}`"
+                ));
+            }
             require_lsp_code_action_arguments(command, arguments, &[witness_command.to_string()])?;
             "unsafe-review.witness_command"
         }

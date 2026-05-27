@@ -9544,6 +9544,33 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_lsp_witness_command_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-lsp-witness-command-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        fs::write(
+            dir.join("lsp.json"),
+            valid_lsp_json(
+                r#"[{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Copy unsafe-review packet for card-1","kind":"quickfix","command":"unsafe-review.copyAgentPacket","payload":{"kind":"unsafe-review.agent_packet","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]},{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Explain unsafe-review witness route","kind":"quickfix","command":"unsafe-review.explainWitnessRoute","payload":{"kind":"unsafe-review.witness_route","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]},{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Copy recommended witness command","kind":"quickfix","command":"unsafe-review.copyWitnessCommand","payload":{"kind":"unsafe-review.witness_command","card_id":"card-1","command":"cargo test unrelated","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["cargo test unrelated"]}]"#,
+            ),
+        )
+        .map_err(|err| format!("write lsp failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains(
+                    "copyWitnessCommand payload command `cargo test unrelated` must match a ReviewCard verify command"
+                )
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_lsp_code_action_payload_edit() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-lsp-action-payload-edit")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;

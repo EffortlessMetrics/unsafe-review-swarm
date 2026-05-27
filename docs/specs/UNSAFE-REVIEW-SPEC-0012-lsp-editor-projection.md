@@ -44,6 +44,8 @@ witness command, explain a witness route, or open a statically related test.
 They must not contain `WorkspaceEdit`, apply patches, insert SAFETY comments,
 execute witnesses, post comments, or enforce policy. This applies to both the
 top-level action object and nested command payloads.
+Witness-command actions must copy only commands already projected from the same
+ReviewCard's verify commands.
 
 Every diagnostic and card-scoped action must carry the relevant `card_id` and
 the static-review trust boundary. Diagnostic data must include the operation

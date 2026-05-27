@@ -339,6 +339,8 @@ trust boundary
 
 Code actions must be command-only. They must not include `WorkspaceEdit` or
 source-edit fields in the action or nested payloads.
+`copyWitnessCommand` actions must copy only a command already projected from the
+same ReviewCard's verify commands.
 
 Allowed action intents:
 
