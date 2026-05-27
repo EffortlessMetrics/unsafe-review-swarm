@@ -10,6 +10,7 @@ mod option_state;
 mod pointer_arithmetic;
 mod raw_pointer_alignment;
 mod raw_pointer_bounds;
+mod receiver_path;
 mod set_len;
 mod source_value;
 mod transmute;
@@ -41,6 +42,10 @@ use self::option_state::{ends_with_some_pattern, is_some_binding, match_some_bra
 use self::pointer_arithmetic::has_slice_end_pointer_arithmetic_evidence;
 use self::raw_pointer_alignment::has_alignment_guard;
 use self::raw_pointer_bounds::has_raw_pointer_read_bounds_evidence;
+use self::receiver_path::{
+    contains_receiver_fragment, contains_receiver_path, is_receiver_path_char,
+    receiver_before_marker,
+};
 use self::source_value::source_value_identifier;
 use self::transmute::{
     has_transmute_layout_size_evidence, has_transmute_u8_bool_valid_value_evidence,
@@ -769,58 +774,6 @@ fn compact_code(lower: &str) -> String {
         .chars()
         .filter(|ch| !ch.is_ascii_whitespace())
         .collect()
-}
-
-fn contains_receiver_fragment(compact: &str, fragment: &str) -> bool {
-    let mut cursor = compact;
-    let mut offset = 0usize;
-    while let Some(pos) = cursor.find(fragment) {
-        let start = offset + pos;
-        let before = compact[..start].chars().next_back();
-        if before.is_none_or(|ch| !is_receiver_path_char(ch)) {
-            return true;
-        }
-        let next = pos + fragment.len();
-        offset += next;
-        cursor = &cursor[next..];
-    }
-    false
-}
-
-fn contains_receiver_path(compact: &str, receiver: &str) -> bool {
-    let mut cursor = compact;
-    let mut offset = 0usize;
-    while let Some(pos) = cursor.find(receiver) {
-        let start = offset + pos;
-        let end = start + receiver.len();
-        let before = compact[..start].chars().next_back();
-        let after = compact[end..].chars().next();
-        if before.is_none_or(|ch| !is_receiver_path_char(ch))
-            && after.is_none_or(|ch| ch == '.' || !is_receiver_path_char(ch))
-        {
-            return true;
-        }
-        let next = pos + receiver.len();
-        offset += next;
-        cursor = &cursor[next..];
-    }
-    false
-}
-
-fn receiver_before_marker<'a>(compact: &'a str, marker: &str) -> Option<&'a str> {
-    let pos = compact.find(marker)?;
-    let before_marker = &compact[..pos];
-    let receiver_start = before_marker
-        .char_indices()
-        .rev()
-        .find_map(|(idx, ch)| (!is_receiver_path_char(ch)).then_some(idx + ch.len_utf8()))
-        .unwrap_or(0);
-    let receiver = &before_marker[receiver_start..];
-    (!receiver.is_empty()).then_some(receiver)
-}
-
-fn is_receiver_path_char(ch: char) -> bool {
-    ch == '_' || ch == ':' || ch == '.' || ch.is_ascii_alphanumeric()
 }
 
 pub(crate) fn reach_evidence(
