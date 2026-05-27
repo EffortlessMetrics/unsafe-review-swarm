@@ -10660,6 +10660,22 @@ Snapshot reports:
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_comment_plan_missing_card_coverage() -> Result<(), String>
+    {
+        let dir = unique_temp_dir("unsafe-review-artifacts-comment-missing-card-coverage")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_two_card_artifacts(&dir)?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(result.err().unwrap_or_default().contains(
+            "comment-plan.json must account for ReviewCard id `card-2` in comments[] or not_selected[]"
+        ));
+        Ok(())
+    }
+
+    #[test]
     fn advisory_artifact_checker_rejects_not_selected_reason_drift() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-artifacts-comment-reason-drift")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;

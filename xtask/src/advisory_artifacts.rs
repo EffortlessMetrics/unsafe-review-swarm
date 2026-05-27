@@ -671,11 +671,11 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             );
         }
     }
+    let mut not_selected_card_ids = BTreeSet::new();
     if let Some(not_selected) = comment_plan.get("not_selected") {
         let Some(not_selected) = not_selected.as_array() else {
             return Err("comment-plan.json not_selected must be an array".to_string());
         };
-        let mut not_selected_card_ids = BTreeSet::new();
         for card in not_selected {
             let Some(card_id) = card.get("card_id").and_then(serde_json::Value::as_str) else {
                 return Err("comment-plan.json not_selected entry is missing card_id".to_string());
@@ -743,6 +743,13 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
                 expected_non_selection_reason(card_projection, comments.len()),
                 "comment-plan.json not_selected reason",
             )?;
+        }
+    }
+    for card_id in &card_ids {
+        if !comment_card_ids.contains(card_id) && !not_selected_card_ids.contains(card_id) {
+            return Err(format!(
+                "comment-plan.json must account for ReviewCard id `{card_id}` in comments[] or not_selected[]"
+            ));
         }
     }
     let comment_boundary = comment_plan
