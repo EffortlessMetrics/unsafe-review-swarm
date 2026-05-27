@@ -392,6 +392,16 @@ mod tests {
             "ptr.cast::<Header>().read()",
             vec![],
         );
+        let comment_return_guard = site_with_context(
+            vec!["if !ptr.cast::<Header>().is_aligned() { /* return None; */ }"],
+            "ptr.cast::<Header>().read()",
+            vec![],
+        );
+        let string_return_guard = site_with_context(
+            vec!["if !ptr.cast::<Header>().is_aligned() { let _note = \"return None\"; }"],
+            "ptr.cast::<Header>().read()",
+            vec![],
+        );
         let closed_positive_branch = site_with_context(
             vec![
                 "if ptr.cast::<Header>().is_aligned() {",
@@ -455,6 +465,8 @@ mod tests {
             closed_modulo_branch,
             reassigned_modulo_pointer,
             observed_method,
+            comment_return_guard,
+            string_return_guard,
             closed_positive_branch,
             reassigned_pointer,
             post_guard,

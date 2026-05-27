@@ -1,7 +1,7 @@
 use super::{
     branch_still_open_at_operation, code_before_operation, compact_code, compact_if_guards,
     contains_receiver_fragment, contains_simple_assignment_to, is_receiver_path_char,
-    matching_code_block_end, receiver_before_marker,
+    matching_code_block_end, receiver_before_marker, strip_block_comments_and_literals,
 };
 use crate::analysis::scanner::ScannedSite;
 
@@ -76,8 +76,18 @@ fn has_alignment_early_return_guard(compact: &str, receiver: &str) -> bool {
                     &guard.after_body_start[body_end + 1..],
                 )
             });
-        guard_body.contains("return") && !contains_simple_assignment_to(after_guard_body, receiver)
+        guard_body_contains_return(guard_body)
+            && !contains_simple_assignment_to(after_guard_body, receiver)
     })
+}
+
+fn guard_body_contains_return(guard_body: &str) -> bool {
+    let code = strip_block_comments_and_literals(guard_body);
+    code.starts_with("return")
+        || code.contains(";return")
+        || code.contains("{return")
+        || code.contains("}return")
+        || code.contains("=>return")
 }
 
 fn alignment_condition_is_positive(condition: &str, receiver: &str) -> bool {
