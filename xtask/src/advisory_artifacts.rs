@@ -4,6 +4,7 @@ use std::path::Path;
 struct AdvisoryArtifactSummary {
     card_ids: BTreeSet<String>,
     card_projections: BTreeMap<String, CardProjection>,
+    scope: String,
     card_count: usize,
     open_actionable_gaps: usize,
     high_priority_cards: usize,
@@ -49,6 +50,11 @@ pub(crate) fn check_advisory_artifacts(dir: &Path) -> Result<(), String> {
 
 pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
     let summary = check_advisory_artifact_set(dir)?;
+    require_expected_value(
+        &summary.scope,
+        "diff",
+        "cards.json scope for first-pr artifacts",
+    )?;
     check_witness_plan_artifact(
         dir,
         summary.card_count,
@@ -58,6 +64,7 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
     check_lsp_artifact(dir, &summary)?;
     check_github_summary_artifact(
         dir,
+        &summary.scope,
         summary.card_count,
         summary.open_actionable_gaps,
         &summary.card_ids,
@@ -74,6 +81,7 @@ const GITHUB_SUMMARY_WORD_LIMIT: usize = 600;
 
 fn check_github_summary_artifact(
     dir: &Path,
+    scope: &str,
     card_count: usize,
     open_actionable_gaps: usize,
     card_ids: &BTreeSet<String>,
@@ -84,6 +92,7 @@ fn check_github_summary_artifact(
     require_text_mentions_only_known_card_ids(&text, &path, card_ids)?;
 
     super::require_text_contains(&text, "## unsafe-review advisory summary", &path)?;
+    super::require_text_contains(&text, &format!("- Scope: `{scope}`"), &path)?;
     super::require_text_contains(&text, &format!("- Review cards: {card_count}"), &path)?;
     super::require_text_contains(
         &text,
@@ -462,6 +471,8 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| "cards.json is missing trust_boundary".to_string())?;
     super::require_boundary_text(cards_boundary, "cards.json")?;
+    let scope = super::require_non_empty_json_str(&cards, "scope", "cards.json")?.to_string();
+    require_known_advisory_scope(&scope)?;
     let card_ids = super::advisory_card_ids(&cards)?;
     let card_projections = advisory_card_projections(&cards)?;
     let card_count = card_ids.len();
@@ -480,6 +491,11 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
 
     let pr_summary_path = dir.join("pr-summary.md");
     let pr_summary = super::read_to_string(&pr_summary_path)?;
+    super::require_text_contains(
+        &pr_summary,
+        &format!("- Scope: `{scope}`"),
+        &pr_summary_path,
+    )?;
     super::require_text_contains(
         &pr_summary,
         &format!("- Review cards: {card_count}"),
@@ -898,10 +914,20 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
     Ok(AdvisoryArtifactSummary {
         card_ids,
         card_projections,
+        scope,
         card_count,
         open_actionable_gaps,
         high_priority_cards,
     })
+}
+
+fn require_known_advisory_scope(scope: &str) -> Result<(), String> {
+    match scope {
+        "diff" | "repo" => Ok(()),
+        _ => Err(format!(
+            "cards.json scope must be `diff` or `repo`; got `{scope}`"
+        )),
+    }
 }
 
 fn require_comment_body_boundary(body: &str) -> Result<(), String> {
@@ -1876,6 +1902,7 @@ fn check_lsp_artifact(dir: &Path, summary: &AdvisoryArtifactSummary) -> Result<(
     super::require_json_str(&lsp, "tool", "unsafe-review", "lsp.json")?;
     super::require_json_str(&lsp, "mode", "read_only_projection", "lsp.json")?;
     super::require_json_str(&lsp, "policy", "advisory", "lsp.json")?;
+    super::require_json_str(&lsp, "scope", &summary.scope, "lsp.json")?;
     super::require_json_array(&lsp, "diagnostics", "lsp.json")?;
     super::require_json_array(&lsp, "hovers", "lsp.json")?;
     super::require_json_array(&lsp, "code_actions", "lsp.json")?;
