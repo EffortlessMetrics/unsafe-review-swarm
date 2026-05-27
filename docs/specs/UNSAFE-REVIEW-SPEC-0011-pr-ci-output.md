@@ -337,7 +337,8 @@ verify commands
 trust boundary
 ```
 
-Code actions must be command-only. They must not include `WorkspaceEdit`.
+Code actions must be command-only. They must not include `WorkspaceEdit` or
+source-edit fields in the action or nested payloads.
 
 Allowed action intents:
 

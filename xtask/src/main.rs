@@ -9544,6 +9544,37 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_lsp_code_action_payload_edit() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-lsp-action-payload-edit")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let lsp_path = dir.join("lsp.json");
+        let mut lsp: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&lsp_path).map_err(|err| format!("read lsp failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse lsp failed: {err}"))?;
+        let first_action = lsp
+            .get_mut("code_actions")
+            .and_then(serde_json::Value::as_array_mut)
+            .and_then(|actions| actions.first_mut())
+            .ok_or_else(|| "test lsp missing first code action".to_string())?;
+        first_action["payload"]["edit"] =
+            serde_json::json!({"changes":{"src/lib.rs":[{"newText":"// edit"}]}});
+        fs::write(&lsp_path, lsp.to_string()).map_err(|err| format!("write lsp failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("lsp.json code_action/payload must not contain source edit field `edit`")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_lsp_code_action_missing_path() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-lsp-action-missing-path")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;

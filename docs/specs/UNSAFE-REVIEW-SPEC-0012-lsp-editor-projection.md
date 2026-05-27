@@ -42,7 +42,8 @@ machine fields.
 Code actions are command-only. They may copy a bounded agent packet, copy a
 witness command, explain a witness route, or open a statically related test.
 They must not contain `WorkspaceEdit`, apply patches, insert SAFETY comments,
-execute witnesses, post comments, or enforce policy.
+execute witnesses, post comments, or enforce policy. This applies to both the
+top-level action object and nested command payloads.
 
 Every diagnostic and card-scoped action must carry the relevant `card_id` and
 the static-review trust boundary. Diagnostic data must include the operation

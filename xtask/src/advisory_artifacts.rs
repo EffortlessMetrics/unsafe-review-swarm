@@ -1872,11 +1872,9 @@ fn check_lsp_artifact(
                 "lsp.json code_actions repeat command `{command}` for card id `{action_card_id}`"
             ));
         }
+        reject_lsp_code_action_edit_fields(action, "lsp.json code_action")?;
         let arguments = super::json_array_at(action, "/arguments", "lsp.json code_action")?;
         check_lsp_code_action_payload(action, action_card_id, command, &card_ids, arguments)?;
-        if action.get("edit").is_some() || action.get("workspace_edit").is_some() {
-            return Err("lsp.json code_action must not contain source edits".to_string());
-        }
     }
     for card_id in &card_ids {
         for command in [
@@ -1889,6 +1887,31 @@ fn check_lsp_artifact(
                 ));
             }
         }
+    }
+    Ok(())
+}
+
+fn reject_lsp_code_action_edit_fields(
+    value: &serde_json::Value,
+    context: &str,
+) -> Result<(), String> {
+    match value {
+        serde_json::Value::Object(map) => {
+            for (key, child) in map {
+                if matches!(key.as_str(), "edit" | "workspace_edit" | "workspaceEdit") {
+                    return Err(format!(
+                        "{context} must not contain source edit field `{key}`"
+                    ));
+                }
+                reject_lsp_code_action_edit_fields(child, &format!("{context}/{key}"))?;
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for (idx, child) in items.iter().enumerate() {
+                reject_lsp_code_action_edit_fields(child, &format!("{context}[{idx}]"))?;
+            }
+        }
+        _ => {}
     }
     Ok(())
 }
