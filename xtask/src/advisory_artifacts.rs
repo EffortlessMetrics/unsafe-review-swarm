@@ -19,6 +19,8 @@ struct CardProjection {
     operation_family: String,
     next_action: String,
     missing: Vec<String>,
+    required_safety_conditions: Vec<serde_json::Value>,
+    obligation_evidence: Vec<serde_json::Value>,
     verify_commands: Vec<String>,
     witness_routes: Vec<WitnessRouteProjection>,
 }
@@ -969,6 +971,35 @@ fn advisory_card_projections(
             })
             .transpose()?
             .unwrap_or_default();
+        let obligation_evidence = card
+            .get("obligation_evidence")
+            .map(|evidence| {
+                evidence
+                    .as_array()
+                    .ok_or_else(|| {
+                        "cards.json card obligation_evidence must be an array".to_string()
+                    })?
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, evidence)| {
+                        let context = format!("cards.json card obligation_evidence[{idx}]");
+                        check_obligation_evidence_projection_shape(evidence, &context)?;
+                        Ok(evidence.clone())
+                    })
+                    .collect::<Result<Vec<_>, String>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
+        let required_safety_conditions = obligation_evidence
+            .iter()
+            .enumerate()
+            .map(|(idx, evidence)| {
+                required_safety_condition_projection(
+                    evidence,
+                    &format!("cards.json card obligation_evidence[{idx}]"),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         let verify_commands = super::json_array_at(card, "/verify_commands", "cards.json card")?
             .iter()
             .map(|command| {
@@ -1037,6 +1068,8 @@ fn advisory_card_projections(
                 operation_family,
                 next_action,
                 missing,
+                required_safety_conditions,
+                obligation_evidence,
                 verify_commands,
                 witness_routes,
             },
@@ -1812,7 +1845,7 @@ fn check_lsp_artifact(
             "lsp.json diagnostic",
         )?;
         super::json_array_at(diagnostic, "/obligation_evidence", "lsp.json diagnostic")?;
-        check_lsp_diagnostic_evidence(diagnostic)?;
+        check_lsp_diagnostic_evidence(diagnostic, card_projection)?;
         require_projected_string_array(
             diagnostic,
             "missing_evidence",
@@ -2048,7 +2081,10 @@ fn require_lsp_diagnostic_card_projection(
     require_projected_string_array(diagnostic, "hazards", &card.hazards, "lsp.json diagnostic")
 }
 
-fn check_lsp_diagnostic_evidence(diagnostic: &serde_json::Value) -> Result<(), String> {
+fn check_lsp_diagnostic_evidence(
+    diagnostic: &serde_json::Value,
+    card: &CardProjection,
+) -> Result<(), String> {
     let conditions = super::json_array_at(
         diagnostic,
         "/required_safety_conditions",
@@ -2062,6 +2098,11 @@ fn check_lsp_diagnostic_evidence(diagnostic: &serde_json::Value) -> Result<(), S
             "lsp.json diagnostic condition",
         )?;
     }
+    require_projected_json_array(
+        conditions,
+        &card.required_safety_conditions,
+        "lsp.json diagnostic required_safety_conditions",
+    )?;
 
     let evidence_summary = diagnostic
         .get("evidence_summary")
@@ -2116,45 +2157,76 @@ fn check_lsp_diagnostic_evidence(diagnostic: &serde_json::Value) -> Result<(), S
         );
     }
 
-    for evidence in super::json_array_at(diagnostic, "/obligation_evidence", "lsp.json diagnostic")?
-    {
-        super::require_non_empty_json_str(
+    let obligation_evidence =
+        super::json_array_at(diagnostic, "/obligation_evidence", "lsp.json diagnostic")?;
+    for (idx, evidence) in obligation_evidence.iter().enumerate() {
+        check_obligation_evidence_projection_shape(
             evidence,
-            "key",
-            "lsp.json diagnostic obligation_evidence",
+            &format!("lsp.json diagnostic obligation_evidence[{idx}]"),
         )?;
-        super::require_non_empty_json_str(
-            evidence,
-            "description",
-            "lsp.json diagnostic obligation_evidence",
-        )?;
-        for key in ["contract", "discharge", "reach", "witness"] {
-            let Some(state) = evidence.get(key) else {
-                return Err(format!(
-                    "lsp.json diagnostic obligation_evidence is missing {key}"
-                ));
-            };
-            if !state
-                .get("present")
-                .is_some_and(serde_json::Value::is_boolean)
-            {
-                return Err(format!(
-                    "lsp.json diagnostic obligation_evidence.{key} is missing boolean present"
-                ));
-            }
-            super::require_non_empty_json_str(
-                state,
-                "state",
-                &format!("lsp.json diagnostic obligation_evidence.{key}"),
-            )?;
-            super::require_non_empty_json_str(
-                state,
-                "summary",
-                &format!("lsp.json diagnostic obligation_evidence.{key}"),
-            )?;
+    }
+    require_projected_json_array(
+        obligation_evidence,
+        &card.obligation_evidence,
+        "lsp.json diagnostic obligation_evidence",
+    )?;
+
+    Ok(())
+}
+
+fn required_safety_condition_projection(
+    evidence: &serde_json::Value,
+    context: &str,
+) -> Result<serde_json::Value, String> {
+    let key = super::require_non_empty_json_str(evidence, "key", context)?;
+    let description = super::require_non_empty_json_str(evidence, "description", context)?;
+    Ok(serde_json::json!({
+        "key": key,
+        "description": description,
+    }))
+}
+
+fn check_obligation_evidence_projection_shape(
+    evidence: &serde_json::Value,
+    context: &str,
+) -> Result<(), String> {
+    super::require_non_empty_json_str(evidence, "key", context)?;
+    super::require_non_empty_json_str(evidence, "description", context)?;
+    for key in ["contract", "discharge", "reach", "witness"] {
+        let Some(state) = evidence.get(key) else {
+            return Err(format!("{context} is missing {key}"));
+        };
+        if !state
+            .get("present")
+            .is_some_and(serde_json::Value::is_boolean)
+        {
+            return Err(format!("{context}.{key} is missing boolean present"));
+        }
+        super::require_non_empty_json_str(state, "state", &format!("{context}.{key}"))?;
+        super::require_non_empty_json_str(state, "summary", &format!("{context}.{key}"))?;
+    }
+    Ok(())
+}
+
+fn require_projected_json_array(
+    actual: &[serde_json::Value],
+    expected: &[serde_json::Value],
+    context: &str,
+) -> Result<(), String> {
+    if actual.len() != expected.len() {
+        return Err(format!(
+            "{context} must project {} cards.json value(s); got {}",
+            expected.len(),
+            actual.len()
+        ));
+    }
+    for (idx, (actual, expected)) in actual.iter().zip(expected.iter()).enumerate() {
+        if actual != expected {
+            return Err(format!(
+                "{context}[{idx}] must project cards.json value `{expected}`; got `{actual}`"
+            ));
         }
     }
-
     Ok(())
 }
 
