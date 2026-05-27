@@ -3031,6 +3031,19 @@ mod tests {
             "unsafe { core::str::from_utf8_unchecked(bytes) }",
             vec![],
         );
+        let nested_early_return = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec![
+                "if core::str::from_utf8(bytes).is_err() {",
+                "    if should_count() {",
+                "        record_invalid_utf8();",
+                "    }",
+                "    return \"\";",
+                "}",
+            ],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
         let if_let_err_return = site_with_family(
             OperationFamily::StrFromUtf8Unchecked,
             vec![
@@ -3083,6 +3096,8 @@ mod tests {
 
         let checked_evidence = obligation_evidence(&checked, &obligations, &contract, &reach);
         let return_evidence = obligation_evidence(&early_return, &obligations, &contract, &reach);
+        let nested_return_evidence =
+            obligation_evidence(&nested_early_return, &obligations, &contract, &reach);
         let if_let_err_return_evidence =
             obligation_evidence(&if_let_err_return, &obligations, &contract, &reach);
         let question_mark_evidence =
@@ -3096,6 +3111,7 @@ mod tests {
 
         assert!(checked_evidence[0].discharge.present);
         assert!(return_evidence[0].discharge.present);
+        assert!(nested_return_evidence[0].discharge.present);
         assert!(if_let_err_return_evidence[0].discharge.present);
         assert!(question_mark_evidence[0].discharge.present);
         assert!(match_return_evidence[0].discharge.present);

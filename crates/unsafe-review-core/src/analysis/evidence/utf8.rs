@@ -266,9 +266,10 @@ fn has_validation_early_return_guard(context: &Utf8ValidationContext<'_>, predic
     while let Some(offset) = before_call[search_from..].find(&guard) {
         let guard_start = search_from + offset;
         let after_guard = &before_call[guard_start + guard.len()..];
-        let guard_end = after_guard.find('}').unwrap_or(after_guard.len());
-        let guard_body = &after_guard[..guard_end];
-        let after_branch = &after_guard[guard_end..];
+        let (guard_body, after_branch) = matching_code_block_end(after_guard)
+            .map_or((after_guard, ""), |body_end| {
+                (&after_guard[..body_end], &after_guard[body_end + 1..])
+            });
         if guard_body.contains("return") && !context.has_argument_assignment(after_branch) {
             return true;
         }
