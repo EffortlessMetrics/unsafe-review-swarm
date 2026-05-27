@@ -4015,10 +4015,27 @@ mod tests {
             "unsafe { core::mem::transmute::<u8, bool>(value) }",
             vec![],
         );
+        let comment_return = site_with_family(
+            OperationFamily::Transmute,
+            vec!["if value > 1 {", "    /* return false; */", "}"],
+            "unsafe { core::mem::transmute::<u8, bool>(value) }",
+            vec![],
+        );
+        let string_return = site_with_family(
+            OperationFamily::Transmute,
+            vec!["if value > 1 {", "    let _note = \"return false\";", "}"],
+            "unsafe { core::mem::transmute::<u8, bool>(value) }",
+            vec![],
+        );
 
         let evidence = obligation_evidence(&transmute, &obligations, &contract, &reach);
+        let comment_evidence =
+            obligation_evidence(&comment_return, &obligations, &contract, &reach);
+        let string_evidence = obligation_evidence(&string_return, &obligations, &contract, &reach);
 
         assert!(!evidence[0].discharge.present);
+        assert!(!comment_evidence[0].discharge.present);
+        assert!(!string_evidence[0].discharge.present);
     }
 
     #[test]
