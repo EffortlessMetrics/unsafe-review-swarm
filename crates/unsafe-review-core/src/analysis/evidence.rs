@@ -3531,6 +3531,66 @@ mod tests {
             "unsafe { core::str::from_utf8_unchecked(bytes) }",
             vec![],
         );
+        let comment_early_return = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec![
+                "if core::str::from_utf8(bytes).is_err() {",
+                "    /* return \"\"; */",
+                "}",
+            ],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
+        let string_early_return = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec![
+                "if core::str::from_utf8(bytes).is_err() {",
+                "    let _note = \"return\";",
+                "}",
+            ],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
+        let comment_if_let_err_return = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec![
+                "if let Err(_err) = core::str::from_utf8(bytes) {",
+                "    /* return \"\"; */",
+                "}",
+            ],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
+        let string_if_let_err_return = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec![
+                "if let Err(_err) = core::str::from_utf8(bytes) {",
+                "    let _note = \"return\";",
+                "}",
+            ],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
+        let comment_let_else_return = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec![
+                "let Ok(_) = core::str::from_utf8(bytes) else {",
+                "    /* return \"\"; */",
+                "};",
+            ],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
+        let string_let_else_return = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec![
+                "let Ok(_) = core::str::from_utf8(bytes) else {",
+                "    let _note = \"return\";",
+                "};",
+            ],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
         let reassigned_after_question_mark = site_with_family(
             OperationFamily::StrFromUtf8Unchecked,
             vec!["core::str::from_utf8(bytes)?;", "bytes = b\"\\xff\";"],
@@ -3614,6 +3674,18 @@ mod tests {
             obligation_evidence(&non_returning_if_let_err, &obligations, &contract, &reach);
         let non_returning_match_evidence =
             obligation_evidence(&non_returning_match, &obligations, &contract, &reach);
+        let comment_early_return_evidence =
+            obligation_evidence(&comment_early_return, &obligations, &contract, &reach);
+        let string_early_return_evidence =
+            obligation_evidence(&string_early_return, &obligations, &contract, &reach);
+        let comment_if_let_err_return_evidence =
+            obligation_evidence(&comment_if_let_err_return, &obligations, &contract, &reach);
+        let string_if_let_err_return_evidence =
+            obligation_evidence(&string_if_let_err_return, &obligations, &contract, &reach);
+        let comment_let_else_return_evidence =
+            obligation_evidence(&comment_let_else_return, &obligations, &contract, &reach);
+        let string_let_else_return_evidence =
+            obligation_evidence(&string_let_else_return, &obligations, &contract, &reach);
         let observed_is_ok_evidence =
             obligation_evidence(&observed_is_ok, &obligations, &contract, &reach);
         let closed_positive_branch_evidence =
@@ -3657,6 +3729,12 @@ mod tests {
         assert!(!non_returning_evidence[0].discharge.present);
         assert!(!non_returning_if_let_err_evidence[0].discharge.present);
         assert!(!non_returning_match_evidence[0].discharge.present);
+        assert!(!comment_early_return_evidence[0].discharge.present);
+        assert!(!string_early_return_evidence[0].discharge.present);
+        assert!(!comment_if_let_err_return_evidence[0].discharge.present);
+        assert!(!string_if_let_err_return_evidence[0].discharge.present);
+        assert!(!comment_let_else_return_evidence[0].discharge.present);
+        assert!(!string_let_else_return_evidence[0].discharge.present);
         assert!(!observed_is_ok_evidence[0].discharge.present);
         assert!(!closed_positive_branch_evidence[0].discharge.present);
         assert!(!closed_if_let_branch_evidence[0].discharge.present);
