@@ -30,7 +30,7 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
         }
         OperationFamily::VecSetLen => {
             if missing_discharge(card, "capacity") { repairs.push("add a same-vector capacity guard before `set_len` for the requested length".to_string()); }
-            if missing_discharge(card, "initialized") { repairs.push("initialize the extended element range before calling `set_len`".to_string()); }
+            if missing_discharge(card, "initialized") { repairs.push("initialize the extended element range for this same vector and requested length before calling `set_len`".to_string()); }
         }
         OperationFamily::MaybeUninitAssumeInit if missing_discharge(card, "initialized") => {
             repairs.push("write or construct the same `MaybeUninit` slot before `assume_init`".to_string());
