@@ -1,0 +1,31 @@
+use core::mem::MaybeUninit;
+
+pub fn extend_partial(values: &mut Vec<MaybeUninit<u8>>, bytes: &[u8]) {
+    let old_len = values.len();
+    let new_len = old_len + bytes.len();
+    if new_len > values.capacity() {
+        return;
+    }
+    if new_len == old_len {
+        return;
+    }
+    let initialized = &mut values[old_len..new_len - 1];
+    for (dst, src) in initialized.iter_mut().zip(bytes.iter()) {
+        *dst = MaybeUninit::new(*src);
+    }
+    // SAFETY: this fixture intentionally leaves the final element uninitialized.
+    unsafe {
+        values.set_len(new_len);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::extend_partial;
+
+    #[test]
+    fn mentions_extend_partial() {
+        let mut values = Vec::with_capacity(1);
+        extend_partial(&mut values, b"x");
+    }
+}

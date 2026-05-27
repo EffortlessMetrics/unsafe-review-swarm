@@ -2082,6 +2082,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
         for fixture in [
             "vec_set_len_post_init_not_guard",
             "vec_set_len_unrelated_initialization_not_guard",
+            "vec_set_len_partial_slice_binding_not_guard",
         ] {
             let output = fixture_output(fixture)?;
             let card = single_card(fixture, &output)?;

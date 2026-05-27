@@ -2025,6 +2025,7 @@ impl<'a> SetLenApplicabilityContext<'a> {
         SetLenInitializedRangeContext {
             before_call: self.before_call,
             same_vec_target: self.same_vec_target,
+            set_len_argument: self.set_len_argument,
         }
     }
 
@@ -2164,6 +2165,7 @@ impl<'a> SetLenCapacityContext<'a> {
 struct SetLenInitializedRangeContext<'a> {
     before_call: &'a str,
     same_vec_target: &'a str,
+    set_len_argument: &'a str,
 }
 
 impl<'a> SetLenInitializedRangeContext<'a> {
@@ -2217,6 +2219,7 @@ impl<'a> SetLenInitializedRangeContext<'a> {
         let binding = let_binding_name(left)?;
         let right = right.trim();
         (set_len_slice_binding_references_receiver(right, self.same_vec_target)
+            && set_len_slice_binding_covers_argument(right, self.set_len_argument)
             && right.contains('[')
             && right.contains("..")
             && !contains_simple_assignment_to(after_binding, self.same_vec_target)
@@ -2462,6 +2465,25 @@ fn set_len_slice_binding_references_receiver(right: &str, receiver: &str) -> boo
         .or_else(|| right.strip_prefix('&'))
         .unwrap_or(right);
     contains_receiver_path(right, receiver)
+}
+
+fn set_len_slice_binding_covers_argument(right: &str, set_len_argument: &str) -> bool {
+    let right = right
+        .strip_prefix("&mut")
+        .or_else(|| right.strip_prefix('&'))
+        .unwrap_or(right);
+    let Some(range_start) = right.find('[') else {
+        return false;
+    };
+    let range = &right[range_start + 1..];
+    let Some(range_end) = range.find(']') else {
+        return false;
+    };
+    let range = &range[..range_end];
+    let Some((_start, end)) = range.split_once("..") else {
+        return false;
+    };
+    end == set_len_argument
 }
 
 fn contains_direct_binding_assignment_to(compact: &str, name: &str) -> bool {
@@ -5996,14 +6018,38 @@ mod tests {
             "self.set_len(new_len);",
             vec![],
         );
+        let partial_range = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "let old_len = self.len();",
+                "let new_len = old_len + s.len();",
+                "if new_len > self.capacity() { return; }",
+                "let dst = &mut self.xs[old_len..new_len - 1];",
+                "for item in dst.iter_mut() {",
+                "    *item = MaybeUninit::new(0);",
+                "}",
+            ],
+            "self.set_len(new_len);",
+            vec![],
+        );
 
         let evidence = obligation_evidence(&set_len, &obligations, &contract, &reach);
         let wrong_target_evidence =
             obligation_evidence(&wrong_target, &obligations, &contract, &reach);
+        let partial_range_evidence =
+            obligation_evidence(&partial_range, &obligations, &contract, &reach);
 
         assert!(evidence.iter().all(|item| item.discharge.present));
         assert!(
             !wrong_target_evidence
+                .iter()
+                .find(|item| item.obligation.key == "initialized")
+                .unwrap()
+                .discharge
+                .present
+        );
+        assert!(
+            !partial_range_evidence
                 .iter()
                 .find(|item| item.obligation.key == "initialized")
                 .unwrap()

@@ -52,6 +52,20 @@ label_source = "fixture_golden"
 rationale = "A visible initialization loop over the extended range discharges initialized-range evidence."
 
 [[samples]]
+id = "vec-set-len-partial-slice-binding-not-initialized-range"
+fixture = "vec_set_len_partial_slice_binding_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-vector slice-binding initialization loop whose range stops before the set_len target does not prove the full extended Vec range is initialized."
+
+[[samples]]
 id = "vec-set-len-capacity-observed-missing"
 fixture = "vec_set_len_capacity_observed_not_guard"
 kind = "false_positive_control"
