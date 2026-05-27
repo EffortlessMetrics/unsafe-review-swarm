@@ -4,22 +4,40 @@ use crate::domain::{OperationFamily, ReviewCard};
 pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
     let mut repairs = Vec::new();
     match card.operation.family {
-        OperationFamily::RawPointerDeref | OperationFamily::RawPointerRead | OperationFamily::RawPointerWrite => add_raw_pointer_repairs(card, &mut repairs, true),
-        OperationFamily::RawPointerReadUnaligned | OperationFamily::RawPointerWriteUnaligned => add_raw_pointer_repairs(card, &mut repairs, false),
+        OperationFamily::RawPointerDeref
+        | OperationFamily::RawPointerRead
+        | OperationFamily::RawPointerWrite => add_raw_pointer_repairs(card, &mut repairs, true),
+        OperationFamily::RawPointerReadUnaligned | OperationFamily::RawPointerWriteUnaligned => {
+            add_raw_pointer_repairs(card, &mut repairs, false)
+        }
         OperationFamily::CopyNonOverlapping => {
-            if missing_discharge(card, "valid-range") { repairs.push("add guards proving the same `count` fits both source and destination ranges before this copy".to_string()); }
-            if missing_discharge(card, "non-overlap") { repairs.push("prove the same source and destination ranges do not overlap, or use `ptr::copy` only if overlap is intended".to_string()); }
+            if missing_discharge(card, "valid-range") {
+                repairs.push("add guards proving the same `count` fits both source and destination ranges before this copy".to_string());
+            }
+            if missing_discharge(card, "non-overlap") {
+                repairs.push("prove the same source and destination ranges do not overlap, or use `ptr::copy` only if overlap is intended".to_string());
+            }
         }
         OperationFamily::PtrCopy => {
-            if missing_discharge(card, "valid-range") { repairs.push("add guards proving the same `count` fits both source and destination ranges before this copy".to_string()); }
-            if missing_discharge(card, "initialized") { repairs.push("show that the same source range is initialized for the copied element count".to_string()); }
+            if missing_discharge(card, "valid-range") {
+                repairs.push("add guards proving the same `count` fits both source and destination ranges before this copy".to_string());
+            }
+            if missing_discharge(card, "initialized") {
+                repairs.push(
+                    "show that the same source range is initialized for the copied element count"
+                        .to_string(),
+                );
+            }
         }
         OperationFamily::PtrReplace => {
             if missing_discharge(card, "pointer-live") {
                 repairs.push("prove the destination pointer is valid for both read and write before `ptr::replace`".to_string());
             }
             if missing_discharge(card, "alignment") {
-                repairs.push("prove the destination pointer is aligned for the replaced value type".to_string());
+                repairs.push(
+                    "prove the destination pointer is aligned for the replaced value type"
+                        .to_string(),
+                );
             }
             if missing_discharge(card, "initialized") {
                 repairs.push("show the destination slot contains an initialized old value before replacement".to_string());
@@ -29,38 +47,74 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
             }
         }
         OperationFamily::VecSetLen => {
-            if missing_discharge(card, "capacity") { repairs.push("add a same-vector capacity guard before `set_len` for the requested length".to_string()); }
-            if missing_discharge(card, "initialized") { repairs.push("initialize the extended element range for this same vector and requested length before calling `set_len`".to_string()); }
+            if missing_discharge(card, "capacity") {
+                repairs.push(
+                    "add a same-vector capacity guard before `set_len` for the requested length"
+                        .to_string(),
+                );
+            }
+            if missing_discharge(card, "initialized") {
+                repairs.push("initialize the extended element range for this same vector and requested length before calling `set_len`".to_string());
+            }
         }
         OperationFamily::MaybeUninitAssumeInit if missing_discharge(card, "initialized") => {
-            repairs.push("write or construct the same `MaybeUninit` slot before `assume_init`".to_string());
+            repairs.push(
+                "write or construct the same `MaybeUninit` slot before `assume_init`".to_string(),
+            );
             repairs.push("keep the initialization branch open to the unsafe site and do not reassign the slot afterward".to_string());
         }
         OperationFamily::Transmute => {
             if missing_discharge(card, "layout") {
-                repairs.push("prove the source and destination layouts are compatible before this transmute".to_string());
+                repairs.push(
+                    "prove the source and destination layouts are compatible before this transmute"
+                        .to_string(),
+                );
             }
             if missing_discharge(card, "valid-value") {
                 repairs.push("prove the source value is in the destination type's valid-value domain before this transmute".to_string());
             }
         }
         OperationFamily::Zeroed if missing_discharge(card, "valid-zero") => {
-            repairs.push("prove the all-zero bit pattern is valid for this target type before `zeroed`".to_string());
+            repairs.push(
+                "prove the all-zero bit pattern is valid for this target type before `zeroed`"
+                    .to_string(),
+            );
             repairs.push("prefer an explicit constructor or `MaybeUninit` path when zero is not a valid value".to_string());
         }
         OperationFamily::UnwrapUnchecked if missing_discharge(card, "valid-value") => {
             repairs.push("add a same-receiver `Some` or `Ok` guard on an open path before `unwrap_unchecked`".to_string());
-            repairs.push("preserve the same receiver value between the guard and `unwrap_unchecked`".to_string());
+            repairs.push(
+                "preserve the same receiver value between the guard and `unwrap_unchecked`"
+                    .to_string(),
+            );
         }
         OperationFamily::UnreachableUnchecked if missing_discharge(card, "unreachable") => {
-            repairs.push("prove the same control-flow path is unreachable before `unreachable_unchecked`".to_string());
-            repairs.push("prefer a safe return, error, or panic path if reachability is uncertain".to_string());
+            repairs.push(
+                "prove the same control-flow path is unreachable before `unreachable_unchecked`"
+                    .to_string(),
+            );
+            repairs.push(
+                "prefer a safe return, error, or panic path if reachability is uncertain"
+                    .to_string(),
+            );
         }
-        OperationFamily::StrFromUtf8Unchecked if missing_discharge(card, "utf8") => repairs.push("validate the same byte buffer as UTF-8 on an open path before calling `from_utf8_unchecked`".to_string()),
-        OperationFamily::NonNullUnchecked if missing_discharge(card, "non-null") => repairs.push("add a same-pointer non-null guard before `NonNull::new_unchecked`".to_string()),
+        OperationFamily::StrFromUtf8Unchecked if missing_discharge(card, "utf8") => {
+            repairs.push("validate the same byte buffer as UTF-8 on an open path before calling `from_utf8_unchecked`".to_string());
+            repairs.push(
+                "preserve the same byte buffer between validation and the unchecked conversion"
+                    .to_string(),
+            );
+        }
+        OperationFamily::NonNullUnchecked if missing_discharge(card, "non-null") => repairs
+            .push("add a same-pointer non-null guard before `NonNull::new_unchecked`".to_string()),
         OperationFamily::GetUnchecked if missing_discharge(card, "bounds") => {
-            repairs.push("add a same-slice length/range guard before `get_unchecked` for the same index".to_string());
-            repairs.push("preserve the same index value between the guard and unchecked access".to_string());
+            repairs.push(
+                "add a same-slice length/range guard before `get_unchecked` for the same index"
+                    .to_string(),
+            );
+            repairs.push(
+                "preserve the same index value between the guard and unchecked access".to_string(),
+            );
         }
         OperationFamily::BoxFromRaw if missing_discharge(card, "ownership") => {
             repairs.push("prove the same raw pointer came from `Box::into_raw` with a compatible allocator before `Box::from_raw`".to_string());
@@ -71,7 +125,9 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
                 repairs.push("prove the pointer is live and valid for dropping one value before `drop_in_place`".to_string());
             }
             if missing_discharge(card, "initialized") {
-                repairs.push("show the pointed-to value is initialized before `drop_in_place`".to_string());
+                repairs.push(
+                    "show the pointed-to value is initialized before `drop_in_place`".to_string(),
+                );
             }
             if missing_discharge(card, "ownership") {
                 repairs.push("show ownership of the pointee so it will not be dropped again or observed after `drop_in_place`".to_string());
@@ -88,7 +144,9 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
                 repairs.push("show the entire `ptr..ptr+len` range is initialized before constructing the slice".to_string());
             }
             if missing_discharge(card, "allocation") {
-                repairs.push("show the `ptr..ptr+len` range stays inside one live allocation".to_string());
+                repairs.push(
+                    "show the `ptr..ptr+len` range stays inside one live allocation".to_string(),
+                );
             }
         }
         OperationFamily::VecFromRawParts => {
@@ -99,10 +157,14 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
                 repairs.push("prove the pointer is aligned for the Vec element type".to_string());
             }
             if missing_discharge(card, "initialized") {
-                repairs.push("show the first `len` elements are initialized before reconstructing the Vec".to_string());
+                repairs.push(
+                    "show the first `len` elements are initialized before reconstructing the Vec"
+                        .to_string(),
+                );
             }
             if missing_discharge(card, "capacity") {
-                repairs.push("add or expose a same-value guard proving `len <= capacity`".to_string());
+                repairs
+                    .push("add or expose a same-value guard proving `len <= capacity`".to_string());
             }
             if missing_discharge(card, "ownership") {
                 repairs.push("show the reconstructed Vec receives unique ownership and the raw parts will not be reused or double-freed".to_string());
@@ -110,7 +172,9 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
         }
         OperationFamily::PinUnchecked if missing_discharge(card, "pin") => {
             repairs.push("prove the value will not move after `Pin::new_unchecked`".to_string());
-            repairs.push("show projections preserve the same pinning invariant for this value".to_string());
+            repairs.push(
+                "show projections preserve the same pinning invariant for this value".to_string(),
+            );
             repairs.push("prefer a safe `Pin::new` or pinned-owner construction path when the invariant cannot be shown locally".to_string());
         }
         OperationFamily::UnsafeImplSendSync => {
@@ -141,7 +205,10 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
         }
         OperationFamily::StaticMut if missing_discharge(card, "global-state") => {
             repairs.push("prove all access to this `static mut` is synchronized or constrained to one execution context".to_string());
-            repairs.push("show the global state invariant avoids aliased mutable references and data races".to_string());
+            repairs.push(
+                "show the global state invariant avoids aliased mutable references and data races"
+                    .to_string(),
+            );
             repairs.push("prefer an `UnsafeCell`, atomic, lock, or one-time initialization owner when the invariant cannot be localized".to_string());
         }
         OperationFamily::InlineAsm if missing_discharge(card, "asm") => {
