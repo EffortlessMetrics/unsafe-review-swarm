@@ -1,4 +1,5 @@
 mod assignment_syntax;
+mod bounds_discharge;
 mod box_raw_origin;
 mod call_syntax;
 mod callee_contract_discharge;
@@ -45,6 +46,7 @@ mod write_bytes;
 mod zeroed;
 
 use self::assignment_syntax::contains_simple_assignment_to;
+use self::bounds_discharge::bounds_discharge_state;
 use self::box_raw_origin::has_drop_in_place_box_origin_evidence;
 use self::call_syntax::{
     matching_call_argument_end, matching_generic_argument_end, split_top_level_arguments,
@@ -75,11 +77,10 @@ use self::identifier_syntax::{is_simple_identifier, let_binding_name};
 use self::layout_discharge::layout_discharge_state;
 use self::marker_scan::{any_marker_occurrence, any_marker_tail};
 use self::maybeuninit::has_maybeuninit_assume_init_initialization_evidence;
-use self::obligation_guard::{has_bounds_guard, has_capacity_guard};
+use self::obligation_guard::has_capacity_guard;
 use self::operation_scope::code_before_operation;
 use self::option_state::{ends_with_some_pattern, is_some_binding, match_some_branch_after_marker};
 use self::ownership_discharge::ownership_discharge_state;
-use self::pointer_arithmetic::has_slice_end_pointer_arithmetic_evidence;
 use self::pointer_live_discharge::pointer_live_discharge_state;
 use self::raw_pointer_alignment::has_alignment_guard;
 use self::raw_pointer_bounds::has_raw_pointer_read_bounds_evidence;
@@ -160,16 +161,7 @@ fn discharge_state_for(
                 EvidenceState::missing("No alignment guard code was detected")
             }
         }
-        "bounds" | "valid-range" => {
-            if has_bounds_guard(site, lower)
-                || (family == &OperationFamily::PointerArithmetic
-                    && has_slice_end_pointer_arithmetic_evidence(lower))
-            {
-                EvidenceState::present("Length or bounds guard code was detected")
-            } else {
-                EvidenceState::missing("No length or bounds guard code was detected")
-            }
-        }
+        "bounds" | "valid-range" => bounds_discharge_state(site, lower),
         "capacity" => {
             let capacity_scope = (family == &OperationFamily::VecSetLen)
                 .then(|| code_context_through_site(site).to_ascii_lowercase());
