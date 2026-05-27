@@ -1,4 +1,5 @@
 mod box_raw_origin;
+mod call_syntax;
 mod control_flow;
 mod copy_range;
 mod freshness;
@@ -25,6 +26,10 @@ mod zeroed;
 
 use self::box_raw_origin::{
     has_box_from_raw_origin_evidence, has_drop_in_place_box_origin_evidence,
+};
+use self::call_syntax::{
+    matching_call_argument_end, matching_generic_argument_end, split_top_level_arguments,
+    split_top_level_pair,
 };
 use self::control_flow::{
     branch_still_open_at_operation, compact_if_guards, matching_code_block_end,
@@ -668,38 +673,6 @@ fn has_capacity_guard(family: &OperationFamily, lower: &str) -> bool {
     lower.contains("capacity") || lower.contains("cap()")
 }
 
-fn split_top_level_arguments(text: &str) -> Vec<&str> {
-    let mut args = Vec::new();
-    let mut start = 0usize;
-    let mut angle_depth = 0usize;
-    let mut paren_depth = 0usize;
-    let mut bracket_depth = 0usize;
-    let mut brace_depth = 0usize;
-    for (idx, ch) in text.char_indices() {
-        match ch {
-            '<' => angle_depth += 1,
-            '>' => angle_depth = angle_depth.saturating_sub(1),
-            '(' => paren_depth += 1,
-            ')' => paren_depth = paren_depth.saturating_sub(1),
-            '[' => bracket_depth += 1,
-            ']' => bracket_depth = bracket_depth.saturating_sub(1),
-            '{' => brace_depth += 1,
-            '}' => brace_depth = brace_depth.saturating_sub(1),
-            ',' if angle_depth == 0
-                && paren_depth == 0
-                && bracket_depth == 0
-                && brace_depth == 0 =>
-            {
-                args.push(text[start..idx].trim());
-                start = idx + ch.len_utf8();
-            }
-            _ => {}
-        }
-    }
-    args.push(text[start..].trim());
-    args
-}
-
 pub(super) fn let_binding_name(left_side: &str) -> Option<&str> {
     let let_pos = left_side.rfind("let")?;
     let rest = &left_side[let_pos + "let".len()..];
@@ -711,42 +684,6 @@ pub(super) fn let_binding_name(left_side: &str) -> Option<&str> {
     (end > 0).then_some(&rest[..end])
 }
 
-fn matching_call_argument_end(text: &str) -> Option<usize> {
-    let mut depth = 0usize;
-    for (idx, ch) in text.char_indices() {
-        match ch {
-            '(' | '[' | '{' => depth += 1,
-            ')' if depth == 0 => return Some(idx),
-            ')' | ']' | '}' => depth = depth.saturating_sub(1),
-            _ => {}
-        }
-    }
-    None
-}
-
-fn split_top_level_pair(text: &str) -> Option<(&str, &str)> {
-    let mut angle_depth = 0usize;
-    let mut paren_depth = 0usize;
-    let mut bracket_depth = 0usize;
-    for (idx, ch) in text.char_indices() {
-        match ch {
-            '<' => angle_depth += 1,
-            '>' => angle_depth = angle_depth.saturating_sub(1),
-            '(' => paren_depth += 1,
-            ')' => paren_depth = paren_depth.saturating_sub(1),
-            '[' => bracket_depth += 1,
-            ']' => bracket_depth = bracket_depth.saturating_sub(1),
-            ',' if angle_depth == 0 && paren_depth == 0 && bracket_depth == 0 => {
-                let left = &text[..idx];
-                let right = &text[idx + 1..];
-                return (!left.is_empty() && !right.is_empty()).then_some((left, right));
-            }
-            _ => {}
-        }
-    }
-    None
-}
-
 fn is_simple_identifier(text: &str) -> bool {
     let mut chars = text.chars();
     let Some(first) = chars.next() else {
@@ -754,19 +691,6 @@ fn is_simple_identifier(text: &str) -> bool {
     };
     (first == '_' || first.is_ascii_alphabetic())
         && chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
-}
-
-fn matching_generic_argument_end(text: &str) -> Option<usize> {
-    let mut depth = 0usize;
-    for (idx, ch) in text.char_indices() {
-        match ch {
-            '<' => depth += 1,
-            '>' if depth == 0 => return Some(idx),
-            '>' => depth = depth.saturating_sub(1),
-            _ => {}
-        }
-    }
-    None
 }
 
 fn compact_code(lower: &str) -> String {
