@@ -1,6 +1,60 @@
 use super::{
-    contains_receiver_path, contains_simple_assignment_to, is_receiver_path_char, let_binding_name,
+    contains_receiver_path, contains_simple_assignment_to, has_assignment_to_any_identifier,
+    has_fresh_guard_pattern_for_identifiers, has_open_positive_branch_guard_for_identifiers,
+    is_receiver_path_char, is_simple_identifier, let_binding_name, matching_call_argument_end,
 };
+
+pub(super) fn has_capacity_bound_guard(
+    before_call: &str,
+    same_vec_target: &str,
+    set_len_argument: &str,
+) -> bool {
+    SetLenCapacityContext {
+        before_call,
+        same_vec_target,
+        set_len_argument,
+    }
+    .has_capacity_bound_guard()
+}
+
+pub(super) fn has_const_capacity_evidence(
+    before_call: &str,
+    same_vec_target: &str,
+    set_len_argument: &str,
+) -> bool {
+    SetLenCapacityContext {
+        before_call,
+        same_vec_target,
+        set_len_argument,
+    }
+    .has_const_capacity_evidence()
+}
+
+pub(super) fn has_reserve_capacity_evidence(
+    before_call: &str,
+    same_vec_target: &str,
+    set_len_argument: &str,
+) -> bool {
+    SetLenCapacityContext {
+        before_call,
+        same_vec_target,
+        set_len_argument,
+    }
+    .has_reserve_capacity_evidence()
+}
+
+pub(super) fn has_with_capacity_evidence(
+    before_call: &str,
+    same_vec_target: &str,
+    set_len_argument: &str,
+) -> bool {
+    SetLenCapacityContext {
+        before_call,
+        same_vec_target,
+        set_len_argument,
+    }
+    .has_with_capacity_evidence()
+}
 
 pub(super) fn has_initialized_range_evidence(
     before_call: &str,
@@ -24,6 +78,119 @@ pub(super) fn has_call_result_initialization_evidence(
         set_len_argument,
     }
     .has_call_result_initialization_evidence()
+}
+
+struct SetLenCapacityContext<'a> {
+    before_call: &'a str,
+    same_vec_target: &'a str,
+    set_len_argument: &'a str,
+}
+
+impl<'a> SetLenCapacityContext<'a> {
+    fn has_capacity_bound_guard(&self) -> bool {
+        if self.has_remaining_capacity_guard() {
+            return true;
+        }
+        for capacity in self.capacity_terms() {
+            if self.has_capacity_relation(&capacity) {
+                return true;
+            }
+        }
+        self.capacity_bindings()
+            .into_iter()
+            .any(|capacity| self.has_capacity_relation(capacity))
+    }
+
+    fn capacity_terms(&self) -> [String; 2] {
+        [
+            format!("{}.capacity()", self.same_vec_target),
+            format!("{}.cap()", self.same_vec_target),
+        ]
+    }
+
+    fn capacity_bindings(&self) -> Vec<&'a str> {
+        self.before_call
+            .split(';')
+            .filter_map(|statement| {
+                let (left, right) = statement.split_once('=')?;
+                let binding = let_binding_name(left)?;
+                let right = right.trim();
+                ((right == format!("{}.capacity()", self.same_vec_target)
+                    || right == format!("{}.cap()", self.same_vec_target))
+                    && !binding.is_empty())
+                .then_some(binding)
+            })
+            .collect()
+    }
+
+    fn has_remaining_capacity_guard(&self) -> bool {
+        has_set_len_remaining_capacity_guard(
+            self.before_call,
+            self.same_vec_target,
+            self.set_len_argument,
+        )
+    }
+
+    fn has_capacity_relation(&self, capacity: &str) -> bool {
+        has_set_len_capacity_relation(
+            self.before_call,
+            self.set_len_argument,
+            capacity,
+            self.same_vec_target,
+        )
+    }
+
+    fn has_const_capacity_evidence(&self) -> bool {
+        self.set_len_argument == "cap"
+            && (self.before_call.contains("maybeuninit::uninit();cap")
+                || self.before_call.contains(";cap]"))
+    }
+
+    fn has_reserve_capacity_evidence(&self) -> bool {
+        if !is_simple_identifier(self.set_len_argument) {
+            return false;
+        }
+        let mut consumed = 0usize;
+        for statement in self.before_call.split_inclusive(';') {
+            let Some((left, right)) = statement.trim_end_matches(';').split_once('=') else {
+                consumed += statement.len();
+                continue;
+            };
+            if let_binding_name(left) != Some(self.set_len_argument) {
+                consumed += statement.len();
+                continue;
+            }
+            let Some(additional) = len_plus_additional_argument(right.trim(), self.same_vec_target)
+            else {
+                consumed += statement.len();
+                continue;
+            };
+            let after_len_binding = &self.before_call[consumed + statement.len()..];
+            if has_fresh_set_len_reserve_call(
+                after_len_binding,
+                self.same_vec_target,
+                self.set_len_argument,
+                additional,
+            ) {
+                return true;
+            }
+            consumed += statement.len();
+        }
+        false
+    }
+
+    fn has_with_capacity_evidence(&self) -> bool {
+        self.before_call.split(';').any(|statement| {
+            let Some((left, right)) = statement.split_once('=') else {
+                return false;
+            };
+            let Some(binding) = let_binding_name(left) else {
+                return false;
+            };
+            binding == self.same_vec_target
+                && with_capacity_argument(right).is_some_and(|arg| arg == self.set_len_argument)
+        })
+    }
 }
 
 struct SetLenCallResultInitializationContext<'a> {
@@ -164,4 +331,287 @@ fn has_initialization_marker(statement: &str) -> bool {
         || statement.contains("ptr::write")
         || statement.contains("copy_nonoverlapping")
         || statement.contains("copy_to_nonoverlapping")
+}
+
+fn has_set_len_remaining_capacity_guard(before_call: &str, receiver: &str, new_len: &str) -> bool {
+    if !is_simple_identifier(new_len) {
+        return false;
+    }
+    let receiver_len = format!("{receiver}.len()");
+    let mut receiver_len_bindings = Vec::new();
+    let mut consumed = 0usize;
+    for statement in before_call.split_inclusive(';') {
+        let statement_without_semicolon = statement.trim_end_matches(';');
+        let Some((left, right)) = statement_without_semicolon.split_once('=') else {
+            consumed += statement.len();
+            continue;
+        };
+        let Some(binding) = let_binding_name(left) else {
+            consumed += statement.len();
+            continue;
+        };
+        let right = right.trim();
+        if right == receiver_len {
+            receiver_len_bindings.push(binding);
+        }
+        if binding == new_len
+            && let Some((len_term, additional)) =
+                set_len_growth_terms(right, &receiver_len, &receiver_len_bindings)
+        {
+            let before_new_len_binding = &before_call[..consumed];
+            let after_new_len_binding =
+                &before_call[(consumed + statement.len()).min(before_call.len())..];
+            if has_fresh_remaining_capacity_early_return(
+                before_new_len_binding,
+                receiver,
+                &receiver_len,
+                additional,
+            ) && set_len_growth_terms_stay_fresh(
+                after_new_len_binding,
+                receiver,
+                new_len,
+                len_term,
+                additional,
+            ) {
+                return true;
+            }
+        }
+        consumed += statement.len();
+    }
+    false
+}
+
+fn set_len_growth_terms<'a>(
+    expression: &'a str,
+    receiver_len: &str,
+    receiver_len_bindings: &[&str],
+) -> Option<(&'a str, &'a str)> {
+    let (left, right) = expression.split_once('+')?;
+    let left = left.trim();
+    let right = right.trim();
+    if set_len_growth_len_term_matches(left, receiver_len, receiver_len_bindings) {
+        return Some((left, right));
+    }
+    if set_len_growth_len_term_matches(right, receiver_len, receiver_len_bindings) {
+        return Some((right, left));
+    }
+    None
+}
+
+fn set_len_growth_len_term_matches(
+    term: &str,
+    receiver_len: &str,
+    receiver_len_bindings: &[&str],
+) -> bool {
+    term == receiver_len || receiver_len_bindings.iter().any(|binding| term == *binding)
+}
+
+fn has_fresh_remaining_capacity_early_return(
+    before_new_len_binding: &str,
+    receiver: &str,
+    receiver_len: &str,
+    additional: &str,
+) -> bool {
+    let Some(additional_stale_identifier) = expression_base_identifier(additional) else {
+        return false;
+    };
+    for capacity in [
+        format!("{receiver}.capacity()"),
+        format!("{receiver}.cap()"),
+    ] {
+        let remaining = format!("{capacity}-{receiver_len}");
+        for predicate in [
+            format!("{additional}>{remaining}"),
+            format!("{remaining}<{additional}"),
+        ] {
+            if remaining_capacity_early_return_matches(
+                before_new_len_binding,
+                &predicate,
+                receiver,
+                additional_stale_identifier,
+            ) {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn remaining_capacity_early_return_matches(
+    before_new_len_binding: &str,
+    predicate: &str,
+    receiver: &str,
+    additional_stale_identifier: &str,
+) -> bool {
+    let guard = format!("if{predicate}{{");
+    let mut search_from = 0usize;
+    while let Some(offset) = before_new_len_binding[search_from..].find(&guard) {
+        let guard_start = search_from + offset;
+        let after_guard = &before_new_len_binding[guard_start + guard.len()..];
+        let guard_end = after_guard.find('}').unwrap_or(after_guard.len());
+        let guard_body = &after_guard[..guard_end];
+        let after_branch = &after_guard[guard_end..];
+        if guard_body.contains("return")
+            && !has_assignment_to_any_identifier(
+                after_branch,
+                &[receiver, additional_stale_identifier],
+            )
+        {
+            return true;
+        }
+        search_from = guard_start + guard.len();
+    }
+    false
+}
+
+fn set_len_growth_terms_stay_fresh(
+    after_new_len_binding: &str,
+    receiver: &str,
+    new_len: &str,
+    len_term: &str,
+    additional: &str,
+) -> bool {
+    let mut identifiers = vec![receiver, new_len];
+    if is_simple_identifier(len_term) {
+        identifiers.push(len_term);
+    }
+    if let Some(identifier) = expression_base_identifier(additional) {
+        identifiers.push(identifier);
+    }
+    !has_assignment_to_any_identifier(after_new_len_binding, &identifiers)
+}
+
+fn expression_base_identifier(expression: &str) -> Option<&str> {
+    if is_simple_identifier(expression) {
+        return Some(expression);
+    }
+    let base_end = expression.find('.')?;
+    let base = &expression[..base_end];
+    is_simple_identifier(base).then_some(base)
+}
+
+fn has_set_len_capacity_relation(
+    before_call: &str,
+    new_len: &str,
+    capacity: &str,
+    receiver: &str,
+) -> bool {
+    let len_lte_cap = format!("{new_len}<={capacity}");
+    let cap_gte_len = format!("{capacity}>={new_len}");
+    let len_gt_cap = format!("{new_len}>{capacity}");
+    let cap_lt_len = format!("{capacity}<{new_len}");
+    has_set_len_capacity_predicate_guard(before_call, &len_lte_cap, new_len, capacity, receiver)
+        || has_set_len_capacity_predicate_guard(
+            before_call,
+            &cap_gte_len,
+            new_len,
+            capacity,
+            receiver,
+        )
+        || has_set_len_capacity_early_return(before_call, &len_gt_cap, new_len, capacity, receiver)
+        || has_set_len_capacity_early_return(before_call, &cap_lt_len, new_len, capacity, receiver)
+}
+
+fn has_set_len_capacity_predicate_guard(
+    before_call: &str,
+    predicate: &str,
+    new_len: &str,
+    capacity: &str,
+    receiver: &str,
+) -> bool {
+    let stale_identifiers = set_len_capacity_stale_identifiers(new_len, capacity, receiver);
+    [
+        format!("assert!({predicate})"),
+        format!("assert!({predicate},"),
+        format!("debug_assert!({predicate})"),
+        format!("debug_assert!({predicate},"),
+    ]
+    .iter()
+    .any(|pattern| {
+        has_fresh_guard_pattern_for_identifiers(before_call, pattern, &stale_identifiers)
+    }) || has_open_positive_branch_guard_for_identifiers(before_call, predicate, &stale_identifiers)
+}
+
+fn has_set_len_capacity_early_return(
+    before_call: &str,
+    predicate: &str,
+    new_len: &str,
+    capacity: &str,
+    receiver: &str,
+) -> bool {
+    let stale_identifiers = set_len_capacity_stale_identifiers(new_len, capacity, receiver);
+    let guard = format!("if{predicate}{{");
+    let mut search_from = 0;
+    while let Some(offset) = before_call[search_from..].find(&guard) {
+        let guard_start = search_from + offset;
+        let after_guard = &before_call[guard_start + guard.len()..];
+        let guard_end = after_guard.find('}').unwrap_or(after_guard.len());
+        let guard_body = &after_guard[..guard_end];
+        let after_branch = &after_guard[guard_end..];
+        if guard_body.contains("return")
+            && !has_assignment_to_any_identifier(after_branch, &stale_identifiers)
+        {
+            return true;
+        }
+        search_from = guard_start + guard.len();
+    }
+    false
+}
+
+fn set_len_capacity_stale_identifiers<'a>(
+    new_len: &'a str,
+    capacity: &'a str,
+    receiver: &'a str,
+) -> Vec<&'a str> {
+    let mut identifiers = vec![new_len, receiver];
+    if is_simple_identifier(capacity) {
+        identifiers.push(capacity);
+    }
+    identifiers
+}
+
+fn len_plus_additional_argument<'a>(expression: &'a str, receiver: &str) -> Option<&'a str> {
+    let len_expr = format!("{receiver}.len()");
+    let after_len = expression.strip_prefix(&format!("{len_expr}+"));
+    let before_len = expression.strip_suffix(&format!("+{len_expr}"));
+    after_len
+        .or(before_len)
+        .filter(|additional| is_simple_identifier(additional))
+}
+
+fn has_fresh_set_len_reserve_call(
+    after_len_binding: &str,
+    receiver: &str,
+    new_len: &str,
+    additional: &str,
+) -> bool {
+    let reserve_patterns = [
+        format!("{receiver}.reserve({additional});"),
+        format!("{receiver}.try_reserve({additional})?;"),
+    ];
+    let identifiers = [receiver, new_len, additional];
+    for reserve in reserve_patterns {
+        let mut search_from = 0usize;
+        while let Some(offset) = after_len_binding[search_from..].find(&reserve) {
+            let reserve_start = search_from + offset;
+            let before_reserve = &after_len_binding[..reserve_start];
+            let after_reserve = &after_len_binding[reserve_start + reserve.len()..];
+            if !has_assignment_to_any_identifier(before_reserve, &identifiers)
+                && !has_assignment_to_any_identifier(after_reserve, &identifiers)
+            {
+                return true;
+            }
+            search_from = reserve_start + reserve.len();
+        }
+    }
+    false
+}
+
+fn with_capacity_argument(right_side: &str) -> Option<&str> {
+    let marker = "with_capacity(";
+    let call_pos = right_side.find(marker)? + marker.len();
+    let argument_text = &right_side[call_pos..];
+    let argument_end = matching_call_argument_end(argument_text)?;
+    let argument = &argument_text[..argument_end];
+    (!argument.is_empty()).then_some(argument)
 }
