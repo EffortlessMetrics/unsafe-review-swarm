@@ -694,6 +694,18 @@ mod tests {
             "NonNull::new_unchecked(ptr)",
             vec!["if ptr.is_null() { return None; }"],
         );
+        let comment_returning_guard = site_with_family(
+            OperationFamily::NonNullUnchecked,
+            vec!["if ptr.is_null() { /* return None; */ }"],
+            "NonNull::new_unchecked(ptr)",
+            vec![],
+        );
+        let string_returning_guard = site_with_family(
+            OperationFamily::NonNullUnchecked,
+            vec!["if ptr.is_null() { let _note = \"return None\"; }"],
+            "NonNull::new_unchecked(ptr)",
+            vec![],
+        );
 
         assert!(
             !obligation_evidence(&non_returning_guard, &obligations, &contract, &reach)[0]
@@ -717,6 +729,16 @@ mod tests {
         );
         assert!(
             !obligation_evidence(&post_returning_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&comment_returning_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&string_returning_guard, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
         );

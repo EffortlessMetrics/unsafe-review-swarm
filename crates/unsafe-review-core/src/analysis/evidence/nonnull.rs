@@ -3,7 +3,7 @@ use crate::analysis::scanner::ScannedSite;
 use super::{
     any_marker_occurrence, any_marker_tail, branch_still_open_at_operation, code_before_operation,
     compact_code, contains_simple_assignment_to, ends_with_some_pattern,
-    match_some_branch_after_marker, matching_code_block_end,
+    match_some_branch_after_marker, matching_code_block_end, strip_block_comments_and_literals,
 };
 
 pub(super) fn has_nullability_guard(site: &ScannedSite, lower: &str) -> bool {
@@ -59,7 +59,7 @@ impl<'a> NonNullPointerContext<'a> {
         guard_body: &str,
         after_guard_body: &str,
     ) -> bool {
-        guard_body.contains("return") && self.pointer_stays_fresh_after(after_guard_body)
+        guard_body_contains_return(guard_body) && self.pointer_stays_fresh_after(after_guard_body)
     }
 
     fn returning_after_marker_preserves_applicability(&self, after_guard: &str) -> bool {
@@ -120,6 +120,15 @@ impl<'a> NonNullPointerContext<'a> {
         };
         self.returning_after_marker_preserves_applicability(after_guard)
     }
+}
+
+fn guard_body_contains_return(guard_body: &str) -> bool {
+    let code = strip_block_comments_and_literals(guard_body);
+    code.starts_with("return")
+        || code.contains(";return")
+        || code.contains("{return")
+        || code.contains("}return")
+        || code.contains("=>return")
 }
 
 fn nonnull_new_unchecked_argument(expression: &str) -> Option<String> {
