@@ -41,7 +41,12 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
     let summary = check_advisory_artifact_set(dir)?;
     check_witness_plan_artifact(dir, summary.card_count, &summary.card_projections)?;
     check_lsp_artifact(dir, &summary.card_projections)?;
-    check_github_summary_artifact(dir, summary.card_count, &summary.card_projections)?;
+    check_github_summary_artifact(
+        dir,
+        summary.card_count,
+        &summary.card_ids,
+        &summary.card_projections,
+    )?;
     check_first_pr_markdown_card_identity(dir, &summary.card_ids, &summary.card_projections)?;
     check_first_pr_artifact_overclaims(dir)?;
 
@@ -54,10 +59,12 @@ const GITHUB_SUMMARY_WORD_LIMIT: usize = 600;
 fn check_github_summary_artifact(
     dir: &Path,
     card_count: usize,
+    card_ids: &BTreeSet<String>,
     card_projections: &BTreeMap<String, CardProjection>,
 ) -> Result<(), String> {
     let path = dir.join("github-summary.md");
     let text = super::read_to_string(&path)?;
+    require_text_mentions_only_known_card_ids(&text, &path, card_ids)?;
 
     super::require_text_contains(&text, "## unsafe-review advisory summary", &path)?;
     super::require_text_contains(&text, &format!("- Review cards: {card_count}"), &path)?;
@@ -125,6 +132,51 @@ fn require_text_mentions_all_card_ids(
         }
     }
     Ok(())
+}
+
+fn require_text_mentions_only_known_card_ids(
+    text: &str,
+    path: &Path,
+    card_ids: &BTreeSet<String>,
+) -> Result<(), String> {
+    for card_id in markdown_review_card_ids(text) {
+        if !card_ids.contains(&card_id) {
+            return Err(format!(
+                "{} mentions unknown ReviewCard id `{card_id}`",
+                path.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn markdown_review_card_ids(text: &str) -> BTreeSet<String> {
+    let mut ids = BTreeSet::new();
+    for line in text.lines() {
+        if line.trim_start().starts_with("```") {
+            continue;
+        }
+        let mut rest = line;
+        while let Some(start) = rest.find('`') {
+            let after_start = &rest[start + 1..];
+            let Some(end) = after_start.find('`') else {
+                break;
+            };
+            let candidate = &after_start[..end];
+            if looks_like_markdown_card_id(candidate) {
+                ids.insert(candidate.to_string());
+            }
+            rest = &after_start[end + 1..];
+        }
+    }
+    ids
+}
+
+fn looks_like_markdown_card_id(value: &str) -> bool {
+    (value.starts_with("UR-") || value.starts_with("card-"))
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == '.')
 }
 
 fn require_witness_plan_headings_known(
@@ -1374,11 +1426,13 @@ fn check_first_pr_markdown_card_identity(
 ) -> Result<(), String> {
     let pr_summary_path = dir.join("pr-summary.md");
     let pr_summary = super::read_to_string(&pr_summary_path)?;
+    require_text_mentions_only_known_card_ids(&pr_summary, &pr_summary_path, card_ids)?;
     require_text_mentions_all_card_ids(&pr_summary, &pr_summary_path, card_ids)?;
     require_markdown_top_card_projection(&pr_summary, &pr_summary_path, card_projections)?;
 
     let witness_plan_path = dir.join("witness-plan.md");
     let witness_plan = super::read_to_string(&witness_plan_path)?;
+    require_text_mentions_only_known_card_ids(&witness_plan, &witness_plan_path, card_ids)?;
     require_witness_plan_headings_known(&witness_plan, &witness_plan_path, card_ids)?;
     require_text_mentions_all_card_ids(&witness_plan, &witness_plan_path, card_ids)
 }

@@ -9665,6 +9665,37 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_stale_markdown_card_mentions() -> Result<(), String> {
+        for (label, file_name) in [
+            ("pr-summary", "pr-summary.md"),
+            ("github-summary", "github-summary.md"),
+            ("witness-plan", "witness-plan.md"),
+        ] {
+            let dir = unique_temp_dir(&format!("unsafe-review-first-pr-stale-{label}-card-id"))?;
+            fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+            write_valid_first_pr_artifacts(&dir)?;
+
+            let path = dir.join(file_name);
+            let text = fs::read_to_string(&path)
+                .map_err(|err| format!("read {file_name} failed: {err}"))?;
+            fs::write(&path, format!("{text}\nStale ReviewCard: `card-2`\n"))
+                .map_err(|err| format!("write {file_name} failed: {err}"))?;
+
+            let result = check_first_pr_artifacts(&dir);
+
+            fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+            let err = result.err().unwrap_or_default();
+            assert!(
+                err.contains(&format!(
+                    "{file_name} mentions unknown ReviewCard id `card-2`"
+                )),
+                "{label} stale card id should be rejected, got: {err}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_pr_summary_unknown_top_card_identity() -> Result<(), String>
     {
         let dir = unique_temp_dir("unsafe-review-first-pr-summary-card-id")?;
