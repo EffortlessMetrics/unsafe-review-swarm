@@ -10341,6 +10341,31 @@ Snapshot reports:
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_comment_plan_witness_route_projection_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-comment-witness-route-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        let path = dir.join("comment-plan.json");
+        let mut comment_plan: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&path).map_err(|err| format!("read comment plan failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse comment plan failed: {err}"))?;
+        comment_plan["comments"][0]["witness_routes"][0]["reason"] =
+            serde_json::json!("unrelated route");
+        fs::write(&path, comment_plan.to_string())
+            .map_err(|err| format!("write comment plan failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(result.err().unwrap_or_default().contains(
+            "comment-plan.json comment witness_routes[0] reason must be `route`; got `unrelated route`"
+        ));
+        Ok(())
+    }
+
+    #[test]
     fn advisory_artifact_checker_rejects_comment_plan_forbidden_class() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-artifacts-comment-forbidden-class")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -10752,7 +10777,7 @@ review_after = "2026-08-01"
         write_valid_artifacts(dir)?;
         fs::write(
             dir.join("cards.json"),
-            r#"{"tool":"unsafe-review","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"cards":2},"cards":[{"id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","hazards":["alignment"],"site":{"file":"src/lib.rs","line":7,"column":5},"operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verify_commands":["cargo +nightly miri test card"]},{"id":"card-2","class":"contract_missing","priority":"high","confidence":"high","hazards":["unknown"],"site":{"file":"src/lib.rs","line":7,"column":1},"operation":"unsafe fn read_header(ptr: *const u8)","operation_family":"unknown","next_action":"Add a precise public `# Safety` section that names the required caller obligations.","verify_commands":[]}]}"#,
+            r#"{"tool":"unsafe-review","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"cards":2},"cards":[{"id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","hazards":["alignment"],"site":{"file":"src/lib.rs","line":7,"column":5},"operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verify_commands":["cargo +nightly miri test card"],"witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}]},{"id":"card-2","class":"contract_missing","priority":"high","confidence":"high","hazards":["unknown"],"site":{"file":"src/lib.rs","line":7,"column":1},"operation":"unsafe fn read_header(ptr: *const u8)","operation_family":"unknown","next_action":"Add a precise public `# Safety` section that names the required caller obligations.","verify_commands":[],"witness_routes":[{"kind":"human-deep-review","reason":"route","command":null,"required":false}]}]}"#,
         )
         .map_err(|err| format!("write cards failed: {err}"))?;
         fs::write(

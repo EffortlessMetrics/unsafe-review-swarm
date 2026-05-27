@@ -810,7 +810,10 @@ fn advisory_card_projections(
                             "cards.json card witness_routes[]",
                         )
                         .map(str::to_string)?;
-                        let command = witness_route_command_projection(route)?;
+                        let command = witness_route_command_projection(
+                            route,
+                            "cards.json card witness_routes[]",
+                        )?;
                         Ok::<WitnessRouteProjection, String>(WitnessRouteProjection {
                             kind,
                             reason,
@@ -915,6 +918,7 @@ fn require_comment_card_projection(
     require_projected_str(comment, "operation", &card.operation, context)?;
     require_projected_str(comment, "next_action", &card.next_action, context)?;
     require_projected_string_array(comment, "verify_commands", &card.verify_commands, context)?;
+    require_projected_witness_routes(comment, &card.witness_routes, context)?;
     require_projected_str(comment, "operation_family", &card.operation_family, context)
 }
 
@@ -936,6 +940,39 @@ fn require_not_selected_card_projection(
         context,
     )?;
     require_projected_str(card, "next_action", &projection.next_action, context)
+}
+
+fn require_projected_witness_routes(
+    value: &serde_json::Value,
+    expected: &[WitnessRouteProjection],
+    context: &str,
+) -> Result<(), String> {
+    let Some(actual) = value
+        .get("witness_routes")
+        .and_then(serde_json::Value::as_array)
+    else {
+        return Err(format!("{context} is missing array field `witness_routes`"));
+    };
+    if actual.len() != expected.len() {
+        return Err(format!(
+            "{context} witness_routes must project {} cards.json route(s); got {}",
+            expected.len(),
+            actual.len()
+        ));
+    }
+    for (idx, (actual, expected)) in actual.iter().zip(expected.iter()).enumerate() {
+        let route_context = format!("{context} witness_routes[{idx}]");
+        require_projected_str(actual, "kind", &expected.kind, &route_context)?;
+        require_projected_str(actual, "reason", &expected.reason, &route_context)?;
+        let actual_command = witness_route_command_projection(actual, &route_context)?;
+        if actual_command != expected.command {
+            return Err(format!(
+                "{route_context} command must project cards.json value {:?}; got {:?}",
+                expected.command, actual_command
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn require_projected_str(
@@ -1202,7 +1239,10 @@ fn require_witness_plan_card_projections(
     Ok(())
 }
 
-fn witness_route_command_projection(route: &serde_json::Value) -> Result<Option<String>, String> {
+fn witness_route_command_projection(
+    route: &serde_json::Value,
+    context: &str,
+) -> Result<Option<String>, String> {
     let Some(command) = route.get("command") else {
         return Ok(None);
     };
@@ -1210,12 +1250,10 @@ fn witness_route_command_projection(route: &serde_json::Value) -> Result<Option<
         return Ok(None);
     }
     let Some(command) = command.as_str() else {
-        return Err(
-            "cards.json card witness_routes[] command must be null or a string".to_string(),
-        );
+        return Err(format!("{context} command must be null or a string"));
     };
     if command.trim().is_empty() {
-        return Err("cards.json card witness_routes[] command must not be empty".to_string());
+        return Err(format!("{context} command must not be empty"));
     }
     Ok(Some(command.to_string()))
 }
