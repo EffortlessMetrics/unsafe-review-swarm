@@ -2205,6 +2205,7 @@ fn check_lsp_diagnostic_evidence(
                 .to_string(),
         );
     }
+    require_lsp_evidence_summary_projection(evidence_summary, card)?;
 
     let obligation_evidence =
         super::json_array_at(diagnostic, "/obligation_evidence", "lsp.json diagnostic")?;
@@ -2220,6 +2221,38 @@ fn check_lsp_diagnostic_evidence(
         "lsp.json diagnostic obligation_evidence",
     )?;
 
+    Ok(())
+}
+
+fn require_lsp_evidence_summary_projection(
+    evidence_summary: &serde_json::Value,
+    card: &CardProjection,
+) -> Result<(), String> {
+    for (field, expected) in [
+        ("contract", card.contract.as_deref()),
+        ("discharge", card.discharge.as_deref()),
+        ("reach", card.reach.as_deref()),
+        ("witness", card.witness.as_deref()),
+    ] {
+        let Some(expected) = expected else {
+            continue;
+        };
+        let Some(evidence) = evidence_summary.get(field) else {
+            return Err(format!(
+                "lsp.json diagnostic evidence_summary is missing {field}"
+            ));
+        };
+        let actual = super::require_non_empty_json_str(
+            evidence,
+            "summary",
+            &format!("lsp.json diagnostic evidence_summary.{field}"),
+        )?;
+        if actual != expected {
+            return Err(format!(
+                "lsp.json diagnostic evidence_summary.{field}.summary must project cards.json value `{expected}`; got `{actual}`"
+            ));
+        }
+    }
     Ok(())
 }
 

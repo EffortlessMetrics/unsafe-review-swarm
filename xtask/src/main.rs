@@ -9798,6 +9798,33 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_lsp_evidence_summary_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-lsp-evidence-summary-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let lsp_path = dir.join("lsp.json");
+        let mut lsp: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&lsp_path).map_err(|err| format!("read lsp failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse lsp failed: {err}"))?;
+        lsp["diagnostics"][0]["evidence_summary"]["discharge"]["summary"] =
+            serde_json::json!("unrelated discharge evidence");
+        fs::write(&lsp_path, lsp.to_string()).map_err(|err| format!("write lsp failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = result.err().unwrap_or_default();
+        assert!(
+            err.contains(
+                "lsp.json diagnostic evidence_summary.discharge.summary must project cards.json value `No visible local guard`"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_lsp_diagnostic_reversed_range() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-lsp-diagnostic-reversed-range")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
