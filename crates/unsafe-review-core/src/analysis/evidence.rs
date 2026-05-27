@@ -1,6 +1,8 @@
 mod assignment_syntax;
+mod bounds_discharge;
 mod box_raw_origin;
 mod call_syntax;
+mod callee_contract_discharge;
 mod code_text;
 mod contract_discharge;
 mod contract_text;
@@ -18,7 +20,9 @@ mod nonnull;
 mod obligation_guard;
 mod operation_scope;
 mod option_state;
+mod ownership_discharge;
 mod pointer_arithmetic;
+mod pointer_live_discharge;
 mod raw_pointer_alignment;
 mod raw_pointer_bounds;
 mod reach_scan;
@@ -26,33 +30,35 @@ mod receiver_path;
 mod set_len;
 mod site_context;
 mod source_value;
+mod target_feature_discharge;
 mod transmute;
 mod u8_bool_value;
+mod unreachable_discharge;
 mod unreachable_unchecked;
 mod unsafe_fn_call;
 mod unwrap_unchecked;
 mod utf8;
 mod utf8_discharge;
 mod valid_value_discharge;
+mod valid_zero_discharge;
 mod vec_from_raw_parts;
 mod write_bytes;
 mod zeroed;
 
 use self::assignment_syntax::contains_simple_assignment_to;
-use self::box_raw_origin::{
-    has_box_from_raw_origin_evidence, has_drop_in_place_box_origin_evidence,
-};
+use self::bounds_discharge::bounds_discharge_state;
+use self::box_raw_origin::has_drop_in_place_box_origin_evidence;
 use self::call_syntax::{
     matching_call_argument_end, matching_generic_argument_end, split_top_level_arguments,
     split_top_level_pair,
 };
+use self::callee_contract_discharge::callee_contract_discharge_state;
 use self::code_text::{
     compact_code, compact_contains_identifier, strip_block_comments_and_literals,
 };
 use self::contract_discharge::{
     DOCUMENTED_PRIVATE_UNSAFE_CONTRACT_DISCHARGE, PUBLIC_UNSAFE_API_CONTRACT_DISCHARGE,
-    TARGET_FEATURE_CONTRACT_DISCHARGE, is_documented_private_unsafe_contract_obligation,
-    is_public_unsafe_contract_obligation,
+    is_documented_private_unsafe_contract_obligation, is_public_unsafe_contract_obligation,
 };
 pub(crate) use self::contract_text::contract_evidence;
 use self::control_flow::{
@@ -71,11 +77,11 @@ use self::identifier_syntax::{is_simple_identifier, let_binding_name};
 use self::layout_discharge::layout_discharge_state;
 use self::marker_scan::{any_marker_occurrence, any_marker_tail};
 use self::maybeuninit::has_maybeuninit_assume_init_initialization_evidence;
-use self::nonnull::has_nullability_guard;
-use self::obligation_guard::{has_bounds_guard, has_capacity_guard};
+use self::obligation_guard::has_capacity_guard;
 use self::operation_scope::code_before_operation;
 use self::option_state::{ends_with_some_pattern, is_some_binding, match_some_branch_after_marker};
-use self::pointer_arithmetic::has_slice_end_pointer_arithmetic_evidence;
+use self::ownership_discharge::ownership_discharge_state;
+use self::pointer_live_discharge::pointer_live_discharge_state;
 use self::raw_pointer_alignment::has_alignment_guard;
 use self::raw_pointer_bounds::has_raw_pointer_read_bounds_evidence;
 pub(crate) use self::reach_scan::reach_evidence;
@@ -85,25 +91,21 @@ use self::receiver_path::{
 };
 use self::site_context::{code_context, code_context_through_site};
 use self::source_value::source_value_identifier;
+use self::target_feature_discharge::target_feature_discharge_state;
 use self::u8_bool_value::{has_u8_bool_value_guard, u8_bool_valid_value_predicates};
-use self::unreachable_unchecked::has_unreachable_unchecked_infallible_path_evidence;
-use self::unsafe_fn_call::{
-    has_encode_utf8_remaining_capacity_evidence, has_unchecked_constructor_availability_evidence,
-};
+use self::unreachable_discharge::unreachable_discharge_state;
 use self::utf8_discharge::utf8_discharge_state;
 use self::valid_value_discharge::valid_value_discharge_state;
+use self::valid_zero_discharge::valid_zero_discharge_state;
 use self::vec_from_raw_parts::{
-    has_vec_from_raw_parts_capacity_evidence, has_vec_from_raw_parts_origin_evidence,
-    has_vec_from_raw_parts_origin_initialized_evidence,
+    has_vec_from_raw_parts_capacity_evidence, has_vec_from_raw_parts_origin_initialized_evidence,
     has_vec_from_raw_parts_origin_len_cap_evidence,
-    has_vec_from_raw_parts_origin_pointer_live_evidence,
 };
 use self::write_bytes::{
     has_bool_write_bytes_pointer_context, has_bool_write_bytes_value_evidence,
     has_maybeuninit_raw_write_context, has_maybeuninit_slice_context, has_u8_write_bytes_context,
     has_write_bytes_bounds_evidence,
 };
-use self::zeroed::has_zeroed_known_valid_zero_type;
 use crate::analysis::scanner::ScannedSite;
 use crate::domain::{
     ContractEvidence, EvidenceState, ObligationEvidence, OperationFamily, ReachEvidence,
@@ -159,16 +161,7 @@ fn discharge_state_for(
                 EvidenceState::missing("No alignment guard code was detected")
             }
         }
-        "bounds" | "valid-range" => {
-            if has_bounds_guard(site, lower)
-                || (family == &OperationFamily::PointerArithmetic
-                    && has_slice_end_pointer_arithmetic_evidence(lower))
-            {
-                EvidenceState::present("Length or bounds guard code was detected")
-            } else {
-                EvidenceState::missing("No length or bounds guard code was detected")
-            }
-        }
+        "bounds" | "valid-range" => bounds_discharge_state(site, lower),
         "capacity" => {
             let capacity_scope = (family == &OperationFamily::VecSetLen)
                 .then(|| code_context_through_site(site).to_ascii_lowercase());
@@ -247,95 +240,17 @@ fn discharge_state_for(
                 EvidenceState::missing("No obligation-specific guard code was detected")
             }
         }
-        "non-null" | "pointer-live" => {
-            if family == &OperationFamily::VecFromRawParts
-                && has_vec_from_raw_parts_origin_pointer_live_evidence(
-                    &site.operation.expression,
-                    lower,
-                )
-            {
-                EvidenceState::present(
-                    "Vec::from_raw_parts same-origin pointer/capacity evidence was detected",
-                )
-            } else if family == &OperationFamily::DropInPlace
-                && has_drop_in_place_box_origin_evidence(&site.operation.expression, lower)
-            {
-                EvidenceState::present("Box::into_raw origin evidence was detected")
-            } else if has_nullability_guard(site, lower) {
-                EvidenceState::present("Nullability guard code was detected")
-            } else if family == &OperationFamily::VecFromRawParts {
-                EvidenceState::missing(
-                    "No Vec::from_raw_parts same-origin pointer/capacity evidence was detected",
-                )
-            } else {
-                EvidenceState::missing("No nullability guard code was detected")
-            }
-        }
-        "ownership" => {
-            if (family == &OperationFamily::DropInPlace
-                && has_drop_in_place_box_origin_evidence(&site.operation.expression, lower))
-                || (family == &OperationFamily::BoxFromRaw
-                    && has_box_from_raw_origin_evidence(&site.operation.expression, lower))
-                || (family == &OperationFamily::VecFromRawParts
-                    && has_vec_from_raw_parts_origin_evidence(&site.operation.expression, lower))
-            {
-                if family == &OperationFamily::VecFromRawParts {
-                    EvidenceState::present(
-                        "ManuallyDrop Vec raw-parts ownership evidence was detected",
-                    )
-                } else {
-                    EvidenceState::present("Box::into_raw ownership evidence was detected")
-                }
-            } else {
-                EvidenceState::missing("No obligation-specific guard code was detected")
-            }
-        }
+        "non-null" | "pointer-live" => pointer_live_discharge_state(site, lower),
+        "ownership" => ownership_discharge_state(family, &site.operation.expression, lower),
         "callee-contract" => {
-            if family == &OperationFamily::UnsafeFnCall
-                && has_encode_utf8_remaining_capacity_evidence(lower)
-            {
-                EvidenceState::present("Unsafe call argument guard code was detected")
-            } else if family == &OperationFamily::UnsafeFnCall
-                && has_unchecked_constructor_availability_evidence(
-                    &site.operation.expression,
-                    lower,
-                )
-            {
-                EvidenceState::present("Unchecked constructor availability guard code was detected")
-            } else {
-                EvidenceState::missing("No obligation-specific guard code was detected")
-            }
+            callee_contract_discharge_state(family, &site.operation.expression, lower)
         }
         "valid-value" => valid_value_discharge_state(family, lower),
         "layout" => layout_discharge_state(family, lower),
-        "unreachable" => {
-            if family == &OperationFamily::UnreachableUnchecked
-                && has_unreachable_unchecked_infallible_path_evidence(lower)
-            {
-                EvidenceState::present(
-                    "Infallible error-path evidence was detected before unreachable_unchecked",
-                )
-            } else {
-                EvidenceState::missing("No obligation-specific guard code was detected")
-            }
-        }
-        "target-feature" => {
-            if family == &OperationFamily::TargetFeature && contract.present {
-                EvidenceState::present(TARGET_FEATURE_CONTRACT_DISCHARGE)
-            } else {
-                EvidenceState::missing("No obligation-specific guard code was detected")
-            }
-        }
+        "unreachable" => unreachable_discharge_state(family, lower),
+        "target-feature" => target_feature_discharge_state(family, contract),
         "utf8" => utf8_discharge_state(family, lower),
-        "valid-zero" => {
-            if family == &OperationFamily::Zeroed && has_zeroed_known_valid_zero_type(lower) {
-                EvidenceState::present(
-                    "Known valid-zero target type evidence was detected before zeroed",
-                )
-            } else {
-                EvidenceState::missing("No obligation-specific guard code was detected")
-            }
-        }
+        "valid-zero" => valid_zero_discharge_state(family, lower),
         _ => EvidenceState::missing("No obligation-specific guard code was detected"),
     }
 }
