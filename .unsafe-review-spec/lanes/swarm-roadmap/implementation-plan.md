@@ -23,53 +23,84 @@ When there is no narrower owner instruction, execute work in this order:
 ## Horizon map
 
 - **H0: lock-in and post-burst alignment**
-  - check-pr / source-divergence posture
-  - PR body normalization and review-state hygiene
-  - analyzer burst audit scaffolding
+  - check-pr / source-divergence posture is installed and used as the routine
+    swarm preflight.
+  - PR body normalization, review-state hygiene, agent operating style, and
+    single-contributor review-block handling are documented.
+  - analyzer burst audit scaffolding is landed and has a follow-up status note.
 - **H1: analyzer burst audit**
-  - grouped family audit tables
-  - missing stale/wrong-target controls recorded
+  - grouped family audit tables landed in the post-burst analyzer audit.
+  - missing stale/wrong-target controls were recorded and later converted into
+    the first evidence-applicability helper sequence.
 - **H2: dogfood first-class lane**
-  - routine snapshot reports
-  - triage taxonomy and regression summaries
+  - post-burst snapshot, focused reruns, no-card control, and triage taxonomy
+    are landed as dogfood report artifacts.
+  - routine dogfood work should now convert one real observation into one
+    fixture/control or route wording correction at a time.
 - **H3: evidence applicability model**
-  - shared subject identity / dominance / staleness model
-  - helper-factoring and target-identity declaration norms
+  - shared subject identity / dominance / staleness model is documented.
+  - initial helper-factoring sequence is implementation-backed for
+    `unwrap_unchecked`, UTF-8 unchecked conversion, `get_unchecked`,
+    `NonNull::new_unchecked`, `MaybeUninit::assume_init`, `Vec::set_len`, and
+    `transmute` / `transmute_copy`.
 - **H4+: disciplined family depth, output coherence, receipts, agent/editor, CI/process, maintainability, and promotion readiness**
 
-## Seed backlog
+## Seed backlog status
 
 ### P0 lock-in
 
-1. align `check-pr` gate usage with `--locked`
-2. add swarm PR body template
-3. document review-bot quota comments as no-review state
-4. add post-burst analyzer audit handoff
-5. add swarm digest template
-6. classify PR lanes for swarm work
-7. add analyzer PR checklist
+1. landed: align `check-pr` gate usage with `--locked`
+2. landed: add swarm PR body template
+3. landed: document review-bot quota comments as no-review state
+4. landed: add post-burst analyzer audit handoff
+5. landed: add swarm digest template
+6. landed: classify PR lanes for swarm work
+7. landed: add analyzer PR checklist
 
 ### P1 audit + dogfood + evidence model
 
-8. group recent analyzer PRs by family
-9. record missing stale/wrong-target controls
-10. fill one missing control per audited family (small scoped PRs)
-11. add post-burst dogfood snapshot report
-12. add dogfood triage taxonomy and no-unsafe control target
-13. define evidence applicability model and helper-factoring follow-ups
+8. landed: group recent analyzer PRs by family
+9. landed: record missing stale/wrong-target controls
+10. active ongoing rule: fill one missing control per audited family only from
+    concrete fixture or dogfood pressure
+11. landed: add post-burst dogfood snapshot report
+12. landed: add dogfood triage taxonomy and no-unsafe control target
+13. landed: define evidence applicability model and initial helper-factoring
+    sequence
 
 ### P2 projection and receipts hardening
 
-14. verify projection card-ID coherence across first-pr artifacts
-15. align LSP hover phrasing with explain output
-16. add zero-card wording regression
-17. harden receipt identity / staleness / duplicate handling
+14. landed: verify projection card-ID coherence across first-pr artifacts
+15. landed: align saved-LSP hover and action payloads with ReviewCard-derived
+    evidence and command-only projection boundaries
+16. landed: add zero-card wording and no-overclaim artifact regressions
+17. landed: harden receipt identity, staleness, duplicate, and command-hash
+    audit behavior
 
 ### P3 maintainability
 
-18. split operation detection from evidence applicability
-19. move family-specific evidence logic into modules
-20. expand fixture naming, parser robustness, and perf rails
+18. active: split operation detection from evidence applicability where the
+    family already has fixture and dogfood pressure
+19. active: move family-specific evidence logic into modules only as small,
+    behavior-preserving slices
+20. active: expand fixture naming, parser robustness, and perf rails when a
+    concrete failure or dogfood observation requires it
+
+## Current next work
+
+The immediate roadmap is no longer "define the model" or "add the initial
+helper sequence"; those rails are landed. Routine swarm work should now choose
+the smallest useful slice from:
+
+- a dogfood observation converted into one fixture/control,
+- a family-specific applicability refactor that preserves current behavior,
+- a verifier rail that keeps a ReviewCard projection honest,
+- a CI/process budget edit that reduces duplicated cost,
+- or a curated source promotion only after a coherent green swarm batch.
+
+Do not broaden analyzer recognition because the roadmap has capacity. Broadening
+needs a concrete fixture, dogfood observation, or verifier gap, and must retain
+the advisory trust boundary.
 
 ## Analyzer PR checklist (required for analyzer behavior PRs)
 
