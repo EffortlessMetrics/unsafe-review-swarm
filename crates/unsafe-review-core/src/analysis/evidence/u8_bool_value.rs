@@ -1,6 +1,6 @@
 use super::{
     has_assignment_to_identifier, has_fresh_guard_pattern,
-    has_open_positive_branch_guard_for_identifiers,
+    has_open_positive_branch_guard_for_identifiers, matching_code_block_end,
 };
 
 pub(super) fn has_u8_bool_value_guard(before_call: &str, argument: &str) -> bool {
@@ -52,9 +52,10 @@ fn has_invalid_byte_returning_branch(before_call: &str, predicate: &str, argumen
     while let Some(offset) = before_call[search_from..].find(&guard) {
         let guard_start = search_from + offset;
         let after_guard = &before_call[guard_start + guard.len()..];
-        let guard_end = after_guard.find('}').unwrap_or(after_guard.len());
-        let guard_body = &after_guard[..guard_end];
-        let after_branch = &after_guard[guard_end..];
+        let (guard_body, after_branch) = matching_code_block_end(after_guard)
+            .map_or((after_guard, ""), |body_end| {
+                (&after_guard[..body_end], &after_guard[body_end + 1..])
+            });
         if guard_body.contains("return") && !has_assignment_to_identifier(after_branch, argument) {
             return true;
         }
