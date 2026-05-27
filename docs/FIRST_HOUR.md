@@ -84,7 +84,8 @@ open target/unsafe-review/pr-summary.md   # or your editor of choice
 
 The summary is the reviewer front panel. It names the highest-priority changed
 unsafe-review gaps, their missing evidence, and a recommended next action per
-card. It also prints an `Inspect top card` command for the most actionable card.
+card. It also prints `Inspect top card` commands for the most actionable card:
+one for human explanation and one for bounded agent context.
 
 If the summary says no changed unsafe-review gaps were found, you can stop
 here. That is the normal result for safe-only PRs and is not a safety claim.

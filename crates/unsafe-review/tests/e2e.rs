@@ -569,6 +569,8 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     );
     let card_id = json_str(&cards["cards"][0]["id"], "cards[0].id")?;
     assert!(stdout.contains("unsafe-review explain --root"));
+    assert!(stdout.contains("unsafe-review context --root"));
+    assert!(stdout.contains(" --json"));
     assert!(stdout.contains(card_id));
 
     let summary = fs::read_to_string(out_dir.join("pr-summary.md"))?;

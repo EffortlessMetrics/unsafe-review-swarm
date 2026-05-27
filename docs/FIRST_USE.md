@@ -122,13 +122,20 @@ artifact only; `unsafe-review` does not post comments by default.
 
 ## Inspect One Card
 
-`first-pr` prints an `Inspect top card` command for the highest-priority card.
-Run that command to see why the card exists, what evidence is missing, what would
-resolve it, what would not resolve it, which witness route fits, and what
-unsafe-review is not claiming:
+`first-pr` prints `Inspect top card` commands for the highest-priority card.
+Run the `explain` command to see why the card exists, what evidence is missing,
+what would resolve it, what would not resolve it, which witness route fits, and
+what unsafe-review is not claiming:
 
 ```bash
 unsafe-review explain <card-id>
+```
+
+Run the `context --json` command when handing the bounded card packet to an
+agent:
+
+```bash
+unsafe-review context <card-id> --json
 ```
 
 You can also copy any other card id from JSON, human output, or the PR summary

@@ -64,7 +64,8 @@ On successful bundle write, terminal output MUST include:
 
 - Artifact directory.
 - Card count.
-- Top-card handoff command (`unsafe-review explain <card-id>` when present).
+- Top-card handoff commands (`unsafe-review explain <card-id>` and
+  `unsafe-review context <card-id> --json` when present).
 - `pr-summary.md` location.
 - Trust boundary statement.
 

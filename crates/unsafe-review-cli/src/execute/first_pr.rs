@@ -80,6 +80,11 @@ fn print_top_card_summary(
         root.display(),
         card.id
     );
+    println!(
+        "  unsafe-review context --root {} {} --json",
+        root.display(),
+        card.id
+    );
 }
 
 fn print_artifact_paths(out_dir: &Path, artifacts: &[ArtifactSpec<'_>]) {
