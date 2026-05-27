@@ -4,6 +4,7 @@ mod generic_bounds;
 mod get_unchecked;
 mod maybeuninit;
 mod nonnull;
+mod pointer_arithmetic;
 mod raw_pointer_alignment;
 mod raw_pointer_bounds;
 mod set_len;
@@ -25,6 +26,7 @@ use self::generic_bounds::has_length_or_bounds_guard;
 use self::get_unchecked::{get_unchecked_receiver_and_index, has_get_unchecked_bounds_guard};
 use self::maybeuninit::has_maybeuninit_assume_init_initialization_evidence;
 use self::nonnull::has_nullability_guard;
+use self::pointer_arithmetic::has_slice_end_pointer_arithmetic_evidence;
 use self::raw_pointer_alignment::has_alignment_guard;
 use self::raw_pointer_bounds::has_raw_pointer_read_bounds_evidence;
 use self::transmute::{
@@ -651,29 +653,6 @@ fn contains_simple_assignment_to(compact: &str, name: &str) -> bool {
         let next = pos + marker.len();
         offset += next;
         cursor = &cursor[next..];
-    }
-    false
-}
-
-fn has_slice_end_pointer_arithmetic_evidence(lower: &str) -> bool {
-    let compact = compact_code(lower);
-    for line in lower.lines() {
-        let line = compact_code(line);
-        let Some(after_let) = line.strip_prefix("let") else {
-            continue;
-        };
-        let Some((binding, expr)) = after_let.split_once('=') else {
-            continue;
-        };
-        let Some(slice_expr) = expr.strip_suffix(".as_ptr();") else {
-            continue;
-        };
-        if !binding.is_empty()
-            && !slice_expr.is_empty()
-            && compact.contains(&format!("{binding}.add({slice_expr}.len())"))
-        {
-            return true;
-        }
     }
     false
 }
