@@ -4,19 +4,21 @@ use super::{
     any_marker_occurrence, any_marker_tail, branch_still_open_at_operation, code_before_operation,
     compact_code, contains_executable_return, contains_simple_assignment_to,
     ends_with_some_pattern, match_some_branch_after_marker, matching_code_block_end,
+    strip_block_comments_and_literals,
 };
 
 pub(super) fn has_nullability_guard(site: &ScannedSite, lower: &str) -> bool {
-    let compact = compact_code(lower);
+    let stripped = strip_block_comments_and_literals(lower);
+    let compact = compact_code(&stripped);
     if let Some(arg) = nonnull_new_unchecked_argument(&site.operation.expression) {
         let arg = compact_code(&arg.to_ascii_lowercase());
         let guard_scope = code_before_operation(lower, &site.operation.expression)
             .unwrap_or_else(|| lower.to_string());
-        let guard_compact = compact_code(&guard_scope);
+        let guard_compact = compact_code(&strip_block_comments_and_literals(&guard_scope));
         let context = NonNullPointerContext::new(&guard_compact, arg);
         return context.has_nullability_guard();
     }
-    lower.contains("is_null") || compact.contains("nonnull::new(")
+    stripped.contains("is_null") || compact.contains("nonnull::new(")
 }
 
 struct NonNullPointerContext<'a> {

@@ -563,6 +563,18 @@ mod tests {
             "NonNull::new_unchecked(ptr)",
             vec![],
         );
+        let line_comment_question_mark_guard = site_with_family(
+            OperationFamily::NonNullUnchecked,
+            vec!["// NonNull::new(ptr)?;"],
+            "NonNull::new_unchecked(ptr)",
+            vec![],
+        );
+        let line_comment_if_let_guard = site_with_family(
+            OperationFamily::NonNullUnchecked,
+            vec!["// if let Some(_) = NonNull::new(ptr) {"],
+            "NonNull::new_unchecked(ptr)",
+            vec![],
+        );
         let stale_if_let_guard = site_with_family(
             OperationFamily::NonNullUnchecked,
             vec!["if let Some(_) = NonNull::new(ptr) {", "ptr = other;"],
@@ -624,6 +636,21 @@ mod tests {
         );
         assert!(
             !obligation_evidence(&other_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(
+                &line_comment_question_mark_guard,
+                &obligations,
+                &contract,
+                &reach,
+            )[0]
+            .discharge
+            .present
+        );
+        assert!(
+            !obligation_evidence(&line_comment_if_let_guard, &obligations, &contract, &reach,)[0]
                 .discharge
                 .present
         );
