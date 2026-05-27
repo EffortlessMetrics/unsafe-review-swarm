@@ -7,12 +7,12 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
         OperationFamily::RawPointerDeref | OperationFamily::RawPointerRead | OperationFamily::RawPointerWrite => add_raw_pointer_repairs(card, &mut repairs, true),
         OperationFamily::RawPointerReadUnaligned | OperationFamily::RawPointerWriteUnaligned => add_raw_pointer_repairs(card, &mut repairs, false),
         OperationFamily::CopyNonOverlapping => {
-            if missing_discharge(card, "valid-range") { repairs.push("add guards proving `count` fits both source and destination ranges before this copy".to_string()); }
-            if missing_discharge(card, "non-overlap") { repairs.push("prove source and destination ranges do not overlap, or use `ptr::copy` only if overlap is intended".to_string()); }
+            if missing_discharge(card, "valid-range") { repairs.push("add guards proving the same `count` fits both source and destination ranges before this copy".to_string()); }
+            if missing_discharge(card, "non-overlap") { repairs.push("prove the same source and destination ranges do not overlap, or use `ptr::copy` only if overlap is intended".to_string()); }
         }
         OperationFamily::PtrCopy => {
-            if missing_discharge(card, "valid-range") { repairs.push("add guards proving `count` fits both source and destination ranges before this copy".to_string()); }
-            if missing_discharge(card, "initialized") { repairs.push("show that the source range is initialized for the copied element count".to_string()); }
+            if missing_discharge(card, "valid-range") { repairs.push("add guards proving the same `count` fits both source and destination ranges before this copy".to_string()); }
+            if missing_discharge(card, "initialized") { repairs.push("show that the same source range is initialized for the copied element count".to_string()); }
         }
         OperationFamily::PtrReplace => {
             if missing_discharge(card, "pointer-live") {
