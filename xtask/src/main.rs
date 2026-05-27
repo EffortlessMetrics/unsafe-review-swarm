@@ -2242,7 +2242,34 @@ fn check_dogfood_report_index_text(
             return Err(format!("{path} must link dogfood report `{link}`"));
         }
     }
+    let report_set = reports.iter().map(String::as_str).collect::<BTreeSet<_>>();
+    for linked_report in dogfood_report_links_from_text(text) {
+        if !report_set.contains(linked_report.as_str()) {
+            return Err(format!(
+                "{path} links missing dogfood report `reports/{linked_report}`"
+            ));
+        }
+    }
     Ok(())
+}
+
+fn dogfood_report_links_from_text(text: &str) -> BTreeSet<String> {
+    let mut links = BTreeSet::new();
+    for line in text.lines() {
+        let mut rest = line;
+        while let Some(pos) = rest.find("reports/") {
+            let after_prefix = &rest[pos + "reports/".len()..];
+            let end = after_prefix
+                .find(|ch: char| ch == ')' || ch == '"' || ch == '\'' || ch.is_whitespace())
+                .unwrap_or(after_prefix.len());
+            let report = after_prefix[..end].trim_end_matches(['.', ',', ';']);
+            if report.ends_with(".md") {
+                links.insert(report.to_string());
+            }
+            rest = &after_prefix[end.min(after_prefix.len())..];
+        }
+    }
+    links
 }
 
 fn check_dogfood_report_triage_labels() -> Result<(), String> {
@@ -8928,6 +8955,27 @@ Snapshot reports:
 
         assert!(err.contains("must link dogfood report"));
         assert!(err.contains("reports/2026-05-26-no-card-control.md"));
+    }
+
+    #[test]
+    fn dogfood_report_index_rejects_stale_report_link() {
+        let reports = vec![
+            "2026-05-26-post-burst.md".to_string(),
+            "2026-05-26-no-card-control.md".to_string(),
+        ];
+        let text = r#"
+Snapshot reports:
+
+- [post burst](reports/2026-05-26-post-burst.md)
+- [no-card control](reports/2026-05-26-no-card-control.md)
+- [stale report](reports/2026-05-26-missing-report.md)
+"#;
+
+        let err =
+            check_dogfood_report_index_text("docs/dogfood/README.md", text, &reports).unwrap_err();
+
+        assert!(err.contains("links missing dogfood report"));
+        assert!(err.contains("reports/2026-05-26-missing-report.md"));
     }
 
     #[test]
