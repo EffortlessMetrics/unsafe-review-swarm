@@ -1,34 +1,39 @@
-use super::compact_code;
+use super::{branch_still_open_at_operation, compact_code};
 
 pub(super) fn has_unreachable_unchecked_infallible_path_evidence(lower: &str) -> bool {
     let compact = compact_code(lower);
-    let Some(call_pos) = compact.find("unreachable_unchecked(") else {
+    let Some(context) = UnreachableUncheckedPathContext::from_compact(&compact) else {
         return false;
     };
-    let before_call = &compact[..call_pos];
-    let Some(match_pos) = before_call.rfind("match") else {
-        return false;
-    };
-    let match_context = &before_call[match_pos..];
-    let Some((match_head, after_open)) = match_context.split_once('{') else {
-        return false;
-    };
-    if !match_head.contains("fallibility::infallible") {
-        return false;
+    context.has_open_infallible_match_context()
+}
+
+// Infallible-path evidence only applies when the unchecked call is inside the
+// same still-open match arm whose head establishes Fallibility::Infallible.
+struct UnreachableUncheckedPathContext<'a> {
+    before_call: &'a str,
+}
+
+impl<'a> UnreachableUncheckedPathContext<'a> {
+    fn from_compact(compact: &'a str) -> Option<Self> {
+        let call_pos = compact.find("unreachable_unchecked(")?;
+        Some(Self {
+            before_call: &compact[..call_pos],
+        })
     }
 
-    let mut depth = 1usize;
-    for ch in after_open.chars() {
-        match ch {
-            '{' => depth += 1,
-            '}' => {
-                depth = depth.saturating_sub(1);
-                if depth == 0 {
-                    return false;
-                }
-            }
-            _ => {}
-        }
+    fn has_open_infallible_match_context(self) -> bool {
+        let Some(match_context) = self.enclosing_match_context() else {
+            return false;
+        };
+        let Some((match_head, after_open)) = match_context.split_once('{') else {
+            return false;
+        };
+        match_head.contains("fallibility::infallible") && branch_still_open_at_operation(after_open)
     }
-    true
+
+    fn enclosing_match_context(self) -> Option<&'a str> {
+        let match_pos = self.before_call.rfind("match")?;
+        Some(&self.before_call[match_pos..])
+    }
 }

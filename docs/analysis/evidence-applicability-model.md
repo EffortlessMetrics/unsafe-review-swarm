@@ -148,6 +148,7 @@ The analyzer must not mix evidence kinds:
 | `#[target_feature]` | Same annotated function/caller contract | Contract docs inform review; availability and dispatch remain unproven. | Cfg predicate treated as runtime availability, docs treated as witness. |
 | `static mut` | Same static owner | Alias/synchronization contracts route to concurrency review. | Nearby prose treated as synchronization guard. |
 | `transmute` / `zeroed` | Same source/destination type and value | Valid-value/valid-zero evidence is type-specific and must keep the source value fresh after the guard. | Layout-only prose, comment-only value claim, stale byte/value check. |
+| `unreachable_unchecked` | Same control-flow path | Infallible-path evidence applies only while the same match arm remains open at the unchecked call. | Other match context, post-operation evidence, closed infallible match. |
 
 ## Helper extraction order
 
@@ -167,6 +168,7 @@ Current implementation checkpoint:
 | `Vec::from_raw_parts` | `VecFromRawPartsCallContext` ties pointer, len, cap, same-origin ManuallyDrop evidence, and pre-call len/cap guards back to the same call | factored | Existing fixtures pin len/cap guards, stale cap, closed branches, comment-only returns, and same-origin pointer/capacity/ownership evidence. |
 | `transmute` / `transmute_copy` | `TransmuteLayoutContext` and `TransmuteValueDomainContext` separate layout-size evidence from value-domain evidence; the value-domain context owns same-source-value and stale-reassignment checks | factored | Do not broaden valid-value domains without one positive and one false-positive control. |
 | `copy_nonoverlapping` / `ptr::copy` | `CopyRangeApplicability` and `SliceCountBoundTarget` require same source slice, destination slice, and count evidence before discharging valid-range | factored | Existing fixtures pin source-only, destination-only, wrong-length, stale source/count, closed-branch, disjunctive-branch, and comment-only controls; add non-overlap or initialization breadth only as separate fixture-backed slices. |
+| `unreachable_unchecked` | `UnreachableUncheckedPathContext` ties infallible-path evidence to the same still-open match context as the unchecked call | factored | Existing fixtures pin wrong-match, post-operation, and closed-match false-positive controls. |
 
 Original extraction sequence, retained as the preferred order for auditing or
 extending these families:
