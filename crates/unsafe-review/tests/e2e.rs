@@ -462,6 +462,7 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
         serde_json::to_string(&packet["do_not_do"])?
             .contains("do not change unrelated unsafe code")
     );
+    assert!(serde_json::to_string(&packet["do_not_do"])?.contains("ran witnesses"));
     assert!(packet["stop_conditions"].is_array());
     assert!(serde_json::to_string(&packet["stop_conditions"])?.contains("same unsafe seam"));
 
