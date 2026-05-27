@@ -177,6 +177,22 @@ Current implementation checkpoint:
 | `new_unchecked` constructors | `UncheckedConstructorAvailabilityContext` ties availability evidence to the same constructor receiver type before the call | factored | Existing fixtures pin same receiver, other receiver, assert guards, unavailable early returns, observed-only availability, and closed branches. |
 | `encode_utf8` unsafe call | `EncodeUtf8CapacityContext` ties the unsafe call to the remaining-capacity binding passed as its length argument | factored | Existing fixtures pin the remaining-capacity call shape; use arrayvec dogfood for wording pressure, not broad UTF-8 unchecked detection. |
 
+Route-heavy implementation checkpoint:
+
+These families are intentionally tracked as route/contract applicability rails,
+not as unfinished local-discharge helper backlog. They should grow only when a
+concrete fixture or dogfood report exposes a wrong-target, stale, dominance, or
+wording gap.
+
+| Family | Current rail | Status | Next useful pressure |
+|---|---|---|---|
+| Raw pointer read/write/arithmetic | ReviewCard hazards keep bounds, alignment, nullability, initialized-memory, and allocation obligations separate; no single nearby guard is treated as broad pointer safety proof. | route-heavy | Add same-origin or stale-origin controls only from concrete raw-pointer fixtures or dogfood cards. |
+| Unsafe function call | Callee/receiver preconditions stay tied to the call site and wrapper context; generic unsafe calls route to human review unless a family-specific helper owns the obligation. | route-heavy | Add argument-target helpers only for one named callee family at a time. |
+| FFI / extern | FFI cards keep ABI, layout, lifetime, and ownership obligations attached to the same foreign boundary or owner; sanitizer and cargo-careful remain suggested routes, not receipts. | route-heavy | Use `mio-pr1388` or another concrete boundary card before changing route wording or wrapper ownership handling. |
+| `unsafe impl Send` / `Sync` | Concurrency cards stay tied to the same impl owner and type parameters; Loom/Shuttle are route suggestions and never concurrency proof. | route-heavy | Use `crossbeam-pr1226` only when a fixture can pin a specific state/owner distinction. |
+| `#[target_feature]` | Owner/caller docs may be contract evidence for the annotated function; cfg predicates, docs, and witness routes are not runtime availability or site-execution proof. | route-heavy | Use memchr dogfood only for concrete contract, ranking, or wording drift. |
+| `static mut` | Global mutable-state cards stay tied to the same static owner and route aliasing/synchronization obligations to review. | route-heavy | Add a dogfood target only if a real PR exposes actionable `static mut` review cards. |
+
 Original extraction sequence, retained as the preferred order for auditing or
 extending these families:
 
