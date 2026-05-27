@@ -11,6 +11,7 @@ mod identifier_syntax;
 mod marker_scan;
 mod maybeuninit;
 mod nonnull;
+mod operation_scope;
 mod option_state;
 mod pointer_arithmetic;
 mod raw_pointer_alignment;
@@ -53,6 +54,7 @@ use self::identifier_syntax::{is_simple_identifier, let_binding_name};
 use self::marker_scan::{any_marker_occurrence, any_marker_tail};
 use self::maybeuninit::has_maybeuninit_assume_init_initialization_evidence;
 use self::nonnull::has_nullability_guard;
+use self::operation_scope::code_before_operation;
 use self::option_state::{ends_with_some_pattern, is_some_binding, match_some_branch_after_marker};
 use self::pointer_arithmetic::has_slice_end_pointer_arithmetic_evidence;
 use self::raw_pointer_alignment::has_alignment_guard;
@@ -551,17 +553,6 @@ fn has_bounds_guard(site: &ScannedSite, lower: &str) -> bool {
         return false;
     }
     has_length_or_bounds_guard(&guard_scope)
-}
-
-fn code_before_operation(lower: &str, expression: &str) -> Option<String> {
-    let compact = compact_code(lower);
-    let expression = compact_code(&expression.to_ascii_lowercase());
-    if expression.is_empty() {
-        return None;
-    }
-    compact
-        .find(&expression)
-        .map(|operation_pos| compact[..operation_pos].to_string())
 }
 
 fn has_capacity_guard(family: &OperationFamily, lower: &str) -> bool {
