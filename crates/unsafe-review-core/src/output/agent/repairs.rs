@@ -133,11 +133,12 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
             }
             if missing_discharge(card, "initialized") {
                 repairs.push(
-                    "show the pointed-to value is initialized before `drop_in_place`".to_string(),
+                    "show the same pointed-to value is initialized before `drop_in_place`"
+                        .to_string(),
                 );
             }
             if missing_discharge(card, "ownership") {
-                repairs.push("show ownership of the pointee so it will not be dropped again or observed after `drop_in_place`".to_string());
+                repairs.push("show ownership of the same pointee so it will not be dropped again or observed after `drop_in_place`".to_string());
             }
         }
         OperationFamily::SliceFromRawParts => {

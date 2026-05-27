@@ -832,8 +832,8 @@ mod tests {
             .map_err(|err| format!("render allowed repairs failed: {err}"))?;
 
         assert_eq!(value["context"]["operation_family"], "drop_in_place");
-        assert!(allowed_repairs.contains("pointed-to value is initialized"));
-        assert!(allowed_repairs.contains("ownership of the pointee"));
+        assert!(allowed_repairs.contains("same pointed-to value is initialized"));
+        assert!(allowed_repairs.contains("ownership of the same pointee"));
         assert!(allowed_repairs.contains("dropped again"));
         assert!(allowed_repairs.contains("witness receipt"));
         assert!(!allowed_repairs.contains("Box::from_raw"));
