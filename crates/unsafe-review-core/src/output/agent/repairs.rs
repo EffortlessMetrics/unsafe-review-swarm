@@ -105,8 +105,15 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
                     .to_string(),
             );
         }
-        OperationFamily::NonNullUnchecked if missing_discharge(card, "non-null") => repairs
-            .push("add a same-pointer non-null guard before `NonNull::new_unchecked`".to_string()),
+        OperationFamily::NonNullUnchecked if missing_discharge(card, "non-null") => {
+            repairs.push(
+                "add a same-pointer non-null guard before `NonNull::new_unchecked`".to_string(),
+            );
+            repairs.push(
+                "preserve the same pointer value between the guard and `NonNull::new_unchecked`"
+                    .to_string(),
+            );
+        }
         OperationFamily::GetUnchecked if missing_discharge(card, "bounds") => {
             repairs.push(
                 "add a same-slice length/range guard before `get_unchecked` for the same index"
