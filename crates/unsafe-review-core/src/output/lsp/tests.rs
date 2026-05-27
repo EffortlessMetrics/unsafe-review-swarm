@@ -118,6 +118,18 @@ fn lsp_projection_is_parseable_and_read_only() -> Result<(), String> {
         value["hovers"][0]["contents"]
             .as_str()
             .unwrap_or("")
+            .contains("Relevant hazard families")
+    );
+    assert!(
+        value["hovers"][0]["contents"]
+            .as_str()
+            .unwrap_or("")
+            .contains("`alignment`")
+    );
+    assert!(
+        value["hovers"][0]["contents"]
+            .as_str()
+            .unwrap_or("")
             .contains("Evidence found")
     );
     assert!(

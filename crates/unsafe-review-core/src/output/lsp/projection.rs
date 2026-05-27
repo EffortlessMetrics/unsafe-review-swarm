@@ -462,6 +462,13 @@ fn hover_contents(card: &ReviewCard) -> String {
         card.class.as_str()
     ));
     text.push_str(&format!("- Operation: `{}`\n\n", card.operation.expression));
+    if !card.hazards.is_empty() {
+        text.push_str("Relevant hazard families:\n");
+        for hazard in &card.hazards {
+            text.push_str(&format!("- `{}`\n", hazard.as_str()));
+        }
+        text.push('\n');
+    }
     text.push_str("Required safety conditions:\n");
     for obligation in &card.obligations {
         text.push_str(&format!("- {}\n", obligation.description));
