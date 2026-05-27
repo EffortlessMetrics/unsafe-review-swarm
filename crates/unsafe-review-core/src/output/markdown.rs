@@ -607,6 +607,39 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn repo_posture_markdown_avoids_score_or_all_clear_wording() -> Result<(), String> {
+        for fixture in ["raw_pointer_alignment", "safe_code_no_cards"] {
+            let output = repo_fixture_output(fixture)?;
+            let rendered = render(&output);
+            let lower = rendered.to_ascii_lowercase();
+
+            assert!(rendered.contains("# unsafe-review repo posture"));
+            assert!(rendered.contains("open review gaps"));
+            assert!(rendered.contains("not raw unsafe usage"));
+            assert!(
+                !lower.contains("score"),
+                "repo posture must report review gaps, not scores: {rendered}"
+            );
+            for forbidden in [
+                "all clear",
+                "verified",
+                "policy-ready",
+                "blocking-ready",
+                "safe to use",
+                "repo is safe",
+                "repository is safe",
+            ] {
+                assert!(
+                    !lower.contains(forbidden),
+                    "repo posture must not contain overclaim wording {forbidden:?}: {rendered}"
+                );
+            }
+        }
+
+        Ok(())
+    }
+
     fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures")
