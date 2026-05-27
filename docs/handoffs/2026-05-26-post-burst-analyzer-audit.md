@@ -34,6 +34,21 @@ Current validation posture:
 - dogfood corpus exists, but most families below are not dogfood-measured
 - no family below is policy-eligible from this audit alone
 
+Subsequent swarm status:
+
+- [Evidence applicability model](../analysis/evidence-applicability-model.md)
+  now records the implementation-backed helper checkpoint.
+- The initial helper sequence has landed for `unwrap_unchecked`, UTF-8
+  unchecked conversion, `get_unchecked`, `NonNull::new_unchecked`,
+  `MaybeUninit::assume_init`, `Vec::set_len`, and `transmute` /
+  `transmute_copy`.
+- This audit remains the snapshot of PRs #350-#396. Later helper PRs close the
+  first applicability refactor rail, but they do not promote support tiers,
+  calibration, policy readiness, or safety claims.
+- Future analyzer changes should come from a new fixture or dogfood observation
+  that exposes a still-missing stale, wrong-target, dominance, or value-domain
+  shape.
+
 ## Family audit
 
 | Family | Accepted evidence | Rejected controls | Missing controls / risk | Dogfood status | Next action |
@@ -70,18 +85,21 @@ recognizer families are added.
 
 ## Follow-up seeds
 
-Immediate validation:
+Immediate validation status:
 
-1. Add a post-burst dogfood snapshot report over a small target subset.
-2. Record obvious useful cards, obvious noise, and fixture follow-ups.
-3. Keep artifacts local/untracked unless a specific report says otherwise.
+1. Post-burst dogfood snapshot reporting is recorded in
+   [2026-05-26 post-burst analyzer snapshot](../dogfood/reports/2026-05-26-post-burst.md).
+2. The dogfood triage vocabulary is recorded in
+   [dogfood triage taxonomy](../dogfood/triage-taxonomy.md).
+3. Artifacts remain local/untracked unless a focused report explicitly records
+   a checked-in output contract.
 
-Architecture:
+Architecture status:
 
-1. Define the evidence applicability model in `docs/analysis/`.
-2. Factor one helper at a time, starting with `unwrap_unchecked` and UTF-8
-   evidence.
-3. Avoid a broad analyzer rewrite.
+1. The evidence applicability model is defined in `docs/analysis/`.
+2. The first helper sequence is factored and fixture-backed.
+3. The next analyzer work should be a small dogfood- or fixture-driven
+   correction, not a broad recognizer expansion.
 
 Do not do next:
 

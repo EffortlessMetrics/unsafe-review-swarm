@@ -157,12 +157,24 @@ result exists.
 
 ## Analyzer follow-ups
 
-1. Define the evidence applicability model before adding new recognizers.
-2. Factor same-receiver/staleness helpers for `unwrap_unchecked`.
-3. Factor same-buffer/staleness helpers for UTF-8 validation.
-4. Add one atomic pointer/state fixture/control only if future dogfood exposes a
+Subsequent swarm work has completed the initial evidence-applicability rail:
+
+- the [evidence applicability model](../../analysis/evidence-applicability-model.md)
+  is implementation-backed;
+- same-target, open-branch, and stale-evidence helper contexts are now factored
+  for the initial family sequence;
+- `Vec::set_len`, `MaybeUninit`, `NonNull`, `get_unchecked`, UTF-8 unchecked
+  conversion, `unwrap_unchecked`, and `transmute` / `transmute_copy` should now
+  be treated as regression-pressure families rather than as unfinished helper
+  scaffolding.
+
+Remaining follow-ups:
+
+1. Add one atomic pointer/state fixture/control only if future dogfood exposes a
    still-missing concrete shape.
-5. Keep FFI/layout route wording human-review-heavy; the focused [mio FFI route wording follow-up](2026-05-26-mio-ffi-route-wording.md) now guards the `miri_unsupported` next-action wording.
+2. Keep FFI/layout route wording human-review-heavy; the focused [mio FFI route wording follow-up](2026-05-26-mio-ffi-route-wording.md) now guards the `miri_unsupported` next-action wording.
+3. Add new analyzer breadth only when a future dogfood report or fixture exposes
+   a concrete missing evidence shape plus a false-positive control.
 
 ## Reproduction commands
 
