@@ -129,16 +129,21 @@ The bundle contains:
 ```text
 target/unsafe-review/cards.json
 target/unsafe-review/pr-summary.md
+target/unsafe-review/github-summary.md
 target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
 target/unsafe-review/lsp.json
 ```
 
-The PR summary artifact is Markdown for GitHub job summaries or uploaded
-artifacts. It projects existing ReviewCards only: counts, top card, card table,
-witness plan, and the trust boundary. It must not add PR-specific analyzer truth
-and must not imply a blocking policy.
+The PR summary artifact is the reviewer front panel. It projects existing
+ReviewCards only: counts, top card, card table, witness plan, and the trust
+boundary. It must not add PR-specific analyzer truth and must not imply a
+blocking policy.
+
+The GitHub summary artifact is the bounded job-summary fragment. It projects
+the same ReviewCards, stays capped for CI display, and points reviewers to the
+full advisory bundle instead of duplicating the full PR summary.
 
 The SARIF artifact projects the same ReviewCards into code-scanning shape. It
 is still advisory static review evidence; uploading SARIF must not be treated as
@@ -242,8 +247,8 @@ Default behavior of the example workflow:
 
 - runs `unsafe-review first-pr --base origin/<base>`;
 - verifies with `cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review`;
-- uploads `cards.json`, `pr-summary.md`, `cards.sarif`, `comment-plan.json`,
-  `witness-plan.md`, and `lsp.json`;
+- uploads `cards.json`, `pr-summary.md`, `github-summary.md`, `cards.sarif`,
+  `comment-plan.json`, `witness-plan.md`, and `lsp.json`;
 - does not post comments;
 - does not run witnesses;
 - does not block on findings, only on artifact/tooling contract failures.

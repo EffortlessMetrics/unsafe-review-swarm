@@ -100,6 +100,7 @@ Then it should upload:
 ```text
 target/unsafe-review/cards.json
 target/unsafe-review/pr-summary.md
+target/unsafe-review/github-summary.md
 target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
@@ -161,7 +162,36 @@ all clear
 
 except inside explicit negative wording.
 
-#### 3.3 `cards.sarif`
+#### 3.3 `github-summary.md`
+
+Bounded GitHub job-summary fragment.
+
+Must include:
+
+```text
+card count
+top actionable card, when present
+full bundle artifact list
+trust boundary
+```
+
+Must stay concise enough for CI display and must not duplicate the full
+`pr-summary.md` card table, witness plan, or reviewer front panel.
+
+Must not include:
+
+```text
+safe
+sound
+verified
+UB-free
+Miri-clean
+all clear
+```
+
+except inside explicit negative wording.
+
+#### 3.4 `cards.sarif`
 
 Code-scanning projection.
 
@@ -179,7 +209,7 @@ trust boundary
 
 SARIF must not create a separate classification truth. It is a projection from ReviewCards.
 
-#### 3.4 `comment-plan.json`
+#### 3.5 `comment-plan.json`
 
 Plan-only inline-comment artifact.
 
@@ -232,7 +262,7 @@ Each body must include the trust boundary.
 
 Each body must stay at or below 220 words.
 
-#### 3.5 `witness-plan.md`
+#### 3.6 `witness-plan.md`
 
 Reviewer-readable witness routing.
 
@@ -258,7 +288,7 @@ what this route cannot prove
 receipt hint
 ```
 
-#### 3.6 `lsp.json`
+#### 3.7 `lsp.json`
 
 Saved editor/LLM projection.
 
@@ -479,6 +509,7 @@ Top card:
 
 Open:
 - `target/unsafe-review/pr-summary.md`
+- `target/unsafe-review/github-summary.md`
 - `target/unsafe-review/witness-plan.md`
 
 Trust boundary:
