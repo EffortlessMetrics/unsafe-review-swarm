@@ -1,11 +1,11 @@
 use super::{
     compact_code, contains_executable_return, has_assignment_to_identifier,
     has_fresh_guard_pattern, is_receiver_path_char, matching_call_argument_end,
-    matching_code_block_end, source_value_identifier,
+    matching_code_block_end, source_value_identifier, strip_block_comments_and_literals,
 };
 
 pub(super) fn has_from_utf8_unchecked_validation_evidence(lower: &str) -> bool {
-    let compact = compact_code(lower);
+    let compact = compact_code(&strip_block_comments_and_literals(lower));
     let Some((before_call, argument)) = from_utf8_unchecked_argument_context(&compact) else {
         return false;
     };

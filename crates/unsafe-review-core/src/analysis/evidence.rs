@@ -3670,6 +3670,12 @@ mod tests {
             "unsafe { core::str::from_utf8_unchecked(bytes) }",
             vec![],
         );
+        let line_comment_is_ok_branch = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec!["// if core::str::from_utf8(bytes).is_ok() {"],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
         let closed_positive_branch = site_with_family(
             OperationFamily::StrFromUtf8Unchecked,
             vec![
@@ -3910,6 +3916,8 @@ mod tests {
             obligation_evidence(&string_let_else_return, &obligations, &contract, &reach);
         let observed_is_ok_evidence =
             obligation_evidence(&observed_is_ok, &obligations, &contract, &reach);
+        let line_comment_is_ok_branch_evidence =
+            obligation_evidence(&line_comment_is_ok_branch, &obligations, &contract, &reach);
         let closed_positive_branch_evidence =
             obligation_evidence(&closed_positive_branch, &obligations, &contract, &reach);
         let closed_if_let_branch_evidence =
@@ -3960,6 +3968,7 @@ mod tests {
         assert!(!comment_let_else_return_evidence[0].discharge.present);
         assert!(!string_let_else_return_evidence[0].discharge.present);
         assert!(!observed_is_ok_evidence[0].discharge.present);
+        assert!(!line_comment_is_ok_branch_evidence[0].discharge.present);
         assert!(!closed_positive_branch_evidence[0].discharge.present);
         assert!(!closed_if_let_branch_evidence[0].discharge.present);
         assert!(!reassigned_after_question_mark_evidence[0].discharge.present);
