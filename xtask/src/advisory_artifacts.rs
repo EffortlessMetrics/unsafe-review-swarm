@@ -18,6 +18,7 @@ struct CardProjection {
     operation: String,
     operation_family: String,
     next_action: String,
+    missing: Vec<String>,
     verify_commands: Vec<String>,
 }
 
@@ -757,6 +758,22 @@ fn advisory_card_projections(
                 .to_string();
         let next_action =
             super::require_non_empty_json_str(card, "next_action", "cards.json card")?.to_string();
+        let missing = card
+            .get("missing")
+            .map(|missing| {
+                missing
+                    .as_array()
+                    .ok_or_else(|| "cards.json card missing must be an array".to_string())?
+                    .iter()
+                    .map(|missing| {
+                        missing.as_str().map(str::to_string).ok_or_else(|| {
+                            "cards.json card missing values must be strings".to_string()
+                        })
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
         let verify_commands = super::json_array_at(card, "/verify_commands", "cards.json card")?
             .iter()
             .map(|command| {
@@ -779,6 +796,7 @@ fn advisory_card_projections(
                 operation,
                 operation_family,
                 next_action,
+                missing,
                 verify_commands,
             },
         );
@@ -1174,6 +1192,12 @@ fn check_lsp_artifact(
         )?;
         super::json_array_at(diagnostic, "/obligation_evidence", "lsp.json diagnostic")?;
         check_lsp_diagnostic_evidence(diagnostic)?;
+        require_projected_string_array(
+            diagnostic,
+            "missing_evidence",
+            &card_projection.missing,
+            "lsp.json diagnostic",
+        )?;
         check_lsp_diagnostic_witness_commands(diagnostic)?;
         require_projected_string_array(
             diagnostic,
