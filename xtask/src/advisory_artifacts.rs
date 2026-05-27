@@ -2039,6 +2039,12 @@ fn require_lsp_diagnostic_card_projection(
         &card.operation_family,
         "lsp.json diagnostic",
     )?;
+    require_projected_str(
+        diagnostic,
+        "next_action",
+        &card.next_action,
+        "lsp.json diagnostic",
+    )?;
     require_projected_string_array(diagnostic, "hazards", &card.hazards, "lsp.json diagnostic")
 }
 
