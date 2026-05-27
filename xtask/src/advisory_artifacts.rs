@@ -368,6 +368,16 @@ fn require_markdown_top_card_projection(
                 path.display()
             ),
         )?;
+        if let Some(command) = &expected_route.command {
+            require_top_card_primary_route_command(
+                text,
+                path,
+                &card_id,
+                &expected_route.kind,
+                &expected_route.reason,
+                command,
+            )?;
+        }
     }
 
     let Some(actual_next_action) = top_card_next_action else {
@@ -388,6 +398,27 @@ fn expected_missing_summary(card: &CardProjection) -> String {
         "No missing evidence recorded".to_string()
     } else {
         card.missing.join("; ")
+    }
+}
+
+fn require_top_card_primary_route_command(
+    text: &str,
+    path: &Path,
+    card_id: &str,
+    route_kind: &str,
+    route_reason: &str,
+    command: &str,
+) -> Result<(), String> {
+    let expected = format!(
+        "- Primary route: `{route_kind}` because {route_reason}\n\n```bash\n{command}\n```"
+    );
+    if text.contains(&expected) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{} top card `{card_id}` primary route command must include fenced command `{command}`",
+            path.display()
+        ))
     }
 }
 

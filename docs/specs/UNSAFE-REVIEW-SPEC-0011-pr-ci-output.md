@@ -178,6 +178,7 @@ top actionable card, when present:
   operation family
   missing evidence
   primary witness route, when present
+  primary witness route command, when available
   next action
 full bundle artifact list
 trust boundary
