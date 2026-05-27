@@ -3783,10 +3783,25 @@ mod tests {
             "unsafe { core::mem::transmute::<u8, bool>(value) }",
             vec![],
         );
+        let nested_return = site_with_family(
+            OperationFamily::Transmute,
+            vec![
+                "if value > 1 {",
+                "    if should_count() {",
+                "        record_invalid_bool_byte(value);",
+                "    }",
+                "    return false;",
+                "}",
+            ],
+            "unsafe { core::mem::transmute::<u8, bool>(value) }",
+            vec![],
+        );
 
         let evidence = obligation_evidence(&transmute, &obligations, &contract, &reach);
+        let nested_evidence = obligation_evidence(&nested_return, &obligations, &contract, &reach);
 
         assert!(evidence[0].discharge.present);
+        assert!(nested_evidence[0].discharge.present);
     }
 
     #[test]
