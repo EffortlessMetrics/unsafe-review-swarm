@@ -450,6 +450,12 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         )?;
         require_projected_string_array(
             properties,
+            "witnessRoutes",
+            &witness_route_summaries(&card_projection.witness_routes),
+            "cards.sarif result properties",
+        )?;
+        require_projected_string_array(
+            properties,
             "hazards",
             &card_projection.hazards,
             "cards.sarif result properties",
@@ -992,6 +998,13 @@ fn require_projected_witness_routes_field(
         }
     }
     Ok(())
+}
+
+fn witness_route_summaries(routes: &[WitnessRouteProjection]) -> Vec<String> {
+    routes
+        .iter()
+        .map(|route| format!("{}: {}", route.kind, route.reason))
+        .collect()
 }
 
 fn require_projected_str(
