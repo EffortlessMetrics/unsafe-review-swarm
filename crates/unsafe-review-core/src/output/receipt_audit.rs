@@ -95,3 +95,107 @@ fn matched_card(card: Option<&ReceiptAuditCard>) -> String {
 fn markdown_cell(value: &str) -> String {
     value.replace('|', "\\|").replace('\n', " ")
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::analysis::receipts::{ReceiptAuditEntry, ReceiptAuditReport, ReceiptAuditSummary};
+
+    #[test]
+    fn markdown_projects_problem_receipt_statuses_and_limits() {
+        let report = ReceiptAuditReport {
+            schema_version: "0.1".to_string(),
+            tool: "unsafe-review".to_string(),
+            mode: "receipt-audit".to_string(),
+            policy: "advisory".to_string(),
+            audit_date: "2026-05-26".to_string(),
+            trust_boundary: "Static witness receipt audit only; does not execute witnesses and does not prove site reach.".to_string(),
+            limitations: vec![
+                "audits saved witness receipt metadata only".to_string(),
+                "does not execute Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux".to_string(),
+                "matched receipts improve witness evidence only and do not erase missing contracts, guards, or reach evidence".to_string(),
+            ],
+            summary: ReceiptAuditSummary {
+                receipts: 2,
+                matched: 1,
+                unmatched: 1,
+                expired: 0,
+                stale: 1,
+                wrong_identity: 0,
+                wrong_tool: 1,
+                weaker_than_required: 1,
+                duplicate: 0,
+                invalid: 0,
+            },
+            receipts: vec![
+                ReceiptAuditEntry {
+                    path: ".unsafe-review/receipts/stale.json".to_string(),
+                    card_id: Some(
+                        "UR-stale-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                            .to_string(),
+                    ),
+                    receipt_tool: Some("miri".to_string()),
+                    strength: Some("ran".to_string()),
+                    expires_at: Some("2026-08-18".to_string()),
+                    statuses: vec!["stale".to_string(), "unmatched".to_string()],
+                    issues: vec![
+                        "receipt card_id is not present in the current ReviewCard set".to_string(),
+                    ],
+                    matched_card: None,
+                    route_tools: Vec::new(),
+                },
+                ReceiptAuditEntry {
+                    path: ".unsafe-review/receipts/weak-wrong-tool.json".to_string(),
+                    card_id: Some(
+                        "UR-live-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                            .to_string(),
+                    ),
+                    receipt_tool: Some("loom".to_string()),
+                    strength: Some("configured".to_string()),
+                    expires_at: Some("2026-08-18".to_string()),
+                    statuses: vec![
+                        "matched".to_string(),
+                        "weaker_than_required".to_string(),
+                        "wrong_tool".to_string(),
+                    ],
+                    issues: vec![
+                        "receipt tool `loom` is not one of this card's routed witness tools: miri, cargo-careful".to_string(),
+                        "receipt strength `configured` is weaker than the minimum `ran` strength for a required witness route".to_string(),
+                    ],
+                    matched_card: Some(ReceiptAuditCard {
+                        id: "UR-live-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                            .to_string(),
+                        class_name: "guard_missing",
+                        operation: "unsafe { ptr.cast::<Header>().read() }".to_string(),
+                        operation_family: "raw_pointer_read",
+                        missing_count: 2,
+                        next_action: "Add or expose guard | witness\nThen attach receipt"
+                            .to_string(),
+                    }),
+                    route_tools: vec!["miri".to_string(), "cargo-careful".to_string()],
+                },
+            ],
+        };
+
+        let markdown = render_markdown(&report);
+
+        assert!(markdown.contains("# unsafe-review receipt audit"));
+        assert!(markdown.contains("| 2 | 1 | 1 | 0 | 1 | 0 | 1 | 1 | 0 | 0 |"));
+        assert!(markdown.contains("stale, unmatched"));
+        assert!(markdown.contains("matched, weaker_than_required, wrong_tool"));
+        assert!(markdown.contains("receipt card_id is not present in the current ReviewCard set"));
+        assert!(
+            markdown.contains("receipt tool `loom` is not one of this card's routed witness tools")
+        );
+        assert!(markdown.contains("receipt strength `configured` is weaker"));
+        assert!(markdown.contains("`guard_missing` / `raw_pointer_read`"));
+        assert!(markdown.contains("unsafe { ptr.cast::<Header>().read() }"));
+        assert!(markdown.contains("Add or expose guard \\| witness Then attach receipt"));
+        assert!(markdown.contains("## Limitations"));
+        assert!(markdown.contains("does not execute Miri"));
+        assert!(markdown.contains("do not erase missing contracts"));
+        assert!(markdown.contains("## Trust boundary"));
+        assert!(markdown.contains("does not execute witnesses"));
+        assert!(markdown.contains("does not prove site reach"));
+    }
+}
