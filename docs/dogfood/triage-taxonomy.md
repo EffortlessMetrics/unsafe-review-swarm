@@ -22,6 +22,7 @@ when an observation has secondary implications.
 | `needs-doc` | The behavior is acceptable, but reviewer-facing wording, trust-boundary text, examples, or support-tier docs are unclear. | Update the owning docs/spec surface. | Analyzer behavior needs to change. |
 | `needs-route` | The card is useful only if its witness or human-review route is more precise. | Adjust route wording or route classification with a fixture if possible. | A witness was executed or a route proves safety. |
 | `needs-analyzer` | The observation points to a narrowly scoped analyzer gap that is ready for implementation. | Open one PR for one operation family, evidence shape, and false-positive control. | Broad analyzer expansion is justified. |
+| `needs-verifier` | The behavior is acceptable, but a projection, artifact, receipt, or policy rail needs a checker so the contract cannot drift. | Add or tighten one verifier invariant with a focused regression. | Analyzer behavior needs to change, or the verifier proves safety. |
 
 ## Required fields in reports
 
@@ -47,6 +48,9 @@ For each triaged observation, include:
   tool or human route is unclear.
 - Use `needs-doc` when the product posture is right but the public explanation
   could overclaim, underexplain, or confuse the trust boundary.
+- Use `needs-verifier` when the output is already correct but needs a checked
+  rail to keep ReviewCard projections, receipts, badges, or policy summaries
+  from drifting.
 - Keep all dogfood artifacts advisory and local unless a report explicitly
   names a checked-in artifact.
 

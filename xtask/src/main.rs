@@ -225,6 +225,7 @@ const DOGFOOD_TRIAGE_LABELS: &[&str] = &[
     "needs-doc",
     "needs-route",
     "needs-analyzer",
+    "needs-verifier",
 ];
 const DOGFOOD_TRIAGE_HEADER: &[&str] = &[
     "Target",
