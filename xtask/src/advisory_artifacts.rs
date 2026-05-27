@@ -442,10 +442,11 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             &card_projection.verify_commands,
             "cards.sarif result properties",
         )?;
-        super::json_array_at(
-            result,
-            "/properties/witnessRouteDetails",
-            "cards.sarif result",
+        require_projected_witness_routes_field(
+            properties,
+            "witnessRouteDetails",
+            &card_projection.witness_routes,
+            "cards.sarif result properties",
         )?;
         super::json_array_at(result, "/properties/verifyCommands", "cards.sarif result")?;
     }
@@ -947,21 +948,27 @@ fn require_projected_witness_routes(
     expected: &[WitnessRouteProjection],
     context: &str,
 ) -> Result<(), String> {
-    let Some(actual) = value
-        .get("witness_routes")
-        .and_then(serde_json::Value::as_array)
-    else {
-        return Err(format!("{context} is missing array field `witness_routes`"));
+    require_projected_witness_routes_field(value, "witness_routes", expected, context)
+}
+
+fn require_projected_witness_routes_field(
+    value: &serde_json::Value,
+    field: &str,
+    expected: &[WitnessRouteProjection],
+    context: &str,
+) -> Result<(), String> {
+    let Some(actual) = value.get(field).and_then(serde_json::Value::as_array) else {
+        return Err(format!("{context} is missing array field `{field}`"));
     };
     if actual.len() != expected.len() {
         return Err(format!(
-            "{context} witness_routes must project {} cards.json route(s); got {}",
+            "{context} {field} must project {} cards.json route(s); got {}",
             expected.len(),
             actual.len()
         ));
     }
     for (idx, (actual, expected)) in actual.iter().zip(expected.iter()).enumerate() {
-        let route_context = format!("{context} witness_routes[{idx}]");
+        let route_context = format!("{context} {field}[{idx}]");
         require_projected_str(actual, "kind", &expected.kind, &route_context)?;
         require_projected_str(actual, "reason", &expected.reason, &route_context)?;
         let actual_command = witness_route_command_projection(actual, &route_context)?;
