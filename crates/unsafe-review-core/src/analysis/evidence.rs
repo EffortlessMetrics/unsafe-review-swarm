@@ -1737,6 +1737,28 @@ mod tests {
             "self.set_len(new_len);",
             vec![],
         );
+        let comment_return_guard = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "if s.len() > self.capacity() - self.len() { /* return; */ }",
+                "let old_len = self.len();",
+                "let new_len = old_len + s.len();",
+            ],
+            "self.set_len(new_len);",
+            vec![],
+        );
+        let string_return_guard = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "if s.len() > self.capacity() - self.len() {",
+                "    let _note = \"return\";",
+                "}",
+                "let old_len = self.len();",
+                "let new_len = old_len + s.len();",
+            ],
+            "self.set_len(new_len);",
+            vec![],
+        );
 
         let guarded_evidence = obligation_evidence(&guarded, &obligations, &contract, &reach);
         let nested_guarded_evidence =
@@ -1745,11 +1767,17 @@ mod tests {
             obligation_evidence(&other_receiver_guard, &obligations, &contract, &reach);
         let stale_evidence =
             obligation_evidence(&stale_after_guard, &obligations, &contract, &reach);
+        let comment_return_evidence =
+            obligation_evidence(&comment_return_guard, &obligations, &contract, &reach);
+        let string_return_evidence =
+            obligation_evidence(&string_return_guard, &obligations, &contract, &reach);
 
         assert!(guarded_evidence[0].discharge.present);
         assert!(nested_guarded_evidence[0].discharge.present);
         assert!(!other_receiver_evidence[0].discharge.present);
         assert!(!stale_evidence[0].discharge.present);
+        assert!(!comment_return_evidence[0].discharge.present);
+        assert!(!string_return_evidence[0].discharge.present);
     }
 
     #[test]
@@ -1827,6 +1855,36 @@ mod tests {
             "self.set_len(new_len);",
             vec![],
         );
+        let comment_return_capacity_guard = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "let old_len = self.len();",
+                "let new_len = old_len + s.len();",
+                "if new_len > self.capacity() { /* return; */ }",
+                "let dst = &mut self.xs[old_len..new_len];",
+                "for (dst, src) in dst.iter_mut().zip(s.as_bytes().iter()) {",
+                "    *dst = MaybeUninit::new(*src);",
+                "}",
+            ],
+            "self.set_len(new_len);",
+            vec![],
+        );
+        let string_return_capacity_guard = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "let old_len = self.len();",
+                "let new_len = old_len + s.len();",
+                "if new_len > self.capacity() {",
+                "    let _note = \"return\";",
+                "}",
+                "let dst = &mut self.xs[old_len..new_len];",
+                "for (dst, src) in dst.iter_mut().zip(s.as_bytes().iter()) {",
+                "    *dst = MaybeUninit::new(*src);",
+                "}",
+            ],
+            "self.set_len(new_len);",
+            vec![],
+        );
 
         let evidence = obligation_evidence(&set_len, &obligations, &contract, &reach);
         let nested_capacity_guard_evidence =
@@ -1835,6 +1893,18 @@ mod tests {
             obligation_evidence(&wrong_target, &obligations, &contract, &reach);
         let partial_range_evidence =
             obligation_evidence(&partial_range, &obligations, &contract, &reach);
+        let comment_return_capacity_evidence = obligation_evidence(
+            &comment_return_capacity_guard,
+            &obligations,
+            &contract,
+            &reach,
+        );
+        let string_return_capacity_evidence = obligation_evidence(
+            &string_return_capacity_guard,
+            &obligations,
+            &contract,
+            &reach,
+        );
 
         assert!(evidence.iter().all(|item| item.discharge.present));
         assert!(
@@ -1854,6 +1924,22 @@ mod tests {
             !partial_range_evidence
                 .iter()
                 .find(|item| item.obligation.key == "initialized")
+                .unwrap()
+                .discharge
+                .present
+        );
+        assert!(
+            !comment_return_capacity_evidence
+                .iter()
+                .find(|item| item.obligation.key == "capacity")
+                .unwrap()
+                .discharge
+                .present
+        );
+        assert!(
+            !string_return_capacity_evidence
+                .iter()
+                .find(|item| item.obligation.key == "capacity")
                 .unwrap()
                 .discharge
                 .present
