@@ -165,11 +165,12 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
                 repairs.push("prove the same pointer was allocated by a compatible allocator for `capacity` elements before `Vec::from_raw_parts`".to_string());
             }
             if missing_discharge(card, "alignment") {
-                repairs.push("prove the pointer is aligned for the Vec element type".to_string());
+                repairs
+                    .push("prove the same pointer is aligned for the Vec element type".to_string());
             }
             if missing_discharge(card, "initialized") {
                 repairs.push(
-                    "show the first `len` elements are initialized before reconstructing the Vec"
+                    "show the first `len` elements for this same pointer are initialized before reconstructing the Vec"
                         .to_string(),
                 );
             }
@@ -178,7 +179,7 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
                     .push("add or expose a same-value guard proving `len <= capacity`".to_string());
             }
             if missing_discharge(card, "ownership") {
-                repairs.push("show the reconstructed Vec receives unique ownership and the raw parts will not be reused or double-freed".to_string());
+                repairs.push("show the reconstructed Vec receives unique ownership of these same raw parts and they will not be reused or double-freed".to_string());
             }
         }
         OperationFamily::PinUnchecked if missing_discharge(card, "pin") => {

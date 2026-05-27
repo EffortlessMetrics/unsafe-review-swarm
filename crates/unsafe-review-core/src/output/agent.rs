@@ -886,10 +886,11 @@ mod tests {
         assert!(allowed_repairs.contains("same pointer"));
         assert!(allowed_repairs.contains("compatible allocator"));
         assert!(allowed_repairs.contains("`capacity` elements"));
-        assert!(allowed_repairs.contains("aligned for the Vec element type"));
-        assert!(allowed_repairs.contains("first `len` elements are initialized"));
+        assert!(allowed_repairs.contains("same pointer is aligned for the Vec element type"));
+        assert!(allowed_repairs.contains("first `len` elements for this same pointer"));
         assert!(allowed_repairs.contains("`len <= capacity`"));
         assert!(allowed_repairs.contains("unique ownership"));
+        assert!(allowed_repairs.contains("these same raw parts"));
         assert!(allowed_repairs.contains("double-freed"));
         assert!(allowed_repairs.contains("witness receipt"));
         assert!(!allowed_repairs.contains("`ptr..ptr+len` range"));
