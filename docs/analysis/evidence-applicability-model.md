@@ -151,7 +151,20 @@ The analyzer must not mix evidence kinds:
 Do not introduce a large generic engine in one PR. Extract helpers only when a
 family already has fixture and dogfood pressure.
 
-Recommended sequence:
+Current implementation checkpoint:
+
+| Family | Current helper/context | Status | Next useful pressure |
+|---|---|---|---|
+| `unwrap_unchecked` | Receiver/state applicability helpers in the analyzer evidence path | factored | Dogfood `hashbrown-pr693` only when a new stale or wrong-receiver shape appears. |
+| `str::from_utf8_unchecked` | Same-buffer UTF-8 validation applicability helpers | factored | Add prefix/suffix or alias controls only when fixture or dogfood evidence exposes them. |
+| `get_unchecked` / `get_unchecked_mut` | `GetUncheckedBoundsApplicability` for same receiver/index, open branches, early returns, and stale targets | factored | Dogfood `arrayvec-pr137` or hashbrown targets before adding new probe shapes. |
+| `NonNull::new_unchecked` | `NonNullPointerContext` for same-pointer probes, open branches, early returns, and stale pointer checks | factored | Add cast/provenance or macro controls only from concrete fixtures. |
+| `MaybeUninit::assume_init` | `MaybeUninitSlotContext` for same-slot writes/new bindings, scope reach, and stale slot checks | factored | Add partial/field/array initialization controls only as separate fixture-backed slices. |
+| `Vec::set_len` | Set-len capacity and initialized-range contexts are split from generic bounds checks | in progress | Keep using `arrayvec-pr288` as regression pressure for stale or wrong-target initialized-range shapes. |
+| `transmute` / `transmute_copy` | `TransmuteLayoutContext` and `TransmuteValueDomainContext` separate layout-size evidence from value-domain evidence | factored | Do not broaden valid-value domains without one positive and one false-positive control. |
+
+Original extraction sequence, retained as the preferred order for auditing or
+extending these families:
 
 1. `unwrap_unchecked`: same receiver, open branch, stale guard.
 2. `str::from_utf8_unchecked`: same buffer, stale buffer, validation branch.
