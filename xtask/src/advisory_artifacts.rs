@@ -1356,7 +1356,8 @@ fn require_lsp_diagnostic_card_projection(
         "operation_family",
         &card.operation_family,
         "lsp.json diagnostic",
-    )
+    )?;
+    require_projected_string_array(diagnostic, "hazards", &card.hazards, "lsp.json diagnostic")
 }
 
 fn check_lsp_diagnostic_evidence(diagnostic: &serde_json::Value) -> Result<(), String> {
