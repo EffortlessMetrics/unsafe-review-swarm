@@ -144,8 +144,10 @@ result exists.
   shows that target is useful for `encode_utf8`, raw pointer, pointer
   arithmetic, and `Vec::set_len` review prompts, but it does not exercise
   `str::from_utf8_unchecked`.
-- `NonNull::new_unchecked` stale-pointer controls were not sampled here; use
-  `hashbrown-pr667` or `memchr-capped` when that family changes.
+- `NonNull::new_unchecked` stale-pointer controls were not sampled here. The
+  focused [`hashbrown-pr667` follow-up](2026-05-27-hashbrown-nonnull-follow-up.md)
+  records concrete nested NonNull cards, but stale or wrong-pointer controls
+  still need separate fixture or dogfood pressure.
 
 ## Fixture follow-ups
 

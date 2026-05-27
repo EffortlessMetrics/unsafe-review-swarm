@@ -22,6 +22,7 @@ Snapshot reports:
 - [2026-05-26 mio FFI route wording](reports/2026-05-26-mio-ffi-route-wording.md)
 - [2026-05-26 no-card fixture smoke](reports/2026-05-26-no-card-control.md)
 - [2026-05-27 arrayvec PR 138 UTF-8 follow-up](reports/2026-05-27-arrayvec-pr138-utf8-follow-up.md)
+- [2026-05-27 hashbrown NonNull follow-up](reports/2026-05-27-hashbrown-nonnull-follow-up.md)
 
 ## PR Diff Targets
 
