@@ -11,6 +11,7 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
     let mut out = String::new();
     out.push_str("# unsafe-review receipt audit\n\n");
     out.push_str("Static audit of saved witness receipt metadata against current ReviewCards.\n\n");
+    out.push_str(&format!("Audit date: `{}`\n\n", report.audit_date));
     out.push_str("## Summary\n\n");
     out.push_str("| Receipts | Matched | Unmatched | Expired | Stale | Wrong identity | Wrong tool | Weak strength | Duplicate | Invalid |\n");
     out.push_str("|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
@@ -183,6 +184,7 @@ mod tests {
         let markdown = render_markdown(&report);
 
         assert!(markdown.contains("# unsafe-review receipt audit"));
+        assert!(markdown.contains("Audit date: `2026-05-26`"));
         assert!(markdown.contains("| 2 | 1 | 1 | 0 | 1 | 0 | 1 | 1 | 0 | 0 |"));
         assert!(markdown.contains(
             "| Status | Receipt | Card | Matched card | Tool | Strength | Expires | Issues |"
