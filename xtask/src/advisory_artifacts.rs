@@ -1964,7 +1964,7 @@ fn check_lsp_artifact(
         let action_card_id = require_known_card_id(action, "lsp.json code_action", &card_ids)?;
         super::require_non_empty_json_str(action, "path", "lsp.json code_action")?;
         check_lsp_range(action, "lsp.json code_action")?;
-        super::require_non_empty_json_str(action, "title", "lsp.json code_action")?;
+        let title = super::require_non_empty_json_str(action, "title", "lsp.json code_action")?;
         super::require_json_str(action, "kind", "quickfix", "lsp.json code_action")?;
         let Some(command) = action.get("command").and_then(serde_json::Value::as_str) else {
             return Err("lsp.json code_action is missing command".to_string());
@@ -1986,6 +1986,7 @@ fn check_lsp_artifact(
         }
         reject_lsp_code_action_edit_fields(action, "lsp.json code_action")?;
         let arguments = super::json_array_at(action, "/arguments", "lsp.json code_action")?;
+        require_lsp_code_action_title(action_card_id, command, title, action)?;
         check_lsp_code_action_payload(
             action,
             action_card_id,
@@ -2008,6 +2009,41 @@ fn check_lsp_artifact(
         }
     }
     Ok(())
+}
+
+fn require_lsp_code_action_title(
+    action_card_id: &str,
+    command: &str,
+    title: &str,
+    action: &serde_json::Value,
+) -> Result<(), String> {
+    let expected = match command {
+        "unsafe-review.copyAgentPacket" => {
+            format!("Copy unsafe-review packet for {action_card_id}")
+        }
+        "unsafe-review.explainWitnessRoute" => "Explain unsafe-review witness route".to_string(),
+        "unsafe-review.openRelatedTest" => {
+            let payload = action
+                .get("payload")
+                .ok_or_else(|| "lsp.json code_action is missing payload".to_string())?;
+            let name =
+                super::require_non_empty_json_str(payload, "name", "lsp.json code_action payload")?;
+            format!("Open related test {name}")
+        }
+        "unsafe-review.copyWitnessCommand" => "Copy recommended witness command".to_string(),
+        _ => {
+            return Err(format!(
+                "lsp.json code_action command `{command}` is not verifier-known"
+            ));
+        }
+    };
+    if title == expected {
+        Ok(())
+    } else {
+        Err(format!(
+            "lsp.json code_action `{command}` title must be `{expected}`; got `{title}`"
+        ))
+    }
 }
 
 fn reject_lsp_code_action_edit_fields(

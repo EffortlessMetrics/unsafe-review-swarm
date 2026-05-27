@@ -10251,6 +10251,36 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_lsp_code_action_title_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-lsp-action-title-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let lsp_path = dir.join("lsp.json");
+        let mut lsp: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&lsp_path).map_err(|err| format!("read lsp failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse lsp failed: {err}"))?;
+        let first_action = lsp
+            .get_mut("code_actions")
+            .and_then(serde_json::Value::as_array_mut)
+            .and_then(|actions| actions.first_mut())
+            .ok_or_else(|| "test lsp missing first code action".to_string())?;
+        first_action["title"] = serde_json::json!("Apply unsafe-review fix");
+        fs::write(&lsp_path, lsp.to_string()).map_err(|err| format!("write lsp failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("code_action `unsafe-review.copyAgentPacket` title must be")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_lsp_witness_command_drift() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-lsp-witness-command-drift")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -10410,6 +10440,32 @@ Snapshot reports:
                 .err()
                 .unwrap_or_default()
                 .contains("related_test path must be `tests/read_header.rs`")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_lsp_related_test_action_title_drift() -> Result<(), String>
+    {
+        let dir = unique_temp_dir("unsafe-review-first-pr-lsp-related-action-title-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        fs::write(
+            dir.join("lsp.json"),
+            valid_lsp_json(
+                r#"[{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Copy unsafe-review packet for card-1","kind":"quickfix","command":"unsafe-review.copyAgentPacket","payload":{"kind":"unsafe-review.agent_packet","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]},{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Explain unsafe-review witness route","kind":"quickfix","command":"unsafe-review.explainWitnessRoute","payload":{"kind":"unsafe-review.witness_route","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]},{"card_id":"card-1","path":"tests/read_header.rs","range":{"start":{"line":2,"character":0},"end":{"line":2,"character":1}},"title":"Open unrelated test","kind":"quickfix","command":"unsafe-review.openRelatedTest","payload":{"kind":"unsafe-review.related_test","card_id":"card-1","file":"tests/read_header.rs","line":3,"name":"read_header","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1","tests/read_header.rs","3","read_header"]}]"#,
+            ),
+        )
+        .map_err(|err| format!("write lsp failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("code_action `unsafe-review.openRelatedTest` title must be")
         );
         Ok(())
     }
