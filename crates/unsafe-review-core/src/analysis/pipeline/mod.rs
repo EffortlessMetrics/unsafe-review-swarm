@@ -1150,6 +1150,31 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn nonnull_new_guard_variants_require_same_pointer_applicability() -> Result<(), String> {
+        for fixture in [
+            "nonnull_new_guard",
+            "nonnull_if_let_new_guard",
+            "nonnull_let_else_new_guard",
+            "nonnull_match_new_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+            assert_eq!(card.operation.family, OperationFamily::NonNullUnchecked);
+            assert_eq!(card.class, ReviewClass::GuardedUnwitnessed);
+            assert!(card.discharge.present);
+            assert!(obligation_discharge_present(card, "non-null"));
+            assert!(
+                card.missing.iter().all(|missing| missing.kind != "guard"),
+                "{fixture} should resolve the local guard prompt with same-pointer evidence"
+            );
+            assert!(card.id.0.contains("nonnull-unchecked"));
+        }
+        Ok(())
+    }
+
+    #[test]
     fn nonnull_new_guard_for_other_pointer_is_not_evidence() -> Result<(), String> {
         let output = fixture_output("nonnull_other_guard_not_evidence")?;
         let card = single_card("nonnull_other_guard_not_evidence", &output)?;
@@ -1218,6 +1243,32 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "checking the pointer after NonNull::new_unchecked must not resolve this card's guard prompt"
         );
         assert!(card.id.0.contains("new-unchecked"));
+        Ok(())
+    }
+
+    #[test]
+    fn nonnull_pointer_evidence_rejects_stale_reassignment() -> Result<(), String> {
+        for fixture in [
+            "nonnull_new_reassigned_ptr_not_guard",
+            "nonnull_is_null_reassigned_ptr_not_guard",
+            "nonnull_if_let_new_reassigned_ptr_not_guard",
+            "nonnull_let_else_new_reassigned_ptr_not_guard",
+            "nonnull_match_new_reassigned_ptr_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+            assert_eq!(card.operation.family, OperationFamily::NonNullUnchecked);
+            assert_eq!(card.class, ReviewClass::GuardMissing);
+            assert!(!card.discharge.present);
+            assert!(!obligation_discharge_present(card, "non-null"));
+            assert!(
+                card.missing.iter().any(|missing| missing.kind == "guard"),
+                "{fixture} must keep stale pointer evidence from resolving the guard prompt"
+            );
+            assert!(card.id.0.contains("nonnull-unchecked"));
+        }
         Ok(())
     }
 
