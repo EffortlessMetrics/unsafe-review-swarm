@@ -913,6 +913,7 @@ fn require_comment_card_projection(
     require_projected_str(comment, "path", &card.path, context)?;
     require_projected_u64(comment, "line", card.line, context)?;
     require_projected_str(comment, "operation", &card.operation, context)?;
+    require_projected_str(comment, "next_action", &card.next_action, context)?;
     require_projected_str(comment, "operation_family", &card.operation_family, context)
 }
 
