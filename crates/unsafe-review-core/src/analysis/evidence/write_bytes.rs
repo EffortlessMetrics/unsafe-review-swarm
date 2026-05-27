@@ -6,31 +6,51 @@ use crate::analysis::scanner::ScannedSite;
 
 pub(super) fn has_maybeuninit_slice_context(lower: &str) -> bool {
     let compact = compact_code(lower);
-    let Some(call_pos) = compact.find("from_raw_parts_mut(") else {
+    let Some(context) = SliceFromRawPartsContext::from_compact(&compact) else {
         return false;
     };
-    let before_call = &compact[..call_pos];
-    let after_marker = &compact[call_pos + "from_raw_parts_mut(".len()..];
-    let argument_end = matching_call_argument_end(after_marker).unwrap_or(after_marker.len());
-    let arguments = &after_marker[..argument_end];
-
-    arguments.contains("maybeuninit") || maybeuninit_slice_return_type(before_call)
+    context.has_maybeuninit_initialized_memory_evidence()
 }
 
-fn maybeuninit_slice_return_type(before_call: &str) -> bool {
-    let Some(fn_pos) = before_call.rfind("fn") else {
-        return false;
-    };
-    let fn_context = &before_call[fn_pos..];
-    let signature = fn_context
-        .split_once('{')
-        .map_or(fn_context, |(signature, _body)| signature);
+// MaybeUninit slice evidence for from_raw_parts_mut applies only to the same
+// raw-parts call arguments or the function return type that owns that call.
+struct SliceFromRawPartsContext<'a> {
+    before_call: &'a str,
+    arguments: &'a str,
+}
 
-    signature
-        .split_once("->")
-        .is_some_and(|(_before, return_type)| {
-            return_type.contains("maybeuninit") && return_type.contains('[')
+impl<'a> SliceFromRawPartsContext<'a> {
+    fn from_compact(compact: &'a str) -> Option<Self> {
+        let call_pos = compact.find("from_raw_parts_mut(")?;
+        let before_call = &compact[..call_pos];
+        let after_marker = &compact[call_pos + "from_raw_parts_mut(".len()..];
+        let argument_end = matching_call_argument_end(after_marker).unwrap_or(after_marker.len());
+        let arguments = &after_marker[..argument_end];
+        Some(Self {
+            before_call,
+            arguments,
         })
+    }
+
+    fn has_maybeuninit_initialized_memory_evidence(&self) -> bool {
+        self.arguments.contains("maybeuninit") || self.has_maybeuninit_slice_return_type()
+    }
+
+    fn has_maybeuninit_slice_return_type(&self) -> bool {
+        let Some(fn_pos) = self.before_call.rfind("fn") else {
+            return false;
+        };
+        let fn_context = &self.before_call[fn_pos..];
+        let signature = fn_context
+            .split_once('{')
+            .map_or(fn_context, |(signature, _body)| signature);
+
+        signature
+            .split_once("->")
+            .is_some_and(|(_before, return_type)| {
+                return_type.contains("maybeuninit") && return_type.contains('[')
+            })
+    }
 }
 
 pub(super) fn has_maybeuninit_raw_write_context(site: &ScannedSite, lower: &str) -> bool {
