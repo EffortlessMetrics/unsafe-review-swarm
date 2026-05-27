@@ -20,6 +20,7 @@ struct CardProjection {
     next_action: String,
     missing: Vec<String>,
     verify_commands: Vec<String>,
+    witness_route_kinds: Vec<String>,
 }
 
 const COMMENT_PLAN_BODY_WORD_LIMIT: usize = 220;
@@ -783,6 +784,25 @@ fn advisory_card_projections(
                     .ok_or_else(|| "cards.json card verify_commands must be strings".to_string())
             })
             .collect::<Result<Vec<_>, _>>()?;
+        let witness_route_kinds = card
+            .get("witness_routes")
+            .map(|routes| {
+                routes
+                    .as_array()
+                    .ok_or_else(|| "cards.json card witness_routes must be an array".to_string())?
+                    .iter()
+                    .map(|route| {
+                        super::require_non_empty_json_str(
+                            route,
+                            "kind",
+                            "cards.json card witness_routes[]",
+                        )
+                        .map(str::to_string)
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
         projections.insert(
             id,
             CardProjection {
@@ -798,6 +818,7 @@ fn advisory_card_projections(
                 next_action,
                 missing,
                 verify_commands,
+                witness_route_kinds,
             },
         );
     }
@@ -1138,6 +1159,15 @@ fn require_witness_plan_card_projections(
             "next action",
             &format!("- Next action: {}", card.next_action),
         )?;
+        for route_kind in &card.witness_route_kinds {
+            require_witness_plan_card_line(
+                section,
+                path,
+                card_id,
+                "witness route",
+                &format!("- Route: `{route_kind}`"),
+            )?;
+        }
     }
     Ok(())
 }
