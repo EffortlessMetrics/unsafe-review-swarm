@@ -323,7 +323,7 @@ fn has_validation_match_return_guard(context: &Utf8ValidationContext<'_>) -> boo
             continue;
         };
         if body.contains("ok(")
-            && err_arm.contains("=>return")
+            && err_arm_contains_executable_return(err_arm)
             && !context.has_argument_assignment(after_block)
         {
             return true;
@@ -333,4 +333,21 @@ fn has_validation_match_return_guard(context: &Utf8ValidationContext<'_>) -> boo
     }
 
     false
+}
+
+fn err_arm_contains_executable_return(err_arm: &str) -> bool {
+    let Some(arrow_pos) = err_arm.find("=>") else {
+        return false;
+    };
+    let after_arrow = &err_arm[arrow_pos + "=>".len()..];
+    if let Some(after_open) = after_arrow.strip_prefix('{') {
+        let guard_body = matching_code_block_end(after_open)
+            .map_or(after_open, |body_end| &after_open[..body_end]);
+        return contains_executable_return(guard_body);
+    }
+
+    let guard_body = after_arrow
+        .find(',')
+        .map_or(after_arrow, |comma_pos| &after_arrow[..comma_pos]);
+    contains_executable_return(guard_body)
 }
