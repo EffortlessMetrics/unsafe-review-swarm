@@ -93,6 +93,7 @@ impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
                 "do not widen unsafe code without reducing the missing evidence",
                 "do not add a broad suppression",
                 "do not claim Miri proof unless the witness command is run and attached",
+                "do not claim unsafe-review ran an agent, applied source edits, or posted comments",
                 "do not change unrelated unsafe code or public API behavior",
                 "do not treat a test mention as proof that the unsafe site executed",
             ],
@@ -537,6 +538,11 @@ mod tests {
             serde_json::to_string(&value["do_not_do"])
                 .map_err(|err| format!("render do_not_do failed: {err}"))?
                 .contains("do not change unrelated unsafe code")
+        );
+        assert!(
+            serde_json::to_string(&value["do_not_do"])
+                .map_err(|err| format!("render do_not_do failed: {err}"))?
+                .contains("ran an agent, applied source edits, or posted comments")
         );
         assert!(value["stop_conditions"].is_array());
         assert!(

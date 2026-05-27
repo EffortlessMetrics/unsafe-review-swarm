@@ -64,6 +64,9 @@ Packets constrain LLMs with task, contract, missing evidence, allowed repairs,
 do-not-do list, verify commands, and stop conditions. They are copy-only in
 v0.x; `unsafe-review` does not run an agent, edit source, post comments, or
 claim that the packet resolves the card.
+The do-not-do list must make that automation boundary visible to packet
+consumers: a packet must not let downstream tooling claim `unsafe-review` ran
+an agent, applied source edits, or posted comments.
 
 ## Projection contract
 
@@ -107,6 +110,8 @@ Whole-file dumps are out of scope by default.
   whole-file dumps and site-execution claims.
 - The packet includes obligation-level evidence, missing evidence, witness
   routes, do-not-do rules, stop conditions, and the trust boundary.
+- The do-not-do rules explicitly preserve the copy-only boundary: do not claim
+  `unsafe-review` ran an agent, applied source edits, or posted comments.
 - Allowed repairs name the current card's missing obligation shape. For
   example, raw-pointer read packets may name same-pointer alignment or
   initialization evidence, while copy packets may name range and non-overlap
