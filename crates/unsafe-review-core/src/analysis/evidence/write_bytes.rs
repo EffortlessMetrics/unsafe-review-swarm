@@ -67,22 +67,21 @@ fn has_maybeuninit_write_bytes_target_context(
     if !compact_expression.contains("write_bytes(") {
         return false;
     };
-    let Some((_before_call, receiver, _byte, _len)) =
-        write_bytes_method_context(compact_expression)
-    else {
+    let Some(context) = WriteBytesCallContext::from_compact(compact_expression) else {
         return false;
     };
-    if receiver.contains("maybeuninit") {
+    if context.receiver.contains("maybeuninit") {
         return true;
     }
     let Some(before_operation) = code_before_operation(lower, &site.operation.expression) else {
         return false;
     };
 
-    if receiver == "self" || receiver.starts_with("self.") {
+    if context.receiver == "self" || context.receiver.starts_with("self.") {
         return maybeuninit_impl_receiver_before_write(&before_operation);
     }
-    receiver
+    context
+        .receiver
         .strip_suffix(".as_mut_ptr()")
         .is_some_and(|slice| maybeuninit_slice_parameter_before_write(&before_operation, slice))
 }
@@ -119,39 +118,38 @@ fn has_maybeuninit_ptr_write_value_context(compact_expression: &str) -> bool {
 
 pub(super) fn has_u8_write_bytes_context(site: &ScannedSite, lower: &str) -> bool {
     let compact_expression = compact_code(&site.operation.expression.to_ascii_lowercase());
-    let Some((_before_call, receiver, _byte, _len)) =
-        write_bytes_method_context(&compact_expression)
-    else {
-        return false;
-    };
-
-    pointer_binding_has_type_before_operation(lower, &site.operation.expression, receiver, "*mutu8")
-}
-
-pub(super) fn has_bool_write_bytes_pointer_context(site: &ScannedSite, lower: &str) -> bool {
-    let compact_expression = compact_code(&site.operation.expression.to_ascii_lowercase());
-    let Some((_before_call, receiver, _byte, _len)) =
-        write_bytes_method_context(&compact_expression)
-    else {
+    let Some(context) = WriteBytesCallContext::from_compact(&compact_expression) else {
         return false;
     };
 
     pointer_binding_has_type_before_operation(
         lower,
         &site.operation.expression,
-        receiver,
+        context.receiver,
+        "*mutu8",
+    )
+}
+
+pub(super) fn has_bool_write_bytes_pointer_context(site: &ScannedSite, lower: &str) -> bool {
+    let compact_expression = compact_code(&site.operation.expression.to_ascii_lowercase());
+    let Some(context) = WriteBytesCallContext::from_compact(&compact_expression) else {
+        return false;
+    };
+
+    pointer_binding_has_type_before_operation(
+        lower,
+        &site.operation.expression,
+        context.receiver,
         "*mutbool",
     )
 }
 
 pub(super) fn has_bool_write_bytes_value_evidence(site: &ScannedSite, lower: &str) -> bool {
     let compact_expression = compact_code(&site.operation.expression.to_ascii_lowercase());
-    let Some((_before_call, receiver, byte, _len)) =
-        write_bytes_method_context(&compact_expression)
-    else {
+    let Some(context) = WriteBytesCallContext::from_compact(&compact_expression) else {
         return false;
     };
-    let Some(byte) = source_value_identifier(byte) else {
+    let Some(byte) = source_value_identifier(context.byte) else {
         return false;
     };
     let Some(before_operation) = code_before_operation(lower, &site.operation.expression) else {
@@ -161,33 +159,46 @@ pub(super) fn has_bool_write_bytes_value_evidence(site: &ScannedSite, lower: &st
     pointer_binding_has_type_before_operation(
         lower,
         &site.operation.expression,
-        receiver,
+        context.receiver,
         "*mutbool",
     ) && has_u8_bool_value_guard(&before_operation, byte)
 }
 
 pub(super) fn has_write_bytes_bounds_evidence(lower: &str) -> bool {
     let compact = compact_code(lower);
-    let Some((_before_call, receiver, _byte, len)) = write_bytes_method_context(&compact) else {
+    let Some(context) = WriteBytesCallContext::from_compact(&compact) else {
         return false;
     };
-    let Some(slice) = receiver.strip_suffix(".as_mut_ptr()") else {
+    let Some(slice) = context.receiver.strip_suffix(".as_mut_ptr()") else {
         return false;
     };
 
-    len == format!("{slice}.len()")
+    context.len == format!("{slice}.len()")
 }
 
-fn write_bytes_method_context(compact: &str) -> Option<(&str, &str, &str, &str)> {
-    let call_marker = ".write_bytes(";
-    let call_pos = compact.find(call_marker)?;
-    let before_call = &compact[..call_pos];
-    let receiver = receiver_expression_before_pos(compact, call_pos)?;
-    let after_marker = &compact[call_pos + call_marker.len()..];
-    let argument_end = matching_call_argument_end(after_marker)?;
-    let arguments = &after_marker[..argument_end];
-    let (byte, len) = split_top_level_pair(arguments)?;
-    (!byte.is_empty() && !len.is_empty()).then_some((before_call, receiver, byte, len))
+// write_bytes evidence is tied to the exact method receiver, byte value, and
+// count used by the unsafe call.
+struct WriteBytesCallContext<'a> {
+    receiver: &'a str,
+    byte: &'a str,
+    len: &'a str,
+}
+
+impl<'a> WriteBytesCallContext<'a> {
+    fn from_compact(compact: &'a str) -> Option<Self> {
+        let call_marker = ".write_bytes(";
+        let call_pos = compact.find(call_marker)?;
+        let receiver = receiver_expression_before_pos(compact, call_pos)?;
+        let after_marker = &compact[call_pos + call_marker.len()..];
+        let argument_end = matching_call_argument_end(after_marker)?;
+        let arguments = &after_marker[..argument_end];
+        let (byte, len) = split_top_level_pair(arguments)?;
+        (!byte.is_empty() && !len.is_empty()).then_some(Self {
+            receiver,
+            byte,
+            len,
+        })
+    }
 }
 
 fn receiver_expression_before_pos(compact: &str, pos: usize) -> Option<&str> {
