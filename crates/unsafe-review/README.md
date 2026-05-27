@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="unsafe-review-logo.svg" alt="unsafe-review warning mark" width="120" />
+  <img src="https://raw.githubusercontent.com/EffortlessMetrics/unsafe-review/main/unsafe-review-logo.svg" alt="unsafe-review warning mark" width="120" />
 </p>
 
 <h1 align="center">unsafe-review</h1>
