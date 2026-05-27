@@ -8795,6 +8795,29 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_witness_plan_route_reason_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-witness-route-reason-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("witness-plan.md");
+        let witness_plan =
+            fs::read_to_string(&path).map_err(|err| format!("read witness plan failed: {err}"))?;
+        fs::write(
+            &path,
+            witness_plan.replace("  - Reason: route", "  - Reason: unrelated route"),
+        )
+        .map_err(|err| format!("write witness plan failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(result.err().unwrap_or_default().contains(
+            "witness-plan ReviewCard `card-1` witness route reason must include `  - Reason: route`"
+        ));
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_lsp_unknown_card_id() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-bad-lsp")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;

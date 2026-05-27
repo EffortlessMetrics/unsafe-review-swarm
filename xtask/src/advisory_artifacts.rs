@@ -20,7 +20,12 @@ struct CardProjection {
     next_action: String,
     missing: Vec<String>,
     verify_commands: Vec<String>,
-    witness_route_kinds: Vec<String>,
+    witness_routes: Vec<WitnessRouteProjection>,
+}
+
+struct WitnessRouteProjection {
+    kind: String,
+    reason: String,
 }
 
 const COMMENT_PLAN_BODY_WORD_LIMIT: usize = 220;
@@ -784,7 +789,7 @@ fn advisory_card_projections(
                     .ok_or_else(|| "cards.json card verify_commands must be strings".to_string())
             })
             .collect::<Result<Vec<_>, _>>()?;
-        let witness_route_kinds = card
+        let witness_routes = card
             .get("witness_routes")
             .map(|routes| {
                 routes
@@ -792,12 +797,22 @@ fn advisory_card_projections(
                     .ok_or_else(|| "cards.json card witness_routes must be an array".to_string())?
                     .iter()
                     .map(|route| {
-                        super::require_non_empty_json_str(
+                        let kind = super::require_non_empty_json_str(
                             route,
                             "kind",
                             "cards.json card witness_routes[]",
                         )
-                        .map(str::to_string)
+                        .map(str::to_string)?;
+                        let reason = super::require_non_empty_json_str(
+                            route,
+                            "reason",
+                            "cards.json card witness_routes[]",
+                        )
+                        .map(str::to_string)?;
+                        Ok::<WitnessRouteProjection, String>(WitnessRouteProjection {
+                            kind,
+                            reason,
+                        })
                     })
                     .collect::<Result<Vec<_>, _>>()
             })
@@ -818,7 +833,7 @@ fn advisory_card_projections(
                 next_action,
                 missing,
                 verify_commands,
-                witness_route_kinds,
+                witness_routes,
             },
         );
     }
@@ -1159,13 +1174,20 @@ fn require_witness_plan_card_projections(
             "next action",
             &format!("- Next action: {}", card.next_action),
         )?;
-        for route_kind in &card.witness_route_kinds {
+        for route in &card.witness_routes {
             require_witness_plan_card_line(
                 section,
                 path,
                 card_id,
                 "witness route",
-                &format!("- Route: `{route_kind}`"),
+                &format!("- Route: `{}`", route.kind),
+            )?;
+            require_witness_plan_card_line(
+                section,
+                path,
+                card_id,
+                "witness route reason",
+                &format!("  - Reason: {}", route.reason),
             )?;
         }
     }
