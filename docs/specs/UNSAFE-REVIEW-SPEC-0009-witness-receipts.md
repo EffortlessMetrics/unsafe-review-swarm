@@ -82,8 +82,10 @@ weaker-than-required, and invalid receipt metadata without running witnesses,
 inferring site reach, making policy decisions, or claiming safety. Matched
 receipt entries include current card operation, missing-count, and next-action
 context. Audit entries include the current card's routed witness tools so a
-reviewer can compare the saved receipt tool against the ReviewCard route. This
-lets a receipt improve witness evidence without erasing remaining guard or
+reviewer can compare the saved receipt tool against the ReviewCard route. Audit
+entries also include the saved `command_hash` when present so reviewers can
+compare command-string drift without treating it as proof that the command ran.
+This lets a receipt improve witness evidence without erasing remaining guard or
 contract gaps. The audit is an advisory metadata report over saved receipts and
 current cards. JSON and Markdown audit output must include explicit limitations
 saying the audit uses saved metadata only, does not execute witness tools, does

@@ -112,6 +112,7 @@ pub struct ReceiptAuditEntry {
     pub receipt_tool: Option<String>,
     pub strength: Option<String>,
     pub expires_at: Option<String>,
+    pub command_hash: Option<String>,
     pub statuses: Vec<String>,
     pub issues: Vec<String>,
     pub matched_card: Option<ReceiptAuditCard>,
@@ -282,6 +283,7 @@ fn audit_receipt_record(
             receipt_tool: None,
             strength: None,
             expires_at: None,
+            command_hash: None,
             statuses: statuses.into_iter().collect(),
             issues,
             matched_card: None,
@@ -298,6 +300,7 @@ fn audit_receipt_record(
             receipt_tool: None,
             strength: None,
             expires_at: None,
+            command_hash: None,
             statuses: statuses.into_iter().collect(),
             issues,
             matched_card: None,
@@ -369,6 +372,7 @@ fn audit_receipt_record(
         receipt_tool: Some(receipt.tool),
         strength: Some(receipt.strength),
         expires_at: receipt.expires_at,
+        command_hash: receipt.command_hash,
         statuses: statuses.into_iter().collect(),
         issues,
         matched_card: matched.map(|card| ReceiptAuditCard {
@@ -831,6 +835,11 @@ mod tests {
         assert_eq!(matched_card.operation_family, "raw_pointer_read");
         assert_eq!(matched_card.missing_count, 2);
         assert!(matched_card.next_action.contains("Add or expose"));
+        let expected_command_hash = WitnessReceipt::command_hash("cargo test");
+        assert_eq!(
+            matched_entry.command_hash.as_deref(),
+            Some(expected_command_hash.as_str())
+        );
         let duplicate_entries = report
             .receipts
             .iter()
@@ -930,6 +939,7 @@ mod tests {
         strength: &str,
         expires_at: &str,
     ) -> Result<(), String> {
+        let command_hash = WitnessReceipt::command_hash("cargo test");
         fs::write(
             dir.join(name),
             format!(
@@ -943,6 +953,7 @@ mod tests {
   "expires_at": "{expires_at}",
   "summary": "focused witness",
   "command": "cargo test",
+  "command_hash": "{command_hash}",
   "limitations": ["fixture only"]
 }}"#
             ),
