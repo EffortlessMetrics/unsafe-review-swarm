@@ -8,6 +8,7 @@ mod raw_pointer_alignment;
 mod raw_pointer_bounds;
 mod set_len;
 mod transmute;
+mod u8_bool_value;
 mod unreachable_unchecked;
 mod unsafe_fn_call;
 mod unwrap_unchecked;
@@ -29,6 +30,7 @@ use self::raw_pointer_bounds::has_raw_pointer_read_bounds_evidence;
 use self::transmute::{
     has_transmute_layout_size_evidence, has_transmute_u8_bool_valid_value_evidence,
 };
+use self::u8_bool_value::{has_u8_bool_value_guard, u8_bool_valid_value_predicates};
 use self::unreachable_unchecked::has_unreachable_unchecked_infallible_path_evidence;
 use self::unsafe_fn_call::{
     has_encode_utf8_remaining_capacity_evidence, has_unchecked_constructor_availability_evidence,
@@ -778,38 +780,6 @@ fn split_top_level_pair(text: &str) -> Option<(&str, &str)> {
     None
 }
 
-fn has_u8_bool_value_guard(before_call: &str, argument: &str) -> bool {
-    u8_bool_valid_value_predicates(argument)
-        .iter()
-        .any(|predicate| has_u8_bool_value_predicate_guard(before_call, predicate, argument))
-        || has_u8_bool_invalid_early_return_guard(before_call, argument)
-}
-
-fn u8_bool_valid_value_predicates(target: &str) -> [String; 8] {
-    [
-        format!("{target}<=1"),
-        format!("1>={target}"),
-        format!("{target}<2"),
-        format!("2>{target}"),
-        format!("matches!({target},0|1)"),
-        format!("matches!({target},1|0)"),
-        format!("{target}==0||{target}==1"),
-        format!("{target}==1||{target}==0"),
-    ]
-}
-
-fn has_u8_bool_value_predicate_guard(before_call: &str, predicate: &str, argument: &str) -> bool {
-    [
-        format!("assert!({predicate})"),
-        format!("assert!({predicate},"),
-        format!("debug_assert!({predicate})"),
-        format!("debug_assert!({predicate},"),
-    ]
-    .iter()
-    .any(|pattern| has_fresh_guard_pattern(before_call, pattern, argument))
-        || has_open_positive_branch_guard(before_call, predicate, argument)
-}
-
 fn has_fresh_guard_pattern(before_call: &str, pattern: &str, argument: &str) -> bool {
     has_fresh_guard_pattern_for_identifiers(before_call, pattern, &[argument])
 }
@@ -835,10 +805,6 @@ fn has_fresh_guard_pattern_for_identifiers(
         search_from = pattern_start + pattern.len();
     }
     false
-}
-
-fn has_open_positive_branch_guard(before_call: &str, predicate: &str, argument: &str) -> bool {
-    has_open_positive_branch_guard_for_identifiers(before_call, predicate, &[argument])
 }
 
 fn has_open_positive_branch_guard_for_identifiers(
@@ -876,30 +842,6 @@ fn has_assignment_to_any_identifier(compact: &str, identifiers: &[&str]) -> bool
     identifiers
         .iter()
         .any(|identifier| has_assignment_to_identifier(compact, identifier))
-}
-
-fn has_u8_bool_invalid_early_return_guard(before_call: &str, argument: &str) -> bool {
-    has_invalid_byte_returning_branch(before_call, &format!("{argument}>1"), argument)
-        || has_invalid_byte_returning_branch(before_call, &format!("1<{argument}"), argument)
-        || has_invalid_byte_returning_branch(before_call, &format!("{argument}>=2"), argument)
-        || has_invalid_byte_returning_branch(before_call, &format!("2<={argument}"), argument)
-}
-
-fn has_invalid_byte_returning_branch(before_call: &str, predicate: &str, argument: &str) -> bool {
-    let guard = format!("if{predicate}{{");
-    let mut search_from = 0;
-    while let Some(offset) = before_call[search_from..].find(&guard) {
-        let guard_start = search_from + offset;
-        let after_guard = &before_call[guard_start + guard.len()..];
-        let guard_end = after_guard.find('}').unwrap_or(after_guard.len());
-        let guard_body = &after_guard[..guard_end];
-        let after_branch = &after_guard[guard_end..];
-        if guard_body.contains("return") && !has_assignment_to_identifier(after_branch, argument) {
-            return true;
-        }
-        search_from = guard_start + guard.len();
-    }
-    false
 }
 
 fn is_simple_identifier(text: &str) -> bool {
