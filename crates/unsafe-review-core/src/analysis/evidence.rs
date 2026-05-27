@@ -2134,6 +2134,17 @@ mod tests {
             "unsafe { values.get_unchecked_mut(index) }",
             vec![],
         );
+        let nested_matching_return_guard = site_with_family(
+            OperationFamily::GetUnchecked,
+            vec![
+                "if index >= values.len() {",
+                "    if should_count() { record(index); }",
+                "    return None;",
+                "}",
+            ],
+            "unsafe { values.get_unchecked_mut(index) }",
+            vec![],
+        );
         let commented_return_guard = site_with_family(
             OperationFamily::GetUnchecked,
             vec!["if index >= values.len() { /* return None; */ }"],
@@ -2264,6 +2275,16 @@ mod tests {
             obligation_evidence(&matching_return_guard, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
+        );
+        assert!(
+            obligation_evidence(
+                &nested_matching_return_guard,
+                &obligations,
+                &contract,
+                &reach
+            )[0]
+            .discharge
+            .present
         );
         assert!(
             !obligation_evidence(&commented_return_guard, &obligations, &contract, &reach)[0]

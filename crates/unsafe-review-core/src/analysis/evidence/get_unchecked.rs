@@ -1,7 +1,7 @@
 use super::{
     any_marker_tail, branch_still_open_at_operation, compact_code, contains_simple_assignment_to,
-    match_some_branch_after_marker, matching_call_argument_end, receiver_before_marker,
-    strip_block_comments_and_literals,
+    match_some_branch_after_marker, matching_call_argument_end, matching_code_block_end,
+    receiver_before_marker, strip_block_comments_and_literals,
 };
 
 pub(super) fn get_unchecked_receiver_and_index(expression: &str) -> Option<(String, String)> {
@@ -104,9 +104,10 @@ impl<'a> GetUncheckedBoundsApplicability<'a> {
 
     fn returning_marker_preserves_applicability(&self, marker: &str) -> bool {
         any_marker_tail(self.before_operation, marker, |after_guard| {
-            let (guard_body, after_guard_body) = after_guard
-                .split_once('}')
-                .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
+            let (guard_body, after_guard_body) = matching_code_block_end(after_guard)
+                .map_or((after_guard, ""), |body_end| {
+                    (&after_guard[..body_end], &after_guard[body_end + 1..])
+                });
             self.returning_guard_preserves_applicability(guard_body, after_guard_body)
         })
     }
