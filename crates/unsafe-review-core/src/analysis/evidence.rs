@@ -19,6 +19,7 @@ mod raw_pointer_alignment;
 mod raw_pointer_bounds;
 mod receiver_path;
 mod set_len;
+mod site_context;
 mod source_value;
 mod transmute;
 mod u8_bool_value;
@@ -65,6 +66,7 @@ use self::receiver_path::{
     contains_receiver_fragment, contains_receiver_path, is_receiver_path_char,
     receiver_before_marker,
 };
+use self::site_context::{code_context, code_context_through_site};
 use self::source_value::source_value_identifier;
 use self::transmute::{
     has_transmute_layout_size_evidence, has_transmute_u8_bool_valid_value_evidence,
@@ -206,31 +208,6 @@ pub(crate) fn summarize_discharge(evidence: &[ObligationEvidence]) -> DischargeE
         );
     }
     DischargeEvidence::missing()
-}
-
-fn code_context(site: &ScannedSite) -> String {
-    site.context_before
-        .iter()
-        .chain(std::iter::once(&site.site.snippet))
-        .chain(site.context_after.iter())
-        .map(|line| {
-            line.split_once("//")
-                .map_or(line.as_str(), |(code, _comment)| code)
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-fn code_context_through_site(site: &ScannedSite) -> String {
-    site.context_before
-        .iter()
-        .chain(std::iter::once(&site.site.snippet))
-        .map(|line| {
-            line.split_once("//")
-                .map_or(line.as_str(), |(code, _comment)| code)
-        })
-        .collect::<Vec<_>>()
-        .join("\n")
 }
 
 fn contract_state(contract: &ContractEvidence) -> EvidenceState {
