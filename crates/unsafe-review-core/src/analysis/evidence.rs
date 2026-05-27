@@ -6,6 +6,7 @@ mod transmute;
 mod unreachable_unchecked;
 mod unwrap_unchecked;
 mod utf8;
+mod zeroed;
 
 use self::get_unchecked::{get_unchecked_receiver_and_index, has_get_unchecked_bounds_guard};
 use self::maybeuninit::has_maybeuninit_assume_init_initialization_evidence;
@@ -18,6 +19,7 @@ use self::unwrap_unchecked::{
     has_unwrap_unchecked_infallible_result_evidence, has_unwrap_unchecked_receiver_state_evidence,
 };
 use self::utf8::has_from_utf8_unchecked_validation_evidence;
+use self::zeroed::has_zeroed_known_valid_zero_type;
 use super::set_len_shrink;
 use crate::analysis::scanner::ScannedSite;
 use crate::domain::{
@@ -1910,32 +1912,6 @@ fn matching_code_block_end(text_after_open: &str) -> Option<usize> {
     None
 }
 
-fn has_zeroed_known_valid_zero_type(lower: &str) -> bool {
-    let compact = compact_code(lower);
-    let Some(target_type) = zeroed_target_type(&compact) else {
-        return false;
-    };
-    matches!(
-        target_type,
-        "()" | "bool"
-            | "char"
-            | "f32"
-            | "f64"
-            | "i8"
-            | "i16"
-            | "i32"
-            | "i64"
-            | "i128"
-            | "isize"
-            | "u8"
-            | "u16"
-            | "u32"
-            | "u64"
-            | "u128"
-            | "usize"
-    )
-}
-
 fn split_top_level_pair(text: &str) -> Option<(&str, &str)> {
     let mut angle_depth = 0usize;
     let mut paren_depth = 0usize;
@@ -2133,15 +2109,6 @@ fn starts_assignment_operator(after_identifier: &str) -> bool {
         || ["+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>="]
             .iter()
             .any(|operator| after_identifier.starts_with(operator))
-}
-
-fn zeroed_target_type(compact: &str) -> Option<&str> {
-    let marker = "zeroed::<";
-    let start = compact.find(marker)? + marker.len();
-    let after_marker = &compact[start..];
-    let end = matching_generic_argument_end(after_marker)?;
-    let target_type = &after_marker[..end];
-    (!target_type.is_empty()).then_some(target_type)
 }
 
 fn matching_generic_argument_end(text: &str) -> Option<usize> {
