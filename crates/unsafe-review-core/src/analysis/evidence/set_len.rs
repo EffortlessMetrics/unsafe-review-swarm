@@ -1,9 +1,11 @@
 use super::{
-    compact_code, contains_receiver_path, contains_simple_assignment_to,
+    code_context_through_site, compact_code, contains_receiver_path, contains_simple_assignment_to,
     has_assignment_to_any_identifier, has_fresh_guard_pattern_for_identifiers,
     has_open_positive_branch_guard_for_identifiers, is_receiver_path_char, is_simple_identifier,
     let_binding_name, matching_call_argument_end,
 };
+use crate::analysis::scanner::ScannedSite;
+use crate::domain::{EvidenceState, OperationFamily};
 
 pub(super) fn has_set_len_capacity_evidence(lower: &str) -> bool {
     has_set_len_shrink_evidence(lower)
@@ -24,6 +26,22 @@ pub(super) fn has_set_len_initialization_evidence(lower: &str) -> bool {
         return false;
     };
     context.has_initialized_range_evidence()
+}
+
+pub(super) fn set_len_initialized_discharge_state(site: &ScannedSite) -> Option<EvidenceState> {
+    if site.operation.family != OperationFamily::VecSetLen {
+        return None;
+    }
+    let init_scope = code_context_through_site(site).to_ascii_lowercase();
+    if has_set_len_initialization_evidence(&init_scope) {
+        Some(EvidenceState::present(
+            "Initialization evidence was detected",
+        ))
+    } else {
+        Some(EvidenceState::missing(
+            "No initialization evidence was detected",
+        ))
+    }
 }
 
 pub(super) fn has_capacity_bound_guard(

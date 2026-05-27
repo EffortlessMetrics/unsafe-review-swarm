@@ -171,17 +171,8 @@ fn discharge_state_for(
             }
         }
         "initialized" => {
-            let local_lower;
-            let init_scope = if family == &OperationFamily::VecSetLen {
-                local_lower = code_context_through_site(site).to_ascii_lowercase();
-                local_lower.as_str()
-            } else {
-                lower
-            };
-            if family == &OperationFamily::VecSetLen
-                && set_len::has_set_len_initialization_evidence(init_scope)
-            {
-                EvidenceState::present("Initialization evidence was detected")
+            if let Some(state) = set_len::set_len_initialized_discharge_state(site) {
+                state
             } else if let Some(state) =
                 maybeuninit_assume_init_discharge_state(family, &site.operation.expression, lower)
             {
@@ -215,8 +206,6 @@ fn discharge_state_for(
                 && has_drop_in_place_box_origin_evidence(&site.operation.expression, lower)
             {
                 EvidenceState::present("Box::into_raw origin evidence was detected")
-            } else if family == &OperationFamily::VecSetLen {
-                EvidenceState::missing("No initialization evidence was detected")
             } else {
                 EvidenceState::missing("No obligation-specific guard code was detected")
             }
