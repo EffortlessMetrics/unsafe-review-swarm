@@ -33,9 +33,9 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
         out.push_str("No receipt files found.\n\n");
     } else {
         out.push_str(
-            "| Status | Receipt | Card | Matched card | Tool | Strength | Expires | Issues |\n",
+            "| Status | Receipt | Card | Matched card | Tool | Strength | Expires | Routed tools | Issues |\n",
         );
-        out.push_str("|---|---|---|---|---|---|---|---|\n");
+        out.push_str("|---|---|---|---|---|---|---|---|---|\n");
         for receipt in &report.receipts {
             out.push_str(&receipt_row(receipt));
         }
@@ -56,7 +56,7 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
 
 fn receipt_row(receipt: &crate::analysis::receipts::ReceiptAuditEntry) -> String {
     format!(
-        "| {} | `{}` | {} | {} | {} | {} | {} | {} |\n",
+        "| {} | `{}` | {} | {} | {} | {} | {} | {} | {} |\n",
         markdown_cell(&receipt.statuses.join(", ")),
         receipt.path,
         optional_code(receipt.card_id.as_deref()),
@@ -64,8 +64,20 @@ fn receipt_row(receipt: &crate::analysis::receipts::ReceiptAuditEntry) -> String
         optional_code(receipt.receipt_tool.as_deref()),
         optional_code(receipt.strength.as_deref()),
         optional_code(receipt.expires_at.as_deref()),
+        route_tools(&receipt.route_tools),
         issues_cell(&receipt.issues)
     )
+}
+
+fn route_tools(tools: &[String]) -> String {
+    if tools.is_empty() {
+        return "-".to_string();
+    }
+    tools
+        .iter()
+        .map(|tool| format!("`{}`", markdown_cell(tool)))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn issues_cell(issues: &[String]) -> String {
@@ -187,9 +199,10 @@ mod tests {
         assert!(markdown.contains("Audit date: `2026-05-26`"));
         assert!(markdown.contains("| 2 | 1 | 1 | 0 | 1 | 0 | 1 | 1 | 0 | 0 |"));
         assert!(markdown.contains(
-            "| Status | Receipt | Card | Matched card | Tool | Strength | Expires | Issues |"
+            "| Status | Receipt | Card | Matched card | Tool | Strength | Expires | Routed tools | Issues |"
         ));
         assert!(markdown.contains("`2026-08-18`"));
+        assert!(markdown.contains("`miri`, `cargo-careful`"));
         assert!(markdown.contains("stale, unmatched"));
         assert!(markdown.contains("matched, weaker_than_required, wrong_tool"));
         assert!(markdown.contains("receipt card_id is not present in the current ReviewCard set"));
