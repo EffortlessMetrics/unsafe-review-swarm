@@ -53,8 +53,10 @@ The goal is reviewer leverage, not commenting on every card.
 
 - Mode is plan-only and policy is advisory.
 - Default candidate count is 0-3; hard max is 3.
-- Cards that are present but not selected for inline comments should appear in
+- Cards that are present but not selected for inline comments must appear in
   `not_selected[]` with a reason.
+- Every ReviewCard must be represented once, either in `comments[]` or
+  `not_selected[]`.
 - Candidate locations must be renderable (`path` + one-based non-zero `line`).
 - Candidate bodies must include a trust boundary statement.
 
@@ -154,6 +156,7 @@ document is a future-lane contract, not a live workflow.
 - missing required fields
 - invalid/unknown `card_id`
 - invalid/unknown `not_selected.card_id`
+- a ReviewCard missing from both `comments[]` and `not_selected[]`
 - a `not_selected` card that is also present in `comments[]`
 - duplicate `card_id` or duplicate `path`/`line` inline anchors
 - invalid line/path

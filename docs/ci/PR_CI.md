@@ -192,7 +192,7 @@ A future trusted poster must consume `comment-plan.json` and keep the same
 ReviewCard identity, next action, actionability, relevance, witness route,
 verify-command, and trust-boundary fields.
 It must not rerun analysis and create a second comment truth.
-Card-present/no-comment cases should be represented through `not_selected`
+Card-present/no-comment cases must be represented through `not_selected`
 entries in `comment-plan.json`, so reviewers can see why a card stayed out of
 the inline comment budget, including its operation and next-action context,
 without opening a second analyzer truth.

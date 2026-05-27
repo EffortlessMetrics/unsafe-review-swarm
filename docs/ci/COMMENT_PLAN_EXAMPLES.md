@@ -193,6 +193,7 @@ The verifier treats these as artifact contract rules:
 - no `static_unknown`, baseline-known, or suppressed planned comments;
 - no `operation_family: "unknown"` planned comments;
 - every planned body stays at or below 220 words;
+- every ReviewCard appears in either `comments[]` or `not_selected[]`;
 - `not_selected` entries must reference known cards and cannot repeat planned
   comment cards;
 - every selected and not-selected entry carries `actionability` and

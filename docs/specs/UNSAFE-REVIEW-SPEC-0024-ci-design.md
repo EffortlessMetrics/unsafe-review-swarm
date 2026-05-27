@@ -588,6 +588,7 @@ result counts stay internally consistent
 comment-plan is plan-only
 comment-plan has <= 3 candidates
 comment-plan references known cards
+comment-plan accounts for every ReviewCard in comments[] or not_selected[]
 comment-plan not_selected entries reference known cards
 comment-plan not_selected entries do not repeat planned comments
 comment-plan not_selected entries project ReviewCard operation and next action

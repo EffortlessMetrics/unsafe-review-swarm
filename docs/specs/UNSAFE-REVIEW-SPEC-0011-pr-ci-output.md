@@ -258,6 +258,10 @@ planned comment card, and must include the ReviewCard operation, operation
 family, next action, actionability, relevance, and a reason for staying out of
 the inline comment budget.
 
+Every ReviewCard must be accounted for by either `comments[]` or
+`not_selected[]`. A card may be absent from inline comments, but it must not be
+absent from the comment-plan projection.
+
 Each body must include the trust boundary.
 
 Each body must stay at or below 220 words.
