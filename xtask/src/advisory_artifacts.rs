@@ -448,6 +448,18 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             &card_projection.witness_routes,
             "cards.sarif result properties",
         )?;
+        require_projected_string_array(
+            properties,
+            "hazards",
+            &card_projection.hazards,
+            "cards.sarif result properties",
+        )?;
+        require_projected_string_array(
+            properties,
+            "missingEvidence",
+            &card_projection.missing,
+            "cards.sarif result properties",
+        )?;
         super::json_array_at(result, "/properties/verifyCommands", "cards.sarif result")?;
     }
     for card_id in &card_ids {
