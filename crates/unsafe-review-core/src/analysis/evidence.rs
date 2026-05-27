@@ -1,5 +1,6 @@
 mod box_raw_origin;
 mod call_syntax;
+mod code_text;
 mod control_flow;
 mod copy_range;
 mod freshness;
@@ -31,6 +32,9 @@ use self::box_raw_origin::{
 use self::call_syntax::{
     matching_call_argument_end, matching_generic_argument_end, split_top_level_arguments,
     split_top_level_pair,
+};
+use self::code_text::{
+    compact_code, compact_contains_identifier, strip_block_comments_and_literals,
 };
 use self::control_flow::{
     branch_still_open_at_operation, compact_if_guards, matching_code_block_end,
@@ -545,61 +549,6 @@ fn has_bounds_guard(site: &ScannedSite, lower: &str) -> bool {
     has_length_or_bounds_guard(&guard_scope)
 }
 
-fn strip_block_comments_and_literals(text: &str) -> String {
-    let mut output = String::with_capacity(text.len());
-    let mut chars = text.chars().peekable();
-    while let Some(ch) = chars.next() {
-        if ch == '/' && chars.peek() == Some(&'*') {
-            chars.next();
-            let mut prev = '\0';
-            for comment_ch in chars.by_ref() {
-                if prev == '*' && comment_ch == '/' {
-                    break;
-                }
-                prev = comment_ch;
-            }
-            continue;
-        }
-        if ch == '"' {
-            output.push('"');
-            let mut escaped = false;
-            for literal_ch in chars.by_ref() {
-                if escaped {
-                    escaped = false;
-                    continue;
-                }
-                if literal_ch == '\\' {
-                    escaped = true;
-                    continue;
-                }
-                if literal_ch == '"' {
-                    output.push('"');
-                    break;
-                }
-            }
-            continue;
-        }
-        output.push(ch);
-    }
-    output
-}
-
-fn compact_contains_identifier(text: &str, ident: &str) -> bool {
-    let mut cursor = text;
-    while let Some(pos) = cursor.find(ident) {
-        let before = cursor[..pos].chars().next_back();
-        let after = cursor[pos + ident.len()..].chars().next();
-        if before.is_none_or(|ch| !is_receiver_path_char(ch))
-            && after.is_none_or(|ch| !is_receiver_path_char(ch))
-        {
-            return true;
-        }
-        let next = pos + ident.len();
-        cursor = &cursor[next..];
-    }
-    false
-}
-
 fn code_before_operation(lower: &str, expression: &str) -> Option<String> {
     let compact = compact_code(lower);
     let expression = compact_code(&expression.to_ascii_lowercase());
@@ -673,13 +622,6 @@ fn has_capacity_guard(family: &OperationFamily, lower: &str) -> bool {
         return false;
     }
     lower.contains("capacity") || lower.contains("cap()")
-}
-
-fn compact_code(lower: &str) -> String {
-    lower
-        .chars()
-        .filter(|ch| !ch.is_ascii_whitespace())
-        .collect()
 }
 
 pub(crate) fn reach_evidence(
