@@ -4,6 +4,7 @@ mod bounds_discharge;
 mod box_raw_origin;
 mod call_syntax;
 mod callee_contract_discharge;
+mod capacity_discharge;
 mod code_text;
 mod contract_discharge;
 mod contract_text;
@@ -55,6 +56,7 @@ use self::call_syntax::{
     split_top_level_pair,
 };
 use self::callee_contract_discharge::callee_contract_discharge_state;
+use self::capacity_discharge::capacity_discharge_state;
 use self::code_text::{
     compact_code, compact_contains_identifier, strip_block_comments_and_literals,
 };
@@ -79,7 +81,6 @@ use self::identifier_syntax::{is_simple_identifier, let_binding_name};
 use self::layout_discharge::layout_discharge_state;
 use self::marker_scan::{any_marker_occurrence, any_marker_tail};
 use self::maybeuninit::maybeuninit_assume_init_discharge_state;
-use self::obligation_guard::has_capacity_guard;
 use self::operation_scope::code_before_operation;
 use self::option_state::{ends_with_some_pattern, is_some_binding, match_some_branch_after_marker};
 use self::ownership_discharge::ownership_discharge_state;
@@ -98,10 +99,7 @@ use self::unreachable_discharge::unreachable_discharge_state;
 use self::utf8_discharge::utf8_discharge_state;
 use self::valid_value_discharge::valid_value_discharge_state;
 use self::valid_zero_discharge::valid_zero_discharge_state;
-use self::vec_from_raw_parts::{
-    has_vec_from_raw_parts_capacity_evidence, has_vec_from_raw_parts_origin_initialized_evidence,
-    has_vec_from_raw_parts_origin_len_cap_evidence,
-};
+use self::vec_from_raw_parts::has_vec_from_raw_parts_origin_initialized_evidence;
 use self::write_bytes::{
     has_bool_write_bytes_value_evidence, has_maybeuninit_raw_write_context,
     has_maybeuninit_slice_context, has_u8_write_bytes_context, has_write_bytes_bounds_evidence,
@@ -148,28 +146,7 @@ fn discharge_state_for(
     match key {
         "alignment" => alignment_discharge_state(site, lower),
         "bounds" | "valid-range" => bounds_discharge_state(site, lower),
-        "capacity" => {
-            let capacity_scope = (family == &OperationFamily::VecSetLen)
-                .then(|| code_context_through_site(site).to_ascii_lowercase());
-            let capacity_lower = capacity_scope.as_deref().unwrap_or(lower);
-            if family == &OperationFamily::VecFromRawParts
-                && has_vec_from_raw_parts_capacity_evidence(&site.operation.expression, lower)
-            {
-                EvidenceState::present(
-                    "Vec::from_raw_parts length/capacity guard code was detected",
-                )
-            } else if family == &OperationFamily::VecFromRawParts
-                && has_vec_from_raw_parts_origin_len_cap_evidence(&site.operation.expression, lower)
-            {
-                EvidenceState::present(
-                    "Vec::from_raw_parts same-origin len/capacity evidence was detected",
-                )
-            } else if has_capacity_guard(family, capacity_lower) {
-                EvidenceState::present("Capacity guard code was detected")
-            } else {
-                EvidenceState::missing("No capacity guard code was detected")
-            }
-        }
+        "capacity" => capacity_discharge_state(site, lower),
         "initialized" => {
             if let Some(state) = set_len::set_len_initialized_discharge_state(site) {
                 state
