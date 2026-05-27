@@ -121,9 +121,9 @@ Receipt JSON fields:
 - `human-deep-review`
 - `unsupported`
 
-`author` must be non-empty. `recorded_at` must be a UTC timestamp in
-`YYYY-MM-DDTHH:MM:SSZ` form. `expires_at` must be a `YYYY-MM-DD` date on or
-after the `recorded_at` date.
+`author` must be non-empty. `recorded_at` must be a calendar-valid UTC
+timestamp in `YYYY-MM-DDTHH:MM:SSZ` form. `expires_at` must be a
+calendar-valid `YYYY-MM-DD` date on or after the `recorded_at` date.
 
 ## Non-goals
 
@@ -150,6 +150,7 @@ after the `recorded_at` date.
 - A receipt with unknown strength is rejected.
 - A receipt with uncounted card identity is rejected.
 - A receipt missing author, timestamp, or expiry metadata is rejected.
+- A receipt with a shaped but invalid calendar date is rejected.
 - A receipt whose expiry predates its recorded date is rejected.
 - If receipt scope is limited, the receipt summary keeps that limitation visible.
 - The core `WitnessReceipt` DTO round-trips through serde JSON and validates the

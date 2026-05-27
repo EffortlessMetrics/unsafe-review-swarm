@@ -484,13 +484,38 @@ fn validate_date(value: &str, key: &str) -> Result<(), String> {
     if !valid_shape {
         return Err(format!("`{key}` must use date format YYYY-MM-DD"));
     }
-    validate_range(decimal_at(value, 0, 4), 1, 9999, key)?;
-    validate_range(decimal_at(value, 5, 2), 1, 12, key)?;
-    validate_range(decimal_at(value, 8, 2), 1, 31, key)
+    let year = decimal_at(value, 0, 4);
+    let month = decimal_at(value, 5, 2);
+    let day = decimal_at(value, 8, 2);
+    validate_range(year, 1, 9999, key)?;
+    validate_range(month, 1, 12, key)?;
+    validate_range(day, 1, 31, key)?;
+    let year = year.expect("year was range-validated");
+    let month = month.expect("month was range-validated");
+    let day = day.expect("day was range-validated");
+    let max_day = days_in_month(year, month).expect("month was range-validated");
+    if day > max_day {
+        return Err(format!("`{key}` is not a valid calendar date"));
+    }
+    Ok(())
 }
 
 fn decimal_at(value: &str, start: usize, len: usize) -> Option<u32> {
     value.get(start..start + len)?.parse().ok()
+}
+
+fn days_in_month(year: u32, month: u32) -> Option<u32> {
+    match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => Some(31),
+        4 | 6 | 9 | 11 => Some(30),
+        2 if is_leap_year(year) => Some(29),
+        2 => Some(28),
+        _ => None,
+    }
+}
+
+fn is_leap_year(year: u32) -> bool {
+    year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
 }
 
 fn validate_range(value: Option<u32>, min: u32, max: u32, key: &str) -> Result<(), String> {
@@ -599,6 +624,38 @@ mod tests {
                 .unwrap_or_default()
                 .contains("`author` is required")
         );
+    }
+
+    #[test]
+    fn witness_receipt_validation_rejects_invalid_calendar_dates() {
+        let mut bad_expiry = fixture_receipt();
+        bad_expiry.expires_at = Some("2026-02-29".to_string());
+        assert!(
+            bad_expiry
+                .validate()
+                .err()
+                .unwrap_or_default()
+                .contains("valid calendar date")
+        );
+
+        let mut bad_recorded_at = fixture_receipt();
+        bad_recorded_at.recorded_at = Some("2026-04-31T00:00:00Z".to_string());
+        assert!(
+            bad_recorded_at
+                .validate()
+                .err()
+                .unwrap_or_default()
+                .contains("valid calendar date")
+        );
+    }
+
+    #[test]
+    fn witness_receipt_validation_accepts_leap_day_dates() -> Result<(), String> {
+        let mut receipt = fixture_receipt();
+        receipt.recorded_at = Some("2028-02-29T00:00:00Z".to_string());
+        receipt.expires_at = Some("2028-02-29".to_string());
+
+        receipt.validate()
     }
 
     #[test]
