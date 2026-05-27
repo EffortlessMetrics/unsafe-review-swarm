@@ -538,6 +538,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("Artifacts:"));
     assert!(stdout.contains("cards.json"));
     assert!(stdout.contains("pr-summary.md"));
+    assert!(stdout.contains("github-summary.md"));
     assert!(stdout.contains("cards.sarif"));
     assert!(stdout.contains("comment-plan.json"));
     assert!(stdout.contains("witness-plan.md"));
@@ -573,6 +574,16 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(summary.contains(&format!("- ID: `{card_id}`")));
     assert!(summary.contains("## Trust boundary"));
     assert!(summary.contains("not a Miri result unless a witness receipt is attached"));
+
+    let github_summary = fs::read_to_string(out_dir.join("github-summary.md"))?;
+    assert!(github_summary.contains("## unsafe-review advisory summary"));
+    assert!(github_summary.contains(&format!("- ID: `{card_id}`")));
+    assert!(github_summary.contains("Full advisory bundle"));
+    assert!(github_summary.contains("github-summary.md"));
+    assert!(github_summary.contains("not memory-safety proof"));
+    assert!(github_summary.contains("not site-execution proof"));
+    assert!(!github_summary.contains("# unsafe-review PR summary"));
+    assert!(!github_summary.contains("## Card table"));
 
     let sarif = parse_json(&fs::read_to_string(out_dir.join("cards.sarif"))?)?;
     assert_eq!(sarif["version"], "2.1.0");
@@ -652,6 +663,7 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
     assert!(stdout.contains("- Open actionable gaps: 0"));
     assert!(stdout.contains("Open:"));
     assert!(stdout.contains("pr-summary.md"));
+    assert!(stdout.contains("github-summary.md"));
     assert!(stdout.contains("No changed unsafe-review gaps were found."));
     assert!(stdout.contains("This does not prove the repo safe"));
     assert!(stdout.contains("UB-free"));
@@ -674,6 +686,14 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
     assert!(summary.contains("This does not prove the repo safe"));
     assert!(summary.contains("unsafe site executed"));
     assert!(!summary.contains("All clear"));
+
+    let github_summary = fs::read_to_string(out_dir.join("github-summary.md"))?;
+    assert!(github_summary.contains("## unsafe-review advisory summary"));
+    assert!(github_summary.contains("No changed unsafe-review gaps were found."));
+    assert!(github_summary.contains("This does not prove the repo safe"));
+    assert!(github_summary.contains("unsafe site executed"));
+    assert!(github_summary.contains("Full advisory bundle"));
+    assert!(!github_summary.contains("All clear"));
 
     let witness_plan = fs::read_to_string(out_dir.join("witness-plan.md"))?;
     assert!(witness_plan.contains("No changed unsafe-review gaps were found."));
