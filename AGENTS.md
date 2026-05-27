@@ -127,6 +127,26 @@ there only if a local tool requires it. Durable unsafe-review repo state belongs
 under `.unsafe-review-spec`, `docs/specs`, or the documented handoff/status
 surfaces.
 
+## Helper roles and workflows
+
+Use available helper agents, skills, or workflows when they make a PR-sized
+task cleaner, but keep them bounded to the current slice. Useful default roles
+are:
+
+- repo discovery before choosing or scoping work,
+- test authoring for fixtures, verifier rails, and regression goldens,
+- docs changes for specs, handoffs, ledgers, and user-facing wording,
+- config/environment review for CI, workflow, runner, and policy edits,
+- code review for incoming PR disposition and risk checks,
+- pull-request workflow for scoped staging, PR creation, hosted-check watching,
+  merge, post-merge proof, and cleanup,
+- release/publication workflow only for source-owned release prep, publish, and
+  receipt tasks.
+
+If a named helper is unavailable, perform the same role explicitly. Do not let a
+helper create a second source of truth, widen the PR scope, skip validation, or
+turn advisory unsafe-review findings into enforcement.
+
 ## PR queue discipline
 
 Review PRs before merging them. Do not merge a batch blindly because checks are
