@@ -255,6 +255,14 @@ fn code_actions_are_command_only() -> Result<(), Box<dyn Error>> {
     assert!(actions.iter().any(|action| {
         matches!(action, CodeActionOrCommand::Command(command) if command.command == CMD_PACKET)
     }));
+    assert!(actions.iter().any(|action| {
+        matches!(
+            action,
+            CodeActionOrCommand::Command(command)
+                if command.command == CMD_WITNESS_COMMAND
+                    && command.title.contains("does not run")
+        )
+    }));
     Ok(())
 }
 

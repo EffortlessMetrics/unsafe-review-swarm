@@ -42,7 +42,7 @@ fn card_code_actions(card: &ReviewCard) -> Vec<CodeActionOrCommand> {
     ];
     if card.routes.iter().any(|route| route.command.is_some()) {
         actions.push(command_action(
-            format!("Copy recommended witness command for {}", card.id.0),
+            format!("Copy witness command for {} (does not run)", card.id.0),
             CMD_WITNESS_COMMAND,
             json!({"card_id": card.id.0}),
         ));

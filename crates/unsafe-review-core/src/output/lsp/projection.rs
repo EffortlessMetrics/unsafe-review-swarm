@@ -429,7 +429,7 @@ fn code_actions(card: &ReviewCard) -> Vec<LspCodeAction<'_>> {
             card_id: &card.id.0,
             path,
             range,
-            title: "Copy recommended witness command".to_string(),
+            title: "Copy witness command (does not run)".to_string(),
             kind: "quickfix",
             command: "unsafe-review.copyWitnessCommand",
             payload: LspCodeActionPayload {

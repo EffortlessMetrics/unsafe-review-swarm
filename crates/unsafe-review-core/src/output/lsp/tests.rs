@@ -217,6 +217,7 @@ fn lsp_projection_is_parseable_and_read_only() -> Result<(), String> {
     assert!(value["code_actions"].as_array().is_some_and(|actions| {
         actions.iter().any(|action| {
             action["command"] == "unsafe-review.copyWitnessCommand"
+                && action["title"] == "Copy witness command (does not run)"
                 && action["payload"]["kind"] == "unsafe-review.witness_command"
                 && action["payload"]["card_id"] == value["diagnostics"][0]["card_id"]
                 && action["payload"]["command"]

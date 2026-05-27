@@ -2167,7 +2167,7 @@ fn require_lsp_code_action_title(
                 super::require_non_empty_json_str(payload, "name", "lsp.json code_action payload")?;
             format!("Open related test {name}")
         }
-        "unsafe-review.copyWitnessCommand" => "Copy recommended witness command".to_string(),
+        "unsafe-review.copyWitnessCommand" => "Copy witness command (does not run)".to_string(),
         _ => {
             return Err(format!(
                 "lsp.json code_action command `{command}` is not verifier-known"

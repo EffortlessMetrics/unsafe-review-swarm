@@ -12,7 +12,7 @@ Linked plan: ../../plans/0.1.0/implementation-plan.md
 
 ## Behavior
 
-LSP v1 is read-only: diagnostics, hover, status, copy agent packet, copy witness command, open related test.
+LSP v1 is read-only: diagnostics, hover, status, copy agent packet, copy witness command without running it, open related test.
 The first supported surface is a saved JSON projection rendered with
 `unsafe-review check --format lsp`. It is not an LSP server and it does not
 edit source. The projection derives diagnostics, hovers, and command-style
@@ -40,7 +40,8 @@ not reclassify cards, invent separate evidence, or parse prose to recover
 machine fields.
 
 Code actions are command-only. They may copy a bounded agent packet, copy a
-witness command, explain a witness route, or open a statically related test.
+witness command without running it, explain a witness route, or open a
+statically related test.
 They must not contain `WorkspaceEdit`, apply patches, insert SAFETY comments,
 execute witnesses, post comments, or enforce policy. This applies to both the
 top-level action object and nested command payloads.
