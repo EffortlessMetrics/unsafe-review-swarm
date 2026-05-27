@@ -90,6 +90,7 @@ fn check_github_summary_artifact(
         &format!("- Open actionable gaps: {open_actionable_gaps}"),
         &path,
     )?;
+    super::require_text_contains(&text, "- Policy mode: `advisory`", &path)?;
     super::require_text_contains(&text, "## Top card", &path)?;
     super::require_text_contains(&text, "static unsafe contract review", &path)?;
     super::require_text_contains(&text, "not memory-safety proof", &path)?;
@@ -489,6 +490,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         &format!("- Open actionable gaps: {open_actionable_gaps}"),
         &pr_summary_path,
     )?;
+    super::require_text_contains(&pr_summary, "- Policy mode: `advisory`", &pr_summary_path)?;
     super::require_text_contains(
         &pr_summary,
         "static unsafe contract review",
@@ -1545,6 +1547,7 @@ fn check_witness_plan_artifact(
     let text = super::read_to_string(&path)?;
     let review_cards_line = format!("- Review cards: {card_count}");
     let open_actionable_line = format!("- Open actionable gaps: {open_actionable_gaps}");
+    let policy_mode_line = "- Policy mode: `advisory`";
     super::require_text_contains_all(
         &text,
         &path,
@@ -1552,6 +1555,7 @@ fn check_witness_plan_artifact(
             "# unsafe-review witness plan",
             review_cards_line.as_str(),
             open_actionable_line.as_str(),
+            policy_mode_line,
             "does not run Miri",
             "cargo-careful",
             "not a proof of memory safety",
