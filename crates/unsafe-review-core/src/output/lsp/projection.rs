@@ -524,6 +524,12 @@ fn hover_contents(card: &ReviewCard) -> String {
     text.push_str(
         "\nReach note: static related-test evidence does not prove the unsafe site executed.\n",
     );
+    text.push_str("\nHandoff commands:\n");
+    text.push_str(&format!("- Explain: `unsafe-review explain {}`\n", card.id));
+    text.push_str(&format!(
+        "- Agent context: `unsafe-review context {} --json`\n",
+        card.id
+    ));
     text.push_str("\nTrust boundary: ");
     text.push_str(TRUST_BOUNDARY);
     text

@@ -11,6 +11,7 @@ struct AdvisoryArtifactSummary {
 }
 
 struct CardProjection {
+    id: String,
     class_name: String,
     priority: String,
     confidence: String,
@@ -1217,8 +1218,9 @@ fn advisory_card_projections(
             .transpose()?
             .unwrap_or_default();
         projections.insert(
-            id,
+            id.clone(),
             CardProjection {
+                id,
                 class_name,
                 priority,
                 confidence,
@@ -1289,6 +1291,7 @@ fn require_lsp_hover_card_projection(
         "What would resolve this",
         "What would not resolve this",
         "Do not widen unsafe scope, suppress the card, or change unrelated unsafe code",
+        "Handoff commands",
         "Trust boundary",
     ] {
         if !contents.contains(required) {
@@ -1303,6 +1306,17 @@ fn require_lsp_hover_card_projection(
         ),
         ("operation", format!("- Operation: `{}`", card.operation)),
         ("next action", format!("- {}", card.next_action)),
+        (
+            "explain command",
+            format!("- Explain: `unsafe-review explain {}`", card.id.as_str()),
+        ),
+        (
+            "agent context command",
+            format!(
+                "- Agent context: `unsafe-review context {} --json`",
+                card.id.as_str()
+            ),
+        ),
     ] {
         if !contents.contains(&expected) {
             return Err(format!(

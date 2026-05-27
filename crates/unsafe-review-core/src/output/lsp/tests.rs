@@ -194,6 +194,13 @@ fn lsp_projection_is_parseable_and_read_only() -> Result<(), String> {
                 "Do not widen unsafe scope, suppress the card, or change unrelated unsafe code"
             )
     );
+    let card_id = value["diagnostics"][0]["card_id"]
+        .as_str()
+        .ok_or("diagnostic card_id should be a string")?;
+    let hover_contents = value["hovers"][0]["contents"].as_str().unwrap_or("");
+    assert!(hover_contents.contains("Handoff commands"));
+    assert!(hover_contents.contains(&format!("unsafe-review explain {card_id}")));
+    assert!(hover_contents.contains(&format!("unsafe-review context {card_id} --json")));
     assert_eq!(
         value["code_actions"][0]["command"],
         "unsafe-review.copyAgentPacket"
