@@ -3,7 +3,7 @@ use crate::analysis::scanner::ScannedSite;
 use super::{
     any_marker_occurrence, any_marker_tail, branch_still_open_at_operation, code_before_operation,
     compact_code, contains_simple_assignment_to, ends_with_some_pattern,
-    match_some_branch_after_marker,
+    match_some_branch_after_marker, matching_code_block_end,
 };
 
 pub(super) fn has_nullability_guard(site: &ScannedSite, lower: &str) -> bool {
@@ -63,9 +63,10 @@ impl<'a> NonNullPointerContext<'a> {
     }
 
     fn returning_after_marker_preserves_applicability(&self, after_guard: &str) -> bool {
-        let (guard_body, after_guard_body) = after_guard
-            .split_once('}')
-            .map_or((after_guard, ""), |(guard_body, after)| (guard_body, after));
+        let (guard_body, after_guard_body) = matching_code_block_end(after_guard)
+            .map_or((after_guard, ""), |body_end| {
+                (&after_guard[..body_end], &after_guard[body_end + 1..])
+            });
         self.returning_guard_preserves_applicability(guard_body, after_guard_body)
     }
 

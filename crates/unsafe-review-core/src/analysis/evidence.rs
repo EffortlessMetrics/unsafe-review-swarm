@@ -647,6 +647,12 @@ mod tests {
             "NonNull::new_unchecked(ptr)",
             vec![],
         );
+        let nested_returning_guard = site_with_family(
+            OperationFamily::NonNullUnchecked,
+            vec!["if ptr.is_null() { log_null(); if should_count() { record(); } return None; }"],
+            "NonNull::new_unchecked(ptr)",
+            vec![],
+        );
         let stale_returning_guard = site_with_family(
             OperationFamily::NonNullUnchecked,
             vec!["if ptr.is_null() { return None; }", "ptr = other;"],
@@ -667,6 +673,11 @@ mod tests {
         );
         assert!(
             obligation_evidence(&returning_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            obligation_evidence(&nested_returning_guard, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
         );
