@@ -1,3 +1,4 @@
+mod box_raw_origin;
 mod get_unchecked;
 mod maybeuninit;
 mod nonnull;
@@ -11,6 +12,9 @@ mod utf8;
 mod write_bytes;
 mod zeroed;
 
+use self::box_raw_origin::{
+    has_box_from_raw_origin_evidence, has_drop_in_place_box_origin_evidence,
+};
 use self::get_unchecked::{get_unchecked_receiver_and_index, has_get_unchecked_bounds_guard};
 use self::maybeuninit::has_maybeuninit_assume_init_initialization_evidence;
 use self::nonnull::has_nullability_guard;
@@ -1618,74 +1622,6 @@ pub(super) fn let_binding_name(left_side: &str) -> Option<&str> {
     (end > 0).then_some(&rest[..end])
 }
 
-fn has_drop_in_place_box_origin_evidence(expression: &str, lower: &str) -> bool {
-    let compact = compact_code(lower);
-    let compact_expression = compact_code(&expression.to_ascii_lowercase());
-    let Some(pointer) = drop_in_place_argument(&compact_expression) else {
-        return false;
-    };
-    let call_pos = compact
-        .find(&compact_expression)
-        .or_else(|| compact.find(&format!("drop_in_place({pointer})")));
-    let Some(call_pos) = call_pos else {
-        return false;
-    };
-    has_same_pointer_box_into_raw_before(&compact[..call_pos], pointer)
-}
-
-fn drop_in_place_argument(compact_expression: &str) -> Option<&str> {
-    let marker = "drop_in_place(";
-    let call_pos = compact_expression.find(marker)? + marker.len();
-    let argument_text = &compact_expression[call_pos..];
-    let argument_end = matching_call_argument_end(argument_text)?;
-    let argument = &argument_text[..argument_end];
-    (!argument.is_empty()).then_some(argument)
-}
-
-fn box_into_raw_argument(right_side: &str) -> Option<&str> {
-    let marker = "box::into_raw(";
-    let call_pos = right_side.find(marker)? + marker.len();
-    let argument_text = &right_side[call_pos..];
-    let argument_end = matching_call_argument_end(argument_text)?;
-    let argument = &argument_text[..argument_end];
-    (!argument.is_empty()).then_some(argument)
-}
-
-fn has_box_from_raw_origin_evidence(expression: &str, lower: &str) -> bool {
-    let compact = compact_code(lower);
-    let compact_expression = compact_code(&expression.to_ascii_lowercase());
-    let Some(pointer) = box_from_raw_argument(&compact_expression) else {
-        return false;
-    };
-    let call_pos = compact
-        .find(&compact_expression)
-        .or_else(|| compact.find(&format!("box::from_raw({pointer})")));
-    let Some(call_pos) = call_pos else {
-        return false;
-    };
-    has_same_pointer_box_into_raw_before(&compact[..call_pos], pointer)
-}
-
-fn has_same_pointer_box_into_raw_before(before_call: &str, pointer: &str) -> bool {
-    let mut offset = 0usize;
-    for statement in before_call.split(';') {
-        let Some((left, right)) = statement.split_once('=') else {
-            offset += statement.len() + 1;
-            continue;
-        };
-        let Some(binding) = let_binding_name(left) else {
-            offset += statement.len() + 1;
-            continue;
-        };
-        if binding == pointer && box_into_raw_argument(right).is_some() {
-            let after_origin = &before_call[(offset + statement.len()).min(before_call.len())..];
-            return !contains_simple_assignment_to(after_origin, pointer);
-        }
-        offset += statement.len() + 1;
-    }
-    false
-}
-
 fn has_same_pointer_vec_raw_parts_origin_before(before_call: &str, pointer: &str) -> bool {
     vec_raw_parts_pointer_origin_receiver_before(before_call, pointer).is_some()
 }
@@ -1787,15 +1723,6 @@ fn vec_raw_parts_capacity_origin_receiver(before_call: &str, cap: &str) -> Optio
         }
     }
     None
-}
-
-fn box_from_raw_argument(compact_expression: &str) -> Option<&str> {
-    let marker = "box::from_raw(";
-    let call_pos = compact_expression.find(marker)? + marker.len();
-    let argument_text = &compact_expression[call_pos..];
-    let argument_end = matching_call_argument_end(argument_text)?;
-    let argument = &argument_text[..argument_end];
-    (!argument.is_empty()).then_some(argument)
 }
 
 fn has_set_len_initialization_evidence(lower: &str) -> bool {
