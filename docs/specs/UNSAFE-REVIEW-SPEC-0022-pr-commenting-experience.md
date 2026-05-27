@@ -127,6 +127,11 @@ Required sections:
 - witness route (if useful)
 - trust boundary
 
+The body must project the same ReviewCard class, operation, operation family,
+missing-evidence summary, next action, first witness route, and first verify
+command as the structured comment entry. The structured fields remain the
+machine contract; the body is the reviewer-facing rendering of that same card.
+
 Length budget: recommended <=140 words, hard max 220 words.
 
 Forbidden patterns include overclaims (`"This PR is unsafe."`, `"Verified."`, `"Miri-clean."`), generic non-actionable comments, and large internal dumps.
@@ -164,7 +169,7 @@ document is a future-lane contract, not a live workflow.
   candidate `trust_boundary`
 - drift between `not_selected` review context and the referenced ReviewCard
 - `relevance` outside the documented set (`high`, `medium`, `low`)
-- body text that drifts from the structured `next_action`
+- body text that drifts from the structured ReviewCard projection
 - missing trust boundary in body
 - body text over 220 words
 - forbidden overclaim wording

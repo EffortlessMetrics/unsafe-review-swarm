@@ -282,6 +282,11 @@ Each body must include the plan-only trust boundary: artifact-only candidate,
 unsafe-review did not post the comment, did not run witnesses, and did not make
 a policy decision.
 
+Each body must also project the referenced ReviewCard's class, operation,
+operation family, missing-evidence summary, next action, first witness route
+when present, and first verify command when present. The body is a concise
+reviewer note, not a second source of truth.
+
 Each body must stay at or below 220 words.
 
 #### 3.6 `witness-plan.md`

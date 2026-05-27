@@ -697,6 +697,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
     }
     let mut comment_card_ids = BTreeSet::new();
     let mut comment_locations = BTreeSet::new();
+    let mut comment_body_projections = Vec::new();
     for comment in comments {
         let Some(card_id) = comment.get("card_id").and_then(serde_json::Value::as_str) else {
             return Err("comment-plan.json comment is missing card_id".to_string());
@@ -806,6 +807,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
                     .to_string(),
             );
         }
+        comment_body_projections.push((body, card_projection));
     }
     let mut not_selected_card_ids = BTreeSet::new();
     if let Some(not_selected) = comment_plan.get("not_selected") {
@@ -888,6 +890,9 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             ));
         }
     }
+    for (body, card_projection) in comment_body_projections {
+        require_comment_body_card_projection(body, card_projection, "comment-plan.json comment")?;
+    }
     let comment_boundary = comment_plan
         .get("trust_boundary")
         .and_then(serde_json::Value::as_str)
@@ -949,6 +954,56 @@ fn require_comment_body_boundary(body: &str) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+fn require_comment_body_card_projection(
+    body: &str,
+    card: &CardProjection,
+    context: &str,
+) -> Result<(), String> {
+    for (field, expected) in [
+        (
+            "class",
+            format!("`unsafe-review` found `{}`", card.class_name),
+        ),
+        (
+            "operation",
+            format!("for `{}`", collapse_whitespace(&card.operation)),
+        ),
+        ("operation_family", format!("(`{}`)", card.operation_family)),
+        (
+            "missing evidence",
+            format!("Missing evidence: {}", expected_missing_summary(card)),
+        ),
+        ("next_action", format!("Next action: {}", card.next_action)),
+    ] {
+        if !body.contains(&expected) {
+            return Err(format!(
+                "{context} body must project ReviewCard {field} `{expected}`"
+            ));
+        }
+    }
+    if let Some(route) = card.witness_routes.first() {
+        let expected = format!("Witness route: `{}` because {}.", route.kind, route.reason);
+        if !body.contains(&expected) {
+            return Err(format!(
+                "{context} body must project ReviewCard witness route `{expected}`"
+            ));
+        }
+    }
+    if let Some(command) = card.verify_commands.first() {
+        let expected = format!("Verify command: `{command}`");
+        if !body.contains(&expected) {
+            return Err(format!(
+                "{context} body must project ReviewCard verify command `{expected}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn collapse_whitespace(value: &str) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn sarif_rule_ids(sarif: &serde_json::Value) -> Result<BTreeSet<&str>, String> {
