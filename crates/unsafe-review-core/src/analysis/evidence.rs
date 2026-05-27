@@ -49,7 +49,6 @@ use self::write_bytes::{
     has_write_bytes_bounds_evidence,
 };
 use self::zeroed::has_zeroed_known_valid_zero_type;
-use super::set_len_shrink;
 use crate::analysis::scanner::ScannedSite;
 use crate::domain::{
     ContractEvidence, DischargeEvidence, EvidenceState, ObligationEvidence, OperationFamily,
@@ -279,7 +278,7 @@ fn discharge_state_for(
                 lower
             };
             if family == &OperationFamily::VecSetLen
-                && has_set_len_initialization_evidence(init_scope)
+                && set_len::has_set_len_initialization_evidence(init_scope)
             {
                 EvidenceState::present("Initialization evidence was detected")
             } else if family == &OperationFamily::MaybeUninitAssumeInit
@@ -679,7 +678,7 @@ fn has_slice_end_pointer_arithmetic_evidence(lower: &str) -> bool {
 
 fn has_capacity_guard(family: &OperationFamily, lower: &str) -> bool {
     if family == &OperationFamily::VecSetLen {
-        return has_set_len_capacity_evidence(lower);
+        return set_len::has_set_len_capacity_evidence(lower);
     }
     if family == &OperationFamily::VecFromRawParts {
         return false;
@@ -719,126 +718,6 @@ fn split_top_level_arguments(text: &str) -> Vec<&str> {
     args
 }
 
-fn has_set_len_capacity_evidence(lower: &str) -> bool {
-    has_set_len_shrink_evidence(lower)
-        || has_set_len_call_result_initialization_evidence(lower)
-        || has_set_len_const_cap_evidence(lower)
-        || has_set_len_with_capacity_evidence(lower)
-        || has_set_len_reserve_capacity_evidence(lower)
-        || has_capacity_bound_guard(lower)
-}
-
-fn has_capacity_bound_guard(lower: &str) -> bool {
-    let compact = compact_code(lower);
-    let Some(context) = set_len_call_context(&compact) else {
-        return false;
-    };
-    context.has_capacity_bound_guard()
-}
-
-fn has_set_len_const_cap_evidence(lower: &str) -> bool {
-    let compact = compact_code(lower);
-    let Some(context) = set_len_call_context(&compact) else {
-        return false;
-    };
-    context.has_const_capacity_evidence()
-}
-
-fn has_set_len_with_capacity_evidence(lower: &str) -> bool {
-    let compact = compact_code(lower);
-    let Some(context) = set_len_call_context(&compact) else {
-        return false;
-    };
-    context.has_with_capacity_evidence()
-}
-
-fn has_set_len_reserve_capacity_evidence(lower: &str) -> bool {
-    let compact = compact_code(lower);
-    let Some(context) = set_len_call_context(&compact) else {
-        return false;
-    };
-    context.has_reserve_capacity_evidence()
-}
-
-fn set_len_receiver_and_argument(compact: &str) -> Option<(&str, &str)> {
-    let marker = ".set_len(";
-    let call_pos = compact.find(marker)?;
-    let before_call = &compact[..call_pos];
-    let receiver_start = before_call
-        .char_indices()
-        .rev()
-        .find_map(|(idx, ch)| (!is_receiver_path_char(ch)).then_some(idx + ch.len_utf8()))
-        .unwrap_or(0);
-    let receiver = &before_call[receiver_start..];
-    let argument_text = &compact[call_pos + marker.len()..];
-    let argument_end = matching_call_argument_end(argument_text)?;
-    let argument = &argument_text[..argument_end];
-    (!receiver.is_empty() && !argument.is_empty()).then_some((receiver, argument))
-}
-
-struct SetLenApplicabilityContext<'a> {
-    before_call: &'a str,
-    same_vec_target: &'a str,
-    set_len_argument: &'a str,
-}
-
-impl<'a> SetLenApplicabilityContext<'a> {
-    fn has_capacity_bound_guard(&self) -> bool {
-        set_len::has_capacity_bound_guard(
-            self.before_call,
-            self.same_vec_target,
-            self.set_len_argument,
-        )
-    }
-
-    fn has_const_capacity_evidence(&self) -> bool {
-        set_len::has_const_capacity_evidence(
-            self.before_call,
-            self.same_vec_target,
-            self.set_len_argument,
-        )
-    }
-
-    fn has_reserve_capacity_evidence(&self) -> bool {
-        set_len::has_reserve_capacity_evidence(
-            self.before_call,
-            self.same_vec_target,
-            self.set_len_argument,
-        )
-    }
-
-    fn has_with_capacity_evidence(&self) -> bool {
-        set_len::has_with_capacity_evidence(
-            self.before_call,
-            self.same_vec_target,
-            self.set_len_argument,
-        )
-    }
-
-    fn has_call_result_initialization_evidence(&self) -> bool {
-        set_len::has_call_result_initialization_evidence(self.before_call, self.set_len_argument)
-    }
-
-    fn has_initialized_range_evidence(&self) -> bool {
-        set_len::has_initialized_range_evidence(
-            self.before_call,
-            self.same_vec_target,
-            self.set_len_argument,
-        )
-    }
-}
-
-fn set_len_call_context(compact: &str) -> Option<SetLenApplicabilityContext<'_>> {
-    let (receiver, new_len) = set_len_receiver_and_argument(compact)?;
-    let marker = format!("{receiver}.set_len(");
-    let call_pos = compact.find(&marker)?;
-    Some(SetLenApplicabilityContext {
-        before_call: &compact[..call_pos],
-        same_vec_target: receiver,
-        set_len_argument: new_len,
-    })
-}
-
 pub(super) fn let_binding_name(left_side: &str) -> Option<&str> {
     let let_pos = left_side.rfind("let")?;
     let rest = &left_side[let_pos + "let".len()..];
@@ -848,26 +727,6 @@ pub(super) fn let_binding_name(left_side: &str) -> Option<&str> {
         .find_map(|(idx, ch)| (!(ch == '_' || ch.is_ascii_alphanumeric())).then_some(idx))
         .unwrap_or(rest.len());
     (end > 0).then_some(&rest[..end])
-}
-
-fn has_set_len_initialization_evidence(lower: &str) -> bool {
-    if has_set_len_shrink_evidence(lower) || has_set_len_call_result_initialization_evidence(lower)
-    {
-        return true;
-    }
-    let compact = compact_code(lower);
-    let Some(context) = set_len_call_context(&compact) else {
-        return false;
-    };
-    context.has_initialized_range_evidence()
-}
-
-fn has_set_len_call_result_initialization_evidence(lower: &str) -> bool {
-    let compact = compact_code(lower);
-    let Some(context) = set_len_call_context(&compact) else {
-        return false;
-    };
-    context.has_call_result_initialization_evidence()
 }
 
 fn matching_call_argument_end(text: &str) -> Option<usize> {
@@ -1106,10 +965,6 @@ fn matching_generic_argument_end(text: &str) -> Option<usize> {
         }
     }
     None
-}
-
-fn has_set_len_shrink_evidence(lower: &str) -> bool {
-    set_len_shrink::has_set_len_shrink_evidence(lower)
 }
 
 fn compact_code(lower: &str) -> String {
