@@ -9,6 +9,7 @@ mod pointer_arithmetic;
 mod raw_pointer_alignment;
 mod raw_pointer_bounds;
 mod set_len;
+mod source_value;
 mod transmute;
 mod u8_bool_value;
 mod unreachable_unchecked;
@@ -31,6 +32,7 @@ use self::option_state::{ends_with_some_pattern, is_some_binding, match_some_bra
 use self::pointer_arithmetic::has_slice_end_pointer_arithmetic_evidence;
 use self::raw_pointer_alignment::has_alignment_guard;
 use self::raw_pointer_bounds::has_raw_pointer_read_bounds_evidence;
+use self::source_value::source_value_identifier;
 use self::transmute::{
     has_transmute_layout_size_evidence, has_transmute_u8_bool_valid_value_evidence,
 };
@@ -832,14 +834,6 @@ fn is_simple_identifier(text: &str) -> bool {
     };
     (first == '_' || first.is_ascii_alphabetic())
         && chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
-}
-
-fn source_value_identifier(argument: &str) -> Option<&str> {
-    if is_simple_identifier(argument) {
-        return Some(argument);
-    }
-    let referenced = argument.strip_prefix('&')?;
-    is_simple_identifier(referenced).then_some(referenced)
 }
 
 fn has_assignment_to_identifier(compact: &str, identifier: &str) -> bool {
