@@ -1,3 +1,4 @@
+mod alignment_discharge;
 mod assignment_syntax;
 mod bounds_discharge;
 mod box_raw_origin;
@@ -45,6 +46,7 @@ mod vec_from_raw_parts;
 mod write_bytes;
 mod zeroed;
 
+use self::alignment_discharge::alignment_discharge_state;
 use self::assignment_syntax::contains_simple_assignment_to;
 use self::bounds_discharge::bounds_discharge_state;
 use self::box_raw_origin::has_drop_in_place_box_origin_evidence;
@@ -82,7 +84,6 @@ use self::operation_scope::code_before_operation;
 use self::option_state::{ends_with_some_pattern, is_some_binding, match_some_branch_after_marker};
 use self::ownership_discharge::ownership_discharge_state;
 use self::pointer_live_discharge::pointer_live_discharge_state;
-use self::raw_pointer_alignment::has_alignment_guard;
 use self::raw_pointer_bounds::has_raw_pointer_read_bounds_evidence;
 pub(crate) use self::reach_scan::reach_evidence;
 use self::receiver_path::{
@@ -102,9 +103,8 @@ use self::vec_from_raw_parts::{
     has_vec_from_raw_parts_origin_len_cap_evidence,
 };
 use self::write_bytes::{
-    has_bool_write_bytes_pointer_context, has_bool_write_bytes_value_evidence,
-    has_maybeuninit_raw_write_context, has_maybeuninit_slice_context, has_u8_write_bytes_context,
-    has_write_bytes_bounds_evidence,
+    has_bool_write_bytes_value_evidence, has_maybeuninit_raw_write_context,
+    has_maybeuninit_slice_context, has_u8_write_bytes_context, has_write_bytes_bounds_evidence,
 };
 use crate::analysis::scanner::ScannedSite;
 use crate::domain::{
@@ -146,21 +146,7 @@ fn discharge_state_for(
         return EvidenceState::present(DOCUMENTED_PRIVATE_UNSAFE_CONTRACT_DISCHARGE);
     }
     match key {
-        "alignment" => {
-            if family == &OperationFamily::RawPointerWrite
-                && has_u8_write_bytes_context(site, lower)
-            {
-                EvidenceState::present("u8 raw write alignment evidence was detected")
-            } else if family == &OperationFamily::RawPointerWrite
-                && has_bool_write_bytes_pointer_context(site, lower)
-            {
-                EvidenceState::present("bool raw write alignment evidence was detected")
-            } else if has_alignment_guard(site, lower) {
-                EvidenceState::present("Alignment guard code was detected")
-            } else {
-                EvidenceState::missing("No alignment guard code was detected")
-            }
-        }
+        "alignment" => alignment_discharge_state(site, lower),
         "bounds" | "valid-range" => bounds_discharge_state(site, lower),
         "capacity" => {
             let capacity_scope = (family == &OperationFamily::VecSetLen)
