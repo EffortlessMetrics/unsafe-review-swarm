@@ -2074,6 +2074,55 @@ struct SetLenApplicabilityContext<'a> {
 
 impl<'a> SetLenApplicabilityContext<'a> {
     fn has_capacity_bound_guard(&self) -> bool {
+        self.capacity_context().has_capacity_bound_guard()
+    }
+
+    fn has_const_capacity_evidence(&self) -> bool {
+        self.capacity_context().has_const_capacity_evidence()
+    }
+
+    fn has_reserve_capacity_evidence(&self) -> bool {
+        self.capacity_context().has_reserve_capacity_evidence()
+    }
+
+    fn has_with_capacity_evidence(&self) -> bool {
+        self.capacity_context().has_with_capacity_evidence()
+    }
+
+    fn capacity_context(&self) -> SetLenCapacityContext<'a> {
+        SetLenCapacityContext {
+            before_call: self.before_call,
+            same_vec_target: self.same_vec_target,
+            set_len_argument: self.set_len_argument,
+        }
+    }
+
+    fn has_call_result_initialization_evidence(&self) -> bool {
+        self.before_call.contains("encode_utf8(")
+            && (self.set_len_argument == "len+n" || self.set_len_argument == "old_len+n")
+    }
+
+    fn has_initialized_range_evidence(&self) -> bool {
+        self.initialized_range_context()
+            .has_initialized_range_evidence()
+    }
+
+    fn initialized_range_context(&self) -> SetLenInitializedRangeContext<'a> {
+        SetLenInitializedRangeContext {
+            before_call: self.before_call,
+            same_vec_target: self.same_vec_target,
+        }
+    }
+}
+
+struct SetLenCapacityContext<'a> {
+    before_call: &'a str,
+    same_vec_target: &'a str,
+    set_len_argument: &'a str,
+}
+
+impl<'a> SetLenCapacityContext<'a> {
+    fn has_capacity_bound_guard(&self) -> bool {
         if self.has_remaining_capacity_guard() {
             return true;
         }
@@ -2176,23 +2225,6 @@ impl<'a> SetLenApplicabilityContext<'a> {
             binding == self.same_vec_target
                 && with_capacity_argument(right).is_some_and(|arg| arg == self.set_len_argument)
         })
-    }
-
-    fn has_call_result_initialization_evidence(&self) -> bool {
-        self.before_call.contains("encode_utf8(")
-            && (self.set_len_argument == "len+n" || self.set_len_argument == "old_len+n")
-    }
-
-    fn has_initialized_range_evidence(&self) -> bool {
-        self.initialized_range_context()
-            .has_initialized_range_evidence()
-    }
-
-    fn initialized_range_context(&self) -> SetLenInitializedRangeContext<'a> {
-        SetLenInitializedRangeContext {
-            before_call: self.before_call,
-            same_vec_target: self.same_vec_target,
-        }
     }
 }
 
