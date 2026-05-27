@@ -1824,8 +1824,7 @@ impl<'a> SetLenApplicabilityContext<'a> {
     }
 
     fn has_call_result_initialization_evidence(&self) -> bool {
-        self.call_result_initialization_context()
-            .has_call_result_initialization_evidence()
+        set_len::has_call_result_initialization_evidence(self.before_call, self.set_len_argument)
     }
 
     fn has_initialized_range_evidence(&self) -> bool {
@@ -1834,25 +1833,6 @@ impl<'a> SetLenApplicabilityContext<'a> {
             self.same_vec_target,
             self.set_len_argument,
         )
-    }
-
-    fn call_result_initialization_context(&self) -> SetLenCallResultInitializationContext<'a> {
-        SetLenCallResultInitializationContext {
-            before_call: self.before_call,
-            set_len_argument: self.set_len_argument,
-        }
-    }
-}
-
-struct SetLenCallResultInitializationContext<'a> {
-    before_call: &'a str,
-    set_len_argument: &'a str,
-}
-
-impl SetLenCallResultInitializationContext<'_> {
-    fn has_call_result_initialization_evidence(&self) -> bool {
-        self.before_call.contains("encode_utf8(")
-            && (self.set_len_argument == "len+n" || self.set_len_argument == "old_len+n")
     }
 }
 

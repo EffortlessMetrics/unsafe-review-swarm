@@ -15,6 +15,29 @@ pub(super) fn has_initialized_range_evidence(
     .has_initialized_range_evidence()
 }
 
+pub(super) fn has_call_result_initialization_evidence(
+    before_call: &str,
+    set_len_argument: &str,
+) -> bool {
+    SetLenCallResultInitializationContext {
+        before_call,
+        set_len_argument,
+    }
+    .has_call_result_initialization_evidence()
+}
+
+struct SetLenCallResultInitializationContext<'a> {
+    before_call: &'a str,
+    set_len_argument: &'a str,
+}
+
+impl SetLenCallResultInitializationContext<'_> {
+    fn has_call_result_initialization_evidence(&self) -> bool {
+        self.before_call.contains("encode_utf8(")
+            && (self.set_len_argument == "len+n" || self.set_len_argument == "old_len+n")
+    }
+}
+
 struct SetLenInitializedRangeContext<'a> {
     before_call: &'a str,
     same_vec_target: &'a str,
