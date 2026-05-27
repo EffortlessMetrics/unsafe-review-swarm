@@ -170,7 +170,15 @@ Must include:
 
 ```text
 card count
-top actionable card, when present
+top actionable card, when present:
+  card id
+  class
+  location
+  operation
+  operation family
+  missing evidence
+  primary witness route, when present
+  next action
 full bundle artifact list
 trust boundary
 ```

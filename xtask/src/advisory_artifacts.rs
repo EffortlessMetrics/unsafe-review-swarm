@@ -225,6 +225,8 @@ fn require_markdown_top_card_projection(
     let mut top_card_location = None;
     let mut top_card_operation = None;
     let mut top_card_operation_family = None;
+    let mut top_card_missing_evidence = None;
+    let mut top_card_primary_route = None;
     let mut top_card_next_action = None;
 
     for line in text.lines() {
@@ -257,6 +259,16 @@ fn require_markdown_top_card_projection(
                 continue;
             };
             top_card_operation_family = Some(operation_family.to_string());
+        } else if let Some(missing_evidence) = trimmed.strip_prefix("- Missing evidence: ") {
+            top_card_missing_evidence = Some(missing_evidence.to_string());
+        } else if let Some(rest) = trimmed.strip_prefix("- Primary route: `") {
+            let Some((route_kind, after_kind)) = rest.split_once('`') else {
+                continue;
+            };
+            let Some(route_reason) = after_kind.strip_prefix(" because ") else {
+                continue;
+            };
+            top_card_primary_route = Some((route_kind.to_string(), route_reason.to_string()));
         } else if let Some(next_action) = trimmed.strip_prefix("- Next action: ") {
             top_card_next_action = Some(next_action.to_string());
         }
@@ -324,6 +336,40 @@ fn require_markdown_top_card_projection(
         &format!("{} top card `{card_id}` operation family", path.display()),
     )?;
 
+    let Some(actual_missing_evidence) = top_card_missing_evidence else {
+        return Err(format!(
+            "{} must include a top ReviewCard missing evidence line",
+            path.display()
+        ));
+    };
+    require_expected_value(
+        &actual_missing_evidence,
+        &expected_missing_summary(card),
+        &format!("{} top card `{card_id}` missing evidence", path.display()),
+    )?;
+
+    if let Some(expected_route) = card.witness_routes.first() {
+        let Some((actual_route_kind, actual_route_reason)) = top_card_primary_route else {
+            return Err(format!(
+                "{} must include a top ReviewCard primary route line",
+                path.display()
+            ));
+        };
+        require_expected_value(
+            &actual_route_kind,
+            &expected_route.kind,
+            &format!("{} top card `{card_id}` primary route kind", path.display()),
+        )?;
+        require_expected_value(
+            &actual_route_reason,
+            &expected_route.reason,
+            &format!(
+                "{} top card `{card_id}` primary route reason",
+                path.display()
+            ),
+        )?;
+    }
+
     let Some(actual_next_action) = top_card_next_action else {
         return Err(format!(
             "{} must include a top ReviewCard next action line",
@@ -335,6 +381,14 @@ fn require_markdown_top_card_projection(
         &card.next_action,
         &format!("{} top card `{card_id}` next action", path.display()),
     )
+}
+
+fn expected_missing_summary(card: &CardProjection) -> String {
+    if card.missing.is_empty() {
+        "No missing evidence recorded".to_string()
+    } else {
+        card.missing.join("; ")
+    }
 }
 
 fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, String> {
