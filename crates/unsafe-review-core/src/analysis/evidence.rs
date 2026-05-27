@@ -34,6 +34,7 @@ mod unwrap_unchecked;
 mod utf8;
 mod utf8_discharge;
 mod valid_value_discharge;
+mod valid_zero_discharge;
 mod vec_from_raw_parts;
 mod write_bytes;
 mod zeroed;
@@ -92,6 +93,7 @@ use self::unsafe_fn_call::{
 };
 use self::utf8_discharge::utf8_discharge_state;
 use self::valid_value_discharge::valid_value_discharge_state;
+use self::valid_zero_discharge::valid_zero_discharge_state;
 use self::vec_from_raw_parts::{
     has_vec_from_raw_parts_capacity_evidence, has_vec_from_raw_parts_origin_evidence,
     has_vec_from_raw_parts_origin_initialized_evidence,
@@ -103,7 +105,6 @@ use self::write_bytes::{
     has_maybeuninit_raw_write_context, has_maybeuninit_slice_context, has_u8_write_bytes_context,
     has_write_bytes_bounds_evidence,
 };
-use self::zeroed::has_zeroed_known_valid_zero_type;
 use crate::analysis::scanner::ScannedSite;
 use crate::domain::{
     ContractEvidence, EvidenceState, ObligationEvidence, OperationFamily, ReachEvidence,
@@ -327,15 +328,7 @@ fn discharge_state_for(
             }
         }
         "utf8" => utf8_discharge_state(family, lower),
-        "valid-zero" => {
-            if family == &OperationFamily::Zeroed && has_zeroed_known_valid_zero_type(lower) {
-                EvidenceState::present(
-                    "Known valid-zero target type evidence was detected before zeroed",
-                )
-            } else {
-                EvidenceState::missing("No obligation-specific guard code was detected")
-            }
-        }
+        "valid-zero" => valid_zero_discharge_state(family, lower),
         _ => EvidenceState::missing("No obligation-specific guard code was detected"),
     }
 }
