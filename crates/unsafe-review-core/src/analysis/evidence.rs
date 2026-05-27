@@ -6,6 +6,7 @@ mod contract_discharge;
 mod contract_text;
 mod control_flow;
 mod copy_range;
+mod evidence_state;
 mod freshness;
 mod generic_bounds;
 mod get_unchecked;
@@ -55,6 +56,8 @@ use self::control_flow::{
     branch_still_open_at_operation, compact_if_guards, matching_code_block_end,
 };
 use self::copy_range::has_copy_slice_range_evidence;
+pub(crate) use self::evidence_state::summarize_discharge;
+use self::evidence_state::{contract_state, reach_state};
 use self::freshness::{
     has_assignment_to_any_identifier, has_assignment_to_identifier, has_fresh_guard_pattern,
     has_fresh_guard_pattern_for_identifiers, has_open_positive_branch_guard_for_identifiers,
@@ -104,8 +107,8 @@ use self::write_bytes::{
 use self::zeroed::has_zeroed_known_valid_zero_type;
 use crate::analysis::scanner::ScannedSite;
 use crate::domain::{
-    ContractEvidence, DischargeEvidence, EvidenceState, ObligationEvidence, OperationFamily,
-    ReachEvidence, SafetyObligation,
+    ContractEvidence, EvidenceState, ObligationEvidence, OperationFamily, ReachEvidence,
+    SafetyObligation,
 };
 
 pub(crate) fn obligation_evidence(
@@ -126,51 +129,6 @@ pub(crate) fn obligation_evidence(
             witness: EvidenceState::missing("No imported witness receipt was found"),
         })
         .collect()
-}
-
-pub(crate) fn summarize_discharge(evidence: &[ObligationEvidence]) -> DischargeEvidence {
-    if evidence.is_empty() {
-        return DischargeEvidence::missing();
-    }
-    if evidence
-        .iter()
-        .all(|obligation| obligation.discharge.present)
-    {
-        if evidence.iter().all(|obligation| {
-            obligation.discharge.summary == PUBLIC_UNSAFE_API_CONTRACT_DISCHARGE
-                || obligation.discharge.summary == DOCUMENTED_PRIVATE_UNSAFE_CONTRACT_DISCHARGE
-        }) {
-            return DischargeEvidence::present(&evidence[0].discharge.summary);
-        }
-        return DischargeEvidence::present(
-            "All inferred safety obligations have visible local discharge evidence",
-        );
-    }
-    if evidence
-        .iter()
-        .any(|obligation| obligation.discharge.present)
-    {
-        return DischargeEvidence::missing_with(
-            "Some inferred safety obligations are missing local guard evidence",
-        );
-    }
-    DischargeEvidence::missing()
-}
-
-fn contract_state(contract: &ContractEvidence) -> EvidenceState {
-    if contract.present {
-        EvidenceState::present(&contract.summary)
-    } else {
-        EvidenceState::missing(&contract.summary)
-    }
-}
-
-fn reach_state(reach: &ReachEvidence) -> EvidenceState {
-    if reach.state == "unreached" || reach.state == "unknown" {
-        EvidenceState::missing(&reach.summary)
-    } else {
-        EvidenceState::present(&reach.summary)
-    }
 }
 
 fn discharge_state_for(
