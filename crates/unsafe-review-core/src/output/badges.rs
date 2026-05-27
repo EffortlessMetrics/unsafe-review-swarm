@@ -2,16 +2,47 @@ use crate::api::AnalyzeOutput;
 use serde::Serialize;
 
 pub(crate) fn render(output: &AnalyzeOutput) -> (String, String) {
-    let color = badge_color(output.summary.open_actionable_gaps);
-    let main = badge(
-        "unsafe-review",
-        output.summary.open_actionable_gaps.to_string(),
-        color,
-    );
-    let weak_evidence_gaps = output.summary.contract_missing
+    let base_count = output.summary.open_actionable_gaps;
+    let base_color = badge_color(base_count);
+    let weak_evidence_findings = output.summary.contract_missing
         + output.summary.guard_missing
         + output.summary.guarded_unwitnessed;
-    let plus = badge("unsafe-review+", weak_evidence_gaps.to_string(), color);
+    let plus_count = base_count + weak_evidence_findings;
+    let plus_color = badge_color(plus_count);
+    let main = badge(
+        "unsafe_review",
+        "repo",
+        "canonical_actionable_review_gap",
+        "unsafe-review",
+        base_count,
+        base_color,
+        BadgeCounts {
+            unsuppressed_review_gaps: base_count,
+            unsuppressed_evidence_quality_findings: 0,
+            suppressed_review_gaps: 0,
+            suppressed_evidence_quality_findings: 0,
+            intentional_findings: 0,
+            unknowns: output.summary.static_unknown,
+            analyzed_unsafe_seams: output.summary.unsafe_sites,
+        },
+    );
+    let plus = badge(
+        "unsafe_review_plus",
+        "repo",
+        "canonical_actionable_review_gap",
+        "unsafe-review+",
+        plus_count,
+        plus_color,
+        BadgeCounts {
+            unsuppressed_review_gaps: base_count,
+            unsuppressed_evidence_quality_findings: weak_evidence_findings,
+            suppressed_review_gaps: 0,
+            suppressed_evidence_quality_findings: 0,
+            intentional_findings: 0,
+            unknowns: output.summary.static_unknown,
+            analyzed_unsafe_seams: output.summary.unsafe_sites,
+        },
+    );
     (render_pretty(&main), render_pretty(&plus))
 }
 
@@ -35,22 +66,50 @@ fn render_pretty(value: &impl Serialize) -> String {
     }
 }
 
-fn badge(label: &'static str, message: String, color: &'static str) -> ShieldsBadge<'static> {
-    ShieldsBadge {
-        schema_version: 1,
+fn badge(
+    kind: &'static str,
+    scope: &'static str,
+    basis: &'static str,
+    label: &'static str,
+    count: usize,
+    color: &'static str,
+    counts: BadgeCounts,
+) -> BadgeJson<'static> {
+    BadgeJson {
+        schema_version: "0.1",
+        kind,
+        scope,
+        basis,
         label,
-        message,
+        message: count.to_string(),
+        status: if count == 0 { "pass" } else { "fail" },
         color,
+        counts,
     }
 }
 
 #[derive(Serialize)]
-struct ShieldsBadge<'a> {
-    #[serde(rename = "schemaVersion")]
-    schema_version: u8,
+struct BadgeJson<'a> {
+    schema_version: &'a str,
+    kind: &'a str,
+    scope: &'a str,
+    basis: &'a str,
     label: &'a str,
     message: String,
+    status: &'a str,
     color: &'static str,
+    counts: BadgeCounts,
+}
+
+#[derive(Serialize)]
+struct BadgeCounts {
+    unsuppressed_review_gaps: usize,
+    unsuppressed_evidence_quality_findings: usize,
+    suppressed_review_gaps: usize,
+    suppressed_evidence_quality_findings: usize,
+    intentional_findings: usize,
+    unknowns: usize,
+    analyzed_unsafe_seams: usize,
 }
 
 #[cfg(test)]
@@ -66,15 +125,19 @@ mod tests {
         let main = parse_json(&main)?;
         let plus = parse_json(&plus)?;
 
-        assert_eq!(main["schemaVersion"], 1);
+        assert_eq!(main["schema_version"], "0.1");
+        assert_eq!(main["kind"], "unsafe_review");
         assert_eq!(main["label"], "unsafe-review");
         assert_eq!(main["message"], "1");
+        assert_eq!(main["status"], "fail");
         assert_eq!(main["color"], "yellow");
         assert_ne!(main["message"], "safe");
 
-        assert_eq!(plus["schemaVersion"], 1);
+        assert_eq!(plus["schema_version"], "0.1");
+        assert_eq!(plus["kind"], "unsafe_review_plus");
         assert_eq!(plus["label"], "unsafe-review+");
-        assert_eq!(plus["message"], "1");
+        assert_eq!(plus["message"], "2");
+        assert_eq!(plus["status"], "fail");
         assert_eq!(plus["color"], "yellow");
         assert_ne!(plus["message"], "UB-free");
         Ok(())
@@ -88,9 +151,11 @@ mod tests {
         let plus = parse_json(&plus)?;
 
         assert_eq!(main["message"], "0");
+        assert_eq!(main["status"], "pass");
         assert_eq!(main["color"], "green");
         assert_ne!(main["message"], "safe");
         assert_eq!(plus["message"], "0");
+        assert_eq!(plus["status"], "pass");
         assert_ne!(plus["message"], "Miri-clean");
         Ok(())
     }
