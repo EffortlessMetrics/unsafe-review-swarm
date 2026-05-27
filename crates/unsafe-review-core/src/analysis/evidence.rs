@@ -19,6 +19,7 @@ mod nonnull;
 mod obligation_guard;
 mod operation_scope;
 mod option_state;
+mod ownership_discharge;
 mod pointer_arithmetic;
 mod raw_pointer_alignment;
 mod raw_pointer_bounds;
@@ -43,9 +44,7 @@ mod write_bytes;
 mod zeroed;
 
 use self::assignment_syntax::contains_simple_assignment_to;
-use self::box_raw_origin::{
-    has_box_from_raw_origin_evidence, has_drop_in_place_box_origin_evidence,
-};
+use self::box_raw_origin::has_drop_in_place_box_origin_evidence;
 use self::call_syntax::{
     matching_call_argument_end, matching_generic_argument_end, split_top_level_arguments,
     split_top_level_pair,
@@ -79,6 +78,7 @@ use self::nonnull::has_nullability_guard;
 use self::obligation_guard::{has_bounds_guard, has_capacity_guard};
 use self::operation_scope::code_before_operation;
 use self::option_state::{ends_with_some_pattern, is_some_binding, match_some_branch_after_marker};
+use self::ownership_discharge::ownership_discharge_state;
 use self::pointer_arithmetic::has_slice_end_pointer_arithmetic_evidence;
 use self::raw_pointer_alignment::has_alignment_guard;
 use self::raw_pointer_bounds::has_raw_pointer_read_bounds_evidence;
@@ -96,8 +96,7 @@ use self::utf8_discharge::utf8_discharge_state;
 use self::valid_value_discharge::valid_value_discharge_state;
 use self::valid_zero_discharge::valid_zero_discharge_state;
 use self::vec_from_raw_parts::{
-    has_vec_from_raw_parts_capacity_evidence, has_vec_from_raw_parts_origin_evidence,
-    has_vec_from_raw_parts_origin_initialized_evidence,
+    has_vec_from_raw_parts_capacity_evidence, has_vec_from_raw_parts_origin_initialized_evidence,
     has_vec_from_raw_parts_origin_len_cap_evidence,
     has_vec_from_raw_parts_origin_pointer_live_evidence,
 };
@@ -273,25 +272,7 @@ fn discharge_state_for(
                 EvidenceState::missing("No nullability guard code was detected")
             }
         }
-        "ownership" => {
-            if (family == &OperationFamily::DropInPlace
-                && has_drop_in_place_box_origin_evidence(&site.operation.expression, lower))
-                || (family == &OperationFamily::BoxFromRaw
-                    && has_box_from_raw_origin_evidence(&site.operation.expression, lower))
-                || (family == &OperationFamily::VecFromRawParts
-                    && has_vec_from_raw_parts_origin_evidence(&site.operation.expression, lower))
-            {
-                if family == &OperationFamily::VecFromRawParts {
-                    EvidenceState::present(
-                        "ManuallyDrop Vec raw-parts ownership evidence was detected",
-                    )
-                } else {
-                    EvidenceState::present("Box::into_raw ownership evidence was detected")
-                }
-            } else {
-                EvidenceState::missing("No obligation-specific guard code was detected")
-            }
-        }
+        "ownership" => ownership_discharge_state(family, &site.operation.expression, lower),
         "callee-contract" => {
             callee_contract_discharge_state(family, &site.operation.expression, lower)
         }
