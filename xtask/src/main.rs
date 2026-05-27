@@ -10286,6 +10286,68 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_github_summary_positive_overclaim() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-github-summary-overclaim")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("github-summary.md");
+        let mut summary = fs::read_to_string(&path)
+            .map_err(|err| format!("read github summary failed: {err}"))?;
+        summary.push_str("\nAll clear.\n");
+        fs::write(&path, summary).map_err(|err| format!("write github summary failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(result.err().unwrap_or_default().contains("all clear"));
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_cards_json_positive_overclaim() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-cards-json-overclaim")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("cards.json");
+        let mut cards = parse_json_file(&path)?;
+        cards["note"] = serde_json::json!("safe to merge");
+        fs::write(
+            &path,
+            serde_json::to_string(&cards)
+                .map_err(|err| format!("serialize cards json failed: {err}"))?,
+        )
+        .map_err(|err| format!("write cards failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(result.err().unwrap_or_default().contains("safe to merge"));
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_sarif_positive_overclaim() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-sarif-overclaim")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("cards.sarif");
+        let mut sarif = parse_json_file(&path)?;
+        sarif["note"] = serde_json::json!("proved safe");
+        fs::write(
+            &path,
+            serde_json::to_string(&sarif)
+                .map_err(|err| format!("serialize sarif failed: {err}"))?,
+        )
+        .map_err(|err| format!("write sarif failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(result.err().unwrap_or_default().contains("proved safe"));
+        Ok(())
+    }
+
+    #[test]
     fn advisory_artifact_checker_rejects_missing_trust_boundary() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-artifacts-missing-boundary")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;

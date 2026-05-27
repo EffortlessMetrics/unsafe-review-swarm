@@ -642,7 +642,10 @@ This applies to:
 ```text
 README badge text
 badge endpoint JSON
+cards.json
 pr-summary.md
+github-summary.md
+cards.sarif
 comment-plan.json
 witness-plan.md
 lsp.json

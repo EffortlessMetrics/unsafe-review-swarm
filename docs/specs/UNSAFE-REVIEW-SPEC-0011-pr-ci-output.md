@@ -595,6 +595,11 @@ This is not UB-free status.
 This is not Miri-clean status.
 ```
 
+The first-pr artifact verifier scans every required bundle artifact for positive
+overclaim wording, including `cards.json`, `pr-summary.md`,
+`github-summary.md`, `cards.sarif`, `comment-plan.json`, `witness-plan.md`, and
+`lsp.json`.
+
 ### 8. Policy report relationship
 
 The default first-pr gate does not require policy report artifacts.

@@ -2365,7 +2365,10 @@ fn require_known_card_id<'a>(
 
 fn check_first_pr_artifact_overclaims(dir: &Path) -> Result<(), String> {
     for name in [
+        "cards.json",
         "pr-summary.md",
+        "github-summary.md",
+        "cards.sarif",
         "comment-plan.json",
         "witness-plan.md",
         "lsp.json",
