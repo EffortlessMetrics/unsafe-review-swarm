@@ -1591,6 +1591,7 @@ fn check_first_pr_markdown_card_identity(
     require_text_mentions_all_card_ids(&pr_summary, &pr_summary_path, card_ids)?;
     require_markdown_top_card_projection(&pr_summary, &pr_summary_path, card_projections)?;
     require_pr_summary_card_table_projection(&pr_summary, &pr_summary_path, card_projections)?;
+    require_pr_summary_witness_plan_projection(&pr_summary, &pr_summary_path, card_projections)?;
 
     let witness_plan_path = dir.join("witness-plan.md");
     let witness_plan = super::read_to_string(&witness_plan_path)?;
@@ -1638,6 +1639,76 @@ fn markdown_table_cell(value: &str) -> String {
         .collect::<Vec<_>>()
         .join(" ")
         .replace('|', "\\|")
+}
+
+fn require_pr_summary_witness_plan_projection(
+    text: &str,
+    path: &Path,
+    card_projections: &BTreeMap<String, CardProjection>,
+) -> Result<(), String> {
+    if card_projections.is_empty() {
+        return Ok(());
+    }
+    let section = pr_summary_witness_plan_section(text).ok_or_else(|| {
+        format!(
+            "{} must include a `## Witness plan` section before `## Trust boundary`",
+            path.display()
+        )
+    })?;
+    for (card_id, card) in card_projections {
+        if let Some(route) = card.witness_routes.first() {
+            let expected = format!("- `{card_id}`: `{}` because {}", route.kind, route.reason);
+            require_pr_summary_witness_line(section, path, card_id, "primary route", &expected)?;
+            if let Some(command) = &route.command {
+                let expected = format!("```bash\n{command}\n```");
+                require_pr_summary_witness_line(
+                    section,
+                    path,
+                    card_id,
+                    "primary route command",
+                    &expected,
+                )?;
+            } else {
+                require_pr_summary_witness_line(
+                    section,
+                    path,
+                    card_id,
+                    "manual route limit",
+                    "  - No automatic command is available; route this to human review.",
+                )?;
+            }
+        } else {
+            let expected = format!(
+                "- `{card_id}`: no witness route was selected; route this to human review."
+            );
+            require_pr_summary_witness_line(section, path, card_id, "manual route", &expected)?;
+        }
+    }
+    Ok(())
+}
+
+fn pr_summary_witness_plan_section(text: &str) -> Option<&str> {
+    let start = text.find("## Witness plan")?;
+    let tail = &text[start..];
+    let end = tail.find("\n## Trust boundary")?;
+    Some(&tail[..end])
+}
+
+fn require_pr_summary_witness_line(
+    section: &str,
+    path: &Path,
+    card_id: &str,
+    field: &str,
+    expected: &str,
+) -> Result<(), String> {
+    if section.contains(expected) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{} pr-summary witness plan for `{card_id}` {field} must include `{expected}`",
+            path.display()
+        ))
+    }
 }
 
 fn check_lsp_artifact(
