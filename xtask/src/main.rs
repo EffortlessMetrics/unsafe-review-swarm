@@ -8825,11 +8825,12 @@ impl WitnessKind {
 |---|---|---|---|---|
 | `target` | `family` | `needs-fixture` | grounded observation | add a fixture |
 | `target` | `family` | `noise` | broad card cluster | add ranking pressure |
+| `target` | `family` | `needs-verifier` | projection rail can drift | add a checker |
 "#;
 
         let rows = check_dogfood_report_triage_labels_text("docs/dogfood/reports/test.md", text)?;
 
-        assert_eq!(rows, 2);
+        assert_eq!(rows, 3);
         Ok(())
     }
 
