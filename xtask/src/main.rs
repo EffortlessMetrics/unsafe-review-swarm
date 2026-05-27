@@ -2281,11 +2281,28 @@ fn check_dogfood_report_triage_labels_text(path: &str, text: &str) -> Result<usi
             .split('|')
             .map(str::trim)
             .collect::<Vec<_>>();
-        if columns.len() < 3 {
+        if columns.len() != 5 {
             return Err(format!(
-                "{path}:{} dogfood triage row must include a Primary label column",
+                "{path}:{} dogfood triage row must include Target, Card or family, Primary label, Evidence, and Follow-up columns",
                 line_idx + 1
             ));
+        }
+        for (column_idx, column_name) in [
+            "Target",
+            "Card or family",
+            "Primary label",
+            "Evidence",
+            "Follow-up",
+        ]
+        .iter()
+        .enumerate()
+        {
+            if markdown_code_cell_value(columns[column_idx]).is_empty() {
+                return Err(format!(
+                    "{path}:{} dogfood triage row must include a non-empty {column_name} column",
+                    line_idx + 1
+                ));
+            }
         }
         let label = markdown_code_cell_value(columns[2]);
         if !DOGFOOD_TRIAGE_LABELS.contains(&label.as_str()) {
@@ -8771,6 +8788,38 @@ impl WitnessKind {
 
         assert!(err.contains("unknown dogfood triage label"));
         assert!(err.contains("probably-actionable"));
+    }
+
+    #[test]
+    fn dogfood_triage_report_rejects_missing_required_fields() {
+        let text = r#"
+## Triage observations
+
+| Target | Card or family | Primary label | Evidence | Follow-up |
+|---|---|---|---|---|
+| `target` |  | `needs-fixture` | grounded observation | add a fixture |
+"#;
+
+        let err = check_dogfood_report_triage_labels_text("docs/dogfood/reports/test.md", text)
+            .unwrap_err();
+
+        assert!(err.contains("non-empty Card or family column"));
+    }
+
+    #[test]
+    fn dogfood_triage_report_rejects_wrong_column_count() {
+        let text = r#"
+## Triage observations
+
+| Target | Card or family | Primary label | Evidence | Follow-up |
+|---|---|---|---|---|
+| `target` | `family` | `needs-fixture` | grounded observation |
+"#;
+
+        let err = check_dogfood_report_triage_labels_text("docs/dogfood/reports/test.md", text)
+            .unwrap_err();
+
+        assert!(err.contains("Target, Card or family, Primary label, Evidence, and Follow-up"));
     }
 
     #[test]
