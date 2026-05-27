@@ -31,6 +31,7 @@ mod unreachable_unchecked;
 mod unsafe_fn_call;
 mod unwrap_unchecked;
 mod utf8;
+mod valid_value_discharge;
 mod vec_from_raw_parts;
 mod write_bytes;
 mod zeroed;
@@ -81,18 +82,14 @@ use self::receiver_path::{
 };
 use self::site_context::{code_context, code_context_through_site};
 use self::source_value::source_value_identifier;
-use self::transmute::{
-    has_transmute_layout_size_evidence, has_transmute_u8_bool_valid_value_evidence,
-};
+use self::transmute::has_transmute_layout_size_evidence;
 use self::u8_bool_value::{has_u8_bool_value_guard, u8_bool_valid_value_predicates};
 use self::unreachable_unchecked::has_unreachable_unchecked_infallible_path_evidence;
 use self::unsafe_fn_call::{
     has_encode_utf8_remaining_capacity_evidence, has_unchecked_constructor_availability_evidence,
 };
-use self::unwrap_unchecked::{
-    has_unwrap_unchecked_infallible_result_evidence, has_unwrap_unchecked_receiver_state_evidence,
-};
 use self::utf8::has_from_utf8_unchecked_validation_evidence;
+use self::valid_value_discharge::valid_value_discharge_state;
 use self::vec_from_raw_parts::{
     has_vec_from_raw_parts_capacity_evidence, has_vec_from_raw_parts_origin_evidence,
     has_vec_from_raw_parts_origin_initialized_evidence,
@@ -307,27 +304,7 @@ fn discharge_state_for(
                 EvidenceState::missing("No obligation-specific guard code was detected")
             }
         }
-        "valid-value" => {
-            if family == &OperationFamily::UnwrapUnchecked
-                && has_unwrap_unchecked_infallible_result_evidence(lower)
-            {
-                EvidenceState::present(
-                    "Infallible Result state evidence was detected before unwrap_unchecked",
-                )
-            } else if family == &OperationFamily::UnwrapUnchecked
-                && has_unwrap_unchecked_receiver_state_evidence(lower)
-            {
-                EvidenceState::present(
-                    "Same-receiver Option/Result state evidence was detected before unwrap_unchecked",
-                )
-            } else if family == &OperationFamily::Transmute
-                && has_transmute_u8_bool_valid_value_evidence(lower)
-            {
-                EvidenceState::present("Transmute u8-to-bool valid-value evidence was detected")
-            } else {
-                EvidenceState::missing("No obligation-specific guard code was detected")
-            }
-        }
+        "valid-value" => valid_value_discharge_state(family, lower),
         "layout" => {
             if family == &OperationFamily::Transmute && has_transmute_layout_size_evidence(lower) {
                 EvidenceState::present("Transmute layout size evidence was detected")
