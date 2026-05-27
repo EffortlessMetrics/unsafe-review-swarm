@@ -2,7 +2,7 @@ use super::{
     code_context_through_site, compact_code, contains_receiver_path, contains_simple_assignment_to,
     has_assignment_to_any_identifier, has_fresh_guard_pattern_for_identifiers,
     has_open_positive_branch_guard_for_identifiers, is_receiver_path_char, is_simple_identifier,
-    let_binding_name, matching_call_argument_end,
+    let_binding_name, matching_call_argument_end, matching_code_block_end,
 };
 use crate::analysis::scanner::ScannedSite;
 use crate::domain::{EvidenceState, OperationFamily};
@@ -611,9 +611,10 @@ fn remaining_capacity_early_return_matches(
     while let Some(offset) = before_new_len_binding[search_from..].find(&guard) {
         let guard_start = search_from + offset;
         let after_guard = &before_new_len_binding[guard_start + guard.len()..];
-        let guard_end = after_guard.find('}').unwrap_or(after_guard.len());
-        let guard_body = &after_guard[..guard_end];
-        let after_branch = &after_guard[guard_end..];
+        let (guard_body, after_branch) = matching_code_block_end(after_guard)
+            .map_or((after_guard, ""), |body_end| {
+                (&after_guard[..body_end], &after_guard[body_end + 1..])
+            });
         if guard_body.contains("return")
             && !has_assignment_to_any_identifier(
                 after_branch,
@@ -708,9 +709,10 @@ fn has_set_len_capacity_early_return(
     while let Some(offset) = before_call[search_from..].find(&guard) {
         let guard_start = search_from + offset;
         let after_guard = &before_call[guard_start + guard.len()..];
-        let guard_end = after_guard.find('}').unwrap_or(after_guard.len());
-        let guard_body = &after_guard[..guard_end];
-        let after_branch = &after_guard[guard_end..];
+        let (guard_body, after_branch) = matching_code_block_end(after_guard)
+            .map_or((after_guard, ""), |body_end| {
+                (&after_guard[..body_end], &after_guard[body_end + 1..])
+            });
         if guard_body.contains("return")
             && !has_assignment_to_any_identifier(after_branch, &stale_identifiers)
         {
