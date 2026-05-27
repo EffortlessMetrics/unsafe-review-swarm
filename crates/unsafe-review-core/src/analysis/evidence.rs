@@ -32,6 +32,7 @@ mod unreachable_unchecked;
 mod unsafe_fn_call;
 mod unwrap_unchecked;
 mod utf8;
+mod utf8_discharge;
 mod valid_value_discharge;
 mod vec_from_raw_parts;
 mod write_bytes;
@@ -89,7 +90,7 @@ use self::unreachable_unchecked::has_unreachable_unchecked_infallible_path_evide
 use self::unsafe_fn_call::{
     has_encode_utf8_remaining_capacity_evidence, has_unchecked_constructor_availability_evidence,
 };
-use self::utf8::has_from_utf8_unchecked_validation_evidence;
+use self::utf8_discharge::utf8_discharge_state;
 use self::valid_value_discharge::valid_value_discharge_state;
 use self::vec_from_raw_parts::{
     has_vec_from_raw_parts_capacity_evidence, has_vec_from_raw_parts_origin_evidence,
@@ -325,17 +326,7 @@ fn discharge_state_for(
                 EvidenceState::missing("No obligation-specific guard code was detected")
             }
         }
-        "utf8" => {
-            if family == &OperationFamily::StrFromUtf8Unchecked
-                && has_from_utf8_unchecked_validation_evidence(lower)
-            {
-                EvidenceState::present(
-                    "Same-buffer UTF-8 validation evidence was detected before from_utf8_unchecked",
-                )
-            } else {
-                EvidenceState::missing("No obligation-specific guard code was detected")
-            }
-        }
+        "utf8" => utf8_discharge_state(family, lower),
         "valid-zero" => {
             if family == &OperationFamily::Zeroed && has_zeroed_known_valid_zero_type(lower) {
                 EvidenceState::present(
