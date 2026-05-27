@@ -2205,13 +2205,35 @@ mod tests {
             "ptr::read(self.as_ptr() as *const [T; CAP])",
             vec![],
         );
+        let comment_return_guard = site_with_family(
+            OperationFamily::RawPointerRead,
+            vec!["if self.len() < core::mem::size_of::<[T; CAP]>() { /* return None; */ }"],
+            "ptr::read(self.as_ptr() as *const [T; CAP])",
+            vec![],
+        );
+        let string_return_guard = site_with_family(
+            OperationFamily::RawPointerRead,
+            vec![
+                "if self.len() < core::mem::size_of::<[T; CAP]>() {",
+                "    let _note = \"return None\";",
+                "}",
+            ],
+            "ptr::read(self.as_ptr() as *const [T; CAP])",
+            vec![],
+        );
 
         let evidence = obligation_evidence(&raw_read, &obligations, &contract, &reach);
         let nested_guard_evidence =
             obligation_evidence(&nested_short_buffer_guard, &obligations, &contract, &reach);
+        let comment_return_evidence =
+            obligation_evidence(&comment_return_guard, &obligations, &contract, &reach);
+        let string_return_evidence =
+            obligation_evidence(&string_return_guard, &obligations, &contract, &reach);
 
         assert!(evidence[0].discharge.present);
         assert!(nested_guard_evidence[0].discharge.present);
+        assert!(!comment_return_evidence[0].discharge.present);
+        assert!(!string_return_evidence[0].discharge.present);
     }
 
     #[test]

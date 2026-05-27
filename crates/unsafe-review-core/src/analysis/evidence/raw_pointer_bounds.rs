@@ -1,7 +1,7 @@
 use super::{
     branch_still_open_at_operation, compact_code, compact_if_guards, contains_simple_assignment_to,
     has_length_or_bounds_guard, is_simple_identifier, let_binding_name, matching_call_argument_end,
-    matching_code_block_end, receiver_before_marker,
+    matching_code_block_end, receiver_before_marker, strip_block_comments_and_literals,
 };
 
 pub(super) fn has_raw_pointer_read_bounds_evidence(
@@ -140,8 +140,18 @@ fn has_origin_len_size_early_return_guard(compact: &str, len: &str, origin: &str
                     &guard.after_body_start[body_end + 1..],
                 )
             });
-        guard_body.contains("return") && !contains_simple_assignment_to(after_guard_body, origin)
+        guard_body_contains_return(guard_body)
+            && !contains_simple_assignment_to(after_guard_body, origin)
     })
+}
+
+fn guard_body_contains_return(guard_body: &str) -> bool {
+    let code = strip_block_comments_and_literals(guard_body);
+    code.starts_with("return")
+        || code.contains(";return")
+        || code.contains("{return")
+        || code.contains("}return")
+        || code.contains("=>return")
 }
 
 fn origin_len_size_condition_is_positive(condition: &str, len: &str) -> bool {
