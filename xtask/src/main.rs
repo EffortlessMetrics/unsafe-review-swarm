@@ -226,6 +226,13 @@ const DOGFOOD_TRIAGE_LABELS: &[&str] = &[
     "needs-route",
     "needs-analyzer",
 ];
+const DOGFOOD_TRIAGE_HEADER: &[&str] = &[
+    "Target",
+    "Card or family",
+    "Primary label",
+    "Evidence",
+    "Follow-up",
+];
 const FUZZ_REQUIRED_FILES: &[&str] = &[
     "docs/FUZZING.md",
     "fuzz/.gitignore",
@@ -2265,6 +2272,19 @@ fn check_dogfood_report_triage_labels_text(path: &str, text: &str) -> Result<usi
     for (line_idx, line) in text.lines().enumerate() {
         if !in_triage_table {
             if line.contains("| Primary label |") {
+                let columns = line
+                    .trim()
+                    .trim_matches('|')
+                    .split('|')
+                    .map(str::trim)
+                    .collect::<Vec<_>>();
+                if columns != DOGFOOD_TRIAGE_HEADER {
+                    return Err(format!(
+                        "{path}:{} dogfood triage header must be `{}`",
+                        line_idx + 1,
+                        DOGFOOD_TRIAGE_HEADER.join(" | ")
+                    ));
+                }
                 in_triage_table = true;
             }
             continue;
@@ -2287,16 +2307,7 @@ fn check_dogfood_report_triage_labels_text(path: &str, text: &str) -> Result<usi
                 line_idx + 1
             ));
         }
-        for (column_idx, column_name) in [
-            "Target",
-            "Card or family",
-            "Primary label",
-            "Evidence",
-            "Follow-up",
-        ]
-        .iter()
-        .enumerate()
-        {
+        for (column_idx, column_name) in DOGFOOD_TRIAGE_HEADER.iter().enumerate() {
             if markdown_code_cell_value(columns[column_idx]).is_empty() {
                 return Err(format!(
                     "{path}:{} dogfood triage row must include a non-empty {column_name} column",
@@ -8820,6 +8831,23 @@ impl WitnessKind {
             .unwrap_err();
 
         assert!(err.contains("Target, Card or family, Primary label, Evidence, and Follow-up"));
+    }
+
+    #[test]
+    fn dogfood_triage_report_rejects_unexpected_header() {
+        let text = r#"
+## Triage observations
+
+| Target | Family | Primary label | Evidence | Follow-up |
+|---|---|---|---|---|
+| `target` | `family` | `needs-fixture` | grounded observation | add a fixture |
+"#;
+
+        let err = check_dogfood_report_triage_labels_text("docs/dogfood/reports/test.md", text)
+            .unwrap_err();
+
+        assert!(err.contains("dogfood triage header must be"));
+        assert!(err.contains("Card or family"));
     }
 
     #[test]
