@@ -3305,13 +3305,96 @@ impl TransmuteValueDomainContext<'_> {
     }
 
     fn has_u8_to_bool_valid_value_evidence(&self) -> bool {
-        self.u8_to_bool_valid_predicates().iter().any(|predicate| {
-            has_u8_bool_value_predicate_guard(self.before_call, predicate, self.source_value_target)
-        }) || has_u8_bool_invalid_early_return_guard(self.before_call, self.source_value_target)
+        self.u8_to_bool_valid_predicates()
+            .iter()
+            .any(|predicate| self.has_u8_bool_value_predicate_guard(predicate))
+            || self.has_u8_bool_invalid_early_return_guard()
     }
 
     fn u8_to_bool_valid_predicates(&self) -> [String; 8] {
         u8_bool_valid_value_predicates(self.source_value_target)
+    }
+
+    fn has_u8_bool_value_predicate_guard(&self, predicate: &str) -> bool {
+        [
+            format!("assert!({predicate})"),
+            format!("assert!({predicate},"),
+            format!("debug_assert!({predicate})"),
+            format!("debug_assert!({predicate},"),
+        ]
+        .iter()
+        .any(|pattern| self.has_fresh_assertion_guard(pattern))
+            || self.has_open_positive_branch_guard(predicate)
+    }
+
+    fn has_fresh_assertion_guard(&self, pattern: &str) -> bool {
+        let mut search_from = 0;
+        while let Some(offset) = self.before_call[search_from..].find(pattern) {
+            let pattern_start = search_from + offset;
+            let after_pattern = &self.before_call[pattern_start + pattern.len()..];
+            let statement_end = after_pattern.find(';').unwrap_or(after_pattern.len());
+            let after_guard = &after_pattern[statement_end..];
+            if self.source_value_stays_fresh_after(after_guard) {
+                return true;
+            }
+            search_from = pattern_start + pattern.len();
+        }
+        false
+    }
+
+    fn has_open_positive_branch_guard(&self, predicate: &str) -> bool {
+        let guard = format!("if{predicate}{{");
+        let mut search_from = 0;
+        while let Some(offset) = self.before_call[search_from..].find(&guard) {
+            let guard_start = search_from + offset;
+            let after_guard = &self.before_call[guard_start + guard.len()..];
+            let mut depth = 1usize;
+            for ch in after_guard.chars() {
+                match ch {
+                    '{' => depth += 1,
+                    '}' => {
+                        depth = depth.saturating_sub(1);
+                        if depth == 0 {
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            if depth > 0 && self.source_value_stays_fresh_after(after_guard) {
+                return true;
+            }
+            search_from = guard_start + guard.len();
+        }
+        false
+    }
+
+    fn has_u8_bool_invalid_early_return_guard(&self) -> bool {
+        self.has_invalid_byte_returning_branch(&format!("{}>1", self.source_value_target))
+            || self.has_invalid_byte_returning_branch(&format!("1<{}", self.source_value_target))
+            || self.has_invalid_byte_returning_branch(&format!("{}>=2", self.source_value_target))
+            || self.has_invalid_byte_returning_branch(&format!("2<={}", self.source_value_target))
+    }
+
+    fn has_invalid_byte_returning_branch(&self, predicate: &str) -> bool {
+        let guard = format!("if{predicate}{{");
+        let mut search_from = 0;
+        while let Some(offset) = self.before_call[search_from..].find(&guard) {
+            let guard_start = search_from + offset;
+            let after_guard = &self.before_call[guard_start + guard.len()..];
+            let guard_end = after_guard.find('}').unwrap_or(after_guard.len());
+            let guard_body = &after_guard[..guard_end];
+            let after_branch = &after_guard[guard_end..];
+            if guard_body.contains("return") && self.source_value_stays_fresh_after(after_branch) {
+                return true;
+            }
+            search_from = guard_start + guard.len();
+        }
+        false
+    }
+
+    fn source_value_stays_fresh_after(&self, evidence: &str) -> bool {
+        !has_assignment_to_identifier(evidence, self.source_value_target)
     }
 }
 
