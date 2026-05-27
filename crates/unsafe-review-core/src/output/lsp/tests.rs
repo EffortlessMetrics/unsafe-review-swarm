@@ -186,6 +186,14 @@ fn lsp_projection_is_parseable_and_read_only() -> Result<(), String> {
             .unwrap_or("")
             .contains("does not prove the unsafe site executed")
     );
+    assert!(
+        value["hovers"][0]["contents"]
+            .as_str()
+            .unwrap_or("")
+            .contains(
+                "Do not widen unsafe scope, suppress the card, or change unrelated unsafe code"
+            )
+    );
     assert_eq!(
         value["code_actions"][0]["command"],
         "unsafe-review.copyAgentPacket"

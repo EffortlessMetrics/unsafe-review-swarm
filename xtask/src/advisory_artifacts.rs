@@ -1288,6 +1288,7 @@ fn require_lsp_hover_card_projection(
         "Evidence missing",
         "What would resolve this",
         "What would not resolve this",
+        "Do not widen unsafe scope, suppress the card, or change unrelated unsafe code",
         "Trust boundary",
     ] {
         if !contents.contains(required) {
