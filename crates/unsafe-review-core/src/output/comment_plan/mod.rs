@@ -166,6 +166,27 @@ mod tests {
     }
 
     #[test]
+    fn comment_plan_projects_relevance_for_selected_and_not_selected_cards() -> Result<(), String> {
+        let selected = parse_json(&render(&fixture_output("raw_pointer_alignment")?))?;
+        assert_eq!(selected["comments"].as_array().map_or(0, Vec::len), 1);
+        assert_eq!(
+            selected["comments"][0]["selection_reason"],
+            "actionable high-priority review card"
+        );
+        assert_eq!(selected["comments"][0]["relevance"], "medium");
+
+        let not_selected = parse_json(&render(&fixture_output("ffi_sanitizer_route")?))?;
+        assert_eq!(not_selected["comments"].as_array().map_or(1, Vec::len), 0);
+        assert_eq!(
+            not_selected["not_selected"][0]["reason"],
+            "priority/confidence below inline comment threshold"
+        );
+        assert_eq!(not_selected["not_selected"][0]["relevance"], "low");
+
+        Ok(())
+    }
+
+    #[test]
     fn comment_plan_skips_unknown_operation_family_cards() -> Result<(), String> {
         let output = fixture_output("public_unsafe_fn_missing_safety")?;
         let value = parse_json(&render(&output))?;
