@@ -17,7 +17,7 @@
 
 <p align="center">
   <a href="docs/BADGE_POLICY.md"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FEffortlessMetrics%2Funsafe-review%2Fmain%2Fbadges%2Funsafe-review.json" alt="unsafe-review open actionable gap count" /></a>
-  <a href="docs/BADGE_POLICY.md"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FEffortlessMetrics%2Funsafe-review%2Fmain%2Fbadges%2Funsafe-review-plus.json" alt="unsafe-review missing or weak evidence count" /></a>
+  <a href="docs/BADGE_POLICY.md"><img src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FEffortlessMetrics%2Funsafe-review%2Fmain%2Fbadges%2Funsafe-review-plus.json" alt="unsafe-review repair plus evidence-quality count" /></a>
 </p>
 
 <p align="center">
@@ -116,8 +116,9 @@ document.
 > Do not copy this repository’s badge URLs. Badge endpoints are repo-scoped
 > static evidence projections and must point at your own `OWNER/REPO/BRANCH`
 > `badges/*.json` paths.
-> `unsafe-review` reports open review gaps; `unsafe-review+` reports a
-> missing-or-weak evidence count. Both are advisory evidence indicators only.
+> `unsafe-review` reports open review gaps; `unsafe-review+` reports open review
+> gaps plus missing-or-weak evidence findings. Both are advisory evidence
+> indicators only.
 
 Try the bundled smoke fixture:
 

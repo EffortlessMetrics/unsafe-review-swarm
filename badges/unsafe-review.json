@@ -1,6 +1,20 @@
 {
   "schemaVersion": 1,
+  "contract_version": "0.1",
+  "kind": "unsafe_review",
+  "scope": "repo",
+  "basis": "open_actionable_review_gaps",
   "label": "unsafe-review",
-  "message": "294",
-  "color": "orange"
+  "message": "310",
+  "status": "fail",
+  "color": "orange",
+  "counts": {
+    "unsuppressed_review_gaps": 310,
+    "unsuppressed_evidence_quality_findings": 0,
+    "suppressed_review_gaps": 0,
+    "suppressed_evidence_quality_findings": 0,
+    "intentional_findings": 0,
+    "unknowns": 0,
+    "analyzed_unsafe_seams": 310
+  }
 }

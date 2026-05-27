@@ -976,15 +976,36 @@ fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<()
     assert!(stdout.contains("not safety, UB-free, or Miri-clean status"));
 
     let main_badge = parse_json(&fs::read_to_string(badge_dir.join("unsafe-review.json"))?)?;
+    assert_eq!(main_badge["schemaVersion"], 1);
+    assert_eq!(main_badge["contract_version"], "0.1");
+    assert_eq!(main_badge["kind"], "unsafe_review");
+    assert_eq!(main_badge["basis"], "open_actionable_review_gaps");
     assert_eq!(main_badge["label"], "unsafe-review");
     assert_eq!(main_badge["message"], "1");
+    assert_eq!(main_badge["counts"]["unsuppressed_review_gaps"], 1);
+    assert_eq!(
+        main_badge["counts"]["unsuppressed_evidence_quality_findings"],
+        0
+    );
     assert_ne!(main_badge["message"], "safe");
 
     let plus_badge = parse_json(&fs::read_to_string(
         badge_dir.join("unsafe-review-plus.json"),
     )?)?;
+    assert_eq!(plus_badge["schemaVersion"], 1);
+    assert_eq!(plus_badge["contract_version"], "0.1");
+    assert_eq!(plus_badge["kind"], "unsafe_review_plus");
+    assert_eq!(
+        plus_badge["basis"],
+        "open_actionable_review_gaps_plus_evidence_quality_findings"
+    );
     assert_eq!(plus_badge["label"], "unsafe-review+");
     assert_eq!(plus_badge["message"], "2");
+    assert_eq!(plus_badge["counts"]["unsuppressed_review_gaps"], 1);
+    assert_eq!(
+        plus_badge["counts"]["unsuppressed_evidence_quality_findings"],
+        1
+    );
     let main_count = main_badge["message"]
         .as_str()
         .ok_or("main badge message missing")?

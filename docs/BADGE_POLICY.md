@@ -16,7 +16,7 @@
 |---|---|---|
 | CI | Current GitHub CI status. | Analyzer correctness proof. |
 | `unsafe-review` | Numeric open static review gap count. | Safety or unsafety status. |
-| `unsafe-review+` | Numeric missing-or-weak evidence count. | Miri-clean or UB-free status. |
+| `unsafe-review+` | Numeric repair-plus-quality count: open review gaps plus missing-or-weak evidence findings. | Miri-clean or UB-free status. |
 | VS Code planned | Editor surface is planned. | Published VS Marketplace extension. |
 | Open VSX planned | Editor surface is planned. | Published Open VSX extension. |
 | GitHub release | Latest published GitHub release tag. | crates.io availability or release quality proof. |
@@ -41,6 +41,11 @@ renderer and covered by repository checks.
 Endpoint badges may appear in README rows only when `badges/unsafe-review.json`
 and `badges/unsafe-review-plus.json` are checked in and covered by the
 validation path above.
+
+The endpoints remain Shields-compatible through `schemaVersion = 1`. Additional
+repo-contract fields describe the source projection: `unsafe-review` uses
+`open_actionable_review_gaps`, while `unsafe-review+` uses
+`open_actionable_review_gaps_plus_evidence_quality_findings`.
 
 ## Forbidden badge posture
 

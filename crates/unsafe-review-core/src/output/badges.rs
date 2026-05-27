@@ -12,7 +12,7 @@ pub(crate) fn render(output: &AnalyzeOutput) -> (String, String) {
     let main = badge(
         "unsafe_review",
         "repo",
-        "canonical_actionable_review_gap",
+        "open_actionable_review_gaps",
         "unsafe-review",
         base_count,
         base_color,
@@ -29,7 +29,7 @@ pub(crate) fn render(output: &AnalyzeOutput) -> (String, String) {
     let plus = badge(
         "unsafe_review_plus",
         "repo",
-        "canonical_actionable_review_gap",
+        "open_actionable_review_gaps_plus_evidence_quality_findings",
         "unsafe-review+",
         plus_count,
         plus_color,
@@ -76,7 +76,8 @@ fn badge(
     counts: BadgeCounts,
 ) -> BadgeJson<'static> {
     BadgeJson {
-        schema_version: "0.1",
+        schema_version: 1,
+        contract_version: "0.1",
         kind,
         scope,
         basis,
@@ -90,7 +91,9 @@ fn badge(
 
 #[derive(Serialize)]
 struct BadgeJson<'a> {
-    schema_version: &'a str,
+    #[serde(rename = "schemaVersion")]
+    schema_version: u8,
+    contract_version: &'a str,
     kind: &'a str,
     scope: &'a str,
     basis: &'a str,
@@ -125,20 +128,31 @@ mod tests {
         let main = parse_json(&main)?;
         let plus = parse_json(&plus)?;
 
-        assert_eq!(main["schema_version"], "0.1");
+        assert_eq!(main["schemaVersion"], 1);
+        assert_eq!(main["contract_version"], "0.1");
         assert_eq!(main["kind"], "unsafe_review");
+        assert_eq!(main["basis"], "open_actionable_review_gaps");
         assert_eq!(main["label"], "unsafe-review");
         assert_eq!(main["message"], "1");
         assert_eq!(main["status"], "fail");
         assert_eq!(main["color"], "yellow");
+        assert_eq!(main["counts"]["unsuppressed_review_gaps"], 1);
+        assert_eq!(main["counts"]["unsuppressed_evidence_quality_findings"], 0);
         assert_ne!(main["message"], "safe");
 
-        assert_eq!(plus["schema_version"], "0.1");
+        assert_eq!(plus["schemaVersion"], 1);
+        assert_eq!(plus["contract_version"], "0.1");
         assert_eq!(plus["kind"], "unsafe_review_plus");
+        assert_eq!(
+            plus["basis"],
+            "open_actionable_review_gaps_plus_evidence_quality_findings"
+        );
         assert_eq!(plus["label"], "unsafe-review+");
         assert_eq!(plus["message"], "2");
         assert_eq!(plus["status"], "fail");
         assert_eq!(plus["color"], "yellow");
+        assert_eq!(plus["counts"]["unsuppressed_review_gaps"], 1);
+        assert_eq!(plus["counts"]["unsuppressed_evidence_quality_findings"], 1);
         assert_ne!(plus["message"], "UB-free");
         Ok(())
     }
@@ -151,10 +165,14 @@ mod tests {
         let plus = parse_json(&plus)?;
 
         assert_eq!(main["message"], "0");
+        assert_eq!(main["schemaVersion"], 1);
+        assert_eq!(main["contract_version"], "0.1");
         assert_eq!(main["status"], "pass");
         assert_eq!(main["color"], "green");
         assert_ne!(main["message"], "safe");
         assert_eq!(plus["message"], "0");
+        assert_eq!(plus["schemaVersion"], 1);
+        assert_eq!(plus["contract_version"], "0.1");
         assert_eq!(plus["status"], "pass");
         assert_ne!(plus["message"], "Miri-clean");
         Ok(())

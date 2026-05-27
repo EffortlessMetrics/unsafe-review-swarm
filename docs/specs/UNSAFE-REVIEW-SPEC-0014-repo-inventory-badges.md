@@ -51,12 +51,13 @@ The `cards` array must reuse the canonical `ReviewCard` JSON shape. Repo JSON
 must not reclassify cards, invent a separate evidence model, or summarize raw
 unsafe usage as safety posture.
 
-Badge JSON is a small serde-backed open-gap summary for shields-compatible
-consumers:
+Badge JSON is a small serde-backed open-gap summary for Shields-compatible
+consumers. Endpoint JSON must keep `schemaVersion = 1` for Shields while any
+additional repo-contract fields remain advisory projection metadata:
 
 - `unsafe-review.json` reports the numeric open-gap count as `<n>`
-- `unsafe-review-plus.json` reports the numeric missing-or-weak evidence count
-  as `<contract_missing + guard_missing + guarded_unwitnessed>`
+- `unsafe-review-plus.json` reports the numeric repair-plus-quality count as
+  `<open_actionable_gaps + contract_missing + guard_missing + guarded_unwitnessed>`
 
 Badges count unresolved review evidence. They never claim the repository is
 safe, UB-free, Miri-clean, or policy-compliant.
@@ -92,7 +93,8 @@ posture and do not certify repository safety.
 Badge meanings are fixed:
 
 - `unsafe-review`: open unsafe-review gap count
-- `unsafe-review+`: missing-or-weak evidence count
+- `unsafe-review+`: open unsafe-review gap count plus missing-or-weak evidence
+  findings
 
 Badges must never imply that the repo is sound, memory-safe, UB-free,
 Miri-clean, verified, all clear, policy-ready, or that any unsafe site executed.
