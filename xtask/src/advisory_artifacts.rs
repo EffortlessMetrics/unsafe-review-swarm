@@ -19,6 +19,10 @@ struct CardProjection {
     operation_family: String,
     next_action: String,
     missing: Vec<String>,
+    contract: Option<String>,
+    discharge: Option<String>,
+    reach: Option<String>,
+    witness: Option<String>,
     required_safety_conditions: Vec<serde_json::Value>,
     obligation_evidence: Vec<serde_json::Value>,
     verify_commands: Vec<String>,
@@ -971,6 +975,10 @@ fn advisory_card_projections(
             })
             .transpose()?
             .unwrap_or_default();
+        let contract = optional_card_string(card, "contract")?;
+        let discharge = optional_card_string(card, "discharge")?;
+        let reach = optional_card_string(card, "reach")?;
+        let witness = optional_card_string(card, "witness")?;
         let obligation_evidence = card
             .get("obligation_evidence")
             .map(|evidence| {
@@ -1068,6 +1076,10 @@ fn advisory_card_projections(
                 operation_family,
                 next_action,
                 missing,
+                contract,
+                discharge,
+                reach,
+                witness,
                 required_safety_conditions,
                 obligation_evidence,
                 verify_commands,
@@ -1076,6 +1088,14 @@ fn advisory_card_projections(
         );
     }
     Ok(projections)
+}
+
+fn optional_card_string(card: &serde_json::Value, field: &str) -> Result<Option<String>, String> {
+    card.get(field)
+        .map(|_| {
+            super::require_non_empty_json_str(card, field, "cards.json card").map(str::to_string)
+        })
+        .transpose()
 }
 
 fn require_lsp_hover_hazard_projection(
@@ -1149,6 +1169,35 @@ fn require_lsp_hover_card_projection(
                     "{context} contents must project ReviewCard missing evidence `{missing}`"
                 ));
             }
+        }
+    }
+    for condition in &card.required_safety_conditions {
+        let description = condition
+            .get("description")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| {
+                "cards.json required safety condition is missing description".to_string()
+            })?;
+        let expected = format!("- {description}");
+        if !contents.contains(&expected) {
+            return Err(format!(
+                "{context} contents must project ReviewCard required safety condition `{description}`"
+            ));
+        }
+    }
+    for (field, expected) in [
+        ("contract", card.contract.as_deref()),
+        ("discharge", card.discharge.as_deref()),
+        ("reach", card.reach.as_deref()),
+        ("witness", card.witness.as_deref()),
+    ] {
+        let Some(expected) = expected else {
+            continue;
+        };
+        if !contents.contains(expected) {
+            return Err(format!(
+                "{context} contents must project ReviewCard {field} evidence summary `{expected}`"
+            ));
         }
     }
     for command in &card.verify_commands {
