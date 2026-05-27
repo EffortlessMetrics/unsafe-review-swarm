@@ -79,11 +79,11 @@ fn has_receiver_early_return_guard(context: ReceiverEvidenceContext<'_>, predica
     let Some((_prefix, after_guard)) = before_call.split_once(&guard) else {
         return false;
     };
-    let guard_returned = after_guard
-        .split_once('}')
-        .map_or(after_guard, |(guard_body, _after)| guard_body)
-        .contains("return");
-    guard_returned && !context.has_assignment_after_branch(after_guard)
+    let (guard_body, after_guard_body) = matching_code_block_end(after_guard)
+        .map_or((after_guard, ""), |body_end| {
+            (&after_guard[..body_end], &after_guard[body_end + 1..])
+        });
+    guard_body.contains("return") && !context.has_assignment_after_branch(after_guard_body)
 }
 
 fn has_receiver_positive_branch_guard(

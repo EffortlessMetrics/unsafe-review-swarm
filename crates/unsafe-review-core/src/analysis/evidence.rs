@@ -2939,12 +2939,28 @@ mod tests {
             "unsafe { result.unwrap_unchecked() }",
             vec![],
         );
+        let nested_option = site_with_family(
+            OperationFamily::UnwrapUnchecked,
+            vec![
+                "if option.is_none() {",
+                "    if should_count() {",
+                "        record_none();",
+                "    }",
+                "    return 0;",
+                "}",
+            ],
+            "unsafe { option.unwrap_unchecked() }",
+            vec![],
+        );
 
         let option_evidence = obligation_evidence(&option, &obligations, &contract, &reach);
         let result_evidence = obligation_evidence(&result, &obligations, &contract, &reach);
+        let nested_option_evidence =
+            obligation_evidence(&nested_option, &obligations, &contract, &reach);
 
         assert!(option_evidence[0].discharge.present);
         assert!(result_evidence[0].discharge.present);
+        assert!(nested_option_evidence[0].discharge.present);
     }
 
     #[test]
