@@ -455,6 +455,11 @@ fn hover_contents(card: &ReviewCard) -> String {
         card.priority.as_str(),
         card.confidence.as_str()
     ));
+    text.push_str(&format!(
+        "Location: {}:{}\n\n",
+        path_display(&card.site.location.file),
+        card.site.location.line
+    ));
     text.push_str("Why this card exists:\n");
     text.push_str(&format!(
         "- The changed code contains a `{}` unsafe operation that unsafe-review classifies as `{}`.\n",

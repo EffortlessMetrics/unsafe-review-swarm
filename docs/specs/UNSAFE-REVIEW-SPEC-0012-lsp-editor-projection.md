@@ -22,8 +22,9 @@ safety conditions, obligation-level evidence states, and the static-review
 trust boundary. Diagnostics also include the concrete operation expression from
 the `ReviewCard`, so editor consumers do not need to parse hover text or
 reclassify findings. Hover text is a compact reviewer view: card identity,
-relevant hazard families, required safety conditions, ReviewCard evidence
-summaries, missing evidence, next action, what would not resolve the card,
+human-readable location, relevant hazard families, required safety conditions,
+ReviewCard evidence summaries, missing evidence, next action, what would not
+resolve the card,
 including that widening unsafe scope, suppressing the card, or changing
 unrelated unsafe code is not a resolution; verify commands when available;
 witness route; card-scoped `explain` and `context --json` handoff commands; and

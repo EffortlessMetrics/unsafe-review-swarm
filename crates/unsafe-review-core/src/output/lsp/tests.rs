@@ -100,6 +100,12 @@ fn lsp_projection_is_parseable_and_read_only() -> Result<(), String> {
         value["hovers"][0]["contents"]
             .as_str()
             .unwrap_or("")
+            .contains("Location: src/lib.rs:8")
+    );
+    assert!(
+        value["hovers"][0]["contents"]
+            .as_str()
+            .unwrap_or("")
             .contains("Required safety conditions")
     );
     assert!(

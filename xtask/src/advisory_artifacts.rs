@@ -1304,6 +1304,7 @@ fn require_lsp_hover_card_projection(
             "operation family",
             format!("`{}` unsafe operation", card.operation_family),
         ),
+        ("location", format!("Location: {}:{}", card.path, card.line)),
         ("operation", format!("- Operation: `{}`", card.operation)),
         ("next action", format!("- {}", card.next_action)),
         (
