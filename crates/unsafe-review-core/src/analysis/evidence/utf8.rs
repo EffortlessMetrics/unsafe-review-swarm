@@ -1,7 +1,7 @@
 use super::{
-    compact_code, has_assignment_to_identifier, has_fresh_guard_pattern, is_receiver_path_char,
-    matching_call_argument_end, matching_code_block_end, source_value_identifier,
-    strip_block_comments_and_literals,
+    compact_code, contains_executable_return, has_assignment_to_identifier,
+    has_fresh_guard_pattern, is_receiver_path_char, matching_call_argument_end,
+    matching_code_block_end, source_value_identifier,
 };
 
 pub(super) fn has_from_utf8_unchecked_validation_evidence(lower: &str) -> bool {
@@ -157,7 +157,7 @@ fn has_validation_let_else_ok_guard(context: &Utf8ValidationContext<'_>) -> bool
             .map_or((after_else, ""), |else_end| {
                 (&after_else[..else_end], &after_else[else_end + 1..])
             });
-        if guard_body_contains_return(else_body)
+        if contains_executable_return(else_body)
             && !context.has_argument_assignment(after_else_body)
         {
             return true;
@@ -197,7 +197,7 @@ fn has_validation_if_let_err_return_guard(context: &Utf8ValidationContext<'_>) -
             .map_or((after_open, ""), |body_end| {
                 (&after_open[..body_end], &after_open[body_end + 1..])
             });
-        if guard_body_contains_return(guard_body)
+        if contains_executable_return(guard_body)
             && !context.has_argument_assignment(after_guard_body)
         {
             return true;
@@ -275,22 +275,13 @@ fn has_validation_early_return_guard(context: &Utf8ValidationContext<'_>, predic
             .map_or((after_guard, ""), |body_end| {
                 (&after_guard[..body_end], &after_guard[body_end + 1..])
             });
-        if guard_body_contains_return(guard_body) && !context.has_argument_assignment(after_branch)
+        if contains_executable_return(guard_body) && !context.has_argument_assignment(after_branch)
         {
             return true;
         }
         search_from = guard_start + guard.len();
     }
     false
-}
-
-fn guard_body_contains_return(guard_body: &str) -> bool {
-    let code = strip_block_comments_and_literals(guard_body);
-    code.starts_with("return")
-        || code.contains(";return")
-        || code.contains("{return")
-        || code.contains("}return")
-        || code.contains("=>return")
 }
 
 fn has_validation_question_mark_guard(context: &Utf8ValidationContext<'_>) -> bool {

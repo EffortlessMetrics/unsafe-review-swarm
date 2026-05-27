@@ -1,7 +1,7 @@
 use super::{
-    any_marker_tail, branch_still_open_at_operation, compact_code, contains_simple_assignment_to,
-    match_some_branch_after_marker, matching_call_argument_end, matching_code_block_end,
-    receiver_before_marker, strip_block_comments_and_literals,
+    any_marker_tail, branch_still_open_at_operation, compact_code, contains_executable_return,
+    contains_simple_assignment_to, match_some_branch_after_marker, matching_call_argument_end,
+    matching_code_block_end, receiver_before_marker, strip_block_comments_and_literals,
 };
 
 pub(super) fn get_unchecked_receiver_and_index(expression: &str) -> Option<(String, String)> {
@@ -121,7 +121,7 @@ impl<'a> GetUncheckedBoundsApplicability<'a> {
         guard_body: &str,
         after_guard_body: &str,
     ) -> bool {
-        guard_body.contains("return") && self.target_stays_fresh_after(after_guard_body)
+        contains_executable_return(guard_body) && self.target_stays_fresh_after(after_guard_body)
     }
 }
 

@@ -49,6 +49,15 @@ pub(super) fn strip_block_comments_and_literals(text: &str) -> String {
     output
 }
 
+pub(super) fn contains_executable_return(text: &str) -> bool {
+    let code = compact_code(&strip_block_comments_and_literals(text));
+    code.starts_with("return")
+        || code.contains(";return")
+        || code.contains("{return")
+        || code.contains("}return")
+        || code.contains("=>return")
+}
+
 pub(super) fn compact_contains_identifier(text: &str, ident: &str) -> bool {
     let mut cursor = text;
     while let Some(pos) = cursor.find(ident) {
@@ -74,7 +83,7 @@ pub(super) fn compact_code(lower: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::strip_block_comments_and_literals;
+    use super::{contains_executable_return, strip_block_comments_and_literals};
 
     #[test]
     fn strips_line_comment_text_without_removing_later_code() {
@@ -96,5 +105,14 @@ mod tests {
         assert!(!stripped.contains("\"return None\""));
         assert!(stripped.contains("\"\""));
         assert!(stripped.contains("return Some(());"));
+    }
+
+    #[test]
+    fn executable_return_detector_ignores_comments_and_literals() {
+        assert!(contains_executable_return("log(); return None;"));
+        assert!(contains_executable_return("Err(err) => return Err(err),"));
+        assert!(!contains_executable_return("/* return None */"));
+        assert!(!contains_executable_return("// return None\nlog();"));
+        assert!(!contains_executable_return("let note = \"return None\";"));
     }
 }

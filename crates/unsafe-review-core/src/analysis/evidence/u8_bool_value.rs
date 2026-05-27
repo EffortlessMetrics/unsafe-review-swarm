@@ -1,7 +1,6 @@
 use super::{
-    has_assignment_to_identifier, has_fresh_guard_pattern,
+    contains_executable_return, has_assignment_to_identifier, has_fresh_guard_pattern,
     has_open_positive_branch_guard_for_identifiers, matching_code_block_end,
-    strip_block_comments_and_literals,
 };
 
 pub(super) fn has_u8_bool_value_guard(before_call: &str, argument: &str) -> bool {
@@ -57,7 +56,7 @@ fn has_invalid_byte_returning_branch(before_call: &str, predicate: &str, argumen
             .map_or((after_guard, ""), |body_end| {
                 (&after_guard[..body_end], &after_guard[body_end + 1..])
             });
-        if guard_body_contains_return(guard_body)
+        if contains_executable_return(guard_body)
             && !has_assignment_to_identifier(after_branch, argument)
         {
             return true;
@@ -65,13 +64,4 @@ fn has_invalid_byte_returning_branch(before_call: &str, predicate: &str, argumen
         search_from = guard_start + guard.len();
     }
     false
-}
-
-fn guard_body_contains_return(guard_body: &str) -> bool {
-    let code = strip_block_comments_and_literals(guard_body);
-    code.starts_with("return")
-        || code.contains(";return")
-        || code.contains("{return")
-        || code.contains("}return")
-        || code.contains("=>return")
 }

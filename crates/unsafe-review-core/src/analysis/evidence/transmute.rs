@@ -1,7 +1,7 @@
 use super::{
-    branch_still_open_at_operation, has_assignment_to_identifier, matching_call_argument_end,
-    matching_code_block_end, matching_generic_argument_end, source_value_identifier,
-    split_top_level_pair, strip_block_comments_and_literals, u8_bool_valid_value_predicates,
+    branch_still_open_at_operation, contains_executable_return, has_assignment_to_identifier,
+    matching_call_argument_end, matching_code_block_end, matching_generic_argument_end,
+    source_value_identifier, split_top_level_pair, u8_bool_valid_value_predicates,
 };
 
 pub(super) fn has_transmute_layout_size_evidence(lower: &str) -> bool {
@@ -180,7 +180,7 @@ impl TransmuteValueDomainContext<'_> {
                 .map_or((after_guard, ""), |body_end| {
                     (&after_guard[..body_end], &after_guard[body_end + 1..])
                 });
-            if guard_body_contains_return(guard_body)
+            if contains_executable_return(guard_body)
                 && self.source_value_stays_fresh_after(after_branch)
             {
                 return true;
@@ -193,15 +193,6 @@ impl TransmuteValueDomainContext<'_> {
     fn source_value_stays_fresh_after(&self, evidence: &str) -> bool {
         !has_assignment_to_identifier(evidence, self.source_value_target)
     }
-}
-
-fn guard_body_contains_return(guard_body: &str) -> bool {
-    let code = strip_block_comments_and_literals(guard_body);
-    code.starts_with("return")
-        || code.contains(";return")
-        || code.contains("{return")
-        || code.contains("}return")
-        || code.contains("=>return")
 }
 
 fn normalize_size_of_paths(compact: &str) -> String {

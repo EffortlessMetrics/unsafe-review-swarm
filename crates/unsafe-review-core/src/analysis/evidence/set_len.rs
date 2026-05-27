@@ -1,9 +1,9 @@
 use super::{
-    code_context_through_site, compact_code, contains_receiver_path, contains_simple_assignment_to,
-    has_assignment_to_any_identifier, has_fresh_guard_pattern_for_identifiers,
-    has_open_positive_branch_guard_for_identifiers, is_receiver_path_char, is_simple_identifier,
-    let_binding_name, matching_call_argument_end, matching_code_block_end,
-    strip_block_comments_and_literals,
+    code_context_through_site, compact_code, contains_executable_return, contains_receiver_path,
+    contains_simple_assignment_to, has_assignment_to_any_identifier,
+    has_fresh_guard_pattern_for_identifiers, has_open_positive_branch_guard_for_identifiers,
+    is_receiver_path_char, is_simple_identifier, let_binding_name, matching_call_argument_end,
+    matching_code_block_end,
 };
 use crate::analysis::scanner::ScannedSite;
 use crate::domain::{EvidenceState, OperationFamily};
@@ -616,7 +616,7 @@ fn remaining_capacity_early_return_matches(
             .map_or((after_guard, ""), |body_end| {
                 (&after_guard[..body_end], &after_guard[body_end + 1..])
             });
-        if guard_body_contains_return(guard_body)
+        if contains_executable_return(guard_body)
             && !has_assignment_to_any_identifier(
                 after_branch,
                 &[receiver, additional_stale_identifier],
@@ -714,7 +714,7 @@ fn has_set_len_capacity_early_return(
             .map_or((after_guard, ""), |body_end| {
                 (&after_guard[..body_end], &after_guard[body_end + 1..])
             });
-        if guard_body_contains_return(guard_body)
+        if contains_executable_return(guard_body)
             && !has_assignment_to_any_identifier(after_branch, &stale_identifiers)
         {
             return true;
@@ -722,15 +722,6 @@ fn has_set_len_capacity_early_return(
         search_from = guard_start + guard.len();
     }
     false
-}
-
-fn guard_body_contains_return(guard_body: &str) -> bool {
-    let code = strip_block_comments_and_literals(guard_body);
-    code.starts_with("return")
-        || code.contains(";return")
-        || code.contains("{return")
-        || code.contains("}return")
-        || code.contains("=>return")
 }
 
 fn set_len_capacity_stale_identifiers<'a>(

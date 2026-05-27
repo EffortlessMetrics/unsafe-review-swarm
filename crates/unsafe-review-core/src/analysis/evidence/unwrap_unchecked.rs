@@ -1,7 +1,8 @@
 use super::{
-    branch_still_open_at_operation, compact_code, contains_receiver_fragment,
-    has_assignment_to_identifier, is_receiver_path_char, is_simple_identifier, is_some_binding,
-    matching_code_block_end, strip_block_comments_and_literals,
+    branch_still_open_at_operation, compact_code, contains_executable_return,
+    contains_receiver_fragment, has_assignment_to_identifier, is_receiver_path_char,
+    is_simple_identifier, is_some_binding, matching_code_block_end,
+    strip_block_comments_and_literals,
 };
 
 pub(super) fn has_unwrap_unchecked_infallible_result_evidence(lower: &str) -> bool {
@@ -83,7 +84,7 @@ fn has_receiver_early_return_guard(context: ReceiverEvidenceContext<'_>, predica
         .map_or((after_guard, ""), |body_end| {
             (&after_guard[..body_end], &after_guard[body_end + 1..])
         });
-    guard_body.contains("return") && !context.has_assignment_after_branch(after_guard_body)
+    contains_executable_return(guard_body) && !context.has_assignment_after_branch(after_guard_body)
 }
 
 fn has_receiver_positive_branch_guard(
@@ -116,7 +117,9 @@ fn has_receiver_let_else_as_ref_guard(
             .map_or((after_guard, ""), |body_end| {
                 (&after_guard[..body_end], &after_guard[body_end + 1..])
             });
-        if guard_body.contains("return") && !context.has_assignment_after_branch(after_guard_body) {
+        if contains_executable_return(guard_body)
+            && !context.has_assignment_after_branch(after_guard_body)
+        {
             return true;
         }
         search_from = guard_start + guard.len();

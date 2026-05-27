@@ -58,7 +58,8 @@ use self::call_syntax::{
 use self::callee_contract_discharge::callee_contract_discharge_state;
 use self::capacity_discharge::capacity_discharge_state;
 use self::code_text::{
-    compact_code, compact_contains_identifier, strip_block_comments_and_literals,
+    compact_code, compact_contains_identifier, contains_executable_return,
+    strip_block_comments_and_literals,
 };
 use self::contract_discharge::{
     DOCUMENTED_PRIVATE_UNSAFE_CONTRACT_DISCHARGE, PUBLIC_UNSAFE_API_CONTRACT_DISCHARGE,

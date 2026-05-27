@@ -1,7 +1,8 @@
 use super::{
-    branch_still_open_at_operation, compact_code, contains_simple_assignment_to, let_binding_name,
-    matching_call_argument_end, matching_code_block_end, receiver_before_marker,
-    split_top_level_arguments, strip_block_comments_and_literals,
+    branch_still_open_at_operation, compact_code, contains_executable_return,
+    contains_simple_assignment_to, let_binding_name, matching_call_argument_end,
+    matching_code_block_end, receiver_before_marker, split_top_level_arguments,
+    strip_block_comments_and_literals,
 };
 
 pub(super) fn has_vec_from_raw_parts_capacity_evidence(expression: &str, lower: &str) -> bool {
@@ -175,7 +176,9 @@ fn has_len_cap_early_return(before_call: &str, predicate: &str, len: &str, cap: 
             .map_or((after_guard, ""), |body_end| {
                 (&after_guard[..body_end], &after_guard[body_end + 1..])
             });
-        if guard_body.contains("return") && !has_len_cap_assignment(after_guard_body, len, cap) {
+        if contains_executable_return(guard_body)
+            && !has_len_cap_assignment(after_guard_body, len, cap)
+        {
             return true;
         }
         search_from = guard_start + guard.len();

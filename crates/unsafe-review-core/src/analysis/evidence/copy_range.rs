@@ -1,8 +1,7 @@
 use super::{
-    branch_still_open_at_operation, compact_code, compact_contains_identifier,
+    branch_still_open_at_operation, compact_code, contains_executable_return,
     contains_simple_assignment_to, is_receiver_path_char, matching_call_argument_end,
     matching_code_block_end, receiver_before_marker, split_top_level_arguments,
-    strip_block_comments_and_literals,
 };
 
 pub(super) fn has_copy_slice_range_evidence(expression: &str, before_call: &str) -> bool {
@@ -305,7 +304,7 @@ fn has_slice_count_early_return(
                     (&after_guard[..body_end], &after_guard[body_end + 1..])
                 });
             if condition_has_top_level_disjunct(condition, predicate)
-                && guard_body_contains_return(guard_body)
+                && contains_executable_return(guard_body)
                 && !has_slice_count_assignment(after_guard_body, receiver, count)
             {
                 return true;
@@ -314,11 +313,6 @@ fn has_slice_count_early_return(
         search_from = guard_start + 2;
     }
     false
-}
-
-fn guard_body_contains_return(guard_body: &str) -> bool {
-    let code = strip_block_comments_and_literals(guard_body);
-    compact_contains_identifier(&code, "return")
 }
 
 fn has_slice_count_assignment(compact: &str, receiver: &str, count: &str) -> bool {
