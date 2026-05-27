@@ -2116,10 +2116,26 @@ mod tests {
             "ptr::read(self.as_ptr() as *const [T; CAP])",
             vec![],
         );
+        let nested_short_buffer_guard = site_with_family(
+            OperationFamily::RawPointerRead,
+            vec![
+                "if self.len() < core::mem::size_of::<[T; CAP]>() {",
+                "    if should_count() {",
+                "        record_short_buffer(self.len());",
+                "    }",
+                "    return None;",
+                "}",
+            ],
+            "ptr::read(self.as_ptr() as *const [T; CAP])",
+            vec![],
+        );
 
         let evidence = obligation_evidence(&raw_read, &obligations, &contract, &reach);
+        let nested_guard_evidence =
+            obligation_evidence(&nested_short_buffer_guard, &obligations, &contract, &reach);
 
         assert!(evidence[0].discharge.present);
+        assert!(nested_guard_evidence[0].discharge.present);
     }
 
     #[test]
