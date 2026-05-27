@@ -2002,6 +2002,8 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "vec_set_len_unrelated_capacity_comparison_not_guard",
             "vec_set_len_cap_argument_not_guard",
             "vec_set_len_reassigned_receiver_not_guard",
+            "vec_set_len_reserve_reassigned_additional_not_guard",
+            "vec_set_len_try_reserve_reassigned_additional_not_guard",
         ] {
             let output = fixture_output(fixture)?;
             let card = single_card(fixture, &output)?;
@@ -2014,6 +2016,60 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             assert!(
                 card.missing.iter().any(|missing| missing.kind == "guard"),
                 "observing capacity without bounding new_len must keep the guard prompt"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn vec_set_len_accepts_pre_call_initialized_range_evidence() -> Result<(), String> {
+        for fixture in [
+            "vec_set_len_initialized_loop",
+            "vec_set_len_call_result_init",
+            "vec_set_len_shrink",
+            "vec_set_len_last_index_shrink",
+            "vec_set_len_start_bound_shrink",
+            "vec_set_len_zero_clear",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+            assert_eq!(card.operation.family, OperationFamily::VecSetLen);
+            assert!(
+                matches!(
+                    card.class,
+                    ReviewClass::GuardedUnwitnessed | ReviewClass::UnsafeUnreached
+                ),
+                "{fixture} should have initialized-range evidence without an open guard prompt"
+            );
+            assert!(obligation_discharge_present(card, "initialized"));
+            assert!(
+                card.missing.iter().all(|missing| missing.kind != "guard"),
+                "{fixture} should resolve the local initialized-range guard prompt"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn vec_set_len_capacity_only_evidence_keeps_initialized_range_gap() -> Result<(), String> {
+        for fixture in [
+            "vec_set_len_with_capacity",
+            "vec_set_len_reserve_capacity",
+            "vec_set_len_try_reserve_capacity",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+            assert_eq!(card.operation.family, OperationFamily::VecSetLen);
+            assert_eq!(card.class, ReviewClass::GuardMissing);
+            assert!(obligation_discharge_present(card, "capacity"));
+            assert!(!obligation_discharge_present(card, "initialized"));
+            assert!(
+                card.missing.iter().any(|missing| missing.kind == "guard"),
+                "{fixture} should keep the initialized-range guard prompt"
             );
         }
         Ok(())
