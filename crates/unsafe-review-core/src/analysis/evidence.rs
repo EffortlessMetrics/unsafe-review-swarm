@@ -2146,6 +2146,24 @@ mod tests {
             "unsafe { Some(One::new_unchecked(needle)) }",
             vec![],
         );
+        let line_comment_assert_guard = site_with_family(
+            OperationFamily::UnsafeFnCall,
+            vec!["// assert!(One::is_available());"],
+            "unsafe { Some(One::new_unchecked(needle)) }",
+            vec![],
+        );
+        let line_comment_open_guard = site_with_family(
+            OperationFamily::UnsafeFnCall,
+            vec!["// if One::is_available() {"],
+            "unsafe { Some(One::new_unchecked(needle)) }",
+            vec![],
+        );
+        let line_comment_unavailable_return_guard = site_with_family(
+            OperationFamily::UnsafeFnCall,
+            vec!["// if !One::is_available() { return None; }"],
+            "unsafe { Some(One::new_unchecked(needle)) }",
+            vec![],
+        );
         let unguarded = site_with_family(
             OperationFamily::UnsafeFnCall,
             vec![],
@@ -2176,6 +2194,16 @@ mod tests {
             &contract,
             &reach,
         );
+        let line_comment_assert_evidence =
+            obligation_evidence(&line_comment_assert_guard, &obligations, &contract, &reach);
+        let line_comment_open_evidence =
+            obligation_evidence(&line_comment_open_guard, &obligations, &contract, &reach);
+        let line_comment_unavailable_return_evidence = obligation_evidence(
+            &line_comment_unavailable_return_guard,
+            &obligations,
+            &contract,
+            &reach,
+        );
         let unguarded_evidence = obligation_evidence(&unguarded, &obligations, &contract, &reach);
 
         assert!(guarded_evidence[0].discharge.present);
@@ -2184,6 +2212,13 @@ mod tests {
         assert!(nested_unavailable_return_evidence[0].discharge.present);
         assert!(!comment_unavailable_return_evidence[0].discharge.present);
         assert!(!string_unavailable_return_evidence[0].discharge.present);
+        assert!(!line_comment_assert_evidence[0].discharge.present);
+        assert!(!line_comment_open_evidence[0].discharge.present);
+        assert!(
+            !line_comment_unavailable_return_evidence[0]
+                .discharge
+                .present
+        );
         assert!(!unguarded_evidence[0].discharge.present);
     }
 

@@ -1,6 +1,6 @@
 use super::{
     branch_still_open_at_operation, compact_code, contains_executable_return,
-    is_receiver_path_char, matching_code_block_end,
+    is_receiver_path_char, matching_code_block_end, strip_block_comments_and_literals,
 };
 
 pub(super) fn has_encode_utf8_remaining_capacity_evidence(lower: &str) -> bool {
@@ -47,7 +47,7 @@ pub(super) fn has_unchecked_constructor_availability_evidence(
     let Some(receiver) = unchecked_constructor_receiver(&compact_expression) else {
         return false;
     };
-    let compact = compact_code(lower);
+    let compact = compact_code(&strip_block_comments_and_literals(lower));
     let before_call = compact
         .find(&compact_expression)
         .map_or(compact.as_str(), |call_pos| &compact[..call_pos]);
