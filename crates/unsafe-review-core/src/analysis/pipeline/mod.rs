@@ -1971,6 +1971,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
         for fixture in [
             "maybeuninit_assume_init_write_guard",
             "maybeuninit_assume_init_open_branch_write_guard",
+            "maybeuninit_assume_init_open_branch_new_guard",
             "maybeuninit_assume_init_new_guard",
         ] {
             let output = fixture_output(fixture)?;
@@ -1997,6 +1998,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
         for fixture in [
             "maybeuninit_assume_init_comment_not_guard",
             "maybeuninit_assume_init_closed_branch_write_not_guard",
+            "maybeuninit_assume_init_closed_branch_new_not_guard",
             "maybeuninit_assume_init_other_slot_write_not_guard",
             "maybeuninit_assume_init_stale_write_not_guard",
             "maybeuninit_assume_init_stale_new_not_guard",
