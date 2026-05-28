@@ -311,6 +311,19 @@ label_source = "fixture_golden"
 rationale = "Length evidence for the original destination slice does not discharge valid-range evidence after destination reassignment."
 
 [[samples]]
+id = "ptr-copy-shadowed-dst-not-guard"
+fixture = "ptr_copy_slice_range_shadowed_dst_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Length evidence for the original destination slice does not discharge valid-range evidence after a later let-binding shadows the destination."
+
+[[samples]]
 id = "ptr-copy-other-len-not-guard"
 fixture = "ptr_copy_other_len_not_guard"
 kind = "false_positive_control"
