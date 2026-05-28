@@ -38,8 +38,9 @@ The useful fields for an agent handoff are:
 - `verify_commands`: suggested commands from the card. They are not executed by
   `unsafe-review`.
 - `do_not_do`: negative instructions that prevent broad unsafe rewrites,
-  suppressions, false witness claims, unrelated edits, and replacing executable
-  guard/discharge evidence with comments or docs.
+  suppressing the current card as a repair, broad suppressions, false witness
+  claims, unrelated edits, and replacing executable guard/discharge evidence
+  with comments or docs.
 - `stop_conditions`: when the agent should stop and hand the result back.
 
 ## Raw Pointer Alignment
@@ -191,7 +192,7 @@ Allowed:
 Do not:
   check a different pointer
   check for null after new_unchecked
-  add a broad suppression
+  suppress this card instead of exposing same-pointer evidence
   widen the unsafe block
 ```
 
@@ -505,7 +506,8 @@ Allowed:
 Do not:
   ask an agent to rewrite the unsafe code broadly
   invent a guard that is not tied to the ReviewCard obligation
-  suppress the card without exact reason, owner, expiry, and evidence
+  suppress this card as a repair instead of documenting an explicit waiver with
+  owner, expiry, and evidence
   claim unsupported static evidence proves safety
 ```
 
