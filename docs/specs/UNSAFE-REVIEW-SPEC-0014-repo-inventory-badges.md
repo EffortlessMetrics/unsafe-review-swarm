@@ -100,6 +100,8 @@ Badges must never imply that the repo is sound, memory-safe, UB-free,
 Miri-clean, verified, all clear, policy-ready, or that any unsafe site executed.
 If a badge endpoint cannot be generated or verified, the public badge row must
 be withheld or marked planned rather than inferred from another surface.
+Repository checks must reject checked-in endpoint JSON that no longer matches
+the current `unsafe-review badges` repo projection.
 
 ## Non-goals
 

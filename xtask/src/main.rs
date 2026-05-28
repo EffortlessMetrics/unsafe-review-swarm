@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use unsafe_review_core::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope};
 
 use calibration_constants::{
     CALIBRATION_CASE_FIELDS, CALIBRATION_REQUIRED_KINDS, HAZARD_KIND_SOURCE,
@@ -276,6 +277,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         }
         commands::XtaskCommand::CheckPr => {
             check_docs()?;
+            check_public_badge_endpoint_generation()?;
             check_policy()?;
             check_support_tiers()?;
             check_fixtures()?;
@@ -590,6 +592,7 @@ fn check_public_surfaces_impl() -> Result<usize, String> {
     }
 
     check_public_badge_endpoints()?;
+    check_public_badge_endpoint_generation()?;
     for path in PUBLIC_SURFACE_FRONT_DOORS {
         check_public_surface_front_door(path)?;
     }
@@ -5398,6 +5401,41 @@ fn check_public_badge_endpoints() -> Result<(), String> {
     Ok(())
 }
 
+fn check_public_badge_endpoint_generation() -> Result<(), String> {
+    let output = unsafe_review_core::analyze(AnalyzeInput {
+        root: repo_path("."),
+        scope: Scope::Repo,
+        diff: DiffSource::NoneRepoScan,
+        mode: AnalysisMode::Repo,
+        policy: PolicyMode::Advisory,
+        include_unchanged_tests: true,
+        max_cards: None,
+    })?;
+    let (main, plus) = unsafe_review_core::render_badge_jsons(&output);
+    for (path, expected_text) in [
+        ("badges/unsafe-review.json", main),
+        ("badges/unsafe-review-plus.json", plus),
+    ] {
+        let actual = parse_json_file(&workspace_path(path))?;
+        let expected: serde_json::Value = serde_json::from_str(&expected_text)
+            .map_err(|err| format!("generated badge JSON for {path} did not parse: {err}"))?;
+        if actual != expected {
+            let actual_message = actual
+                .get("message")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("<missing>");
+            let expected_message = expected
+                .get("message")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("<missing>");
+            return Err(format!(
+                "{path} is stale (checked-in message {actual_message}, generated message {expected_message}); run `cargo run --locked -p unsafe-review -- badges --out badges/`"
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn require_numeric_badge_message(path: &str, message: &str) -> Result<(), String> {
     if message.chars().all(|ch| ch.is_ascii_digit()) {
         Ok(())
@@ -9024,6 +9062,11 @@ Snapshot reports:
     #[test]
     fn public_badge_endpoints_match_readme_and_json() -> Result<(), String> {
         check_public_badge_endpoints()
+    }
+
+    #[test]
+    fn public_badge_endpoints_match_generated_repo_projection() -> Result<(), String> {
+        check_public_badge_endpoint_generation()
     }
 
     #[test]
