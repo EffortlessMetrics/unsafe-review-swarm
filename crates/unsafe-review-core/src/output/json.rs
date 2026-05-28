@@ -433,6 +433,7 @@ mod tests {
         "vec_set_len_cap_argument_not_guard",
         "vec_set_len_reassigned_receiver_not_guard",
         "vec_set_len_reassigned_new_len_not_guard",
+        "vec_set_len_compound_reassigned_new_len_not_guard",
         "vec_set_len_with_capacity",
         "vec_set_len_reserve_capacity",
         "vec_set_len_reserve_reassigned_additional_not_guard",

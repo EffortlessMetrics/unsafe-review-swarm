@@ -1,0 +1,20 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,17 @@
++pub fn extend_after_compound_new_len(values: &mut Vec<u8>, mut new_len: usize) {
++    assert!(new_len <= values.capacity());
++    new_len += 1;
++    // SAFETY: this fixture intentionally mutates the checked new length before use.
++    unsafe { values.set_len(new_len) }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::extend_after_compound_new_len;
++
++    #[test]
++    fn mentions_extend_after_compound_new_len() {
++        let _ = stringify!(extend_after_compound_new_len);
++    }
++}

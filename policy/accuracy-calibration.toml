@@ -464,6 +464,7 @@ fixtures = [
   "vec_set_len_unrelated_const_cap_not_guard",
   "vec_set_len_reassigned_receiver_not_guard",
   "vec_set_len_reassigned_new_len_not_guard",
+  "vec_set_len_compound_reassigned_new_len_not_guard",
   "vec_set_len_call_result_init",
   "vec_set_len_shrink",
   "vec_set_len_last_index_shrink",
@@ -492,7 +493,8 @@ reserve/try_reserve evidence from comment-only, post-init,
 unrelated-initialization, partial-slice initialization, single-index
 initialization, unrelated-capacity, unrelated-const-cap, other-receiver shrink,
 stale-receiver, stale-with-capacity receiver, stale-with-capacity new length,
-stale-new-len, stale-additional, and cap-name-only controls in the listed fixtures.
+stale-new-len, compound-stale-new-len, stale-additional, and cap-name-only
+controls in the listed fixtures.
 """
 forbidden_claims = [
   "broad Vec soundness",
