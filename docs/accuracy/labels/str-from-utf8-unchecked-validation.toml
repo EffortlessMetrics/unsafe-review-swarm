@@ -169,6 +169,19 @@ label_source = "fixture_golden"
 rationale = "UTF-8 validation of another buffer does not discharge the target buffer's unchecked conversion."
 
 [[samples]]
+id = "utf8-unchecked-prefix-validation-not-guard"
+fixture = "str_from_utf8_unchecked_prefix_validation_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "utf8"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "UTF-8 validation of a prefix slice does not discharge the full buffer's unchecked conversion."
+
+[[samples]]
 id = "utf8-unchecked-observed-not-guard"
 fixture = "str_from_utf8_unchecked_is_ok_observed_not_guard"
 kind = "false_positive_control"

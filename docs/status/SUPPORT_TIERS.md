@@ -173,4 +173,6 @@ stale-buffer rejection after if-let `Err` validation,
 `str_from_utf8_unchecked_let_else_ok_reassigned_not_guard` for stale-buffer
 rejection after let-else validation, and
 `str_from_utf8_unchecked_match_ok_reassigned_not_guard` for stale-buffer
-rejection after reassignment inside that arm.
+rejection after reassignment inside that arm, and
+`str_from_utf8_unchecked_prefix_validation_not_guard` for rejecting prefix-only
+UTF-8 validation as full-buffer evidence.
