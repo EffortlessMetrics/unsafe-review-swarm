@@ -1,0 +1,22 @@
+pub fn copy_overlapping_checked(mut src: &[u8], dst: &mut [u8], count: usize, fallback: &[u8]) {
+    if count > src.len() || count > dst.len() {
+        return;
+    }
+    src = fallback;
+    // SAFETY: fixture has a stale disjunctive early-return range check; source is reassigned before use.
+    unsafe { core::ptr::copy(src.as_ptr(), dst.as_mut_ptr(), count) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::copy_overlapping_checked;
+
+    #[test]
+    fn copies_from_fallback() {
+        let src = [1_u8, 2, 3, 4];
+        let fallback = [5_u8, 6, 7, 8];
+        let mut dst = [0_u8; 4];
+        copy_overlapping_checked(&src, &mut dst, fallback.len(), &fallback);
+        assert_eq!(dst, fallback);
+    }
+}

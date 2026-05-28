@@ -155,6 +155,19 @@ label_source = "fixture_golden"
 rationale = "Invalid-range early-return evidence becomes stale when count is reassigned before the copy."
 
 [[samples]]
+id = "ptr-copy-disjunctive-return-reassigned-src-not-guard"
+fixture = "ptr_copy_slice_range_disjunctive_early_return_reassigned_src_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Invalid-range early-return evidence becomes stale when the source slice is reassigned before the copy."
+
+[[samples]]
 id = "ptr-copy-open-branch-reassigned-count-not-guard"
 fixture = "ptr_copy_slice_range_open_branch_reassigned_count_not_guard"
 kind = "false_positive_control"

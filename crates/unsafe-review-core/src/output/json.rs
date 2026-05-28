@@ -332,6 +332,7 @@ mod tests {
         "ptr_copy_slice_range_or_branch_not_guard",
         "ptr_copy_slice_range_disjunctive_early_return_block_comment_not_guard",
         "ptr_copy_slice_range_disjunctive_early_return_reassigned_count_not_guard",
+        "ptr_copy_slice_range_disjunctive_early_return_reassigned_src_not_guard",
         "ptr_copy_slice_range_open_branch_reassigned_count_not_guard",
         "ptr_copy_slice_range_open_branch_reassigned_src_not_guard",
         "ptr_copy_slice_range_open_branch_reassigned_dst_not_guard",
