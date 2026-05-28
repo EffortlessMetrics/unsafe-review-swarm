@@ -1,7 +1,7 @@
-use super::{compact_code, matching_generic_argument_end};
+use super::{compact_code, matching_generic_argument_end, strip_block_comments_and_literals};
 
 pub(super) fn has_zeroed_known_valid_zero_type(lower: &str) -> bool {
-    let compact = compact_code(lower);
+    let compact = compact_code(&strip_block_comments_and_literals(lower));
     let Some(context) = ZeroedTargetContext::from_compact(&compact) else {
         return false;
     };

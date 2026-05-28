@@ -4250,10 +4250,42 @@ mod tests {
             "unsafe { core::mem::zeroed::<core::ptr::NonNull<u8>>() }",
             vec![],
         );
+        let line_comment_known_valid_zeroed = site_with_family(
+            OperationFamily::Zeroed,
+            vec![
+                "pub fn invalid_zeroed_nonnull() -> core::ptr::NonNull<u8> {",
+                "// unsafe { core::mem::zeroed::<bool>() }",
+            ],
+            "unsafe { core::mem::zeroed::<core::ptr::NonNull<u8>>() }",
+            vec![],
+        );
+        let string_literal_known_valid_zeroed = site_with_family(
+            OperationFamily::Zeroed,
+            vec![
+                "pub fn invalid_zeroed_nonnull() -> core::ptr::NonNull<u8> {",
+                "let _note = \"unsafe { core::mem::zeroed::<bool>() }\";",
+            ],
+            "unsafe { core::mem::zeroed::<core::ptr::NonNull<u8>>() }",
+            vec![],
+        );
 
         let evidence = obligation_evidence(&zeroed, &obligations, &contract, &reach);
+        let line_comment_evidence = obligation_evidence(
+            &line_comment_known_valid_zeroed,
+            &obligations,
+            &contract,
+            &reach,
+        );
+        let string_literal_evidence = obligation_evidence(
+            &string_literal_known_valid_zeroed,
+            &obligations,
+            &contract,
+            &reach,
+        );
 
         assert!(!evidence[0].discharge.present);
+        assert!(!line_comment_evidence[0].discharge.present);
+        assert!(!string_literal_evidence[0].discharge.present);
     }
 
     #[test]
