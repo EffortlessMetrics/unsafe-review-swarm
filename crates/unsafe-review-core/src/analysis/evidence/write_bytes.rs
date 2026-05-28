@@ -166,7 +166,7 @@ pub(super) fn has_bool_write_bytes_value_evidence(site: &ScannedSite, lower: &st
 }
 
 pub(super) fn has_write_bytes_bounds_evidence(lower: &str) -> bool {
-    let compact = compact_code(lower);
+    let compact = compact_code(&strip_block_comments_and_literals(lower));
     let Some(context) = WriteBytesCallContext::from_compact(&compact) else {
         return false;
     };

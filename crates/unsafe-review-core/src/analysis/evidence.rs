@@ -3248,6 +3248,53 @@ mod tests {
     }
 
     #[test]
+    fn write_bytes_bounds_evidence_ignores_comments_and_literals() {
+        let obligations = vec![SafetyObligation::new(
+            "bounds",
+            "write_bytes target range is in bounds",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let matching = site_with_family(
+            OperationFamily::RawPointerWrite,
+            vec![],
+            "unsafe { bytes.as_mut_ptr().write_bytes(byte, bytes.len()) }",
+            vec![],
+        );
+        let block_comment = site_with_family(
+            OperationFamily::RawPointerWrite,
+            vec![],
+            "unsafe { /* bytes.as_mut_ptr().write_bytes(byte, bytes.len()) */ ptr.write_bytes(byte, len) }",
+            vec![],
+        );
+        let string_literal = site_with_family(
+            OperationFamily::RawPointerWrite,
+            vec![],
+            "unsafe { let _note = \"bytes.as_mut_ptr().write_bytes(byte, bytes.len())\"; ptr.write_bytes(byte, len) }",
+            vec![],
+        );
+
+        assert!(
+            obligation_evidence(&matching, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&block_comment, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&string_literal, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+    }
+
+    #[test]
     fn copy_range_bounds_require_same_source_destination_and_count() {
         let obligations = vec![SafetyObligation::new(
             "bounds",
