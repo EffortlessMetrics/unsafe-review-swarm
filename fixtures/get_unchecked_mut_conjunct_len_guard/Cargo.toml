@@ -1,0 +1,4 @@
+[package]
+name = "get-unchecked-mut-conjunct-len-guard-fixture"
+version = "0.1.0"
+edition = "2024"

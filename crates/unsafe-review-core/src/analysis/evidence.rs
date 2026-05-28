@@ -2796,6 +2796,18 @@ mod tests {
             "unsafe { values.get_unchecked_mut(index) }",
             vec!["}"],
         );
+        let matching_conjunct_guard = site_with_family(
+            OperationFamily::GetUnchecked,
+            vec!["if index < values.len() && allow {"],
+            "unsafe { values.get_unchecked_mut(index) }",
+            vec!["}"],
+        );
+        let disjunctive_bounds_branch = site_with_family(
+            OperationFamily::GetUnchecked,
+            vec!["if index < values.len() || allow {"],
+            "unsafe { values.get_unchecked_mut(index) }",
+            vec!["}"],
+        );
         let matching_return_guard = site_with_family(
             OperationFamily::GetUnchecked,
             vec!["if index >= values.len() { return None; }"],
@@ -2936,6 +2948,16 @@ mod tests {
         );
         assert!(
             obligation_evidence(&matching_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            obligation_evidence(&matching_conjunct_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&disjunctive_bounds_branch, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
         );

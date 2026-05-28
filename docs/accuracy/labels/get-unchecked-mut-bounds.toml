@@ -39,6 +39,20 @@ label_source = "fixture_golden"
 rationale = "A same-receiver len guard before get_unchecked_mut discharges the bounds obligation."
 
 [[samples]]
+id = "get-unchecked-mut-conjunct-len-guard-present"
+fixture = "get_unchecked_mut_conjunct_len_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-receiver len guard in a top-level conjunctive branch discharges the bounds obligation when the unsafe access remains inside that open branch."
+
+[[samples]]
 id = "get-unchecked-mut-get-probe-guard-present"
 fixture = "get_unchecked_mut_get_probe_guard"
 kind = "positive"
@@ -121,6 +135,20 @@ expected_discharge_state = "missing"
 expected_witness_route_kinds = ["miri", "cargo-careful"]
 label_source = "fixture_golden"
 rationale = "A len guard for another receiver does not discharge get_unchecked_mut bounds evidence."
+
+[[samples]]
+id = "get-unchecked-mut-disjunct-len-not-guard"
+fixture = "get_unchecked_mut_disjunct_len_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A disjunctive branch can reach get_unchecked_mut when the bounds predicate is false, so it does not discharge the bounds obligation."
 
 [[samples]]
 id = "get-unchecked-mut-post-check-not-guard"

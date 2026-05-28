@@ -1,0 +1,12 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,8 @@
++pub fn pick_when_allowed_or_checked(values: &mut [u8], index: usize, allow: bool) -> Option<&mut u8> {
++    if index < values.len() || allow {
++        // SAFETY: `allow` is not bounds evidence for `values[index]`.
++        Some(unsafe { values.get_unchecked_mut(index) })
++    } else {
++        None
++    }
++}
