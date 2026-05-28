@@ -711,6 +711,7 @@ fixtures = [
   "transmute_bool_closed_if_observed_not_guard",
   "transmute_bool_guard_then_reassigned_not_guard",
   "transmute_bool_guard_then_compound_reassigned_not_guard",
+  "transmute_bool_guard_then_shadowed_not_guard",
   "transmute_copy_invalid_value",
   "transmute_copy_layout_size_guard",
   "transmute_copy_bool_valid_value_guard",

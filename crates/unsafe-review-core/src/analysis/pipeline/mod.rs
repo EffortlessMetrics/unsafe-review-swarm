@@ -2232,6 +2232,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "transmute_bool_closed_if_observed_not_guard",
             "transmute_bool_guard_then_reassigned_not_guard",
             "transmute_bool_guard_then_compound_reassigned_not_guard",
+            "transmute_bool_guard_then_shadowed_not_guard",
         ] {
             let output = fixture_output(fixture)?;
             let card = single_card(fixture, &output)?;

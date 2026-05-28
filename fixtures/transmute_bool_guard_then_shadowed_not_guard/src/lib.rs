@@ -1,0 +1,18 @@
+pub fn byte_to_bool_shadowed(input: u8) -> bool {
+    assert_eq!(core::mem::size_of::<u8>(), core::mem::size_of::<bool>());
+    let value = input;
+    assert!(value <= 1);
+    let value = 2;
+    // SAFETY: fixture deliberately shadows the checked byte before transmute.
+    unsafe { core::mem::transmute::<u8, bool>(value) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::byte_to_bool_shadowed;
+
+    #[test]
+    fn mentions_byte_to_bool_shadowed() {
+        let _ = stringify!(byte_to_bool_shadowed);
+    }
+}

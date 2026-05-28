@@ -259,6 +259,7 @@ required_core_fixtures = [
   "transmute_bool_closed_if_observed_not_guard",
   "transmute_bool_guard_then_reassigned_not_guard",
   "transmute_bool_guard_then_compound_reassigned_not_guard",
+  "transmute_bool_guard_then_shadowed_not_guard",
   "transmute_copy_invalid_value",
   "transmute_copy_layout_size_guard",
   "transmute_copy_bool_valid_value_guard",
@@ -2882,6 +2883,16 @@ expected_hazard = "invalid_value"
 fixture = "transmute_bool_guard_then_compound_reassigned_not_guard"
 kind = "false_positive_control"
 claim = "transmute::<u8, bool> does not accept bool-domain evidence that is stale after compound reassignment"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "transmute_bool_guard_then_shadowed_not_guard"
+kind = "false_positive_control"
+claim = "transmute::<u8, bool> does not accept bool-domain evidence that is stale after source value shadowing"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
