@@ -1,6 +1,6 @@
 # Objective audit
 
-Date: 2026-05-23
+Date: 2026-05-28
 Status: active objective partially achieved; fixture-pinned calibration rail is
 installed; dogfood-backed evidence remains experimental; continue broader
 calibration before support-tier or policy promotion
@@ -39,6 +39,10 @@ returns, other receivers, bare observations, and closed branches.
 Long unsafe-function bodies and `macro_rules!` bodies now have fixture-backed
 owner identity coverage while leaving operation families and advisory
 classifications unchanged.
+Recent applicability helper work also makes same-target and freshness checks
+explicit for the initial family sequence, including `get_unchecked`,
+`NonNull::new_unchecked`, `MaybeUninit::assume_init`, `Vec::set_len`, and
+`transmute` / `transmute_copy` value-domain evidence.
 
 The latest closed execution lane is recorded in
 `docs/status/DOGFOOD_CALIBRATED_EVIDENCE_LANE.md` and
@@ -49,7 +53,7 @@ The active calibration rail is now recorded in
 `.unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md`,
 `policy/accuracy-calibration.toml`, and
 `docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 34
-fixture-pinned claims, 263 calibration cases, 34 label ledgers, and 274 label
+fixture-pinned claims, 285 calibration cases, 34 label ledgers, and 293 label
 samples. It records zero dogfood-measured, labeled-calibrated, or
 policy-eligible claims. That is intentional: the current report is a
 claim-scoped fixture-pinned proof index, not a global precision/recall result
@@ -250,6 +254,7 @@ rtk git diff --check
 Targeted proof commands added by recent receipt work:
 
 ```bash
+rtk cargo test -p unsafe-review-core receipt_audit --locked
 rtk cargo test -p unsafe-review-core receipt --locked
 rtk cargo test -p unsafe-review-core imported_receipt --locked
 rtk cargo test -p unsafe-review-cli receipt_template --locked
