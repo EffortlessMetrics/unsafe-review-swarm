@@ -34,9 +34,9 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
         out.push_str("No receipt files found.\n\n");
     } else {
         out.push_str(
-            "| Status | Receipt | Card | Matched card | Tool | Strength | Author | Recorded | Expires | Command hash | Routed tools | Issues |\n",
+            "| Status | Receipt | Card | Matched card | Tool | Strength | Author | Recorded | Expires | Command hash | Limitations | Routed tools | Issues |\n",
         );
-        out.push_str("|---|---|---|---|---|---|---|---|---|---|---|---|\n");
+        out.push_str("|---|---|---|---|---|---|---|---|---|---|---|---|---|\n");
         for receipt in &report.receipts {
             out.push_str(&receipt_row(receipt));
         }
@@ -57,7 +57,7 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
 
 fn receipt_row(receipt: &crate::analysis::receipts::ReceiptAuditEntry) -> String {
     format!(
-        "| {} | `{}` | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
+        "| {} | `{}` | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
         markdown_cell(&receipt.statuses.join(", ")),
         receipt.path,
         optional_code(receipt.card_id.as_deref()),
@@ -68,9 +68,17 @@ fn receipt_row(receipt: &crate::analysis::receipts::ReceiptAuditEntry) -> String
         optional_code(receipt.recorded_at.as_deref()),
         optional_code(receipt.expires_at.as_deref()),
         optional_code(receipt.command_hash.as_deref()),
+        limitations_cell(&receipt.limitations),
         route_tools(&receipt.route_tools),
         issues_cell(&receipt.issues)
     )
+}
+
+fn limitations_cell(limitations: &[String]) -> String {
+    if limitations.is_empty() {
+        return "-".to_string();
+    }
+    markdown_cell(&limitations.join("; "))
 }
 
 fn route_tools(tools: &[String]) -> String {
@@ -161,6 +169,7 @@ mod tests {
                     recorded_at: Some("2026-05-20T00:00:00Z".to_string()),
                     expires_at: Some("2026-08-18".to_string()),
                     command_hash: None,
+                    limitations: Vec::new(),
                     statuses: vec!["stale".to_string(), "unmatched".to_string()],
                     issues: vec![
                         "receipt card_id is not present in the current ReviewCard set".to_string(),
@@ -180,6 +189,7 @@ mod tests {
                     recorded_at: Some("2026-05-20T00:00:00Z".to_string()),
                     expires_at: Some("2026-08-18".to_string()),
                     command_hash: Some("4ce9d7c8eeb19a30".to_string()),
+                    limitations: vec!["fixture only".to_string()],
                     statuses: vec![
                         "command_hash_mismatch".to_string(),
                         "matched".to_string(),
@@ -212,12 +222,13 @@ mod tests {
         assert!(markdown.contains("Command hash mismatch"));
         assert!(markdown.contains("| 2 | 1 | 1 | 0 | 1 | 0 | 1 | 1 | 1 | 0 | 0 |"));
         assert!(markdown.contains(
-            "| Status | Receipt | Card | Matched card | Tool | Strength | Author | Recorded | Expires | Command hash | Routed tools | Issues |"
+            "| Status | Receipt | Card | Matched card | Tool | Strength | Author | Recorded | Expires | Command hash | Limitations | Routed tools | Issues |"
         ));
         assert!(markdown.contains("`core/fixtures`"));
         assert!(markdown.contains("`2026-05-20T00:00:00Z`"));
         assert!(markdown.contains("`2026-08-18`"));
         assert!(markdown.contains("`4ce9d7c8eeb19a30`"));
+        assert!(markdown.contains("fixture only"));
         assert!(markdown.contains("`miri`, `cargo-careful`"));
         assert!(markdown.contains("stale, unmatched"));
         assert!(

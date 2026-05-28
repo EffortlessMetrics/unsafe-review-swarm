@@ -116,6 +116,7 @@ pub struct ReceiptAuditEntry {
     pub recorded_at: Option<String>,
     pub expires_at: Option<String>,
     pub command_hash: Option<String>,
+    pub limitations: Vec<String>,
     pub statuses: Vec<String>,
     pub issues: Vec<String>,
     pub matched_card: Option<ReceiptAuditCard>,
@@ -289,6 +290,7 @@ fn audit_receipt_record(
             recorded_at: None,
             expires_at: None,
             command_hash: None,
+            limitations: Vec::new(),
             statuses: statuses.into_iter().collect(),
             issues,
             matched_card: None,
@@ -308,6 +310,7 @@ fn audit_receipt_record(
             recorded_at: None,
             expires_at: None,
             command_hash: None,
+            limitations: Vec::new(),
             statuses: statuses.into_iter().collect(),
             issues,
             matched_card: None,
@@ -385,6 +388,7 @@ fn audit_receipt_record(
         recorded_at: receipt.recorded_at,
         expires_at: receipt.expires_at,
         command_hash: receipt.command_hash,
+        limitations: receipt.limitations.unwrap_or_default(),
         statuses: statuses.into_iter().collect(),
         issues,
         matched_card: matched.map(|card| ReceiptAuditCard {
@@ -859,6 +863,7 @@ mod tests {
             Some("2025-12-18T00:00:00Z")
         );
         assert_eq!(matched_entry.author.as_deref(), Some("core/fixtures"));
+        assert_eq!(matched_entry.limitations, vec!["fixture only"]);
         let duplicate_entries = report
             .receipts
             .iter()
