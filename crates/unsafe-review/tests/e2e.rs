@@ -1427,6 +1427,12 @@ fn receipt_audit_reports_matching_saved_receipts_without_running_witnesses()
     );
     let receipt = &value["receipts"][0];
     assert_eq!(receipt["receipt_tool"], "miri");
+    assert_eq!(receipt["summary"], "focused fixture witness passed");
+    assert_eq!(receipt["author"], "core/fixtures");
+    assert_eq!(receipt["recorded_at"], "2026-05-18T00:00:00Z");
+    assert_eq!(receipt["expires_at"], "2026-08-18");
+    assert_eq!(receipt["command_hash"], "3e163b0bce29ff2e");
+    assert_eq!(receipt["limitations"][0], "fixture only");
     assert!(
         receipt["statuses"]
             .as_array()
@@ -1469,6 +1475,13 @@ fn receipt_audit_reports_matching_saved_receipts_without_running_witnesses()
     assert!(markdown.contains("# unsafe-review receipt audit"));
     assert!(markdown.contains("Duplicate"));
     assert!(markdown.contains("Matched card"));
+    assert!(markdown.contains("Summary"));
+    assert!(markdown.contains("focused fixture witness passed"));
+    assert!(markdown.contains("core/fixtures"));
+    assert!(markdown.contains("2026-05-18T00:00:00Z"));
+    assert!(markdown.contains("2026-08-18"));
+    assert!(markdown.contains("3e163b0bce29ff2e"));
+    assert!(markdown.contains("fixture only"));
     assert!(markdown.contains("raw_pointer_read"));
     assert!(markdown.contains("unsafe { ptr.cast::<Header>().read() }"));
     assert!(markdown.contains("Add or expose"));
