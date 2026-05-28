@@ -707,6 +707,7 @@ fixtures = [
   "transmute_bool_value_observed_not_guard",
   "transmute_bool_closed_if_observed_not_guard",
   "transmute_bool_guard_then_reassigned_not_guard",
+  "transmute_bool_guard_then_compound_reassigned_not_guard",
   "transmute_copy_invalid_value",
   "transmute_copy_layout_size_guard",
   "transmute_copy_bool_valid_value_guard",
@@ -725,8 +726,8 @@ allowed_public_claim = """
 Fixture-pinned transmute bool valid-value evidence distinguishes dominating
 bool-domain and invalid-byte early-return guards from layout-only,
 closed-layout, observed-layout, comment-only, other-value, observed,
-closed-branch, stale-byte, and multiline transmute_copy controls in the listed
-fixtures.
+closed-branch, stale-byte, compound-stale-byte, and multiline transmute_copy
+controls in the listed fixtures.
 """
 forbidden_claims = [
   "broad transmute soundness",

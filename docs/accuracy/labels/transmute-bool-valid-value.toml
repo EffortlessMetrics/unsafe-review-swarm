@@ -160,6 +160,19 @@ label_source = "fixture_golden"
 rationale = "Bool-domain evidence becomes stale when the transmuted byte is reassigned before use."
 
 [[samples]]
+id = "transmute-bool-compound-reassigned-not-guard"
+fixture = "transmute_bool_guard_then_compound_reassigned_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Bool-domain evidence becomes stale when the transmuted byte is compound reassigned before use."
+
+[[samples]]
 id = "transmute-copy-bool-missing-valid-value"
 fixture = "transmute_copy_invalid_value"
 kind = "positive"

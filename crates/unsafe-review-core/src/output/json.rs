@@ -472,6 +472,7 @@ mod tests {
         "transmute_bool_valid_value_guard",
         "transmute_bool_invalid_return_guard",
         "transmute_bool_other_value_not_guard",
+        "transmute_bool_guard_then_compound_reassigned_not_guard",
         "transmute_copy_invalid_value",
         "transmute_copy_layout_size_guard",
         "transmute_copy_bool_valid_value_guard",
