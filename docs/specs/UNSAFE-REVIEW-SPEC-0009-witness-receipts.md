@@ -84,9 +84,10 @@ decisions, or claiming safety. Matched receipt entries include current card
 operation, missing-count, and next-action context. Audit entries include the
 current card's routed witness tools so a reviewer can compare the saved receipt
 tool against the ReviewCard route. Audit entries also include the saved
-`command_hash` when present and surface command-hash mismatches as their own
-audit status so reviewers can compare command-string drift without treating it
-as proof that the command ran.
+`recorded_at` timestamp and saved `command_hash` when present, and surface
+command-hash mismatches as their own audit status so reviewers can compare
+receipt recency and command-string drift without treating either as proof that
+the command ran.
 When a matching receipt is imported as ReviewCard witness evidence, the
 evidence summary also includes the saved `command_hash` when present so
 card-level projections keep the same drift key visible.
@@ -192,9 +193,9 @@ calendar-valid `YYYY-MM-DD` date on or after the `recorded_at` date.
   wrong-identity, wrong-tool, weaker-than-required, command-hash-mismatch,
   duplicate, and invalid receipts without executing witnesses or making policy
   decisions.
-- Receipt-audit JSON and Markdown include limitations that preserve the saved
-  metadata boundary and state that matched receipts only improve witness
-  evidence.
+- Receipt-audit JSON and Markdown include per-receipt `recorded_at` metadata
+  and limitations that preserve the saved metadata boundary and state that
+  matched receipts only improve witness evidence.
 
 ## CI proof
 

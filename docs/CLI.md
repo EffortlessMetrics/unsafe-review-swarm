@@ -406,11 +406,12 @@ The audit reports matched, unmatched, stale, expired, wrong-identity,
 wrong-tool, weaker-than-required, command-hash-mismatch, duplicate, and invalid
 receipt metadata. Matched receipts include current ReviewCard operation
 expression, operation family, missing-count, next-action context, routed witness
-tools, and the saved `command_hash` when present so receipt evidence does not
-hide remaining gaps. The command hash is drift metadata only, not proof that
-the command ran. It is advisory only: it does not execute witness commands,
-infer site reach, make policy decisions, or claim safety. JSON and Markdown
-output include limitations that keep the saved-metadata boundary explicit.
+tools, saved `recorded_at` timestamp, and the saved `command_hash` when present
+so receipt evidence does not hide remaining gaps. The command hash is drift
+metadata only, not proof that the command ran. It is advisory only: it does not
+execute witness commands, infer site reach, make policy decisions, or claim
+safety. JSON and Markdown output include limitations that keep the
+saved-metadata boundary explicit.
 When a receipt matches a card, the ReviewCard witness evidence summary also
 keeps the saved command hash visible when present.
 
