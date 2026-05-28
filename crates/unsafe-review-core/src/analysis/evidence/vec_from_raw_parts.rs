@@ -14,7 +14,7 @@ pub(super) fn has_vec_from_raw_parts_origin_len_cap_evidence(
     expression: &str,
     lower: &str,
 ) -> bool {
-    VecFromRawPartsCallContext::from_code(expression, lower)
+    VecFromRawPartsCallContext::from_code(expression, &strip_block_comments_and_literals(lower))
         .is_some_and(|context| context.has_same_origin_len_cap_evidence())
 }
 
@@ -22,7 +22,7 @@ pub(super) fn has_vec_from_raw_parts_origin_initialized_evidence(
     expression: &str,
     lower: &str,
 ) -> bool {
-    VecFromRawPartsCallContext::from_code(expression, lower)
+    VecFromRawPartsCallContext::from_code(expression, &strip_block_comments_and_literals(lower))
         .is_some_and(|context| context.has_same_origin_initialized_evidence())
 }
 
@@ -30,12 +30,12 @@ pub(super) fn has_vec_from_raw_parts_origin_pointer_live_evidence(
     expression: &str,
     lower: &str,
 ) -> bool {
-    VecFromRawPartsCallContext::from_code(expression, lower)
+    VecFromRawPartsCallContext::from_code(expression, &strip_block_comments_and_literals(lower))
         .is_some_and(|context| context.has_same_origin_pointer_live_evidence())
 }
 
 pub(super) fn has_vec_from_raw_parts_origin_evidence(expression: &str, lower: &str) -> bool {
-    VecFromRawPartsCallContext::from_code(expression, lower)
+    VecFromRawPartsCallContext::from_code(expression, &strip_block_comments_and_literals(lower))
         .is_some_and(|context| context.has_same_pointer_origin_evidence())
 }
 

@@ -1788,6 +1788,65 @@ mod tests {
     }
 
     #[test]
+    fn vec_from_raw_parts_origin_evidence_ignores_comments_and_literals() {
+        let obligations = vec![
+            SafetyObligation::new("capacity", "`len` is at most `capacity`"),
+            SafetyObligation::new(
+                "pointer-live",
+                "pointer was allocated by a compatible allocator for `capacity` elements",
+            ),
+            SafetyObligation::new("initialized", "first `len` elements are initialized"),
+            SafetyObligation::new(
+                "ownership",
+                "the constructed Vec receives unique ownership and will not double-free",
+            ),
+        ];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let line_comment_origin = site_with_family(
+            OperationFamily::VecFromRawParts,
+            vec![
+                "// let mut raw = core::mem::ManuallyDrop::new(input);",
+                "// let ptr = raw.as_mut_ptr();",
+                "// let len = raw.len();",
+                "// let cap = raw.capacity();",
+            ],
+            "unsafe { Vec::from_raw_parts(ptr, len, cap) }",
+            vec![],
+        );
+        let string_literal_origin = site_with_family(
+            OperationFamily::VecFromRawParts,
+            vec![
+                "let _origin = \"let mut raw = core::mem::ManuallyDrop::new(input);\";",
+                "let _ptr = \"let ptr = raw.as_mut_ptr();\";",
+                "let _len = \"let len = raw.len();\";",
+                "let _cap = \"let cap = raw.capacity();\";",
+            ],
+            "unsafe { Vec::from_raw_parts(ptr, len, cap) }",
+            vec![],
+        );
+
+        let line_comment_evidence =
+            obligation_evidence(&line_comment_origin, &obligations, &contract, &reach);
+        let string_literal_evidence =
+            obligation_evidence(&string_literal_origin, &obligations, &contract, &reach);
+
+        assert!(
+            line_comment_evidence
+                .iter()
+                .all(|item| !item.discharge.present)
+        );
+        assert!(
+            string_literal_evidence
+                .iter()
+                .all(|item| !item.discharge.present)
+        );
+    }
+
+    #[test]
     fn set_len_shrink_discharges_capacity_and_initialized_obligations() {
         let obligations = vec![
             SafetyObligation::new("capacity", "new length is at most capacity"),
