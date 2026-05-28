@@ -1175,8 +1175,24 @@ fn outcome_compares_existing_json_snapshots_without_safety_claim() -> Result<(),
     assert_eq!(outcome["reviewer_delta"]["new_cards"], 1);
     assert_eq!(outcome["reviewer_delta"]["resolved_cards"], 0);
     assert_eq!(
+        outcome["reviewer_delta"]["top_remaining_gaps"][0]["card_id"],
+        outcome["cards"]["new"][0]["card_id"]
+    );
+    assert_eq!(
+        outcome["reviewer_delta"]["top_remaining_gaps"][0]["class"],
+        "guard_missing"
+    );
+    assert_eq!(
+        outcome["reviewer_delta"]["top_remaining_gaps"][0]["priority"],
+        "high"
+    );
+    assert_eq!(
         outcome["reviewer_delta"]["top_remaining_gaps"][0]["operation_family"],
         "raw_pointer_read"
+    );
+    assert_eq!(
+        outcome["reviewer_delta"]["top_remaining_gaps"][0]["missing_count"],
+        2
     );
     assert!(
         outcome["reviewer_delta"]["top_remaining_gaps"][0]["next_action"]
@@ -1240,6 +1256,12 @@ fn outcome_compares_existing_json_snapshots_without_safety_claim() -> Result<(),
     assert!(markdown.contains("- New cards: 1"));
     assert!(markdown.contains("- Receipt movement: 0 improved, 0 regressed"));
     assert!(markdown.contains("Top remaining gaps"));
+    assert!(
+        markdown.contains("| Card | Class | Priority | Operation family | Missing | Next action |")
+    );
+    assert!(markdown.contains("guard_missing"));
+    assert!(markdown.contains("high"));
+    assert!(markdown.contains("| 2 |"));
     assert!(markdown.contains("| Status | Card | Reason | Before | After |"));
     assert!(markdown.contains("## Limitations"));
     assert!(markdown.contains("## Trust boundary"));
