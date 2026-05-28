@@ -12,8 +12,9 @@ remains the authority for public claim wording.
 Latest evidence-hardening notes include `get_unchecked` same-receiver
 `get(index)` probe guards, including if-let, let-else, and match Some-arm forms, plus
 false-positive controls for bare predicate observations, closed positive
-branches, comment-only early-return text, and checked indexes reassigned before
-the unchecked access. `NonNull::new_unchecked` nullability evidence now also
+branches, comment-only early-return text, and checked indexes or checked
+receivers reassigned before the unchecked access. `NonNull::new_unchecked`
+nullability evidence now also
 recognizes same-pointer if-let and let-else `NonNull::new` guards while
 rejecting stale reassigned pointers.
 Raw pointer alignment evidence now also has fixture-backed controls for
@@ -53,7 +54,7 @@ The active calibration rail is now recorded in
 `.unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md`,
 `policy/accuracy-calibration.toml`, and
 `docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 34
-fixture-pinned claims, 285 calibration cases, 34 label ledgers, and 293 label
+fixture-pinned claims, 294 calibration cases, 34 label ledgers, and 302 label
 samples. It records zero dogfood-measured, labeled-calibrated, or
 policy-eligible claims. That is intentional: the current report is a
 claim-scoped fixture-pinned proof index, not a global precision/recall result

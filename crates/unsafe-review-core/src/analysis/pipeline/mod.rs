@@ -1380,6 +1380,25 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             reassigned_receiver_card,
             "bounds"
         ));
+
+        let reassigned_probe_receiver =
+            fixture_output("get_unchecked_mut_get_probe_reassigned_receiver_not_guard")?;
+        let reassigned_probe_receiver_card = single_card(
+            "get_unchecked_mut_get_probe_reassigned_receiver_not_guard",
+            &reassigned_probe_receiver,
+        )?;
+        assert_eq!(
+            reassigned_probe_receiver_card.operation.family,
+            OperationFamily::GetUnchecked
+        );
+        assert_eq!(
+            reassigned_probe_receiver_card.class,
+            ReviewClass::GuardMissing
+        );
+        assert!(!obligation_discharge_present(
+            reassigned_probe_receiver_card,
+            "bounds"
+        ));
         Ok(())
     }
 
