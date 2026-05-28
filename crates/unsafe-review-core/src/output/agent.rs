@@ -614,6 +614,40 @@ mod tests {
     }
 
     #[test]
+    fn agent_packet_queues_contract_gaps_without_auto_repair_ready() -> Result<(), String> {
+        let output = fixture_output("public_unsafe_fn_missing_safety")?;
+        let Some(card) = output.cards.first() else {
+            return Err("fixture should emit one card".to_string());
+        };
+        assert_eq!(card.class.as_str(), "contract_missing");
+        assert!(
+            card.missing
+                .iter()
+                .any(|missing| missing.kind == "contract"),
+            "fixture should carry a contract gap"
+        );
+
+        let value = parse_json(&render(card))?;
+        let allowed_repairs = serde_json::to_string(&value["allowed_repairs"])
+            .map_err(|err| format!("render allowed repairs failed: {err}"))?;
+        let repair_queue = serde_json::to_string(&value["repair_queue"])
+            .map_err(|err| format!("render repair queue failed: {err}"))?;
+        let reasons = serde_json::to_string(&value["agent_readiness"]["reasons"])
+            .map_err(|err| format!("render readiness reasons failed: {err}"))?;
+
+        assert!(allowed_repairs.contains("safety contract"));
+        assert!(repair_queue.contains("repairable_by_contract"));
+        assert!(repair_queue.contains("repairable_by_test"));
+        assert!(repair_queue.contains("requires_witness_receipt"));
+        assert!(repair_queue.contains("requires_human_review"));
+        assert_eq!(value["agent_readiness"]["ready"], false);
+        assert_eq!(value["agent_readiness"]["state"], "needs_human_review");
+        assert!(reasons.contains("operation family `unknown`"));
+        assert!(reasons.contains("no verify command"));
+        Ok(())
+    }
+
+    #[test]
     fn agent_packet_scopes_copy_repairs_to_range_and_overlap() -> Result<(), String> {
         let output = fixture_output("copy_nonoverlapping")?;
         let Some(card) = output.cards.first() else {
