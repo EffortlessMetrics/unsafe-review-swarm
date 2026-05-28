@@ -16,7 +16,7 @@ mod tests {
     use super::code_before_operation;
 
     #[test]
-    fn ignores_comments_and_literals_when_locating_operation() {
+    fn ignores_comments_and_literals_when_locating_operation() -> Result<(), String> {
         let before = code_before_operation(
             r#"
             // unsafe { ptr.read() }
@@ -26,8 +26,9 @@ mod tests {
             "#,
             "unsafe { ptr.read() }",
         )
-        .expect("operation should be found");
+        .ok_or_else(|| "operation should be found".to_string())?;
 
         assert!(before.contains("assert!(idx<len);"));
+        Ok(())
     }
 }

@@ -522,10 +522,18 @@ fn validate_date(value: &str, key: &str) -> Result<(), String> {
     validate_range(year, 1, 9999, key)?;
     validate_range(month, 1, 12, key)?;
     validate_range(day, 1, 31, key)?;
-    let year = year.expect("year was range-validated");
-    let month = month.expect("month was range-validated");
-    let day = day.expect("day was range-validated");
-    let max_day = days_in_month(year, month).expect("month was range-validated");
+    let Some(year) = year else {
+        return Err(format!("`{key}` contains an invalid number"));
+    };
+    let Some(month) = month else {
+        return Err(format!("`{key}` contains an invalid number"));
+    };
+    let Some(day) = day else {
+        return Err(format!("`{key}` contains an invalid number"));
+    };
+    let Some(max_day) = days_in_month(year, month) else {
+        return Err(format!("`{key}` is out of range"));
+    };
     if day > max_day {
         return Err(format!("`{key}` is not a valid calendar date"));
     }
@@ -547,7 +555,7 @@ fn days_in_month(year: u32, month: u32) -> Option<u32> {
 }
 
 fn is_leap_year(year: u32) -> bool {
-    year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+    year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400))
 }
 
 fn validate_range(value: Option<u32>, min: u32, max: u32, key: &str) -> Result<(), String> {

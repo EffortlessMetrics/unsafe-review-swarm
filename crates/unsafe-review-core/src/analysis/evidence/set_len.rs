@@ -577,7 +577,7 @@ fn set_len_growth_len_term_matches(
     receiver_len: &str,
     receiver_len_bindings: &[&str],
 ) -> bool {
-    term == receiver_len || receiver_len_bindings.iter().any(|binding| term == *binding)
+    term == receiver_len || receiver_len_bindings.contains(&term)
 }
 
 fn has_fresh_remaining_capacity_early_return(

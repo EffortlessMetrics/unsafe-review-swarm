@@ -207,6 +207,13 @@ mod tests {
         }
     }
 
+    fn discharge_present(evidence: &[ObligationEvidence], key: &str) -> Result<bool, String> {
+        evidence
+            .iter()
+            .find_map(|item| (item.obligation.key == key).then_some(item.discharge.present))
+            .ok_or_else(|| format!("missing `{key}` obligation evidence"))
+    }
+
     #[test]
     fn contract_evidence_accepts_safety_docs_and_safety_comments() {
         let doc_site = site_with_context(
@@ -2067,7 +2074,7 @@ mod tests {
     }
 
     #[test]
-    fn set_len_slice_binding_loop_discharges_initialized_obligation() {
+    fn set_len_slice_binding_loop_discharges_initialized_obligation() -> Result<(), String> {
         let obligations = vec![
             SafetyObligation::new("capacity", "new length is at most capacity"),
             SafetyObligation::new(
@@ -2213,54 +2220,22 @@ mod tests {
                 .iter()
                 .all(|item| item.discharge.present)
         );
-        assert!(
-            line_comment_loop_evidence
-                .iter()
-                .find(|item| item.obligation.key == "capacity")
-                .unwrap()
-                .discharge
-                .present
-        );
-        assert!(
-            !line_comment_loop_evidence
-                .iter()
-                .find(|item| item.obligation.key == "initialized")
-                .unwrap()
-                .discharge
-                .present
-        );
-        assert!(
-            !wrong_target_evidence
-                .iter()
-                .find(|item| item.obligation.key == "initialized")
-                .unwrap()
-                .discharge
-                .present
-        );
-        assert!(
-            !partial_range_evidence
-                .iter()
-                .find(|item| item.obligation.key == "initialized")
-                .unwrap()
-                .discharge
-                .present
-        );
-        assert!(
-            !comment_return_capacity_evidence
-                .iter()
-                .find(|item| item.obligation.key == "capacity")
-                .unwrap()
-                .discharge
-                .present
-        );
-        assert!(
-            !string_return_capacity_evidence
-                .iter()
-                .find(|item| item.obligation.key == "capacity")
-                .unwrap()
-                .discharge
-                .present
-        );
+        assert!(discharge_present(&line_comment_loop_evidence, "capacity")?);
+        assert!(!discharge_present(
+            &line_comment_loop_evidence,
+            "initialized"
+        )?);
+        assert!(!discharge_present(&wrong_target_evidence, "initialized")?);
+        assert!(!discharge_present(&partial_range_evidence, "initialized")?);
+        assert!(!discharge_present(
+            &comment_return_capacity_evidence,
+            "capacity"
+        )?);
+        assert!(!discharge_present(
+            &string_return_capacity_evidence,
+            "capacity"
+        )?);
+        Ok(())
     }
 
     #[test]
