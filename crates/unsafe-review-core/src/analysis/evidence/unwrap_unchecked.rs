@@ -6,7 +6,7 @@ use super::{
 };
 
 pub(super) fn has_unwrap_unchecked_infallible_result_evidence(lower: &str) -> bool {
-    let compact = compact_code(lower);
+    let compact = compact_code(&strip_block_comments_and_literals(lower));
     let Some(context) = unwrap_unchecked_receiver_context(&compact) else {
         return false;
     };

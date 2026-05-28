@@ -3478,6 +3478,41 @@ mod tests {
     }
 
     #[test]
+    fn unwrap_unchecked_infallible_result_ignores_comments_and_literals() {
+        let obligations = vec![SafetyObligation::new(
+            "valid-value",
+            "value is known to be `Some` or `Ok` before `unwrap_unchecked`",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let line_comment = site_with_family(
+            OperationFamily::UnwrapUnchecked,
+            vec!["// let result = reserve_rehash(additional, Fallibility::Infallible);"],
+            "unsafe { result.unwrap_unchecked() }",
+            vec![],
+        );
+        let string_literal = site_with_family(
+            OperationFamily::UnwrapUnchecked,
+            vec![
+                "let _note = \"let result = reserve_rehash(additional, Fallibility::Infallible);\";",
+            ],
+            "unsafe { result.unwrap_unchecked() }",
+            vec![],
+        );
+
+        let line_comment_evidence =
+            obligation_evidence(&line_comment, &obligations, &contract, &reach);
+        let string_literal_evidence =
+            obligation_evidence(&string_literal, &obligations, &contract, &reach);
+
+        assert!(!line_comment_evidence[0].discharge.present);
+        assert!(!string_literal_evidence[0].discharge.present);
+    }
+
+    #[test]
     fn unwrap_unchecked_same_receiver_state_discharges_valid_value_obligation() {
         let obligations = vec![SafetyObligation::new(
             "valid-value",
