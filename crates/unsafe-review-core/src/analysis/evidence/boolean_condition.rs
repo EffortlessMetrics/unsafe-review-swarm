@@ -1,11 +1,18 @@
 pub(super) fn condition_has_top_level_conjunct(condition: &str, predicate: &str) -> bool {
     let condition = strip_balanced_outer_parens(condition.trim());
-    split_top_level_conjuncts(condition)
+    split_top_level_conditions(condition, b'&')
         .into_iter()
         .any(|conjunct| strip_balanced_outer_parens(conjunct.trim()) == predicate)
 }
 
-fn split_top_level_conjuncts(condition: &str) -> Vec<&str> {
+pub(super) fn condition_has_top_level_disjunct(condition: &str, predicate: &str) -> bool {
+    let condition = strip_balanced_outer_parens(condition.trim());
+    split_top_level_conditions(condition, b'|')
+        .into_iter()
+        .any(|conjunct| strip_balanced_outer_parens(conjunct.trim()) == predicate)
+}
+
+fn split_top_level_conditions(condition: &str, operator: u8) -> Vec<&str> {
     let mut conjuncts = Vec::new();
     let mut start = 0usize;
     let mut paren_depth = 0usize;
@@ -21,8 +28,9 @@ fn split_top_level_conjuncts(condition: &str) -> Vec<&str> {
             b']' => bracket_depth = bracket_depth.saturating_sub(1),
             b'{' => brace_depth += 1,
             b'}' => brace_depth = brace_depth.saturating_sub(1),
-            b'&' if idx + 1 < bytes.len()
-                && bytes[idx + 1] == b'&'
+            byte if byte == operator
+                && idx + 1 < bytes.len()
+                && bytes[idx + 1] == operator
                 && paren_depth == 0
                 && bracket_depth == 0
                 && brace_depth == 0 =>

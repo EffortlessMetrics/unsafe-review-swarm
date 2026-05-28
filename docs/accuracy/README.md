@@ -127,8 +127,9 @@ The current fixture-pinned slices are:
 - `NonNull::new_unchecked` nullability evidence: checks whether the `non-null`
   obligation is discharged by a same-pointer `NonNull::new` guard, including
   if-let, let-else, and match Some-arm forms, plus same-pointer non-null open
-  branches, while rejecting disjunctive, wrong-pointer, observed-only,
-  non-returning `is_null`, post-check, and stale-pointer controls.
+  branches and null early-return branches, while rejecting inverse boolean
+  branch shapes, wrong-pointer, observed-only, non-returning `is_null`,
+  post-check, and stale-pointer controls.
 - `Pin::new_unchecked` human-review routing: checks that pinning move-prevention
   and projection invariants route to human deep review without implying an
   executable witness ran.

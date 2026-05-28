@@ -311,6 +311,8 @@ required_core_fixtures = [
   "nonnull_match_new_guard",
   "nonnull_other_guard_not_evidence",
   "nonnull_is_null_nonreturning_not_guard",
+  "nonnull_is_null_disjunct_return_guard",
+  "nonnull_is_null_conjunct_return_not_guard",
   "nonnull_is_null_reassigned_ptr_not_guard",
   "nonnull_is_null_open_branch_guard",
   "nonnull_is_null_conjunct_open_branch_guard",
@@ -3394,6 +3396,26 @@ expected_hazard = "pointer_validity"
 fixture = "nonnull_is_null_nonreturning_not_guard"
 kind = "false_positive_control"
 claim = "same-pointer is_null observation without an early exit does not discharge the non-null obligation"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "nonnull_is_null_disjunct_return_guard"
+kind = "positive"
+claim = "same-pointer is_null evidence in a top-level disjunction with an early return discharges the non-null obligation after the guard"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "nonnull_is_null_conjunct_return_not_guard"
+kind = "false_positive_control"
+claim = "same-pointer is_null evidence in a conjunction with an early return does not discharge the non-null obligation after the guard"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

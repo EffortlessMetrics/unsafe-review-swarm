@@ -1,0 +1,78 @@
+[
+  {
+    "id": "UR-nonnull-is-null-disjunct-return-guard-fixture-src-lib-rs-expose-nonnull-after-null-or-disabled-operation-nonnull_unchecked-nonnull-unchecked-eee16b5e2cd1-pointer_validity-c1",
+    "class": "guarded_unwitnessed",
+    "priority": "medium",
+    "confidence": "medium",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 12,
+      "column": 5,
+      "kind": "operation",
+      "owner": "expose_nonnull_after_null_or_disabled",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "Some(unsafe { NonNull::new_unchecked(ptr) })"
+    },
+    "operation": "Some(unsafe { NonNull::new_unchecked(ptr) })",
+    "operation_family": "nonnull_unchecked",
+    "hazards": [
+      "pointer_validity"
+    ],
+    "obligations": [
+      "pointer is non-null before constructing NonNull"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "non-null",
+        "description": "pointer is non-null before constructing NonNull",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Nullability guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `expose_nonnull_after_null_or_disabled`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "All inferred safety obligations have visible local discharge evidence",
+    "reach": "1 related test file(s) mention owner `expose_nonnull_after_null_or_disabled`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test expose_nonnull_after_null_or_disabled",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test expose_nonnull_after_null_or_disabled",
+        "required": false
+      }
+    ],
+    "missing": [
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Attach a focused Miri or cargo-careful witness receipt or mark the static limitation explicitly.",
+    "verify_commands": [
+      "cargo +nightly miri test expose_nonnull_after_null_or_disabled",
+      "cargo +nightly careful test expose_nonnull_after_null_or_disabled"
+    ]
+  }
+]

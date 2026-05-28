@@ -621,6 +621,8 @@ fixtures = [
   "nonnull_match_new_guard",
   "nonnull_other_guard_not_evidence",
   "nonnull_is_null_nonreturning_not_guard",
+  "nonnull_is_null_disjunct_return_guard",
+  "nonnull_is_null_conjunct_return_not_guard",
   "nonnull_is_null_reassigned_ptr_not_guard",
   "nonnull_is_null_open_branch_guard",
   "nonnull_is_null_conjunct_open_branch_guard",
@@ -641,9 +643,10 @@ allowed_public_claim = """
 Fixture-pinned NonNull::new_unchecked nullability evidence distinguishes a
 same-pointer NonNull::new guard, including if-let, let-else, and match Some-arm
 forms, plus same-pointer non-null open branches, top-level conjunctive non-null
-open branches, and null early-return branches, from disjunctive, wrong-pointer,
-observed-only, non-returning is_null, post-check, and stale pointer controls in
-the listed fixtures.
+open branches, and null early-return branches including top-level disjunctive
+null branches, from conjunctive null-return, disjunctive non-null-branch,
+wrong-pointer, observed-only, non-returning is_null, post-check, and stale
+pointer controls in the listed fixtures.
 """
 forbidden_claims = [
   "broad NonNull soundness",

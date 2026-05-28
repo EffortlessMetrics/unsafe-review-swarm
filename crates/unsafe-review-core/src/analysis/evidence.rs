@@ -51,7 +51,7 @@ mod zeroed;
 
 use self::alignment_discharge::alignment_discharge_state;
 use self::assignment_syntax::contains_simple_assignment_to;
-use self::boolean_condition::condition_has_top_level_conjunct;
+use self::boolean_condition::{condition_has_top_level_conjunct, condition_has_top_level_disjunct};
 use self::bounds_discharge::bounds_discharge_state;
 use self::call_syntax::{
     matching_call_argument_end, matching_generic_argument_end, split_top_level_arguments,
@@ -730,6 +730,18 @@ mod tests {
             "NonNull::new_unchecked(ptr)",
             vec![],
         );
+        let disjunctive_returning_guard = site_with_family(
+            OperationFamily::NonNullUnchecked,
+            vec!["if ptr.is_null() || disabled { return None; }"],
+            "NonNull::new_unchecked(ptr)",
+            vec![],
+        );
+        let conjunctive_returning_not_guard = site_with_family(
+            OperationFamily::NonNullUnchecked,
+            vec!["if ptr.is_null() && disabled { return None; }"],
+            "NonNull::new_unchecked(ptr)",
+            vec![],
+        );
         let open_non_null_branch_guard = site_with_family(
             OperationFamily::NonNullUnchecked,
             vec!["if !ptr.is_null() {"],
@@ -800,6 +812,26 @@ mod tests {
             obligation_evidence(&returning_guard, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
+        );
+        assert!(
+            obligation_evidence(
+                &disjunctive_returning_guard,
+                &obligations,
+                &contract,
+                &reach
+            )[0]
+            .discharge
+            .present
+        );
+        assert!(
+            !obligation_evidence(
+                &conjunctive_returning_not_guard,
+                &obligations,
+                &contract,
+                &reach,
+            )[0]
+            .discharge
+            .present
         );
         assert!(
             obligation_evidence(&open_non_null_branch_guard, &obligations, &contract, &reach,)[0]

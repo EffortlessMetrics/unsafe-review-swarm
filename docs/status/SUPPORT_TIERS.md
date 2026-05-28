@@ -28,6 +28,8 @@ Recent `NonNull::new_unchecked` nullability additions include
 `nonnull_if_let_new_guard`, `nonnull_let_else_new_guard`,
 `nonnull_match_new_guard`, `nonnull_new_reassigned_ptr_not_guard`,
 `nonnull_new_shadowed_ptr_not_guard`,
+`nonnull_is_null_disjunct_return_guard`,
+`nonnull_is_null_conjunct_return_not_guard`,
 `nonnull_is_null_reassigned_ptr_not_guard`,
 `nonnull_is_null_open_branch_guard`,
 `nonnull_is_null_conjunct_open_branch_guard`,
@@ -37,8 +39,9 @@ Recent `NonNull::new_unchecked` nullability additions include
 `nonnull_let_else_new_reassigned_ptr_not_guard`, and
 `nonnull_match_new_reassigned_ptr_not_guard`, which pin same-pointer
 `NonNull::new` if-let, let-else, and match Some-arm guards plus non-null
-open-branch guards, including top-level conjunctive non-null branches, while
-rejecting disjunctive, stale, or shadowed checked-pointer evidence.
+open-branch guards and null early-return guards, including the top-level
+conjunctive/disjunctive boolean shapes that dominate the operation, while
+rejecting inverse, stale, or shadowed checked-pointer evidence.
 Recent guard-evidence additions include
 `raw_pointer_alignment_is_aligned_guard`,
 `raw_pointer_alignment_observed_not_guard`,
