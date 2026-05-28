@@ -8528,18 +8528,18 @@ OperationFamily::RawPointerRead => vec![
     }
 
     #[test]
-    fn spec_status_lifecycle_match_rejects_dashboard_drift() {
-        let err = check_spec_status_lifecycle_match(
+    fn spec_status_lifecycle_match_rejects_dashboard_drift() -> Result<(), String> {
+        let err = err_text(check_spec_status_lifecycle_match(
             "UNSAFE-REVIEW-SPEC-0026",
             "accepted",
             "proposed",
             "docs/specs/UNSAFE-REVIEW-SPEC-0026-accuracy-validation-and-calibration.md",
-        )
-        .unwrap_err();
+        ))?;
 
         assert!(err.contains("UNSAFE-REVIEW-SPEC-0026"));
         assert!(err.contains("status `accepted` must match"));
         assert!(err.contains("Status lifecycle `proposed`"));
+        Ok(())
     }
 
     #[test]
@@ -8559,7 +8559,7 @@ OperationFamily::RawPointerRead => vec![
     }
 
     #[test]
-    fn doc_artifact_index_status_rejects_policy_ledger_drift() {
+    fn doc_artifact_index_status_rejects_policy_ledger_drift() -> Result<(), String> {
         let mut ledger = BTreeMap::new();
         ledger.insert(
             "UNSAFE-REVIEW-SPEC-0026".to_string(),
@@ -8571,11 +8571,14 @@ OperationFamily::RawPointerRead => vec![
             doc_artifact_entry("draft"),
         );
 
-        let err = check_doc_artifacts_source_index_consistency(&ledger, &index).unwrap_err();
+        let err = err_text(check_doc_artifacts_source_index_consistency(
+            &ledger, &index,
+        ))?;
 
         assert!(err.contains(".unsafe-review-spec/index.toml"));
         assert!(err.contains("UNSAFE-REVIEW-SPEC-0026"));
         assert!(err.contains("status `draft` must match"));
+        Ok(())
     }
 
     #[test]
@@ -8873,7 +8876,7 @@ impl WitnessKind {
     }
 
     #[test]
-    fn dogfood_triage_report_rejects_unknown_labels() {
+    fn dogfood_triage_report_rejects_unknown_labels() -> Result<(), String> {
         let text = r#"
 ## Triage observations
 
@@ -8882,15 +8885,18 @@ impl WitnessKind {
 | `target` | `family` | `probably-actionable` | grounded observation | none |
 "#;
 
-        let err = check_dogfood_report_triage_labels_text("docs/dogfood/reports/test.md", text)
-            .unwrap_err();
+        let err = err_text(check_dogfood_report_triage_labels_text(
+            "docs/dogfood/reports/test.md",
+            text,
+        ))?;
 
         assert!(err.contains("unknown dogfood triage label"));
         assert!(err.contains("probably-actionable"));
+        Ok(())
     }
 
     #[test]
-    fn dogfood_triage_report_rejects_missing_required_fields() {
+    fn dogfood_triage_report_rejects_missing_required_fields() -> Result<(), String> {
         let text = r#"
 ## Triage observations
 
@@ -8899,14 +8905,17 @@ impl WitnessKind {
 | `target` |  | `needs-fixture` | grounded observation | add a fixture |
 "#;
 
-        let err = check_dogfood_report_triage_labels_text("docs/dogfood/reports/test.md", text)
-            .unwrap_err();
+        let err = err_text(check_dogfood_report_triage_labels_text(
+            "docs/dogfood/reports/test.md",
+            text,
+        ))?;
 
         assert!(err.contains("non-empty Card or family column"));
+        Ok(())
     }
 
     #[test]
-    fn dogfood_triage_report_rejects_wrong_column_count() {
+    fn dogfood_triage_report_rejects_wrong_column_count() -> Result<(), String> {
         let text = r#"
 ## Triage observations
 
@@ -8915,14 +8924,17 @@ impl WitnessKind {
 | `target` | `family` | `needs-fixture` | grounded observation |
 "#;
 
-        let err = check_dogfood_report_triage_labels_text("docs/dogfood/reports/test.md", text)
-            .unwrap_err();
+        let err = err_text(check_dogfood_report_triage_labels_text(
+            "docs/dogfood/reports/test.md",
+            text,
+        ))?;
 
         assert!(err.contains("Target, Card or family, Primary label, Evidence, and Follow-up"));
+        Ok(())
     }
 
     #[test]
-    fn dogfood_triage_report_rejects_unexpected_header() {
+    fn dogfood_triage_report_rejects_unexpected_header() -> Result<(), String> {
         let text = r#"
 ## Triage observations
 
@@ -8931,11 +8943,14 @@ impl WitnessKind {
 | `target` | `family` | `needs-fixture` | grounded observation | add a fixture |
 "#;
 
-        let err = check_dogfood_report_triage_labels_text("docs/dogfood/reports/test.md", text)
-            .unwrap_err();
+        let err = err_text(check_dogfood_report_triage_labels_text(
+            "docs/dogfood/reports/test.md",
+            text,
+        ))?;
 
         assert!(err.contains("dogfood triage header must be"));
         assert!(err.contains("Card or family"));
+        Ok(())
     }
 
     #[test]
@@ -8952,7 +8967,7 @@ precision or recall, witness adequacy, or policy readiness.
     }
 
     #[test]
-    fn dogfood_report_trust_boundary_rejects_missing_witness_limits() {
+    fn dogfood_report_trust_boundary_rejects_missing_witness_limits() -> Result<(), String> {
         let text = r#"
 ## Trust boundary
 
@@ -8961,14 +8976,17 @@ proof, UB-free status, Miri-clean status, site-execution proof, calibrated
 precision or recall, or policy readiness.
 "#;
 
-        let err = check_dogfood_report_trust_boundary_text("docs/dogfood/reports/test.md", text)
-            .unwrap_err();
+        let err = err_text(check_dogfood_report_trust_boundary_text(
+            "docs/dogfood/reports/test.md",
+            text,
+        ))?;
 
         assert!(err.contains("witness limits"));
+        Ok(())
     }
 
     #[test]
-    fn dogfood_report_trust_boundary_rejects_missing_policy_limits() {
+    fn dogfood_report_trust_boundary_rejects_missing_policy_limits() -> Result<(), String> {
         let text = r#"
 ## Trust boundary
 
@@ -8977,14 +8995,17 @@ proof, UB-free status, Miri-clean status, site-execution proof, calibrated
 precision or recall, or witness adequacy.
 "#;
 
-        let err = check_dogfood_report_trust_boundary_text("docs/dogfood/reports/test.md", text)
-            .unwrap_err();
+        let err = err_text(check_dogfood_report_trust_boundary_text(
+            "docs/dogfood/reports/test.md",
+            text,
+        ))?;
 
         assert!(err.contains("`policy` limits"));
+        Ok(())
     }
 
     #[test]
-    fn dogfood_report_overclaim_rejects_all_clear() {
+    fn dogfood_report_overclaim_rejects_all_clear() -> Result<(), String> {
         let text = r#"
 # Dogfood report
 
@@ -8997,10 +9018,13 @@ proof, UB-free status, Miri-clean status, site-execution proof, calibrated
 precision or recall, witness adequacy, or policy readiness.
 "#;
 
-        let err = reject_positive_overclaims(Path::new("docs/dogfood/reports/test.md"), text)
-            .unwrap_err();
+        let err = err_text(reject_positive_overclaims(
+            Path::new("docs/dogfood/reports/test.md"),
+            text,
+        ))?;
 
         assert!(err.contains("all clear"));
+        Ok(())
     }
 
     #[test]
@@ -9020,7 +9044,7 @@ Snapshot reports:
     }
 
     #[test]
-    fn dogfood_report_index_rejects_missing_report_link() {
+    fn dogfood_report_index_rejects_missing_report_link() -> Result<(), String> {
         let reports = vec![
             "2026-05-26-post-burst.md".to_string(),
             "2026-05-26-no-card-control.md".to_string(),
@@ -9031,15 +9055,19 @@ Snapshot reports:
 - [post burst](reports/2026-05-26-post-burst.md)
 "#;
 
-        let err =
-            check_dogfood_report_index_text("docs/dogfood/README.md", text, &reports).unwrap_err();
+        let err = err_text(check_dogfood_report_index_text(
+            "docs/dogfood/README.md",
+            text,
+            &reports,
+        ))?;
 
         assert!(err.contains("must link dogfood report"));
         assert!(err.contains("reports/2026-05-26-no-card-control.md"));
+        Ok(())
     }
 
     #[test]
-    fn dogfood_report_index_rejects_stale_report_link() {
+    fn dogfood_report_index_rejects_stale_report_link() -> Result<(), String> {
         let reports = vec![
             "2026-05-26-post-burst.md".to_string(),
             "2026-05-26-no-card-control.md".to_string(),
@@ -9052,11 +9080,15 @@ Snapshot reports:
 - [stale report](reports/2026-05-26-missing-report.md)
 "#;
 
-        let err =
-            check_dogfood_report_index_text("docs/dogfood/README.md", text, &reports).unwrap_err();
+        let err = err_text(check_dogfood_report_index_text(
+            "docs/dogfood/README.md",
+            text,
+            &reports,
+        ))?;
 
         assert!(err.contains("links missing dogfood report"));
         assert!(err.contains("reports/2026-05-26-missing-report.md"));
+        Ok(())
     }
 
     #[test]
@@ -9070,21 +9102,19 @@ Snapshot reports:
     }
 
     #[test]
-    fn public_badge_messages_must_be_numeric_counts() {
-        assert!(require_numeric_badge_message("badges/unsafe-review.json", "294").is_ok());
-        assert!(
-            require_numeric_badge_message("badges/unsafe-review.json", "294 open gaps")
-                .unwrap_err()
-                .contains("numeric count")
-        );
-        assert!(
-            require_numeric_badge_message(
-                "badges/unsafe-review-plus.json",
-                "19 contract / 111 guard / 37 witness"
-            )
-            .unwrap_err()
-            .contains("numeric count")
-        );
+    fn public_badge_messages_must_be_numeric_counts() -> Result<(), String> {
+        require_numeric_badge_message("badges/unsafe-review.json", "294")?;
+        let main_err = err_text(require_numeric_badge_message(
+            "badges/unsafe-review.json",
+            "294 open gaps",
+        ))?;
+        assert!(main_err.contains("numeric count"));
+        let plus_err = err_text(require_numeric_badge_message(
+            "badges/unsafe-review-plus.json",
+            "19 contract / 111 guard / 37 witness",
+        ))?;
+        assert!(plus_err.contains("numeric count"));
+        Ok(())
     }
 
     #[test]
@@ -9790,7 +9820,7 @@ Snapshot reports:
         write_valid_first_pr_artifacts(&dir)?;
         let mut lsp: serde_json::Value = serde_json::from_str(&valid_lsp_json(
             r#"[{"card_id":"card-1","command":"unsafe-review.copyAgentPacket","payload":{"kind":"unsafe-review.agent_packet","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]}]"#,
-        ))
+        )?)
         .map_err(|err| format!("parse lsp failed: {err}"))?;
         *lsp.get_mut("diagnostics")
             .ok_or_else(|| "test lsp missing diagnostics".to_string())? = serde_json::json!([]);
@@ -9816,7 +9846,7 @@ Snapshot reports:
         write_valid_first_pr_artifacts(&dir)?;
         let mut lsp: serde_json::Value = serde_json::from_str(&valid_lsp_json(
             r#"[{"card_id":"card-1","command":"unsafe-review.copyAgentPacket","payload":{"kind":"unsafe-review.agent_packet","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]}]"#,
-        ))
+        )?)
         .map_err(|err| format!("parse lsp failed: {err}"))?;
         let diagnostics = lsp
             .get_mut("diagnostics")
@@ -10087,23 +10117,6 @@ Snapshot reports:
         let dir = unique_temp_dir("unsafe-review-first-pr-lsp-diagnostic-missing-evidence-drift")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
         write_valid_first_pr_artifacts(&dir)?;
-        let cards_path = dir.join("cards.json");
-        let mut cards: serde_json::Value = serde_json::from_str(
-            &fs::read_to_string(&cards_path).map_err(|err| format!("read cards failed: {err}"))?,
-        )
-        .map_err(|err| format!("parse cards failed: {err}"))?;
-        cards["cards"][0]["missing"] = serde_json::json!(["expected missing evidence"]);
-        fs::write(&cards_path, cards.to_string())
-            .map_err(|err| format!("write cards failed: {err}"))?;
-        let sarif_path = dir.join("cards.sarif");
-        let mut sarif: serde_json::Value = serde_json::from_str(
-            &fs::read_to_string(&sarif_path).map_err(|err| format!("read sarif failed: {err}"))?,
-        )
-        .map_err(|err| format!("parse sarif failed: {err}"))?;
-        sarif["runs"][0]["results"][0]["properties"]["missingEvidence"] =
-            serde_json::json!(["expected missing evidence"]);
-        fs::write(&sarif_path, sarif.to_string())
-            .map_err(|err| format!("write sarif failed: {err}"))?;
         let lsp_path = dir.join("lsp.json");
         let mut lsp: serde_json::Value = serde_json::from_str(
             &fs::read_to_string(&lsp_path).map_err(|err| format!("read lsp failed: {err}"))?,
@@ -10247,7 +10260,7 @@ Snapshot reports:
         write_valid_first_pr_artifacts(&dir)?;
         let mut lsp: serde_json::Value = serde_json::from_str(&valid_lsp_json(
             r#"[{"card_id":"card-1","command":"unsafe-review.copyAgentPacket","payload":{"kind":"unsafe-review.agent_packet","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]}]"#,
-        ))
+        )?)
         .map_err(|err| format!("parse lsp failed: {err}"))?;
         *lsp.get_mut("hovers")
             .ok_or_else(|| "test lsp missing hovers".to_string())? = serde_json::json!([]);
@@ -10273,7 +10286,7 @@ Snapshot reports:
         write_valid_first_pr_artifacts(&dir)?;
         let mut lsp: serde_json::Value = serde_json::from_str(&valid_lsp_json(
             r#"[{"card_id":"card-1","command":"unsafe-review.copyAgentPacket","payload":{"kind":"unsafe-review.agent_packet","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]}]"#,
-        ))
+        )?)
         .map_err(|err| format!("parse lsp failed: {err}"))?;
         let hovers = lsp
             .get_mut("hovers")
@@ -10675,7 +10688,7 @@ Snapshot reports:
             dir.join("lsp.json"),
             valid_lsp_json(
                 r#"[{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Copy unsafe-review packet for card-1","kind":"quickfix","command":"unsafe-review.copyAgentPacket","payload":{"kind":"unsafe-review.agent_packet","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]}]"#,
-            ),
+            )?,
         )
         .map_err(|err| format!("write lsp failed: {err}"))?;
 
@@ -10700,7 +10713,7 @@ Snapshot reports:
             dir.join("lsp.json"),
             valid_lsp_json(
                 r#"[{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Copy unsafe-review packet for card-1","kind":"quickfix","command":"unsafe-review.copyAgentPacket","payload":{"kind":"unsafe-review.agent_packet","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]},{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Copy unsafe-review packet for card-1","kind":"quickfix","command":"unsafe-review.copyAgentPacket","payload":{"kind":"unsafe-review.agent_packet","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]},{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Explain unsafe-review witness route","kind":"quickfix","command":"unsafe-review.explainWitnessRoute","payload":{"kind":"unsafe-review.witness_route","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]}]"#,
-            ),
+            )?,
         )
         .map_err(|err| format!("write lsp failed: {err}"))?;
 
@@ -10725,7 +10738,7 @@ Snapshot reports:
             dir.join("lsp.json"),
             valid_lsp_json(
                 r#"[{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Copy unsafe-review packet for card-1","kind":"quickfix","command":"unsafe-review.copyAgentPacket","payload":{"kind":"unsafe-review.agent_packet","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["other-card"]},{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Explain unsafe-review witness route","kind":"quickfix","command":"unsafe-review.explainWitnessRoute","payload":{"kind":"unsafe-review.witness_route","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]}]"#,
-            ),
+            )?,
         )
         .map_err(|err| format!("write lsp failed: {err}"))?;
 
@@ -10780,7 +10793,7 @@ Snapshot reports:
             dir.join("lsp.json"),
             valid_lsp_json(
                 r#"[{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Copy unsafe-review packet for card-1","kind":"quickfix","command":"unsafe-review.copyAgentPacket","payload":{"kind":"unsafe-review.agent_packet","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]},{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Explain unsafe-review witness route","kind":"quickfix","command":"unsafe-review.explainWitnessRoute","payload":{"kind":"unsafe-review.witness_route","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]},{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Copy witness command (does not run)","kind":"quickfix","command":"unsafe-review.copyWitnessCommand","payload":{"kind":"unsafe-review.witness_command","card_id":"card-1","command":"cargo test unrelated","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["cargo test unrelated"]}]"#,
-            ),
+            )?,
         )
         .map_err(|err| format!("write lsp failed: {err}"))?;
 
@@ -10899,7 +10912,7 @@ Snapshot reports:
             dir.join("lsp.json"),
             valid_lsp_json(
                 r#"[{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Copy unsafe-review packet for card-1","kind":"quickfix","command":"unsafe-review.copyAgentPacket","payload":{"kind":"unsafe-review.agent_packet","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]},{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Explain unsafe-review witness route","kind":"quickfix","command":"unsafe-review.explainWitnessRoute","payload":{"kind":"unsafe-review.witness_route","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]},{"card_id":"card-1","path":"tests/read_header.rs","range":{"start":{"line":2,"character":0},"end":{"line":2,"character":1}},"title":"Open related test read_header","kind":"quickfix","command":"unsafe-review.openRelatedTest","payload":{"kind":"unsafe-review.related_test","card_id":"card-1","file":"tests/read_header.rs","line":3,"name":"read_header","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1","tests/read_header.rs","3","read_header"]}]"#,
-            ),
+            )?,
         )
         .map_err(|err| format!("write lsp failed: {err}"))?;
 
@@ -10919,7 +10932,7 @@ Snapshot reports:
             dir.join("lsp.json"),
             valid_lsp_json(
                 r#"[{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Copy unsafe-review packet for card-1","kind":"quickfix","command":"unsafe-review.copyAgentPacket","payload":{"kind":"unsafe-review.agent_packet","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]},{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Explain unsafe-review witness route","kind":"quickfix","command":"unsafe-review.explainWitnessRoute","payload":{"kind":"unsafe-review.witness_route","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]},{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":2,"character":0},"end":{"line":2,"character":1}},"title":"Open related test read_header","kind":"quickfix","command":"unsafe-review.openRelatedTest","payload":{"kind":"unsafe-review.related_test","card_id":"card-1","file":"tests/read_header.rs","line":3,"name":"read_header","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1","tests/read_header.rs","3","read_header"]}]"#,
-            ),
+            )?,
         )
         .map_err(|err| format!("write lsp failed: {err}"))?;
 
@@ -10945,7 +10958,7 @@ Snapshot reports:
             dir.join("lsp.json"),
             valid_lsp_json(
                 r#"[{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Copy unsafe-review packet for card-1","kind":"quickfix","command":"unsafe-review.copyAgentPacket","payload":{"kind":"unsafe-review.agent_packet","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]},{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Explain unsafe-review witness route","kind":"quickfix","command":"unsafe-review.explainWitnessRoute","payload":{"kind":"unsafe-review.witness_route","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]},{"card_id":"card-1","path":"tests/read_header.rs","range":{"start":{"line":2,"character":0},"end":{"line":2,"character":1}},"title":"Open unrelated test","kind":"quickfix","command":"unsafe-review.openRelatedTest","payload":{"kind":"unsafe-review.related_test","card_id":"card-1","file":"tests/read_header.rs","line":3,"name":"read_header","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1","tests/read_header.rs","3","read_header"]}]"#,
-            ),
+            )?,
         )
         .map_err(|err| format!("write lsp failed: {err}"))?;
 
@@ -11758,7 +11771,7 @@ Snapshot reports:
             dir.join("lsp.json"),
             valid_lsp_json(
                 r#"[{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Copy unsafe-review packet for card-1","kind":"quickfix","command":"unsafe-review.copyAgentPacket","arguments":["card-1"]}]"#,
-            ),
+            )?,
         )
         .map_err(|err| format!("write lsp failed: {err}"))?;
 
@@ -12954,7 +12967,7 @@ review_after = "2026-08-01"
             dir.join("lsp.json"),
             valid_lsp_json(
                 r#"[{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Copy unsafe-review packet for card-1","kind":"quickfix","command":"unsafe-review.copyAgentPacket","payload":{"kind":"unsafe-review.agent_packet","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]},{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Explain unsafe-review witness route","kind":"quickfix","command":"unsafe-review.explainWitnessRoute","payload":{"kind":"unsafe-review.witness_route","card_id":"card-1","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]}]"#,
-            ),
+            )?,
         )
         .map_err(|err| format!("write lsp failed: {err}"))?;
         fs::write(
@@ -12965,14 +12978,14 @@ review_after = "2026-08-01"
         Ok(())
     }
 
-    fn valid_lsp_json(code_actions: &str) -> String {
+    fn valid_lsp_json(code_actions: &str) -> Result<String, String> {
         let mut value: serde_json::Value = serde_json::from_str(&format!(
             r#"{{"tool":"unsafe-review","mode":"read_only_projection","policy":"advisory","scope":"diff","status":{{"state":"actionable","cards":1,"open_actionable_gaps":1,"high_priority_cards":1,"message":"1 unsafe-review card(s), 1 open actionable gap(s)","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}},"diagnostics":[{{"card_id":"card-1","path":"src/lib.rs","range":{{"start":{{"line":6,"character":0}},"end":{{"line":6,"character":1}}}},"code":"guard_missing","operation":"unsafe {{ ptr.cast::<Header>().read() }}","operation_family":"raw_pointer_read","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","hazards":["alignment"],"required_safety_conditions":[{{"key":"alignment","description":"pointer aligned"}}],"evidence_summary":{{"contract":{{"present":true,"state":"present","summary":"safety contract"}},"discharge":{{"present":false,"state":"missing","summary":"No visible local guard"}},"reach":{{"state":"owner_reached","summary":"related test mention"}},"witness":{{"present":false,"state":"missing","summary":"No imported witness receipt"}},"reach_limitation":"static reach evidence is not proof that the unsafe site executed"}},"obligation_evidence":[{{"key":"alignment","description":"pointer aligned","contract":{{"present":true,"state":"present","summary":"safety contract"}},"discharge":{{"present":false,"state":"missing","summary":"No visible local guard"}},"reach":{{"present":true,"state":"present","summary":"related test mention"}},"witness":{{"present":false,"state":"missing","summary":"No imported witness receipt"}}}}],"witness_routes":[{{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}}],"verify_commands":["cargo +nightly miri test card"],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}],"hovers":[{{"card_id":"card-1","path":"src/lib.rs","position":{{"line":6,"character":0}},"contents":"Card: `card-1`; priority `high`; confidence `medium`\n\nWhy this card exists:\n- The changed code contains a `raw_pointer_read` unsafe operation that unsafe-review classifies as `guard_missing`.\n- Operation: `unsafe {{ ptr.cast::<Header>().read() }}`\n\nRelevant hazard families:\n- `alignment`\n\nRequired safety conditions:\n- pointer aligned\n\nEvidence found:\n- Contract [present]: safety contract\n- Guard/discharge [missing]: No visible local guard\n- Reach [owner_reached]: related test mention\n- Witness [missing]: No imported witness receipt\n\nEvidence missing:\n- none recorded\n\nWhat would resolve this:\n- Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n\nVerify commands:\n- `cargo +nightly miri test card`\n\nWhat would not resolve this:\n- A `SAFETY:` comment alone does not discharge missing guard evidence.\n- A related test mention is not proof that this unsafe site executed.\n- Do not claim witness proof unless a matching receipt exists.\n- Do not widen unsafe scope, suppress the card, or change unrelated unsafe code to silence this review item.\n\nWitness route: `miri` because route.\n\nTrust boundary: static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}],"code_actions":{code_actions},"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}"#
         ))
-        .expect("valid lsp json fixture parses");
+        .map_err(|err| format!("valid lsp json fixture failed to parse: {err}"))?;
         let hover_contents = value["hovers"][0]["contents"]
             .as_str()
-            .expect("valid lsp hover contents is a string")
+            .ok_or_else(|| "valid lsp hover contents must be a string".to_string())?
             .replace(
                 "\n\nWhy this card exists:",
                 "\n\nLocation: src/lib.rs:7\n\nWhy this card exists:",
@@ -12983,7 +12996,7 @@ review_after = "2026-08-01"
             );
         value["hovers"][0]["contents"] = serde_json::json!(hover_contents);
         value["diagnostics"][0]["missing_evidence"] = serde_json::json!([]);
-        value.to_string()
+        Ok(value.to_string())
     }
 
     fn write_valid_zero_card_first_pr_artifacts(dir: &Path) -> Result<(), String> {
