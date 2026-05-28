@@ -99,7 +99,7 @@ use self::receiver_path::{
 use self::site_context::{code_context, code_context_through_site};
 use self::source_value::source_value_identifier;
 use self::target_feature_discharge::target_feature_discharge_state;
-use self::u8_bool_value::{has_u8_bool_value_guard, u8_bool_valid_value_predicates};
+use self::u8_bool_value::has_u8_bool_value_guard;
 use self::unreachable_discharge::unreachable_discharge_state;
 use self::utf8_discharge::utf8_discharge_state;
 use self::valid_value_discharge::valid_value_discharge_state;

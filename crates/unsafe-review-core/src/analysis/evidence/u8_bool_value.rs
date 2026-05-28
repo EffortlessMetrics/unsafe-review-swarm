@@ -8,7 +8,7 @@ pub(super) fn has_u8_bool_value_guard(before_call: &str, argument: &str) -> bool
     U8BoolValueApplicability::new(before_call, argument).has_valid_value_evidence()
 }
 
-pub(super) fn u8_bool_valid_value_predicates(target: &str) -> [String; 8] {
+fn u8_bool_valid_value_predicates(target: &str) -> [String; 8] {
     [
         format!("{target}<=1"),
         format!("1>={target}"),

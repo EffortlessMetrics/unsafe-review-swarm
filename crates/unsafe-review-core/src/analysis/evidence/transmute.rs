@@ -1,9 +1,7 @@
 use super::{
-    any_compact_if_condition, branch_still_open_at_operation, condition_has_top_level_conjunct,
-    condition_has_top_level_disjunct, contains_executable_return, has_assignment_to_identifier,
-    matching_call_argument_end, matching_code_block_end, matching_generic_argument_end,
-    source_value_identifier, split_top_level_pair, strip_block_comments_and_literals,
-    u8_bool_valid_value_predicates,
+    branch_still_open_at_operation, has_u8_bool_value_guard, matching_call_argument_end,
+    matching_generic_argument_end, source_value_identifier, split_top_level_pair,
+    strip_block_comments_and_literals,
 };
 
 pub(super) fn has_transmute_layout_size_evidence(lower: &str) -> bool {
@@ -69,10 +67,8 @@ impl<'a> TransmuteCallContext<'a> {
     fn value_domain_context(&self) -> Option<TransmuteValueDomainContext<'a>> {
         let domain = self.value_domain()?;
         Some(TransmuteValueDomainContext {
-            applicability: TransmuteValueDomainApplicability::new(
-                self.before_call,
-                source_value_identifier(self.argument)?,
-            ),
+            before_call: self.before_call,
+            same_source_value_target: source_value_identifier(self.argument)?,
             domain,
         })
     }
@@ -97,7 +93,8 @@ impl TransmuteLayoutContext<'_> {
 }
 
 struct TransmuteValueDomainContext<'a> {
-    applicability: TransmuteValueDomainApplicability<'a>,
+    before_call: &'a str,
+    same_source_value_target: &'a str,
     domain: TransmuteValueDomain,
 }
 
@@ -108,121 +105,10 @@ enum TransmuteValueDomain {
 impl TransmuteValueDomainContext<'_> {
     fn has_valid_value_evidence(&self) -> bool {
         match self.domain {
-            TransmuteValueDomain::U8ToBool => self.has_u8_to_bool_valid_value_evidence(),
-        }
-    }
-
-    fn has_u8_to_bool_valid_value_evidence(&self) -> bool {
-        self.u8_to_bool_valid_predicates()
-            .iter()
-            .any(|predicate| self.has_u8_bool_value_predicate_guard(predicate))
-            || self.has_u8_bool_invalid_early_return_guard()
-    }
-
-    fn u8_to_bool_valid_predicates(&self) -> [String; 8] {
-        self.applicability.u8_to_bool_valid_predicates()
-    }
-
-    fn has_u8_bool_value_predicate_guard(&self, predicate: &str) -> bool {
-        [
-            format!("assert!({predicate})"),
-            format!("assert!({predicate},"),
-            format!("debug_assert!({predicate})"),
-            format!("debug_assert!({predicate},"),
-        ]
-        .iter()
-        .any(|pattern| self.applicability.has_fresh_assertion_guard(pattern))
-            || self.has_open_positive_branch_guard(predicate)
-    }
-
-    fn has_open_positive_branch_guard(&self, predicate: &str) -> bool {
-        self.applicability.has_open_positive_branch_guard(predicate)
-    }
-
-    fn has_u8_bool_invalid_early_return_guard(&self) -> bool {
-        self.has_invalid_byte_returning_branch(&format!(
-            "{}>1",
-            self.applicability.same_source_value_target
-        )) || self.has_invalid_byte_returning_branch(&format!(
-            "1<{}",
-            self.applicability.same_source_value_target
-        )) || self.has_invalid_byte_returning_branch(&format!(
-            "{}>=2",
-            self.applicability.same_source_value_target
-        )) || self.has_invalid_byte_returning_branch(&format!(
-            "2<={}",
-            self.applicability.same_source_value_target
-        ))
-    }
-
-    fn has_invalid_byte_returning_branch(&self, predicate: &str) -> bool {
-        self.applicability.has_returning_branch_guard(predicate)
-    }
-}
-
-// Valid-value evidence for transmute applies only to the same source value that
-// is converted, and that value must remain fresh until the unsafe operation.
-struct TransmuteValueDomainApplicability<'a> {
-    before_call: &'a str,
-    same_source_value_target: &'a str,
-}
-
-impl<'a> TransmuteValueDomainApplicability<'a> {
-    fn new(before_call: &'a str, same_source_value_target: &'a str) -> Self {
-        Self {
-            before_call,
-            same_source_value_target,
-        }
-    }
-
-    fn u8_to_bool_valid_predicates(&self) -> [String; 8] {
-        u8_bool_valid_value_predicates(self.same_source_value_target)
-    }
-
-    fn has_fresh_assertion_guard(&self, pattern: &str) -> bool {
-        let mut search_from = 0;
-        while let Some(offset) = self.before_call[search_from..].find(pattern) {
-            let pattern_start = search_from + offset;
-            let after_pattern = &self.before_call[pattern_start + pattern.len()..];
-            let statement_end = after_pattern.find(';').unwrap_or(after_pattern.len());
-            let after_guard = &after_pattern[statement_end..];
-            if self.source_value_stays_fresh_after(after_guard) {
-                return true;
+            TransmuteValueDomain::U8ToBool => {
+                has_u8_bool_value_guard(self.before_call, self.same_source_value_target)
             }
-            search_from = pattern_start + pattern.len();
         }
-        false
-    }
-
-    fn has_open_positive_branch_guard(&self, predicate: &str) -> bool {
-        any_compact_if_condition(self.before_call, |condition, after_guard| {
-            condition_has_top_level_conjunct(condition, predicate)
-                && self.open_branch_preserves_applicability(after_guard)
-        })
-    }
-
-    fn open_branch_preserves_applicability(&self, after_guard: &str) -> bool {
-        branch_still_open_at_operation(after_guard)
-            && self.source_value_stays_fresh_after(after_guard)
-    }
-
-    fn has_returning_branch_guard(&self, predicate: &str) -> bool {
-        any_compact_if_condition(self.before_call, |condition, after_guard| {
-            condition_has_top_level_disjunct(condition, predicate)
-                && self.returning_branch_preserves_applicability(after_guard)
-        })
-    }
-
-    fn returning_branch_preserves_applicability(&self, after_guard: &str) -> bool {
-        let (guard_body, after_branch) = matching_code_block_end(after_guard)
-            .map_or((after_guard, ""), |body_end| {
-                (&after_guard[..body_end], &after_guard[body_end + 1..])
-            });
-        contains_executable_return(guard_body) && self.source_value_stays_fresh_after(after_branch)
-    }
-
-    fn source_value_stays_fresh_after(&self, evidence: &str) -> bool {
-        !has_assignment_to_identifier(evidence, self.same_source_value_target)
     }
 }
 
