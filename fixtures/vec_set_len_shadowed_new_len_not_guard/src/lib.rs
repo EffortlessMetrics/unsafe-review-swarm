@@ -1,0 +1,16 @@
+pub fn extend_after_shadowed_new_len(values: &mut Vec<u8>, new_len: usize) {
+    assert!(new_len <= values.capacity());
+    let new_len = values.capacity() + 1;
+    // SAFETY: this fixture intentionally shadows the checked new length before use.
+    unsafe { values.set_len(new_len) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::extend_after_shadowed_new_len;
+
+    #[test]
+    fn mentions_extend_after_shadowed_new_len() {
+        let _ = stringify!(extend_after_shadowed_new_len);
+    }
+}

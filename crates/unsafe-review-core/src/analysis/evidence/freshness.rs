@@ -1,4 +1,4 @@
-use super::is_receiver_path_char;
+use super::{is_receiver_path_char, is_simple_identifier};
 
 pub(super) fn has_fresh_guard_pattern(before_call: &str, pattern: &str, argument: &str) -> bool {
     has_fresh_guard_pattern_for_identifiers(before_call, pattern, &[argument])
@@ -65,6 +65,15 @@ pub(super) fn has_assignment_to_any_identifier(compact: &str, identifiers: &[&st
 }
 
 pub(super) fn has_assignment_to_identifier(compact: &str, identifier: &str) -> bool {
+    if is_simple_identifier(identifier)
+        && (compact.contains(&format!("let{identifier}="))
+            || compact.contains(&format!("letmut{identifier}="))
+            || compact.contains(&format!("let{identifier}:"))
+            || compact.contains(&format!("letmut{identifier}:")))
+    {
+        return true;
+    }
+
     let mut cursor = compact;
     let mut offset = 0usize;
     while let Some(pos) = cursor.find(identifier) {
@@ -97,4 +106,34 @@ fn starts_assignment_operator(after_identifier: &str) -> bool {
         || ["+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>="]
             .iter()
             .any(|operator| after_identifier.starts_with(operator))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::has_assignment_to_identifier;
+
+    #[test]
+    fn detects_shadowing_bindings_as_assignments() {
+        for code in [
+            "letnew_len=values.capacity()+1;",
+            "letmutnew_len=values.capacity()+1;",
+            "letnew_len:usize=values.capacity()+1;",
+            "letmutnew_len:usize=values.capacity()+1;",
+        ] {
+            assert!(
+                has_assignment_to_identifier(code, "new_len"),
+                "{code} should stale new_len evidence"
+            );
+        }
+    }
+
+    #[test]
+    fn ignores_other_binding_names() {
+        for code in ["letother_new_len=1;", "letwrappernew_len=1;"] {
+            assert!(
+                !has_assignment_to_identifier(code, "new_len"),
+                "{code} should not stale new_len evidence"
+            );
+        }
+    }
 }

@@ -62,6 +62,7 @@ required_core_fixtures = [
   "vec_set_len_reassigned_receiver_not_guard",
   "vec_set_len_reassigned_new_len_not_guard",
   "vec_set_len_compound_reassigned_new_len_not_guard",
+  "vec_set_len_shadowed_new_len_not_guard",
   "vec_set_len_with_capacity",
   "vec_set_len_stale_with_capacity_not_guard",
   "vec_set_len_stale_with_capacity_len_not_guard",
@@ -911,6 +912,16 @@ expected_hazard = "initialized_memory"
 fixture = "vec_set_len_compound_reassigned_new_len_not_guard"
 kind = "false_positive_control"
 claim = "Vec::set_len capacity evidence is stale when compound assignment mutates the checked new length before set_len"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "vec_set_len_shadowed_new_len_not_guard"
+kind = "false_positive_control"
+claim = "Vec::set_len capacity evidence is stale when the checked new length is shadowed before set_len"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
