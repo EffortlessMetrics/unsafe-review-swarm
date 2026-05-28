@@ -1,0 +1,5 @@
+[package]
+name = "vec-set-len-stale-with-capacity-not-guard"
+version = "0.1.0"
+edition = "2024"
+

@@ -252,6 +252,19 @@ label_source = "fixture_golden"
 rationale = "Allocating enough capacity does not initialize the extended Vec range."
 
 [[samples]]
+id = "vec-set-len-stale-with-capacity-missing-capacity"
+fixture = "vec_set_len_stale_with_capacity_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "capacity"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Vec::with_capacity(new_len) capacity evidence becomes stale when the vector receiver is reassigned before Vec::set_len."
+
+[[samples]]
 id = "vec-set-len-reserve-capacity-missing-initialized-range"
 fixture = "vec_set_len_reserve_capacity"
 kind = "positive"

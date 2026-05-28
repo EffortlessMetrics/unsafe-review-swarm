@@ -354,16 +354,33 @@ impl<'a> SetLenCapacityContext<'a> {
     }
 
     fn has_with_capacity_evidence(&self) -> bool {
-        self.before_call.split(';').any(|statement| {
-            let Some((left, right)) = statement.split_once('=') else {
-                return false;
+        let mut stale_identifiers = vec![self.same_vec_target];
+        if is_simple_identifier(self.set_len_argument) {
+            stale_identifiers.push(self.set_len_argument);
+        }
+
+        let mut consumed = 0usize;
+        for statement in self.before_call.split_inclusive(';') {
+            let statement_without_semicolon = statement.trim_end_matches(';');
+            let Some((left, right)) = statement_without_semicolon.split_once('=') else {
+                consumed += statement.len();
+                continue;
             };
             let Some(binding) = let_binding_name(left) else {
-                return false;
+                consumed += statement.len();
+                continue;
             };
-            binding == self.same_vec_target
+            let after_binding =
+                &self.before_call[(consumed + statement.len()).min(self.before_call.len())..];
+            if binding == self.same_vec_target
                 && with_capacity_argument(right).is_some_and(|arg| arg == self.set_len_argument)
-        })
+                && !has_assignment_to_any_identifier(after_binding, &stale_identifiers)
+            {
+                return true;
+            }
+            consumed += statement.len();
+        }
+        false
     }
 }
 

@@ -1257,6 +1257,24 @@ mod tests {
             "unsafe { values.set_len(new_len); }",
             vec![],
         );
+        let stale_receiver = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "let mut values = Vec::with_capacity(new_len);",
+                "values = Vec::new();",
+            ],
+            "unsafe { values.set_len(new_len); }",
+            vec![],
+        );
+        let stale_new_len = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "let mut values = Vec::with_capacity(new_len);",
+                "new_len = values.capacity() + 1;",
+            ],
+            "unsafe { values.set_len(new_len); }",
+            vec![],
+        );
 
         assert!(
             obligation_evidence(&matching, &obligations, &contract, &reach)[0]
@@ -1270,6 +1288,16 @@ mod tests {
         );
         assert!(
             !obligation_evidence(&other_receiver, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&stale_receiver, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&stale_new_len, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
         );
