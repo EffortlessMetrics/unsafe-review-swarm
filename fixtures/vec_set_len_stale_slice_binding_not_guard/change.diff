@@ -1,0 +1,36 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,30 @@
++use core::mem::MaybeUninit;
++
++pub fn extend_after_shadowed_slice_binding(
++    values: &mut Vec<MaybeUninit<u8>>,
++    other: &mut [MaybeUninit<u8>],
++    bytes: &[u8],
++) {
++    let old_len = values.len();
++    let new_len = old_len + bytes.len();
++    if new_len > values.capacity() {
++        return;
++    }
++    let dst = &mut values[old_len..new_len];
++    let dst = &mut other[old_len..new_len];
++    for (dst, src) in dst.iter_mut().zip(bytes.iter()) {
++        *dst = MaybeUninit::new(*src);
++    }
++    // SAFETY: this fixture intentionally shadows the target slice binding.
++    unsafe {
++        values.set_len(new_len);
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::extend_after_shadowed_slice_binding;
++
++    #[test]
++    fn mentions_extend_after_shadowed_slice_binding() {
++        let _ = stringify!(extend_after_shadowed_slice_binding);
++    }
++}

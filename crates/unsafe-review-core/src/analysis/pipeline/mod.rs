@@ -2145,6 +2145,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     fn vec_set_len_accepts_pre_call_initialized_range_evidence() -> Result<(), String> {
         for fixture in [
             "vec_set_len_initialized_loop",
+            "vec_set_len_slice_binding_initialized_loop",
             "vec_set_len_call_result_init",
             "vec_set_len_shrink",
             "vec_set_len_last_index_shrink",
@@ -2200,7 +2201,9 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
         for fixture in [
             "vec_set_len_post_init_not_guard",
             "vec_set_len_unrelated_initialization_not_guard",
+            "vec_set_len_other_slice_binding_not_guard",
             "vec_set_len_partial_slice_binding_not_guard",
+            "vec_set_len_stale_slice_binding_not_guard",
             "vec_set_len_single_index_init_not_guard",
         ] {
             let output = fixture_output(fixture)?;

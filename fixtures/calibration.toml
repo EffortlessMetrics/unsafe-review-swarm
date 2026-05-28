@@ -54,6 +54,7 @@ required_core_fixtures = [
   "vec_set_len_slice_binding_initialized_loop",
   "vec_set_len_other_slice_binding_not_guard",
   "vec_set_len_partial_slice_binding_not_guard",
+  "vec_set_len_stale_slice_binding_not_guard",
   "vec_set_len_single_index_init_not_guard",
   "vec_set_len_capacity_observed_not_guard",
   "vec_set_len_unrelated_capacity_comparison_not_guard",
@@ -874,6 +875,16 @@ expected_hazard = "initialized_memory"
 fixture = "vec_set_len_partial_slice_binding_not_guard"
 kind = "false_positive_control"
 claim = "Vec::set_len does not accept partial same-vector slice-binding initialization as full initialized-range evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "vec_set_len_stale_slice_binding_not_guard"
+kind = "false_positive_control"
+claim = "Vec::set_len does not accept stale same-vector slice bindings as initialized-range evidence"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
