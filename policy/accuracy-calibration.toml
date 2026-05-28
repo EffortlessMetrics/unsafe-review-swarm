@@ -742,6 +742,7 @@ fixtures = [
   "transmute_copy_layout_disjunct_branch_not_guard",
   "transmute_copy_layout_mismatch_return_guard",
   "transmute_copy_layout_conjunct_return_not_guard",
+  "transmute_copy_bool_comment_not_guard",
   "transmute_copy_bool_valid_value_guard",
   "transmute_copy_bool_conjunct_branch_guard",
   "transmute_copy_bool_disjunct_branch_not_guard",
@@ -771,7 +772,7 @@ layout-only, disjunctive-layout, transmute_copy disjunctive-layout,
 transmute_copy disjunctive bool-domain branches, conjunctive-layout-return,
 transmute_copy conjunctive layout-return, transmute_copy conjunctive
 invalid-byte return, closed-layout, observed-layout, comment-only,
-disjunctive-branch, conjunctive-return, other-value, observed, closed-branch,
+transmute_copy comment-only, disjunctive-branch, conjunctive-return, other-value, observed, closed-branch,
 stale-byte, compound-stale-byte, shadowed-byte, transmute_copy
 compound-stale-byte, transmute_copy shadowed-byte, and multiline transmute_copy
 controls in the listed fixtures.
