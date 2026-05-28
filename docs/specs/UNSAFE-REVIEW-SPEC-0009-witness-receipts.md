@@ -77,14 +77,16 @@ use the same importer checks as normal card analysis so users do not get a
 separate receipt truth.
 
 The CLI may audit receipt files against the current `ReviewCard` set. Receipt
-audit must report matched, unmatched, stale, expired, wrong-identity, wrong-tool,
-weaker-than-required, and invalid receipt metadata without running witnesses,
-inferring site reach, making policy decisions, or claiming safety. Matched
-receipt entries include current card operation, missing-count, and next-action
-context. Audit entries include the current card's routed witness tools so a
-reviewer can compare the saved receipt tool against the ReviewCard route. Audit
-entries also include the saved `command_hash` when present so reviewers can
-compare command-string drift without treating it as proof that the command ran.
+audit must report matched, unmatched, stale, expired, wrong-identity,
+wrong-tool, weaker-than-required, command-hash-mismatch, and invalid receipt
+metadata without running witnesses, inferring site reach, making policy
+decisions, or claiming safety. Matched receipt entries include current card
+operation, missing-count, and next-action context. Audit entries include the
+current card's routed witness tools so a reviewer can compare the saved receipt
+tool against the ReviewCard route. Audit entries also include the saved
+`command_hash` when present and surface command-hash mismatches as their own
+audit status so reviewers can compare command-string drift without treating it
+as proof that the command ran.
 This lets a receipt improve witness evidence without erasing remaining guard or
 contract gaps. The audit is an advisory metadata report over saved receipts and
 current cards. JSON and Markdown audit output must include explicit limitations
@@ -184,8 +186,8 @@ calendar-valid `YYYY-MM-DD` date on or after the `recorded_at` date.
 - The CLI receipt-validate command counts importable receipts and rejects the
   same invalid receipt files as normal analysis.
 - The CLI receipt-audit command reports matched, stale, expired,
-  wrong-identity, wrong-tool, weaker-than-required, and invalid receipts without
-  executing witnesses or making policy decisions.
+  wrong-identity, wrong-tool, weaker-than-required, command-hash-mismatch, and
+  invalid receipts without executing witnesses or making policy decisions.
 - Receipt-audit JSON and Markdown include limitations that preserve the saved
   metadata boundary and state that matched receipts only improve witness
   evidence.

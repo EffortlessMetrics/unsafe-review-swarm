@@ -13,10 +13,10 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
     out.push_str("Static audit of saved witness receipt metadata against current ReviewCards.\n\n");
     out.push_str(&format!("Audit date: `{}`\n\n", report.audit_date));
     out.push_str("## Summary\n\n");
-    out.push_str("| Receipts | Matched | Unmatched | Expired | Stale | Wrong identity | Wrong tool | Weak strength | Duplicate | Invalid |\n");
-    out.push_str("|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
+    out.push_str("| Receipts | Matched | Unmatched | Expired | Stale | Wrong identity | Wrong tool | Weak strength | Command hash mismatch | Duplicate | Invalid |\n");
+    out.push_str("|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
     out.push_str(&format!(
-        "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n\n",
+        "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n\n",
         report.summary.receipts,
         report.summary.matched,
         report.summary.unmatched,
@@ -25,6 +25,7 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
         report.summary.wrong_identity,
         report.summary.wrong_tool,
         report.summary.weaker_than_required,
+        report.summary.command_hash_mismatch,
         report.summary.duplicate,
         report.summary.invalid
     ));
@@ -141,6 +142,7 @@ mod tests {
                 wrong_identity: 0,
                 wrong_tool: 1,
                 weaker_than_required: 1,
+                command_hash_mismatch: 1,
                 duplicate: 0,
                 invalid: 0,
             },
@@ -173,6 +175,7 @@ mod tests {
                     expires_at: Some("2026-08-18".to_string()),
                     command_hash: Some("4ce9d7c8eeb19a30".to_string()),
                     statuses: vec![
+                        "command_hash_mismatch".to_string(),
                         "matched".to_string(),
                         "weaker_than_required".to_string(),
                         "wrong_tool".to_string(),
@@ -200,7 +203,8 @@ mod tests {
 
         assert!(markdown.contains("# unsafe-review receipt audit"));
         assert!(markdown.contains("Audit date: `2026-05-26`"));
-        assert!(markdown.contains("| 2 | 1 | 1 | 0 | 1 | 0 | 1 | 1 | 0 | 0 |"));
+        assert!(markdown.contains("Command hash mismatch"));
+        assert!(markdown.contains("| 2 | 1 | 1 | 0 | 1 | 0 | 1 | 1 | 1 | 0 | 0 |"));
         assert!(markdown.contains(
             "| Status | Receipt | Card | Matched card | Tool | Strength | Expires | Command hash | Routed tools | Issues |"
         ));
@@ -208,7 +212,9 @@ mod tests {
         assert!(markdown.contains("`4ce9d7c8eeb19a30`"));
         assert!(markdown.contains("`miri`, `cargo-careful`"));
         assert!(markdown.contains("stale, unmatched"));
-        assert!(markdown.contains("matched, weaker_than_required, wrong_tool"));
+        assert!(
+            markdown.contains("command_hash_mismatch, matched, weaker_than_required, wrong_tool")
+        );
         assert!(markdown.contains("receipt card_id is not present in the current ReviewCard set"));
         assert!(
             markdown.contains("receipt tool `loom` is not one of this card's routed witness tools")

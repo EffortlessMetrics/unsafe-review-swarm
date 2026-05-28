@@ -101,6 +101,7 @@ pub struct ReceiptAuditSummary {
     pub wrong_identity: usize,
     pub wrong_tool: usize,
     pub weaker_than_required: usize,
+    pub command_hash_mismatch: usize,
     pub duplicate: usize,
     pub invalid: usize,
 }
@@ -322,6 +323,9 @@ fn audit_receipt_record(
         if err.contains("unknown receipt tool") {
             statuses.insert("wrong_tool".to_string());
         }
+        if err.contains("command_hash") {
+            statuses.insert("command_hash_mismatch".to_string());
+        }
     }
 
     let matched = cards.get(&receipt.card_id).copied();
@@ -423,6 +427,7 @@ fn count_statuses(summary: &mut ReceiptAuditSummary, statuses: &[String]) {
             "wrong_identity" => summary.wrong_identity += 1,
             "wrong_tool" => summary.wrong_tool += 1,
             "weaker_than_required" => summary.weaker_than_required += 1,
+            "command_hash_mismatch" => summary.command_hash_mismatch += 1,
             "duplicate" => summary.duplicate += 1,
             "invalid" => summary.invalid += 1,
             _ => {}
@@ -803,6 +808,7 @@ mod tests {
         assert_eq!(report.summary.wrong_identity, 1);
         assert_eq!(report.summary.wrong_tool, 1);
         assert_eq!(report.summary.weaker_than_required, 1);
+        assert_eq!(report.summary.command_hash_mismatch, 0);
         assert_eq!(report.summary.duplicate, 5);
         assert_eq!(report.summary.invalid, 1);
         assert_eq!(report.limitations.len(), 4);
@@ -918,6 +924,7 @@ mod tests {
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
         assert_eq!(report.summary.receipts, 1);
         assert_eq!(report.summary.matched, 1);
+        assert_eq!(report.summary.command_hash_mismatch, 1);
         assert_eq!(report.summary.invalid, 1);
         let entry = report
             .receipts
@@ -926,6 +933,12 @@ mod tests {
         assert_eq!(entry.command_hash.as_deref(), Some("0000000000000000"));
         assert!(entry.statuses.iter().any(|status| status == "matched"));
         assert!(entry.statuses.iter().any(|status| status == "invalid"));
+        assert!(
+            entry
+                .statuses
+                .iter()
+                .any(|status| status == "command_hash_mismatch")
+        );
         assert!(entry.matched_card.is_some());
         assert!(
             entry
