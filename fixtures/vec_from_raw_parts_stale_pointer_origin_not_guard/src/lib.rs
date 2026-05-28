@@ -1,0 +1,11 @@
+pub fn rebuild_vec(input: Vec<u8>, spare: Vec<u8>) -> Vec<u8> {
+    let mut raw = core::mem::ManuallyDrop::new(input);
+    let mut spare = spare;
+    let mut ptr = raw.as_mut_ptr();
+    let len = raw.len();
+    let cap = raw.capacity();
+    ptr = spare.as_mut_ptr();
+    // SAFETY: fixture keeps len/cap from raw but makes pointer origin stale.
+    unsafe { Vec::from_raw_parts(ptr, len, cap) }
+}
+

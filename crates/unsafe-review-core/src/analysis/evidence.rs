@@ -1741,6 +1741,17 @@ mod tests {
             "unsafe { Vec::from_raw_parts(ptr, len, cap) }",
             vec![],
         );
+        let stale_pointer_origin = site_with_family(
+            OperationFamily::VecFromRawParts,
+            vec![
+                "let mut raw = core::mem::ManuallyDrop::new(input);",
+                "let mut spare = spare;",
+                "let mut ptr = raw.as_mut_ptr();",
+                "ptr = spare.as_mut_ptr();",
+            ],
+            "unsafe { Vec::from_raw_parts(ptr, len, cap) }",
+            vec![],
+        );
 
         assert!(
             obligation_evidence(&matching, &obligations, &contract, &reach)[0]
@@ -1759,6 +1770,11 @@ mod tests {
         );
         assert!(
             !obligation_evidence(&out_of_order_origin, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&stale_pointer_origin, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
         );

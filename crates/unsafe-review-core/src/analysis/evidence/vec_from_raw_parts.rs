@@ -1,8 +1,8 @@
 use super::{
     branch_still_open_at_operation, compact_code, contains_executable_return,
-    contains_simple_assignment_to, let_binding_name, matching_call_argument_end,
-    matching_code_block_end, receiver_before_marker, split_top_level_arguments,
-    strip_block_comments_and_literals,
+    contains_simple_assignment_to, is_simple_identifier, let_binding_name,
+    matching_call_argument_end, matching_code_block_end, receiver_before_marker,
+    split_top_level_arguments, strip_block_comments_and_literals,
 };
 
 pub(super) fn has_vec_from_raw_parts_capacity_evidence(expression: &str, lower: &str) -> bool {
@@ -201,27 +201,36 @@ fn vec_raw_parts_pointer_origin_receiver_before(
     pointer: &str,
 ) -> Option<String> {
     let mut prior_statements = String::new();
+    let mut pointer_origin_receiver = None;
     for statement in before_call.split(';') {
         let Some((left, right)) = statement.split_once('=') else {
             prior_statements.push_str(statement);
             prior_statements.push(';');
             continue;
         };
-        let Some(binding) = let_binding_name(left) else {
+        let Some(binding) = raw_parts_assignment_binding(left) else {
             prior_statements.push_str(statement);
             prior_statements.push(';');
             continue;
         };
-        if binding == pointer
-            && let Some(receiver) = vec_raw_pointer_receiver(right)
-            && vec_raw_pointer_receiver_has_manually_drop_origin(&prior_statements, receiver)
-        {
-            return Some(receiver.to_string());
+        if binding == pointer {
+            pointer_origin_receiver = vec_raw_pointer_receiver(right).and_then(|receiver| {
+                vec_raw_pointer_receiver_has_manually_drop_origin(&prior_statements, receiver)
+                    .then(|| receiver.to_string())
+            });
         }
         prior_statements.push_str(statement);
         prior_statements.push(';');
     }
-    None
+    pointer_origin_receiver
+}
+
+fn raw_parts_assignment_binding(left: &str) -> Option<&str> {
+    let binding = let_binding_name(left).or_else(|| {
+        let trimmed = left.trim();
+        is_simple_identifier(trimmed).then_some(trimmed)
+    })?;
+    (!binding.is_empty()).then_some(binding)
 }
 
 fn vec_raw_pointer_receiver(right_side: &str) -> Option<&str> {

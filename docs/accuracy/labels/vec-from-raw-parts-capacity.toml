@@ -126,3 +126,16 @@ expected_obligation_key = "capacity"
 expected_discharge_state = "present"
 label_source = "fixture_golden"
 rationale = "Capacity read from the same ManuallyDrop Vec raw-parts origin discharges the capacity obligation while alignment still remains separate."
+
+[[samples]]
+id = "vec-from-raw-parts-stale-pointer-origin-not-ownership"
+fixture = "vec_from_raw_parts_stale_pointer_origin_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_from_raw_parts"
+expected_hazard = "leak_or_ownership_transfer"
+expected_obligation_key = "ownership"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "ManuallyDrop raw-parts origin evidence becomes stale when the pointer argument is reassigned before Vec::from_raw_parts."
