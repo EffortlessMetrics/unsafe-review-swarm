@@ -1,11 +1,12 @@
 use super::{
     branch_still_open_at_operation, contains_executable_return, has_assignment_to_identifier,
     matching_call_argument_end, matching_code_block_end, matching_generic_argument_end,
-    source_value_identifier, split_top_level_pair, u8_bool_valid_value_predicates,
+    source_value_identifier, split_top_level_pair, strip_block_comments_and_literals,
+    u8_bool_valid_value_predicates,
 };
 
 pub(super) fn has_transmute_layout_size_evidence(lower: &str) -> bool {
-    let compact = compact_code(lower);
+    let compact = compact_code(&strip_block_comments_and_literals(lower));
     let Some(context) = TransmuteCallContext::parse(&compact) else {
         return false;
     };
@@ -13,7 +14,7 @@ pub(super) fn has_transmute_layout_size_evidence(lower: &str) -> bool {
 }
 
 pub(super) fn has_transmute_u8_bool_valid_value_evidence(lower: &str) -> bool {
-    let compact = compact_code(lower);
+    let compact = compact_code(&strip_block_comments_and_literals(lower));
     let Some(context) = TransmuteCallContext::parse(&compact) else {
         return false;
     };

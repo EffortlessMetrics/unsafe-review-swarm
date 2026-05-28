@@ -4359,10 +4359,34 @@ mod tests {
             "unsafe { core::mem::transmute::<u8, bool>(value) }",
             vec![],
         );
+        let line_comment_matching_size = site_with_family(
+            OperationFamily::Transmute,
+            vec!["// assert_eq!(core::mem::size_of::<u8>(), core::mem::size_of::<bool>());"],
+            "unsafe { core::mem::transmute::<u8, bool>(value) }",
+            vec![],
+        );
+        let string_literal_matching_size = site_with_family(
+            OperationFamily::Transmute,
+            vec![
+                "let _note = \"assert_eq!(core::mem::size_of::<u8>(), core::mem::size_of::<bool>())\";",
+            ],
+            "unsafe { core::mem::transmute::<u8, bool>(value) }",
+            vec![],
+        );
 
         let evidence = obligation_evidence(&transmute, &obligations, &contract, &reach);
+        let line_comment_evidence =
+            obligation_evidence(&line_comment_matching_size, &obligations, &contract, &reach);
+        let string_literal_evidence = obligation_evidence(
+            &string_literal_matching_size,
+            &obligations,
+            &contract,
+            &reach,
+        );
 
         assert!(!evidence[0].discharge.present);
+        assert!(!line_comment_evidence[0].discharge.present);
+        assert!(!string_literal_evidence[0].discharge.present);
     }
 
     #[test]
@@ -4518,6 +4542,18 @@ mod tests {
             "unsafe { core::mem::transmute::<u8, bool>(value) }",
             vec![],
         );
+        let line_comment_valid_value_assert = site_with_family(
+            OperationFamily::Transmute,
+            vec!["// assert!(value <= 1);"],
+            "unsafe { core::mem::transmute::<u8, bool>(value) }",
+            vec![],
+        );
+        let string_literal_valid_value_assert = site_with_family(
+            OperationFamily::Transmute,
+            vec!["let _note = \"assert!(value <= 1)\";"],
+            "unsafe { core::mem::transmute::<u8, bool>(value) }",
+            vec![],
+        );
 
         let other_arg_evidence = obligation_evidence(&other_arg, &obligations, &contract, &reach);
         let post_call_evidence =
@@ -4554,6 +4590,18 @@ mod tests {
             &contract,
             &reach,
         );
+        let line_comment_valid_value_evidence = obligation_evidence(
+            &line_comment_valid_value_assert,
+            &obligations,
+            &contract,
+            &reach,
+        );
+        let string_literal_valid_value_evidence = obligation_evidence(
+            &string_literal_valid_value_assert,
+            &obligations,
+            &contract,
+            &reach,
+        );
 
         assert!(!other_arg_evidence[0].discharge.present);
         assert!(!post_call_evidence[0].discharge.present);
@@ -4573,6 +4621,8 @@ mod tests {
                 .present
         );
         assert!(!reassigned_after_early_return_evidence[0].discharge.present);
+        assert!(!line_comment_valid_value_evidence[0].discharge.present);
+        assert!(!string_literal_valid_value_evidence[0].discharge.present);
     }
 
     #[test]
