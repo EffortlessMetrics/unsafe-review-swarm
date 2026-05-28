@@ -751,6 +751,8 @@ fixtures = [
   "transmute_copy_bool_value_observed_not_guard",
   "transmute_copy_bool_closed_if_observed_not_guard",
   "transmute_copy_bool_guard_then_reassigned_not_guard",
+  "transmute_copy_bool_guard_then_compound_reassigned_not_guard",
+  "transmute_copy_bool_guard_then_shadowed_not_guard",
   "multiline_transmute_copy_invalid_value",
 ]
 dogfood_targets = []
@@ -770,8 +772,9 @@ transmute_copy disjunctive bool-domain branches, conjunctive-layout-return,
 transmute_copy conjunctive layout-return, transmute_copy conjunctive
 invalid-byte return, closed-layout, observed-layout, comment-only,
 disjunctive-branch, conjunctive-return, other-value, observed, closed-branch,
-stale-byte,
-compound-stale-byte, and multiline transmute_copy controls in the listed fixtures.
+stale-byte, compound-stale-byte, shadowed-byte, transmute_copy
+compound-stale-byte, transmute_copy shadowed-byte, and multiline transmute_copy
+controls in the listed fixtures.
 """
 forbidden_claims = [
   "broad transmute soundness",
