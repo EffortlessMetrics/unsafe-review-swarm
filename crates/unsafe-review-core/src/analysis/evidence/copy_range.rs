@@ -11,8 +11,8 @@ pub(super) fn has_copy_slice_range_evidence(expression: &str, before_call: &str)
 }
 
 struct CopyRangeApplicability {
-    same_source_slice: SliceCountBoundTarget,
-    same_destination_slice: SliceCountBoundTarget,
+    same_source_slice: CopyRangeBoundTarget,
+    same_destination_slice: CopyRangeBoundTarget,
 }
 
 impl CopyRangeApplicability {
@@ -22,8 +22,8 @@ impl CopyRangeApplicability {
         let dst_receiver = copy_destination_slice_receiver(&dst)?;
 
         Some(Self {
-            same_source_slice: SliceCountBoundTarget::new(&src_receiver, &count)?,
-            same_destination_slice: SliceCountBoundTarget::new(&dst_receiver, &count)?,
+            same_source_slice: CopyRangeBoundTarget::new(&src_receiver, &count)?,
+            same_destination_slice: CopyRangeBoundTarget::new(&dst_receiver, &count)?,
         })
     }
 
@@ -33,8 +33,8 @@ impl CopyRangeApplicability {
     }
 }
 
-struct SliceCountBoundTarget {
-    receiver: String,
+struct CopyRangeBoundTarget {
+    slice_receiver: String,
     count: String,
     count_lte_len: String,
     len_gte_count: String,
@@ -42,7 +42,7 @@ struct SliceCountBoundTarget {
     len_lt_count: String,
 }
 
-impl SliceCountBoundTarget {
+impl CopyRangeBoundTarget {
     fn new(receiver: &str, count: &str) -> Option<Self> {
         let receiver = compact_code(receiver);
         let count = compact_code(count);
@@ -56,33 +56,25 @@ impl SliceCountBoundTarget {
             len_gte_count: format!("{len}>={count}"),
             count_gt_len: format!("{count}>{len}"),
             len_lt_count: format!("{len}<{count}"),
-            receiver,
+            slice_receiver: receiver,
             count,
         })
     }
 
     fn has_bound_guard(&self, before_call: &str) -> bool {
-        has_slice_count_bound_predicate(
-            before_call,
-            &self.count_lte_len,
-            &self.receiver,
-            &self.count,
-        ) || has_slice_count_bound_predicate(
-            before_call,
-            &self.len_gte_count,
-            &self.receiver,
-            &self.count,
-        ) || has_slice_count_early_return(
-            before_call,
-            &self.count_gt_len,
-            &self.receiver,
-            &self.count,
-        ) || has_slice_count_early_return(
-            before_call,
-            &self.len_lt_count,
-            &self.receiver,
-            &self.count,
-        )
+        has_slice_count_bound_predicate(before_call, &self.count_lte_len, self)
+            || has_slice_count_bound_predicate(before_call, &self.len_gte_count, self)
+            || has_slice_count_early_return(before_call, &self.count_gt_len, self)
+            || has_slice_count_early_return(before_call, &self.len_lt_count, self)
+    }
+
+    fn remains_fresh_after_guard(&self, after_guard: &str) -> bool {
+        !self.has_stale_target_assignment(after_guard)
+    }
+
+    fn has_stale_target_assignment(&self, text: &str) -> bool {
+        contains_simple_assignment_to(text, &self.slice_receiver)
+            || contains_simple_assignment_to(text, &self.count)
     }
 }
 
@@ -121,18 +113,16 @@ fn copy_destination_slice_receiver(argument: &str) -> Option<String> {
 fn has_slice_count_bound_predicate(
     before_call: &str,
     predicate: &str,
-    receiver: &str,
-    count: &str,
+    target: &CopyRangeBoundTarget,
 ) -> bool {
-    has_slice_count_assertion_guard(before_call, predicate, receiver, count)
-        || has_open_slice_count_branch_guard(before_call, predicate, receiver, count)
+    has_slice_count_assertion_guard(before_call, predicate, target)
+        || has_open_slice_count_branch_guard(before_call, predicate, target)
 }
 
 fn has_slice_count_assertion_guard(
     before_call: &str,
     predicate: &str,
-    receiver: &str,
-    count: &str,
+    target: &CopyRangeBoundTarget,
 ) -> bool {
     ["assert!(", "debug_assert!("].into_iter().any(|prefix| {
         let mut search_from = 0;
@@ -150,7 +140,7 @@ fn has_slice_count_assertion_guard(
             if args
                 .first()
                 .is_some_and(|condition| condition_has_top_level_conjunct(condition, predicate))
-                && !has_slice_count_assignment(after_guard, receiver, count)
+                && target.remains_fresh_after_guard(after_guard)
             {
                 return true;
             }
@@ -163,8 +153,7 @@ fn has_slice_count_assertion_guard(
 fn has_open_slice_count_branch_guard(
     before_call: &str,
     predicate: &str,
-    receiver: &str,
-    count: &str,
+    target: &CopyRangeBoundTarget,
 ) -> bool {
     let mut search_from = 0;
     while let Some(offset) = before_call[search_from..].find("if") {
@@ -180,7 +169,7 @@ fn has_open_slice_count_branch_guard(
             let after_guard = &after_if[brace_pos + 1..];
             if condition_has_top_level_conjunct(condition, predicate)
                 && branch_still_open_at_operation(after_guard)
-                && !has_slice_count_assignment(after_guard, receiver, count)
+                && target.remains_fresh_after_guard(after_guard)
             {
                 return true;
             }
@@ -287,8 +276,7 @@ fn outer_parens_enclose_whole_expression(text: &str) -> bool {
 fn has_slice_count_early_return(
     before_call: &str,
     predicate: &str,
-    receiver: &str,
-    count: &str,
+    target: &CopyRangeBoundTarget,
 ) -> bool {
     let mut search_from = 0;
     while let Some(offset) = before_call[search_from..].find("if") {
@@ -308,7 +296,7 @@ fn has_slice_count_early_return(
                 });
             if condition_has_top_level_disjunct(condition, predicate)
                 && contains_executable_return(guard_body)
-                && !has_slice_count_assignment(after_guard_body, receiver, count)
+                && target.remains_fresh_after_guard(after_guard_body)
             {
                 return true;
             }
@@ -316,9 +304,4 @@ fn has_slice_count_early_return(
         search_from = guard_start + 2;
     }
     false
-}
-
-fn has_slice_count_assignment(compact: &str, receiver: &str, count: &str) -> bool {
-    contains_simple_assignment_to(compact, receiver)
-        || contains_simple_assignment_to(compact, count)
 }
