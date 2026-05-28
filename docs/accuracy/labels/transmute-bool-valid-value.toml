@@ -444,6 +444,34 @@ label_source = "fixture_golden"
 rationale = "An early return on invalid referenced-byte values discharges transmute_copy valid-value evidence."
 
 [[samples]]
+id = "transmute-copy-bool-disjunct-return-guard-present"
+fixture = "transmute_copy_bool_disjunct_return_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A referenced-byte invalid-domain predicate that appears as a top-level disjunct in an early-return branch still excludes invalid bool byte values before transmute_copy."
+
+[[samples]]
+id = "transmute-copy-bool-conjunct-return-not-valid-value"
+fixture = "transmute_copy_bool_conjunct_return_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A referenced-byte invalid-domain predicate that appears only in a conjunctive early-return branch can leave invalid bytes on the fallthrough path and must not discharge transmute_copy valid-value evidence."
+
+[[samples]]
 id = "transmute-copy-bool-observed-not-guard"
 fixture = "transmute_copy_bool_value_observed_not_guard"
 kind = "false_positive_control"
