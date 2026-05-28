@@ -3011,6 +3011,45 @@ mod tests {
     }
 
     #[test]
+    fn maybeuninit_slice_evidence_ignores_comments_and_literals() {
+        let obligations = vec![SafetyObligation::new(
+            "initialized",
+            "memory range is initialized",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let line_comment = site_with_family(
+            OperationFamily::SliceFromRawParts,
+            vec![
+                "fn expose(ptr: *mut u8, len: usize) -> &mut [u8] {",
+                "    // unsafe { core::slice::from_raw_parts_mut(ptr.cast::<core::mem::MaybeUninit<u8>>(), len) }",
+            ],
+            "unsafe { core::slice::from_raw_parts_mut(ptr, len) }",
+            vec!["}"],
+        );
+        let string_literal = site_with_family(
+            OperationFamily::SliceFromRawParts,
+            vec![
+                "fn expose(ptr: *mut u8, len: usize) -> &mut [u8] {",
+                "    let _note = \"unsafe { core::slice::from_raw_parts_mut(ptr.cast::<core::mem::MaybeUninit<u8>>(), len) }\";",
+            ],
+            "unsafe { core::slice::from_raw_parts_mut(ptr, len) }",
+            vec!["}"],
+        );
+
+        let line_comment_evidence =
+            obligation_evidence(&line_comment, &obligations, &contract, &reach);
+        let string_literal_evidence =
+            obligation_evidence(&string_literal, &obligations, &contract, &reach);
+
+        assert!(!line_comment_evidence[0].discharge.present);
+        assert!(!string_literal_evidence[0].discharge.present);
+    }
+
+    #[test]
     fn maybeuninit_raw_write_discharges_initialized_obligation_only() {
         let obligations = vec![
             SafetyObligation::new("initialized", "memory is initialized for the accessed type"),

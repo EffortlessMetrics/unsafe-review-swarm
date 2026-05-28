@@ -1,11 +1,12 @@
 use super::{
     code_before_operation, compact_code, has_u8_bool_value_guard, is_receiver_path_char,
     matching_call_argument_end, source_value_identifier, split_top_level_pair,
+    strip_block_comments_and_literals,
 };
 use crate::analysis::scanner::ScannedSite;
 
 pub(super) fn has_maybeuninit_slice_context(lower: &str) -> bool {
-    let compact = compact_code(lower);
+    let compact = compact_code(&strip_block_comments_and_literals(lower));
     let Some(context) = SliceFromRawPartsContext::from_compact(&compact) else {
         return false;
     };
