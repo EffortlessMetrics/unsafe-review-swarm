@@ -738,6 +738,8 @@ fixtures = [
   "transmute_bool_guard_then_shadowed_not_guard",
   "transmute_copy_invalid_value",
   "transmute_copy_layout_size_guard",
+  "transmute_copy_layout_conjunct_branch_guard",
+  "transmute_copy_layout_disjunct_branch_not_guard",
   "transmute_copy_layout_mismatch_return_guard",
   "transmute_copy_layout_conjunct_return_not_guard",
   "transmute_copy_bool_valid_value_guard",
@@ -755,8 +757,9 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned transmute bool valid-value evidence distinguishes dominating
 layout and bool-domain guards, including top-level conjunctive layout and
-bool-domain open branches, layout mismatch early-return guards, and top-level
-disjunctive invalid-byte early-return guards, from layout-only,
+bool-domain open branches, transmute_copy top-level conjunctive layout branches,
+layout mismatch early-return guards, and top-level disjunctive invalid-byte
+early-return guards, from layout-only, disjunctive-layout, transmute_copy
 disjunctive-layout, conjunctive-layout-return, transmute_copy conjunctive
 layout-return, closed-layout, observed-layout, comment-only, disjunctive-branch,
 conjunctive-return, other-value, observed, closed-branch, stale-byte,

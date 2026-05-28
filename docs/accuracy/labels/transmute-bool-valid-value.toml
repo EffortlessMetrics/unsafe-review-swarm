@@ -330,6 +330,36 @@ label_source = "fixture_golden"
 rationale = "A transmute_copy layout-size guard does not discharge the referenced bool valid-value obligation."
 
 [[samples]]
+id = "transmute-copy-conjunct-layout-guard-present"
+fixture = "transmute_copy_layout_conjunct_branch_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "layout"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A transmute_copy size_of layout predicate that appears as a top-level conjunct in an open branch is still dominating layout evidence."
+
+[[samples]]
+id = "transmute-copy-disjunct-layout-not-guard"
+fixture = "transmute_copy_layout_disjunct_branch_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "layout"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A transmute_copy layout-size predicate that appears only in a disjunctive open branch can enter without the layout check and must not discharge layout evidence."
+
+[[samples]]
 id = "transmute-copy-layout-mismatch-return-present"
 fixture = "transmute_copy_layout_mismatch_return_guard"
 kind = "positive"
