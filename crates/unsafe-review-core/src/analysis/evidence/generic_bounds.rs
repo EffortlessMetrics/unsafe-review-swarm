@@ -1,10 +1,14 @@
-use super::{branch_still_open_at_operation, compact_code, compact_contains_identifier};
+use super::{
+    branch_still_open_at_operation, compact_code, compact_contains_identifier,
+    strip_block_comments_and_literals,
+};
 
 pub(super) fn has_length_or_bounds_guard(lower: &str) -> bool {
-    let compact = compact_code(lower);
+    let lower = strip_block_comments_and_literals(lower);
+    let compact = compact_code(&lower);
     has_bounds_assertion_guard(&compact)
         || has_bounds_open_positive_branch_guard(&compact)
-        || has_len_capacity_equality_guard(lower)
+        || has_len_capacity_equality_guard(&lower)
 }
 
 fn has_bounds_assertion_guard(compact: &str) -> bool {

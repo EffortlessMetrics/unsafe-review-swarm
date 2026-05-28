@@ -829,6 +829,24 @@ mod tests {
             "let end = start.add(haystack.len());",
             vec![],
         );
+        let generic_bounds_guard = site_with_family(
+            OperationFamily::PointerArithmetic,
+            vec!["assert!(offset < haystack.len());"],
+            "let end = start.add(offset);",
+            vec![],
+        );
+        let line_comment_bounds_guard = site_with_family(
+            OperationFamily::PointerArithmetic,
+            vec!["// assert!(offset < haystack.len());"],
+            "let end = start.add(offset);",
+            vec![],
+        );
+        let string_literal_bounds_guard = site_with_family(
+            OperationFamily::PointerArithmetic,
+            vec!["let _note = \"assert!(offset < haystack.len())\";"],
+            "let end = start.add(offset);",
+            vec![],
+        );
 
         assert!(
             obligation_evidence(&slice_end, &obligations, &contract, &reach)[0]
@@ -839,6 +857,26 @@ mod tests {
             !obligation_evidence(&mismatched_len, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
+        );
+        assert!(
+            obligation_evidence(&generic_bounds_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&line_comment_bounds_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(
+                &string_literal_bounds_guard,
+                &obligations,
+                &contract,
+                &reach
+            )[0]
+            .discharge
+            .present
         );
     }
 
