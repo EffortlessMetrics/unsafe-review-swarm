@@ -11262,6 +11262,63 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_pr_summary_primary_route_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-summary-primary-route")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("pr-summary.md");
+        let summary =
+            fs::read_to_string(&path).map_err(|err| format!("read pr summary failed: {err}"))?;
+        fs::write(
+            &path,
+            summary.replace(
+                "- Primary route: `miri` because route",
+                "- Primary route: `miri` because unrelated route",
+            ),
+        )
+        .map_err(|err| format!("write pr summary failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("top card `card-1` primary route reason must be `route`")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_pr_summary_primary_route_command_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-summary-primary-route-command")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("pr-summary.md");
+        let summary =
+            fs::read_to_string(&path).map_err(|err| format!("read pr summary failed: {err}"))?;
+        fs::write(
+            &path,
+            summary.replacen(
+                "cargo +nightly miri test card",
+                "cargo +nightly miri test unrelated_card",
+                1,
+            ),
+        )
+        .map_err(|err| format!("write pr summary failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(result.err().unwrap_or_default().contains(
+            "top card `card-1` primary route command must include fenced command `cargo +nightly miri test card`"
+        ));
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_github_summary_unknown_top_card_identity()
     -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-github-card-id")?;
