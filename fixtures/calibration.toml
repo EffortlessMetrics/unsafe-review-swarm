@@ -36,6 +36,7 @@ required_core_fixtures = [
   "maybeuninit_assume_init_open_branch_write_guard",
   "maybeuninit_assume_init_closed_branch_write_not_guard",
   "maybeuninit_assume_init_new_guard",
+  "maybeuninit_assume_init_other_slot_write_not_guard",
   "maybeuninit_assume_init_stale_write_not_guard",
   "maybeuninit_assume_init_stale_new_not_guard",
   "maybeuninit_assume_init_partial_field_not_guard",
@@ -635,6 +636,16 @@ claim = "MaybeUninit::assume_init recognizes same-slot MaybeUninit::new initiali
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
+expected_operation_family = "maybe_uninit_assume_init"
+expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "maybeuninit_assume_init_other_slot_write_not_guard"
+kind = "false_positive_control"
+claim = "MaybeUninit::assume_init rejects write evidence for a different slot"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
 expected_operation_family = "maybe_uninit_assume_init"
 expected_hazard = "initialized_memory"
 

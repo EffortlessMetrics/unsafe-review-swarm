@@ -54,14 +54,14 @@ The active calibration rail is now recorded in
 `.unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md`,
 `policy/accuracy-calibration.toml`, and
 `docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 34
-fixture-pinned claims, 294 calibration cases, 34 label ledgers, and 302 label
+fixture-pinned claims, 295 calibration cases, 34 label ledgers, and 303 label
 samples. It records zero dogfood-measured, labeled-calibrated, or
 policy-eligible claims. That is intentional: the current report is a
 claim-scoped fixture-pinned proof index, not a global precision/recall result
 or support-tier promotion. The latest MaybeUninit assume-init slice recognizes
 narrow same-slot `write`, open-branch `write`, and `MaybeUninit::new`
-initialization evidence while rejecting closed conditional writes and stale
-writes after reassignment.
+initialization evidence while rejecting other-slot writes, closed conditional
+writes, and stale writes after reassignment.
 
 Recent PR artifact hardening also improved the comment-plan surface: planned
 comments stay capped and deduplicated, selected cards carry next actions, and

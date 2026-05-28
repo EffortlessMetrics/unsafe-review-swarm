@@ -644,6 +644,7 @@ fixtures = [
   "maybeuninit_assume_init_open_branch_write_guard",
   "maybeuninit_assume_init_closed_branch_write_not_guard",
   "maybeuninit_assume_init_new_guard",
+  "maybeuninit_assume_init_other_slot_write_not_guard",
   "maybeuninit_assume_init_stale_write_not_guard",
   "maybeuninit_assume_init_stale_new_not_guard",
   "maybeuninit_assume_init_partial_field_not_guard",
@@ -661,9 +662,9 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned MaybeUninit::assume_init family evidence reports missing
 initialized-memory discharge, recognizes narrow same-slot write and
-MaybeUninit::new evidence, rejects comment-only, stale write/new, and partial
-field or array-element initialization evidence, and routes the listed fixtures to
-Miri/cargo-careful witness suggestions.
+MaybeUninit::new evidence, rejects comment-only, other-slot writes, stale
+write/new, and partial field or array-element initialization evidence, and
+routes the listed fixtures to Miri/cargo-careful witness suggestions.
 """
 forbidden_claims = [
   "broad MaybeUninit soundness",
