@@ -1,7 +1,7 @@
 use super::{
-    branch_still_open_at_operation, has_u8_bool_value_guard, matching_call_argument_end,
-    matching_generic_argument_end, source_value_identifier, split_top_level_pair,
-    strip_block_comments_and_literals,
+    any_compact_if_condition, branch_still_open_at_operation, condition_has_top_level_conjunct,
+    has_u8_bool_value_guard, matching_call_argument_end, matching_generic_argument_end,
+    source_value_identifier, split_top_level_pair, strip_block_comments_and_literals,
 };
 
 pub(super) fn has_transmute_layout_size_evidence(lower: &str) -> bool {
@@ -149,17 +149,10 @@ fn has_size_assert(compact: &str, predicate: &str) -> bool {
 }
 
 fn has_open_size_branch(compact: &str, predicate: &str) -> bool {
-    let guard = format!("if{predicate}{{");
-    let mut search_from = 0usize;
-    while let Some(offset) = compact[search_from..].find(&guard) {
-        let guard_start = search_from + offset;
-        let after_guard = &compact[guard_start + guard.len()..];
-        if branch_still_open_at_operation(after_guard) {
-            return true;
-        }
-        search_from = guard_start + guard.len();
-    }
-    false
+    any_compact_if_condition(compact, |condition, after_guard| {
+        condition_has_top_level_conjunct(condition, predicate)
+            && branch_still_open_at_operation(after_guard)
+    })
 }
 
 fn has_applicable_size_pattern(compact: &str, pattern: &str) -> bool {

@@ -261,6 +261,8 @@ required_core_fixtures = [
   "static_mut_global_state",
   "transmute_invalid_value",
   "transmute_layout_size_guard",
+  "transmute_layout_conjunct_branch_guard",
+  "transmute_layout_disjunct_branch_not_guard",
   "transmute_layout_closed_branch_not_guard",
   "transmute_layout_observed_not_guard",
   "transmute_bool_comment_not_guard",
@@ -2923,6 +2925,26 @@ expected_hazard = "invalid_value"
 fixture = "transmute_layout_size_guard"
 kind = "positive"
 claim = "transmute::<u8, bool> recognizes explicit size_of layout evidence while keeping valid-value evidence missing"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "transmute_layout_conjunct_branch_guard"
+kind = "positive"
+claim = "transmute::<u8, bool> recognizes size_of layout evidence as a top-level conjunct in an open branch"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "transmute_layout_disjunct_branch_not_guard"
+kind = "false_positive_control"
+claim = "transmute::<u8, bool> rejects size_of layout evidence that appears only in a disjunctive open branch"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

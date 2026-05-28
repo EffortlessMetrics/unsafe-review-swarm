@@ -4829,6 +4829,22 @@ mod tests {
             "unsafe { core::mem::transmute::<u8, bool>(value) }",
             vec!["}"],
         );
+        let conjunct_branch_predicate_transmute = site_with_family(
+            OperationFamily::Transmute,
+            vec![
+                "if core::mem::size_of::<u8>() == core::mem::size_of::<bool>() && allow_conversion {",
+            ],
+            "unsafe { core::mem::transmute::<u8, bool>(value) }",
+            vec!["}"],
+        );
+        let disjunct_branch_predicate_transmute = site_with_family(
+            OperationFamily::Transmute,
+            vec![
+                "if core::mem::size_of::<u8>() == core::mem::size_of::<bool>() || allow_conversion {",
+            ],
+            "unsafe { core::mem::transmute::<u8, bool>(value) }",
+            vec!["}"],
+        );
         let observed_transmute = site_with_family(
             OperationFamily::Transmute,
             vec!["let _same_layout = core::mem::size_of::<u8>() == core::mem::size_of::<bool>();"],
@@ -4860,6 +4876,18 @@ mod tests {
             obligation_evidence(&assert_predicate_transmute, &obligations, &contract, &reach);
         let branch_predicate_evidence =
             obligation_evidence(&branch_predicate_transmute, &obligations, &contract, &reach);
+        let conjunct_branch_predicate_evidence = obligation_evidence(
+            &conjunct_branch_predicate_transmute,
+            &obligations,
+            &contract,
+            &reach,
+        );
+        let disjunct_branch_predicate_evidence = obligation_evidence(
+            &disjunct_branch_predicate_transmute,
+            &obligations,
+            &contract,
+            &reach,
+        );
         let observed_evidence =
             obligation_evidence(&observed_transmute, &obligations, &contract, &reach);
         let closed_branch_evidence =
@@ -4870,6 +4898,8 @@ mod tests {
         assert!(evidence[0].discharge.present);
         assert!(assert_predicate_evidence[0].discharge.present);
         assert!(branch_predicate_evidence[0].discharge.present);
+        assert!(conjunct_branch_predicate_evidence[0].discharge.present);
+        assert!(!disjunct_branch_predicate_evidence[0].discharge.present);
         assert!(!observed_evidence[0].discharge.present);
         assert!(!closed_branch_evidence[0].discharge.present);
         assert!(branch_scoped_evidence[0].discharge.present);

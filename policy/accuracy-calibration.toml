@@ -717,6 +717,8 @@ support_tier = "Core operation smoke slice"
 fixtures = [
   "transmute_invalid_value",
   "transmute_layout_size_guard",
+  "transmute_layout_conjunct_branch_guard",
+  "transmute_layout_disjunct_branch_not_guard",
   "transmute_layout_closed_branch_not_guard",
   "transmute_layout_observed_not_guard",
   "transmute_bool_comment_not_guard",
@@ -748,10 +750,11 @@ label_ledgers = [
 labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned transmute bool valid-value evidence distinguishes dominating
-bool-domain, top-level conjunctive bool-domain, and invalid-byte early-return
-guards, including top-level disjunctive invalid-byte early-return guards, from
-layout-only, closed-layout, observed-layout, comment-only, disjunctive-branch,
-conjunctive-return, other-value, observed, closed-branch, stale-byte,
+layout and bool-domain guards, including top-level conjunctive layout and
+bool-domain open branches and top-level disjunctive invalid-byte early-return
+guards, from layout-only, disjunctive-layout, closed-layout, observed-layout,
+comment-only, disjunctive-branch, conjunctive-return, other-value, observed,
+closed-branch, stale-byte,
 compound-stale-byte, and multiline transmute_copy controls in the listed fixtures.
 """
 forbidden_claims = [
