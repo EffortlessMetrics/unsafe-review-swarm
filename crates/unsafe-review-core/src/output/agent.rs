@@ -1355,7 +1355,7 @@ mod tests {
     }
 
     #[test]
-    fn agent_packet_do_not_do_preserves_copy_only_guard_boundary() -> Result<(), String> {
+    fn agent_packet_preserves_delegation_boundaries_across_families() -> Result<(), String> {
         for fixture in [
             "raw_pointer_alignment",
             "str_from_utf8_unchecked",
@@ -1371,6 +1371,7 @@ mod tests {
             };
             let value = parse_json(&render(card))?;
             assert_agent_boundary_rules(&value)?;
+            assert_agent_stop_conditions(&value)?;
         }
         Ok(())
     }
@@ -1419,6 +1420,34 @@ mod tests {
         ] {
             if !rules.contains(expected) {
                 return Err(format!("do_not_do must include boundary `{expected}`"));
+            }
+        }
+        Ok(())
+    }
+
+    fn assert_agent_stop_conditions(value: &serde_json::Value) -> Result<(), String> {
+        let stop_conditions = value["stop_conditions"]
+            .as_array()
+            .ok_or("stop_conditions should be an array")?;
+        for item in stop_conditions {
+            if !item.is_string() {
+                return Err("stop_conditions entries should be strings".to_string());
+            }
+        }
+        let rules = serde_json::to_string(&value["stop_conditions"])
+            .map_err(|err| format!("render stop_conditions failed: {err}"))?;
+        for expected in [
+            "missing evidence is present",
+            "waived with owner and expiry",
+            "focused test or witness command",
+            "marked unavailable",
+            "no unrelated unsafe code was changed",
+            "ReviewCard identity still maps to the same unsafe seam",
+        ] {
+            if !rules.contains(expected) {
+                return Err(format!(
+                    "stop_conditions must include boundary `{expected}`"
+                ));
             }
         }
         Ok(())
