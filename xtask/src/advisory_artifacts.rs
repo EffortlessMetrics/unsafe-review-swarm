@@ -2130,6 +2130,7 @@ fn check_lsp_artifact(dir: &Path, summary: &AdvisoryArtifactSummary) -> Result<(
                 "lsp.json hover contents must mention card id `{hover_card_id}`"
             ));
         }
+        require_text_mentions_only_known_card_ids(contents, &path, &card_ids)?;
         require_lsp_hover_card_projection(contents, card_projection, "lsp.json hover")?;
         require_lsp_hover_hazard_projection(contents, card_projection, "lsp.json hover")?;
         super::require_text_contains(contents, "Trust boundary", &path)?;
