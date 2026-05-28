@@ -4688,10 +4688,36 @@ mod tests {
             "Err(_) => unsafe { hint::unreachable_unchecked() },",
             vec![],
         );
+        let line_comment_infallible_match = site_with_family(
+            OperationFamily::UnreachableUnchecked,
+            vec!["// match fallible_with_capacity(Fallibility::Infallible) {"],
+            "Err(_) => unsafe { hint::unreachable_unchecked() },",
+            vec![],
+        );
+        let string_literal_infallible_match = site_with_family(
+            OperationFamily::UnreachableUnchecked,
+            vec!["let _note = \"match fallible_with_capacity(Fallibility::Infallible) {\";"],
+            "Err(_) => unsafe { hint::unreachable_unchecked() },",
+            vec![],
+        );
 
         let evidence = obligation_evidence(&unreachable, &obligations, &contract, &reach);
+        let line_comment_evidence = obligation_evidence(
+            &line_comment_infallible_match,
+            &obligations,
+            &contract,
+            &reach,
+        );
+        let string_literal_evidence = obligation_evidence(
+            &string_literal_infallible_match,
+            &obligations,
+            &contract,
+            &reach,
+        );
 
         assert!(!evidence[0].discharge.present);
+        assert!(!line_comment_evidence[0].discharge.present);
+        assert!(!string_literal_evidence[0].discharge.present);
     }
 
     #[test]

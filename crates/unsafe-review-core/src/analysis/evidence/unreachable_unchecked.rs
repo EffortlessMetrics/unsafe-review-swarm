@@ -1,7 +1,7 @@
-use super::{branch_still_open_at_operation, compact_code};
+use super::{branch_still_open_at_operation, compact_code, strip_block_comments_and_literals};
 
 pub(super) fn has_unreachable_unchecked_infallible_path_evidence(lower: &str) -> bool {
-    let compact = compact_code(lower);
+    let compact = compact_code(&strip_block_comments_and_literals(lower));
     let Some(context) = UnreachableUncheckedPathContext::from_compact(&compact) else {
         return false;
     };
