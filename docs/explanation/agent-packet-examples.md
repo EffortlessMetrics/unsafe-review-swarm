@@ -480,6 +480,40 @@ Why this is not a repair-ready packet:
   automatic source edits.
 - `agent_readiness` should prevent treating this as a normal repair task.
 
+## Human Review Only Or Unknown Family
+
+Packet focus:
+
+```text
+operation_family: unknown or unsupported
+agent_readiness: not ready / needs human review
+```
+
+Useful handoff:
+
+```text
+Task:
+  Summarize the card and the missing evidence for a human reviewer.
+
+Allowed:
+  add missing contract text when the ReviewCard asks for contract evidence
+  split the unsafe boundary into a smaller review if the card is too broad
+  collect a focused witness only when the card names a concrete route
+
+Do not:
+  ask an agent to rewrite the unsafe code broadly
+  invent a guard that is not tied to the ReviewCard obligation
+  suppress the card without exact reason, owner, expiry, and evidence
+  claim unsupported static evidence proves safety
+```
+
+Why this is not a repair-ready packet:
+
+- Unknown and unsupported cards are still useful review work, but the packet
+  should not promote them into automatic source edits.
+- The safe handoff is a bounded human-review brief: what changed, why it matters,
+  what evidence is missing, and which route could add signal.
+
 ## Review Checklist
 
 Before handing a packet to an agent, check:
@@ -492,6 +526,11 @@ Before handing a packet to an agent, check:
 - `verify_commands` are suggestions only; a receipt is needed before claiming a
   witness result.
 - The `do_not_do` and `stop_conditions` are copied with the task.
+- The task does not replace executable guard or discharge evidence with comments
+  or docs.
+- The task does not claim proof, UB-free status, Miri-clean status, site
+  execution, calibrated precision/recall, source edits by `unsafe-review`, or
+  automatic comment posting.
 
 The conservative default is to ask the agent to stop after one card and return a
 patch, validation output, and any remaining missing evidence.
