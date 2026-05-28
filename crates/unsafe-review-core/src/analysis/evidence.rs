@@ -3451,6 +3451,47 @@ mod tests {
     }
 
     #[test]
+    fn copy_range_expression_ignores_comments_and_literals() {
+        let obligations = vec![SafetyObligation::new(
+            "bounds",
+            "copy source and destination ranges are in bounds",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let block_comment = site_with_family(
+            OperationFamily::CopyNonOverlapping,
+            vec![
+                "fn copy(src: &[u8], dst: &mut [u8], count: usize) {",
+                "    assert!(count <= src.len());",
+                "    assert!(count <= dst.len());",
+            ],
+            "unsafe { /* core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count) */ core::ptr::copy_nonoverlapping(raw_src, raw_dst, count) }",
+            vec!["}"],
+        );
+        let string_literal = site_with_family(
+            OperationFamily::CopyNonOverlapping,
+            vec![
+                "fn copy(src: &[u8], dst: &mut [u8], count: usize) {",
+                "    assert!(count <= src.len());",
+                "    assert!(count <= dst.len());",
+            ],
+            "unsafe { let _note = \"core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count)\"; core::ptr::copy_nonoverlapping(raw_src, raw_dst, count) }",
+            vec!["}"],
+        );
+
+        let block_comment_evidence =
+            obligation_evidence(&block_comment, &obligations, &contract, &reach);
+        let string_literal_evidence =
+            obligation_evidence(&string_literal, &obligations, &contract, &reach);
+
+        assert!(!block_comment_evidence[0].discharge.present);
+        assert!(!string_literal_evidence[0].discharge.present);
+    }
+
+    #[test]
     fn bool_write_bytes_value_guard_discharges_initialized_obligation() {
         let obligations = vec![SafetyObligation::new(
             "initialized",

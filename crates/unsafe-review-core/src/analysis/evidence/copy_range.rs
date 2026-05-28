@@ -2,6 +2,7 @@ use super::{
     branch_still_open_at_operation, compact_code, contains_executable_return,
     contains_simple_assignment_to, is_receiver_path_char, matching_call_argument_end,
     matching_code_block_end, receiver_before_marker, split_top_level_arguments,
+    strip_block_comments_and_literals,
 };
 
 pub(super) fn has_copy_slice_range_evidence(expression: &str, before_call: &str) -> bool {
@@ -86,7 +87,9 @@ impl SliceCountBoundTarget {
 }
 
 fn copy_call_arguments(expression: &str) -> Option<(String, String, String)> {
-    let compact = compact_code(&expression.to_ascii_lowercase());
+    let compact = compact_code(&strip_block_comments_and_literals(
+        &expression.to_ascii_lowercase(),
+    ));
     for marker in ["copy_nonoverlapping(", "ptr::copy("] {
         let Some(call_pos) = compact.find(marker) else {
             continue;
