@@ -1264,6 +1264,8 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "nonnull_new_reassigned_ptr_not_guard",
             "nonnull_new_shadowed_ptr_not_guard",
             "nonnull_is_null_reassigned_ptr_not_guard",
+            "nonnull_is_null_shadowed_ptr_not_guard",
+            "nonnull_is_null_open_branch_shadowed_ptr_not_guard",
             "nonnull_if_let_new_reassigned_ptr_not_guard",
             "nonnull_let_else_new_reassigned_ptr_not_guard",
             "nonnull_match_new_reassigned_ptr_not_guard",

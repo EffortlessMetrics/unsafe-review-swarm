@@ -1,0 +1,23 @@
+use core::ptr::NonNull;
+
+pub fn expose_nonnull_after_shadowed_is_null(
+    ptr: *mut u8,
+    other: *mut u8,
+) -> Option<NonNull<u8>> {
+    if ptr.is_null() {
+        return None;
+    }
+    let ptr = other;
+    // SAFETY: this fixture intentionally shadows the checked pointer before use.
+    Some(unsafe { NonNull::new_unchecked(ptr) })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::expose_nonnull_after_shadowed_is_null;
+
+    #[test]
+    fn mentions_expose_nonnull_after_shadowed_is_null() {
+        let _ = stringify!(expose_nonnull_after_shadowed_is_null);
+    }
+}

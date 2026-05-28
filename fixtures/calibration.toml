@@ -339,10 +339,12 @@ required_core_fixtures = [
   "nonnull_is_null_disjunct_return_guard",
   "nonnull_is_null_conjunct_return_not_guard",
   "nonnull_is_null_reassigned_ptr_not_guard",
+  "nonnull_is_null_shadowed_ptr_not_guard",
   "nonnull_is_null_open_branch_guard",
   "nonnull_is_null_conjunct_open_branch_guard",
   "nonnull_is_null_disjunct_open_branch_not_guard",
   "nonnull_is_null_open_branch_reassigned_ptr_not_guard",
+  "nonnull_is_null_open_branch_shadowed_ptr_not_guard",
   "nonnull_observed_not_guard",
   "nonnull_post_check_not_guard",
   "nonnull_if_let_new_reassigned_ptr_not_guard",
@@ -3708,6 +3710,16 @@ expected_operation_family = "nonnull_unchecked"
 expected_hazard = "pointer_validity"
 
 [[cases]]
+fixture = "nonnull_is_null_shadowed_ptr_not_guard"
+kind = "false_positive_control"
+claim = "same-pointer is_null early-return evidence does not discharge the non-null obligation after the checked pointer is shadowed"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+
+[[cases]]
 fixture = "nonnull_is_null_open_branch_guard"
 kind = "positive"
 claim = "same-pointer non-null open-branch evidence discharges the non-null obligation for NonNull::new_unchecked"
@@ -3741,6 +3753,16 @@ expected_hazard = "pointer_validity"
 fixture = "nonnull_is_null_open_branch_reassigned_ptr_not_guard"
 kind = "false_positive_control"
 claim = "same-pointer non-null open-branch evidence does not discharge the non-null obligation after the checked pointer is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "nonnull_is_null_open_branch_shadowed_ptr_not_guard"
+kind = "false_positive_control"
+claim = "same-pointer non-null open-branch evidence does not discharge the non-null obligation after the checked pointer is shadowed"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

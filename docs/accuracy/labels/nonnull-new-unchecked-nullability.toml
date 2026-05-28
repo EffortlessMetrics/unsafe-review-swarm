@@ -155,6 +155,19 @@ label_source = "fixture_golden"
 rationale = "A same-pointer is_null early-return guard becomes stale when the checked pointer is reassigned before NonNull::new_unchecked."
 
 [[samples]]
+id = "nonnull-is-null-shadowed-ptr-not-guard"
+fixture = "nonnull_is_null_shadowed_ptr_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "non-null"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A same-pointer is_null early-return guard becomes stale when the checked pointer is shadowed before NonNull::new_unchecked."
+
+[[samples]]
 id = "nonnull-is-null-open-branch-guard-present"
 fixture = "nonnull_is_null_open_branch_guard"
 kind = "positive"
@@ -205,6 +218,19 @@ expected_obligation_key = "non-null"
 expected_discharge_state = "missing"
 label_source = "fixture_golden"
 rationale = "A same-pointer `!ptr.is_null()` open branch becomes stale when the checked pointer is reassigned before NonNull::new_unchecked."
+
+[[samples]]
+id = "nonnull-is-null-open-branch-shadowed-ptr-not-guard"
+fixture = "nonnull_is_null_open_branch_shadowed_ptr_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "non-null"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A same-pointer `!ptr.is_null()` open branch becomes stale when the checked pointer is shadowed before NonNull::new_unchecked."
 
 [[samples]]
 id = "nonnull-observed-not-guard"
