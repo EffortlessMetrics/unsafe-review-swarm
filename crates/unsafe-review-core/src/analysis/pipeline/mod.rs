@@ -1397,6 +1397,18 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "bounds"
         ));
 
+        let shadowed_index = fixture_output("get_unchecked_mut_shadowed_index_not_guard")?;
+        let shadowed_index_card = single_card(
+            "get_unchecked_mut_shadowed_index_not_guard",
+            &shadowed_index,
+        )?;
+        assert_eq!(
+            shadowed_index_card.operation.family,
+            OperationFamily::GetUnchecked
+        );
+        assert_eq!(shadowed_index_card.class, ReviewClass::GuardMissing);
+        assert!(!obligation_discharge_present(shadowed_index_card, "bounds"));
+
         let reassigned_receiver =
             fixture_output("get_unchecked_mut_reassigned_receiver_not_guard")?;
         let reassigned_receiver_card = single_card(
@@ -1410,6 +1422,21 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
         assert_eq!(reassigned_receiver_card.class, ReviewClass::GuardMissing);
         assert!(!obligation_discharge_present(
             reassigned_receiver_card,
+            "bounds"
+        ));
+
+        let shadowed_receiver = fixture_output("get_unchecked_mut_shadowed_receiver_not_guard")?;
+        let shadowed_receiver_card = single_card(
+            "get_unchecked_mut_shadowed_receiver_not_guard",
+            &shadowed_receiver,
+        )?;
+        assert_eq!(
+            shadowed_receiver_card.operation.family,
+            OperationFamily::GetUnchecked
+        );
+        assert_eq!(shadowed_receiver_card.class, ReviewClass::GuardMissing);
+        assert!(!obligation_discharge_present(
+            shadowed_receiver_card,
             "bounds"
         ));
 

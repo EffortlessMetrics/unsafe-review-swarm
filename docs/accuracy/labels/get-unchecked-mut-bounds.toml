@@ -235,6 +235,20 @@ label_source = "fixture_golden"
 rationale = "Bounds evidence becomes stale when compound assignment mutates the checked index before get_unchecked_mut."
 
 [[samples]]
+id = "get-unchecked-mut-shadowed-index-not-guard"
+fixture = "get_unchecked_mut_shadowed_index_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Bounds evidence becomes stale when a later let-binding shadows the checked index before get_unchecked_mut."
+
+[[samples]]
 id = "get-unchecked-mut-reassigned-receiver-not-guard"
 fixture = "get_unchecked_mut_reassigned_receiver_not_guard"
 kind = "false_positive_control"
@@ -247,6 +261,20 @@ expected_discharge_state = "missing"
 expected_witness_route_kinds = ["miri", "cargo-careful"]
 label_source = "fixture_golden"
 rationale = "Bounds evidence becomes stale when the checked slice receiver is reassigned before get_unchecked_mut."
+
+[[samples]]
+id = "get-unchecked-mut-shadowed-receiver-not-guard"
+fixture = "get_unchecked_mut_shadowed_receiver_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Bounds evidence becomes stale when a later let-binding shadows the checked slice receiver before get_unchecked_mut."
 
 [[samples]]
 id = "get-unchecked-mut-get-probe-reassigned-index-not-guard"
