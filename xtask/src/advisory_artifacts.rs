@@ -737,6 +737,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
     }
     let mut comment_card_ids = BTreeSet::new();
     let mut comment_locations = BTreeSet::new();
+    let mut comment_operation_families = BTreeSet::new();
     let mut comment_body_projections = Vec::new();
     for comment in comments {
         let Some(card_id) = comment.get("card_id").and_then(serde_json::Value::as_str) else {
@@ -801,11 +802,16 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         super::require_non_empty_json_str(comment, "priority", "comment-plan.json comment")?;
         super::require_non_empty_json_str(comment, "confidence", "comment-plan.json comment")?;
         super::require_non_empty_json_str(comment, "operation", "comment-plan.json comment")?;
-        super::require_non_empty_json_str(
+        let operation_family = super::require_non_empty_json_str(
             comment,
             "operation_family",
             "comment-plan.json comment",
         )?;
+        if !comment_operation_families.insert(operation_family.to_string()) {
+            return Err(format!(
+                "comment-plan.json repeats operation_family `{operation_family}` in planned comments"
+            ));
+        }
         let next_action =
             super::require_non_empty_json_str(comment, "next_action", "comment-plan.json comment")?;
         let selection_reason = super::require_non_empty_json_str(
@@ -918,7 +924,11 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             )?;
             require_expected_value(
                 reason,
-                expected_non_selection_reason(card_projection, comments.len()),
+                expected_non_selection_reason(
+                    card_projection,
+                    comments.len(),
+                    &comment_operation_families,
+                ),
                 "comment-plan.json not_selected reason",
             )?;
         }
@@ -1603,7 +1613,11 @@ fn expected_selection_reason(card: &CardProjection) -> &'static str {
     }
 }
 
-fn expected_non_selection_reason(card: &CardProjection, planned_count: usize) -> &'static str {
+fn expected_non_selection_reason(
+    card: &CardProjection,
+    planned_count: usize,
+    selected_operation_families: &BTreeSet<String>,
+) -> &'static str {
     if !class_is_actionable(&card.class_name) {
         "class not eligible for inline comments"
     } else if card.operation_family == "unknown" {
@@ -1612,6 +1626,8 @@ fn expected_non_selection_reason(card: &CardProjection, planned_count: usize) ->
         "confidence below inline comment threshold"
     } else if !(card.priority == "high" || card.confidence == "high") {
         "priority/confidence below inline comment threshold"
+    } else if selected_operation_families.contains(&card.operation_family) {
+        "operation family already selected for comment-plan budget"
     } else if planned_count >= 3 {
         "comment-plan max of three candidates reached"
     } else {

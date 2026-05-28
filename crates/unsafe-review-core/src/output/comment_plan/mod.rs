@@ -10,6 +10,7 @@ mod tests {
     use crate::api::{
         AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, PolicyMode, Scope, analyze,
     };
+    use crate::domain::OperationFamily;
     use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
     use std::path::PathBuf;
 
@@ -112,6 +113,14 @@ mod tests {
             .map(|idx| {
                 let mut card = template.clone();
                 card.id.0 = format!("card-{idx}");
+                card.operation.family = [
+                    OperationFamily::RawPointerRead,
+                    OperationFamily::StrFromUtf8Unchecked,
+                    OperationFamily::GetUnchecked,
+                    OperationFamily::MaybeUninitAssumeInit,
+                    OperationFamily::VecSetLen,
+                ][idx]
+                    .clone();
                 card
             })
             .collect();
@@ -137,6 +146,40 @@ mod tests {
         assert_eq!(
             value["not_selected"][0]["reason"],
             "comment-plan max of three candidates reached"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn comment_plan_suppresses_duplicate_operation_family_candidates() -> Result<(), String> {
+        let mut output = fixture_output("raw_pointer_alignment")?;
+        let template = output
+            .cards
+            .first()
+            .cloned()
+            .ok_or_else(|| "fixture should emit a card".to_string())?;
+        output.cards = (0..3)
+            .map(|idx| {
+                let mut card = template.clone();
+                card.id.0 = format!("raw-pointer-card-{idx}");
+                card
+            })
+            .collect();
+        output.summary.cards = output.cards.len();
+        output.summary.open_actionable_gaps = output.cards.len();
+
+        let value = parse_json(&render(&output))?;
+
+        assert_eq!(value["comments"].as_array().map_or(0, Vec::len), 1);
+        assert_eq!(value["comments"][0]["operation_family"], "raw_pointer_read");
+        assert_eq!(value["not_selected"].as_array().map_or(0, Vec::len), 2);
+        assert_eq!(
+            value["not_selected"][0]["reason"],
+            "operation family already selected for comment-plan budget"
+        );
+        assert_eq!(
+            value["not_selected"][1]["reason"],
+            "operation family already selected for comment-plan budget"
         );
         Ok(())
     }

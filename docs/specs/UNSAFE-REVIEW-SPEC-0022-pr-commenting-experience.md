@@ -83,11 +83,16 @@ Selection is sparse and changed-line only:
 - max 3 comments
 - one comment per card
 - one comment per line unless explicitly justified
+- one comment per operation family by default
 - no duplicate card IDs
 
 Never select suppressed, `baseline_known`, `static_unknown`, or
 `operation_family: "unknown"` cards. Prefer actionable changed unsafe
 operations that name specific missing evidence and a concrete next action.
+Additional cards in an already-selected operation family remain in
+`not_selected[]` with reason `operation family already selected for
+comment-plan budget`; this preserves the review budget without hiding the
+underlying ReviewCards.
 
 ## 6. Relevance and actionability
 

@@ -12741,6 +12741,82 @@ Snapshot reports:
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_duplicate_comment_operation_family() -> Result<(), String>
+    {
+        let dir = unique_temp_dir("unsafe-review-artifacts-comment-duplicate-family")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+
+        let cards_path = dir.join("cards.json");
+        let mut cards: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&cards_path).map_err(|err| format!("read cards failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse cards failed: {err}"))?;
+        let mut second_card = cards["cards"][0].clone();
+        second_card["id"] = serde_json::json!("card-2");
+        second_card["site"]["line"] = serde_json::json!(8);
+        cards["summary"]["cards"] = serde_json::json!(2);
+        cards["summary"]["open_actionable_gaps"] = serde_json::json!(2);
+        cards["cards"]
+            .as_array_mut()
+            .ok_or_else(|| "cards fixture must have cards array".to_string())?
+            .push(second_card);
+        fs::write(&cards_path, cards.to_string())
+            .map_err(|err| format!("write cards failed: {err}"))?;
+
+        let pr_summary_path = dir.join("pr-summary.md");
+        let pr_summary = fs::read_to_string(&pr_summary_path)
+            .map_err(|err| format!("read pr summary failed: {err}"))?
+            .replace("- Review cards: 1", "- Review cards: 2")
+            .replace("- Open actionable gaps: 1", "- Open actionable gaps: 2");
+        fs::write(&pr_summary_path, pr_summary)
+            .map_err(|err| format!("write pr summary failed: {err}"))?;
+
+        let sarif_path = dir.join("cards.sarif");
+        let mut sarif: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&sarif_path).map_err(|err| format!("read sarif failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse sarif failed: {err}"))?;
+        let mut second_result = sarif["runs"][0]["results"][0].clone();
+        second_result["properties"]["cardId"] = serde_json::json!("card-2");
+        second_result["locations"][0]["physicalLocation"]["region"]["startLine"] =
+            serde_json::json!(8);
+        sarif["runs"][0]["results"]
+            .as_array_mut()
+            .ok_or_else(|| "sarif fixture must have results array".to_string())?
+            .push(second_result);
+        fs::write(&sarif_path, sarif.to_string())
+            .map_err(|err| format!("write sarif failed: {err}"))?;
+
+        let comment_path = dir.join("comment-plan.json");
+        let mut comment_plan: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&comment_path)
+                .map_err(|err| format!("read comment plan failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse comment plan failed: {err}"))?;
+        let mut second_comment = comment_plan["comments"][0].clone();
+        second_comment["card_id"] = serde_json::json!("card-2");
+        second_comment["line"] = serde_json::json!(8);
+        comment_plan["comments"]
+            .as_array_mut()
+            .ok_or_else(|| "comment plan fixture must have comments array".to_string())?
+            .push(second_comment);
+        fs::write(&comment_path, comment_plan.to_string())
+            .map_err(|err| format!("write comment plan failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("repeats operation_family `raw_pointer_read`")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn advisory_artifact_checker_rejects_duplicate_comment_locations() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-artifacts-comment-duplicate-location")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;

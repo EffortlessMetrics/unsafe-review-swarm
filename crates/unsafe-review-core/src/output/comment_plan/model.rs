@@ -3,10 +3,11 @@ use crate::domain::{ReviewCard, WitnessRoute};
 use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
 use crate::util::path_display;
 use serde::Serialize;
+use std::collections::BTreeSet;
 
 use super::selection::{
-    actionability, comment_body, non_selection_reason, relevance, selection_reason,
-    should_plan_comment,
+    OPERATION_FAMILY_BUDGET_REASON, actionability, comment_body, non_selection_reason, relevance,
+    selection_reason, should_plan_comment,
 };
 
 const MAX_PLANNED_COMMENTS: usize = 3;
@@ -30,10 +31,18 @@ impl From<&AnalyzeOutput> for CommentPlan {
     fn from(output: &AnalyzeOutput) -> Self {
         let mut comments = Vec::new();
         let mut not_selected = Vec::new();
+        let mut selected_operation_families = BTreeSet::new();
 
         for card in &output.cards {
             if should_plan_comment(card) {
-                if comments.len() < MAX_PLANNED_COMMENTS {
+                let operation_family = card.operation.family.as_str();
+                if selected_operation_families.contains(operation_family) {
+                    not_selected.push(NotSelectedCard::from_reason(
+                        card,
+                        OPERATION_FAMILY_BUDGET_REASON,
+                    ));
+                } else if comments.len() < MAX_PLANNED_COMMENTS {
+                    selected_operation_families.insert(operation_family);
                     comments.push(PlannedComment::from(card));
                 } else {
                     not_selected.push(NotSelectedCard::from_reason(
