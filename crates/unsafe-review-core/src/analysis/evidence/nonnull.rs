@@ -1,11 +1,11 @@
 use crate::analysis::scanner::ScannedSite;
 
 use super::{
-    any_marker_occurrence, any_marker_tail, branch_still_open_at_operation, code_before_operation,
-    compact_code, condition_has_top_level_conjunct, condition_has_top_level_disjunct,
-    contains_executable_return, contains_simple_assignment_to, ends_with_some_pattern,
-    is_receiver_path_char, match_some_branch_after_marker, matching_code_block_end,
-    strip_block_comments_and_literals,
+    any_compact_if_condition, any_marker_occurrence, any_marker_tail,
+    branch_still_open_at_operation, code_before_operation, compact_code,
+    condition_has_top_level_conjunct, condition_has_top_level_disjunct, contains_executable_return,
+    contains_simple_assignment_to, ends_with_some_pattern, match_some_branch_after_marker,
+    matching_code_block_end, strip_block_comments_and_literals,
 };
 
 pub(super) fn has_nullability_guard(site: &ScannedSite, lower: &str) -> bool {
@@ -119,52 +119,18 @@ impl<'a> NonNullPointerContext<'a> {
 
     fn has_null_early_return_guard(&self) -> bool {
         let predicate = format!("{}.is_null()", self.same_pointer_target);
-        let mut search_from = 0;
-        while let Some(offset) = self.compact[search_from..].find("if") {
-            let guard_start = search_from + offset;
-            let before = self.compact[..guard_start].chars().next_back();
-            if before.is_some_and(is_receiver_path_char) {
-                search_from = guard_start + 2;
-                continue;
-            }
-            let after_if = &self.compact[guard_start + 2..];
-            if let Some(brace_pos) = after_if.find('{') {
-                let condition = &after_if[..brace_pos];
-                let after_guard = &after_if[brace_pos + 1..];
-                if condition_has_top_level_disjunct(condition, &predicate)
-                    && self.returning_after_marker_preserves_applicability(after_guard)
-                {
-                    return true;
-                }
-            }
-            search_from = guard_start + 2;
-        }
-        false
+        any_compact_if_condition(self.compact, |condition, after_guard| {
+            condition_has_top_level_disjunct(condition, &predicate)
+                && self.returning_after_marker_preserves_applicability(after_guard)
+        })
     }
 
     fn has_non_null_open_branch_guard(&self) -> bool {
         let predicate = format!("!{}.is_null()", self.same_pointer_target);
-        let mut search_from = 0;
-        while let Some(offset) = self.compact[search_from..].find("if") {
-            let guard_start = search_from + offset;
-            let before = self.compact[..guard_start].chars().next_back();
-            if before.is_some_and(is_receiver_path_char) {
-                search_from = guard_start + 2;
-                continue;
-            }
-            let after_if = &self.compact[guard_start + 2..];
-            if let Some(brace_pos) = after_if.find('{') {
-                let condition = &after_if[..brace_pos];
-                let after_guard = &after_if[brace_pos + 1..];
-                if condition_has_top_level_conjunct(condition, &predicate)
-                    && self.open_branch_preserves_applicability(after_guard)
-                {
-                    return true;
-                }
-            }
-            search_from = guard_start + 2;
-        }
-        false
+        any_compact_if_condition(self.compact, |condition, after_guard| {
+            condition_has_top_level_conjunct(condition, &predicate)
+                && self.open_branch_preserves_applicability(after_guard)
+        })
     }
 }
 

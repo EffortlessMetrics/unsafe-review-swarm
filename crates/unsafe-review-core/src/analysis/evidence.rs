@@ -51,7 +51,9 @@ mod zeroed;
 
 use self::alignment_discharge::alignment_discharge_state;
 use self::assignment_syntax::contains_simple_assignment_to;
-use self::boolean_condition::{condition_has_top_level_conjunct, condition_has_top_level_disjunct};
+use self::boolean_condition::{
+    any_compact_if_condition, condition_has_top_level_conjunct, condition_has_top_level_disjunct,
+};
 use self::bounds_discharge::bounds_discharge_state;
 use self::call_syntax::{
     matching_call_argument_end, matching_generic_argument_end, split_top_level_arguments,

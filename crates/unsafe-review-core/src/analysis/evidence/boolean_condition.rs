@@ -1,3 +1,30 @@
+use super::is_receiver_path_char;
+
+pub(super) fn any_compact_if_condition(
+    compact: &str,
+    mut predicate: impl FnMut(&str, &str) -> bool,
+) -> bool {
+    let mut search_from = 0;
+    while let Some(offset) = compact[search_from..].find("if") {
+        let guard_start = search_from + offset;
+        let before = compact[..guard_start].chars().next_back();
+        if before.is_some_and(is_receiver_path_char) {
+            search_from = guard_start + 2;
+            continue;
+        }
+        let after_if = &compact[guard_start + 2..];
+        if let Some(brace_pos) = after_if.find('{') {
+            let condition = &after_if[..brace_pos];
+            let after_guard = &after_if[brace_pos + 1..];
+            if predicate(condition, after_guard) {
+                return true;
+            }
+        }
+        search_from = guard_start + 2;
+    }
+    false
+}
+
 pub(super) fn condition_has_top_level_conjunct(condition: &str, predicate: &str) -> bool {
     let condition = strip_balanced_outer_parens(condition.trim());
     split_top_level_conditions(condition, b'&')

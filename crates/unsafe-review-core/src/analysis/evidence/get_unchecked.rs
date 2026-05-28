@@ -1,8 +1,8 @@
 use super::{
-    any_marker_tail, branch_still_open_at_operation, compact_code,
+    any_compact_if_condition, any_marker_tail, branch_still_open_at_operation, compact_code,
     condition_has_top_level_conjunct, contains_executable_return, contains_simple_assignment_to,
-    is_receiver_path_char, match_some_branch_after_marker, matching_call_argument_end,
-    matching_code_block_end, receiver_before_marker, strip_block_comments_and_literals,
+    match_some_branch_after_marker, matching_call_argument_end, matching_code_block_end,
+    receiver_before_marker, strip_block_comments_and_literals,
 };
 
 pub(super) fn get_unchecked_receiver_and_index(expression: &str) -> Option<(String, String)> {
@@ -138,27 +138,10 @@ fn has_get_unchecked_open_bounds_branch(
     context: &GetUncheckedBoundsApplicability<'_>,
     predicate: &str,
 ) -> bool {
-    let mut search_from = 0;
-    while let Some(offset) = context.before_operation[search_from..].find("if") {
-        let guard_start = search_from + offset;
-        let before = context.before_operation[..guard_start].chars().next_back();
-        if before.is_some_and(is_receiver_path_char) {
-            search_from = guard_start + 2;
-            continue;
-        }
-        let after_if = &context.before_operation[guard_start + 2..];
-        if let Some(brace_pos) = after_if.find('{') {
-            let condition = &after_if[..brace_pos];
-            let after_guard = &after_if[brace_pos + 1..];
-            if condition_has_top_level_conjunct(condition, predicate)
-                && context.open_branch_preserves_applicability(after_guard)
-            {
-                return true;
-            }
-        }
-        search_from = guard_start + 2;
-    }
-    false
+    any_compact_if_condition(context.before_operation, |condition, after_guard| {
+        condition_has_top_level_conjunct(condition, predicate)
+            && context.open_branch_preserves_applicability(after_guard)
+    })
 }
 
 fn has_get_unchecked_bounds_assertion(
