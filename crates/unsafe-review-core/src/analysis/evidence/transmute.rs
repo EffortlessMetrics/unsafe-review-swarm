@@ -68,8 +68,10 @@ impl<'a> TransmuteCallContext<'a> {
     fn value_domain_context(&self) -> Option<TransmuteValueDomainContext<'a>> {
         let domain = self.value_domain()?;
         Some(TransmuteValueDomainContext {
-            before_call: self.before_call,
-            source_value_target: source_value_identifier(self.argument)?,
+            applicability: TransmuteValueDomainApplicability::new(
+                self.before_call,
+                source_value_identifier(self.argument)?,
+            ),
             domain,
         })
     }
@@ -94,8 +96,7 @@ impl TransmuteLayoutContext<'_> {
 }
 
 struct TransmuteValueDomainContext<'a> {
-    before_call: &'a str,
-    source_value_target: &'a str,
+    applicability: TransmuteValueDomainApplicability<'a>,
     domain: TransmuteValueDomain,
 }
 
@@ -118,7 +119,7 @@ impl TransmuteValueDomainContext<'_> {
     }
 
     fn u8_to_bool_valid_predicates(&self) -> [String; 8] {
-        u8_bool_valid_value_predicates(self.source_value_target)
+        self.applicability.u8_to_bool_valid_predicates()
     }
 
     fn has_u8_bool_value_predicate_guard(&self, predicate: &str) -> bool {
@@ -129,8 +130,54 @@ impl TransmuteValueDomainContext<'_> {
             format!("debug_assert!({predicate},"),
         ]
         .iter()
-        .any(|pattern| self.has_fresh_assertion_guard(pattern))
+        .any(|pattern| self.applicability.has_fresh_assertion_guard(pattern))
             || self.has_open_positive_branch_guard(predicate)
+    }
+
+    fn has_open_positive_branch_guard(&self, predicate: &str) -> bool {
+        let guard = format!("if{predicate}{{");
+        self.applicability.has_open_positive_branch_guard(&guard)
+    }
+
+    fn has_u8_bool_invalid_early_return_guard(&self) -> bool {
+        self.has_invalid_byte_returning_branch(&format!(
+            "{}>1",
+            self.applicability.same_source_value_target
+        )) || self.has_invalid_byte_returning_branch(&format!(
+            "1<{}",
+            self.applicability.same_source_value_target
+        )) || self.has_invalid_byte_returning_branch(&format!(
+            "{}>=2",
+            self.applicability.same_source_value_target
+        )) || self.has_invalid_byte_returning_branch(&format!(
+            "2<={}",
+            self.applicability.same_source_value_target
+        ))
+    }
+
+    fn has_invalid_byte_returning_branch(&self, predicate: &str) -> bool {
+        let guard = format!("if{predicate}{{");
+        self.applicability.has_returning_branch_guard(&guard)
+    }
+}
+
+// Valid-value evidence for transmute applies only to the same source value that
+// is converted, and that value must remain fresh until the unsafe operation.
+struct TransmuteValueDomainApplicability<'a> {
+    before_call: &'a str,
+    same_source_value_target: &'a str,
+}
+
+impl<'a> TransmuteValueDomainApplicability<'a> {
+    fn new(before_call: &'a str, same_source_value_target: &'a str) -> Self {
+        Self {
+            before_call,
+            same_source_value_target,
+        }
+    }
+
+    fn u8_to_bool_valid_predicates(&self) -> [String; 8] {
+        u8_bool_valid_value_predicates(self.same_source_value_target)
     }
 
     fn has_fresh_assertion_guard(&self, pattern: &str) -> bool {
@@ -148,10 +195,9 @@ impl TransmuteValueDomainContext<'_> {
         false
     }
 
-    fn has_open_positive_branch_guard(&self, predicate: &str) -> bool {
-        let guard = format!("if{predicate}{{");
+    fn has_open_positive_branch_guard(&self, guard: &str) -> bool {
         let mut search_from = 0;
-        while let Some(offset) = self.before_call[search_from..].find(&guard) {
+        while let Some(offset) = self.before_call[search_from..].find(guard) {
             let guard_start = search_from + offset;
             let after_guard = &self.before_call[guard_start + guard.len()..];
             if branch_still_open_at_operation(after_guard)
@@ -164,17 +210,9 @@ impl TransmuteValueDomainContext<'_> {
         false
     }
 
-    fn has_u8_bool_invalid_early_return_guard(&self) -> bool {
-        self.has_invalid_byte_returning_branch(&format!("{}>1", self.source_value_target))
-            || self.has_invalid_byte_returning_branch(&format!("1<{}", self.source_value_target))
-            || self.has_invalid_byte_returning_branch(&format!("{}>=2", self.source_value_target))
-            || self.has_invalid_byte_returning_branch(&format!("2<={}", self.source_value_target))
-    }
-
-    fn has_invalid_byte_returning_branch(&self, predicate: &str) -> bool {
-        let guard = format!("if{predicate}{{");
+    fn has_returning_branch_guard(&self, guard: &str) -> bool {
         let mut search_from = 0;
-        while let Some(offset) = self.before_call[search_from..].find(&guard) {
+        while let Some(offset) = self.before_call[search_from..].find(guard) {
             let guard_start = search_from + offset;
             let after_guard = &self.before_call[guard_start + guard.len()..];
             let (guard_body, after_branch) = matching_code_block_end(after_guard)
@@ -192,7 +230,7 @@ impl TransmuteValueDomainContext<'_> {
     }
 
     fn source_value_stays_fresh_after(&self, evidence: &str) -> bool {
-        !has_assignment_to_identifier(evidence, self.source_value_target)
+        !has_assignment_to_identifier(evidence, self.same_source_value_target)
     }
 }
 
