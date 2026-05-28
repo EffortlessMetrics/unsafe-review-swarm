@@ -71,6 +71,8 @@ The do-not-do list must make that automation boundary visible to packet
 consumers: a packet must not let downstream tooling claim `unsafe-review` ran
 an agent, ran witnesses, applied source edits, or posted comments, and it must
 not let comments or docs substitute for executable guard or discharge evidence.
+It also must not present suppression of the current card as an agent repair in
+place of adding, exposing, or explicitly waiving evidence.
 
 ## Projection contract
 
@@ -121,6 +123,8 @@ Whole-file dumps are out of scope by default.
   comments.
 - The do-not-do rules explicitly preserve the evidence boundary: do not replace
   executable guard or discharge evidence with comments or docs.
+- The do-not-do rules explicitly reject suppressing the current card as a repair
+  substitute for evidence.
 - Allowed repairs name the current card's missing obligation shape. For
   example, raw-pointer read packets may name same-pointer alignment or
   initialization evidence, while copy packets may name range and non-overlap

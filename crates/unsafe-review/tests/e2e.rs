@@ -463,6 +463,7 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
             .contains("cargo +nightly miri test read_header")
     );
     assert!(packet["do_not_do"].is_array());
+    assert!(serde_json::to_string(&packet["do_not_do"])?.contains("do not suppress this card"));
     assert!(
         serde_json::to_string(&packet["do_not_do"])?
             .contains("do not change unrelated unsafe code")
