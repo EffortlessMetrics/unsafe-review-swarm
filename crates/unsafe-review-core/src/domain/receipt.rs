@@ -657,7 +657,7 @@ mod tests {
 
         assert_eq!(
             receipt.evidence_summary(),
-            "Imported miri receipt with `ran` strength; limitations: fixture only"
+            "Imported miri receipt with `ran` strength; command_hash: 3e163b0bce29ff2e; limitations: fixture only"
         );
     }
 

@@ -8,6 +8,7 @@
   "expires_at": "2026-08-18",
   "summary": "focused fixture witness passed",
   "command": "cargo +nightly miri test read_header",
+  "command_hash": "3e163b0bce29ff2e",
   "limitations": [
     "fixture only"
   ]

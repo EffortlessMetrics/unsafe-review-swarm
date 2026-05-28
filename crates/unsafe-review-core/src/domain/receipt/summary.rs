@@ -18,6 +18,11 @@ pub(super) fn evidence_summary(receipt: &WitnessReceipt) -> String {
         receipt.expires_at.as_deref(),
     );
     append_optional(&mut summary, "; command: ", receipt.command.as_deref());
+    append_optional(
+        &mut summary,
+        "; command_hash: ",
+        receipt.command_hash.as_deref(),
+    );
     append_limitations(&mut summary, receipt.limitations.as_ref());
     summary
 }

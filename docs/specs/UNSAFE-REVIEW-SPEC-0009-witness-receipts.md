@@ -87,6 +87,9 @@ tool against the ReviewCard route. Audit entries also include the saved
 `command_hash` when present and surface command-hash mismatches as their own
 audit status so reviewers can compare command-string drift without treating it
 as proof that the command ran.
+When a matching receipt is imported as ReviewCard witness evidence, the
+evidence summary also includes the saved `command_hash` when present so
+card-level projections keep the same drift key visible.
 This lets a receipt improve witness evidence without erasing remaining guard or
 contract gaps. The audit is an advisory metadata report over saved receipts and
 current cards. JSON and Markdown audit output must include explicit limitations

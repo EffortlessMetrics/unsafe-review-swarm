@@ -411,6 +411,8 @@ hide remaining gaps. The command hash is drift metadata only, not proof that
 the command ran. It is advisory only: it does not execute witness commands,
 infer site reach, make policy decisions, or claim safety. JSON and Markdown
 output include limitations that keep the saved-metadata boundary explicit.
+When a receipt matches a card, the ReviewCard witness evidence summary also
+keeps the saved command hash visible when present.
 
 `unsafe-review` imports receipts. It does not run Miri, `cargo-careful`,
 sanitizers, Loom, Shuttle, Kani, or Crux by default.
