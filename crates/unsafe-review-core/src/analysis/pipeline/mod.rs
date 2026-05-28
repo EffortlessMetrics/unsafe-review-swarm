@@ -2291,6 +2291,28 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn transmute_layout_mismatch_return_requires_top_level_disjunct() -> Result<(), String> {
+        let guarded = fixture_output("transmute_layout_mismatch_return_guard")?;
+        let guarded_card = single_card("transmute_layout_mismatch_return_guard", &guarded)?;
+
+        assert_eq!(guarded_card.site.kind, UnsafeSiteKind::Operation);
+        assert_eq!(guarded_card.operation.family, OperationFamily::Transmute);
+        assert_eq!(guarded_card.class, ReviewClass::GuardMissing);
+        assert!(obligation_discharge_present(guarded_card, "layout"));
+        assert!(!obligation_discharge_present(guarded_card, "valid-value"));
+
+        let conjunct = fixture_output("transmute_layout_conjunct_return_not_guard")?;
+        let conjunct_card = single_card("transmute_layout_conjunct_return_not_guard", &conjunct)?;
+
+        assert_eq!(conjunct_card.site.kind, UnsafeSiteKind::Operation);
+        assert_eq!(conjunct_card.operation.family, OperationFamily::Transmute);
+        assert_eq!(conjunct_card.class, ReviewClass::GuardMissing);
+        assert!(!obligation_discharge_present(conjunct_card, "layout"));
+        assert!(!obligation_discharge_present(conjunct_card, "valid-value"));
+        Ok(())
+    }
+
+    #[test]
     fn transmute_bool_value_domain_guards_are_discharged() -> Result<(), String> {
         for fixture in [
             "transmute_bool_valid_value_guard",

@@ -4845,6 +4845,26 @@ mod tests {
             "unsafe { core::mem::transmute::<u8, bool>(value) }",
             vec!["}"],
         );
+        let mismatch_return_transmute = site_with_family(
+            OperationFamily::Transmute,
+            vec![
+                "if core::mem::size_of::<u8>() != core::mem::size_of::<bool>() {",
+                "return false;",
+                "}",
+            ],
+            "unsafe { core::mem::transmute::<u8, bool>(value) }",
+            vec![],
+        );
+        let conjunct_mismatch_return_transmute = site_with_family(
+            OperationFamily::Transmute,
+            vec![
+                "if core::mem::size_of::<u8>() != core::mem::size_of::<bool>() && allow_conversion {",
+                "return false;",
+                "}",
+            ],
+            "unsafe { core::mem::transmute::<u8, bool>(value) }",
+            vec![],
+        );
         let observed_transmute = site_with_family(
             OperationFamily::Transmute,
             vec!["let _same_layout = core::mem::size_of::<u8>() == core::mem::size_of::<bool>();"],
@@ -4888,6 +4908,14 @@ mod tests {
             &contract,
             &reach,
         );
+        let mismatch_return_evidence =
+            obligation_evidence(&mismatch_return_transmute, &obligations, &contract, &reach);
+        let conjunct_mismatch_return_evidence = obligation_evidence(
+            &conjunct_mismatch_return_transmute,
+            &obligations,
+            &contract,
+            &reach,
+        );
         let observed_evidence =
             obligation_evidence(&observed_transmute, &obligations, &contract, &reach);
         let closed_branch_evidence =
@@ -4900,6 +4928,8 @@ mod tests {
         assert!(branch_predicate_evidence[0].discharge.present);
         assert!(conjunct_branch_predicate_evidence[0].discharge.present);
         assert!(!disjunct_branch_predicate_evidence[0].discharge.present);
+        assert!(mismatch_return_evidence[0].discharge.present);
+        assert!(!conjunct_mismatch_return_evidence[0].discharge.present);
         assert!(!observed_evidence[0].discharge.present);
         assert!(!closed_branch_evidence[0].discharge.present);
         assert!(branch_scoped_evidence[0].discharge.present);

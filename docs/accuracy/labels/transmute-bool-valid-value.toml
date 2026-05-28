@@ -67,6 +67,36 @@ label_source = "fixture_golden"
 rationale = "A layout-size predicate that appears only in a disjunctive open branch can enter without the layout check and must not discharge layout evidence."
 
 [[samples]]
+id = "transmute-bool-layout-mismatch-return-present"
+fixture = "transmute_layout_mismatch_return_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "layout"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "An early return on mismatched source/destination size discharges the layout obligation for the later transmute."
+
+[[samples]]
+id = "transmute-bool-conjunct-layout-return-not-guard"
+fixture = "transmute_layout_conjunct_return_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "layout"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A layout mismatch predicate that appears only in a conjunctive early-return branch can still fall through with mismatched layout and must not discharge layout evidence."
+
+[[samples]]
 id = "transmute-bool-closed-layout-not-guard"
 fixture = "transmute_layout_closed_branch_not_guard"
 kind = "false_positive_control"

@@ -1,6 +1,7 @@
 use super::{
     any_compact_if_condition, branch_still_open_at_operation, condition_has_top_level_conjunct,
-    has_u8_bool_value_guard, matching_call_argument_end, matching_generic_argument_end,
+    condition_has_top_level_disjunct, contains_executable_return, has_u8_bool_value_guard,
+    matching_call_argument_end, matching_code_block_end, matching_generic_argument_end,
     source_value_identifier, split_top_level_pair, strip_block_comments_and_literals,
 };
 
@@ -124,12 +125,16 @@ fn has_size_of_equality(compact: &str, left_type: &str, right_type: &str) -> boo
     let right = format!("size_of::<{right_type}>()");
     let left_eq_right = format!("{left}=={right}");
     let right_eq_left = format!("{right}=={left}");
+    let left_ne_right = format!("{left}!={right}");
+    let right_ne_left = format!("{right}!={left}");
     has_size_assert_eq(compact, &left, &right)
         || has_size_assert_eq(compact, &right, &left)
         || has_size_assert(compact, &left_eq_right)
         || has_size_assert(compact, &right_eq_left)
         || has_open_size_branch(compact, &left_eq_right)
         || has_open_size_branch(compact, &right_eq_left)
+        || has_returning_size_mismatch_branch(compact, &left_ne_right)
+        || has_returning_size_mismatch_branch(compact, &right_ne_left)
 }
 
 fn has_size_assert_eq(compact: &str, left: &str, right: &str) -> bool {
@@ -153,6 +158,21 @@ fn has_open_size_branch(compact: &str, predicate: &str) -> bool {
         condition_has_top_level_conjunct(condition, predicate)
             && branch_still_open_at_operation(after_guard)
     })
+}
+
+fn has_returning_size_mismatch_branch(compact: &str, predicate: &str) -> bool {
+    any_compact_if_condition(compact, |condition, after_guard| {
+        condition_has_top_level_disjunct(condition, predicate)
+            && returning_size_branch_reaches_operation(after_guard)
+    })
+}
+
+fn returning_size_branch_reaches_operation(after_guard: &str) -> bool {
+    let (guard_body, after_branch) = matching_code_block_end(after_guard)
+        .map_or((after_guard, ""), |body_end| {
+            (&after_guard[..body_end], &after_guard[body_end + 1..])
+        });
+    contains_executable_return(guard_body) && branch_still_open_at_operation(after_branch)
 }
 
 fn has_applicable_size_pattern(compact: &str, pattern: &str) -> bool {
