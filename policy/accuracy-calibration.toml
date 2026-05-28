@@ -328,8 +328,10 @@ support_tier = "Raw pointer card slice"
 fixtures = [
   "raw_pointer_write_bytes",
   "raw_pointer_write_bool_bytes_guard",
+  "raw_pointer_write_bool_conjunct_branch_guard",
   "raw_pointer_write_bool_reassigned_byte_not_guard",
   "raw_pointer_write_bool_closed_branch_not_guard",
+  "raw_pointer_write_bool_disjunct_branch_not_guard",
   "raw_pointer_write_previous_u8_not_guard",
   "raw_pointer_write_previous_bool_not_guard",
   "raw_pointer_write_previous_maybeuninit_not_guard",

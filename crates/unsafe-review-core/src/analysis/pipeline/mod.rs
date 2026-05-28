@@ -599,16 +599,21 @@ mod tests {
 
     #[test]
     fn raw_pointer_write_bool_bytes_guard_discharges_byte_obligations() -> Result<(), String> {
-        let output = fixture_output("raw_pointer_write_bool_bytes_guard")?;
-        let card = single_card("raw_pointer_write_bool_bytes_guard", &output)?;
+        for fixture in [
+            "raw_pointer_write_bool_bytes_guard",
+            "raw_pointer_write_bool_conjunct_branch_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
 
-        assert_eq!(card.operation.family, OperationFamily::RawPointerWrite);
-        assert_eq!(card.class, ReviewClass::GuardMissing);
-        assert!(obligation_discharge_present(card, "initialized"));
-        assert!(obligation_discharge_present(card, "alignment"));
-        assert!(!obligation_discharge_present(card, "pointer-live"));
-        assert!(!obligation_discharge_present(card, "bounds"));
-        assert!(!obligation_discharge_present(card, "allocation"));
+            assert_eq!(card.operation.family, OperationFamily::RawPointerWrite);
+            assert_eq!(card.class, ReviewClass::GuardMissing);
+            assert!(obligation_discharge_present(card, "initialized"));
+            assert!(obligation_discharge_present(card, "alignment"));
+            assert!(!obligation_discharge_present(card, "pointer-live"));
+            assert!(!obligation_discharge_present(card, "bounds"));
+            assert!(!obligation_discharge_present(card, "allocation"));
+        }
         Ok(())
     }
 
@@ -629,16 +634,21 @@ mod tests {
 
     #[test]
     fn raw_pointer_write_bool_bytes_guard_requires_open_branch() -> Result<(), String> {
-        let output = fixture_output("raw_pointer_write_bool_closed_branch_not_guard")?;
-        let card = single_card("raw_pointer_write_bool_closed_branch_not_guard", &output)?;
+        for fixture in [
+            "raw_pointer_write_bool_closed_branch_not_guard",
+            "raw_pointer_write_bool_disjunct_branch_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
 
-        assert_eq!(card.operation.family, OperationFamily::RawPointerWrite);
-        assert_eq!(card.class, ReviewClass::GuardMissing);
-        assert!(obligation_discharge_present(card, "alignment"));
-        assert!(!obligation_discharge_present(card, "initialized"));
-        assert!(!obligation_discharge_present(card, "pointer-live"));
-        assert!(!obligation_discharge_present(card, "bounds"));
-        assert!(!obligation_discharge_present(card, "allocation"));
+            assert_eq!(card.operation.family, OperationFamily::RawPointerWrite);
+            assert_eq!(card.class, ReviewClass::GuardMissing);
+            assert!(obligation_discharge_present(card, "alignment"));
+            assert!(!obligation_discharge_present(card, "initialized"));
+            assert!(!obligation_discharge_present(card, "pointer-live"));
+            assert!(!obligation_discharge_present(card, "bounds"));
+            assert!(!obligation_discharge_present(card, "allocation"));
+        }
         Ok(())
     }
 

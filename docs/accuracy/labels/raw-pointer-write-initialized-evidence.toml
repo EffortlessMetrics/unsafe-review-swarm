@@ -38,6 +38,19 @@ label_source = "fixture_golden"
 rationale = "A dominating byte-domain guard for a *mut bool write discharges initialized-value evidence without proving pointer, bounds, or allocation evidence."
 
 [[samples]]
+id = "raw-pointer-write-bool-conjunct-branch-guard-present"
+fixture = "raw_pointer_write_bool_conjunct_branch_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "initialized"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A top-level conjunctive open branch byte-domain guard for a *mut bool write discharges initialized-value evidence while preserving other raw pointer review gaps."
+
+[[samples]]
 id = "raw-pointer-write-bool-reassigned-byte-not-guard"
 fixture = "raw_pointer_write_bool_reassigned_byte_not_guard"
 kind = "false_positive_control"
@@ -62,6 +75,19 @@ expected_obligation_key = "initialized"
 expected_discharge_state = "missing"
 label_source = "fixture_golden"
 rationale = "A closed positive bool byte-domain branch is only an observation and does not dominate the later write."
+
+[[samples]]
+id = "raw-pointer-write-bool-disjunct-branch-not-guard"
+fixture = "raw_pointer_write_bool_disjunct_branch_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A disjunctive positive bool byte-domain branch may execute for non-byte-domain reasons, so it does not discharge initialized-value evidence for the later write."
 
 [[samples]]
 id = "raw-pointer-write-previous-u8-not-guard"

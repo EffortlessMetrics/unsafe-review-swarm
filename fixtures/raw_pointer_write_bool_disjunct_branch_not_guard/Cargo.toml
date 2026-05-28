@@ -1,0 +1,4 @@
+[package]
+name = "raw-pointer-write-bool-disjunct-branch-not-guard"
+version = "0.0.0"
+edition = "2024"

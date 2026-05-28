@@ -1,6 +1,7 @@
 use super::{
+    any_compact_if_condition, branch_still_open_at_operation, condition_has_top_level_conjunct,
     contains_executable_return, has_assignment_to_identifier, has_fresh_guard_pattern,
-    has_open_positive_branch_guard_for_identifiers, matching_code_block_end,
+    matching_code_block_end,
 };
 
 pub(super) fn has_u8_bool_value_guard(before_call: &str, argument: &str) -> bool {
@@ -36,7 +37,11 @@ fn has_u8_bool_value_predicate_guard(before_call: &str, predicate: &str, argumen
 }
 
 fn has_open_positive_branch_guard(before_call: &str, predicate: &str, argument: &str) -> bool {
-    has_open_positive_branch_guard_for_identifiers(before_call, predicate, &[argument])
+    any_compact_if_condition(before_call, |condition, after_guard| {
+        condition_has_top_level_conjunct(condition, predicate)
+            && branch_still_open_at_operation(after_guard)
+            && !has_assignment_to_identifier(after_guard, argument)
+    })
 }
 
 fn has_u8_bool_invalid_early_return_guard(before_call: &str, argument: &str) -> bool {
