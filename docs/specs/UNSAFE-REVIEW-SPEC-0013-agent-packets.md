@@ -120,6 +120,9 @@ Whole-file dumps are out of scope by default.
   example, raw-pointer read packets may name same-pointer alignment or
   initialization evidence, while copy packets may name range and non-overlap
   evidence. They must not suggest an obligation the ReviewCard does not carry.
+- If the ReviewCard carries a static reach gap, allowed repairs may name a
+  focused test for the owner or seam, but the packet must preserve that a test
+  mention is reach evidence only and not site-execution proof.
 - Agent readiness is `ready` for a high-confidence, card-scoped repair packet
   with a verify command, and is not ready for human-review or unsupported
   operation families such as inline assembly and FFI ownership boundaries.

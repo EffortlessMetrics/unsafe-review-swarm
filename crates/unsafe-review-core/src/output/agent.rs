@@ -1100,6 +1100,25 @@ mod tests {
     }
 
     #[test]
+    fn agent_packet_suggests_focused_test_for_reach_gap() -> Result<(), String> {
+        let output = fixture_output("unsafe_fn_call_wrapper")?;
+        let Some(card) = output.cards.first() else {
+            return Err("fixture should emit one card".to_string());
+        };
+        assert!(
+            card.missing.iter().any(|missing| missing.kind == "reach"),
+            "fixture should carry a static reach gap"
+        );
+        let value = parse_json(&render(card))?;
+        let allowed_repairs = serde_json::to_string(&value["allowed_repairs"])
+            .map_err(|err| format!("render allowed repairs failed: {err}"))?;
+
+        assert!(allowed_repairs.contains("focused test"));
+        assert!(allowed_repairs.contains("exercises this owner or seam"));
+        Ok(())
+    }
+
+    #[test]
     fn agent_packet_marks_loom_routed_cards_as_not_ready_for_repair_delegation()
     -> Result<(), String> {
         let output = fixture_output("atomic_pointer_state_fetch_ops")?;

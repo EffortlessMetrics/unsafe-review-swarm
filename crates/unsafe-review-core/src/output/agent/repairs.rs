@@ -243,7 +243,7 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
     if missing_kind(card, "contract") {
         repairs.push("add or expose the local safety contract for this card".to_string());
     }
-    if missing_kind(card, "test") {
+    if missing_kind(card, "reach") || missing_kind(card, "test") {
         repairs
             .push("add or point to a focused test that exercises this owner or seam".to_string());
     }
