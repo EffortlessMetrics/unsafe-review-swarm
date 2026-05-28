@@ -91,7 +91,8 @@ The current fixture-pinned slices are:
   Miri-first review to sanitizer/cargo-careful witness suggestions, keeps
   documented and missing-contract unsafe extern boundary cards scoped to the
   declared foreign function owner, and avoids treating local Rust wrappers as FFI
-  merely because their module names resemble libc.
+  merely because their module names resemble libc, even when a same-named extern
+  declaration exists.
 - FFI boundary obligation evidence: checks that ABI/layout compatibility and
   ownership/lifetime/nullability contracts are tracked as separate obligations
   for documented and missing-contract unsafe extern C declarations and calls.
