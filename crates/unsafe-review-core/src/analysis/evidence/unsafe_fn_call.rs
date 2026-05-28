@@ -4,7 +4,7 @@ use super::{
 };
 
 pub(super) fn has_encode_utf8_remaining_capacity_evidence(lower: &str) -> bool {
-    let compact = compact_code(lower);
+    let compact = compact_code(&strip_block_comments_and_literals(lower));
     let context = EncodeUtf8CapacityContext::new(&compact);
     context.has_same_remaining_capacity_argument_evidence()
 }

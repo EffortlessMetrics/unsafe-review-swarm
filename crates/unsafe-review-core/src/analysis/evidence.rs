@@ -2961,6 +2961,45 @@ mod tests {
     }
 
     #[test]
+    fn encode_utf8_remaining_capacity_ignores_comments_and_literals() {
+        let obligations = vec![SafetyObligation::new(
+            "callee-contract",
+            "callee safety preconditions are satisfied",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let line_comment = site_with_family(
+            OperationFamily::UnsafeFnCall,
+            vec![
+                "let ptr = self.xs[len..].as_mut_ptr() as *mut u8;",
+                "// let remaining_cap = self.capacity() - len;",
+            ],
+            "match unsafe { encode_utf8(c, ptr, remaining_cap) } {",
+            vec![],
+        );
+        let string_literal = site_with_family(
+            OperationFamily::UnsafeFnCall,
+            vec![
+                "let ptr = self.xs[len..].as_mut_ptr() as *mut u8;",
+                "let _note = \"let remaining_cap = self.capacity() - len\";",
+            ],
+            "match unsafe { encode_utf8(c, ptr, remaining_cap) } {",
+            vec![],
+        );
+
+        let line_comment_evidence =
+            obligation_evidence(&line_comment, &obligations, &contract, &reach);
+        let string_literal_evidence =
+            obligation_evidence(&string_literal, &obligations, &contract, &reach);
+
+        assert!(!line_comment_evidence[0].discharge.present);
+        assert!(!string_literal_evidence[0].discharge.present);
+    }
+
+    #[test]
     fn maybeuninit_slice_discharges_initialized_obligation_only() {
         let obligations = vec![
             SafetyObligation::new("initialized", "memory range is initialized"),
