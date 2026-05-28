@@ -11121,6 +11121,33 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_pr_summary_top_card_operation_drift() -> Result<(), String>
+    {
+        let dir = unique_temp_dir("unsafe-review-first-pr-summary-card-operation")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("pr-summary.md");
+        let summary =
+            fs::read_to_string(&path).map_err(|err| format!("read pr summary failed: {err}"))?;
+        fs::write(
+            &path,
+            summary.replace(
+                "- Operation: `unsafe { ptr.cast::<Header>().read() }`",
+                "- Operation: `unsafe { other.cast::<Header>().read() }`",
+            ),
+        )
+        .map_err(|err| format!("write pr summary failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(result.err().unwrap_or_default().contains(
+            "top card `card-1` operation must be `unsafe { ptr.cast::<Header>().read() }`"
+        ));
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_pr_summary_operation_family_drift() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-summary-operation-family")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -11278,6 +11305,33 @@ Snapshot reports:
                 .unwrap_or_default()
                 .contains("top card `card-1` location must be `src/lib.rs:7`")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_github_summary_top_card_operation_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-github-card-operation")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("github-summary.md");
+        let summary = fs::read_to_string(&path)
+            .map_err(|err| format!("read github summary failed: {err}"))?;
+        fs::write(
+            &path,
+            summary.replace(
+                "- Operation: `unsafe { ptr.cast::<Header>().read() }`",
+                "- Operation: `unsafe { other.cast::<Header>().read() }`",
+            ),
+        )
+        .map_err(|err| format!("write github summary failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(result.err().unwrap_or_default().contains(
+            "top card `card-1` operation must be `unsafe { ptr.cast::<Header>().read() }`"
+        ));
         Ok(())
     }
 
