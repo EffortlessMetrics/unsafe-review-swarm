@@ -1,0 +1,19 @@
+use core::mem::MaybeUninit;
+
+pub fn assume_shadowed() -> u32 {
+    let mut slot = MaybeUninit::<u32>::uninit();
+    slot.write(7);
+    let slot = MaybeUninit::<u32>::uninit();
+    // SAFETY: this fixture checks that shadowed writes do not initialize the current slot.
+    unsafe { slot.assume_init() }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::assume_shadowed;
+
+    #[test]
+    fn assumes_shadowed() {
+        let _ = core::mem::size_of_val(&(assume_shadowed as fn() -> u32));
+    }
+}
