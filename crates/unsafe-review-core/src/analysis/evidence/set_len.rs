@@ -11,7 +11,10 @@ use crate::domain::{EvidenceState, OperationFamily};
 pub(super) fn has_set_len_capacity_evidence(lower: &str) -> bool {
     let stripped = strip_block_comments_and_literals(lower);
     let lower = stripped.as_str();
-    has_set_len_shrink_evidence(lower)
+    let compact = compact_code(lower);
+    let shrink_evidence =
+        set_len_call_context(&compact).is_some_and(|context| context.has_shrink_evidence());
+    shrink_evidence
         || has_set_len_call_result_initialization_evidence(lower)
         || has_set_len_const_cap_evidence(lower)
         || has_set_len_with_capacity_evidence(lower)
@@ -22,14 +25,13 @@ pub(super) fn has_set_len_capacity_evidence(lower: &str) -> bool {
 pub(super) fn has_set_len_initialization_evidence(lower: &str) -> bool {
     let stripped = strip_block_comments_and_literals(lower);
     let lower = stripped.as_str();
-    if has_set_len_shrink_evidence(lower) || has_set_len_call_result_initialization_evidence(lower)
-    {
-        return true;
-    }
     let compact = compact_code(lower);
     let Some(context) = set_len_call_context(&compact) else {
         return false;
     };
+    if context.has_shrink_evidence() || context.has_call_result_initialization_evidence() {
+        return true;
+    }
     context.has_initialized_range_evidence()
 }
 
@@ -223,6 +225,14 @@ impl<'a> SetLenApplicabilityContext<'a> {
             self.set_len_argument,
         )
     }
+
+    fn has_shrink_evidence(&self) -> bool {
+        super::super::set_len_shrink::has_set_len_shrink_evidence(
+            self.before_call,
+            self.same_vec_target,
+            self.set_len_argument,
+        )
+    }
 }
 
 fn set_len_call_context(compact: &str) -> Option<SetLenApplicabilityContext<'_>> {
@@ -242,10 +252,6 @@ fn has_set_len_call_result_initialization_evidence(lower: &str) -> bool {
         return false;
     };
     context.has_call_result_initialization_evidence()
-}
-
-fn has_set_len_shrink_evidence(lower: &str) -> bool {
-    super::super::set_len_shrink::has_set_len_shrink_evidence(lower)
 }
 
 struct SetLenCapacityContext<'a> {

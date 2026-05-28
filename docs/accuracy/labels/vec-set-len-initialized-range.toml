@@ -181,6 +181,21 @@ label_source = "fixture_golden"
 rationale = "A non-empty last-index shrink keeps the new length inside the already initialized Vec range."
 
 [[samples]]
+id = "vec-set-len-other-last-index-shrink-not-guard"
+fixture = "vec_set_len_other_last_index_shrink_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A last_index derived from another Vec receiver does not prove the target Vec's new length is within its initialized range."
+
+[[samples]]
 id = "vec-set-len-start-bound-shrink-present"
 fixture = "vec_set_len_start_bound_shrink"
 kind = "positive"

@@ -427,6 +427,7 @@ mod tests {
         "vec_set_len_call_result_init",
         "vec_set_len_shrink",
         "vec_set_len_last_index_shrink",
+        "vec_set_len_other_last_index_shrink_not_guard",
         "vec_set_len_start_bound_shrink",
         "vec_set_len_zero_clear",
         "drop_in_place_deallocation",

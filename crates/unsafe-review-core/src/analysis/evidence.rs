@@ -103,8 +103,7 @@ use self::valid_zero_discharge::valid_zero_discharge_state;
 use self::write_bytes::has_write_bytes_bounds_evidence;
 use crate::analysis::scanner::ScannedSite;
 use crate::domain::{
-    ContractEvidence, EvidenceState, ObligationEvidence, OperationFamily, ReachEvidence,
-    SafetyObligation,
+    ContractEvidence, EvidenceState, ObligationEvidence, ReachEvidence, SafetyObligation,
 };
 
 pub(crate) fn obligation_evidence(
