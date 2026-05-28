@@ -78,8 +78,8 @@ separate receipt truth.
 
 The CLI may audit receipt files against the current `ReviewCard` set. Receipt
 audit must report matched, unmatched, stale, expired, wrong-identity,
-wrong-tool, weaker-than-required, command-hash-mismatch, and invalid receipt
-metadata without running witnesses, inferring site reach, making policy
+wrong-tool, weaker-than-required, command-hash-mismatch, duplicate, and invalid
+receipt metadata without running witnesses, inferring site reach, making policy
 decisions, or claiming safety. Matched receipt entries include current card
 operation, missing-count, and next-action context. Audit entries include the
 current card's routed witness tools so a reviewer can compare the saved receipt
@@ -189,8 +189,9 @@ calendar-valid `YYYY-MM-DD` date on or after the `recorded_at` date.
 - The CLI receipt-validate command counts importable receipts and rejects the
   same invalid receipt files as normal analysis.
 - The CLI receipt-audit command reports matched, stale, expired,
-  wrong-identity, wrong-tool, weaker-than-required, command-hash-mismatch, and
-  invalid receipts without executing witnesses or making policy decisions.
+  wrong-identity, wrong-tool, weaker-than-required, command-hash-mismatch,
+  duplicate, and invalid receipts without executing witnesses or making policy
+  decisions.
 - Receipt-audit JSON and Markdown include limitations that preserve the saved
   metadata boundary and state that matched receipts only improve witness
   evidence.
