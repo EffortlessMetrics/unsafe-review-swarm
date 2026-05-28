@@ -1,0 +1,19 @@
+pub fn fill_bools(ptr: *mut bool, len: usize, byte: u8, disabled: bool) {
+    if byte > 1 && disabled {
+        return;
+    }
+    // SAFETY: fixture checks that a conjunctive invalid-byte return is not enough.
+    unsafe { ptr.write_bytes(byte, len) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::fill_bools;
+
+    #[test]
+    fn mentions_fill_bools() {
+        let mut values = [false; 2];
+        fill_bools(values.as_mut_ptr(), values.len(), 1, false);
+        assert!(values.iter().all(|value| *value));
+    }
+}

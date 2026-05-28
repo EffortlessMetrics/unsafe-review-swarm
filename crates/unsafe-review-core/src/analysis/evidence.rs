@@ -3675,6 +3675,17 @@ mod tests {
             "unsafe { ptr.write_bytes(byte, len) }",
             vec!["}"],
         );
+        let disjunctive_return = site_with_family(
+            OperationFamily::RawPointerWrite,
+            vec![
+                "pub fn fill_bools(ptr: *mut bool, len: usize, byte: u8, disabled: bool) {",
+                "    if byte > 1 || disabled {",
+                "        return;",
+                "    }",
+            ],
+            "unsafe { ptr.write_bytes(byte, len) }",
+            vec!["}"],
+        );
         let conjunctive_open_branch = site_with_family(
             OperationFamily::RawPointerWrite,
             vec![
@@ -3689,6 +3700,17 @@ mod tests {
             vec![
                 "pub fn fill_bools(ptr: *mut bool, len: usize, byte: u8, enabled: bool) {",
                 "    if byte <= 1 || enabled {",
+            ],
+            "unsafe { ptr.write_bytes(byte, len) }",
+            vec!["}"],
+        );
+        let conjunctive_return = site_with_family(
+            OperationFamily::RawPointerWrite,
+            vec![
+                "pub fn fill_bools(ptr: *mut bool, len: usize, byte: u8, disabled: bool) {",
+                "    if byte > 1 && disabled {",
+                "        return;",
+                "    }",
             ],
             "unsafe { ptr.write_bytes(byte, len) }",
             vec!["}"],
@@ -3717,17 +3739,23 @@ mod tests {
         );
 
         let evidence = obligation_evidence(&raw_write, &obligations, &contract, &reach);
+        let disjunctive_return_evidence =
+            obligation_evidence(&disjunctive_return, &obligations, &contract, &reach);
         let conjunctive_open_branch_evidence =
             obligation_evidence(&conjunctive_open_branch, &obligations, &contract, &reach);
         let disjunctive_open_branch_evidence =
             obligation_evidence(&disjunctive_open_branch, &obligations, &contract, &reach);
+        let conjunctive_return_evidence =
+            obligation_evidence(&conjunctive_return, &obligations, &contract, &reach);
         let comment_evidence =
             obligation_evidence(&comment_return, &obligations, &contract, &reach);
         let string_evidence = obligation_evidence(&string_return, &obligations, &contract, &reach);
 
         assert!(evidence[0].discharge.present);
+        assert!(disjunctive_return_evidence[0].discharge.present);
         assert!(conjunctive_open_branch_evidence[0].discharge.present);
         assert!(!disjunctive_open_branch_evidence[0].discharge.present);
+        assert!(!conjunctive_return_evidence[0].discharge.present);
         assert!(!comment_evidence[0].discharge.present);
         assert!(!string_evidence[0].discharge.present);
     }

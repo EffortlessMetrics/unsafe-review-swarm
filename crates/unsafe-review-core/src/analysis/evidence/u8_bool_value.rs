@@ -1,7 +1,7 @@
 use super::{
     any_compact_if_condition, branch_still_open_at_operation, condition_has_top_level_conjunct,
-    contains_executable_return, has_assignment_to_identifier, has_fresh_guard_pattern,
-    matching_code_block_end,
+    condition_has_top_level_disjunct, contains_executable_return, has_assignment_to_identifier,
+    has_fresh_guard_pattern, matching_code_block_end,
 };
 
 pub(super) fn has_u8_bool_value_guard(before_call: &str, argument: &str) -> bool {
@@ -52,21 +52,17 @@ fn has_u8_bool_invalid_early_return_guard(before_call: &str, argument: &str) -> 
 }
 
 fn has_invalid_byte_returning_branch(before_call: &str, predicate: &str, argument: &str) -> bool {
-    let guard = format!("if{predicate}{{");
-    let mut search_from = 0;
-    while let Some(offset) = before_call[search_from..].find(&guard) {
-        let guard_start = search_from + offset;
-        let after_guard = &before_call[guard_start + guard.len()..];
+    any_compact_if_condition(before_call, |condition, after_guard| {
         let (guard_body, after_branch) = matching_code_block_end(after_guard)
             .map_or((after_guard, ""), |body_end| {
                 (&after_guard[..body_end], &after_guard[body_end + 1..])
             });
         if contains_executable_return(guard_body)
+            && condition_has_top_level_disjunct(condition, predicate)
             && !has_assignment_to_identifier(after_branch, argument)
         {
             return true;
         }
-        search_from = guard_start + guard.len();
-    }
-    false
+        false
+    })
 }

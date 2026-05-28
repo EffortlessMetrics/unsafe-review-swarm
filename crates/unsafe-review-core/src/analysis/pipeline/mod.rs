@@ -602,6 +602,7 @@ mod tests {
         for fixture in [
             "raw_pointer_write_bool_bytes_guard",
             "raw_pointer_write_bool_conjunct_branch_guard",
+            "raw_pointer_write_bool_disjunct_return_guard",
         ] {
             let output = fixture_output(fixture)?;
             let card = single_card(fixture, &output)?;
@@ -637,6 +638,7 @@ mod tests {
         for fixture in [
             "raw_pointer_write_bool_closed_branch_not_guard",
             "raw_pointer_write_bool_disjunct_branch_not_guard",
+            "raw_pointer_write_bool_conjunct_return_not_guard",
         ] {
             let output = fixture_output(fixture)?;
             let card = single_card(fixture, &output)?;
