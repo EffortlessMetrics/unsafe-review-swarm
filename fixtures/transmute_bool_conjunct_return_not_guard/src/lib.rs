@@ -1,0 +1,19 @@
+pub fn byte_to_bool_conjunct_return(value: u8, disabled: bool) -> bool {
+    assert_eq!(core::mem::size_of::<u8>(), core::mem::size_of::<bool>());
+    if value > 1 && disabled {
+        return false;
+    }
+    // SAFETY: this fixture intentionally uses a conjunctive invalid-byte return guard.
+    unsafe { core::mem::transmute::<u8, bool>(value) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::byte_to_bool_conjunct_return;
+
+    #[test]
+    fn mentions_conjunctive_return() {
+        let _ = core::mem::size_of_val(&(byte_to_bool_conjunct_return as fn(u8, bool) -> bool));
+    }
+}
+

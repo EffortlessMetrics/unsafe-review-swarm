@@ -720,6 +720,8 @@ fixtures = [
   "transmute_bool_conjunct_branch_guard",
   "transmute_bool_disjunct_branch_not_guard",
   "transmute_bool_invalid_return_guard",
+  "transmute_bool_disjunct_return_guard",
+  "transmute_bool_conjunct_return_not_guard",
   "transmute_bool_other_value_not_guard",
   "transmute_bool_value_observed_not_guard",
   "transmute_bool_closed_if_observed_not_guard",
@@ -743,10 +745,10 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned transmute bool valid-value evidence distinguishes dominating
 bool-domain, top-level conjunctive bool-domain, and invalid-byte early-return
-guards from layout-only, closed-layout, observed-layout, comment-only,
-disjunctive-branch, other-value, observed, closed-branch, stale-byte,
-compound-stale-byte, and multiline transmute_copy controls in the listed
-fixtures.
+guards, including top-level disjunctive invalid-byte early-return guards, from
+layout-only, closed-layout, observed-layout, comment-only, disjunctive-branch,
+conjunctive-return, other-value, observed, closed-branch, stale-byte,
+compound-stale-byte, and multiline transmute_copy controls in the listed fixtures.
 """
 forbidden_claims = [
   "broad transmute soundness",

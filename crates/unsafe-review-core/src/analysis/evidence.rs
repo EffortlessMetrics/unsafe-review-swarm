@@ -5199,12 +5199,21 @@ mod tests {
             "unsafe { core::mem::transmute::<u8, bool>(value) }",
             vec![],
         );
+        let disjunct_return = site_with_family(
+            OperationFamily::Transmute,
+            vec!["if value > 1 || disabled {", "    return false;", "}"],
+            "unsafe { core::mem::transmute::<u8, bool>(value) }",
+            vec![],
+        );
 
         let evidence = obligation_evidence(&transmute, &obligations, &contract, &reach);
         let nested_evidence = obligation_evidence(&nested_return, &obligations, &contract, &reach);
+        let disjunct_evidence =
+            obligation_evidence(&disjunct_return, &obligations, &contract, &reach);
 
         assert!(evidence[0].discharge.present);
         assert!(nested_evidence[0].discharge.present);
+        assert!(disjunct_evidence[0].discharge.present);
     }
 
     #[test]
@@ -5259,15 +5268,24 @@ mod tests {
             "unsafe { core::mem::transmute::<u8, bool>(value) }",
             vec![],
         );
+        let conjunctive_return = site_with_family(
+            OperationFamily::Transmute,
+            vec!["if value > 1 && disabled {", "    return false;", "}"],
+            "unsafe { core::mem::transmute::<u8, bool>(value) }",
+            vec![],
+        );
 
         let evidence = obligation_evidence(&transmute, &obligations, &contract, &reach);
         let comment_evidence =
             obligation_evidence(&comment_return, &obligations, &contract, &reach);
         let string_evidence = obligation_evidence(&string_return, &obligations, &contract, &reach);
+        let conjunctive_evidence =
+            obligation_evidence(&conjunctive_return, &obligations, &contract, &reach);
 
         assert!(!evidence[0].discharge.present);
         assert!(!comment_evidence[0].discharge.present);
         assert!(!string_evidence[0].discharge.present);
+        assert!(!conjunctive_evidence[0].discharge.present);
     }
 
     #[test]

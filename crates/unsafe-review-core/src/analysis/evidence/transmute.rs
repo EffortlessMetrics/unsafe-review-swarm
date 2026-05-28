@@ -1,8 +1,9 @@
 use super::{
     any_compact_if_condition, branch_still_open_at_operation, condition_has_top_level_conjunct,
-    contains_executable_return, has_assignment_to_identifier, matching_call_argument_end,
-    matching_code_block_end, matching_generic_argument_end, source_value_identifier,
-    split_top_level_pair, strip_block_comments_and_literals, u8_bool_valid_value_predicates,
+    condition_has_top_level_disjunct, contains_executable_return, has_assignment_to_identifier,
+    matching_call_argument_end, matching_code_block_end, matching_generic_argument_end,
+    source_value_identifier, split_top_level_pair, strip_block_comments_and_literals,
+    u8_bool_valid_value_predicates,
 };
 
 pub(super) fn has_transmute_layout_size_evidence(lower: &str) -> bool {
@@ -155,8 +156,7 @@ impl TransmuteValueDomainContext<'_> {
     }
 
     fn has_invalid_byte_returning_branch(&self, predicate: &str) -> bool {
-        let guard = format!("if{predicate}{{");
-        self.applicability.has_returning_branch_guard(&guard)
+        self.applicability.has_returning_branch_guard(predicate)
     }
 }
 
@@ -206,23 +206,19 @@ impl<'a> TransmuteValueDomainApplicability<'a> {
             && self.source_value_stays_fresh_after(after_guard)
     }
 
-    fn has_returning_branch_guard(&self, guard: &str) -> bool {
-        let mut search_from = 0;
-        while let Some(offset) = self.before_call[search_from..].find(guard) {
-            let guard_start = search_from + offset;
-            let after_guard = &self.before_call[guard_start + guard.len()..];
-            let (guard_body, after_branch) = matching_code_block_end(after_guard)
-                .map_or((after_guard, ""), |body_end| {
-                    (&after_guard[..body_end], &after_guard[body_end + 1..])
-                });
-            if contains_executable_return(guard_body)
-                && self.source_value_stays_fresh_after(after_branch)
-            {
-                return true;
-            }
-            search_from = guard_start + guard.len();
-        }
-        false
+    fn has_returning_branch_guard(&self, predicate: &str) -> bool {
+        any_compact_if_condition(self.before_call, |condition, after_guard| {
+            condition_has_top_level_disjunct(condition, predicate)
+                && self.returning_branch_preserves_applicability(after_guard)
+        })
+    }
+
+    fn returning_branch_preserves_applicability(&self, after_guard: &str) -> bool {
+        let (guard_body, after_branch) = matching_code_block_end(after_guard)
+            .map_or((after_guard, ""), |body_end| {
+                (&after_guard[..body_end], &after_guard[body_end + 1..])
+            });
+        contains_executable_return(guard_body) && self.source_value_stays_fresh_after(after_branch)
     }
 
     fn source_value_stays_fresh_after(&self, evidence: &str) -> bool {
