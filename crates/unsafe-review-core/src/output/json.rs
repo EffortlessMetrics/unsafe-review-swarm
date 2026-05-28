@@ -479,6 +479,7 @@ mod tests {
         "ffi_sanitizer_route",
         "ffi_missing_boundary_contract",
         "ffi_call_sanitizer_route",
+        "ffi_qualified_call_sanitizer_route",
         "ffi_libc_call_sanitizer_route",
         "ffi_non_libc_wrapper_call_not_route",
         "get_unchecked_mut_bounds",

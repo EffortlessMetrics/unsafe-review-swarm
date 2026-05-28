@@ -261,6 +261,7 @@ required_core_fixtures = [
   "ffi_sanitizer_route",
   "ffi_missing_boundary_contract",
   "ffi_call_sanitizer_route",
+  "ffi_qualified_call_sanitizer_route",
   "ffi_libc_call_sanitizer_route",
   "ffi_non_libc_wrapper_call_not_route",
   "safe_code_no_cards",
@@ -2885,6 +2886,16 @@ expected_hazard = "ffi_abi"
 fixture = "ffi_call_sanitizer_route"
 kind = "positive"
 claim = "unsafe call to a same-file extern C declaration routes away from Miri-first review"
+support_tier = "Witness routing"
+expected_cards = 1
+expected_class = "miri_unsupported"
+expected_operation_family = "ffi"
+expected_hazard = "ffi_abi"
+
+[[cases]]
+fixture = "ffi_qualified_call_sanitizer_route"
+kind = "positive"
+claim = "qualified unsafe call to a same-file extern C declaration routes away from Miri-first review"
 support_tier = "Witness routing"
 expected_cards = 1
 expected_class = "miri_unsupported"

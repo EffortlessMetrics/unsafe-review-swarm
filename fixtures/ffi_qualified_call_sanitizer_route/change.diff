@@ -1,0 +1,5 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -9,1 +9,1 @@
++    unsafe { ffi::strlen(ptr) }

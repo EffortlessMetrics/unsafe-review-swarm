@@ -975,6 +975,7 @@ fixtures = [
   "ffi_sanitizer_route",
   "ffi_missing_boundary_contract",
   "ffi_call_sanitizer_route",
+  "ffi_qualified_call_sanitizer_route",
   "ffi_libc_call_sanitizer_route",
 ]
 dogfood_targets = []
@@ -986,7 +987,8 @@ allowed_public_claim = """
 Fixture-pinned FFI witness routing sends unsafe extern C boundaries to
 sanitizer/cargo-careful route suggestions in the listed fixtures, including
 owner-scoped documented and missing-contract extern block declarations, unsafe
-calls to same-file extern C declarations, and libc path calls.
+unqualified and qualified calls to same-file extern C declarations, and libc
+path calls.
 """
 forbidden_claims = [
   "FFI ABI correctness proof",
@@ -1007,6 +1009,7 @@ fixtures = [
   "ffi_sanitizer_route",
   "ffi_missing_boundary_contract",
   "ffi_call_sanitizer_route",
+  "ffi_qualified_call_sanitizer_route",
   "ffi_libc_call_sanitizer_route",
 ]
 dogfood_targets = []
@@ -1018,7 +1021,8 @@ allowed_public_claim = """
 Fixture-pinned FFI boundary evidence records ABI/layout and ownership/lifetime/
 nullability obligations separately for the listed unsafe extern C fixtures, with
 documented and missing-contract extern block cards scoped to the declared
-foreign function owner.
+foreign function owner and qualified same-file extern calls kept on the FFI
+boundary route.
 """
 forbidden_claims = [
   "FFI ABI correctness proof",

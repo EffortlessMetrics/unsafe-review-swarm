@@ -427,6 +427,8 @@ fn is_extern_boundary(line: &str) -> bool {
 fn extern_fn_names(lines: &[&str]) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
     let mut in_extern = false;
+    let mut module_stack: Vec<(String, usize)> = Vec::new();
+    let mut brace_depth = 0usize;
     let mut state = LineCommentState::default();
     for raw in lines {
         let detection_line = line_for_text_detection(raw, &mut state);
@@ -434,19 +436,62 @@ fn extern_fn_names(lines: &[&str]) -> BTreeSet<String> {
         if trimmed.is_empty() {
             continue;
         }
+        while module_stack
+            .last()
+            .is_some_and(|(_name, depth)| brace_depth < *depth)
+        {
+            module_stack.pop();
+        }
+        if trimmed.contains('{')
+            && let Some(module_name) = parse_mod_name(trimmed)
+        {
+            module_stack.push((module_name, brace_depth + 1));
+        }
         if is_extern_boundary(trimmed) {
             in_extern = true;
         }
         if in_extern {
             if let Some(name) = parse_fn_name(trimmed) {
-                names.insert(name);
+                insert_extern_call_paths(&mut names, &module_stack, &name);
             }
             if trimmed.contains('}') {
                 in_extern = false;
             }
         }
+        brace_depth = update_brace_depth(trimmed, brace_depth);
     }
     names
+}
+
+fn insert_extern_call_paths(
+    names: &mut BTreeSet<String>,
+    module_stack: &[(String, usize)],
+    name: &str,
+) {
+    if module_stack.is_empty() {
+        names.insert(name.to_string());
+        return;
+    }
+    let module_path = module_stack
+        .iter()
+        .map(|(module, _depth)| module.as_str())
+        .collect::<Vec<_>>()
+        .join("::");
+    let qualified = format!("{module_path}::{name}");
+    names.insert(qualified.clone());
+    names.insert(format!("crate::{qualified}"));
+    names.insert(format!("self::{qualified}"));
+}
+
+fn update_brace_depth(line: &str, mut depth: usize) -> usize {
+    for ch in line.chars() {
+        match ch {
+            '{' => depth += 1,
+            '}' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+    depth
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -467,11 +512,37 @@ fn ffi_boundary_applicability(
     }
     if extern_names
         .iter()
-        .any(|name| contains_unqualified_call_name(line, name))
+        .any(|name| contains_extern_call_path(line, name))
     {
         return Some(FfiBoundaryApplicability::SameFileExtern);
     }
     None
+}
+
+fn contains_extern_call_path(line: &str, path: &str) -> bool {
+    if path.contains("::") {
+        contains_call_path(line, path)
+    } else {
+        contains_unqualified_call_name(line, path)
+    }
+}
+
+fn contains_call_path(line: &str, path: &str) -> bool {
+    let mut cursor = line;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(path) {
+        let absolute = offset + pos;
+        let before = line[..absolute].chars().next_back();
+        let starts_on_boundary = before.is_none_or(|ch| !is_ident_continue(ch) && ch != ':');
+        let after_path = &line[absolute + path.len()..];
+        if starts_on_boundary && call_suffix(after_path) {
+            return true;
+        }
+        let next = pos + path.len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
 }
 
 fn contains_call_path_prefix(line: &str, prefix: &str) -> bool {
@@ -1491,6 +1562,20 @@ fn parse_fn_name(line: &str) -> Option<String> {
     parse_ident(rest)
 }
 
+fn parse_mod_name(line: &str) -> Option<String> {
+    let mut rest = line.trim_start();
+    if let Some(after_pub) = rest.strip_prefix("pub ") {
+        rest = after_pub.trim_start();
+    } else if let Some(after_pub) = rest.strip_prefix("pub(") {
+        let after_pub = after_pub.trim_start();
+        if let Some((_visibility, after_visibility)) = after_pub.split_once(')') {
+            rest = after_visibility.trim_start();
+        }
+    }
+    let rest = rest.strip_prefix("mod ")?.trim_start();
+    parse_ident(rest)
+}
+
 fn parse_trait_name(line: &str) -> Option<String> {
     let marker = "trait ";
     let pos = line.find(marker)?;
@@ -1613,11 +1698,24 @@ mod tests {
 
     #[test]
     fn ffi_boundary_applicability_keeps_foreign_boundary_explicit() {
-        let extern_names = BTreeSet::from(["strlen".to_string()]);
+        let extern_names = BTreeSet::from([
+            "strlen".to_string(),
+            "ffi::strlen".to_string(),
+            "crate::ffi::strlen".to_string(),
+            "self::ffi::strlen".to_string(),
+        ]);
 
         assert_eq!(
             ffi_boundary_applicability("unsafe { strlen(ptr) }", &extern_names),
             Some(FfiBoundaryApplicability::SameFileExtern)
+        );
+        assert_eq!(
+            ffi_boundary_applicability("unsafe { ffi::strlen(ptr) }", &extern_names),
+            Some(FfiBoundaryApplicability::SameFileExtern)
+        );
+        assert_eq!(
+            ffi_boundary_applicability("unsafe { other::ffi::strlen(ptr) }", &extern_names),
+            None
         );
         assert_eq!(
             ffi_boundary_applicability("unsafe { libc::strlen(ptr) }", &extern_names),
@@ -1652,6 +1750,33 @@ mod tests {
         assert_eq!(sites[0].operation.family, OperationFamily::Ffi);
         assert_eq!(sites[0].site.owner, Some("len".to_string()));
         assert_eq!(sites[0].site.snippet, "unsafe { strlen(ptr) }");
+        Ok(())
+    }
+
+    #[test]
+    fn syntax_detection_classifies_qualified_same_file_extern_calls_as_ffi_calls()
+    -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "mod ffi {\n    unsafe extern \"C\" {\n        pub(super) fn strlen(ptr: *const u8) -> usize;\n    }\n}\n\npub fn len(ptr: *const u8) -> usize {\n    // SAFETY: caller provides a C string pointer.\n    unsafe { ffi::strlen(ptr) }\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+        let diff = crate::input::diff::parse_unified_diff(
+            "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -9,1 +9,1 @@\n+    unsafe { ffi::strlen(ptr) }\n",
+        );
+
+        let rel = PathBuf::from("src/lib.rs");
+        let sites = scan_file(&root, &rel, Some(&diff), false)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert_eq!(sites.len(), 1, "unexpected sites: {sites:#?}");
+        assert_eq!(sites[0].site.kind, UnsafeSiteKind::FfiCall);
+        assert_eq!(sites[0].operation.family, OperationFamily::Ffi);
+        assert_eq!(sites[0].site.owner, Some("len".to_string()));
+        assert_eq!(sites[0].site.snippet, "unsafe { ffi::strlen(ptr) }");
         Ok(())
     }
 
