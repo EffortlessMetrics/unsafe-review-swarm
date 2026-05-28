@@ -1,7 +1,8 @@
-use super::compact_code;
+use super::{compact_code, strip_block_comments_and_literals};
 
 pub(super) fn has_slice_end_pointer_arithmetic_evidence(lower: &str) -> bool {
-    let compact = compact_code(lower);
+    let lower = strip_block_comments_and_literals(lower);
+    let compact = compact_code(&lower);
     for line in lower.lines() {
         let line = compact_code(line);
         let Some(after_let) = line.strip_prefix("let") else {

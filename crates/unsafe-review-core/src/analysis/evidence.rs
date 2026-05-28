@@ -829,6 +829,24 @@ mod tests {
             "let end = start.add(haystack.len());",
             vec![],
         );
+        let line_comment_slice_end = site_with_family(
+            OperationFamily::PointerArithmetic,
+            vec![
+                "let start = haystack.as_ptr();",
+                "// let end = start.add(haystack.len());",
+            ],
+            "let end = start.add(offset);",
+            vec![],
+        );
+        let string_literal_slice_end = site_with_family(
+            OperationFamily::PointerArithmetic,
+            vec![
+                "let start = haystack.as_ptr();",
+                "let _note = \"let end = start.add(haystack.len())\";",
+            ],
+            "let end = start.add(offset);",
+            vec![],
+        );
         let generic_bounds_guard = site_with_family(
             OperationFamily::PointerArithmetic,
             vec!["assert!(offset < haystack.len());"],
@@ -855,6 +873,16 @@ mod tests {
         );
         assert!(
             !obligation_evidence(&mismatched_len, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&line_comment_slice_end, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&string_literal_slice_end, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
         );
