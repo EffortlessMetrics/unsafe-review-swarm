@@ -140,6 +140,21 @@ label_source = "fixture_golden"
 rationale = "Initialization or capacity evidence becomes stale after the checked Vec receiver is reassigned."
 
 [[samples]]
+id = "vec-set-len-reassigned-new-len-missing"
+fixture = "vec_set_len_reassigned_new_len_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "capacity"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Capacity evidence becomes stale when the checked new length is reassigned before Vec::set_len."
+
+[[samples]]
 id = "vec-set-len-call-result-init-present"
 fixture = "vec_set_len_call_result_init"
 kind = "positive"

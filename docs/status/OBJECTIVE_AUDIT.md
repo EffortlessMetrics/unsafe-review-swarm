@@ -31,7 +31,7 @@ rejects unrelated initialization statements not tied to the receiver being
 lengthened.
 `Vec::set_len` capacity evidence also recognizes narrow same-vector
 `reserve(additional)` and `try_reserve(additional)?` evidence for
-`len + additional` while rejecting stale `additional` facts.
+`len + additional` while rejecting stale `additional` and stale `new_len` facts.
 `Box::from_raw` and `ptr::drop_in_place` ownership evidence reject stale
 `Box::into_raw` origins when the raw pointer is reassigned before use.
 Unchecked-constructor availability evidence now has fixture-backed controls for
@@ -54,7 +54,7 @@ The active calibration rail is now recorded in
 `.unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md`,
 `policy/accuracy-calibration.toml`, and
 `docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 34
-fixture-pinned claims, 295 calibration cases, 34 label ledgers, and 303 label
+fixture-pinned claims, 296 calibration cases, 34 label ledgers, and 304 label
 samples. It records zero dogfood-measured, labeled-calibrated, or
 policy-eligible claims. That is intentional: the current report is a
 claim-scoped fixture-pinned proof index, not a global precision/recall result
@@ -131,7 +131,7 @@ These are not failures; they are the next unsupported or weakly verified areas:
   `Vec::with_capacity(new_len)`, narrow same-vector `reserve(additional)`, and
   narrow same-vector `try_reserve(additional)?` capacity evidence have fixture
   coverage, and unrelated capacity comparisons, local arguments merely named
-  `cap`, and stale `additional` facts are pinned as non-evidence before
+  `cap`, stale `new_len`, and stale `additional` facts are pinned as non-evidence before
   `set_len`;
   `arrayvec#288` has a rerun receipt;
   `MaybeUninit::assume_init` now has fixture coverage for same-slot `write` and
