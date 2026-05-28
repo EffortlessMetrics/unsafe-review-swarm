@@ -452,6 +452,10 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     let allowed_repairs = serde_json::to_string(&packet["allowed_repairs"])?;
     assert!(allowed_repairs.contains("alignment guard"));
     assert!(allowed_repairs.contains("witness receipt"));
+    let repair_queue = serde_json::to_string(&packet["repair_queue"])?;
+    assert!(repair_queue.contains("repairable_by_guard"));
+    assert!(repair_queue.contains("requires_witness_receipt"));
+    assert!(!repair_queue.contains("requires_human_review"));
     assert!(
         packet["verify_commands"][0]
             .as_str()
