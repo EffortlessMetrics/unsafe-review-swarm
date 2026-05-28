@@ -84,11 +84,11 @@ decisions, or claiming safety. Matched receipt entries include current card
 operation, missing-count, and next-action context. Audit entries include the
 current card's routed witness tools so a reviewer can compare the saved receipt
 tool against the ReviewCard route. Audit entries also include the saved
-`author`, saved `recorded_at` timestamp, and saved `command_hash` when present,
-saved per-receipt limitations, and surface command-hash mismatches as their own
-audit status so reviewers can compare receipt ownership, recency,
-command-string drift, and saved scope limits without treating any of them as
-proof that the command ran or covered the unsafe site.
+`summary`, saved `author`, saved `recorded_at` timestamp, saved `command_hash`
+when present, saved per-receipt limitations, and surface command-hash
+mismatches as their own audit status so reviewers can compare receipt synopsis,
+ownership, recency, command-string drift, and saved scope limits without
+treating any of them as proof that the command ran or covered the unsafe site.
 When a matching receipt is imported as ReviewCard witness evidence, the
 evidence summary also includes the saved `command_hash` when present so
 card-level projections keep the same drift key visible.
@@ -194,10 +194,10 @@ calendar-valid `YYYY-MM-DD` date on or after the `recorded_at` date.
   wrong-identity, wrong-tool, weaker-than-required, command-hash-mismatch,
   duplicate, and invalid receipts without executing witnesses or making policy
   decisions.
-- Receipt-audit JSON and Markdown include per-receipt `author`, `recorded_at`,
-  and limitation metadata plus report limitations that preserve the saved
-  metadata boundary and state that matched receipts only improve witness
-  evidence.
+- Receipt-audit JSON and Markdown include per-receipt `summary`, `author`,
+  `recorded_at`, and limitation metadata plus report limitations that preserve
+  the saved metadata boundary and state that matched receipts only improve
+  witness evidence.
 
 ## CI proof
 

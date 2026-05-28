@@ -34,9 +34,9 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
         out.push_str("No receipt files found.\n\n");
     } else {
         out.push_str(
-            "| Status | Receipt | Card | Matched card | Tool | Strength | Author | Recorded | Expires | Command hash | Limitations | Routed tools | Issues |\n",
+            "| Status | Receipt | Card | Matched card | Tool | Strength | Summary | Author | Recorded | Expires | Command hash | Limitations | Routed tools | Issues |\n",
         );
-        out.push_str("|---|---|---|---|---|---|---|---|---|---|---|---|---|\n");
+        out.push_str("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n");
         for receipt in &report.receipts {
             out.push_str(&receipt_row(receipt));
         }
@@ -57,13 +57,14 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
 
 fn receipt_row(receipt: &crate::analysis::receipts::ReceiptAuditEntry) -> String {
     format!(
-        "| {} | `{}` | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
+        "| {} | `{}` | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
         markdown_cell(&receipt.statuses.join(", ")),
         receipt.path,
         optional_code(receipt.card_id.as_deref()),
         matched_card(receipt.matched_card.as_ref()),
         optional_code(receipt.receipt_tool.as_deref()),
         optional_code(receipt.strength.as_deref()),
+        summary_cell(receipt.summary.as_deref()),
         optional_code(receipt.author.as_deref()),
         optional_code(receipt.recorded_at.as_deref()),
         optional_code(receipt.expires_at.as_deref()),
@@ -72,6 +73,13 @@ fn receipt_row(receipt: &crate::analysis::receipts::ReceiptAuditEntry) -> String
         route_tools(&receipt.route_tools),
         issues_cell(&receipt.issues)
     )
+}
+
+fn summary_cell(summary: Option<&str>) -> String {
+    match summary {
+        Some(summary) if !summary.is_empty() => markdown_cell(summary),
+        _ => "-".to_string(),
+    }
 }
 
 fn limitations_cell(limitations: &[String]) -> String {
@@ -165,6 +173,7 @@ mod tests {
                     ),
                     receipt_tool: Some("miri".to_string()),
                     strength: Some("ran".to_string()),
+                    summary: None,
                     author: Some("core/fixtures".to_string()),
                     recorded_at: Some("2026-05-20T00:00:00Z".to_string()),
                     expires_at: Some("2026-08-18".to_string()),
@@ -185,6 +194,7 @@ mod tests {
                     ),
                     receipt_tool: Some("loom".to_string()),
                     strength: Some("configured".to_string()),
+                    summary: Some("focused witness".to_string()),
                     author: Some("core/fixtures".to_string()),
                     recorded_at: Some("2026-05-20T00:00:00Z".to_string()),
                     expires_at: Some("2026-08-18".to_string()),
@@ -222,8 +232,9 @@ mod tests {
         assert!(markdown.contains("Command hash mismatch"));
         assert!(markdown.contains("| 2 | 1 | 1 | 0 | 1 | 0 | 1 | 1 | 1 | 0 | 0 |"));
         assert!(markdown.contains(
-            "| Status | Receipt | Card | Matched card | Tool | Strength | Author | Recorded | Expires | Command hash | Limitations | Routed tools | Issues |"
+            "| Status | Receipt | Card | Matched card | Tool | Strength | Summary | Author | Recorded | Expires | Command hash | Limitations | Routed tools | Issues |"
         ));
+        assert!(markdown.contains("focused witness"));
         assert!(markdown.contains("`core/fixtures`"));
         assert!(markdown.contains("`2026-05-20T00:00:00Z`"));
         assert!(markdown.contains("`2026-08-18`"));
