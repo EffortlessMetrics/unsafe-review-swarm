@@ -1371,6 +1371,7 @@ mod tests {
                 return Err(format!("fixture `{fixture}` should emit at least one card"));
             };
             let value = parse_json(&render(card))?;
+            assert_agent_allowed_repairs_do_not_offer_suppression(&value)?;
             assert_agent_boundary_rules(&value)?;
             assert_agent_stop_conditions(&value)?;
         }
@@ -1422,6 +1423,28 @@ mod tests {
         ] {
             if !rules.contains(expected) {
                 return Err(format!("do_not_do must include boundary `{expected}`"));
+            }
+        }
+        Ok(())
+    }
+
+    fn assert_agent_allowed_repairs_do_not_offer_suppression(
+        value: &serde_json::Value,
+    ) -> Result<(), String> {
+        let allowed_repairs = value["allowed_repairs"]
+            .as_array()
+            .ok_or("allowed_repairs should be an array")?;
+        for repair in allowed_repairs {
+            let Some(text) = repair.as_str() else {
+                return Err("allowed_repairs entries should be strings".to_string());
+            };
+            let lower = text.to_ascii_lowercase();
+            for forbidden in ["suppress", "suppression"] {
+                if lower.contains(forbidden) {
+                    return Err(format!(
+                        "allowed_repairs must not offer suppression as repair: {text}"
+                    ));
+                }
             }
         }
         Ok(())
