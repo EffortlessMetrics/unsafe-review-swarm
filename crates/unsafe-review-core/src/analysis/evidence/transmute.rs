@@ -244,15 +244,44 @@ fn normalize_size_of_paths(compact: &str) -> String {
 fn has_size_of_equality(compact: &str, left_type: &str, right_type: &str) -> bool {
     let left = format!("size_of::<{left_type}>()");
     let right = format!("size_of::<{right_type}>()");
-    has_applicable_size_pattern(compact, &format!("{left}=={right}"))
-        || has_applicable_size_pattern(compact, &format!("{right}=={left}"))
-        || has_size_assert_eq(compact, &left, &right)
+    let left_eq_right = format!("{left}=={right}");
+    let right_eq_left = format!("{right}=={left}");
+    has_size_assert_eq(compact, &left, &right)
         || has_size_assert_eq(compact, &right, &left)
+        || has_size_assert(compact, &left_eq_right)
+        || has_size_assert(compact, &right_eq_left)
+        || has_open_size_branch(compact, &left_eq_right)
+        || has_open_size_branch(compact, &right_eq_left)
 }
 
 fn has_size_assert_eq(compact: &str, left: &str, right: &str) -> bool {
     has_applicable_size_pattern(compact, &format!("assert_eq!({left},{right}"))
         || has_applicable_size_pattern(compact, &format!("debug_assert_eq!({left},{right}"))
+}
+
+fn has_size_assert(compact: &str, predicate: &str) -> bool {
+    [
+        format!("assert!({predicate})"),
+        format!("assert!({predicate},"),
+        format!("debug_assert!({predicate})"),
+        format!("debug_assert!({predicate},"),
+    ]
+    .iter()
+    .any(|pattern| has_applicable_size_pattern(compact, pattern))
+}
+
+fn has_open_size_branch(compact: &str, predicate: &str) -> bool {
+    let guard = format!("if{predicate}{{");
+    let mut search_from = 0usize;
+    while let Some(offset) = compact[search_from..].find(&guard) {
+        let guard_start = search_from + offset;
+        let after_guard = &compact[guard_start + guard.len()..];
+        if branch_still_open_at_operation(after_guard) {
+            return true;
+        }
+        search_from = guard_start + guard.len();
+    }
+    false
 }
 
 fn has_applicable_size_pattern(compact: &str, pattern: &str) -> bool {
