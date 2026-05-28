@@ -470,6 +470,7 @@ fixtures = [
   "vec_set_len_zero_clear",
   "vec_set_len_with_capacity",
   "vec_set_len_stale_with_capacity_not_guard",
+  "vec_set_len_stale_with_capacity_len_not_guard",
   "vec_set_len_reserve_capacity",
   "vec_set_len_reserve_reassigned_additional_not_guard",
   "vec_set_len_try_reserve_capacity",
@@ -488,8 +489,8 @@ loop, call-result, same-vector shrink, zero-clear, and capacity-only
 reserve/try_reserve evidence from comment-only, post-init,
 unrelated-initialization, partial-slice initialization, single-index
 initialization, unrelated-capacity, other-receiver shrink, stale-receiver,
-stale-with-capacity receiver, stale-new-len, stale-additional, and
-cap-name-only controls in the listed fixtures.
+stale-with-capacity receiver, stale-with-capacity new length, stale-new-len,
+stale-additional, and cap-name-only controls in the listed fixtures.
 """
 forbidden_claims = [
   "broad Vec soundness",

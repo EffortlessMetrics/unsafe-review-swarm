@@ -1,0 +1,21 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,16 @@
++pub fn grow_after_len_change(mut new_len: usize) -> Vec<u8> {
++    let mut values = Vec::with_capacity(new_len);
++    new_len = values.capacity() + 1;
++    // SAFETY: this fixture checks that stale with_capacity length evidence does not apply after reassignment.
++    unsafe { values.set_len(new_len) };
++    values
++}
++
++#[cfg(test)]
++mod tests {
++    use super::grow_after_len_change;
++
++    #[test]
++    fn mentions_grow_after_len_change() {
++        let _ = stringify!(grow_after_len_change);
++    }
++}

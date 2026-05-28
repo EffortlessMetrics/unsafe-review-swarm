@@ -61,6 +61,7 @@ required_core_fixtures = [
   "vec_set_len_reassigned_new_len_not_guard",
   "vec_set_len_with_capacity",
   "vec_set_len_stale_with_capacity_not_guard",
+  "vec_set_len_stale_with_capacity_len_not_guard",
   "vec_set_len_reserve_capacity",
   "vec_set_len_reserve_reassigned_additional_not_guard",
   "vec_set_len_try_reserve_capacity",
@@ -891,6 +892,16 @@ expected_hazard = "initialized_memory"
 fixture = "vec_set_len_stale_with_capacity_not_guard"
 kind = "false_positive_control"
 claim = "Vec::set_len does not accept Vec::with_capacity(new_len) as capacity evidence after the vector is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "vec_set_len_stale_with_capacity_len_not_guard"
+kind = "false_positive_control"
+claim = "Vec::set_len does not accept Vec::with_capacity(new_len) as capacity evidence after the new length is reassigned"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
