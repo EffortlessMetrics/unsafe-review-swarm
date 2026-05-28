@@ -167,6 +167,7 @@ required_core_fixtures = [
   "ptr_copy_slice_range_src_only_not_guard",
   "ptr_copy_slice_range_dst_only_not_guard",
   "ptr_copy_slice_range_reassigned_count_not_guard",
+  "ptr_copy_slice_range_shadowed_count_not_guard",
   "ptr_copy_slice_range_reassigned_src_not_guard",
   "ptr_copy_slice_range_reassigned_dst_not_guard",
   "ptr_copy_other_len_not_guard",
@@ -2194,6 +2195,16 @@ expected_hazard = "pointer_validity"
 fixture = "ptr_copy_slice_range_reassigned_count_not_guard"
 kind = "false_positive_control"
 claim = "ptr::copy rejects stale slice range evidence after the checked count is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_shadowed_count_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy rejects stale slice range evidence after the checked count is shadowed"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

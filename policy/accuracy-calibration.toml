@@ -576,6 +576,7 @@ fixtures = [
   "ptr_copy_slice_range_src_only_not_guard",
   "ptr_copy_slice_range_dst_only_not_guard",
   "ptr_copy_slice_range_reassigned_count_not_guard",
+  "ptr_copy_slice_range_shadowed_count_not_guard",
   "ptr_copy_slice_range_reassigned_src_not_guard",
   "ptr_copy_slice_range_reassigned_dst_not_guard",
   "ptr_copy_other_len_not_guard",
@@ -588,7 +589,7 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned ptr::copy valid-range evidence distinguishes same-call source and
 destination length evidence from stale, partial, closed-branch, comment-only,
-and unrelated-length controls in the listed fixtures, while initialized-memory
+shadowed-count, and unrelated-length controls in the listed fixtures, while initialized-memory
 remains a separate missing obligation.
 """
 forbidden_claims = [

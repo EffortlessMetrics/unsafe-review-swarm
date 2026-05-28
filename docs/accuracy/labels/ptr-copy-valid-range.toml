@@ -259,6 +259,19 @@ label_source = "fixture_golden"
 rationale = "Length evidence for the original count does not discharge valid-range evidence after count reassignment."
 
 [[samples]]
+id = "ptr-copy-shadowed-count-not-guard"
+fixture = "ptr_copy_slice_range_shadowed_count_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Length evidence for the original count does not discharge valid-range evidence after a later let-binding shadows the count."
+
+[[samples]]
 id = "ptr-copy-reassigned-src-not-guard"
 fixture = "ptr_copy_slice_range_reassigned_src_not_guard"
 kind = "false_positive_control"
