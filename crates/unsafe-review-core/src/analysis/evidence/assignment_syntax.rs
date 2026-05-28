@@ -14,7 +14,7 @@ pub(super) fn contains_simple_assignment_to(compact: &str, name: &str) -> bool {
     let marker = name;
     let mut cursor = compact;
     let mut offset = 0usize;
-    while let Some(pos) = cursor.find(&marker) {
+    while let Some(pos) = cursor.find(marker) {
         let start = offset + pos;
         let after_name_start = start + marker.len();
         let before = compact[..start].chars().next_back();
