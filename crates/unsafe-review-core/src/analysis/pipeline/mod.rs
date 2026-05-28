@@ -1247,9 +1247,10 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
-    fn nonnull_pointer_evidence_rejects_stale_reassignment() -> Result<(), String> {
+    fn nonnull_pointer_evidence_rejects_stale_reassignment_or_shadowing() -> Result<(), String> {
         for fixture in [
             "nonnull_new_reassigned_ptr_not_guard",
+            "nonnull_new_shadowed_ptr_not_guard",
             "nonnull_is_null_reassigned_ptr_not_guard",
             "nonnull_if_let_new_reassigned_ptr_not_guard",
             "nonnull_let_else_new_reassigned_ptr_not_guard",

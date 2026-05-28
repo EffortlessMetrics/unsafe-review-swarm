@@ -1,0 +1,25 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,21 @@
++use core::ptr::NonNull;
++
++pub fn expose_nonnull_after_shadowed_question_mark(
++    ptr: *mut u8,
++    other: *mut u8,
++) -> Option<NonNull<u8>> {
++    NonNull::new(ptr)?;
++    let ptr = other;
++    // SAFETY: this fixture intentionally shadows the checked pointer before use.
++    Some(unsafe { NonNull::new_unchecked(ptr) })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::expose_nonnull_after_shadowed_question_mark;
++
++    #[test]
++    fn mentions_expose_nonnull_after_shadowed_question_mark() {
++        let _ = stringify!(expose_nonnull_after_shadowed_question_mark);
++    }
++}
