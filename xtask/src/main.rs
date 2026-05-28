@@ -12607,6 +12607,37 @@ Snapshot reports:
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_comment_body_unknown_card_mentions() -> Result<(), String>
+    {
+        let dir = unique_temp_dir("unsafe-review-artifacts-comment-body-unknown-card")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+        let path = dir.join("comment-plan.json");
+        let mut comment_plan: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&path).map_err(|err| format!("read comment plan failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse comment plan failed: {err}"))?;
+        let body = comment_plan["comments"][0]["body"]
+            .as_str()
+            .ok_or_else(|| "test comment body missing".to_string())?;
+        comment_plan["comments"][0]["body"] =
+            serde_json::json!(format!("{body}\n\nRelated card: `card-2`\n"));
+        fs::write(&path, comment_plan.to_string())
+            .map_err(|err| format!("write comment plan failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("mentions unknown ReviewCard id `card-2`")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn advisory_artifact_checker_rejects_comment_plan_missing_card_coverage() -> Result<(), String>
     {
         let dir = unique_temp_dir("unsafe-review-artifacts-comment-missing-card-coverage")?;

@@ -724,7 +724,8 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         .ok_or_else(|| "cards.sarif is missing /runs/0/properties/scope".to_string())?;
     require_expected_value(sarif_scope, &scope, "cards.sarif /runs/0/properties/scope")?;
 
-    let comment_plan = super::parse_json_file(&dir.join("comment-plan.json"))?;
+    let comment_plan_path = dir.join("comment-plan.json");
+    let comment_plan = super::parse_json_file(&comment_plan_path)?;
     super::require_json_str(&comment_plan, "mode", "plan_only", "comment-plan.json")?;
     super::require_json_str(&comment_plan, "policy", "advisory", "comment-plan.json")?;
     super::require_json_array(&comment_plan, "comments", "comment-plan.json")?;
@@ -777,6 +778,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         let Some(body) = comment.get("body").and_then(serde_json::Value::as_str) else {
             return Err("comment-plan.json comment is missing body".to_string());
         };
+        require_text_mentions_only_known_card_ids(body, &comment_plan_path, &card_ids)?;
         require_comment_body_boundary(body)?;
         let body_word_count = body.split_whitespace().count();
         if body_word_count > COMMENT_PLAN_BODY_WORD_LIMIT {
