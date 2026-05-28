@@ -5,10 +5,7 @@ use super::{
 };
 
 pub(super) fn has_u8_bool_value_guard(before_call: &str, argument: &str) -> bool {
-    u8_bool_valid_value_predicates(argument)
-        .iter()
-        .any(|predicate| has_u8_bool_value_predicate_guard(before_call, predicate, argument))
-        || has_u8_bool_invalid_early_return_guard(before_call, argument)
+    U8BoolValueApplicability::new(before_call, argument).has_valid_value_evidence()
 }
 
 pub(super) fn u8_bool_valid_value_predicates(target: &str) -> [String; 8] {
@@ -24,45 +21,86 @@ pub(super) fn u8_bool_valid_value_predicates(target: &str) -> [String; 8] {
     ]
 }
 
-fn has_u8_bool_value_predicate_guard(before_call: &str, predicate: &str, argument: &str) -> bool {
-    [
-        format!("assert!({predicate})"),
-        format!("assert!({predicate},"),
-        format!("debug_assert!({predicate})"),
-        format!("debug_assert!({predicate},"),
-    ]
-    .iter()
-    .any(|pattern| has_fresh_guard_pattern(before_call, pattern, argument))
-        || has_open_positive_branch_guard(before_call, predicate, argument)
+// U8-to-bool value evidence applies only to the same byte value that reaches
+// the unsafe operation, and the byte must stay fresh after the evidence.
+struct U8BoolValueApplicability<'a> {
+    before_call: &'a str,
+    same_source_value_target: &'a str,
 }
 
-fn has_open_positive_branch_guard(before_call: &str, predicate: &str, argument: &str) -> bool {
-    any_compact_if_condition(before_call, |condition, after_guard| {
-        condition_has_top_level_conjunct(condition, predicate)
-            && branch_still_open_at_operation(after_guard)
-            && !has_assignment_to_identifier(after_guard, argument)
-    })
-}
+impl<'a> U8BoolValueApplicability<'a> {
+    fn new(before_call: &'a str, same_source_value_target: &'a str) -> Self {
+        Self {
+            before_call,
+            same_source_value_target,
+        }
+    }
 
-fn has_u8_bool_invalid_early_return_guard(before_call: &str, argument: &str) -> bool {
-    has_invalid_byte_returning_branch(before_call, &format!("{argument}>1"), argument)
-        || has_invalid_byte_returning_branch(before_call, &format!("1<{argument}"), argument)
-        || has_invalid_byte_returning_branch(before_call, &format!("{argument}>=2"), argument)
-        || has_invalid_byte_returning_branch(before_call, &format!("2<={argument}"), argument)
-}
+    fn has_valid_value_evidence(&self) -> bool {
+        self.valid_value_predicates()
+            .iter()
+            .any(|predicate| self.has_value_predicate_guard(predicate))
+            || self.has_invalid_early_return_guard()
+    }
 
-fn has_invalid_byte_returning_branch(before_call: &str, predicate: &str, argument: &str) -> bool {
-    any_compact_if_condition(before_call, |condition, after_guard| {
+    fn valid_value_predicates(&self) -> [String; 8] {
+        u8_bool_valid_value_predicates(self.same_source_value_target)
+    }
+
+    fn has_value_predicate_guard(&self, predicate: &str) -> bool {
+        [
+            format!("assert!({predicate})"),
+            format!("assert!({predicate},"),
+            format!("debug_assert!({predicate})"),
+            format!("debug_assert!({predicate},"),
+        ]
+        .iter()
+        .any(|pattern| self.has_fresh_assertion_guard(pattern))
+            || self.has_open_positive_branch_guard(predicate)
+    }
+
+    fn has_fresh_assertion_guard(&self, pattern: &str) -> bool {
+        has_fresh_guard_pattern(self.before_call, pattern, self.same_source_value_target)
+    }
+
+    fn has_open_positive_branch_guard(&self, predicate: &str) -> bool {
+        any_compact_if_condition(self.before_call, |condition, after_guard| {
+            condition_has_top_level_conjunct(condition, predicate)
+                && self.open_branch_preserves_applicability(after_guard)
+        })
+    }
+
+    fn open_branch_preserves_applicability(&self, after_guard: &str) -> bool {
+        branch_still_open_at_operation(after_guard)
+            && self.source_value_stays_fresh_after(after_guard)
+    }
+
+    fn has_invalid_early_return_guard(&self) -> bool {
+        self.has_invalid_byte_returning_branch(&format!("{}>1", self.same_source_value_target))
+            || self
+                .has_invalid_byte_returning_branch(&format!("1<{}", self.same_source_value_target))
+            || self
+                .has_invalid_byte_returning_branch(&format!("{}>=2", self.same_source_value_target))
+            || self
+                .has_invalid_byte_returning_branch(&format!("2<={}", self.same_source_value_target))
+    }
+
+    fn has_invalid_byte_returning_branch(&self, predicate: &str) -> bool {
+        any_compact_if_condition(self.before_call, |condition, after_guard| {
+            condition_has_top_level_disjunct(condition, predicate)
+                && self.returning_branch_preserves_applicability(after_guard)
+        })
+    }
+
+    fn returning_branch_preserves_applicability(&self, after_guard: &str) -> bool {
         let (guard_body, after_branch) = matching_code_block_end(after_guard)
             .map_or((after_guard, ""), |body_end| {
                 (&after_guard[..body_end], &after_guard[body_end + 1..])
             });
-        if contains_executable_return(guard_body)
-            && condition_has_top_level_disjunct(condition, predicate)
-            && !has_assignment_to_identifier(after_branch, argument)
-        {
-            return true;
-        }
-        false
-    })
+        contains_executable_return(guard_body) && self.source_value_stays_fresh_after(after_branch)
+    }
+
+    fn source_value_stays_fresh_after(&self, evidence: &str) -> bool {
+        !has_assignment_to_identifier(evidence, self.same_source_value_target)
+    }
 }
