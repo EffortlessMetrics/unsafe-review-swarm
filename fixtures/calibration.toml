@@ -57,6 +57,7 @@ required_core_fixtures = [
   "vec_set_len_remaining_capacity_guard",
   "vec_set_len_other_remaining_capacity_not_guard",
   "vec_set_len_cap_argument_not_guard",
+  "vec_set_len_unrelated_const_cap_not_guard",
   "vec_set_len_reassigned_receiver_not_guard",
   "vec_set_len_reassigned_new_len_not_guard",
   "vec_set_len_with_capacity",
@@ -852,6 +853,16 @@ expected_hazard = "initialized_memory"
 fixture = "vec_set_len_cap_argument_not_guard"
 kind = "false_positive_control"
 claim = "Vec::set_len does not accept a local argument named cap as capacity evidence without a const-capacity context"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "vec_set_len_unrelated_const_cap_not_guard"
+kind = "false_positive_control"
+claim = "Vec::set_len does not accept an unrelated const-CAP MaybeUninit buffer as capacity evidence for the target vector"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

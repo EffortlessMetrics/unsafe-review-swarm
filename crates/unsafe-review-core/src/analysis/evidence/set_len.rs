@@ -315,9 +315,35 @@ impl<'a> SetLenCapacityContext<'a> {
     }
 
     fn has_const_capacity_evidence(&self) -> bool {
-        self.set_len_argument == "cap"
-            && (self.before_call.contains("maybeuninit::uninit();cap")
-                || self.before_call.contains(";cap]"))
+        self.set_len_argument == "cap" && self.has_same_receiver_const_cap_initialization()
+    }
+
+    fn has_same_receiver_const_cap_initialization(&self) -> bool {
+        let mut stale_identifiers = vec![self.same_vec_target];
+        if is_simple_identifier(self.set_len_argument) {
+            stale_identifiers.push(self.set_len_argument);
+        }
+
+        for binding_marker in [
+            format!("let{}=", self.same_vec_target),
+            format!("letmut{}=", self.same_vec_target),
+        ] {
+            let mut search_from = 0usize;
+            while let Some(offset) = self.before_call[search_from..].find(&binding_marker) {
+                let binding_start = search_from + offset;
+                let after_binding = &self.before_call[binding_start + binding_marker.len()..];
+                let initializer_end = after_binding.find("};").unwrap_or(after_binding.len());
+                let initializer = &after_binding[..initializer_end];
+                let after_initializer = &after_binding[initializer_end.min(after_binding.len())..];
+                if has_const_cap_array_evidence(initializer)
+                    && !has_assignment_to_any_identifier(after_initializer, &stale_identifiers)
+                {
+                    return true;
+                }
+                search_from = binding_start + binding_marker.len();
+            }
+        }
+        false
     }
 
     fn has_reserve_capacity_evidence(&self) -> bool {
@@ -570,6 +596,10 @@ fn has_set_len_remaining_capacity_guard(before_call: &str, receiver: &str, new_l
         consumed += statement.len();
     }
     false
+}
+
+fn has_const_cap_array_evidence(initializer: &str) -> bool {
+    initializer.contains("maybeuninit::uninit();cap") || initializer.contains(";cap]")
 }
 
 fn set_len_growth_terms<'a>(

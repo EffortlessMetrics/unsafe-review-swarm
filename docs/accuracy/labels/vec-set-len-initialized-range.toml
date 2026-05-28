@@ -125,6 +125,21 @@ label_source = "fixture_golden"
 rationale = "A local argument named cap is not initialized-range evidence for the Vec::set_len target."
 
 [[samples]]
+id = "vec-set-len-unrelated-const-cap-missing-capacity"
+fixture = "vec_set_len_unrelated_const_cap_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "capacity"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "An unrelated const-CAP MaybeUninit buffer does not prove capacity for the Vec receiver passed to set_len."
+
+[[samples]]
 id = "vec-set-len-reassigned-receiver-missing"
 fixture = "vec_set_len_reassigned_receiver_not_guard"
 kind = "false_positive_control"

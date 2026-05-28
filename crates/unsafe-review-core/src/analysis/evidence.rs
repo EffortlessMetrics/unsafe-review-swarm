@@ -1182,14 +1182,38 @@ mod tests {
             vec![
                 "pub struct Buffer<const CAP: usize> {",
                 "    xs: [MaybeUninit<u8>; CAP],",
+                "let mut out = Self { xs: [MaybeUninit::uninit(); CAP], len: 0 };",
+            ],
+            "out.set_len(CAP);",
+            vec![],
+        );
+        let unrelated = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "let _scratch = [MaybeUninit::<u8>::uninit(); CAP];",
+                "let cap = requested;",
+            ],
+            "values.set_len(cap);",
+            vec![],
+        );
+        let stale_receiver = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "let mut out = Self { xs: [MaybeUninit::uninit(); CAP], len: 0 };",
+                "out = Self { xs: [MaybeUninit::uninit(); CAP], len: 0 };",
             ],
             "out.set_len(CAP);",
             vec![],
         );
 
         let evidence = obligation_evidence(&set_len, &obligations, &contract, &reach);
+        let unrelated_evidence = obligation_evidence(&unrelated, &obligations, &contract, &reach);
+        let stale_receiver_evidence =
+            obligation_evidence(&stale_receiver, &obligations, &contract, &reach);
 
         assert!(evidence[0].discharge.present);
+        assert!(!unrelated_evidence[0].discharge.present);
+        assert!(!stale_receiver_evidence[0].discharge.present);
     }
 
     #[test]
