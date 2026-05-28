@@ -1,0 +1,4 @@
+[package]
+name = "transmute-layout-closed-branch-not-guard"
+version = "0.0.0"
+edition = "2021"

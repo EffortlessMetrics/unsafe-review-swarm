@@ -37,6 +37,21 @@ label_source = "fixture_golden"
 rationale = "A layout-size guard does not discharge the bool valid-value obligation."
 
 [[samples]]
+id = "transmute-bool-closed-layout-not-guard"
+fixture = "transmute_layout_closed_branch_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "layout"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A layout-size assertion in a closed branch does not dominate the later transmute and must not discharge layout evidence."
+
+[[samples]]
 id = "transmute-bool-comment-not-valid-value"
 fixture = "transmute_bool_comment_not_guard"
 kind = "false_positive_control"

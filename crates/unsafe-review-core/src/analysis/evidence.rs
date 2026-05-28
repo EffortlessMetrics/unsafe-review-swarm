@@ -4675,10 +4675,35 @@ mod tests {
             "unsafe { core::mem::transmute::<u8, bool>(value) }",
             vec![],
         );
+        let closed_branch_transmute = site_with_family(
+            OperationFamily::Transmute,
+            vec![
+                "if value == 0 {",
+                "assert_eq!(core::mem::size_of::<u8>(), core::mem::size_of::<bool>());",
+                "}",
+            ],
+            "unsafe { core::mem::transmute::<u8, bool>(value) }",
+            vec![],
+        );
+        let branch_scoped_transmute = site_with_family(
+            OperationFamily::Transmute,
+            vec![
+                "if value == 0 {",
+                "assert_eq!(core::mem::size_of::<u8>(), core::mem::size_of::<bool>());",
+            ],
+            "unsafe { core::mem::transmute::<u8, bool>(value) }",
+            vec!["}"],
+        );
 
         let evidence = obligation_evidence(&transmute, &obligations, &contract, &reach);
+        let closed_branch_evidence =
+            obligation_evidence(&closed_branch_transmute, &obligations, &contract, &reach);
+        let branch_scoped_evidence =
+            obligation_evidence(&branch_scoped_transmute, &obligations, &contract, &reach);
 
         assert!(evidence[0].discharge.present);
+        assert!(!closed_branch_evidence[0].discharge.present);
+        assert!(branch_scoped_evidence[0].discharge.present);
         assert!(!evidence[1].discharge.present);
     }
 
@@ -4702,10 +4727,23 @@ mod tests {
             "unsafe { core::mem::transmute_copy::<u8, bool>(&value) }",
             vec![],
         );
+        let closed_branch_transmute = site_with_family(
+            OperationFamily::Transmute,
+            vec![
+                "if value == 0 {",
+                "debug_assert_eq!(core::mem::size_of::<u8>(), core::mem::size_of::<bool>());",
+                "}",
+            ],
+            "unsafe { core::mem::transmute_copy::<u8, bool>(&value) }",
+            vec![],
+        );
 
         let evidence = obligation_evidence(&transmute, &obligations, &contract, &reach);
+        let closed_branch_evidence =
+            obligation_evidence(&closed_branch_transmute, &obligations, &contract, &reach);
 
         assert!(evidence[0].discharge.present);
+        assert!(!closed_branch_evidence[0].discharge.present);
         assert!(!evidence[1].discharge.present);
     }
 

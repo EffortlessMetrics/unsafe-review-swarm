@@ -244,15 +244,61 @@ fn normalize_size_of_paths(compact: &str) -> String {
 fn has_size_of_equality(compact: &str, left_type: &str, right_type: &str) -> bool {
     let left = format!("size_of::<{left_type}>()");
     let right = format!("size_of::<{right_type}>()");
-    compact.contains(&format!("{left}=={right}"))
-        || compact.contains(&format!("{right}=={left}"))
+    has_applicable_size_pattern(compact, &format!("{left}=={right}"))
+        || has_applicable_size_pattern(compact, &format!("{right}=={left}"))
         || has_size_assert_eq(compact, &left, &right)
         || has_size_assert_eq(compact, &right, &left)
 }
 
 fn has_size_assert_eq(compact: &str, left: &str, right: &str) -> bool {
-    compact.contains(&format!("assert_eq!({left},{right}"))
-        || compact.contains(&format!("debug_assert_eq!({left},{right}"))
+    has_applicable_size_pattern(compact, &format!("assert_eq!({left},{right}"))
+        || has_applicable_size_pattern(compact, &format!("debug_assert_eq!({left},{right}"))
+}
+
+fn has_applicable_size_pattern(compact: &str, pattern: &str) -> bool {
+    let mut search_from = 0usize;
+    while let Some(offset) = compact[search_from..].find(pattern) {
+        let pattern_start = search_from + offset;
+        if evidence_scope_reaches_operation(compact, pattern_start) {
+            return true;
+        }
+        search_from = pattern_start + pattern.len();
+    }
+    false
+}
+
+fn evidence_scope_reaches_operation(compact: &str, evidence_start: usize) -> bool {
+    let depth_at_evidence = brace_depth(&compact[..evidence_start]);
+    if depth_at_evidence == 0 {
+        return true;
+    }
+
+    let mut depth = depth_at_evidence;
+    for ch in compact[evidence_start..].chars() {
+        match ch {
+            '{' => depth += 1,
+            '}' => {
+                depth = depth.saturating_sub(1);
+                if depth < depth_at_evidence {
+                    return false;
+                }
+            }
+            _ => {}
+        }
+    }
+    true
+}
+
+fn brace_depth(text: &str) -> usize {
+    let mut depth = 0usize;
+    for ch in text.chars() {
+        match ch {
+            '{' => depth += 1,
+            '}' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+    depth
 }
 
 fn compact_code(lower: &str) -> String {
