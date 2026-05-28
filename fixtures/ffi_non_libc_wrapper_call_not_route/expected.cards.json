@@ -6,7 +6,7 @@
         "confidence":  "medium",
         "site":  {
                      "file":  "src/lib.rs",
-                     "line":  12,
+                     "line":  16,
                      "column":  5,
                      "kind":  "operation",
                      "owner":  "len",

@@ -1,5 +1,5 @@
 diff --git a/src/lib.rs b/src/lib.rs
 --- a/src/lib.rs
 +++ b/src/lib.rs
-@@ -12,1 +12,1 @@
+@@ -16,1 +16,1 @@
 +    unsafe { mylibc::strlen(ptr) }

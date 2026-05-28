@@ -2772,7 +2772,7 @@ expected_hazard = "ffi_abi"
 [[cases]]
 fixture = "ffi_non_libc_wrapper_call_not_route"
 kind = "false_positive_control"
-claim = "local Rust wrapper calls whose module names only resemble libc remain generic unsafe function calls"
+claim = "local Rust wrapper calls whose module names only resemble libc remain generic unsafe function calls even when a same-named extern declaration exists"
 support_tier = "Witness routing"
 expected_cards = 1
 expected_class = "guard_missing"

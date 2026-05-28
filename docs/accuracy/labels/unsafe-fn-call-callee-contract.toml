@@ -64,7 +64,7 @@ expected_obligation_key = "callee-contract"
 expected_discharge_state = "missing"
 expected_witness_route_kinds = ["human-deep-review"]
 label_source = "fixture_golden"
-rationale = "A local Rust wrapper whose module name only resembles libc should keep generic unsafe-call review instead of gaining FFI sanitizer routing."
+rationale = "A local Rust wrapper whose module name only resembles libc should keep generic unsafe-call review instead of gaining FFI sanitizer routing, even when a same-named extern declaration exists."
 
 [[samples]]
 id = "unchecked-constructor-availability-guard-present"

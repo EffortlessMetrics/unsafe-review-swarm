@@ -1,3 +1,7 @@
+unsafe extern "C" {
+    fn strlen(ptr: *const i8) -> usize;
+}
+
 mod mylibc {
     /// # Safety
     ///

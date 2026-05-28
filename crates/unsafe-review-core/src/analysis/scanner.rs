@@ -449,15 +449,29 @@ fn extern_fn_names(lines: &[&str]) -> BTreeSet<String> {
     names
 }
 
-fn unsafe_block_calls_known_extern(line: &str, extern_names: &BTreeSet<String>) -> bool {
-    unsafe_block_contains_call(line)
-        && extern_names
-            .iter()
-            .any(|name| contains_call_name(line, name))
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum FfiBoundaryApplicability {
+    SameFileExtern,
+    KnownForeignPath,
 }
 
-fn unsafe_block_calls_known_ffi_path(line: &str) -> bool {
-    unsafe_block_contains_call(line) && contains_call_path_prefix(line, "libc::")
+fn ffi_boundary_applicability(
+    line: &str,
+    extern_names: &BTreeSet<String>,
+) -> Option<FfiBoundaryApplicability> {
+    if !unsafe_block_contains_call(line) {
+        return None;
+    }
+    if contains_call_path_prefix(line, "libc::") {
+        return Some(FfiBoundaryApplicability::KnownForeignPath);
+    }
+    if extern_names
+        .iter()
+        .any(|name| contains_unqualified_call_name(line, name))
+    {
+        return Some(FfiBoundaryApplicability::SameFileExtern);
+    }
+    None
 }
 
 fn contains_call_path_prefix(line: &str, prefix: &str) -> bool {
@@ -544,6 +558,24 @@ fn contains_call_name(line: &str, name: &str) -> bool {
         let before = cursor[..pos].chars().next_back();
         let after = &cursor[pos + name.len()..];
         let starts_on_boundary = before.is_none_or(|ch| !is_ident_continue(ch));
+        if starts_on_boundary && call_suffix(after) {
+            return true;
+        }
+        cursor = &after[after
+            .char_indices()
+            .next()
+            .map_or(after.len(), |(idx, ch)| idx + ch.len_utf8())..];
+    }
+    false
+}
+
+fn contains_unqualified_call_name(line: &str, name: &str) -> bool {
+    let mut cursor = line;
+    while let Some(pos) = cursor.find(name) {
+        let before = cursor[..pos].chars().next_back();
+        let after = &cursor[pos + name.len()..];
+        let starts_on_boundary =
+            before.is_none_or(|ch| !is_ident_continue(ch)) && before != Some(':');
         if starts_on_boundary && call_suffix(after) {
             return true;
         }
@@ -917,14 +949,7 @@ fn detect_syntax_site(
         "BLOCK_EXPR"
             if compact.starts_with("unsafe {")
                 && !operation_block_ranges.contains(&(fact.start, fact.end))
-                && unsafe_block_calls_known_extern(&compact, extern_names) =>
-        {
-            Some((UnsafeSiteKind::FfiCall, OperationFamily::Ffi))
-        }
-        "BLOCK_EXPR"
-            if compact.starts_with("unsafe {")
-                && !operation_block_ranges.contains(&(fact.start, fact.end))
-                && unsafe_block_calls_known_ffi_path(&compact) =>
+                && ffi_boundary_applicability(&compact, extern_names).is_some() =>
         {
             Some((UnsafeSiteKind::FfiCall, OperationFamily::Ffi))
         }
@@ -1587,6 +1612,24 @@ mod tests {
     }
 
     #[test]
+    fn ffi_boundary_applicability_keeps_foreign_boundary_explicit() {
+        let extern_names = BTreeSet::from(["strlen".to_string()]);
+
+        assert_eq!(
+            ffi_boundary_applicability("unsafe { strlen(ptr) }", &extern_names),
+            Some(FfiBoundaryApplicability::SameFileExtern)
+        );
+        assert_eq!(
+            ffi_boundary_applicability("unsafe { libc::strlen(ptr) }", &extern_names),
+            Some(FfiBoundaryApplicability::KnownForeignPath)
+        );
+        assert_eq!(
+            ffi_boundary_applicability("unsafe { mylibc::strlen(ptr) }", &extern_names),
+            None
+        );
+    }
+
+    #[test]
     fn syntax_detection_classifies_known_extern_calls_as_ffi_calls() -> Result<(), String> {
         let root = unique_temp_dir()?;
         fs::create_dir_all(root.join("src"))
@@ -1646,11 +1689,11 @@ mod tests {
             .map_err(|err| format!("create temp src failed: {err}"))?;
         fs::write(
             root.join("src/lib.rs"),
-            "mod mylibc {\n    pub unsafe fn strlen(_ptr: *const i8) -> usize { 0 }\n}\n\npub fn len(ptr: *const i8) -> usize {\n    // SAFETY: fixture exercises a local module whose name merely contains libc.\n    unsafe { mylibc::strlen(ptr) }\n}\n",
+            "unsafe extern \"C\" {\n    fn strlen(ptr: *const i8) -> usize;\n}\n\nmod mylibc {\n    pub unsafe fn strlen(_ptr: *const i8) -> usize { 0 }\n}\n\npub fn len(ptr: *const i8) -> usize {\n    // SAFETY: fixture exercises a local module whose name merely contains libc.\n    unsafe { mylibc::strlen(ptr) }\n}\n",
         )
         .map_err(|err| format!("write temp source failed: {err}"))?;
         let diff = crate::input::diff::parse_unified_diff(
-            "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -7,1 +7,1 @@\n+    unsafe { mylibc::strlen(ptr) }\n",
+            "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -11,1 +11,1 @@\n+    unsafe { mylibc::strlen(ptr) }\n",
         );
 
         let rel = PathBuf::from("src/lib.rs");
