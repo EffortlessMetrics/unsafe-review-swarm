@@ -142,6 +142,32 @@ label_source = "fixture_golden"
 rationale = "A same-pointer `!ptr.is_null()` open branch that contains NonNull::new_unchecked discharges the non-null obligation."
 
 [[samples]]
+id = "nonnull-is-null-conjunct-open-branch-guard-present"
+fixture = "nonnull_is_null_conjunct_open_branch_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "non-null"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "A same-pointer `!ptr.is_null()` predicate in a top-level `&&` open-branch condition discharges the non-null obligation for that branch."
+
+[[samples]]
+id = "nonnull-is-null-disjunct-open-branch-not-guard"
+fixture = "nonnull_is_null_disjunct_open_branch_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "non-null"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A same-pointer `!ptr.is_null()` predicate in a `||` branch does not dominate NonNull::new_unchecked and must not discharge non-null evidence."
+
+[[samples]]
 id = "nonnull-is-null-open-branch-reassigned-ptr-not-guard"
 fixture = "nonnull_is_null_open_branch_reassigned_ptr_not_guard"
 kind = "false_positive_control"

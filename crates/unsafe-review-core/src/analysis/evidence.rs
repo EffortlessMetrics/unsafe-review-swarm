@@ -1,5 +1,6 @@
 mod alignment_discharge;
 mod assignment_syntax;
+mod boolean_condition;
 mod bounds_discharge;
 mod box_raw_origin;
 mod call_syntax;
@@ -50,6 +51,7 @@ mod zeroed;
 
 use self::alignment_discharge::alignment_discharge_state;
 use self::assignment_syntax::contains_simple_assignment_to;
+use self::boolean_condition::condition_has_top_level_conjunct;
 use self::bounds_discharge::bounds_discharge_state;
 use self::call_syntax::{
     matching_call_argument_end, matching_generic_argument_end, split_top_level_arguments,
@@ -734,6 +736,18 @@ mod tests {
             "NonNull::new_unchecked(ptr)",
             vec!["}"],
         );
+        let conjunctive_open_non_null_branch_guard = site_with_family(
+            OperationFamily::NonNullUnchecked,
+            vec!["if !ptr.is_null() && len > 0 {"],
+            "NonNull::new_unchecked(ptr)",
+            vec!["}"],
+        );
+        let disjunctive_open_non_null_branch_not_guard = site_with_family(
+            OperationFamily::NonNullUnchecked,
+            vec!["if !ptr.is_null() || allow_unchecked {"],
+            "NonNull::new_unchecked(ptr)",
+            vec!["}"],
+        );
         let stale_open_non_null_branch_guard = site_with_family(
             OperationFamily::NonNullUnchecked,
             vec!["if !ptr.is_null() {", "ptr = other;"],
@@ -791,6 +805,26 @@ mod tests {
             obligation_evidence(&open_non_null_branch_guard, &obligations, &contract, &reach,)[0]
                 .discharge
                 .present
+        );
+        assert!(
+            obligation_evidence(
+                &conjunctive_open_non_null_branch_guard,
+                &obligations,
+                &contract,
+                &reach,
+            )[0]
+            .discharge
+            .present
+        );
+        assert!(
+            !obligation_evidence(
+                &disjunctive_open_non_null_branch_not_guard,
+                &obligations,
+                &contract,
+                &reach,
+            )[0]
+            .discharge
+            .present
         );
         assert!(
             !obligation_evidence(

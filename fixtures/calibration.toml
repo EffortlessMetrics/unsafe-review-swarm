@@ -313,6 +313,8 @@ required_core_fixtures = [
   "nonnull_is_null_nonreturning_not_guard",
   "nonnull_is_null_reassigned_ptr_not_guard",
   "nonnull_is_null_open_branch_guard",
+  "nonnull_is_null_conjunct_open_branch_guard",
+  "nonnull_is_null_disjunct_open_branch_not_guard",
   "nonnull_is_null_open_branch_reassigned_ptr_not_guard",
   "nonnull_observed_not_guard",
   "nonnull_post_check_not_guard",
@@ -3415,6 +3417,26 @@ claim = "same-pointer non-null open-branch evidence discharges the non-null obli
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "nonnull_is_null_conjunct_open_branch_guard"
+kind = "positive"
+claim = "same-pointer non-null evidence in a top-level conjunction discharges the non-null obligation inside the open branch"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "nonnull_is_null_disjunct_open_branch_not_guard"
+kind = "false_positive_control"
+claim = "same-pointer non-null evidence in a disjunction does not discharge the non-null obligation inside the branch"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
 expected_operation_family = "nonnull_unchecked"
 expected_hazard = "pointer_validity"
 
