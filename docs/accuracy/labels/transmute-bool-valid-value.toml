@@ -95,6 +95,34 @@ label_source = "fixture_golden"
 rationale = "A dominating same-value bool-domain guard discharges the valid-value obligation."
 
 [[samples]]
+id = "transmute-bool-conjunct-branch-guard-present"
+fixture = "transmute_bool_conjunct_branch_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-value bool-domain predicate that appears as a top-level conjunct in an open branch is still dominating valid-value evidence."
+
+[[samples]]
+id = "transmute-bool-disjunct-branch-not-valid-value"
+fixture = "transmute_bool_disjunct_branch_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-value bool-domain predicate that appears only in a disjunctive open branch can admit invalid bytes and must not discharge valid-value evidence."
+
+[[samples]]
 id = "transmute-bool-invalid-return-guard-present"
 fixture = "transmute_bool_invalid_return_guard"
 kind = "positive"

@@ -261,6 +261,8 @@ required_core_fixtures = [
   "transmute_layout_observed_not_guard",
   "transmute_bool_comment_not_guard",
   "transmute_bool_valid_value_guard",
+  "transmute_bool_conjunct_branch_guard",
+  "transmute_bool_disjunct_branch_not_guard",
   "transmute_bool_invalid_return_guard",
   "transmute_bool_other_value_not_guard",
   "transmute_bool_value_observed_not_guard",
@@ -2918,6 +2920,26 @@ claim = "transmute::<u8, bool> recognizes explicit size_of layout evidence and u
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "transmute_bool_conjunct_branch_guard"
+kind = "positive"
+claim = "transmute::<u8, bool> recognizes a same-value bool-domain predicate as a top-level conjunct in an open branch"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "transmute_bool_disjunct_branch_not_guard"
+kind = "false_positive_control"
+claim = "transmute::<u8, bool> rejects same-value bool-domain predicates that appear only in a disjunctive open branch"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
 expected_operation_family = "transmute"
 expected_hazard = "invalid_value"
 

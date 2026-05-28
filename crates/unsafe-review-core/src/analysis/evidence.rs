@@ -4960,14 +4960,23 @@ mod tests {
             "unsafe { core::mem::transmute::<u8, bool>(value) }",
             vec!["}"],
         );
+        let conjunct_branch_transmute = site_with_family(
+            OperationFamily::Transmute,
+            vec!["if value <= 1 && allow_conversion {"],
+            "unsafe { core::mem::transmute::<u8, bool>(value) }",
+            vec!["}"],
+        );
 
         let evidence = obligation_evidence(&transmute, &obligations, &contract, &reach);
         let branch_scoped_evidence =
             obligation_evidence(&branch_scoped_transmute, &obligations, &contract, &reach);
+        let conjunct_branch_evidence =
+            obligation_evidence(&conjunct_branch_transmute, &obligations, &contract, &reach);
 
         assert!(!evidence[0].discharge.present);
         assert!(evidence[1].discharge.present);
         assert!(branch_scoped_evidence[1].discharge.present);
+        assert!(conjunct_branch_evidence[1].discharge.present);
     }
 
     #[test]
@@ -5040,6 +5049,12 @@ mod tests {
             "unsafe { core::mem::transmute::<u8, bool>(value) }",
             vec![],
         );
+        let disjunctive_positive_branch = site_with_family(
+            OperationFamily::Transmute,
+            vec!["if value <= 1 || allow_conversion {"],
+            "unsafe { core::mem::transmute::<u8, bool>(value) }",
+            vec!["}"],
+        );
         let closed_referenced_positive_branch = site_with_family(
             OperationFamily::Transmute,
             vec!["if value <= 1 {", "let _observed = value;", "}"],
@@ -5092,6 +5107,12 @@ mod tests {
         );
         let closed_positive_branch_evidence =
             obligation_evidence(&closed_positive_branch, &obligations, &contract, &reach);
+        let disjunctive_positive_branch_evidence = obligation_evidence(
+            &disjunctive_positive_branch,
+            &obligations,
+            &contract,
+            &reach,
+        );
         let closed_referenced_positive_branch_evidence = obligation_evidence(
             &closed_referenced_positive_branch,
             &obligations,
@@ -5131,6 +5152,7 @@ mod tests {
         assert!(!observed_predicate_evidence[0].discharge.present);
         assert!(!observed_referenced_predicate_evidence[0].discharge.present);
         assert!(!closed_positive_branch_evidence[0].discharge.present);
+        assert!(!disjunctive_positive_branch_evidence[0].discharge.present);
         assert!(
             !closed_referenced_positive_branch_evidence[0]
                 .discharge

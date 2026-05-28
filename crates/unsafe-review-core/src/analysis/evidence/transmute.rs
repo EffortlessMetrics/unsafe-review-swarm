@@ -1,8 +1,8 @@
 use super::{
-    branch_still_open_at_operation, contains_executable_return, has_assignment_to_identifier,
-    matching_call_argument_end, matching_code_block_end, matching_generic_argument_end,
-    source_value_identifier, split_top_level_pair, strip_block_comments_and_literals,
-    u8_bool_valid_value_predicates,
+    any_compact_if_condition, branch_still_open_at_operation, condition_has_top_level_conjunct,
+    contains_executable_return, has_assignment_to_identifier, matching_call_argument_end,
+    matching_code_block_end, matching_generic_argument_end, source_value_identifier,
+    split_top_level_pair, strip_block_comments_and_literals, u8_bool_valid_value_predicates,
 };
 
 pub(super) fn has_transmute_layout_size_evidence(lower: &str) -> bool {
@@ -135,8 +135,7 @@ impl TransmuteValueDomainContext<'_> {
     }
 
     fn has_open_positive_branch_guard(&self, predicate: &str) -> bool {
-        let guard = format!("if{predicate}{{");
-        self.applicability.has_open_positive_branch_guard(&guard)
+        self.applicability.has_open_positive_branch_guard(predicate)
     }
 
     fn has_u8_bool_invalid_early_return_guard(&self) -> bool {
@@ -195,19 +194,16 @@ impl<'a> TransmuteValueDomainApplicability<'a> {
         false
     }
 
-    fn has_open_positive_branch_guard(&self, guard: &str) -> bool {
-        let mut search_from = 0;
-        while let Some(offset) = self.before_call[search_from..].find(guard) {
-            let guard_start = search_from + offset;
-            let after_guard = &self.before_call[guard_start + guard.len()..];
-            if branch_still_open_at_operation(after_guard)
-                && self.source_value_stays_fresh_after(after_guard)
-            {
-                return true;
-            }
-            search_from = guard_start + guard.len();
-        }
-        false
+    fn has_open_positive_branch_guard(&self, predicate: &str) -> bool {
+        any_compact_if_condition(self.before_call, |condition, after_guard| {
+            condition_has_top_level_conjunct(condition, predicate)
+                && self.open_branch_preserves_applicability(after_guard)
+        })
+    }
+
+    fn open_branch_preserves_applicability(&self, after_guard: &str) -> bool {
+        branch_still_open_at_operation(after_guard)
+            && self.source_value_stays_fresh_after(after_guard)
     }
 
     fn has_returning_branch_guard(&self, guard: &str) -> bool {

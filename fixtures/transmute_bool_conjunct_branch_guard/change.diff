@@ -1,0 +1,24 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,17 @@
++pub fn byte_to_bool_conjunct(value: u8, allow_conversion: bool) -> bool {
++    assert_eq!(core::mem::size_of::<u8>(), core::mem::size_of::<bool>());
++    if value <= 1 && allow_conversion {
++        // SAFETY: size equality is asserted and this open branch constrains the byte domain.
++        unsafe { core::mem::transmute::<u8, bool>(value) }
++    } else {
++        false
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::byte_to_bool_conjunct;
++
++    #[test]
++    fn converts_known_bool_byte() {
++        let _value = byte_to_bool_conjunct(1, true);
++    }
++}
+
