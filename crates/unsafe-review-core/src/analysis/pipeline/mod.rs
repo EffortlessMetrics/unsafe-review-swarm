@@ -1365,6 +1365,25 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "bounds"
         ));
 
+        let compound_reassigned_index =
+            fixture_output("get_unchecked_mut_compound_reassigned_index_not_guard")?;
+        let compound_reassigned_index_card = single_card(
+            "get_unchecked_mut_compound_reassigned_index_not_guard",
+            &compound_reassigned_index,
+        )?;
+        assert_eq!(
+            compound_reassigned_index_card.operation.family,
+            OperationFamily::GetUnchecked
+        );
+        assert_eq!(
+            compound_reassigned_index_card.class,
+            ReviewClass::GuardMissing
+        );
+        assert!(!obligation_discharge_present(
+            compound_reassigned_index_card,
+            "bounds"
+        ));
+
         let reassigned_receiver =
             fixture_output("get_unchecked_mut_reassigned_receiver_not_guard")?;
         let reassigned_receiver_card = single_card(

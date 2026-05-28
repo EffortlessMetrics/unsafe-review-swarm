@@ -498,6 +498,7 @@ mod tests {
         "get_unchecked_mut_closed_bounds_not_guard",
         "get_unchecked_mut_return_comment_not_guard",
         "get_unchecked_mut_reassigned_index_not_guard",
+        "get_unchecked_mut_compound_reassigned_index_not_guard",
         "get_unchecked_mut_reassigned_receiver_not_guard",
         "get_unchecked_mut_get_probe_reassigned_index_not_guard",
         "get_unchecked_mut_get_probe_reassigned_receiver_not_guard",
