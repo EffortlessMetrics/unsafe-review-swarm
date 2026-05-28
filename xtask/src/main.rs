@@ -9814,6 +9814,31 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_sarif_unknown_card_id() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-bad-sarif-card-id")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("cards.sarif");
+        let mut sarif: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&path).map_err(|err| format!("read sarif failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse sarif failed: {err}"))?;
+        sarif["runs"][0]["results"][0]["properties"]["cardId"] = serde_json::json!("missing");
+        fs::write(&path, sarif.to_string()).map_err(|err| format!("write sarif failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("cards.sarif result references unknown card id `missing`")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_lsp_missing_card_diagnostic() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-lsp-missing-diagnostic")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
