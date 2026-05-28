@@ -403,6 +403,34 @@ label_source = "fixture_golden"
 rationale = "A dominating referenced-byte bool-domain guard discharges transmute_copy valid-value evidence."
 
 [[samples]]
+id = "transmute-copy-bool-conjunct-branch-guard-present"
+fixture = "transmute_copy_bool_conjunct_branch_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A referenced-byte bool-domain predicate that appears as a top-level conjunct in an open branch is still dominating transmute_copy valid-value evidence."
+
+[[samples]]
+id = "transmute-copy-bool-disjunct-branch-not-valid-value"
+fixture = "transmute_copy_bool_disjunct_branch_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A referenced-byte bool-domain predicate that appears only in a disjunctive open branch can admit invalid bytes and must not discharge transmute_copy valid-value evidence."
+
+[[samples]]
 id = "transmute-copy-bool-invalid-return-guard-present"
 fixture = "transmute_copy_bool_invalid_return_guard"
 kind = "positive"

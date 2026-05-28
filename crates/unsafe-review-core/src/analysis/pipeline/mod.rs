@@ -2358,6 +2358,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     fn transmute_copy_bool_value_observation_is_not_guard_evidence() -> Result<(), String> {
         for fixture in [
             "transmute_copy_layout_size_guard",
+            "transmute_copy_bool_disjunct_branch_not_guard",
             "transmute_copy_bool_value_observed_not_guard",
             "transmute_copy_bool_closed_if_observed_not_guard",
             "transmute_copy_bool_guard_then_reassigned_not_guard",
@@ -2382,6 +2383,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     fn transmute_copy_bool_value_domain_guards_are_discharged() -> Result<(), String> {
         for fixture in [
             "transmute_copy_bool_valid_value_guard",
+            "transmute_copy_bool_conjunct_branch_guard",
             "transmute_copy_bool_invalid_return_guard",
         ] {
             let output = fixture_output(fixture)?;

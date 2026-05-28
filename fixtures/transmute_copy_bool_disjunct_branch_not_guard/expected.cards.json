@@ -1,0 +1,106 @@
+[
+  {
+    "id": "UR-transmute-copy-bool-disjunct-branch-not-guard-src-lib-rs-copy-byte-to-bool-disjunct-operation-transmute-u8-bool-2fbedaf7cfc7-invalid_value-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 5,
+      "column": 9,
+      "kind": "operation",
+      "owner": "copy_byte_to_bool_disjunct",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { core::mem::transmute_copy::<u8, bool>(&value) }"
+    },
+    "operation": "unsafe { core::mem::transmute_copy::<u8, bool>(&value) }",
+    "operation_family": "transmute",
+    "hazards": [
+      "invalid_value",
+      "layout_or_repr",
+      "aliasing_or_provenance"
+    ],
+    "obligations": [
+      "source and destination layouts are compatible",
+      "destination value satisfies Rust validity rules"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "layout",
+        "description": "source and destination layouts are compatible",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Transmute layout size evidence was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `copy_byte_to_bool_disjunct`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "valid-value",
+        "description": "destination value satisfies Rust validity rules",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `copy_byte_to_bool_disjunct`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "Some inferred safety obligations are missing local guard evidence",
+    "reach": "1 related test file(s) mention owner `copy_byte_to_bool_disjunct`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test copy_byte_to_bool_disjunct",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test copy_byte_to_bool_disjunct",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose the local guard that discharges the `transmute` safety obligation.",
+    "verify_commands": [
+      "cargo +nightly miri test copy_byte_to_bool_disjunct",
+      "cargo +nightly careful test copy_byte_to_bool_disjunct"
+    ]
+  }
+]
