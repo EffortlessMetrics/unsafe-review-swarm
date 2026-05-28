@@ -418,6 +418,7 @@ fixtures = [
   "copy_nonoverlapping_slice_range_dst_only_not_guard",
   "copy_nonoverlapping_slice_range_reassigned_count_not_guard",
   "copy_nonoverlapping_slice_range_reassigned_src_not_guard",
+  "copy_nonoverlapping_slice_range_reassigned_dst_not_guard",
   "copy_nonoverlapping_other_len_not_guard",
 ]
 dogfood_targets = []

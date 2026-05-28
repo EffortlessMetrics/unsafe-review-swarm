@@ -96,6 +96,7 @@ evidence, while
 `ptr_copy_slice_range_open_branch_reassigned_dst_not_guard`,
 `copy_nonoverlapping_slice_range_reassigned_count_not_guard`,
 `copy_nonoverlapping_slice_range_reassigned_src_not_guard`,
+`copy_nonoverlapping_slice_range_reassigned_dst_not_guard`,
 `ptr_copy_slice_range_reassigned_count_not_guard`,
 `ptr_copy_slice_range_reassigned_dst_not_guard`,
 `copy_nonoverlapping_other_len_not_guard`, and `ptr_copy_other_len_not_guard`
