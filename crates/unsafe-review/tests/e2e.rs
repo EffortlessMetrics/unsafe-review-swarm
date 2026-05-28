@@ -513,6 +513,59 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
 }
 
 #[test]
+fn context_packet_queues_contract_gaps_for_public_safety_docs() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("public_unsafe_fn_missing_safety");
+
+    let json = run_success([
+        os("check"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let value = parse_json(&stdout_text(&json)?)?;
+    assert_eq!(value["summary"]["cards"], 1);
+    assert_eq!(value["cards"][0]["class"], "contract_missing");
+    let card_id = json_str(&value["cards"][0]["id"], "cards[0].id")?;
+
+    let context = run_success([
+        os("context"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        OsString::from(card_id),
+    ])?;
+    let packet = parse_json(&stdout_text(&context)?)?;
+    assert_eq!(packet["mode"], "bounded_repair_packet");
+    assert_eq!(packet["source"], "review_card");
+    assert_eq!(packet["card_id"], card_id);
+    assert_eq!(packet["card"]["class"], "contract_missing");
+    assert_eq!(packet["context"]["operation_family"], "unknown");
+
+    let allowed_repairs = serde_json::to_string(&packet["allowed_repairs"])?;
+    assert!(allowed_repairs.contains("safety contract"));
+    let repair_queue = serde_json::to_string(&packet["repair_queue"])?;
+    assert!(repair_queue.contains("repairable_by_contract"));
+    assert!(repair_queue.contains("repairable_by_test"));
+    assert!(repair_queue.contains("requires_witness_receipt"));
+    assert!(repair_queue.contains("requires_human_review"));
+    assert_eq!(packet["agent_readiness"]["ready"], false);
+    assert_eq!(packet["agent_readiness"]["state"], "needs_human_review");
+    let reasons = serde_json::to_string(&packet["agent_readiness"]["reasons"])?;
+    assert!(reasons.contains("operation family `unknown`"));
+    assert!(reasons.contains("no verify command"));
+    assert!(
+        packet["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not UB-free status")
+    );
+
+    Ok(())
+}
+
+#[test]
 fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment");
     let temp = TempDir::new("unsafe-review-first-pr-e2e")?;
