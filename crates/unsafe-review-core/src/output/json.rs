@@ -283,6 +283,8 @@ mod tests {
         "nonnull_other_guard_not_evidence",
         "nonnull_is_null_nonreturning_not_guard",
         "nonnull_is_null_reassigned_ptr_not_guard",
+        "nonnull_is_null_open_branch_guard",
+        "nonnull_is_null_open_branch_reassigned_ptr_not_guard",
         "nonnull_if_let_new_reassigned_ptr_not_guard",
         "nonnull_let_else_new_reassigned_ptr_not_guard",
         "nonnull_match_new_reassigned_ptr_not_guard",

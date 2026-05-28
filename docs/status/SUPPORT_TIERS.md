@@ -28,11 +28,14 @@ Recent `NonNull::new_unchecked` nullability additions include
 `nonnull_if_let_new_guard`, `nonnull_let_else_new_guard`,
 `nonnull_match_new_guard`, `nonnull_new_reassigned_ptr_not_guard`,
 `nonnull_is_null_reassigned_ptr_not_guard`,
+`nonnull_is_null_open_branch_guard`,
+`nonnull_is_null_open_branch_reassigned_ptr_not_guard`,
 `nonnull_if_let_new_reassigned_ptr_not_guard`,
 `nonnull_let_else_new_reassigned_ptr_not_guard`, and
 `nonnull_match_new_reassigned_ptr_not_guard`, which pin same-pointer
-`NonNull::new` if-let, let-else, and match Some-arm guards while rejecting stale checked-pointer
-evidence after reassignment.
+`NonNull::new` if-let, let-else, and match Some-arm guards plus non-null
+open-branch guards while rejecting stale checked-pointer evidence after
+reassignment.
 Recent guard-evidence additions include
 `raw_pointer_alignment_is_aligned_guard`,
 `raw_pointer_alignment_observed_not_guard`,

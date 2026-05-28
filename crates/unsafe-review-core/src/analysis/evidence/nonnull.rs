@@ -78,6 +78,7 @@ impl<'a> NonNullPointerContext<'a> {
             || self.has_let_else_guard()
             || self.has_match_some_guard()
             || self.has_null_early_return_guard()
+            || self.has_non_null_open_branch_guard()
     }
 
     fn has_question_mark_guard(&self) -> bool {
@@ -121,6 +122,13 @@ impl<'a> NonNullPointerContext<'a> {
             return false;
         };
         self.returning_after_marker_preserves_applicability(after_guard)
+    }
+
+    fn has_non_null_open_branch_guard(&self) -> bool {
+        let guard = format!("if!{}.is_null(){{", self.same_pointer_target);
+        any_marker_tail(self.compact, &guard, |after_guard| {
+            self.open_branch_preserves_applicability(after_guard)
+        })
     }
 }
 
