@@ -1,9 +1,10 @@
 use super::{
     compact_code, contains_simple_assignment_to, let_binding_name, matching_call_argument_end,
+    strip_block_comments_and_literals,
 };
 
 pub(super) fn has_drop_in_place_box_origin_evidence(expression: &str, lower: &str) -> bool {
-    let compact = compact_code(lower);
+    let compact = compact_code(&strip_block_comments_and_literals(lower));
     let compact_expression = compact_code(&expression.to_ascii_lowercase());
     let Some(pointer) = drop_in_place_argument(&compact_expression) else {
         return false;
@@ -36,7 +37,7 @@ fn box_into_raw_argument(right_side: &str) -> Option<&str> {
 }
 
 pub(super) fn has_box_from_raw_origin_evidence(expression: &str, lower: &str) -> bool {
-    let compact = compact_code(lower);
+    let compact = compact_code(&strip_block_comments_and_literals(lower));
     let compact_expression = compact_code(&expression.to_ascii_lowercase());
     let Some(pointer) = box_from_raw_argument(&compact_expression) else {
         return false;

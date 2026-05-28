@@ -1361,12 +1361,28 @@ mod tests {
             "core::ptr::drop_in_place(ptr);",
             vec![],
         );
+        let line_comment_origin = site_with_family(
+            OperationFamily::DropInPlace,
+            vec!["// let ptr = Box::into_raw(value);"],
+            "core::ptr::drop_in_place(ptr);",
+            vec![],
+        );
+        let string_literal_origin = site_with_family(
+            OperationFamily::DropInPlace,
+            vec!["let _note = \"let ptr = Box::into_raw(value);\";"],
+            "core::ptr::drop_in_place(ptr);",
+            vec![],
+        );
 
         let evidence = obligation_evidence(&matching, &obligations, &contract, &reach);
         assert!(evidence.iter().all(|item| item.discharge.present));
         let evidence = obligation_evidence(&other_pointer, &obligations, &contract, &reach);
         assert!(evidence.iter().all(|item| !item.discharge.present));
         let evidence = obligation_evidence(&reassigned_pointer, &obligations, &contract, &reach);
+        assert!(evidence.iter().all(|item| !item.discharge.present));
+        let evidence = obligation_evidence(&line_comment_origin, &obligations, &contract, &reach);
+        assert!(evidence.iter().all(|item| !item.discharge.present));
+        let evidence = obligation_evidence(&string_literal_origin, &obligations, &contract, &reach);
         assert!(evidence.iter().all(|item| !item.discharge.present));
     }
 
@@ -1399,6 +1415,18 @@ mod tests {
             "unsafe { Box::from_raw(ptr) }",
             vec![],
         );
+        let line_comment_origin = site_with_family(
+            OperationFamily::BoxFromRaw,
+            vec!["// let ptr = Box::into_raw(value);"],
+            "unsafe { Box::from_raw(ptr) }",
+            vec![],
+        );
+        let string_literal_origin = site_with_family(
+            OperationFamily::BoxFromRaw,
+            vec!["let _note = \"let ptr = Box::into_raw(value);\";"],
+            "unsafe { Box::from_raw(ptr) }",
+            vec![],
+        );
 
         assert!(
             obligation_evidence(&matching, &obligations, &contract, &reach)[0]
@@ -1412,6 +1440,16 @@ mod tests {
         );
         assert!(
             !obligation_evidence(&reassigned_pointer, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&line_comment_origin, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&string_literal_origin, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
         );
