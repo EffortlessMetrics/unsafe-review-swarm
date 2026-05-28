@@ -112,6 +112,7 @@ pub struct ReceiptAuditEntry {
     pub card_id: Option<String>,
     pub receipt_tool: Option<String>,
     pub strength: Option<String>,
+    pub author: Option<String>,
     pub recorded_at: Option<String>,
     pub expires_at: Option<String>,
     pub command_hash: Option<String>,
@@ -284,6 +285,7 @@ fn audit_receipt_record(
             card_id: None,
             receipt_tool: None,
             strength: None,
+            author: None,
             recorded_at: None,
             expires_at: None,
             command_hash: None,
@@ -302,6 +304,7 @@ fn audit_receipt_record(
             card_id: None,
             receipt_tool: None,
             strength: None,
+            author: None,
             recorded_at: None,
             expires_at: None,
             command_hash: None,
@@ -378,6 +381,7 @@ fn audit_receipt_record(
         card_id: Some(receipt.card_id),
         receipt_tool: Some(receipt.tool),
         strength: Some(receipt.strength),
+        author: receipt.author,
         recorded_at: receipt.recorded_at,
         expires_at: receipt.expires_at,
         command_hash: receipt.command_hash,
@@ -854,6 +858,7 @@ mod tests {
             matched_entry.recorded_at.as_deref(),
             Some("2025-12-18T00:00:00Z")
         );
+        assert_eq!(matched_entry.author.as_deref(), Some("core/fixtures"));
         let duplicate_entries = report
             .receipts
             .iter()
