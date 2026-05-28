@@ -1685,10 +1685,23 @@ mod tests {
             "values.set_len(new_len);",
             vec![],
         );
+        let line_comment_shrink = site_with_family(
+            OperationFamily::VecSetLen,
+            vec!["// if new_len <= values.len() {"],
+            "values.set_len(new_len);",
+            vec![],
+        );
 
         let evidence = obligation_evidence(&set_len, &obligations, &contract, &reach);
+        let line_comment_evidence =
+            obligation_evidence(&line_comment_shrink, &obligations, &contract, &reach);
 
         assert!(evidence.iter().all(|item| item.discharge.present));
+        assert!(
+            line_comment_evidence
+                .iter()
+                .all(|item| !item.discharge.present)
+        );
     }
 
     #[test]
@@ -1893,6 +1906,19 @@ mod tests {
             "self.set_len(new_len);",
             vec![],
         );
+        let line_comment_loop = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "let old_len = self.len();",
+                "let new_len = old_len + s.len();",
+                "if new_len > self.capacity() { return; }",
+                "// for item in self.xs[old_len..new_len].iter_mut() {",
+                "//     *item = MaybeUninit::new(0);",
+                "// }",
+            ],
+            "self.set_len(new_len);",
+            vec![],
+        );
         let wrong_target = site_with_family(
             OperationFamily::VecSetLen,
             vec![
@@ -1955,6 +1981,8 @@ mod tests {
         let evidence = obligation_evidence(&set_len, &obligations, &contract, &reach);
         let nested_capacity_guard_evidence =
             obligation_evidence(&nested_capacity_guard, &obligations, &contract, &reach);
+        let line_comment_loop_evidence =
+            obligation_evidence(&line_comment_loop, &obligations, &contract, &reach);
         let wrong_target_evidence =
             obligation_evidence(&wrong_target, &obligations, &contract, &reach);
         let partial_range_evidence =
@@ -1977,6 +2005,22 @@ mod tests {
             nested_capacity_guard_evidence
                 .iter()
                 .all(|item| item.discharge.present)
+        );
+        assert!(
+            line_comment_loop_evidence
+                .iter()
+                .find(|item| item.obligation.key == "capacity")
+                .unwrap()
+                .discharge
+                .present
+        );
+        assert!(
+            !line_comment_loop_evidence
+                .iter()
+                .find(|item| item.obligation.key == "initialized")
+                .unwrap()
+                .discharge
+                .present
         );
         assert!(
             !wrong_target_evidence

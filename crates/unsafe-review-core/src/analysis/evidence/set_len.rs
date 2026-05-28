@@ -3,12 +3,14 @@ use super::{
     contains_simple_assignment_to, has_assignment_to_any_identifier,
     has_fresh_guard_pattern_for_identifiers, has_open_positive_branch_guard_for_identifiers,
     is_receiver_path_char, is_simple_identifier, let_binding_name, matching_call_argument_end,
-    matching_code_block_end,
+    matching_code_block_end, strip_block_comments_and_literals,
 };
 use crate::analysis::scanner::ScannedSite;
 use crate::domain::{EvidenceState, OperationFamily};
 
 pub(super) fn has_set_len_capacity_evidence(lower: &str) -> bool {
+    let stripped = strip_block_comments_and_literals(lower);
+    let lower = stripped.as_str();
     has_set_len_shrink_evidence(lower)
         || has_set_len_call_result_initialization_evidence(lower)
         || has_set_len_const_cap_evidence(lower)
@@ -18,6 +20,8 @@ pub(super) fn has_set_len_capacity_evidence(lower: &str) -> bool {
 }
 
 pub(super) fn has_set_len_initialization_evidence(lower: &str) -> bool {
+    let stripped = strip_block_comments_and_literals(lower);
+    let lower = stripped.as_str();
     if has_set_len_shrink_evidence(lower) || has_set_len_call_result_initialization_evidence(lower)
     {
         return true;
