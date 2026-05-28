@@ -2496,6 +2496,22 @@ mod tests {
             "ptr::read(self.as_ptr() as *const [T; CAP])",
             vec![],
         );
+        let line_comment_capacity_guard = site_with_family(
+            OperationFamily::RawPointerRead,
+            vec!["// debug_assert_eq!(self.len(), self.capacity());"],
+            "ptr::read(self.as_ptr() as *const [T; CAP])",
+            vec![],
+        );
+        let line_comment_size_return_guard = site_with_family(
+            OperationFamily::RawPointerRead,
+            vec![
+                "// if self.len() < core::mem::size_of::<[T; CAP]>() {",
+                "//     return None;",
+                "// }",
+            ],
+            "ptr::read(self.as_ptr() as *const [T; CAP])",
+            vec![],
+        );
 
         let evidence = obligation_evidence(&raw_read, &obligations, &contract, &reach);
         let nested_guard_evidence =
@@ -2504,11 +2520,25 @@ mod tests {
             obligation_evidence(&comment_return_guard, &obligations, &contract, &reach);
         let string_return_evidence =
             obligation_evidence(&string_return_guard, &obligations, &contract, &reach);
+        let line_comment_capacity_evidence = obligation_evidence(
+            &line_comment_capacity_guard,
+            &obligations,
+            &contract,
+            &reach,
+        );
+        let line_comment_size_return_evidence = obligation_evidence(
+            &line_comment_size_return_guard,
+            &obligations,
+            &contract,
+            &reach,
+        );
 
         assert!(evidence[0].discharge.present);
         assert!(nested_guard_evidence[0].discharge.present);
         assert!(!comment_return_evidence[0].discharge.present);
         assert!(!string_return_evidence[0].discharge.present);
+        assert!(!line_comment_capacity_evidence[0].discharge.present);
+        assert!(!line_comment_size_return_evidence[0].discharge.present);
     }
 
     #[test]

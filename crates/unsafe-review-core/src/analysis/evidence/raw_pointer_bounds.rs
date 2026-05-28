@@ -2,6 +2,7 @@ use super::{
     branch_still_open_at_operation, compact_code, compact_if_guards, contains_executable_return,
     contains_simple_assignment_to, has_length_or_bounds_guard, is_simple_identifier,
     let_binding_name, matching_call_argument_end, matching_code_block_end, receiver_before_marker,
+    strip_block_comments_and_literals,
 };
 
 pub(super) fn has_raw_pointer_read_bounds_evidence(
@@ -9,10 +10,11 @@ pub(super) fn has_raw_pointer_read_bounds_evidence(
     before_operation: &str,
 ) -> bool {
     let compact_expression = compact_code(&expression.to_ascii_lowercase());
+    let before_operation = strip_block_comments_and_literals(before_operation);
     let Some(pointer) = raw_pointer_read_pointer_receiver(&compact_expression) else {
-        return has_length_or_bounds_guard(before_operation);
+        return has_length_or_bounds_guard(&before_operation);
     };
-    let before_operation = compact_code(before_operation);
+    let before_operation = compact_code(&before_operation);
     let Some(origin) = pointer_origin_receiver_before(&before_operation, pointer) else {
         return false;
     };
