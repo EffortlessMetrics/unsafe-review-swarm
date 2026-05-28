@@ -37,6 +37,7 @@ struct AgentPacket<'a> {
     missing_evidence: Vec<AgentMissingEvidence<'a>>,
     allowed_repairs: Vec<String>,
     agent_readiness: AgentReadiness,
+    repair_queue: AgentRepairQueue,
     repair_scope: &'static str,
     witness_routes: Vec<AgentWitnessRoute<'a>>,
     verify_commands: &'a [String],
@@ -48,6 +49,7 @@ impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
     fn from(card: &'a ReviewCard) -> Self {
         let allowed_repairs = allowed_repairs(card);
         let agent_readiness = agent_readiness(card, allowed_repairs.has_card_scoped_repairs);
+        let repair_queue = repair_queue(card, &agent_readiness);
         Self {
             schema_version: "0.1",
             tool: "unsafe-review",
@@ -86,6 +88,7 @@ impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
                 .collect(),
             allowed_repairs: allowed_repairs.repairs,
             agent_readiness,
+            repair_queue,
             repair_scope: "this card only",
             witness_routes: card.routes.iter().map(AgentWitnessRoute::from).collect(),
             verify_commands: &card.next_action.verify_commands,
@@ -114,6 +117,55 @@ fn agent_readiness(card: &ReviewCard, has_card_scoped_repairs: bool) -> AgentRea
 
 fn allowed_repairs(card: &ReviewCard) -> AllowedRepairs {
     repairs::build(card)
+}
+
+fn repair_queue(card: &ReviewCard, readiness: &AgentReadiness) -> AgentRepairQueue {
+    let mut buckets = Vec::new();
+    if has_missing_kind(card, "contract") {
+        push_bucket(&mut buckets, "repairable_by_contract");
+    }
+    if has_missing_kind(card, "guard") {
+        push_bucket(&mut buckets, "repairable_by_guard");
+    }
+    if has_missing_kind(card, "reach") {
+        push_bucket(&mut buckets, "repairable_by_test");
+    }
+    if has_missing_kind(card, "witness") {
+        push_bucket(&mut buckets, "requires_witness_receipt");
+    }
+    if !readiness.ready {
+        push_bucket(&mut buckets, "requires_human_review");
+    }
+    if buckets.is_empty() {
+        push_bucket(&mut buckets, "review_only");
+    }
+
+    AgentRepairQueue {
+        summary: repair_queue_summary(&buckets, readiness.ready),
+        buckets,
+    }
+}
+
+fn repair_queue_summary(buckets: &[&'static str], ready: bool) -> String {
+    if buckets == ["review_only"] {
+        return "No repair bucket selected; inspect the ReviewCard before delegating work."
+            .to_string();
+    }
+    let mut summary = format!("Queue this card as: {}.", buckets.join(", "));
+    if !ready {
+        summary.push_str(" Keep human review in the loop before delegating edits.");
+    }
+    summary
+}
+
+fn has_missing_kind(card: &ReviewCard, kind: &str) -> bool {
+    card.missing.iter().any(|missing| missing.kind == kind)
+}
+
+fn push_bucket(buckets: &mut Vec<&'static str>, bucket: &'static str) {
+    if !buckets.contains(&bucket) {
+        buckets.push(bucket);
+    }
 }
 
 struct AllowedRepairs {
@@ -346,6 +398,12 @@ struct AgentReadiness {
     reasons: Vec<String>,
 }
 
+#[derive(Serialize)]
+struct AgentRepairQueue {
+    buckets: Vec<&'static str>,
+    summary: String,
+}
+
 impl AgentReadiness {
     fn not_ready(state: &'static str, reasons: Vec<String>) -> Self {
         Self {
@@ -499,6 +557,11 @@ mod tests {
                 .map_err(|err| format!("render readiness reasons failed: {err}"))?
                 .contains("card-scoped allowed repairs")
         );
+        let repair_queue = serde_json::to_string(&value["repair_queue"])
+            .map_err(|err| format!("render repair queue failed: {err}"))?;
+        assert!(repair_queue.contains("repairable_by_guard"));
+        assert!(repair_queue.contains("requires_witness_receipt"));
+        assert!(!repair_queue.contains("requires_human_review"));
         let allowed_repairs = serde_json::to_string(&value["allowed_repairs"])
             .map_err(|err| format!("render allowed repairs failed: {err}"))?;
         assert!(allowed_repairs.contains("alignment guard"));
@@ -1112,9 +1175,16 @@ mod tests {
         let value = parse_json(&render(card))?;
         let allowed_repairs = serde_json::to_string(&value["allowed_repairs"])
             .map_err(|err| format!("render allowed repairs failed: {err}"))?;
+        let repair_queue = serde_json::to_string(&value["repair_queue"])
+            .map_err(|err| format!("render repair queue failed: {err}"))?;
 
         assert!(allowed_repairs.contains("focused test"));
         assert!(allowed_repairs.contains("exercises this owner or seam"));
+        assert!(repair_queue.contains("repairable_by_guard"));
+        assert!(repair_queue.contains("repairable_by_test"));
+        assert!(repair_queue.contains("requires_witness_receipt"));
+        assert!(repair_queue.contains("requires_human_review"));
+        assert!(repair_queue.contains("Keep human review in the loop"));
         Ok(())
     }
 

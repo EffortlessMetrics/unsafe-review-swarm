@@ -37,6 +37,9 @@ source of analyzer truth. It carries:
   operation family and missing obligation evidence
 - `agent_readiness`, an advisory classification of whether this card is a
   bounded repair-delegation candidate
+- `repair_queue`, a compact card-scoped grouping such as
+  `repairable_by_contract`, `repairable_by_guard`, `repairable_by_test`,
+  `requires_witness_receipt`, or `requires_human_review`
 - witness routes and verify commands from the card
 - do-not-do rules
 - stop conditions
@@ -79,6 +82,8 @@ The packet may classify whether the card is ready for bounded repair delegation,
 but that classification is advisory metadata. It must not hide the ReviewCard,
 weaken missing evidence, or promote human-deep-review, ambiguous macro-heavy,
 unsupported provenance, or FFI ownership cards into automatic repair tasks.
+Repair queue buckets are handoff labels for sorting cards into small work items.
+They are not policy decisions and do not mean `unsafe-review` applied a repair.
 
 Bounded source context must stay small: unsafe site, nearby contract/guard
 summaries, related test mentions, witness route, and explicit trust boundary.
@@ -126,6 +131,11 @@ Whole-file dumps are out of scope by default.
 - Agent readiness is `ready` for a high-confidence, card-scoped repair packet
   with a verify command, and is not ready for human-review or unsupported
   operation families such as inline assembly and FFI ownership boundaries.
+- Repair queue buckets reflect missing ReviewCard evidence: contract gaps can
+  enter `repairable_by_contract`, guard gaps can enter `repairable_by_guard`,
+  static reach gaps can enter `repairable_by_test`, missing receipts can enter
+  `requires_witness_receipt`, and not-ready packets can enter
+  `requires_human_review`.
 - If evidence is not knowable statically, the packet names the limitation
   instead of overclaiming.
 

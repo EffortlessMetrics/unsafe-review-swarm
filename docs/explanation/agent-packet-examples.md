@@ -33,6 +33,8 @@ The useful fields for an agent handoff are:
 - `missing_evidence`: the exact missing evidence the repair must address.
 - `allowed_repairs`: card-scoped repairs derived from operation family and
   missing obligations.
+- `repair_queue`: compact buckets that help sort this one card into guard,
+  contract, test, witness, or human-review work.
 - `verify_commands`: suggested commands from the card. They are not executed by
   `unsafe-review`.
 - `do_not_do`: negative instructions that prevent broad unsafe rewrites,
