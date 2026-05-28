@@ -280,6 +280,7 @@ required_core_fixtures = [
   "transmute_bool_disjunct_return_guard",
   "transmute_bool_conjunct_return_not_guard",
   "transmute_bool_other_value_not_guard",
+  "transmute_bool_prior_guarded_call_not_guard",
   "transmute_bool_value_observed_not_guard",
   "transmute_bool_closed_if_observed_not_guard",
   "transmute_bool_guard_then_reassigned_not_guard",
@@ -3135,6 +3136,16 @@ expected_hazard = "invalid_value"
 fixture = "transmute_bool_other_value_not_guard"
 kind = "false_positive_control"
 claim = "transmute::<u8, bool> does not accept bool-domain evidence for another source value"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "transmute_bool_prior_guarded_call_not_guard"
+kind = "false_positive_control"
+claim = "transmute::<u8, bool> applies bool-domain evidence to the current operation, not a prior guarded transmute"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

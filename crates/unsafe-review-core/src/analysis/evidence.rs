@@ -153,8 +153,8 @@ fn discharge_state_for(
         "callee-contract" => {
             callee_contract_discharge_state(family, &site.operation.expression, lower)
         }
-        "valid-value" => valid_value_discharge_state(family, lower),
-        "layout" => layout_discharge_state(family, lower),
+        "valid-value" => valid_value_discharge_state(site, lower),
+        "layout" => layout_discharge_state(site, lower),
         "unreachable" => unreachable_discharge_state(family, lower),
         "target-feature" => target_feature_discharge_state(family, contract),
         "utf8" => utf8_discharge_state(family, lower),
@@ -5279,6 +5279,38 @@ mod tests {
         assert!(!reassigned_after_early_return_evidence[0].discharge.present);
         assert!(!line_comment_valid_value_evidence[0].discharge.present);
         assert!(!string_literal_valid_value_evidence[0].discharge.present);
+    }
+
+    #[test]
+    fn transmute_u8_bool_guard_applies_to_current_operation() -> Result<(), String> {
+        let obligations = vec![
+            SafetyObligation::new("layout", "source and destination layouts are compatible"),
+            SafetyObligation::new(
+                "valid-value",
+                "destination value satisfies Rust validity rules",
+            ),
+        ];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let transmute = site_with_family(
+            OperationFamily::Transmute,
+            vec![
+                "assert_eq!(core::mem::size_of::<u8>(), core::mem::size_of::<bool>());",
+                "assert!(value <= 1);",
+                "let _first = unsafe { core::mem::transmute::<u8, bool>(value) };",
+            ],
+            "let _second = unsafe { core::mem::transmute::<u8, bool>(other) };",
+            vec![],
+        );
+
+        let evidence = obligation_evidence(&transmute, &obligations, &contract, &reach);
+
+        assert!(discharge_present(&evidence, "layout")?);
+        assert!(!discharge_present(&evidence, "valid-value")?);
+        Ok(())
     }
 
     #[test]

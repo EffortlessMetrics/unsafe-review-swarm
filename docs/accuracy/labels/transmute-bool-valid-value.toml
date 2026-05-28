@@ -237,6 +237,19 @@ label_source = "fixture_golden"
 rationale = "Bool-domain evidence for another source byte does not discharge the valid-value obligation for the transmuted byte."
 
 [[samples]]
+id = "transmute-bool-prior-guarded-call-not-guard"
+fixture = "transmute_bool_prior_guarded_call_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Bool-domain evidence for a prior transmute operation does not discharge the valid-value obligation for a later transmute of another byte."
+
+[[samples]]
 id = "transmute-bool-observed-not-guard"
 fixture = "transmute_bool_value_observed_not_guard"
 kind = "false_positive_control"

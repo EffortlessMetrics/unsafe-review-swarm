@@ -1,21 +1,20 @@
 use super::{
-    any_compact_if_condition, branch_still_open_at_operation, condition_has_top_level_conjunct,
-    condition_has_top_level_disjunct, contains_executable_return, has_u8_bool_value_guard,
-    matching_call_argument_end, matching_code_block_end, matching_generic_argument_end,
-    source_value_identifier, split_top_level_pair, strip_block_comments_and_literals,
+    any_compact_if_condition, branch_still_open_at_operation, code_before_operation,
+    condition_has_top_level_conjunct, condition_has_top_level_disjunct, contains_executable_return,
+    has_u8_bool_value_guard, matching_call_argument_end, matching_code_block_end,
+    matching_generic_argument_end, source_value_identifier, split_top_level_pair,
+    strip_block_comments_and_literals,
 };
 
-pub(super) fn has_transmute_layout_size_evidence(lower: &str) -> bool {
-    let compact = compact_code(&strip_block_comments_and_literals(lower));
-    let Some(context) = TransmuteCallContext::parse(&compact) else {
+pub(super) fn has_transmute_layout_size_evidence(lower: &str, expression: &str) -> bool {
+    let Some(context) = TransmuteCallContext::for_operation(lower, expression) else {
         return false;
     };
     context.layout_context().has_size_evidence()
 }
 
-pub(super) fn has_transmute_u8_bool_valid_value_evidence(lower: &str) -> bool {
-    let compact = compact_code(&strip_block_comments_and_literals(lower));
-    let Some(context) = TransmuteCallContext::parse(&compact) else {
+pub(super) fn has_transmute_u8_bool_valid_value_evidence(lower: &str, expression: &str) -> bool {
+    let Some(context) = TransmuteCallContext::for_operation(lower, expression) else {
         return false;
     };
     context
@@ -23,22 +22,28 @@ pub(super) fn has_transmute_u8_bool_valid_value_evidence(lower: &str) -> bool {
         .is_some_and(|value_domain| value_domain.has_valid_value_evidence())
 }
 
-struct TransmuteCallContext<'a> {
-    before_call: &'a str,
-    source_type: &'a str,
-    destination_type: &'a str,
-    argument: &'a str,
+struct TransmuteCallContext {
+    before_call: String,
+    source_type: String,
+    destination_type: String,
+    argument: String,
 }
 
-impl<'a> TransmuteCallContext<'a> {
-    fn parse(compact: &'a str) -> Option<Self> {
+impl TransmuteCallContext {
+    fn for_operation(lower: &str, expression: &str) -> Option<Self> {
+        let stripped = strip_block_comments_and_literals(lower);
+        let before_call = code_before_operation(&stripped, expression)?;
+        let compact_expression = compact_code(&expression.to_ascii_lowercase());
+        Self::parse_operation(before_call, &compact_expression)
+    }
+
+    fn parse_operation(before_call: String, compact_expression: &str) -> Option<Self> {
         for marker in ["transmute::<", "transmute_copy::<"] {
-            let Some(marker_start) = compact.find(marker) else {
+            let Some(marker_start) = compact_expression.find(marker) else {
                 continue;
             };
-            let before_call = &compact[..marker_start];
             let start = marker_start + marker.len();
-            let after_marker = &compact[start..];
+            let after_marker = &compact_expression[start..];
             let end = matching_generic_argument_end(after_marker)?;
             let arguments = &after_marker[..end];
             let after_arguments = after_marker.get(end + 1..)?;
@@ -48,28 +53,28 @@ impl<'a> TransmuteCallContext<'a> {
             if let Some((source_type, destination_type)) = split_top_level_pair(arguments) {
                 return Some(Self {
                     before_call,
-                    source_type,
-                    destination_type,
-                    argument,
+                    source_type: source_type.to_string(),
+                    destination_type: destination_type.to_string(),
+                    argument: argument.to_string(),
                 });
             }
         }
         None
     }
 
-    fn layout_context(&self) -> TransmuteLayoutContext<'a> {
+    fn layout_context(&self) -> TransmuteLayoutContext<'_> {
         TransmuteLayoutContext {
-            before_call: self.before_call,
-            source_type: self.source_type,
-            destination_type: self.destination_type,
+            before_call: &self.before_call,
+            source_type: &self.source_type,
+            destination_type: &self.destination_type,
         }
     }
 
-    fn value_domain_context(&self) -> Option<TransmuteValueDomainContext<'a>> {
+    fn value_domain_context(&self) -> Option<TransmuteValueDomainContext<'_>> {
         let domain = self.value_domain()?;
         Some(TransmuteValueDomainContext {
-            before_call: self.before_call,
-            same_source_value_target: source_value_identifier(self.argument)?,
+            before_call: &self.before_call,
+            same_source_value_target: source_value_identifier(&self.argument)?,
             domain,
         })
     }

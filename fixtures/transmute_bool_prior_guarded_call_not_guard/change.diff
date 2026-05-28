@@ -1,0 +1,5 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -11,0 +12,1 @@ pub fn byte_pair_to_bools(value: u8, other: u8) -> (bool, bool) {
++    let second = unsafe { core::mem::transmute::<u8, bool>(other) };
