@@ -74,7 +74,9 @@ This lane is done when:
 - dogfood has a manifest-backed corpus of selected real crates and PR diffs
 - dogfood artifacts are mechanically validated
 - saved-snapshot outcome JSON and Markdown are pinned and explain movement
-- receipt matching reports matched, unmatched, expired, stale, and wrong-identity receipts
+- receipt matching reports matched, unmatched, expired, stale, wrong-identity,
+  wrong-tool, weaker-than-required, command-hash-mismatch, duplicate, and invalid
+  receipt metadata
 - outcome comparison can report receipt-strength movement without overclaiming
 - repo inventory JSON and Markdown are pinned for later posture reporting
 - advisory no-new-debt can emit a non-blocking policy report
@@ -92,7 +94,9 @@ This lane proceeded PR by PR:
 4. Add `xtask` validation for dogfood receipts and snapshots.
 5. Pin outcome comparison JSON and Markdown.
 6. Add outcome reason text explaining why cards improved or regressed.
-7. Add receipt audit: matched, unmatched, expired, stale, wrong identity, and wrong tool.
+7. Add receipt audit: matched, unmatched, expired, stale, wrong identity, wrong
+   tool, weaker-than-required, command-hash-mismatch, duplicate, and invalid
+   receipt metadata.
 8. Add receipt-strength movement to outcome comparison.
 9. Pin repo inventory JSON and Markdown.
 10. Add an advisory no-new-debt policy report that remains non-blocking by default.
