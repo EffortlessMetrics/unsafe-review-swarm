@@ -403,6 +403,21 @@ mod tests {
             "ptr.cast::<Header>().read()",
             vec![],
         );
+        let line_comment_modulo_guard = site_with_context(
+            vec!["// if (ptr as usize) % core::mem::align_of::<Header>() != 0 { return None; }"],
+            "ptr.cast::<Header>().read()",
+            vec![],
+        );
+        let line_comment_method_assertion = site_with_context(
+            vec!["// assert!(ptr.cast::<Header>().is_aligned());"],
+            "ptr.cast::<Header>().read()",
+            vec![],
+        );
+        let line_comment_open_branch_guard = site_with_context(
+            vec!["// if ptr.cast::<Header>().is_aligned() {"],
+            "ptr.cast::<Header>().read()",
+            vec![],
+        );
         let closed_positive_branch = site_with_context(
             vec![
                 "if ptr.cast::<Header>().is_aligned() {",
@@ -468,6 +483,9 @@ mod tests {
             observed_method,
             comment_return_guard,
             string_return_guard,
+            line_comment_modulo_guard,
+            line_comment_method_assertion,
+            line_comment_open_branch_guard,
             closed_positive_branch,
             reassigned_pointer,
             post_guard,

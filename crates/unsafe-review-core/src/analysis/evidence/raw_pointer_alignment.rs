@@ -2,21 +2,23 @@ use super::{
     branch_still_open_at_operation, code_before_operation, compact_code, compact_if_guards,
     contains_executable_return, contains_receiver_fragment, contains_simple_assignment_to,
     is_receiver_path_char, matching_code_block_end, receiver_before_marker,
+    strip_block_comments_and_literals,
 };
 use crate::analysis::scanner::ScannedSite;
 
 pub(super) fn has_alignment_guard(site: &ScannedSite, lower: &str) -> bool {
-    let compact = compact_code(lower);
+    let stripped = strip_block_comments_and_literals(lower);
+    let compact = compact_code(&stripped);
     if let Some(receiver) = raw_pointer_alignment_receiver(&site.operation.expression) {
         let guard_scope = code_before_operation(lower, &site.operation.expression)
             .unwrap_or_else(|| lower.to_string());
-        let guard_compact = compact_code(&guard_scope);
+        let guard_compact = compact_code(&strip_block_comments_and_literals(&guard_scope));
         return has_same_receiver_alignment_guard(&guard_compact, &receiver);
     }
-    lower.contains("is_aligned")
-        || lower.contains("align_offset")
-        || lower.contains("addr() %")
-        || lower.contains("as usize %")
+    stripped.contains("is_aligned")
+        || stripped.contains("align_offset")
+        || stripped.contains("addr() %")
+        || stripped.contains("as usize %")
         || compact.contains("addr()%")
         || compact.contains("asusize)%")
         || compact.contains("asusize%")
