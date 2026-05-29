@@ -187,7 +187,7 @@ It does not fail because advisory findings exist:
 The comment-plan contract is intentionally narrow:
 
 - at most three planned comments,
-- changed lines only,
+- changed lines only, with `changed_line = true` on selected entries,
 - high-confidence actionable cards only,
 - no duplicate card IDs or duplicate inline anchors,
 - comment bodies stay within the hard 220-word limit,

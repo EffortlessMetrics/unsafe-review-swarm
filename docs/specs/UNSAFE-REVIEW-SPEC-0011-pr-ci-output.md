@@ -272,6 +272,7 @@ Each comment candidate must include:
 card_id
 path
 line
+changed_line
 class
 priority
 confidence
@@ -296,8 +297,9 @@ budget reason.
 
 Each `not_selected` entry must reference a known card, must not repeat a
 planned comment card, and must include the ReviewCard operation, operation
-family, next action, actionability, relevance, and a reason for staying out of
-the inline comment budget.
+family, next action, actionability, relevance, `changed_line`, and a reason for
+staying out of the inline comment budget. Entries with `changed_line = false`
+must use reason `outside changed hunk`.
 
 Every ReviewCard must be accounted for by either `comments[]` or
 `not_selected[]`. A card may be absent from inline comments, but it must not be

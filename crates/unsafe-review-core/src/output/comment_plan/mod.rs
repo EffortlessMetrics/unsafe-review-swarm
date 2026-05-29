@@ -24,6 +24,7 @@ mod tests {
         assert_review_budget_summary(&value, 1, 0)?;
         assert_eq!(value["comments"][0]["class"], "guard_missing");
         assert_eq!(value["comments"][0]["path"], "src/lib.rs");
+        assert_eq!(value["comments"][0]["changed_line"], true);
         assert_eq!(
             value["comments"][0]["operation"],
             "unsafe { ptr.cast::<Header>().read() }"
@@ -185,6 +186,30 @@ mod tests {
             value["not_selected"][1]["reason"],
             "operation family already selected for comment-plan budget"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn comment_plan_keeps_unchanged_cards_out_of_inline_budget() -> Result<(), String> {
+        let mut output = fixture_output("raw_pointer_alignment")?;
+        let card = output
+            .cards
+            .first_mut()
+            .ok_or_else(|| "fixture should emit one card".to_string())?;
+        card.site.changed = false;
+
+        let value = parse_json(&render(&output))?;
+
+        assert_eq!(value["comments"].as_array().map_or(1, Vec::len), 0);
+        assert_eq!(value["not_selected"].as_array().map_or(0, Vec::len), 1);
+        assert_review_budget_summary(&value, 0, 1)?;
+        assert_eq!(value["not_selected"][0]["reason"], "outside changed hunk");
+        assert_eq!(value["not_selected"][0]["changed_line"], false);
+        assert_eq!(
+            value["not_selected"][0]["actionability"],
+            "specific_guard_missing"
+        );
+        assert_eq!(value["not_selected"][0]["relevance"], "medium");
         Ok(())
     }
 

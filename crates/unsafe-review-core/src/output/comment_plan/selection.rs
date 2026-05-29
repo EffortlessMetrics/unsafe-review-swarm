@@ -5,14 +5,17 @@ pub(super) const OPERATION_FAMILY_BUDGET_REASON: &str =
     "operation family already selected for comment-plan budget";
 
 pub(super) fn should_plan_comment(card: &ReviewCard) -> bool {
-    card.class.is_actionable()
+    card.site.changed
+        && card.class.is_actionable()
         && !matches!(card.operation.family, OperationFamily::Unknown)
         && (matches!(card.priority, Priority::High) || matches!(card.confidence, Confidence::High))
         && !matches!(card.confidence, Confidence::Low | Confidence::Unknown)
 }
 
 pub(super) fn non_selection_reason(card: &ReviewCard) -> &'static str {
-    if !card.class.is_actionable() {
+    if !card.site.changed {
+        "outside changed hunk"
+    } else if !card.class.is_actionable() {
         "class not eligible for inline comments"
     } else if matches!(card.operation.family, OperationFamily::Unknown) {
         "operation family unknown"

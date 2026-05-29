@@ -62,6 +62,7 @@ Representative fields:
     {
       "class": "guard_missing",
       "operation_family": "raw_pointer_read",
+      "changed_line": true,
       "actionability": "specific_guard_missing",
       "relevance": "medium",
       "selection_reason": "actionable high-priority review card",
@@ -119,6 +120,7 @@ the inline comment slot and the others stay visible in `not_selected[]`:
   "not_selected": [
     {
       "operation_family": "raw_pointer_read",
+      "changed_line": true,
       "reason": "operation family already selected for comment-plan budget"
     }
   ]
@@ -128,6 +130,11 @@ the inline comment slot and the others stay visible in `not_selected[]`:
 This keeps future comment posting quiet without hiding the underlying
 ReviewCards from `cards.json`, `pr-summary.md`, SARIF, witness plan, saved
 `lsp.json`, or agent context.
+
+Cards without a changed-line anchor also stay out of `comments[]` and remain
+visible in `not_selected[]` with reason `outside changed hunk`. That preserves
+the inline review budget without turning unchanged repository inventory into
+future PR comments.
 
 ## Card present, not selected — public unsafe fn missing `# Safety`
 
@@ -147,6 +154,7 @@ changed unsafe operation. The card remains visible in the bundle.
       "class": "contract_missing",
       "operation": "pub unsafe fn caller_must_uphold_contract() {",
       "operation_family": "unknown",
+      "changed_line": true,
       "next_action": "Add a precise public `# Safety` section that names the required caller obligations.",
       "actionability": "specific_contract_missing",
       "relevance": "high",
@@ -178,6 +186,7 @@ Representative fields:
       "class": "miri_unsupported",
       "operation": "unsafe extern \"C\" {",
       "operation_family": "ffi",
+      "changed_line": true,
       "next_action": "Use sanitizer/cargo-careful or an explicit FFI boundary contract; Miri may not exercise this seam.",
       "actionability": "specific_witness_missing",
       "relevance": "low",
@@ -224,7 +233,7 @@ The verifier treats these as artifact contract rules:
   `summary.budget` must match the bounded review budget;
 - one planned comment per `card_id`;
 - one planned comment per `path`/`line`;
-- changed-line, renderable locations only;
+- `changed_line = true`, renderable locations only;
 - no `static_unknown`, baseline-known, or suppressed planned comments;
 - no `operation_family: "unknown"` planned comments;
 - every planned body stays at or below 220 words;

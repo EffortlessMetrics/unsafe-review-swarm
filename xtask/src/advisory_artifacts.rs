@@ -830,6 +830,17 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         if line == 0 {
             return Err("comment-plan.json comment line must be one-based".to_string());
         }
+        let Some(changed_line) = comment
+            .get("changed_line")
+            .and_then(serde_json::Value::as_bool)
+        else {
+            return Err("comment-plan.json comment is missing changed_line".to_string());
+        };
+        if !changed_line {
+            return Err(
+                "comment-plan.json planned comments must have changed_line=true".to_string(),
+            );
+        }
         require_comment_card_projection(comment, card_projection, "comment-plan.json comment")?;
         let location_key = (path.to_string(), line);
         if !comment_locations.insert(location_key) {
@@ -957,6 +968,14 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             if line == 0 {
                 return Err("comment-plan.json not_selected line must be one-based".to_string());
             }
+            let Some(changed_line) = card
+                .get("changed_line")
+                .and_then(serde_json::Value::as_bool)
+            else {
+                return Err(
+                    "comment-plan.json not_selected entry is missing changed_line".to_string(),
+                );
+            };
             require_not_selected_card_projection(
                 card,
                 card_projection,
@@ -994,6 +1013,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
                     card_projection,
                     comments.len(),
                     &comment_operation_families,
+                    changed_line,
                 ),
                 "comment-plan.json not_selected reason",
             )?;
@@ -2034,8 +2054,11 @@ fn expected_non_selection_reason(
     card: &CardProjection,
     planned_count: usize,
     selected_operation_families: &BTreeSet<String>,
+    changed_line: bool,
 ) -> &'static str {
-    if !class_is_actionable(&card.class_name) {
+    if !changed_line {
+        "outside changed hunk"
+    } else if !class_is_actionable(&card.class_name) {
         "class not eligible for inline comments"
     } else if card.operation_family == "unknown" {
         "operation family unknown"

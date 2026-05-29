@@ -65,6 +65,7 @@ The goal is reviewer leverage, not commenting on every card.
 Each selected candidate includes required fields:
 
 - `card_id`, `path`, `line`
+- `changed_line`
 - `operation`, `operation_family`, `class`, `priority`, `confidence`
 - `next_action`, `witness_routes`, `verify_commands`
 - `selection_reason`, `actionability`, `relevance`
@@ -73,6 +74,7 @@ Each selected candidate includes required fields:
 Each `not_selected` entry includes:
 
 - `card_id`, `path`, `line`
+- `changed_line`
 - `operation`, `operation_family`, `class`, `priority`, `confidence`
 - `next_action`
 - `actionability`, `relevance`
@@ -95,6 +97,10 @@ Additional cards in an already-selected operation family remain in
 `not_selected[]` with reason `operation family already selected for
 comment-plan budget`; this preserves the review budget without hiding the
 underlying ReviewCards.
+Cards that are present in the ReviewCard set but lack a changed-line anchor
+must stay out of `comments[]` with reason `outside changed hunk`; this keeps
+future inline comments tied to PR review context without hiding the card from
+the artifact bundle.
 
 ## 6. Relevance and actionability
 
@@ -178,6 +184,9 @@ document is a future-lane contract, not a live workflow.
 - invalid line/path
 - missing `next_action`, `selection_reason`, `actionability`, `relevance`, or
   candidate `trust_boundary`
+- planned comments with `changed_line = false`
+- `not_selected[]` entries with `changed_line = false` whose reason is not
+  `outside changed hunk`
 - drift between `not_selected` review context and the referenced ReviewCard
 - `relevance` outside the documented set (`high`, `medium`, `low`)
 - body text that drifts from the structured ReviewCard projection

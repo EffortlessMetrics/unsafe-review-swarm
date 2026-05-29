@@ -889,6 +889,7 @@ fn first_pr_comment_plan_explains_not_selected_cards() -> Result<(), Box<dyn Err
         1
     );
     assert_eq!(comment_plan["not_selected"][0]["card_id"], card_id);
+    assert_eq!(comment_plan["not_selected"][0]["changed_line"], true);
     assert_eq!(comment_plan["not_selected"][0]["class"], "miri_unsupported");
     assert_eq!(
         comment_plan["not_selected"][0]["operation"],

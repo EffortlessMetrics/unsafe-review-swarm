@@ -598,7 +598,7 @@ comment-plan not_selected entries reference known cards
 comment-plan not_selected entries do not repeat planned comments
 comment-plan not_selected entries project ReviewCard operation and next action
 comment-plan has no duplicate card IDs or duplicate path/line anchors
-comment-plan has renderable line/path fields
+comment-plan has renderable line/path fields and keeps selected comments changed-line scoped
 comment-plan carries structured next action, actionability, relevance, and witness route fields
 comment-plan comment bodies stay within the hard 220-word limit
 comment-plan includes trust boundary
