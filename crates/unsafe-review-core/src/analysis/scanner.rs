@@ -1,6 +1,7 @@
 use super::atomic_pointer_state::is_atomic_pointer_state_transition;
 use super::copy_operation::copy_operation_family;
 use super::ffi_boundary::ffi_boundary_applicability;
+use super::slice_operation::slice_operation_family;
 use super::static_mut::{is_static_mut_item, parse_static_mut_name};
 use super::syntax::{ParsedSource, SyntaxNodeFact};
 use super::target_feature::is_target_feature_attribute;
@@ -531,9 +532,8 @@ fn detect_operation_family(line: &str) -> Option<OperationFamily> {
     if let Some(family) = vec_operation_family(line) {
         return Some(family);
     }
-    if contains_call_name(line, "from_raw_parts") || contains_call_name(line, "from_raw_parts_mut")
-    {
-        return Some(OperationFamily::SliceFromRawParts);
+    if let Some(family) = slice_operation_family(line) {
+        return Some(family);
     }
     None
 }
