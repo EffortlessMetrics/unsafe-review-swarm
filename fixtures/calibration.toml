@@ -375,6 +375,7 @@ required_core_fixtures = [
   "nonnull_let_else_new_reassigned_ptr_not_guard",
   "nonnull_let_else_new_shadowed_ptr_not_guard",
   "nonnull_match_new_reassigned_ptr_not_guard",
+  "nonnull_match_new_shadowed_ptr_not_guard",
   "impl_trait_bound_owner_inference",
   "long_unsafe_fn_owner_inference",
   "macro_rules_owner_inference",
@@ -4088,6 +4089,16 @@ expected_hazard = "pointer_validity"
 fixture = "nonnull_match_new_reassigned_ptr_not_guard"
 kind = "false_positive_control"
 claim = "match NonNull::new Some-arm evidence does not discharge the non-null obligation after the checked pointer is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "nonnull_match_new_shadowed_ptr_not_guard"
+kind = "false_positive_control"
+claim = "match NonNull::new Some-arm evidence does not discharge the non-null obligation after the checked pointer is shadowed"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

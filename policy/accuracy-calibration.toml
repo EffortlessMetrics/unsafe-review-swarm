@@ -645,6 +645,7 @@ fixtures = [
   "nonnull_let_else_new_reassigned_ptr_not_guard",
   "nonnull_let_else_new_shadowed_ptr_not_guard",
   "nonnull_match_new_reassigned_ptr_not_guard",
+  "nonnull_match_new_shadowed_ptr_not_guard",
 ]
 dogfood_targets = []
 label_ledgers = [
