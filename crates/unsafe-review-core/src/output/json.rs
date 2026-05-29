@@ -340,6 +340,7 @@ mod tests {
         "ptr_copy_slice_range_disjunctive_early_return_compound_reassigned_count_not_guard",
         "ptr_copy_slice_range_disjunctive_early_return_shadowed_count_not_guard",
         "ptr_copy_slice_range_disjunctive_early_return_reassigned_src_not_guard",
+        "ptr_copy_slice_range_disjunctive_early_return_shadowed_src_not_guard",
         "ptr_copy_slice_range_disjunctive_early_return_reassigned_dst_not_guard",
         "ptr_copy_slice_range_open_branch_reassigned_count_not_guard",
         "ptr_copy_slice_range_open_branch_compound_reassigned_count_not_guard",

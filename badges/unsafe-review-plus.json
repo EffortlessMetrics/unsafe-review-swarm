@@ -5,16 +5,16 @@
   "scope": "repo",
   "basis": "open_actionable_review_gaps_plus_evidence_quality_findings",
   "label": "unsafe-review+",
-  "message": "833",
+  "message": "835",
   "status": "fail",
   "color": "orange",
   "counts": {
-    "unsuppressed_review_gaps": 425,
-    "unsuppressed_evidence_quality_findings": 408,
+    "unsuppressed_review_gaps": 426,
+    "unsuppressed_evidence_quality_findings": 409,
     "suppressed_review_gaps": 0,
     "suppressed_evidence_quality_findings": 0,
     "intentional_findings": 0,
     "unknowns": 0,
-    "analyzed_unsafe_seams": 425
+    "analyzed_unsafe_seams": 426
   }
 }
