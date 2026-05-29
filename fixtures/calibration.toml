@@ -371,6 +371,7 @@ required_core_fixtures = [
   "nonnull_observed_not_guard",
   "nonnull_post_check_not_guard",
   "nonnull_if_let_new_reassigned_ptr_not_guard",
+  "nonnull_if_let_new_shadowed_ptr_not_guard",
   "nonnull_let_else_new_reassigned_ptr_not_guard",
   "nonnull_match_new_reassigned_ptr_not_guard",
   "impl_trait_bound_owner_inference",
@@ -3889,6 +3890,16 @@ claim = "if-let NonNull::new evidence discharges the non-null obligation for Non
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "nonnull_if_let_new_shadowed_ptr_not_guard"
+kind = "false_positive_control"
+claim = "if-let NonNull::new evidence does not discharge the non-null obligation after the checked pointer is shadowed"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
 expected_operation_family = "nonnull_unchecked"
 expected_hazard = "pointer_validity"
 
