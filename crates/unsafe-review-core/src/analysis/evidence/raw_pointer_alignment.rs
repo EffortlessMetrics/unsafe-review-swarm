@@ -13,7 +13,8 @@ pub(super) fn has_alignment_guard(site: &ScannedSite, lower: &str) -> bool {
         let guard_scope = code_before_operation(lower, &site.operation.expression)
             .unwrap_or_else(|| lower.to_string());
         let guard_compact = compact_code(&strip_block_comments_and_literals(&guard_scope));
-        return has_same_receiver_alignment_guard(&guard_compact, &receiver);
+        return RawPointerAlignmentApplicability::new(&guard_compact, &receiver)
+            .has_same_receiver_alignment_evidence();
     }
     stripped.contains("is_aligned")
         || stripped.contains("align_offset")
@@ -24,9 +25,22 @@ pub(super) fn has_alignment_guard(site: &ScannedSite, lower: &str) -> bool {
         || compact.contains("asusize%")
 }
 
-fn has_same_receiver_alignment_guard(compact: &str, receiver: &str) -> bool {
-    let receiver = compact_code(&receiver.to_ascii_lowercase());
-    has_same_receiver_alignment_condition_guard(compact, &receiver)
+struct RawPointerAlignmentApplicability<'a> {
+    guard_scope: &'a str,
+    same_receiver_target: String,
+}
+
+impl<'a> RawPointerAlignmentApplicability<'a> {
+    fn new(guard_scope: &'a str, receiver: &str) -> Self {
+        Self {
+            guard_scope,
+            same_receiver_target: compact_code(&receiver.to_ascii_lowercase()),
+        }
+    }
+
+    fn has_same_receiver_alignment_evidence(&self) -> bool {
+        has_same_receiver_alignment_condition_guard(self.guard_scope, &self.same_receiver_target)
+    }
 }
 
 fn has_same_receiver_alignment_condition_guard(compact: &str, receiver: &str) -> bool {
@@ -157,4 +171,31 @@ fn raw_pointer_alignment_receiver(expression: &str) -> Option<String> {
         return Some(receiver.to_string());
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn applicability_uses_same_receiver_alignment_guard() {
+        let context = RawPointerAlignmentApplicability::new("assert!(ptr.is_aligned());", "ptr");
+
+        assert!(context.has_same_receiver_alignment_evidence());
+    }
+
+    #[test]
+    fn applicability_rejects_other_receiver_alignment_guard() {
+        let context = RawPointerAlignmentApplicability::new("assert!(other.is_aligned());", "ptr");
+
+        assert!(!context.has_same_receiver_alignment_evidence());
+    }
+
+    #[test]
+    fn applicability_rejects_stale_receiver_after_guard() {
+        let context =
+            RawPointerAlignmentApplicability::new("assert!(ptr.is_aligned());ptr=other;", "ptr");
+
+        assert!(!context.has_same_receiver_alignment_evidence());
+    }
 }
