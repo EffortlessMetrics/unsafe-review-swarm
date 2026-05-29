@@ -7,6 +7,9 @@ use super::slice_operation::slice_operation_family;
 use super::static_mut::{is_static_mut_item, parse_static_mut_name};
 use super::syntax::{ParsedSource, SyntaxNodeFact};
 use super::target_feature::is_target_feature_attribute;
+use super::transmute_operation::{
+    is_incomplete_multiline_transmute_copy, transmute_operation_family,
+};
 use super::unsafe_impl::{
     is_impl_declaration_line, parse_impl_declaration_owner, parse_impl_owner, parse_impl_trait_name,
 };
@@ -346,8 +349,8 @@ fn detect_site(line: &str) -> Option<(UnsafeSiteKind, OperationFamily)> {
     if let Some(family) = maybeuninit_operation_family(line) {
         return Some((UnsafeSiteKind::Operation, family));
     }
-    if contains_call_name(line, "transmute") || contains_call_name(line, "transmute_copy") {
-        return Some((UnsafeSiteKind::Operation, OperationFamily::Transmute));
+    if let Some(family) = transmute_operation_family(line) {
+        return Some((UnsafeSiteKind::Operation, family));
     }
     if contains_call_name(line, "zeroed") {
         return Some((UnsafeSiteKind::Operation, OperationFamily::Zeroed));
@@ -575,11 +578,6 @@ fn call_suffix(after_name: &str) -> bool {
 
 fn is_ident_continue(ch: char) -> bool {
     ch == '_' || ch.is_ascii_alphanumeric()
-}
-
-fn is_incomplete_multiline_transmute_copy(line: &str) -> bool {
-    let compact = compact_whitespace(line);
-    compact.ends_with("transmute_copy::<")
 }
 
 #[derive(Clone, Debug)]

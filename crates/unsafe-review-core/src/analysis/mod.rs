@@ -14,6 +14,7 @@ mod slice_operation;
 mod static_mut;
 pub(crate) mod syntax;
 mod target_feature;
+mod transmute_operation;
 mod unsafe_impl;
 mod vec_operation;
 pub(crate) mod witness;
