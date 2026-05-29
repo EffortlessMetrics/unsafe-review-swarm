@@ -7,6 +7,7 @@ use super::target_feature::is_target_feature_attribute;
 use super::unsafe_impl::{
     is_impl_declaration_line, parse_impl_declaration_owner, parse_impl_owner, parse_impl_trait_name,
 };
+use super::vec_operation::vec_operation_family;
 use crate::domain::{OperationFamily, SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind};
 use crate::input::diff::DiffIndex;
 use std::collections::BTreeSet;
@@ -527,11 +528,8 @@ fn detect_operation_family(line: &str) -> Option<OperationFamily> {
     if let Some(family) = copy_operation_family(line) {
         return Some(family);
     }
-    if contains_call_name(line, "set_len") {
-        return Some(OperationFamily::VecSetLen);
-    }
-    if is_vec_from_raw_parts_call(line) {
-        return Some(OperationFamily::VecFromRawParts);
+    if let Some(family) = vec_operation_family(line) {
+        return Some(family);
     }
     if contains_call_name(line, "from_raw_parts") || contains_call_name(line, "from_raw_parts_mut")
     {
@@ -582,11 +580,6 @@ fn is_ident_continue(ch: char) -> bool {
 
 fn is_nonnull_new_unchecked_call(line: &str) -> bool {
     compact_whitespace(line).contains("NonNull::new_unchecked")
-}
-
-fn is_vec_from_raw_parts_call(line: &str) -> bool {
-    let compact = compact_whitespace(line);
-    compact.contains("Vec::from_raw_parts") || compact.contains("vec::Vec::from_raw_parts")
 }
 
 fn is_maybeuninit_assume_init_call(line: &str) -> bool {

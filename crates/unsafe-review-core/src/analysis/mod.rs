@@ -12,4 +12,5 @@ mod static_mut;
 pub(crate) mod syntax;
 mod target_feature;
 mod unsafe_impl;
+mod vec_operation;
 pub(crate) mod witness;
