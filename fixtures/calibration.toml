@@ -185,6 +185,7 @@ required_core_fixtures = [
   "ptr_copy_slice_range_or_branch_not_guard",
   "ptr_copy_slice_range_disjunctive_early_return_block_comment_not_guard",
   "ptr_copy_slice_range_disjunctive_early_return_reassigned_count_not_guard",
+  "ptr_copy_slice_range_disjunctive_early_return_compound_reassigned_count_not_guard",
   "ptr_copy_slice_range_disjunctive_early_return_reassigned_src_not_guard",
   "ptr_copy_slice_range_disjunctive_early_return_reassigned_dst_not_guard",
   "ptr_copy_slice_range_open_branch_reassigned_count_not_guard",
@@ -2468,6 +2469,16 @@ expected_hazard = "pointer_validity"
 fixture = "ptr_copy_slice_range_disjunctive_early_return_reassigned_count_not_guard"
 kind = "false_positive_control"
 claim = "ptr::copy rejects stale disjunctive invalid-range early-return evidence after the checked count is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_disjunctive_early_return_compound_reassigned_count_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy rejects stale disjunctive invalid-range early-return evidence after the checked count is compound-reassigned"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
