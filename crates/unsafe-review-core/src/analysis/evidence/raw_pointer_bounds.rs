@@ -15,12 +15,8 @@ pub(super) fn has_raw_pointer_read_bounds_evidence(
         return has_length_or_bounds_guard(&before_operation);
     };
     let before_operation = compact_code(&before_operation);
-    let Some(origin) = pointer_origin_receiver_before(&before_operation, pointer) else {
-        return false;
-    };
-
-    has_origin_len_size_guard(&before_operation, &origin)
-        || has_origin_len_capacity_equality_guard(&before_operation, &origin)
+    RawPointerReadBoundsApplicability::new(&before_operation, pointer)
+        .is_some_and(|context| context.has_same_origin_bounds_evidence())
 }
 
 fn raw_pointer_read_pointer_receiver(compact_expression: &str) -> Option<&str> {
@@ -90,6 +86,28 @@ fn assignment_binding_name(left_side: &str) -> Option<&str> {
         return Some(binding);
     }
     is_simple_identifier(left_side).then_some(left_side)
+}
+
+struct RawPointerReadBoundsApplicability<'a> {
+    before_operation: &'a str,
+    same_origin_target: String,
+}
+
+impl<'a> RawPointerReadBoundsApplicability<'a> {
+    fn new(before_operation: &'a str, pointer: &str) -> Option<Self> {
+        Some(Self {
+            before_operation,
+            same_origin_target: pointer_origin_receiver_before(before_operation, pointer)?,
+        })
+    }
+
+    fn has_same_origin_bounds_evidence(&self) -> bool {
+        has_origin_len_size_guard(self.before_operation, &self.same_origin_target)
+            || has_origin_len_capacity_equality_guard(
+                self.before_operation,
+                &self.same_origin_target,
+            )
+    }
 }
 
 fn has_origin_len_size_guard(compact: &str, origin: &str) -> bool {
@@ -230,4 +248,41 @@ fn origin_len_capacity_condition_matches(
     cap: &str,
 ) -> bool {
     condition.contains(len) && (condition.contains(capacity) || condition.contains(cap))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn applicability_uses_same_pointer_origin_bounds() -> Result<(), String> {
+        let before_operation =
+            "letptr=values.as_ptr();assert!(core::mem::size_of::<u8>()<=values.len());";
+        let context = RawPointerReadBoundsApplicability::new(before_operation, "ptr")
+            .ok_or_else(|| "ptr should trace to values".to_string())?;
+
+        assert!(context.has_same_origin_bounds_evidence());
+        Ok(())
+    }
+
+    #[test]
+    fn applicability_rejects_other_origin_bounds() -> Result<(), String> {
+        let before_operation =
+            "letptr=other.as_ptr();assert!(core::mem::size_of::<u8>()<=values.len());";
+        let context = RawPointerReadBoundsApplicability::new(before_operation, "ptr")
+            .ok_or_else(|| "ptr should trace to other".to_string())?;
+
+        assert!(!context.has_same_origin_bounds_evidence());
+        Ok(())
+    }
+
+    #[test]
+    fn applicability_rejects_stale_origin_after_guard() -> Result<(), String> {
+        let before_operation = "letptr=values.as_ptr();assert!(core::mem::size_of::<u8>()<=values.len());values=other;";
+        let context = RawPointerReadBoundsApplicability::new(before_operation, "ptr")
+            .ok_or_else(|| "ptr should trace to values".to_string())?;
+
+        assert!(!context.has_same_origin_bounds_evidence());
+        Ok(())
+    }
 }
