@@ -1610,6 +1610,25 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "bounds"
         ));
 
+        let shadowed_let_else_probe_index =
+            fixture_output("get_unchecked_mut_let_else_get_shadowed_index_not_guard")?;
+        let shadowed_let_else_probe_index_card = single_card(
+            "get_unchecked_mut_let_else_get_shadowed_index_not_guard",
+            &shadowed_let_else_probe_index,
+        )?;
+        assert_eq!(
+            shadowed_let_else_probe_index_card.operation.family,
+            OperationFamily::GetUnchecked
+        );
+        assert_eq!(
+            shadowed_let_else_probe_index_card.class,
+            ReviewClass::GuardMissing
+        );
+        assert!(!obligation_discharge_present(
+            shadowed_let_else_probe_index_card,
+            "bounds"
+        ));
+
         let stale_let_else_probe_receiver =
             fixture_output("get_unchecked_mut_let_else_get_reassigned_receiver_not_guard")?;
         let stale_let_else_probe_receiver_card = single_card(

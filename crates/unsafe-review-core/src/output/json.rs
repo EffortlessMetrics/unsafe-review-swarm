@@ -521,6 +521,7 @@ mod tests {
         "get_unchecked_mut_if_let_get_reassigned_receiver_not_guard",
         "get_unchecked_mut_if_let_get_shadowed_receiver_not_guard",
         "get_unchecked_mut_let_else_get_reassigned_index_not_guard",
+        "get_unchecked_mut_let_else_get_shadowed_index_not_guard",
         "get_unchecked_mut_let_else_get_reassigned_receiver_not_guard",
         "get_unchecked_mut_let_else_get_shadowed_receiver_not_guard",
         "get_unchecked_mut_match_get_reassigned_index_not_guard",
