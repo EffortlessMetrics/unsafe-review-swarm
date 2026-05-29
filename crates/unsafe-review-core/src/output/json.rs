@@ -444,6 +444,7 @@ mod tests {
         "vec_from_raw_parts_capacity_return_comment_not_guard",
         "vec_from_raw_parts_capacity_reassigned_not_guard",
         "vec_from_raw_parts_manuallydrop_origin",
+        "vec_from_raw_parts_stale_pointer_origin_not_guard",
         "box_from_raw",
         "box_from_raw_box_origin",
         "box_from_raw_reassigned_origin_not_guard",
