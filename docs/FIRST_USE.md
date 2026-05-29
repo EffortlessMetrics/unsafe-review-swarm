@@ -123,7 +123,8 @@ artifact only; `unsafe-review` does not post comments by default.
 
 ## Inspect One Card
 
-`first-pr` prints `Inspect top card` commands for the highest-priority card.
+`first-pr` prints `Explain top card` and `Agent packet` commands for the
+highest-priority card.
 Run the `explain` command to see why the card exists, what evidence is missing,
 what would resolve it, what would not resolve it, which witness route fits, and
 what unsafe-review is not claiming:

@@ -125,8 +125,9 @@ fn print_top_card_summary(
         println!("  Route: `{}`", route.kind.as_str());
     }
     println!("  Next: {}", card.next_action.summary);
-    println!("Inspect top card:");
+    println!("Explain top card:");
     println!("  {}", explain_command(root, &card.id));
+    println!("Agent packet:");
     println!("  {}", context_command(root, &card.id));
 }
 

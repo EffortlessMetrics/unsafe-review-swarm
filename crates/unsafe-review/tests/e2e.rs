@@ -605,7 +605,8 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("`raw_pointer_read`"));
     assert!(stdout.contains("Class: `guard_missing`"));
     assert!(stdout.contains("Route: `miri`"));
-    assert!(stdout.contains("Inspect top card:"));
+    assert!(stdout.contains("Explain top card:"));
+    assert!(stdout.contains("Agent packet:"));
     assert!(stdout.contains("Artifacts:"));
     assert!(stdout.contains("cards.json"));
     assert!(stdout.contains("pr-summary.md"));
