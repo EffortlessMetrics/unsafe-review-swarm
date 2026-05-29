@@ -1,3 +1,4 @@
+use super::ffi_boundary::ffi_boundary_applicability;
 use super::syntax::{ParsedSource, SyntaxNodeFact};
 use crate::domain::{OperationFamily, SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind};
 use crate::input::diff::DiffIndex;
@@ -508,118 +509,6 @@ fn update_brace_depth(line: &str, mut depth: usize) -> usize {
     depth
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct FfiBoundaryApplicability {
-    kind: FfiBoundaryKind,
-    call_path: String,
-}
-
-impl FfiBoundaryApplicability {
-    fn same_file_extern(call_path: impl Into<String>) -> Self {
-        Self {
-            kind: FfiBoundaryKind::SameFileExtern,
-            call_path: call_path.into(),
-        }
-    }
-
-    fn known_foreign_path(call_path: impl Into<String>) -> Self {
-        Self {
-            kind: FfiBoundaryKind::KnownForeignPath,
-            call_path: call_path.into(),
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum FfiBoundaryKind {
-    SameFileExtern,
-    KnownForeignPath,
-}
-
-fn ffi_boundary_applicability(
-    line: &str,
-    extern_names: &BTreeSet<String>,
-    local_modules: &BTreeSet<String>,
-) -> Option<FfiBoundaryApplicability> {
-    if !unsafe_block_contains_call(line) {
-        return None;
-    }
-    if !local_modules.contains("libc")
-        && let Some(call_path) = matching_call_path_prefix(line, "libc::")
-    {
-        return Some(FfiBoundaryApplicability::known_foreign_path(call_path));
-    }
-    if let Some(call_path) = matching_extern_call_path(line, extern_names) {
-        return Some(FfiBoundaryApplicability::same_file_extern(call_path));
-    }
-    None
-}
-
-fn matching_extern_call_path<'a>(
-    line: &str,
-    extern_names: &'a BTreeSet<String>,
-) -> Option<&'a str> {
-    extern_names
-        .iter()
-        .find_map(|name| contains_extern_call_path(line, name).then_some(name.as_str()))
-}
-
-fn contains_extern_call_path(line: &str, path: &str) -> bool {
-    if path.contains("::") {
-        contains_call_path(line, path)
-    } else {
-        contains_unqualified_call_name(line, path)
-    }
-}
-
-fn contains_call_path(line: &str, path: &str) -> bool {
-    let mut cursor = line;
-    let mut offset = 0usize;
-    while let Some(pos) = cursor.find(path) {
-        let absolute = offset + pos;
-        let before = line[..absolute].chars().next_back();
-        let starts_on_boundary = before.is_none_or(|ch| !is_ident_continue(ch) && ch != ':');
-        let after_path = &line[absolute + path.len()..];
-        if starts_on_boundary && call_suffix(after_path) {
-            return true;
-        }
-        let next = pos + path.len();
-        offset += next;
-        cursor = &cursor[next..];
-    }
-    false
-}
-
-fn matching_call_path_prefix(line: &str, prefix: &str) -> Option<String> {
-    let mut cursor = line;
-    let mut offset = 0usize;
-    while let Some(pos) = cursor.find(prefix) {
-        let absolute = offset + pos;
-        let before = line[..absolute].chars().next_back();
-        let starts_on_boundary = before.is_none_or(|ch| !is_ident_continue(ch));
-        let after_prefix = &line[absolute + prefix.len()..];
-        if starts_on_boundary && call_path_suffix(after_prefix) {
-            let path_end = after_prefix.find('(').unwrap_or(after_prefix.len());
-            let call_suffix = after_prefix[..path_end].trim();
-            return Some(format!("{prefix}{call_suffix}"));
-        }
-        let next = pos + prefix.len();
-        offset += next;
-        cursor = &cursor[next..];
-    }
-    None
-}
-
-fn call_path_suffix(after_prefix: &str) -> bool {
-    let Some(paren) = after_prefix.find('(') else {
-        return false;
-    };
-    let path = after_prefix[..paren].trim();
-    !path.is_empty()
-        && path.chars().next().is_some_and(is_ident_continue)
-        && path.chars().all(|ch| is_ident_continue(ch) || ch == ':')
-}
-
 fn is_import_item(line: &str) -> bool {
     let trimmed = line.trim_start();
     trimmed.starts_with("use ")
@@ -676,24 +565,6 @@ fn contains_call_name(line: &str, name: &str) -> bool {
         let before = cursor[..pos].chars().next_back();
         let after = &cursor[pos + name.len()..];
         let starts_on_boundary = before.is_none_or(|ch| !is_ident_continue(ch));
-        if starts_on_boundary && call_suffix(after) {
-            return true;
-        }
-        cursor = &after[after
-            .char_indices()
-            .next()
-            .map_or(after.len(), |(idx, ch)| idx + ch.len_utf8())..];
-    }
-    false
-}
-
-fn contains_unqualified_call_name(line: &str, name: &str) -> bool {
-    let mut cursor = line;
-    while let Some(pos) = cursor.find(name) {
-        let before = cursor[..pos].chars().next_back();
-        let after = &cursor[pos + name.len()..];
-        let starts_on_boundary =
-            before.is_none_or(|ch| !is_ident_continue(ch)) && before != Some(':');
         if starts_on_boundary && call_suffix(after) {
             return true;
         }
@@ -1070,7 +941,7 @@ fn detect_syntax_site(
         "BLOCK_EXPR"
             if compact.starts_with("unsafe {")
                 && !operation_block_ranges.contains(&(fact.start, fact.end))
-                && ffi_boundary_applicability(&compact, extern_names, local_modules).is_some() =>
+                && ffi_boundary_applicability(&compact, extern_names, local_modules) =>
         {
             Some((UnsafeSiteKind::FfiCall, OperationFamily::Ffi))
         }
@@ -1743,59 +1614,6 @@ mod tests {
         assert_eq!(
             detect_site("unsafe extern \"C\" {"),
             Some((UnsafeSiteKind::ExternBlock, OperationFamily::Ffi))
-        );
-    }
-
-    #[test]
-    fn ffi_boundary_applicability_keeps_foreign_boundary_explicit() {
-        let extern_names = BTreeSet::from([
-            "strlen".to_string(),
-            "ffi::strlen".to_string(),
-            "crate::ffi::strlen".to_string(),
-            "self::ffi::strlen".to_string(),
-        ]);
-        let local_modules = BTreeSet::new();
-        let local_libc = BTreeSet::from(["libc".to_string()]);
-
-        assert_eq!(
-            ffi_boundary_applicability("unsafe { strlen(ptr) }", &extern_names, &local_modules),
-            Some(FfiBoundaryApplicability::same_file_extern("strlen"))
-        );
-        assert_eq!(
-            ffi_boundary_applicability(
-                "unsafe { ffi::strlen(ptr) }",
-                &extern_names,
-                &local_modules
-            ),
-            Some(FfiBoundaryApplicability::same_file_extern("ffi::strlen"))
-        );
-        assert_eq!(
-            ffi_boundary_applicability(
-                "unsafe { other::ffi::strlen(ptr) }",
-                &extern_names,
-                &local_modules
-            ),
-            None
-        );
-        assert_eq!(
-            ffi_boundary_applicability(
-                "unsafe { libc::strlen(ptr) }",
-                &extern_names,
-                &local_modules
-            ),
-            Some(FfiBoundaryApplicability::known_foreign_path("libc::strlen"))
-        );
-        assert_eq!(
-            ffi_boundary_applicability("unsafe { libc::strlen(ptr) }", &extern_names, &local_libc),
-            None
-        );
-        assert_eq!(
-            ffi_boundary_applicability(
-                "unsafe { mylibc::strlen(ptr) }",
-                &extern_names,
-                &local_modules
-            ),
-            None
         );
     }
 

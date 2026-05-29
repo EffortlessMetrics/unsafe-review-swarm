@@ -1,5 +1,6 @@
 pub(crate) mod classify;
 pub(crate) mod evidence;
+mod ffi_boundary;
 pub(crate) mod obligations;
 pub(crate) mod pipeline;
 pub(crate) mod receipts;
