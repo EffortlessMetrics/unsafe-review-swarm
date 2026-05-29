@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      UNSAFE_REVIEW_VERSION: "0.2.0"
+      UNSAFE_REVIEW_VERSION: "0.2.1"
       BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
       BUNDLE_DIR: target/unsafe-review
     steps:
@@ -73,7 +73,8 @@ jobs:
             cards.sarif \
             comment-plan.json \
             witness-plan.md \
-            lsp.json
+            lsp.json \
+            repair-queue.json
           do
             if [ ! -s "${BUNDLE_DIR}/${required}" ]; then
               echo "::error::unsafe-review bundle is missing ${required}"
@@ -97,4 +98,5 @@ jobs:
             target/unsafe-review/comment-plan.json
             target/unsafe-review/witness-plan.md
             target/unsafe-review/lsp.json
+            target/unsafe-review/repair-queue.json
           if-no-files-found: error
