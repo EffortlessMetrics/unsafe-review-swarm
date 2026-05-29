@@ -234,6 +234,8 @@ a code-scanning baseline contract change, not a wording-only edit.
 
 Plan-only inline-comment artifact.
 
+Must include `schema_version = 0.1`.
+
 Must include:
 
 ```text
@@ -326,6 +328,8 @@ receipt hint
 #### 3.7 `lsp.json`
 
 Saved editor/LLM projection.
+
+Must include `schema_version = 0.1`.
 
 Must be read-only.
 

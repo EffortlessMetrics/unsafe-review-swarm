@@ -578,11 +578,14 @@ It must validate:
 
 ```text
 cards.json exists and parses
+cards.json schema_version is checked
 pr-summary.md exists
 cards.sarif exists and parses
 comment-plan.json exists and parses
+comment-plan.json schema_version is checked
 witness-plan.md exists
 lsp.json exists and parses
+lsp.json schema_version is checked
 repair-queue.json exists and parses
 
 card IDs align across artifacts

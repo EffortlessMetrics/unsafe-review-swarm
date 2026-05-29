@@ -526,6 +526,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
     }
 
     let cards = super::parse_json_file(&dir.join("cards.json"))?;
+    super::require_json_str(&cards, "schema_version", "0.1", "cards.json")?;
     super::require_json_str(&cards, "tool", "unsafe-review", "cards.json")?;
     super::require_json_str(&cards, "policy", "advisory", "cards.json")?;
     super::require_json_array(&cards, "cards", "cards.json")?;
@@ -749,6 +750,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
 
     let comment_plan_path = dir.join("comment-plan.json");
     let comment_plan = super::parse_json_file(&comment_plan_path)?;
+    super::require_json_str(&comment_plan, "schema_version", "0.1", "comment-plan.json")?;
     super::require_json_str(&comment_plan, "mode", "plan_only", "comment-plan.json")?;
     super::require_json_str(&comment_plan, "policy", "advisory", "comment-plan.json")?;
     super::require_json_array(&comment_plan, "comments", "comment-plan.json")?;
@@ -2284,6 +2286,7 @@ fn check_lsp_artifact(dir: &Path, summary: &AdvisoryArtifactSummary) -> Result<(
     let lsp = super::parse_json_file(&path)?;
     let card_projections = &summary.card_projections;
     let card_ids = card_projections.keys().cloned().collect::<BTreeSet<_>>();
+    super::require_json_str(&lsp, "schema_version", "0.1", "lsp.json")?;
     super::require_json_str(&lsp, "tool", "unsafe-review", "lsp.json")?;
     super::require_json_str(&lsp, "mode", "read_only_projection", "lsp.json")?;
     super::require_json_str(&lsp, "policy", "advisory", "lsp.json")?;
