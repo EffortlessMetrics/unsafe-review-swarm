@@ -13340,6 +13340,33 @@ Snapshot reports:
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_repair_queue_schema_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-repair-queue-schema-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+
+        let path = dir.join("repair-queue.json");
+        let mut repair_queue: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&path).map_err(|err| format!("read repair queue failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse repair queue failed: {err}"))?;
+        repair_queue["schema_version"] = serde_json::json!("2.0");
+        fs::write(&path, repair_queue.to_string())
+            .map_err(|err| format!("write repair queue failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("repair-queue.json key `schema_version` is `2.0`, expected `0.1`")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn policy_ledger_accepts_empty_status_without_entries() -> Result<(), String> {
         let path = unique_temp_dir("unsafe-review-empty-ledger")?.with_extension("toml");
         fs::write(

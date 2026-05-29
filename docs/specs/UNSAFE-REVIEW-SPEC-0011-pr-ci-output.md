@@ -387,6 +387,7 @@ Aggregate copy-only agent handoff queue.
 Must include:
 
 ```text
+schema_version = 0.1
 mode = aggregate_repair_queue
 source = review_card
 policy = advisory

@@ -102,6 +102,8 @@ target/unsafe-review/repair-queue.json
 That artifact must be a checked projection of the same ReviewCards and
 card-scoped agent packet metadata. It must not reclassify cards, invent new
 repairs, or become a second source of analyzer truth.
+Its schema version is currently `0.1` and is part of the artifact verifier
+contract.
 
 The aggregate queue may group cards into bounded work buckets:
 

@@ -1015,6 +1015,7 @@ fn check_repair_queue_artifact(
 ) -> Result<(), String> {
     let path = dir.join("repair-queue.json");
     let repair_queue = super::parse_json_file(&path)?;
+    super::require_json_str(&repair_queue, "schema_version", "0.1", "repair-queue.json")?;
     super::require_json_str(
         &repair_queue,
         "mode",

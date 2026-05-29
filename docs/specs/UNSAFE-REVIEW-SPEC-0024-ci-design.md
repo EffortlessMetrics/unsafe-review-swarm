@@ -602,6 +602,7 @@ comment-plan includes trust boundary
 witness-plan includes route limits
 lsp.json contains read-only projections
 lsp.json code actions are command-only
+repair-queue.json schema_version is checked
 repair-queue.json references known ReviewCards
 repair-queue.json bucket names use the closed vocabulary
 repair-queue.json bucket reasons use the closed vocabulary
