@@ -180,11 +180,11 @@ mod tests {
         assert_review_budget_summary(&value, 1, 2)?;
         assert_eq!(
             value["not_selected"][0]["reason"],
-            "operation family and obligation already selected for comment-plan budget"
+            "covered by selected family/obligation sibling"
         );
         assert_eq!(
             value["not_selected"][1]["reason"],
-            "operation family and obligation already selected for comment-plan budget"
+            "covered by selected family/obligation sibling"
         );
         Ok(())
     }

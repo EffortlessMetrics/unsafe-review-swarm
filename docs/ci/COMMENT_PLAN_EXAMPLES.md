@@ -122,7 +122,7 @@ visible in `not_selected[]`:
     {
       "operation_family": "raw_pointer_read",
       "changed_line": true,
-      "reason": "operation family and obligation already selected for comment-plan budget"
+"reason": "covered by selected family/obligation sibling"
     }
   ]
 }

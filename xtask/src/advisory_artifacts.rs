@@ -2068,7 +2068,7 @@ fn expected_non_selection_reason(
     } else if !(card.priority == "high" || card.confidence == "high") {
         "priority/confidence below inline comment threshold"
     } else if selected_budget_keys.contains(&comment_budget_key(card)) {
-        "operation family and obligation already selected for comment-plan budget"
+        "covered by selected family/obligation sibling"
     } else if planned_count >= 3 {
         "comment-plan max of three candidates reached"
     } else {
