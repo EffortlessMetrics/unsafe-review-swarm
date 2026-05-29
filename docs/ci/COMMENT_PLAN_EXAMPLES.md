@@ -109,11 +109,12 @@ the call site. The plan keeps the comment specific:
 The candidate body asks for the missing length / overlap guard explicitly; it
 does not say "copy is unsafe" or "this is UB".
 
-## Family-budget suppression
+## Family/Obligation-Budget Suppression
 
-The inline plan is capped by count and by operation family. If multiple
-high-signal cards share one `operation_family`, the first selected card keeps
-the inline comment slot and the others stay visible in `not_selected[]`:
+The inline plan is capped by count and by operation family plus obligation. If
+multiple high-signal cards share one `operation_family` and missing-obligation
+set, the first selected card keeps the inline comment slot and the others stay
+visible in `not_selected[]`:
 
 ```json
 {
@@ -121,7 +122,7 @@ the inline comment slot and the others stay visible in `not_selected[]`:
     {
       "operation_family": "raw_pointer_read",
       "changed_line": true,
-      "reason": "operation family already selected for comment-plan budget"
+      "reason": "operation family and obligation already selected for comment-plan budget"
     }
   ]
 }

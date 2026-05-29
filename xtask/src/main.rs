@@ -13418,8 +13418,7 @@ Snapshot reports:
     }
 
     #[test]
-    fn advisory_artifact_checker_rejects_duplicate_comment_operation_family() -> Result<(), String>
-    {
+    fn advisory_artifact_checker_rejects_duplicate_comment_budget_key() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-artifacts-comment-duplicate-family")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
         write_valid_artifacts(&dir)?;
@@ -13488,7 +13487,7 @@ Snapshot reports:
             result
                 .err()
                 .unwrap_or_default()
-                .contains("repeats operation_family `raw_pointer_read`")
+                .contains("repeats operation family and obligation budget key")
         );
         Ok(())
     }

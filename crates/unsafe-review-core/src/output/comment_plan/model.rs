@@ -33,18 +33,18 @@ impl From<&AnalyzeOutput> for CommentPlan {
     fn from(output: &AnalyzeOutput) -> Self {
         let mut comments = Vec::new();
         let mut not_selected = Vec::new();
-        let mut selected_operation_families = BTreeSet::new();
+        let mut selected_budget_keys = BTreeSet::new();
 
         for card in &output.cards {
             if should_plan_comment(card) {
-                let operation_family = card.operation.family.as_str();
-                if selected_operation_families.contains(operation_family) {
+                let budget_key = comment_budget_key(card);
+                if selected_budget_keys.contains(&budget_key) {
                     not_selected.push(NotSelectedCard::from_reason(
                         card,
                         OPERATION_FAMILY_BUDGET_REASON,
                     ));
                 } else if comments.len() < MAX_PLANNED_COMMENTS {
-                    selected_operation_families.insert(operation_family);
+                    selected_budget_keys.insert(budget_key);
                     comments.push(PlannedComment::from(card));
                 } else {
                     not_selected.push(NotSelectedCard::from_reason(
@@ -80,6 +80,32 @@ impl From<&AnalyzeOutput> for CommentPlan {
             trust_boundary: TRUST_BOUNDARY,
         }
     }
+}
+
+fn comment_budget_key(card: &ReviewCard) -> String {
+    let mut obligations = card
+        .obligation_evidence
+        .iter()
+        .filter(|evidence| {
+            !evidence.contract.present
+                || !evidence.discharge.present
+                || !evidence.reach.present
+                || !evidence.witness.present
+        })
+        .map(|evidence| evidence.obligation.key.as_str())
+        .collect::<Vec<_>>();
+    obligations.sort_unstable();
+    obligations.dedup();
+
+    if obligations.is_empty() {
+        obligations.push("review");
+    }
+
+    format!(
+        "{}:{}",
+        card.operation.family.as_str(),
+        obligations.join("|")
+    )
 }
 
 #[derive(Serialize)]

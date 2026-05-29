@@ -291,9 +291,9 @@ trust_boundary
 `line` must be one-based and nonzero.
 
 Planned comments must not repeat a `card_id` or a `path`/`line` inline anchor.
-Planned comments also must not repeat an `operation_family` by default; later
-cards in the same family remain visible in `not_selected[]` with an explicit
-budget reason.
+Planned comments also must not repeat an `operation_family` plus
+missing-obligation set by default; later cards with the same family/obligation
+budget key remain visible in `not_selected[]` with an explicit budget reason.
 
 Each `not_selected` entry must reference a known card, must not repeat a
 planned comment card, and must include the ReviewCard operation, operation

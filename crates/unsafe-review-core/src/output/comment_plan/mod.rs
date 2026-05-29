@@ -155,7 +155,7 @@ mod tests {
     }
 
     #[test]
-    fn comment_plan_suppresses_duplicate_operation_family_candidates() -> Result<(), String> {
+    fn comment_plan_suppresses_duplicate_family_obligation_candidates() -> Result<(), String> {
         let mut output = fixture_output("raw_pointer_alignment")?;
         let template = output
             .cards
@@ -180,12 +180,44 @@ mod tests {
         assert_review_budget_summary(&value, 1, 2)?;
         assert_eq!(
             value["not_selected"][0]["reason"],
-            "operation family already selected for comment-plan budget"
+            "operation family and obligation already selected for comment-plan budget"
         );
         assert_eq!(
             value["not_selected"][1]["reason"],
-            "operation family already selected for comment-plan budget"
+            "operation family and obligation already selected for comment-plan budget"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn comment_plan_allows_same_family_with_different_missing_obligations() -> Result<(), String> {
+        let mut output = fixture_output("raw_pointer_alignment")?;
+        let template = output
+            .cards
+            .first()
+            .cloned()
+            .ok_or_else(|| "fixture should emit a card".to_string())?;
+        let mut alignment = template.clone();
+        alignment.id.0 = "raw-pointer-alignment-card".to_string();
+        alignment
+            .obligation_evidence
+            .retain(|evidence| evidence.obligation.key == "alignment");
+        let mut initialized = template;
+        initialized.id.0 = "raw-pointer-initialized-card".to_string();
+        initialized
+            .obligation_evidence
+            .retain(|evidence| evidence.obligation.key == "initialized");
+        output.cards = vec![alignment, initialized];
+        output.summary.cards = output.cards.len();
+        output.summary.open_actionable_gaps = output.cards.len();
+
+        let value = parse_json(&render(&output))?;
+
+        assert_eq!(value["comments"].as_array().map_or(0, Vec::len), 2);
+        assert_eq!(value["comments"][0]["operation_family"], "raw_pointer_read");
+        assert_eq!(value["comments"][1]["operation_family"], "raw_pointer_read");
+        assert!(value.get("not_selected").is_none());
+        assert_review_budget_summary(&value, 2, 0)?;
         Ok(())
     }
 

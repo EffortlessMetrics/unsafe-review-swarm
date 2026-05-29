@@ -802,7 +802,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
     }
     let mut comment_card_ids = BTreeSet::new();
     let mut comment_locations = BTreeSet::new();
-    let mut comment_operation_families = BTreeSet::new();
+    let mut comment_budget_keys = BTreeSet::new();
     let mut comment_body_projections = Vec::new();
     for comment in comments {
         let Some(card_id) = comment.get("card_id").and_then(serde_json::Value::as_str) else {
@@ -879,14 +879,15 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         super::require_non_empty_json_str(comment, "priority", "comment-plan.json comment")?;
         super::require_non_empty_json_str(comment, "confidence", "comment-plan.json comment")?;
         super::require_non_empty_json_str(comment, "operation", "comment-plan.json comment")?;
-        let operation_family = super::require_non_empty_json_str(
+        super::require_non_empty_json_str(
             comment,
             "operation_family",
             "comment-plan.json comment",
         )?;
-        if !comment_operation_families.insert(operation_family.to_string()) {
+        let budget_key = comment_budget_key(card_projection);
+        if !comment_budget_keys.insert(budget_key.clone()) {
             return Err(format!(
-                "comment-plan.json repeats operation_family `{operation_family}` in planned comments"
+                "comment-plan.json repeats operation family and obligation budget key `{budget_key}` in planned comments"
             ));
         }
         let next_action =
@@ -1012,7 +1013,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
                 expected_non_selection_reason(
                     card_projection,
                     comments.len(),
-                    &comment_operation_families,
+                    &comment_budget_keys,
                     changed_line,
                 ),
                 "comment-plan.json not_selected reason",
@@ -2053,7 +2054,7 @@ fn expected_selection_reason(card: &CardProjection) -> &'static str {
 fn expected_non_selection_reason(
     card: &CardProjection,
     planned_count: usize,
-    selected_operation_families: &BTreeSet<String>,
+    selected_budget_keys: &BTreeSet<String>,
     changed_line: bool,
 ) -> &'static str {
     if !changed_line {
@@ -2066,13 +2067,41 @@ fn expected_non_selection_reason(
         "confidence below inline comment threshold"
     } else if !(card.priority == "high" || card.confidence == "high") {
         "priority/confidence below inline comment threshold"
-    } else if selected_operation_families.contains(&card.operation_family) {
-        "operation family already selected for comment-plan budget"
+    } else if selected_budget_keys.contains(&comment_budget_key(card)) {
+        "operation family and obligation already selected for comment-plan budget"
     } else if planned_count >= 3 {
         "comment-plan max of three candidates reached"
     } else {
         "not selected by current inline comment policy"
     }
+}
+
+fn comment_budget_key(card: &CardProjection) -> String {
+    let mut obligations = card
+        .obligation_evidence
+        .iter()
+        .filter(|evidence| {
+            !evidence_axis_present(evidence, "contract")
+                || !evidence_axis_present(evidence, "discharge")
+                || !evidence_axis_present(evidence, "reach")
+                || !evidence_axis_present(evidence, "witness")
+        })
+        .filter_map(|evidence| evidence.get("key").and_then(serde_json::Value::as_str))
+        .collect::<Vec<_>>();
+    obligations.sort_unstable();
+    obligations.dedup();
+    if obligations.is_empty() {
+        obligations.push("review");
+    }
+    format!("{}:{}", card.operation_family, obligations.join("|"))
+}
+
+fn evidence_axis_present(evidence: &serde_json::Value, axis: &str) -> bool {
+    evidence
+        .get(axis)
+        .and_then(|axis| axis.get("present"))
+        .and_then(serde_json::Value::as_bool)
+        .unwrap_or(false)
 }
 
 fn expected_relevance(card: &CardProjection) -> &'static str {

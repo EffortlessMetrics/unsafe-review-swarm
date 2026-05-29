@@ -2,7 +2,7 @@ use crate::domain::{Confidence, OperationFamily, Priority, ReviewCard, ReviewCla
 
 const PLAN_BOUNDARY: &str = "Plan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision.";
 pub(super) const OPERATION_FAMILY_BUDGET_REASON: &str =
-    "operation family already selected for comment-plan budget";
+    "operation family and obligation already selected for comment-plan budget";
 
 pub(super) fn should_plan_comment(card: &ReviewCard) -> bool {
     card.site.changed
