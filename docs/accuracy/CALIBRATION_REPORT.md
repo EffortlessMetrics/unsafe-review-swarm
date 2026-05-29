@@ -20,9 +20,9 @@ It does not promote any claim to labeled calibration or policy readiness.
 - Dogfood-measured claims: 0
 - Labeled-calibrated claims: 0
 - Policy-eligible claims: 0
-- Calibration cases: 388
+- Calibration cases: 389
 - Label ledgers: 34
-- Label samples: 400
+- Label samples: 401
 - Labeled reports: 0
 
 ## Current Claim Level

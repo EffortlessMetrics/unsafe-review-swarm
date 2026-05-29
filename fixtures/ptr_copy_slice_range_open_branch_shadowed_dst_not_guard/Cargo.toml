@@ -1,0 +1,6 @@
+[package]
+name = "ptr-copy-slice-range-open-branch-shadowed-dst-not-guard"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
