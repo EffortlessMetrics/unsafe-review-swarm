@@ -186,6 +186,8 @@ validation,
 `str_from_utf8_unchecked_match_ok_guard` for same-buffer match `Ok` arm
 validation, `str_from_utf8_unchecked_if_let_err_reassigned_not_guard` for
 stale-buffer rejection after if-let `Err` validation,
+`str_from_utf8_unchecked_guard_then_shadowed_not_guard` for stale-buffer
+rejection after binding shadowing,
 `str_from_utf8_unchecked_let_else_ok_reassigned_not_guard` for stale-buffer
 rejection after let-else validation, and
 `str_from_utf8_unchecked_match_ok_reassigned_not_guard` for stale-buffer
