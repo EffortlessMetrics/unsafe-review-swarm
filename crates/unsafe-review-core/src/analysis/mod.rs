@@ -9,4 +9,5 @@ pub(crate) mod scanner;
 mod set_len_shrink;
 mod static_mut;
 pub(crate) mod syntax;
+mod target_feature;
 pub(crate) mod witness;

@@ -2,6 +2,7 @@ use super::atomic_pointer_state::is_atomic_pointer_state_transition;
 use super::ffi_boundary::ffi_boundary_applicability;
 use super::static_mut::{is_static_mut_item, parse_static_mut_name};
 use super::syntax::{ParsedSource, SyntaxNodeFact};
+use super::target_feature::is_target_feature_attribute;
 use crate::domain::{OperationFamily, SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind};
 use crate::input::diff::DiffIndex;
 use std::collections::BTreeSet;
@@ -583,11 +584,6 @@ fn call_suffix(after_name: &str) -> bool {
 
 fn is_ident_continue(ch: char) -> bool {
     ch == '_' || ch.is_ascii_alphanumeric()
-}
-
-fn is_target_feature_attribute(line: &str) -> bool {
-    let trimmed = line.trim_start();
-    trimmed.starts_with("#[target_feature") || contains_call_name(trimmed, "target_feature")
 }
 
 fn is_nonnull_new_unchecked_call(line: &str) -> bool {
