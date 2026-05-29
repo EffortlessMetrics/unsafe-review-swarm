@@ -29,6 +29,32 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
         report.summary.duplicate,
         report.summary.invalid
     ));
+    out.push_str("## Reviewer front panel\n\n");
+    out.push_str(&format!("- Matched receipts: {}\n", report.summary.matched));
+    out.push_str(&format!(
+        "- Receipts without a current card match: {} unmatched, {} stale\n",
+        report.summary.unmatched, report.summary.stale
+    ));
+    out.push_str("- Problem flags: ");
+    let problem_flags = problem_flags(&report.summary);
+    if problem_flags.is_empty() {
+        out.push_str("none\n");
+    } else {
+        out.push_str(&problem_flags.join("; "));
+        out.push('\n');
+    }
+    if problem_flags.is_empty() {
+        out.push_str(
+            "- Next action: keep matching receipt metadata attached to the review record.\n",
+        );
+    } else {
+        out.push_str(
+            "- Next action: review nonzero problem flags before treating saved receipts as current witness evidence.\n",
+        );
+    }
+    out.push_str(
+        "- Boundary: matched receipts improve witness evidence only; they do not erase missing contracts, guards, or reach evidence.\n\n",
+    );
     out.push_str("## Receipts\n\n");
     if report.receipts.is_empty() {
         out.push_str("No receipt files found.\n\n");
@@ -53,6 +79,23 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
     out.push_str(&report.trust_boundary);
     out.push('\n');
     out
+}
+
+fn problem_flags(summary: &crate::analysis::receipts::ReceiptAuditSummary) -> Vec<String> {
+    [
+        ("unmatched", summary.unmatched),
+        ("stale", summary.stale),
+        ("expired", summary.expired),
+        ("wrong identity", summary.wrong_identity),
+        ("wrong tool", summary.wrong_tool),
+        ("weak strength", summary.weaker_than_required),
+        ("command hash mismatch", summary.command_hash_mismatch),
+        ("duplicate", summary.duplicate),
+        ("invalid", summary.invalid),
+    ]
+    .into_iter()
+    .filter_map(|(label, count)| (count > 0).then(|| format!("{label}: {count}")))
+    .collect()
 }
 
 fn receipt_row(receipt: &crate::analysis::receipts::ReceiptAuditEntry) -> String {
@@ -231,6 +274,18 @@ mod tests {
         assert!(markdown.contains("Audit date: `2026-05-26`"));
         assert!(markdown.contains("Command hash mismatch"));
         assert!(markdown.contains("| 2 | 1 | 1 | 0 | 1 | 0 | 1 | 1 | 1 | 0 | 0 |"));
+        assert!(markdown.contains("## Reviewer front panel"));
+        assert!(markdown.contains("- Matched receipts: 1"));
+        assert!(markdown.contains("- Receipts without a current card match: 1 unmatched, 1 stale"));
+        assert!(markdown.contains(
+            "- Problem flags: unmatched: 1; stale: 1; wrong tool: 1; weak strength: 1; command hash mismatch: 1"
+        ));
+        assert!(markdown.contains(
+            "review nonzero problem flags before treating saved receipts as current witness evidence"
+        ));
+        assert!(markdown.contains(
+            "matched receipts improve witness evidence only; they do not erase missing contracts"
+        ));
         assert!(markdown.contains(
             "| Status | Receipt | Card | Matched card | Tool | Strength | Summary | Author | Recorded | Expires | Command hash | Limitations | Routed tools | Issues |"
         ));

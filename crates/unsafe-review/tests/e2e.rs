@@ -1510,6 +1510,12 @@ fn receipt_audit_reports_matching_saved_receipts_without_running_witnesses()
     assert_eq!(stdout_text(&markdown)?.trim(), "");
     let markdown = fs::read_to_string(audit_path)?;
     assert!(markdown.contains("# unsafe-review receipt audit"));
+    assert!(markdown.contains("## Reviewer front panel"));
+    assert!(markdown.contains("- Matched receipts: 1"));
+    assert!(markdown.contains("- Receipts without a current card match: 0 unmatched, 0 stale"));
+    assert!(markdown.contains("- Problem flags: none"));
+    assert!(markdown.contains("keep matching receipt metadata attached to the review record"));
+    assert!(markdown.contains("do not erase missing contracts"));
     assert!(markdown.contains("Duplicate"));
     assert!(markdown.contains("Matched card"));
     assert!(markdown.contains("Summary"));
