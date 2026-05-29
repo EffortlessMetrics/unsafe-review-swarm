@@ -425,7 +425,7 @@ Allowed buckets:
 
 ```text
 repairable_by_guard
-repairable_by_contract
+repairable_by_safety_docs
 repairable_by_test
 requires_witness_receipt
 requires_human_review

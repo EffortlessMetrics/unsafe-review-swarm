@@ -63,7 +63,7 @@ const COMMENT_PLAN_REVIEW_BUDGET: usize = 3;
 const COMMENT_PLAN_REVIEW_BUDGET_REASON: &str = "bounded reviewer noise";
 const REPAIR_QUEUE_BUCKETS: [&str; 6] = [
     "repairable_by_guard",
-    "repairable_by_contract",
+    "repairable_by_safety_docs",
     "repairable_by_test",
     "requires_witness_receipt",
     "requires_human_review",
@@ -1355,7 +1355,7 @@ fn push_repair_queue_projection(
 fn expected_repair_queue_bucket_reason(bucket: &str) -> &'static str {
     match bucket {
         "repairable_by_guard" => "guard_evidence_missing",
-        "repairable_by_contract" => "contract_evidence_missing",
+        "repairable_by_safety_docs" => "safety_docs_evidence_missing",
         "repairable_by_test" => "reach_evidence_missing",
         "requires_witness_receipt" => "witness_receipt_missing",
         "requires_human_review" => "human_review_required",

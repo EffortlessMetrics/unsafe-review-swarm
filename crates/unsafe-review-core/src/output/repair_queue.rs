@@ -55,7 +55,7 @@ impl From<&AnalyzeOutput> for RepairQueueArtifact {
 #[derive(Default, Serialize)]
 struct RepairQueueBuckets {
     repairable_by_guard: Vec<RepairQueueEntry>,
-    repairable_by_contract: Vec<RepairQueueEntry>,
+    repairable_by_safety_docs: Vec<RepairQueueEntry>,
     repairable_by_test: Vec<RepairQueueEntry>,
     requires_witness_receipt: Vec<RepairQueueEntry>,
     requires_human_review: Vec<RepairQueueEntry>,
@@ -66,7 +66,7 @@ impl RepairQueueBuckets {
     fn push(&mut self, bucket: &'static str, entry: RepairQueueEntry) {
         match bucket {
             "repairable_by_guard" => self.repairable_by_guard.push(entry),
-            "repairable_by_contract" => self.repairable_by_contract.push(entry),
+            "repairable_by_safety_docs" => self.repairable_by_safety_docs.push(entry),
             "repairable_by_test" => self.repairable_by_test.push(entry),
             "requires_witness_receipt" => self.requires_witness_receipt.push(entry),
             "requires_human_review" => self.requires_human_review.push(entry),
@@ -80,7 +80,7 @@ impl RepairQueueBuckets {
 struct RepairQueueSummary {
     cards: usize,
     repairable_by_guard: usize,
-    repairable_by_contract: usize,
+    repairable_by_safety_docs: usize,
     repairable_by_test: usize,
     requires_witness_receipt: usize,
     requires_human_review: usize,
@@ -92,7 +92,7 @@ impl From<&RepairQueueBuckets> for RepairQueueSummary {
         Self {
             cards: unique_card_count(buckets),
             repairable_by_guard: buckets.repairable_by_guard.len(),
-            repairable_by_contract: buckets.repairable_by_contract.len(),
+            repairable_by_safety_docs: buckets.repairable_by_safety_docs.len(),
             repairable_by_test: buckets.repairable_by_test.len(),
             requires_witness_receipt: buckets.requires_witness_receipt.len(),
             requires_human_review: buckets.requires_human_review.len(),
@@ -166,10 +166,11 @@ fn aggregate_buckets(projection: &agent::AgentQueueProjection) -> Vec<&'static s
     for bucket in &projection.repair_queue.buckets {
         let mapped = match *bucket {
             "repairable_by_guard"
-            | "repairable_by_contract"
+            | "repairable_by_safety_docs"
             | "repairable_by_test"
             | "requires_witness_receipt"
-            | "requires_human_review" => *bucket,
+            | "requires_human_review"
+            | "do_not_auto_repair" => *bucket,
             "review_only" => "do_not_auto_repair",
             _ => continue,
         };
@@ -190,7 +191,7 @@ fn push_unique(values: &mut Vec<&'static str>, value: &'static str) {
 fn bucket_reason(bucket: &str) -> &'static str {
     match bucket {
         "repairable_by_guard" => "guard_evidence_missing",
-        "repairable_by_contract" => "contract_evidence_missing",
+        "repairable_by_safety_docs" => "safety_docs_evidence_missing",
         "repairable_by_test" => "reach_evidence_missing",
         "requires_witness_receipt" => "witness_receipt_missing",
         "requires_human_review" => "human_review_required",
@@ -211,7 +212,7 @@ fn unique_card_count(buckets: &RepairQueueBuckets) -> usize {
     for entry in buckets
         .repairable_by_guard
         .iter()
-        .chain(&buckets.repairable_by_contract)
+        .chain(&buckets.repairable_by_safety_docs)
         .chain(&buckets.repairable_by_test)
         .chain(&buckets.requires_witness_receipt)
         .chain(&buckets.requires_human_review)

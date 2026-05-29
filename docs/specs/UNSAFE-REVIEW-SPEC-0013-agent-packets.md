@@ -38,8 +38,8 @@ source of analyzer truth. It carries:
 - `agent_readiness`, an advisory classification of whether this card is a
   bounded repair-delegation candidate
 - `repair_queue`, a compact card-scoped grouping such as
-  `repairable_by_contract`, `repairable_by_guard`, `repairable_by_test`,
-  `requires_witness_receipt`, or `requires_human_review`
+  `repairable_by_safety_docs`, `repairable_by_guard`, `repairable_by_test`,
+  `requires_witness_receipt`, `requires_human_review`, or `do_not_auto_repair`
 - witness routes and verify commands from the card
 - do-not-do rules
 - stop conditions
@@ -109,7 +109,7 @@ contract.
 The aggregate queue may group cards into bounded work buckets:
 
 - `repairable_by_guard`
-- `repairable_by_contract`
+- `repairable_by_safety_docs`
 - `repairable_by_test`
 - `requires_witness_receipt`
 - `requires_human_review`
@@ -189,11 +189,11 @@ agent-ready.
 - Agent readiness is `ready` for a high-confidence, card-scoped repair packet
   with a verify command, and is not ready for human-review or unsupported
   operation families such as inline assembly and FFI ownership boundaries.
-- Repair queue buckets reflect missing ReviewCard evidence: contract gaps can
-  enter `repairable_by_contract`, guard gaps can enter `repairable_by_guard`,
+- Repair queue buckets reflect missing ReviewCard evidence: safety-doc gaps can
+  enter `repairable_by_safety_docs`, guard gaps can enter `repairable_by_guard`,
   static reach gaps can enter `repairable_by_test`, missing receipts can enter
   `requires_witness_receipt`, and not-ready packets can enter
-  `requires_human_review`.
+  `requires_human_review` and `do_not_auto_repair`.
 - If evidence is not knowable statically, the packet names the limitation
   instead of overclaiming.
 

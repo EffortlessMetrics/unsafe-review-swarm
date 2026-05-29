@@ -574,10 +574,11 @@ fn context_packet_queues_contract_gaps_for_public_safety_docs() -> Result<(), Bo
     let allowed_repairs = serde_json::to_string(&packet["allowed_repairs"])?;
     assert!(allowed_repairs.contains("safety contract"));
     let repair_queue = serde_json::to_string(&packet["repair_queue"])?;
-    assert!(repair_queue.contains("repairable_by_contract"));
+    assert!(repair_queue.contains("repairable_by_safety_docs"));
     assert!(repair_queue.contains("repairable_by_test"));
     assert!(repair_queue.contains("requires_witness_receipt"));
     assert!(repair_queue.contains("requires_human_review"));
+    assert!(repair_queue.contains("do_not_auto_repair"));
     assert_eq!(packet["agent_readiness"]["ready"], false);
     assert_eq!(packet["agent_readiness"]["state"], "needs_human_review");
     let reasons = serde_json::to_string(&packet["agent_readiness"]["reasons"])?;

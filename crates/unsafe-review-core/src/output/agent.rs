@@ -125,7 +125,7 @@ fn allowed_repairs(card: &ReviewCard) -> AllowedRepairs {
 fn repair_queue(card: &ReviewCard, readiness: &AgentReadiness) -> AgentRepairQueue {
     let mut buckets = Vec::new();
     if has_missing_kind(card, "contract") {
-        push_bucket(&mut buckets, "repairable_by_contract");
+        push_bucket(&mut buckets, "repairable_by_safety_docs");
     }
     if has_missing_kind(card, "guard") {
         push_bucket(&mut buckets, "repairable_by_guard");
@@ -138,6 +138,7 @@ fn repair_queue(card: &ReviewCard, readiness: &AgentReadiness) -> AgentRepairQue
     }
     if !readiness.ready {
         push_bucket(&mut buckets, "requires_human_review");
+        push_bucket(&mut buckets, "do_not_auto_repair");
     }
     if buckets.is_empty() {
         push_bucket(&mut buckets, "review_only");
@@ -655,10 +656,11 @@ mod tests {
             .map_err(|err| format!("render readiness reasons failed: {err}"))?;
 
         assert!(allowed_repairs.contains("safety contract"));
-        assert!(repair_queue.contains("repairable_by_contract"));
+        assert!(repair_queue.contains("repairable_by_safety_docs"));
         assert!(repair_queue.contains("repairable_by_test"));
         assert!(repair_queue.contains("requires_witness_receipt"));
         assert!(repair_queue.contains("requires_human_review"));
+        assert!(repair_queue.contains("do_not_auto_repair"));
         assert_eq!(value["agent_readiness"]["ready"], false);
         assert_eq!(value["agent_readiness"]["state"], "needs_human_review");
         assert!(reasons.contains("operation family `unknown`"));

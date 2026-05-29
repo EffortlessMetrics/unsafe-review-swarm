@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 const DEFAULT_REVIEW_ROUTE: &str = "human-deep-review";
 const REPAIR_QUEUE_BUCKET_ORDER: [&str; 6] = [
     "repairable_by_guard",
-    "repairable_by_contract",
+    "repairable_by_safety_docs",
     "repairable_by_test",
     "requires_witness_receipt",
     "requires_human_review",
