@@ -124,10 +124,10 @@ source, post comments, execute witnesses, suppress cards, resolve cards, or
 claim proof, UB-free status, Miri-clean status, site execution, calibrated
 precision/recall, or policy readiness.
 
-The artifact verifier must check that every queue entry references a known
-ReviewCard, every bucket reason is from a closed vocabulary, do-not-do
-boundaries are present, and no queue entry weakens the source card's missing
-evidence or trust boundary.
+The artifact verifier must check that every bucket name is from the closed
+repair-queue vocabulary, every queue entry references a known ReviewCard, every
+bucket reason is from a closed vocabulary, do-not-do boundaries are present, and
+no queue entry weakens the source card's missing evidence or trust boundary.
 
 ## Non-goals
 

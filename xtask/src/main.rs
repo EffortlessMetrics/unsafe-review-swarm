@@ -13313,6 +13313,33 @@ Snapshot reports:
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_unknown_repair_queue_bucket() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-repair-queue-unknown-bucket")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+
+        let path = dir.join("repair-queue.json");
+        let mut repair_queue: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&path).map_err(|err| format!("read repair queue failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse repair queue failed: {err}"))?;
+        repair_queue["buckets"]["repairable_by_magic"] = serde_json::json!([]);
+        fs::write(&path, repair_queue.to_string())
+            .map_err(|err| format!("write repair queue failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("repair-queue.json buckets contain unknown bucket `repairable_by_magic`")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn policy_ledger_accepts_empty_status_without_entries() -> Result<(), String> {
         let path = unique_temp_dir("unsafe-review-empty-ledger")?.with_extension("toml");
         fs::write(

@@ -41,6 +41,14 @@ struct WitnessRouteProjection {
 }
 
 const COMMENT_PLAN_BODY_WORD_LIMIT: usize = 220;
+const REPAIR_QUEUE_BUCKETS: [&str; 6] = [
+    "repairable_by_guard",
+    "repairable_by_contract",
+    "repairable_by_test",
+    "requires_witness_receipt",
+    "requires_human_review",
+    "do_not_auto_repair",
+];
 
 pub(crate) fn check_advisory_artifacts(dir: &Path) -> Result<(), String> {
     check_advisory_artifact_set(dir)?;
@@ -1035,16 +1043,20 @@ fn check_repair_queue_artifact(
     if !buckets.is_object() {
         return Err("repair-queue.json buckets must be an object".to_string());
     }
+    for bucket in buckets
+        .as_object()
+        .ok_or_else(|| "repair-queue.json buckets must be an object".to_string())?
+        .keys()
+    {
+        if !REPAIR_QUEUE_BUCKETS.contains(&bucket.as_str()) {
+            return Err(format!(
+                "repair-queue.json buckets contain unknown bucket `{bucket}`"
+            ));
+        }
+    }
 
     let mut queued_card_ids = BTreeSet::new();
-    for bucket in [
-        "repairable_by_guard",
-        "repairable_by_contract",
-        "repairable_by_test",
-        "requires_witness_receipt",
-        "requires_human_review",
-        "do_not_auto_repair",
-    ] {
+    for bucket in REPAIR_QUEUE_BUCKETS {
         let entries = super::json_array_at(
             &repair_queue,
             &format!("/buckets/{bucket}"),

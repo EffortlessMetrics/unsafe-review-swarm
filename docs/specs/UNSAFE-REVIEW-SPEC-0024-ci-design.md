@@ -603,6 +603,7 @@ witness-plan includes route limits
 lsp.json contains read-only projections
 lsp.json code actions are command-only
 repair-queue.json references known ReviewCards
+repair-queue.json bucket names use the closed vocabulary
 repair-queue.json bucket reasons use the closed vocabulary
 repair-queue.json buckets do not repeat a ReviewCard
 repair-queue.json entries carry do-not-do boundaries
