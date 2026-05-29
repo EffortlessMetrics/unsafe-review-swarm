@@ -507,6 +507,7 @@ mod tests {
         "get_unchecked_mut_compound_reassigned_index_not_guard",
         "get_unchecked_mut_reassigned_receiver_not_guard",
         "get_unchecked_mut_get_probe_reassigned_index_not_guard",
+        "get_unchecked_mut_get_probe_shadowed_index_not_guard",
         "get_unchecked_mut_get_probe_reassigned_receiver_not_guard",
         "get_unchecked_mut_get_probe_early_return_reassigned_index_not_guard",
         "get_unchecked_mut_if_let_get_reassigned_index_not_guard",
