@@ -343,6 +343,7 @@ mod tests {
         "ptr_copy_slice_range_open_branch_reassigned_count_not_guard",
         "ptr_copy_slice_range_open_branch_compound_reassigned_count_not_guard",
         "ptr_copy_slice_range_open_branch_shadowed_count_not_guard",
+        "ptr_copy_slice_range_open_branch_shadowed_src_not_guard",
         "ptr_copy_slice_range_open_branch_reassigned_src_not_guard",
         "ptr_copy_slice_range_open_branch_reassigned_dst_not_guard",
         "ptr_copy_slice_range_src_only_not_guard",
