@@ -10,4 +10,5 @@ mod set_len_shrink;
 mod static_mut;
 pub(crate) mod syntax;
 mod target_feature;
+mod unsafe_impl;
 pub(crate) mod witness;
