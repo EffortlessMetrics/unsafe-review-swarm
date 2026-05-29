@@ -1222,6 +1222,9 @@ fn check_repair_queue_readiness(readiness: &serde_json::Value, bucket: &str) -> 
     };
     super::require_non_empty_json_str(readiness, "state", "repair-queue.json agent_readiness")?;
     let reasons = super::json_array_at(readiness, "/reasons", "repair-queue.json agent_readiness")?;
+    if reasons.is_empty() {
+        return Err("repair-queue.json agent_readiness.reasons must not be empty".to_string());
+    }
     for reason in reasons {
         if !reason.is_string() {
             return Err(

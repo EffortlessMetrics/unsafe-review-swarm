@@ -430,6 +430,10 @@ do_not_do
 trust_boundary
 ```
 
+`agent_readiness.reasons` must contain at least one explanation. Empty reasons
+fail artifact verification because a queue entry without a readiness rationale
+is not a bounded work order.
+
 The same `card_id` must not repeat within one repair queue bucket. The same card
 may appear in multiple buckets only when the bucket reasons are distinct and
 card-scoped.
