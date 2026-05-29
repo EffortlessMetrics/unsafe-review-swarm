@@ -347,7 +347,8 @@ fn parse_format(raw: &str) -> Result<Format, String> {
         "human" => Ok(Format::Human),
         "json" | "repo-json" => Ok(Format::Json),
         "markdown" | "md" => Ok(Format::Markdown),
-        "pr-summary" | "github-summary" | "github-markdown" => Ok(Format::PrSummary),
+        "pr-summary" => Ok(Format::PrSummary),
+        "github-summary" | "github-markdown" => Ok(Format::GithubSummary),
         "sarif" => Ok(Format::Sarif),
         "comment-plan" | "comments" => Ok(Format::CommentPlan),
         "lsp" | "lsp-json" | "editor-json" => Ok(Format::Lsp),
@@ -394,6 +395,7 @@ fn format_name(format: &Format) -> &'static str {
         Format::Json => "json",
         Format::Markdown => "markdown",
         Format::PrSummary => "pr-summary",
+        Format::GithubSummary => "github-summary",
         Format::Sarif => "sarif",
         Format::CommentPlan => "comment-plan",
         Format::Lsp => "lsp",
@@ -458,7 +460,7 @@ mod tests {
         let Command::Check(options) = command else {
             return Err("expected check command".to_string());
         };
-        assert_eq!(options.format, Format::PrSummary);
+        assert_eq!(options.format, Format::GithubSummary);
         Ok(())
     }
 

@@ -13,6 +13,7 @@ pub(crate) enum Format {
     Json,
     Markdown,
     PrSummary,
+    GithubSummary,
     Sarif,
     CommentPlan,
     Lsp,

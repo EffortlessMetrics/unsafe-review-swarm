@@ -133,6 +133,30 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     assert!(summary_text.contains("| `raw_pointer_read` |"));
     assert!(summary_text.contains("## Trust boundary"));
 
+    let github_summary_path = temp.path().join("nested").join("github-summary.md");
+    let github_summary = run_success([
+        os("check"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--format"),
+        os("github-summary"),
+        os("--out"),
+        github_summary_path.as_os_str().to_os_string(),
+    ])?;
+    assert_eq!(stdout_text(&github_summary)?.trim(), "");
+    let github_summary_text = fs::read_to_string(&github_summary_path)?;
+    assert!(github_summary_text.contains("## unsafe-review advisory summary"));
+    assert!(github_summary_text.contains("## Top card"));
+    assert!(github_summary_text.contains(&format!("- ID: `{card_id}`")));
+    assert!(github_summary_text.contains("## Open next"));
+    assert!(github_summary_text.contains("Full reviewer cockpit: `pr-summary.md`"));
+    assert!(github_summary_text.contains("not site-execution proof"));
+    assert!(!github_summary_text.contains("# unsafe-review PR summary"));
+    assert!(!github_summary_text.contains("## Card table"));
+    assert!(!github_summary_text.contains("## Witness plan"));
+
     let sarif_path = temp.path().join("cards.sarif");
     run_success([
         os("check"),

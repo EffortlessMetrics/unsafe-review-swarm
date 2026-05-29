@@ -243,6 +243,7 @@ fn render_with_format(output: &unsafe_review_core::AnalyzeOutput, format: &Forma
         Format::Json => render_json(output),
         Format::Markdown => render_markdown(output),
         Format::PrSummary => render_pr_summary(output),
+        Format::GithubSummary => render_github_summary(output),
         Format::Sarif => render_sarif(output),
         Format::CommentPlan => render_comment_plan(output),
         Format::Lsp => render_lsp(output),
@@ -698,10 +699,10 @@ fn print_help() {
     println!();
     println!("Commands:");
     println!(
-        "  check   [--root .] [--base origin/main | --diff file|-] [--format human|json|markdown|pr-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file]"
+        "  check   [--root .] [--base origin/main | --diff file|-] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file]"
     );
     println!(
-        "  repo    [--root .] [--format human|json|markdown|pr-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file]"
+        "  repo    [--root .] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file]"
     );
     println!(
         "  first-pr [--root .] [--base origin/main|--diff file|-] [--out-dir target/unsafe-review] [--max-cards N]"
