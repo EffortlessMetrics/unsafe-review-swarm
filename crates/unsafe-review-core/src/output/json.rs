@@ -429,6 +429,7 @@ mod tests {
         "str_from_utf8_unchecked_match_ok_guard",
         "str_from_utf8_unchecked_match_ok_reassigned_not_guard",
         "zeroed_invalid_value",
+        "zeroed_valid_u32",
         "inline_asm_human_review",
         "pointer_arithmetic_num_ctrl_bytes_guard",
         "pointer_arithmetic_slice_end",
