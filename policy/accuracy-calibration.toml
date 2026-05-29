@@ -1309,6 +1309,7 @@ fixtures = [
   "get_unchecked_mut_let_else_get_shadowed_receiver_not_guard",
   "get_unchecked_mut_match_get_reassigned_index_not_guard",
   "get_unchecked_mut_match_get_reassigned_receiver_not_guard",
+  "get_unchecked_mut_match_get_shadowed_receiver_not_guard",
 ]
 dogfood_targets = []
 label_ledgers = [
