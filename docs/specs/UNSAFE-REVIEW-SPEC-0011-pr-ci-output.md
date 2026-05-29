@@ -433,6 +433,8 @@ trust_boundary
 The same `card_id` must not repeat within one repair queue bucket. The same card
 may appear in multiple buckets only when the bucket reasons are distinct and
 card-scoped.
+Entries in `requires_human_review` and `do_not_auto_repair` must not be marked
+agent-ready.
 
 No other bucket names are valid. Unknown repair queue buckets fail artifact
 verification instead of creating a second, unchecked agent-task vocabulary.

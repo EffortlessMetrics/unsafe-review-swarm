@@ -1229,10 +1229,10 @@ fn check_repair_queue_readiness(readiness: &serde_json::Value, bucket: &str) -> 
             );
         }
     }
-    if bucket == "do_not_auto_repair" && ready {
-        return Err(
-            "repair-queue.json do_not_auto_repair entries must not be agent-ready".to_string(),
-        );
+    if matches!(bucket, "requires_human_review" | "do_not_auto_repair") && ready {
+        return Err(format!(
+            "repair-queue.json {bucket} entries must not be agent-ready"
+        ));
     }
     Ok(())
 }
