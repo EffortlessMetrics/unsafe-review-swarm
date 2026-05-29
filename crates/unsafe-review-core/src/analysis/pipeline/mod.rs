@@ -1534,6 +1534,25 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "bounds"
         ));
 
+        let stale_let_else_probe_receiver =
+            fixture_output("get_unchecked_mut_let_else_get_reassigned_receiver_not_guard")?;
+        let stale_let_else_probe_receiver_card = single_card(
+            "get_unchecked_mut_let_else_get_reassigned_receiver_not_guard",
+            &stale_let_else_probe_receiver,
+        )?;
+        assert_eq!(
+            stale_let_else_probe_receiver_card.operation.family,
+            OperationFamily::GetUnchecked
+        );
+        assert_eq!(
+            stale_let_else_probe_receiver_card.class,
+            ReviewClass::GuardMissing
+        );
+        assert!(!obligation_discharge_present(
+            stale_let_else_probe_receiver_card,
+            "bounds"
+        ));
+
         let other_slice_probe =
             fixture_output("get_unchecked_mut_get_probe_other_slice_not_guard")?;
         let other_slice_probe_card = single_card(

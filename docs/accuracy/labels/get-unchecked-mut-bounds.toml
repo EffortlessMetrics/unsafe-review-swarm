@@ -417,6 +417,20 @@ label_source = "fixture_golden"
 rationale = "Let-else get-probe evidence becomes stale when the checked index is reassigned before get_unchecked_mut."
 
 [[samples]]
+id = "get-unchecked-mut-let-else-get-reassigned-receiver-not-guard"
+fixture = "get_unchecked_mut_let_else_get_reassigned_receiver_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Let-else get-probe evidence becomes stale when the checked receiver is reassigned before get_unchecked_mut."
+
+[[samples]]
 id = "get-unchecked-mut-match-get-reassigned-index-not-guard"
 fixture = "get_unchecked_mut_match_get_reassigned_index_not_guard"
 kind = "false_positive_control"
