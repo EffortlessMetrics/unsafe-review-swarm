@@ -980,16 +980,8 @@ jobs:
             --out-dir target/unsafe-review
       - name: Verify first-pr artifact contract
         run: cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review
-      - name: Write GitHub summary
-        run: |
-          {
-            echo "## unsafe-review advisory summary"
-            echo
-            cat target/unsafe-review/pr-summary.md
-            echo
-            echo
-            echo "> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof."
-          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Write bounded GitHub job summary
+        run: cat target/unsafe-review/github-summary.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v7
         if: always()
         with:
@@ -997,6 +989,7 @@ jobs:
           path: |
             target/unsafe-review/cards.json
             target/unsafe-review/pr-summary.md
+            target/unsafe-review/github-summary.md
             target/unsafe-review/cards.sarif
             target/unsafe-review/comment-plan.json
             target/unsafe-review/witness-plan.md
