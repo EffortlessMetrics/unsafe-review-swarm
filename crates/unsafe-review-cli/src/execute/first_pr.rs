@@ -1,3 +1,4 @@
+use std::fmt;
 use std::path::Path;
 
 use crate::command::{CheckOptions, DiffInput};
@@ -125,16 +126,22 @@ fn print_top_card_summary(
     }
     println!("  Next: {}", card.next_action.summary);
     println!("Inspect top card:");
-    println!(
-        "  unsafe-review explain --root {} {}",
-        root.display(),
-        card.id
-    );
-    println!(
-        "  unsafe-review context --root {} {} --json",
-        root.display(),
-        card.id
-    );
+    println!("  {}", explain_command(root, &card.id));
+    println!("  {}", context_command(root, &card.id));
+}
+
+fn explain_command(root: &Path, card_id: &impl fmt::Display) -> String {
+    format!(
+        "unsafe-review explain --root {} {card_id}",
+        shell_arg(&root.display().to_string())
+    )
+}
+
+fn context_command(root: &Path, card_id: &impl fmt::Display) -> String {
+    format!(
+        "unsafe-review context --root {} {card_id} --json",
+        shell_arg(&root.display().to_string())
+    )
 }
 
 fn print_artifact_paths(out_dir: &Path, artifacts: &[ArtifactSpec<'_>]) {
@@ -152,4 +159,24 @@ fn print_trust_boundary() {
     println!(
         "  unsafe-review did not run witnesses, post comments, edit source, or enforce blocking policy."
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn top_card_handoff_commands_quote_roots_with_spaces() {
+        let root = Path::new("C:/Code/Rust With Spaces/unsafe-review");
+        let card_id = "UR-fixture-src-lib-rs-owner-operation-read-hash-hazard-c1";
+
+        assert_eq!(
+            explain_command(root, &card_id),
+            "unsafe-review explain --root \"C:/Code/Rust With Spaces/unsafe-review\" UR-fixture-src-lib-rs-owner-operation-read-hash-hazard-c1"
+        );
+        assert_eq!(
+            context_command(root, &card_id),
+            "unsafe-review context --root \"C:/Code/Rust With Spaces/unsafe-review\" UR-fixture-src-lib-rs-owner-operation-read-hash-hazard-c1 --json"
+        );
+    }
 }
