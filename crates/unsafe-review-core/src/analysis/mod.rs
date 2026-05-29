@@ -20,3 +20,4 @@ mod unwrap_operation;
 mod utf8_operation;
 mod vec_operation;
 pub(crate) mod witness;
+mod zeroed_operation;

@@ -16,6 +16,7 @@ use super::unsafe_impl::{
 use super::unwrap_operation::unwrap_operation_family;
 use super::utf8_operation::utf8_operation_family;
 use super::vec_operation::vec_operation_family;
+use super::zeroed_operation::zeroed_operation_family;
 use crate::domain::{OperationFamily, SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind};
 use crate::input::diff::DiffIndex;
 use std::collections::BTreeSet;
@@ -351,8 +352,8 @@ fn detect_site(line: &str) -> Option<(UnsafeSiteKind, OperationFamily)> {
     if let Some(family) = transmute_operation_family(line) {
         return Some((UnsafeSiteKind::Operation, family));
     }
-    if contains_call_name(line, "zeroed") {
-        return Some((UnsafeSiteKind::Operation, OperationFamily::Zeroed));
+    if let Some(family) = zeroed_operation_family(line) {
+        return Some((UnsafeSiteKind::Operation, family));
     }
     if contains_call_name(line, "drop_in_place") {
         return Some((UnsafeSiteKind::Operation, OperationFamily::DropInPlace));
