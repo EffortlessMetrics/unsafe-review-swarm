@@ -3,7 +3,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use unsafe_review_core::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope};
 
 use calibration_constants::{
     CALIBRATION_CASE_FIELDS, CALIBRATION_REQUIRED_KINDS, HAZARD_KIND_SOURCE,
@@ -21,6 +20,7 @@ mod commands;
 mod docs_automation_paths;
 mod first_hour;
 mod markdown;
+mod public_badges;
 mod source_sync;
 mod workflow_allowlist;
 
@@ -254,11 +254,6 @@ const FUZZ_REQUIRED_FILES: &[&str] = &[
     "fuzz/corpus/analyze/basic",
     "fuzz/fuzz_targets/analyze.rs",
 ];
-const PUBLIC_BADGE_ENDPOINTS: &[(&str, &str)] = &[
-    ("badges/unsafe-review.json", "unsafe-review"),
-    ("badges/unsafe-review-plus.json", "unsafe-review+"),
-];
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct DocArtifactEntry {
     kind: String,
@@ -288,7 +283,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         }
         commands::XtaskCommand::CheckPr => {
             check_docs()?;
-            check_public_badge_endpoint_generation()?;
+            public_badges::check_generated_projection()?;
             check_policy()?;
             check_support_tiers()?;
             check_fixtures()?;
@@ -334,7 +329,7 @@ fn check_docs() -> Result<(), String> {
     for path in FRONT_DOOR_MARKDOWN_DOCS {
         check_markdown_local_links(path)?;
     }
-    check_public_badge_endpoints()?;
+    public_badges::check_endpoints()?;
     check_spec_status_dashboard_impl()?;
     check_docs_map_paths("docs/README.md")?;
     check_index(
@@ -602,13 +597,13 @@ fn check_public_surfaces_impl() -> Result<usize, String> {
         }
     }
 
-    check_public_badge_endpoints()?;
-    check_public_badge_endpoint_generation()?;
+    public_badges::check_endpoints()?;
+    public_badges::check_generated_projection()?;
     for path in PUBLIC_SURFACE_FRONT_DOORS {
         check_public_surface_front_door(path)?;
     }
 
-    Ok(PUBLIC_SURFACE_FRONT_DOORS.len() + PUBLIC_BADGE_ENDPOINTS.len())
+    Ok(PUBLIC_SURFACE_FRONT_DOORS.len() + public_badges::endpoint_count())
 }
 
 fn check_public_surface_front_door(path: &str) -> Result<(), String> {
@@ -5578,96 +5573,6 @@ fn check_no_windows_paths(paths: &[&Path]) -> Result<(), String> {
     Ok(())
 }
 
-fn check_public_badge_endpoints() -> Result<(), String> {
-    let readme = read_to_string(&workspace_path("README.md"))?;
-    let endpoint_prefix = "https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FEffortlessMetrics%2Funsafe-review%2Fmain%2Fbadges%2F";
-    let endpoint_links = readme.matches(endpoint_prefix).count();
-    if endpoint_links != PUBLIC_BADGE_ENDPOINTS.len() {
-        return Err(format!(
-            "README.md has {endpoint_links} public unsafe-review badge endpoint link(s), expected {}",
-            PUBLIC_BADGE_ENDPOINTS.len()
-        ));
-    }
-
-    for (path, label) in PUBLIC_BADGE_ENDPOINTS {
-        let endpoint = public_badge_endpoint_url(path);
-        if !readme.contains(&endpoint) {
-            return Err(format!(
-                "README.md is missing public badge endpoint `{endpoint}`"
-            ));
-        }
-        let value = parse_json_file(&workspace_path(path))?;
-        let schema = json_usize_at(&value, "/schemaVersion", path)?;
-        if schema != 1 {
-            return Err(format!("{path} schemaVersion is {schema}, expected 1"));
-        }
-        require_json_str(&value, "label", label, path)?;
-        let message = require_non_empty_json_str(&value, "message", path)?;
-        require_numeric_badge_message(path, message)?;
-        for forbidden in ["safe", "sound", "ub-free", "miri-clean", "proof"] {
-            if text_contains_ignore_ascii_case(message, forbidden) {
-                return Err(format!(
-                    "{path} badge message must not imply `{forbidden}`: {message}"
-                ));
-            }
-        }
-        require_non_empty_json_str(&value, "color", path)?;
-    }
-    Ok(())
-}
-
-fn check_public_badge_endpoint_generation() -> Result<(), String> {
-    let output = unsafe_review_core::analyze(AnalyzeInput {
-        root: repo_path("."),
-        scope: Scope::Repo,
-        diff: DiffSource::NoneRepoScan,
-        mode: AnalysisMode::Repo,
-        policy: PolicyMode::Advisory,
-        include_unchanged_tests: true,
-        max_cards: None,
-    })?;
-    let (main, plus) = unsafe_review_core::render_badge_jsons(&output);
-    for (path, expected_text) in [
-        ("badges/unsafe-review.json", main),
-        ("badges/unsafe-review-plus.json", plus),
-    ] {
-        let actual = parse_json_file(&workspace_path(path))?;
-        let expected: serde_json::Value = serde_json::from_str(&expected_text)
-            .map_err(|err| format!("generated badge JSON for {path} did not parse: {err}"))?;
-        if actual != expected {
-            let actual_message = actual
-                .get("message")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or("<missing>");
-            let expected_message = expected
-                .get("message")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or("<missing>");
-            return Err(format!(
-                "{path} is stale (checked-in message {actual_message}, generated message {expected_message}); run `cargo run --locked -p unsafe-review -- badges --out badges/`"
-            ));
-        }
-    }
-    Ok(())
-}
-
-fn require_numeric_badge_message(path: &str, message: &str) -> Result<(), String> {
-    if message.chars().all(|ch| ch.is_ascii_digit()) {
-        Ok(())
-    } else {
-        Err(format!(
-            "{path} badge message must be a numeric count; got `{message}`"
-        ))
-    }
-}
-
-fn public_badge_endpoint_url(path: &str) -> String {
-    let encoded_path = path.replace('/', "%2F");
-    format!(
-        "https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FEffortlessMetrics%2Funsafe-review%2Fmain%2F{encoded_path}"
-    )
-}
-
 fn check_tracked_generated_artifacts() -> Result<(), String> {
     let output = Command::new("git")
         .args(["ls-files"])
@@ -5693,7 +5598,7 @@ fn parse_toml_file(path: &Path) -> Result<toml::Value, String> {
     })
 }
 
-fn parse_json_file(path: &Path) -> Result<serde_json::Value, String> {
+pub(crate) fn parse_json_file(path: &Path) -> Result<serde_json::Value, String> {
     parse_text_file(path, "JSON", |text| serde_json::from_str(text))
 }
 
@@ -5733,7 +5638,11 @@ fn json_array_at<'a>(
         .ok_or_else(|| format!("{path} is missing array at `{pointer}`"))
 }
 
-fn json_usize_at(value: &serde_json::Value, pointer: &str, path: &str) -> Result<usize, String> {
+pub(crate) fn json_usize_at(
+    value: &serde_json::Value,
+    pointer: &str,
+    path: &str,
+) -> Result<usize, String> {
     let Some(number) = value.pointer(pointer).and_then(serde_json::Value::as_u64) else {
         return Err(format!("{path} is missing unsigned integer at `{pointer}`"));
     };
@@ -5946,7 +5855,7 @@ fn json_str<'a>(value: &'a serde_json::Value, key: &str) -> Option<&'a str> {
     value.get(key).and_then(serde_json::Value::as_str)
 }
 
-fn require_non_empty_json_str<'a>(
+pub(crate) fn require_non_empty_json_str<'a>(
     value: &'a serde_json::Value,
     key: &str,
     path: &str,
@@ -5973,7 +5882,7 @@ fn json_array_contains_str(value: &serde_json::Value, key: &str, needle: &str) -
         })
 }
 
-fn require_json_str(
+pub(crate) fn require_json_str(
     value: &serde_json::Value,
     key: &str,
     expected: &str,
@@ -6074,7 +5983,7 @@ pub(crate) fn read_to_string(path: &Path) -> Result<String, String> {
     fs::read_to_string(path).map_err(|err| format!("read {} failed: {err}", path.display()))
 }
 
-fn workspace_path(relative: &str) -> PathBuf {
+pub(crate) fn workspace_path(relative: &str) -> PathBuf {
     let current_dir_path = PathBuf::from(relative);
     if current_dir_path.exists() {
         current_dir_path
@@ -6085,7 +5994,7 @@ fn workspace_path(relative: &str) -> PathBuf {
     }
 }
 
-fn repo_path(relative: &str) -> PathBuf {
+pub(crate) fn repo_path(relative: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join(relative)
@@ -6316,16 +6225,10 @@ fn has_windows_path(line: &str) -> bool {
 
 fn is_forbidden_generated_path(path: &str) -> bool {
     path.starts_with("target/")
-        || (path.starts_with("badges/") && !is_public_badge_endpoint(path))
+        || (path.starts_with("badges/") && !public_badges::is_public_endpoint(path))
         || path.ends_with(".sarif")
         || path.ends_with(".profraw")
         || path.ends_with(".profdata")
-}
-
-fn is_public_badge_endpoint(path: &str) -> bool {
-    PUBLIC_BADGE_ENDPOINTS
-        .iter()
-        .any(|(endpoint, _label)| *endpoint == path)
 }
 
 #[cfg(test)]
@@ -9491,28 +9394,12 @@ Snapshot reports:
 
     #[test]
     fn public_badge_endpoints_match_readme_and_json() -> Result<(), String> {
-        check_public_badge_endpoints()
+        public_badges::check_endpoints()
     }
 
     #[test]
     fn public_badge_endpoints_match_generated_repo_projection() -> Result<(), String> {
-        check_public_badge_endpoint_generation()
-    }
-
-    #[test]
-    fn public_badge_messages_must_be_numeric_counts() -> Result<(), String> {
-        require_numeric_badge_message("badges/unsafe-review.json", "294")?;
-        let main_err = err_text(require_numeric_badge_message(
-            "badges/unsafe-review.json",
-            "294 open gaps",
-        ))?;
-        assert!(main_err.contains("numeric count"));
-        let plus_err = err_text(require_numeric_badge_message(
-            "badges/unsafe-review-plus.json",
-            "19 contract / 111 guard / 37 witness",
-        ))?;
-        assert!(plus_err.contains("numeric count"));
-        Ok(())
+        public_badges::check_generated_projection()
     }
 
     #[test]
@@ -9534,14 +9421,6 @@ Snapshot reports:
         assert!(!public_surface_has_trust_boundary(
             "Install this command to review pull requests."
         ));
-    }
-
-    #[test]
-    fn public_badge_endpoint_url_uses_public_source_repo() {
-        assert_eq!(
-            public_badge_endpoint_url("badges/unsafe-review.json"),
-            "https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FEffortlessMetrics%2Funsafe-review%2Fmain%2Fbadges%2Funsafe-review.json"
-        );
     }
 
     #[test]
