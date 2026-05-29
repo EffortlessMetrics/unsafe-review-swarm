@@ -1,0 +1,6 @@
+[package]
+name = "ptr-copy-slice-range-disjunctive-early-return-shadowed-count-not-guard"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
