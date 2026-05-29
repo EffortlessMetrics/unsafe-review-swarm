@@ -6,12 +6,13 @@
   "trust_boundary": "Dogfood corpus records are static unsafe contract review evidence, not a proof of memory safety, not UB-free status, and not a Miri result unless an exact witness receipt is attached.",
   "summary": {
     "repositories": 7,
-    "targets": 30,
+    "targets": 31,
     "repo_snapshots": 7,
     "pr_diffs": 23,
+    "fixture_controls": 1,
     "checked_in_scan_outputs": 0,
     "artifact_statuses": {
-      "local_untracked": 30
+      "local_untracked": 31
     }
   },
   "repositories": [
@@ -74,8 +75,17 @@
       "notes": "Documented target_feature declarations moved from guard_missing to guarded_unwitnessed without claiming target-feature availability, site execution, or soundness."
     }
   ],
+  "control_targets": [
+    {
+      "id": "safe-code-no-cards-control",
+      "fixture": "fixtures/safe_code_no_cards",
+      "primary_exercise": "Quiet no-card output and no all-clear wording for a fixture-level false-positive control.",
+      "report": "docs/dogfood/reports/2026-05-26-no-card-control.md"
+    }
+  ],
   "limitations": [
     "The corpus is selected and capped, not ecosystem-wide calibration.",
+    "Fixture controls are indexed separately from real-crate repository coverage.",
     "Saved-output artifacts are local_untracked under target/dogfood-work.",
     "Outcome comparison reads saved snapshots only and does not rerun analysis.",
     "Dogfood records do not execute witness tools or make policy decisions."

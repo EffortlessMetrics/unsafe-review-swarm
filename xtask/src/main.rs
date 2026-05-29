@@ -216,7 +216,7 @@ const ACCURACY_PROMOTION_FORBIDDEN_TERMS: &[&str] = &[
 ];
 const ACCURACY_REQUIRED_FORBIDDEN_CLAIMS: &[&str] =
     &["global precision", "global recall", "memory-safety proof"];
-const DOGFOOD_TARGET_KINDS: &[&str] = &["repo-snapshot", "pr-diff"];
+const DOGFOOD_TARGET_KINDS: &[&str] = &["repo-snapshot", "pr-diff", "fixture-control"];
 const DOGFOOD_TARGET_STATUSES: &[&str] = &["active", "parked", "retired"];
 const DOGFOOD_ARTIFACT_STATUSES: &[&str] = &["checked_in", "local_untracked", "remote_manual"];
 const DOGFOOD_TRIAGE_LABELS: &[&str] = &[
@@ -2125,16 +2125,24 @@ fn check_dogfood() -> Result<(), String> {
     let mut ids = BTreeSet::new();
     let mut repositories = BTreeSet::new();
     let mut artifact_status_counts = BTreeMap::new();
+    let mut fixture_control_ids = BTreeSet::new();
     let mut repo_snapshots = 0usize;
     let mut pr_diffs = 0usize;
+    let mut fixture_controls = 0usize;
     for (idx, target) in targets.iter().enumerate() {
         let stats = dogfood_checks::validate_target(target, idx, &mut ids)?;
-        repositories.insert(stats.repository);
+        if let Some(repository) = stats.repository {
+            repositories.insert(repository);
+        }
         *artifact_status_counts
             .entry(stats.artifact_status)
             .or_insert(0usize) += 1;
         repo_snapshots += stats.repo_snapshots;
         pr_diffs += stats.pr_diffs;
+        fixture_controls += stats.fixture_controls;
+        if let Some(id) = stats.fixture_control_id {
+            fixture_control_ids.insert(id);
+        }
     }
 
     if repositories.len() < 5 {
@@ -2152,7 +2160,9 @@ fn check_dogfood() -> Result<(), String> {
         repositories.len(),
         repo_snapshots,
         pr_diffs,
+        fixture_controls,
         &repositories,
+        &fixture_control_ids,
         &artifact_status_counts,
     )?;
     check_dogfood_report_triage_labels()?;
@@ -2600,10 +2610,12 @@ mod dogfood_checks {
     use super::*;
 
     pub(super) struct TargetStats {
-        pub(super) repository: String,
+        pub(super) repository: Option<String>,
         pub(super) artifact_status: String,
         pub(super) repo_snapshots: usize,
         pub(super) pr_diffs: usize,
+        pub(super) fixture_controls: usize,
+        pub(super) fixture_control_id: Option<String>,
     }
 
     pub(super) fn validate_target(
@@ -2622,19 +2634,24 @@ mod dogfood_checks {
                 "{DOGFOOD_MANIFEST} contains duplicate target id `{id}`"
             ));
         }
-        let repository = required_target_string(target, "repository", idx)?;
-        if !repository.contains('/') {
-            return Err(format!(
-                "{DOGFOOD_MANIFEST} targets[{idx}] repository `{repository}` must be owner/repo"
-            ));
-        }
-        required_target_string(target, "crate", idx)?;
         let kind = required_target_string(target, "kind", idx)?;
         if !DOGFOOD_TARGET_KINDS.contains(&kind) {
             return Err(format!(
                 "{DOGFOOD_MANIFEST} targets[{idx}] uses unknown kind `{kind}`"
             ));
         }
+        let repository = if kind == "fixture-control" {
+            None
+        } else {
+            let repository = required_target_string(target, "repository", idx)?;
+            if !repository.contains('/') {
+                return Err(format!(
+                    "{DOGFOOD_MANIFEST} targets[{idx}] repository `{repository}` must be owner/repo"
+                ));
+            }
+            Some(repository.to_string())
+        };
+        required_target_string(target, "crate", idx)?;
         let status = required_target_string(target, "status", idx)?;
         if !DOGFOOD_TARGET_STATUSES.contains(&status) {
             return Err(format!(
@@ -2660,12 +2677,15 @@ mod dogfood_checks {
             ));
         }
         validate_artifacts(target, idx, artifact_status)?;
-        let (repo_snapshots, pr_diffs) = validate_kind_fields(target, idx, kind)?;
+        let (repo_snapshots, pr_diffs, fixture_controls) = validate_kind_fields(target, idx, kind)?;
+        let fixture_control_id = (fixture_controls > 0).then(|| id.to_string());
         Ok(TargetStats {
-            repository: repository.to_string(),
+            repository,
             artifact_status: artifact_status.to_string(),
             repo_snapshots,
             pr_diffs,
+            fixture_controls,
+            fixture_control_id,
         })
     }
 
@@ -2705,7 +2725,7 @@ mod dogfood_checks {
         target: &toml::Table,
         idx: usize,
         kind: &str,
-    ) -> Result<(usize, usize), String> {
+    ) -> Result<(usize, usize, usize), String> {
         match kind {
             "repo-snapshot" => {
                 let commit = required_target_string(target, "commit", idx)?;
@@ -2716,7 +2736,7 @@ mod dogfood_checks {
                 }
                 let root = required_target_string(target, "root", idx)?;
                 check_dogfood_path(root, idx, "root")?;
-                Ok((1, 0))
+                Ok((1, 0, 0))
             }
             "pr-diff" => {
                 let Some(pr) = target.get("pr").and_then(toml::Value::as_integer) else {
@@ -2733,7 +2753,21 @@ mod dogfood_checks {
                 check_dogfood_path(root, idx, "root")?;
                 let diff = required_target_string(target, "diff", idx)?;
                 check_dogfood_path(diff, idx, "diff")?;
-                Ok((0, 1))
+                Ok((0, 1, 0))
+            }
+            "fixture-control" => {
+                let fixture = required_target_string(target, "fixture", idx)?;
+                check_dogfood_path(fixture, idx, "fixture")?;
+                if !fixture.starts_with("fixtures/") {
+                    return Err(format!(
+                        "{DOGFOOD_MANIFEST} targets[{idx}] fixture-control fixture must live under fixtures/"
+                    ));
+                }
+                let root = required_target_string(target, "root", idx)?;
+                check_dogfood_path(root, idx, "root")?;
+                let diff = required_target_string(target, "diff", idx)?;
+                check_dogfood_path(diff, idx, "diff")?;
+                Ok((0, 0, 1))
             }
             _ => Err(format!(
                 "{DOGFOOD_MANIFEST} targets[{idx}] uses unsupported kind `{kind}`"
@@ -2747,7 +2781,9 @@ fn check_dogfood_index(
     repository_count: usize,
     repo_snapshots: usize,
     pr_diffs: usize,
+    fixture_controls: usize,
     repositories: &BTreeSet<String>,
+    fixture_control_ids: &BTreeSet<String>,
     artifact_status_counts: &BTreeMap<String, usize>,
 ) -> Result<(), String> {
     let index = parse_json_file(&workspace_path(DOGFOOD_INDEX))?;
@@ -2773,6 +2809,12 @@ fn check_dogfood_index(
         DOGFOOD_INDEX,
     )?;
     require_json_usize_at(&index, "/summary/pr_diffs", pr_diffs, DOGFOOD_INDEX)?;
+    require_json_usize_at(
+        &index,
+        "/summary/fixture_controls",
+        fixture_controls,
+        DOGFOOD_INDEX,
+    )?;
 
     for (status, count) in artifact_status_counts {
         require_json_usize_at(
@@ -2822,6 +2864,61 @@ fn check_dogfood_index(
                 "{DOGFOOD_INDEX} repositories[{idx}] primary_exercise is too terse"
             ));
         }
+    }
+
+    let control_rows = json_array_at(&index, "/control_targets", DOGFOOD_INDEX)?;
+    if control_rows.len() != fixture_controls {
+        return Err(format!(
+            "{DOGFOOD_INDEX} control_targets has {}, expected {fixture_controls}",
+            control_rows.len()
+        ));
+    }
+    let mut seen_controls = BTreeSet::new();
+    for (idx, row) in control_rows.iter().enumerate() {
+        let Some(id) = row.get("id").and_then(serde_json::Value::as_str) else {
+            return Err(format!(
+                "{DOGFOOD_INDEX} control_targets[{idx}] is missing id"
+            ));
+        };
+        if !fixture_control_ids.contains(id) {
+            return Err(format!(
+                "{DOGFOOD_INDEX} control_targets[{idx}] references unknown fixture-control target `{id}`"
+            ));
+        }
+        if !seen_controls.insert(id.to_string()) {
+            return Err(format!(
+                "{DOGFOOD_INDEX} control_targets contains duplicate `{id}`"
+            ));
+        }
+        let Some(fixture) = row.get("fixture").and_then(serde_json::Value::as_str) else {
+            return Err(format!(
+                "{DOGFOOD_INDEX} control_targets[{idx}] is missing fixture"
+            ));
+        };
+        if !fixture.starts_with("fixtures/") {
+            return Err(format!(
+                "{DOGFOOD_INDEX} control_targets[{idx}] fixture `{fixture}` must live under fixtures/"
+            ));
+        }
+        let Some(summary) = row
+            .get("primary_exercise")
+            .and_then(serde_json::Value::as_str)
+        else {
+            return Err(format!(
+                "{DOGFOOD_INDEX} control_targets[{idx}] is missing primary_exercise"
+            ));
+        };
+        if summary.len() < 24 {
+            return Err(format!(
+                "{DOGFOOD_INDEX} control_targets[{idx}] primary_exercise is too terse"
+            ));
+        }
+        let Some(report) = row.get("report").and_then(serde_json::Value::as_str) else {
+            return Err(format!(
+                "{DOGFOOD_INDEX} control_targets[{idx}] is missing report"
+            ));
+        };
+        require_file(report)?;
     }
 
     if json_array_at(&index, "/recorded_outcomes", DOGFOOD_INDEX)?.is_empty() {

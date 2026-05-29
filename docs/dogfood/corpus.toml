@@ -4,6 +4,19 @@ artifact_root = "target/dogfood-work"
 trust_boundary = "Dogfood corpus records are static unsafe contract review evidence, not a proof of memory safety, not UB-free status, and not a Miri result unless an exact witness receipt is attached."
 
 [[targets]]
+id = "safe-code-no-cards-control"
+crate = "safe_code_no_cards"
+kind = "fixture-control"
+status = "active"
+fixture = "fixtures/safe_code_no_cards"
+root = "fixtures/safe_code_no_cards"
+diff = "fixtures/safe_code_no_cards/change.diff"
+purpose = "fixture-level no-card control for quiet first-pr and JSON output; not real-crate precision evidence"
+command = "rtk cargo run --locked -p unsafe-review -- check --root fixtures/safe_code_no_cards --diff fixtures/safe_code_no_cards/change.diff --format json --out target/dogfood-work/safe-code-no-cards.unsafe-review.json"
+artifact_status = "local_untracked"
+artifacts = ["target/dogfood-work/safe-code-no-cards.unsafe-review.json"]
+
+[[targets]]
 id = "smallvec-capped"
 crate = "rust-smallvec"
 repository = "servo/rust-smallvec"

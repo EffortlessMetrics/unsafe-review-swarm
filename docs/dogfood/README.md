@@ -4,8 +4,9 @@ This directory records the selected real-crate dogfood corpus for
 `unsafe-review`.
 
 The corpus is advisory evidence. It records repeatable targets, commands, and
-expected artifact paths for real Rust crates and PR diffs. It is not a release
-claim, not calibrated precision/recall measurement, and not memory-safety proof.
+expected artifact paths for real Rust crates, PR diffs, and separately indexed
+fixture controls. It is not a release claim, not calibrated precision/recall
+measurement, and not memory-safety proof.
 
 The manifest is [`corpus.toml`](corpus.toml). The human-facing index is
 [`index.md`](index.md), with a machine-readable companion at
@@ -39,6 +40,12 @@ Report requirements:
   safety, UB-free, Miri-clean, site-execution, calibration, and policy limits.
 
 `cargo run --locked -p xtask -- check-dogfood` verifies these report rails.
+
+## Fixture Controls
+
+`fixture-control` targets are explicit false-positive controls that live under
+`fixtures/`. They may exercise quiet/no-card behavior or other dogfood rails,
+but they do not count as real-crate coverage or calibrated precision evidence.
 
 ## PR Diff Targets
 

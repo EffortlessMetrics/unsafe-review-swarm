@@ -26,9 +26,10 @@ local artifact is needed.
 | Measure | Count |
 |---|---:|
 | Repositories | 7 |
-| Total targets | 30 |
+| Total targets | 31 |
 | Capped repo snapshots | 7 |
 | PR diff targets | 23 |
+| Fixture control targets | 1 |
 | Checked-in scan outputs | 0 |
 
 ## Repository Coverage
@@ -87,6 +88,12 @@ local artifact is needed.
 - `crossbeam-pr1187`
 - `mio-pr1388`
 
+### Fixture Controls
+
+- `safe-code-no-cards-control` - fixture-level quiet/no-card control linked to
+  [2026-05-26 no-card fixture smoke](reports/2026-05-26-no-card-control.md).
+  It is not real-crate precision evidence.
+
 ## Local Workflow
 
 Validate the dogfood manifest:
@@ -109,6 +116,10 @@ rtk cargo run --locked -p unsafe-review -- outcome \
 Update this index only when the corpus manifest or recorded outcome evidence
 changes. Do not use it to claim calibrated precision, safety, or policy
 readiness.
+
+For `fixture-control` targets, keep the target under `fixtures/` and describe
+the control as fixture-level evidence. Do not count fixture controls as
+real-crate coverage, calibrated precision, or safety evidence.
 
 For `pr-diff` targets, make sure the target checkout under `root` matches the
 saved diff's expected source tree. A zero-card result from checkout drift is not
