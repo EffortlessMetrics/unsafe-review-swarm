@@ -121,6 +121,11 @@ one bucket only when the reasons are distinct and card-scoped, such as a card
 that is repairable by guard evidence but still requires a witness receipt for a
 stronger review signal. A card must not repeat within the same bucket.
 
+`pr-summary.md` may repeat the top card's agent-readiness state, queue buckets,
+and readiness reasons as a reviewer cockpit cue. That summary is not a separate
+classification path; it must project the checked aggregate `repair-queue.json`
+state for the same ReviewCard.
+
 The aggregate artifact is still copy-only. It must not run an agent, edit
 source, post comments, execute witnesses, suppress cards, resolve cards, or
 claim proof, UB-free status, Miri-clean status, site execution, calibrated

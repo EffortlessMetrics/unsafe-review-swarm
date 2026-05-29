@@ -146,6 +146,8 @@ card count
 top actionable card, when present
   explain handoff command
   bounded agent context handoff command
+  agent handoff readiness, repair buckets, and readiness reasons projected from
+  `repair-queue.json`
 compact card table
   rows project ReviewCard id, class, location, operation family, operation,
   missing evidence, primary route, and next action
@@ -450,6 +452,10 @@ verification instead of creating a second, unchecked agent-task vocabulary.
 ```text
 unsafe-review context <card-id> --json
 ```
+
+`pr-summary.md` may surface the top card's aggregate queue state as a reviewer
+cue, but that line is still a projection of `repair-queue.json`; it must not
+invent a second agent-readiness truth.
 
 The queue must not run agents, edit source, post comments, execute witnesses,
 suppress cards, resolve cards, or claim proof, UB-free status, Miri-clean

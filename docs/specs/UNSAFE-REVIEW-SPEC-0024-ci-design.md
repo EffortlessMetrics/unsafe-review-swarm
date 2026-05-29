@@ -612,6 +612,8 @@ repair-queue.json bucket reasons use the closed vocabulary
 repair-queue.json buckets do not repeat a ReviewCard
 repair-queue.json readiness state uses the closed vocabulary and matches readiness
 repair-queue.json readiness reasons are present
+pr-summary.md top-card agent handoff line projects repair-queue.json readiness
+state, buckets, and readiness reasons
 repair-queue.json entries carry do-not-do boundaries
 repair-queue.json human-review and do-not-auto-repair entries are not agent-ready
 repair-queue.json does not claim agent execution or repair success

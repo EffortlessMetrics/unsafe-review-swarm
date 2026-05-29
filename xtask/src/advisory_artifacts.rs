@@ -4,6 +4,7 @@ use std::path::Path;
 struct AdvisoryArtifactSummary {
     card_ids: BTreeSet<String>,
     card_projections: BTreeMap<String, CardProjection>,
+    repair_queue_projections: BTreeMap<String, RepairQueueProjection>,
     scope: String,
     card_count: usize,
     open_actionable_gaps: usize,
@@ -38,6 +39,23 @@ struct WitnessRouteProjection {
     reason: String,
     command: Option<String>,
     required: bool,
+}
+
+struct RepairQueueProjection {
+    buckets: Vec<String>,
+    readiness_state: String,
+    readiness_reasons: Vec<String>,
+}
+
+struct RepairQueueEntryProjection {
+    card_id: String,
+    readiness_state: String,
+    readiness_reasons: Vec<String>,
+}
+
+struct RepairQueueReadinessProjection {
+    state: String,
+    reasons: Vec<String>,
 }
 
 const COMMENT_PLAN_BODY_WORD_LIMIT: usize = 220;
@@ -79,7 +97,12 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         &summary.card_ids,
         &summary.card_projections,
     )?;
-    check_first_pr_markdown_card_identity(dir, &summary.card_ids, &summary.card_projections)?;
+    check_first_pr_markdown_card_identity(
+        dir,
+        &summary.card_ids,
+        &summary.card_projections,
+        &summary.repair_queue_projections,
+    )?;
     check_advisory_artifact_overclaims(dir)?;
 
     println!("check-first-pr-artifacts: ok ({})", dir.display());
@@ -997,11 +1020,13 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             );
         }
     }
-    check_repair_queue_artifact(dir, card_count, &card_ids, &card_projections)?;
+    let repair_queue_projections =
+        check_repair_queue_artifact(dir, card_count, &card_ids, &card_projections)?;
 
     Ok(AdvisoryArtifactSummary {
         card_ids,
         card_projections,
+        repair_queue_projections,
         scope,
         card_count,
         open_actionable_gaps,
@@ -1014,7 +1039,7 @@ fn check_repair_queue_artifact(
     card_count: usize,
     card_ids: &BTreeSet<String>,
     card_projections: &BTreeMap<String, CardProjection>,
-) -> Result<(), String> {
+) -> Result<BTreeMap<String, RepairQueueProjection>, String> {
     let path = dir.join("repair-queue.json");
     let repair_queue = super::parse_json_file(&path)?;
     super::require_json_str(&repair_queue, "schema_version", "0.1", "repair-queue.json")?;
@@ -1059,6 +1084,7 @@ fn check_repair_queue_artifact(
     }
 
     let mut queued_card_ids = BTreeSet::new();
+    let mut repair_queue_projections = BTreeMap::<String, RepairQueueProjection>::new();
     for bucket in REPAIR_QUEUE_BUCKETS {
         let entries = super::json_array_at(
             &repair_queue,
@@ -1078,15 +1104,16 @@ fn check_repair_queue_artifact(
         }
         let mut bucket_card_ids = BTreeSet::new();
         for entry in entries {
-            check_repair_queue_entry(entry, bucket, card_ids, card_projections)?;
-            if let Some(card_id) = entry.get("card_id").and_then(serde_json::Value::as_str) {
-                if !bucket_card_ids.insert(card_id.to_string()) {
-                    return Err(format!(
-                        "repair-queue.json bucket `{bucket}` repeats card id `{card_id}`"
-                    ));
-                }
-                queued_card_ids.insert(card_id.to_string());
+            let entry_projection =
+                check_repair_queue_entry(entry, bucket, card_ids, card_projections)?;
+            if !bucket_card_ids.insert(entry_projection.card_id.clone()) {
+                return Err(format!(
+                    "repair-queue.json bucket `{bucket}` repeats card id `{}`",
+                    entry_projection.card_id
+                ));
             }
+            queued_card_ids.insert(entry_projection.card_id.clone());
+            push_repair_queue_projection(&mut repair_queue_projections, bucket, entry_projection)?;
         }
     }
     for card_id in card_ids {
@@ -1096,7 +1123,7 @@ fn check_repair_queue_artifact(
             ));
         }
     }
-    Ok(())
+    Ok(repair_queue_projections)
 }
 
 fn check_repair_queue_entry(
@@ -1104,7 +1131,7 @@ fn check_repair_queue_entry(
     bucket: &str,
     card_ids: &BTreeSet<String>,
     card_projections: &BTreeMap<String, CardProjection>,
-) -> Result<(), String> {
+) -> Result<RepairQueueEntryProjection, String> {
     let card_id = require_known_card_id(entry, "repair-queue.json entry", card_ids)?;
     let card = card_projections
         .get(card_id)
@@ -1167,8 +1194,12 @@ fn check_repair_queue_entry(
     let readiness = entry
         .get("agent_readiness")
         .ok_or_else(|| "repair-queue.json entry is missing agent_readiness".to_string())?;
-    check_repair_queue_readiness(readiness, bucket)?;
-    Ok(())
+    let readiness = check_repair_queue_readiness(readiness, bucket)?;
+    Ok(RepairQueueEntryProjection {
+        card_id: card_id.to_string(),
+        readiness_state: readiness.state,
+        readiness_reasons: readiness.reasons,
+    })
 }
 
 fn check_repair_queue_do_not_do(entry: &serde_json::Value) -> Result<(), String> {
@@ -1204,6 +1235,41 @@ fn check_repair_queue_do_not_do(entry: &serde_json::Value) -> Result<(), String>
     Ok(())
 }
 
+fn push_repair_queue_projection(
+    projections: &mut BTreeMap<String, RepairQueueProjection>,
+    bucket: &str,
+    entry: RepairQueueEntryProjection,
+) -> Result<(), String> {
+    let projection =
+        projections
+            .entry(entry.card_id.clone())
+            .or_insert_with(|| RepairQueueProjection {
+                buckets: Vec::new(),
+                readiness_state: entry.readiness_state.clone(),
+                readiness_reasons: entry.readiness_reasons.clone(),
+            });
+    if projection.readiness_state != entry.readiness_state {
+        return Err(format!(
+            "repair-queue.json card `{}` has inconsistent agent_readiness.state across buckets",
+            entry.card_id
+        ));
+    }
+    if projection.readiness_reasons != entry.readiness_reasons {
+        return Err(format!(
+            "repair-queue.json card `{}` has inconsistent agent_readiness.reasons across buckets",
+            entry.card_id
+        ));
+    }
+    if !projection
+        .buckets
+        .iter()
+        .any(|candidate| candidate == bucket)
+    {
+        projection.buckets.push(bucket.to_string());
+    }
+    Ok(())
+}
+
 fn expected_repair_queue_bucket_reason(bucket: &str) -> &'static str {
     match bucket {
         "repairable_by_guard" => "guard_evidence_missing",
@@ -1216,7 +1282,10 @@ fn expected_repair_queue_bucket_reason(bucket: &str) -> &'static str {
     }
 }
 
-fn check_repair_queue_readiness(readiness: &serde_json::Value, bucket: &str) -> Result<(), String> {
+fn check_repair_queue_readiness(
+    readiness: &serde_json::Value,
+    bucket: &str,
+) -> Result<RepairQueueReadinessProjection, String> {
     let Some(ready) = readiness.get("ready").and_then(serde_json::Value::as_bool) else {
         return Err("repair-queue.json agent_readiness.ready must be a boolean".to_string());
     };
@@ -1257,7 +1326,15 @@ fn check_repair_queue_readiness(readiness: &serde_json::Value, bucket: &str) -> 
             "repair-queue.json {bucket} entries must not be agent-ready"
         ));
     }
-    Ok(())
+    let readiness_reasons = reasons
+        .iter()
+        .filter_map(serde_json::Value::as_str)
+        .map(str::to_string)
+        .collect();
+    Ok(RepairQueueReadinessProjection {
+        state: state.to_string(),
+        reasons: readiness_reasons,
+    })
 }
 
 fn require_known_advisory_scope(scope: &str) -> Result<(), String> {
@@ -2177,12 +2254,19 @@ fn check_first_pr_markdown_card_identity(
     dir: &Path,
     card_ids: &BTreeSet<String>,
     card_projections: &BTreeMap<String, CardProjection>,
+    repair_queue_projections: &BTreeMap<String, RepairQueueProjection>,
 ) -> Result<(), String> {
     let pr_summary_path = dir.join("pr-summary.md");
     let pr_summary = super::read_to_string(&pr_summary_path)?;
     require_text_mentions_only_known_card_ids(&pr_summary, &pr_summary_path, card_ids)?;
     require_text_mentions_all_card_ids(&pr_summary, &pr_summary_path, card_ids)?;
     require_markdown_top_card_projection(&pr_summary, &pr_summary_path, card_projections)?;
+    require_pr_summary_top_card_repair_queue_projection(
+        &pr_summary,
+        &pr_summary_path,
+        card_ids,
+        repair_queue_projections,
+    )?;
     require_pr_summary_card_table_projection(&pr_summary, &pr_summary_path, card_projections)?;
     require_pr_summary_witness_plan_projection(&pr_summary, &pr_summary_path, card_projections)?;
 
@@ -2191,6 +2275,83 @@ fn check_first_pr_markdown_card_identity(
     require_text_mentions_only_known_card_ids(&witness_plan, &witness_plan_path, card_ids)?;
     require_witness_plan_headings_known(&witness_plan, &witness_plan_path, card_ids)?;
     require_text_mentions_all_card_ids(&witness_plan, &witness_plan_path, card_ids)
+}
+
+fn require_pr_summary_top_card_repair_queue_projection(
+    text: &str,
+    path: &Path,
+    card_ids: &BTreeSet<String>,
+    repair_queue_projections: &BTreeMap<String, RepairQueueProjection>,
+) -> Result<(), String> {
+    if card_ids.is_empty() {
+        return Ok(());
+    }
+    let top_card_id = markdown_top_card_id(text, path, card_ids)?;
+    let projection = repair_queue_projections.get(&top_card_id).ok_or_else(|| {
+        format!(
+            "repair-queue.json does not include top card `{top_card_id}` for {}",
+            path.display()
+        )
+    })?;
+    let expected = expected_agent_handoff_summary(projection);
+    if text.contains(&expected) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{} top card `{top_card_id}` agent handoff must include `{expected}`",
+            path.display()
+        ))
+    }
+}
+
+fn markdown_top_card_id(
+    text: &str,
+    path: &Path,
+    card_ids: &BTreeSet<String>,
+) -> Result<String, String> {
+    for line in text.lines() {
+        let trimmed = line.trim();
+        let Some(rest) = trimmed
+            .strip_prefix("- ID: `")
+            .or_else(|| trimmed.strip_prefix("- Top card: `"))
+        else {
+            continue;
+        };
+        let Some((card_id, _)) = rest.split_once('`') else {
+            continue;
+        };
+        if !card_ids.contains(card_id) {
+            return Err(format!(
+                "{} top card id `{card_id}` is not present in cards.json",
+                path.display()
+            ));
+        }
+        return Ok(card_id.to_string());
+    }
+    Err(format!(
+        "{} must include a top ReviewCard id line",
+        path.display()
+    ))
+}
+
+fn expected_agent_handoff_summary(projection: &RepairQueueProjection) -> String {
+    format!(
+        "- Agent handoff: `{}`; buckets: {}; reasons: {}",
+        projection.readiness_state,
+        render_backtick_list(&projection.buckets),
+        projection.readiness_reasons.join("; ")
+    )
+}
+
+fn render_backtick_list(values: &[String]) -> String {
+    if values.is_empty() {
+        return "`none`".to_string();
+    }
+    values
+        .iter()
+        .map(|value| format!("`{value}`"))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn require_pr_summary_card_table_projection(

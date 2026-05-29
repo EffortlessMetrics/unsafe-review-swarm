@@ -1,11 +1,20 @@
 use crate::api::AnalyzeOutput;
 use crate::api::Scope;
 use crate::domain::ReviewCard;
+use crate::output::agent;
 use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
 use crate::util::path_display;
 use std::collections::BTreeMap;
 
 const DEFAULT_REVIEW_ROUTE: &str = "human-deep-review";
+const REPAIR_QUEUE_BUCKET_ORDER: [&str; 6] = [
+    "repairable_by_guard",
+    "repairable_by_contract",
+    "repairable_by_test",
+    "requires_witness_receipt",
+    "requires_human_review",
+    "do_not_auto_repair",
+];
 
 pub(crate) fn render(output: &AnalyzeOutput) -> String {
     if matches!(output.scope, Scope::Repo) {
@@ -144,6 +153,43 @@ fn repo_primary_route(card: &ReviewCard) -> &str {
     card.routes
         .first()
         .map_or(DEFAULT_REVIEW_ROUTE, |route| route.kind.as_str())
+}
+
+fn agent_handoff_summary(card: &ReviewCard) -> String {
+    let projection = agent::repair_queue_projection(card);
+    let buckets = repair_queue_buckets(&projection.repair_queue.buckets);
+    format!(
+        "Agent handoff: `{}`; buckets: {}; reasons: {}",
+        projection.agent_readiness.state,
+        render_backtick_list(&buckets),
+        projection.agent_readiness.reasons.join("; ")
+    )
+}
+
+fn repair_queue_buckets(buckets: &[&'static str]) -> Vec<&'static str> {
+    REPAIR_QUEUE_BUCKET_ORDER
+        .into_iter()
+        .filter(|bucket| {
+            buckets.iter().any(|candidate| {
+                if *candidate == "review_only" {
+                    *bucket == "do_not_auto_repair"
+                } else {
+                    candidate == bucket
+                }
+            })
+        })
+        .collect()
+}
+
+fn render_backtick_list(values: &[&str]) -> String {
+    if values.is_empty() {
+        return "`none`".to_string();
+    }
+    values
+        .iter()
+        .map(|value| format!("`{value}`"))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn render_counts_table(out: &mut String, label: &str, counts: BTreeMap<String, usize>) {
@@ -292,6 +338,7 @@ fn render_pr_summary_reviewer_cockpit(out: &mut String, output: &AnalyzeOutput) 
             "- Agent context: `unsafe-review context {} --json`\n",
             card.id
         ));
+        out.push_str(&format!("- {}\n", agent_handoff_summary(card)));
         out.push_str("- Trust boundary: static unsafe contract review only; not proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n\n");
     } else {
         render_no_changed_gaps(out);
@@ -666,6 +713,9 @@ mod tests {
             "- Agent context: `unsafe-review context {} --json`",
             card.id
         )));
+        assert!(rendered.contains(
+            "- Agent handoff: `ready`; buckets: `repairable_by_guard`, `requires_witness_receipt`; reasons: specific operation family"
+        ));
         assert!(rendered.contains("not Miri-clean status"));
         assert!(rendered.contains("not site-execution proof"));
         assert!(rendered.contains("not a proof of memory safety"));
