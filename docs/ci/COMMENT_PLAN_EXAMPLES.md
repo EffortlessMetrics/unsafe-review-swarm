@@ -52,6 +52,12 @@ Representative fields:
 
 ```json
 {
+  "summary": {
+    "selected_count": 1,
+    "not_selected_count": 0,
+    "budget": 3,
+    "reason": "bounded reviewer noise"
+  },
   "comments": [
     {
       "class": "guard_missing",
@@ -192,6 +198,12 @@ planned comments and carries the no-card limitation:
 
 ```json
 {
+  "summary": {
+    "selected_count": 0,
+    "not_selected_count": 0,
+    "budget": 3,
+    "reason": "bounded reviewer noise"
+  },
   "comments": [],
   "no_changed_gaps": {
     "message": "No changed unsafe-review gaps were found.",
@@ -208,6 +220,8 @@ changed unsafe-review gaps.
 The verifier treats these as artifact contract rules:
 
 - at most three planned comments;
+- `summary.selected_count`, `summary.not_selected_count`, and
+  `summary.budget` must match the bounded review budget;
 - one planned comment per `card_id`;
 - one planned comment per `path`/`line`;
 - changed-line, renderable locations only;

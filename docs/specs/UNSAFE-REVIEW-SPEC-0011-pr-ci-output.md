@@ -243,6 +243,7 @@ Must include:
 ```text
 mode = plan_only
 policy = advisory
+summary
 comments[]
 trust_boundary
 ```
@@ -252,6 +253,18 @@ May include:
 ```text
 not_selected[]
 ```
+
+`summary` must include:
+
+```text
+selected_count
+not_selected_count
+budget
+reason
+```
+
+These fields describe the bounded reviewer-noise budget. They do not create a
+blocking policy or a second classification truth.
 
 Each comment candidate must include:
 
@@ -289,6 +302,10 @@ the inline comment budget.
 Every ReviewCard must be accounted for by either `comments[]` or
 `not_selected[]`. A card may be absent from inline comments, but it must not be
 absent from the comment-plan projection.
+
+`summary.selected_count` must match `comments[]`,
+`summary.not_selected_count` must match `not_selected[]`, and
+`summary.budget` must match the hard inline comment budget.
 
 Each body must include the plan-only trust boundary: artifact-only candidate,
 unsafe-review did not post the comment, did not run witnesses, and did not make

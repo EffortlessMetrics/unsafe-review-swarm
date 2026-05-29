@@ -59,6 +59,8 @@ struct RepairQueueReadinessProjection {
 }
 
 const COMMENT_PLAN_BODY_WORD_LIMIT: usize = 220;
+const COMMENT_PLAN_REVIEW_BUDGET: usize = 3;
+const COMMENT_PLAN_REVIEW_BUDGET_REASON: &str = "bounded reviewer noise";
 const REPAIR_QUEUE_BUCKETS: [&str; 6] = [
     "repairable_by_guard",
     "repairable_by_contract",
@@ -1020,6 +1022,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             );
         }
     }
+    require_comment_plan_summary(&comment_plan, comments.len(), not_selected_card_ids.len())?;
     let repair_queue_projections =
         check_repair_queue_artifact(dir, card_count, &card_ids, &card_projections)?;
 
@@ -1032,6 +1035,49 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         open_actionable_gaps,
         high_priority_cards,
     })
+}
+
+fn require_comment_plan_summary(
+    comment_plan: &serde_json::Value,
+    selected_count: usize,
+    not_selected_count: usize,
+) -> Result<(), String> {
+    let summary = comment_plan
+        .get("summary")
+        .ok_or_else(|| "comment-plan.json is missing summary".to_string())?;
+    if !summary.is_object() {
+        return Err("comment-plan.json summary must be an object".to_string());
+    }
+    let actual_selected =
+        super::json_usize_at(comment_plan, "/summary/selected_count", "comment-plan.json")?;
+    if actual_selected != selected_count {
+        return Err(format!(
+            "comment-plan.json summary.selected_count is {actual_selected}, but comments[] has {selected_count} entrie(s)"
+        ));
+    }
+    let actual_not_selected = super::json_usize_at(
+        comment_plan,
+        "/summary/not_selected_count",
+        "comment-plan.json",
+    )?;
+    if actual_not_selected != not_selected_count {
+        return Err(format!(
+            "comment-plan.json summary.not_selected_count is {actual_not_selected}, but not_selected[] has {not_selected_count} entrie(s)"
+        ));
+    }
+    let budget = super::json_usize_at(comment_plan, "/summary/budget", "comment-plan.json")?;
+    if budget != COMMENT_PLAN_REVIEW_BUDGET {
+        return Err(format!(
+            "comment-plan.json summary.budget is {budget}, expected {COMMENT_PLAN_REVIEW_BUDGET}"
+        ));
+    }
+    let reason = super::require_non_empty_json_str(summary, "reason", "comment-plan.json summary")?;
+    require_expected_value(
+        reason,
+        COMMENT_PLAN_REVIEW_BUDGET_REASON,
+        "comment-plan.json summary reason",
+    )?;
+    Ok(())
 }
 
 fn check_repair_queue_artifact(

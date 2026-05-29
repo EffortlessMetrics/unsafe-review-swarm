@@ -21,6 +21,7 @@ mod tests {
 
         assert_eq!(value["mode"], "plan_only");
         assert_eq!(value["comments"].as_array().map_or(0, Vec::len), 1);
+        assert_review_budget_summary(&value, 1, 0)?;
         assert_eq!(value["comments"][0]["class"], "guard_missing");
         assert_eq!(value["comments"][0]["path"], "src/lib.rs");
         assert_eq!(
@@ -87,6 +88,7 @@ mod tests {
 
         assert_eq!(value["comments"].as_array().map_or(1, Vec::len), 0);
         assert!(value.get("not_selected").is_none());
+        assert_review_budget_summary(&value, 0, 0)?;
         assert_eq!(value["no_changed_gaps"]["message"], NO_CHANGED_GAPS_MESSAGE);
         assert_eq!(
             value["no_changed_gaps"]["limitation"],
@@ -143,6 +145,7 @@ mod tests {
                 .len(),
             2
         );
+        assert_review_budget_summary(&value, 3, 2)?;
         assert_eq!(
             value["not_selected"][0]["reason"],
             "comment-plan max of three candidates reached"
@@ -173,6 +176,7 @@ mod tests {
         assert_eq!(value["comments"].as_array().map_or(0, Vec::len), 1);
         assert_eq!(value["comments"][0]["operation_family"], "raw_pointer_read");
         assert_eq!(value["not_selected"].as_array().map_or(0, Vec::len), 2);
+        assert_review_budget_summary(&value, 1, 2)?;
         assert_eq!(
             value["not_selected"][0]["reason"],
             "operation family already selected for comment-plan budget"
@@ -191,6 +195,7 @@ mod tests {
 
         assert_eq!(value["comments"].as_array().map_or(1, Vec::len), 0);
         assert_eq!(value["not_selected"].as_array().map_or(0, Vec::len), 1);
+        assert_review_budget_summary(&value, 0, 1)?;
         assert_eq!(value["not_selected"][0]["class"], "miri_unsupported");
         assert_eq!(
             value["not_selected"][0]["operation"],
@@ -236,6 +241,7 @@ mod tests {
 
         assert_eq!(value["comments"].as_array().map_or(1, Vec::len), 0);
         assert_eq!(value["not_selected"].as_array().map_or(0, Vec::len), 1);
+        assert_review_budget_summary(&value, 0, 1)?;
         assert_eq!(value["not_selected"][0]["class"], "contract_missing");
         assert_eq!(
             value["not_selected"][0]["operation"],
@@ -270,5 +276,17 @@ mod tests {
 
     fn parse_json(text: &str) -> Result<serde_json::Value, String> {
         serde_json::from_str(text).map_err(|err| format!("JSON parse failed: {err}"))
+    }
+
+    fn assert_review_budget_summary(
+        value: &serde_json::Value,
+        selected_count: usize,
+        not_selected_count: usize,
+    ) -> Result<(), String> {
+        assert_eq!(value["summary"]["selected_count"], selected_count);
+        assert_eq!(value["summary"]["not_selected_count"], not_selected_count);
+        assert_eq!(value["summary"]["budget"], 3);
+        assert_eq!(value["summary"]["reason"], "bounded reviewer noise");
+        Ok(())
     }
 }

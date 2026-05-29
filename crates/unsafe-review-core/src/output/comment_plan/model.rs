@@ -11,6 +11,7 @@ use super::selection::{
 };
 
 const MAX_PLANNED_COMMENTS: usize = 3;
+const REVIEW_BUDGET_REASON: &str = "bounded reviewer noise";
 pub(super) const TRUST_BOUNDARY: &str = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.";
 
 #[derive(Serialize)]
@@ -19,6 +20,7 @@ pub(super) struct CommentPlan {
     pub(super) tool: String,
     pub(super) mode: &'static str,
     pub(super) policy: &'static str,
+    pub(super) summary: CommentPlanSummary,
     pub(super) comments: Vec<PlannedComment>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub(super) not_selected: Vec<NotSelectedCard>,
@@ -63,6 +65,12 @@ impl From<&AnalyzeOutput> for CommentPlan {
             tool: output.tool.clone(),
             mode: "plan_only",
             policy: output.policy.as_str(),
+            summary: CommentPlanSummary {
+                selected_count: comments.len(),
+                not_selected_count: not_selected.len(),
+                budget: MAX_PLANNED_COMMENTS,
+                reason: REVIEW_BUDGET_REASON,
+            },
             comments,
             not_selected,
             no_changed_gaps: (output.summary.open_actionable_gaps == 0).then_some(NoChangedGaps {
@@ -72,6 +80,14 @@ impl From<&AnalyzeOutput> for CommentPlan {
             trust_boundary: TRUST_BOUNDARY,
         }
     }
+}
+
+#[derive(Serialize)]
+pub(super) struct CommentPlanSummary {
+    selected_count: usize,
+    not_selected_count: usize,
+    budget: usize,
+    reason: &'static str,
 }
 
 #[derive(Serialize)]

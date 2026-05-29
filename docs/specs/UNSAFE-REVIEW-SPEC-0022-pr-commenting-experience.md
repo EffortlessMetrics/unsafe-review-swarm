@@ -53,6 +53,8 @@ The goal is reviewer leverage, not commenting on every card.
 
 - Mode is plan-only and policy is advisory.
 - Default candidate count is 0-3; hard max is 3.
+- `summary` records the bounded review budget:
+  `selected_count`, `not_selected_count`, `budget`, and `reason`.
 - Cards that are present but not selected for inline comments must appear in
   `not_selected[]` with a reason.
 - Every ReviewCard must be represented once, either in `comments[]` or
@@ -119,6 +121,9 @@ Actionability values:
 
 Normally eligible for inline comments: `specific_guard_missing`, `specific_contract_missing`, `specific_witness_missing`, `specific_repair_available`.
 
+The summary reason is review-noise metadata. It does not create a policy gate
+and does not change ReviewCard truth.
+
 ## 7. Comment body contract
 
 Bodies are reviewer notes, not scanner dumps.
@@ -164,6 +169,7 @@ document is a future-lane contract, not a live workflow.
 
 - over max comments
 - missing required fields
+- missing or mismatched `summary` review-budget counts
 - invalid/unknown `card_id`
 - invalid/unknown `not_selected.card_id`
 - a ReviewCard missing from both `comments[]` and `not_selected[]`
