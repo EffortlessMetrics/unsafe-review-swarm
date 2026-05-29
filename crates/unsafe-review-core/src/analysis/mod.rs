@@ -1,3 +1,4 @@
+mod atomic_pointer_state;
 pub(crate) mod classify;
 pub(crate) mod evidence;
 mod ffi_boundary;

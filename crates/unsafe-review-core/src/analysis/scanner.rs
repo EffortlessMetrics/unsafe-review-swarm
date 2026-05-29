@@ -1,3 +1,4 @@
+use super::atomic_pointer_state::is_atomic_pointer_state_transition;
 use super::ffi_boundary::ffi_boundary_applicability;
 use super::syntax::{ParsedSource, SyntaxNodeFact};
 use crate::domain::{OperationFamily, SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind};
@@ -634,21 +635,6 @@ fn is_ptr_replace_call(line: &str) -> bool {
     compact.contains("ptr::replace(")
         || compact.contains("core::ptr::replace(")
         || compact.contains("std::ptr::replace(")
-}
-
-fn is_atomic_pointer_state_transition(line: &str) -> bool {
-    contains_call_name(line, "swap")
-        && line.contains("ptr::null_mut")
-        && line.contains("Ordering::")
-        || is_atomic_pointer_fetch_state_transition(line)
-}
-
-fn is_atomic_pointer_fetch_state_transition(line: &str) -> bool {
-    let compact = compact_whitespace(line);
-    compact.contains("from_ptr(")
-        && ["fetch_and", "fetch_or", "fetch_xor"]
-            .iter()
-            .any(|name| contains_call_name(line, name))
 }
 
 fn is_incomplete_multiline_transmute_copy(line: &str) -> bool {
