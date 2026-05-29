@@ -35,6 +35,11 @@ fn print_first_pr_overview(output: &AnalyzeOutput, out_dir: &Path) {
     );
     println!("Open:");
     println!("  {}", out_dir.join("pr-summary.md").display());
+    println!("Agent repair queue:");
+    println!(
+        "  {} (copy-only; unsafe-review did not run an agent)",
+        out_dir.join("repair-queue.json").display()
+    );
 }
 
 fn print_top_card_summary(

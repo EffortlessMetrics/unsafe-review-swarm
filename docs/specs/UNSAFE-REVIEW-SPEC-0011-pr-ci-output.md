@@ -630,6 +630,7 @@ Open:
 - `target/unsafe-review/pr-summary.md`
 - `target/unsafe-review/github-summary.md`
 - `target/unsafe-review/witness-plan.md`
+- `target/unsafe-review/repair-queue.json` (copy-only; no agent was run)
 
 Trust boundary:
 Static unsafe contract review only. Not memory-safety proof, not UB-free status,

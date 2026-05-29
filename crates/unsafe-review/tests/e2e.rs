@@ -593,6 +593,9 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("- Open actionable gaps: 1"));
     assert!(stdout.contains("Open:"));
     assert!(stdout.contains("pr-summary.md"));
+    assert!(stdout.contains("Agent repair queue:"));
+    assert!(stdout.contains("repair-queue.json"));
+    assert!(stdout.contains("copy-only; unsafe-review did not run an agent"));
     assert!(stdout.contains("Top card:"));
     assert!(stdout.contains("`raw_pointer_read`"));
     assert!(stdout.contains("Class: `guard_missing`"));
@@ -763,6 +766,9 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
     assert!(stdout.contains("- Open actionable gaps: 0"));
     assert!(stdout.contains("Open:"));
     assert!(stdout.contains("pr-summary.md"));
+    assert!(stdout.contains("Agent repair queue:"));
+    assert!(stdout.contains("repair-queue.json"));
+    assert!(stdout.contains("copy-only; unsafe-review did not run an agent"));
     assert!(stdout.contains("github-summary.md"));
     assert!(stdout.contains("No changed unsafe-review gaps were found."));
     assert!(stdout.contains("This does not prove the repo safe"));

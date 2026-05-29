@@ -69,6 +69,8 @@ On successful bundle write, terminal output MUST include:
 - Top-card handoff commands (`unsafe-review explain <card-id>` and
   `unsafe-review context <card-id> --json` when present).
 - `pr-summary.md` location.
+- `repair-queue.json` location as a copy-only agent handoff; terminal output
+  must not imply that unsafe-review ran an agent.
 - Trust boundary statement.
 
 Minimum trust boundary wording intent:
