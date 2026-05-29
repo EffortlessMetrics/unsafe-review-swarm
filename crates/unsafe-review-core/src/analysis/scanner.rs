@@ -1,6 +1,7 @@
 use super::atomic_pointer_state::is_atomic_pointer_state_transition;
 use super::copy_operation::copy_operation_family;
 use super::ffi_boundary::ffi_boundary_applicability;
+use super::maybeuninit_operation::maybeuninit_operation_family;
 use super::slice_operation::slice_operation_family;
 use super::static_mut::{is_static_mut_item, parse_static_mut_name};
 use super::syntax::{ParsedSource, SyntaxNodeFact};
@@ -341,11 +342,8 @@ fn detect_site(line: &str) -> Option<(UnsafeSiteKind, OperationFamily)> {
             OperationFamily::StrFromUtf8Unchecked,
         ));
     }
-    if is_maybeuninit_assume_init_call(line) {
-        return Some((
-            UnsafeSiteKind::Operation,
-            OperationFamily::MaybeUninitAssumeInit,
-        ));
+    if let Some(family) = maybeuninit_operation_family(line) {
+        return Some((UnsafeSiteKind::Operation, family));
     }
     if contains_call_name(line, "transmute") || contains_call_name(line, "transmute_copy") {
         return Some((UnsafeSiteKind::Operation, OperationFamily::Transmute));
@@ -580,14 +578,6 @@ fn is_ident_continue(ch: char) -> bool {
 
 fn is_nonnull_new_unchecked_call(line: &str) -> bool {
     compact_whitespace(line).contains("NonNull::new_unchecked")
-}
-
-fn is_maybeuninit_assume_init_call(line: &str) -> bool {
-    contains_call_name(line, "assume_init")
-        || contains_call_name(line, "assume_init_read")
-        || contains_call_name(line, "assume_init_ref")
-        || contains_call_name(line, "assume_init_mut")
-        || contains_call_name(line, "assume_init_drop")
 }
 
 fn is_incomplete_multiline_transmute_copy(line: &str) -> bool {

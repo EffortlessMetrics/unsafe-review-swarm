@@ -3,6 +3,7 @@ pub(crate) mod classify;
 mod copy_operation;
 pub(crate) mod evidence;
 mod ffi_boundary;
+mod maybeuninit_operation;
 pub(crate) mod obligations;
 pub(crate) mod pipeline;
 pub(crate) mod receipts;
