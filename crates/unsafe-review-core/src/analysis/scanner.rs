@@ -2,6 +2,7 @@ use super::atomic_pointer_state::is_atomic_pointer_state_transition;
 use super::copy_operation::copy_operation_family;
 use super::ffi_boundary::ffi_boundary_applicability;
 use super::maybeuninit_operation::maybeuninit_operation_family;
+use super::nonnull_operation::nonnull_operation_family;
 use super::slice_operation::slice_operation_family;
 use super::static_mut::{is_static_mut_item, parse_static_mut_name};
 use super::syntax::{ParsedSource, SyntaxNodeFact};
@@ -378,8 +379,8 @@ fn detect_site(line: &str) -> Option<(UnsafeSiteKind, OperationFamily)> {
     if contains_call_name(line, "get_unchecked") || contains_call_name(line, "get_unchecked_mut") {
         return Some((UnsafeSiteKind::Operation, OperationFamily::GetUnchecked));
     }
-    if contains_call_name(line, "new_unchecked") && is_nonnull_new_unchecked_call(line) {
-        return Some((UnsafeSiteKind::Operation, OperationFamily::NonNullUnchecked));
+    if let Some(family) = nonnull_operation_family(line) {
+        return Some((UnsafeSiteKind::Operation, family));
     }
     if contains_call_name(line, "new_unchecked") {
         return Some((UnsafeSiteKind::Operation, OperationFamily::UnsafeFnCall));
@@ -574,10 +575,6 @@ fn call_suffix(after_name: &str) -> bool {
 
 fn is_ident_continue(ch: char) -> bool {
     ch == '_' || ch.is_ascii_alphanumeric()
-}
-
-fn is_nonnull_new_unchecked_call(line: &str) -> bool {
-    compact_whitespace(line).contains("NonNull::new_unchecked")
 }
 
 fn is_incomplete_multiline_transmute_copy(line: &str) -> bool {
