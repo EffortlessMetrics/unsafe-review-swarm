@@ -533,6 +533,8 @@ mod tests {
         "unreachable_unchecked_path",
         "unreachable_unchecked_infallible_path",
         "unreachable_unchecked_other_infallible_not_guard",
+        "unreachable_unchecked_post_infallible_not_guard",
+        "unreachable_unchecked_closed_infallible_match_not_guard",
         "transmute_invalid_value",
         "transmute_layout_size_guard",
         "transmute_layout_conjunct_branch_guard",
