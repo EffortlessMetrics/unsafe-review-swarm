@@ -94,7 +94,8 @@ fn problem_flags(summary: &crate::analysis::receipts::ReceiptAuditSummary) -> Ve
         ("invalid", summary.invalid),
     ]
     .into_iter()
-    .filter_map(|(label, count)| (count > 0).then(|| format!("{label}: {count}")))
+    .filter(|(_label, count)| *count > 0)
+    .map(|(label, count)| format!("{label}: {count}"))
     .collect()
 }
 

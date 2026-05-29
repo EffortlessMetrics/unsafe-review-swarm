@@ -79,7 +79,7 @@ pub(super) fn render_markdown(report: &OutcomeReport) -> String {
                 "- Additional movement reasons: {remaining} more in the Card outcomes table.\n"
             ));
         }
-        out.push_str("\n");
+        out.push('\n');
     }
     out.push_str("## Card outcomes\n\n");
     if report.cards.is_empty() {
