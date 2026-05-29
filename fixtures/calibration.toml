@@ -122,6 +122,7 @@ required_core_fixtures = [
   "get_unchecked_mut_conjunct_len_guard",
   "get_unchecked_mut_get_probe_guard",
   "get_unchecked_mut_get_probe_early_return_guard",
+  "get_unchecked_mut_get_probe_other_slice_not_guard",
   "get_unchecked_mut_if_let_get_guard",
   "get_unchecked_mut_let_else_get_guard",
   "get_unchecked_mut_match_get_guard",
@@ -1561,6 +1562,16 @@ claim = "get_unchecked_mut recognizes same-receiver get probe is_none early-retu
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+
+[[cases]]
+fixture = "get_unchecked_mut_get_probe_other_slice_not_guard"
+kind = "false_positive_control"
+claim = "get_unchecked_mut does not accept get probe bounds evidence from another slice"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
 expected_operation_family = "get_unchecked"
 expected_hazard = "bounds"
 

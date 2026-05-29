@@ -81,6 +81,20 @@ label_source = "fixture_golden"
 rationale = "A same-receiver get(index).is_none() early return before get_unchecked_mut discharges the bounds obligation."
 
 [[samples]]
+id = "get-unchecked-mut-get-probe-other-slice-not-guard"
+fixture = "get_unchecked_mut_get_probe_other_slice_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A get(index) probe for another slice does not discharge get_unchecked_mut bounds evidence for the indexed slice."
+
+[[samples]]
 id = "get-unchecked-mut-if-let-get-present"
 fixture = "get_unchecked_mut_if_let_get_guard"
 kind = "positive"

@@ -493,6 +493,7 @@ mod tests {
         "get_unchecked_mut_conjunct_len_guard",
         "get_unchecked_mut_get_probe_guard",
         "get_unchecked_mut_get_probe_early_return_guard",
+        "get_unchecked_mut_get_probe_other_slice_not_guard",
         "get_unchecked_mut_if_let_get_guard",
         "get_unchecked_mut_let_else_get_guard",
         "get_unchecked_mut_match_get_guard",

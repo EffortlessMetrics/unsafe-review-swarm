@@ -8,6 +8,7 @@ file remains the detailed claim-to-proof ledger.
 Recent core smoke proof additions include
 `get_unchecked_mut_get_probe_guard`,
 `get_unchecked_mut_get_probe_early_return_guard`,
+`get_unchecked_mut_get_probe_other_slice_not_guard`,
 `get_unchecked_mut_if_let_get_guard`,
 `get_unchecked_mut_let_else_get_guard`,
 `get_unchecked_mut_get_probe_reassigned_index_not_guard`,
@@ -22,8 +23,9 @@ Recent core smoke proof additions include
 `get_unchecked_mut_reassigned_receiver_not_guard`, which pin that same-receiver
 `get(index)` probes, including if-let, let-else, and match Some-arm forms, and positive bounds
 branches must still dominate `get_unchecked`, bare predicate observations and
-comment-only early-return text are not guards, and reassigned checked indexes or
-receivers do not discharge bounds evidence.
+comment-only early-return text are not guards, get-probe evidence must target
+the same slice, and reassigned checked indexes or receivers do not discharge
+bounds evidence.
 Recent `NonNull::new_unchecked` nullability additions include
 `nonnull_if_let_new_guard`, `nonnull_let_else_new_guard`,
 `nonnull_match_new_guard`, `nonnull_new_reassigned_ptr_not_guard`,
