@@ -266,7 +266,10 @@ fn require_markdown_top_card_projection(
 
     for line in text.lines() {
         let trimmed = line.trim();
-        if let Some(rest) = trimmed.strip_prefix("- ID: `") {
+        if let Some(rest) = trimmed
+            .strip_prefix("- ID: `")
+            .or_else(|| trimmed.strip_prefix("- Top card: `"))
+        {
             let Some((card_id, _)) = rest.split_once('`') else {
                 continue;
             };
@@ -294,9 +297,15 @@ fn require_markdown_top_card_projection(
                 continue;
             };
             top_card_operation_family = Some(operation_family.to_string());
-        } else if let Some(missing_evidence) = trimmed.strip_prefix("- Missing evidence: ") {
+        } else if let Some(missing_evidence) = trimmed
+            .strip_prefix("- Missing evidence: ")
+            .or_else(|| trimmed.strip_prefix("- Missing/weak evidence: "))
+        {
             top_card_missing_evidence = Some(missing_evidence.to_string());
-        } else if let Some(rest) = trimmed.strip_prefix("- Primary route: `") {
+        } else if let Some(rest) = trimmed
+            .strip_prefix("- Primary route: `")
+            .or_else(|| trimmed.strip_prefix("- Witness route: `"))
+        {
             let Some((route_kind, after_kind)) = rest.split_once('`') else {
                 continue;
             };
@@ -304,7 +313,10 @@ fn require_markdown_top_card_projection(
                 continue;
             };
             top_card_primary_route = Some((route_kind.to_string(), route_reason.to_string()));
-        } else if let Some(next_action) = trimmed.strip_prefix("- Next action: ") {
+        } else if let Some(next_action) = trimmed
+            .strip_prefix("- Next action: ")
+            .or_else(|| trimmed.strip_prefix("- Next reviewer action: "))
+        {
             top_card_next_action = Some(next_action.to_string());
         } else if let Some(rest) = trimmed.strip_prefix("- Explain: `") {
             let Some((command, _)) = rest.split_once('`') else {
@@ -484,7 +496,10 @@ fn require_top_card_primary_route_command(
     let expected = format!(
         "- Primary route: `{route_kind}` because {route_reason}\n\n```bash\n{command}\n```"
     );
-    if text.contains(&expected) {
+    let expected_front_panel = format!(
+        "- Witness route: `{route_kind}` because {route_reason}\n  - Suggested command:\n\n```bash\n{command}\n```"
+    );
+    if text.contains(&expected) || text.contains(&expected_front_panel) {
         Ok(())
     } else {
         Err(format!(

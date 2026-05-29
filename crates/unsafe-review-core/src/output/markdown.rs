@@ -162,7 +162,7 @@ fn render_counts_table(out: &mut String, label: &str, counts: BTreeMap<String, u
 pub(crate) fn render_pr_summary(output: &AnalyzeOutput) -> String {
     let mut out = String::new();
     render_pr_summary_header(&mut out, output);
-    render_pr_summary_top_card(&mut out, output);
+    render_pr_summary_reviewer_cockpit(&mut out, output);
     render_pr_summary_card_table(&mut out, output);
     render_pr_summary_witness_plan(&mut out, output);
     render_pr_summary_trust_boundary(&mut out);
@@ -222,6 +222,68 @@ fn render_pr_summary_header(out: &mut String, output: &AnalyzeOutput) {
         output.summary.open_actionable_gaps
     ));
     out.push_str(&format!("- Policy mode: `{}`\n\n", output.policy.as_str()));
+}
+
+fn render_pr_summary_reviewer_cockpit(out: &mut String, output: &AnalyzeOutput) {
+    out.push_str("## Reviewer cockpit\n\n");
+    if let Some(card) = output.cards.first() {
+        out.push_str(&format!("- Top card: `{}`\n", card.id));
+        out.push_str(&format!("- Class: `{}`\n", card.class.as_str()));
+        out.push_str(&format!(
+            "- Location: {}:{}\n",
+            path_display(&card.site.location.file),
+            card.site.location.line
+        ));
+        out.push_str(&format!(
+            "- Operation: `{}`\n",
+            one_line(&card.operation.expression)
+        ));
+        out.push_str(&format!(
+            "- Operation family: `{}`\n",
+            card.operation.family.as_str()
+        ));
+        out.push_str(&format!(
+            "- Obligation: {}\n",
+            primary_obligation_summary(card)
+        ));
+        out.push_str("- Evidence found:\n");
+        out.push_str(&format!("  - Contract: {}\n", card.contract.summary));
+        out.push_str(&format!(
+            "  - Guard/discharge: {}\n",
+            card.discharge.summary
+        ));
+        out.push_str(&format!("  - Reach: {}\n", card.reach.summary));
+        out.push_str(&format!("  - Witness: {}\n", card.witness.summary));
+        out.push_str(&format!(
+            "- Missing/weak evidence: {}\n",
+            missing_summary(card)
+        ));
+        out.push_str(&format!(
+            "- Next reviewer action: {}\n",
+            card.next_action.summary
+        ));
+        if let Some(route) = card.routes.first() {
+            out.push_str(&format!(
+                "- Witness route: `{}` because {}\n",
+                route.kind.as_str(),
+                route.reason
+            ));
+            if let Some(command) = &route.command {
+                out.push_str("  - Suggested command:\n\n");
+                push_bash_block(out, command);
+            }
+        } else {
+            out.push_str("- Witness route: no focused witness route was selected; route this to human review.\n");
+        }
+        out.push_str(&format!("- Explain: `unsafe-review explain {}`\n", card.id));
+        out.push_str(&format!(
+            "- Agent context: `unsafe-review context {} --json`\n",
+            card.id
+        ));
+        out.push_str("- Trust boundary: static unsafe contract review only; not proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n\n");
+    } else {
+        render_no_changed_gaps(out);
+    }
 }
 
 fn render_pr_summary_top_card(out: &mut String, output: &AnalyzeOutput) {
@@ -469,6 +531,14 @@ fn missing_summary(card: &ReviewCard) -> String {
         .join("; ")
 }
 
+fn primary_obligation_summary(card: &ReviewCard) -> &str {
+    card.obligations
+        .first()
+        .map_or("No safety obligation recorded", |obligation| {
+            obligation.description.as_str()
+        })
+}
+
 fn md_cell(value: &str) -> String {
     one_line(value).replace('|', "\\|")
 }
@@ -561,10 +631,17 @@ mod tests {
             .ok_or_else(|| "raw pointer fixture should emit a card".to_string())?;
 
         assert!(rendered.contains("# unsafe-review PR summary"));
-        assert!(rendered.contains("## Top card"));
+        assert!(rendered.contains("## Reviewer cockpit"));
+        assert!(rendered.contains(&format!("- Top card: `{}`", card.id)));
         assert!(rendered.contains("## Card table"));
         assert!(rendered.contains("- Operation: `unsafe { ptr.cast::<Header>().read() }`"));
         assert!(rendered.contains("- Operation family: `raw_pointer_read`"));
+        assert!(rendered.contains("- Obligation:"));
+        assert!(rendered.contains("- Evidence found:"));
+        assert!(rendered.contains("  - Guard/discharge:"));
+        assert!(rendered.contains("- Missing/weak evidence: Missing visible local guard"));
+        assert!(rendered.contains("- Next reviewer action: Add or expose the local guard"));
+        assert!(rendered.contains("- Witness route: `miri` because Pure-Rust UB-adjacent hazard"));
         assert!(rendered.contains("| ID | Class | Location | Operation family | Operation |"));
         assert!(rendered.contains("unsafe { ptr.cast::<Header>().read() }"));
         assert!(rendered.contains("| `raw_pointer_read` |"));
@@ -577,6 +654,8 @@ mod tests {
             "- Agent context: `unsafe-review context {} --json`",
             card.id
         )));
+        assert!(rendered.contains("not Miri-clean status"));
+        assert!(rendered.contains("not site-execution proof"));
         assert!(rendered.contains("not a proof of memory safety"));
         assert!(rendered.contains("not a Miri result unless a witness receipt is attached"));
         Ok(())

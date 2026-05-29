@@ -636,7 +636,13 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
 
     let summary = fs::read_to_string(out_dir.join("pr-summary.md"))?;
     assert!(summary.contains("# unsafe-review PR summary"));
-    assert!(summary.contains(&format!("- ID: `{card_id}`")));
+    assert!(summary.contains("## Reviewer cockpit"));
+    assert!(summary.contains(&format!("- Top card: `{card_id}`")));
+    assert!(summary.contains("- Missing/weak evidence:"));
+    assert!(summary.contains("- Next reviewer action:"));
+    assert!(summary.contains("- Witness route:"));
+    assert!(summary.contains(&format!("unsafe-review explain {card_id}")));
+    assert!(summary.contains(&format!("unsafe-review context {card_id} --json")));
     assert!(summary.contains("## Trust boundary"));
     assert!(summary.contains("not a Miri result unless a witness receipt is attached"));
 
