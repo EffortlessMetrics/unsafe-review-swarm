@@ -13281,6 +13281,38 @@ Snapshot reports:
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_duplicate_repair_queue_bucket_card_ids()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-repair-queue-duplicate-bucket-card")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+
+        let path = dir.join("repair-queue.json");
+        let mut repair_queue: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&path).map_err(|err| format!("read repair queue failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse repair queue failed: {err}"))?;
+        let duplicate = repair_queue["buckets"]["repairable_by_guard"][0].clone();
+        repair_queue["buckets"]["repairable_by_guard"]
+            .as_array_mut()
+            .ok_or_else(|| "repair queue fixture must have repairable_by_guard".to_string())?
+            .push(duplicate);
+        repair_queue["summary"]["repairable_by_guard"] = serde_json::json!(2);
+        fs::write(&path, repair_queue.to_string())
+            .map_err(|err| format!("write repair queue failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result.err().unwrap_or_default().contains(
+                "repair-queue.json bucket `repairable_by_guard` repeats card id `card-1`"
+            )
+        );
+        Ok(())
+    }
+
+    #[test]
     fn policy_ledger_accepts_empty_status_without_entries() -> Result<(), String> {
         let path = unique_temp_dir("unsafe-review-empty-ledger")?.with_extension("toml");
         fs::write(

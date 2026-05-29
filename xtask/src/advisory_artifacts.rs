@@ -1061,9 +1061,15 @@ fn check_repair_queue_artifact(
                 entries.len()
             ));
         }
+        let mut bucket_card_ids = BTreeSet::new();
         for entry in entries {
             check_repair_queue_entry(entry, bucket, card_ids, card_projections)?;
             if let Some(card_id) = entry.get("card_id").and_then(serde_json::Value::as_str) {
+                if !bucket_card_ids.insert(card_id.to_string()) {
+                    return Err(format!(
+                        "repair-queue.json bucket `{bucket}` repeats card id `{card_id}`"
+                    ));
+                }
                 queued_card_ids.insert(card_id.to_string());
             }
         }

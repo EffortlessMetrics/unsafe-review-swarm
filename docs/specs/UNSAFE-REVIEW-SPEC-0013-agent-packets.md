@@ -117,7 +117,7 @@ agent-readiness state, bucket reason, do-not-do rules, and a copyable
 `unsafe-review context <card-id> --json` command. Cards may appear in more than
 one bucket only when the reasons are distinct and card-scoped, such as a card
 that is repairable by guard evidence but still requires a witness receipt for a
-stronger review signal.
+stronger review signal. A card must not repeat within the same bucket.
 
 The aggregate artifact is still copy-only. It must not run an agent, edit
 source, post comments, execute witnesses, suppress cards, resolve cards, or

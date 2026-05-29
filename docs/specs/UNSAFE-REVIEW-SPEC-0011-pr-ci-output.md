@@ -425,6 +425,10 @@ do_not_do
 trust_boundary
 ```
 
+The same `card_id` must not repeat within one repair queue bucket. The same card
+may appear in multiple buckets only when the bucket reasons are distinct and
+card-scoped.
+
 `context_command` must be exactly:
 
 ```text
