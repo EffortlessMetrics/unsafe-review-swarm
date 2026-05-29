@@ -134,7 +134,7 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     let diff = diff_source(&check)?;
     let root = check.root.clone();
     let output = analyze(AnalyzeInput {
-        root: check.root,
+        root: root.clone(),
         scope: Scope::Diff,
         diff,
         mode: AnalysisMode::Draft,
@@ -153,6 +153,7 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         &output,
         &options.out_dir,
         &root,
+        &check,
         NO_CHANGED_GAPS_MESSAGE,
         NO_CHANGED_GAPS_LIMITATION,
         &FIRST_PR_ARTIFACTS,

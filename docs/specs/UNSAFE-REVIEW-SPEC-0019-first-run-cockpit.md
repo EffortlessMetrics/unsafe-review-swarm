@@ -71,6 +71,9 @@ On successful bundle write, terminal output MUST include:
 - `pr-summary.md` location.
 - `repair-queue.json` location as a copy-only agent handoff; terminal output
   must not imply that unsafe-review ran an agent.
+- A `receipt audit` command for checking saved witness receipt metadata against
+  the same first-pr card set; terminal output must not imply that unsafe-review
+  ran a witness.
 - Trust boundary statement.
 
 Minimum trust boundary wording intent:

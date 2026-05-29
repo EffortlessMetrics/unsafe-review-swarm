@@ -596,6 +596,11 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("Agent repair queue:"));
     assert!(stdout.contains("repair-queue.json"));
     assert!(stdout.contains("copy-only; unsafe-review did not run an agent"));
+    assert!(stdout.contains("Audit saved receipts:"));
+    assert!(stdout.contains("unsafe-review receipt audit --root"));
+    assert!(stdout.contains("--diff"));
+    assert!(stdout.contains("--format markdown"));
+    assert!(stdout.contains("saved receipt metadata only; unsafe-review did not run a witness"));
     assert!(stdout.contains("Top card:"));
     assert!(stdout.contains("`raw_pointer_read`"));
     assert!(stdout.contains("Class: `guard_missing`"));
@@ -769,6 +774,11 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
     assert!(stdout.contains("Agent repair queue:"));
     assert!(stdout.contains("repair-queue.json"));
     assert!(stdout.contains("copy-only; unsafe-review did not run an agent"));
+    assert!(stdout.contains("Audit saved receipts:"));
+    assert!(stdout.contains("unsafe-review receipt audit --root"));
+    assert!(stdout.contains("--diff"));
+    assert!(stdout.contains("--format markdown"));
+    assert!(stdout.contains("saved receipt metadata only; unsafe-review did not run a witness"));
     assert!(stdout.contains("github-summary.md"));
     assert!(stdout.contains("No changed unsafe-review gaps were found."));
     assert!(stdout.contains("This does not prove the repo safe"));

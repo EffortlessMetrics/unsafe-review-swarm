@@ -108,6 +108,11 @@ The command analyzes once and renders every artifact from the same
 `ReviewCard`s. It stays advisory-only: it does not execute witness tools, post
 comments, edit source, or enforce blocking policy.
 
+The terminal handoff also prints a matching `unsafe-review receipt audit`
+command so reviewers can check whether saved witness receipt metadata still
+matches the current first-pr cards. The audit is metadata-only and does not run
+the witness.
+
 ## Output Formats
 
 All output formats project the same `ReviewCard`s. They must not reclassify

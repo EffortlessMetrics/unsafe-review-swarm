@@ -1,5 +1,6 @@
 use std::path::Path;
 
+use crate::command::{CheckOptions, DiffInput};
 use unsafe_review_core::AnalyzeOutput;
 
 type ArtifactRenderer = fn(&AnalyzeOutput) -> String;
@@ -9,11 +10,13 @@ pub(super) fn print_first_pr_report(
     output: &AnalyzeOutput,
     out_dir: &Path,
     root: &Path,
+    check: &CheckOptions,
     no_changed_gaps_message: &str,
     no_changed_gaps_limitation: &str,
     artifacts: &[ArtifactSpec<'_>],
 ) {
     print_first_pr_overview(output, out_dir);
+    print_receipt_audit_handoff(check);
     print_top_card_summary(
         output,
         root,
@@ -22,6 +25,48 @@ pub(super) fn print_first_pr_report(
     );
     print_artifact_paths(out_dir, artifacts);
     print_trust_boundary();
+}
+
+fn print_receipt_audit_handoff(check: &CheckOptions) {
+    println!("Audit saved receipts:");
+    println!("  {}", receipt_audit_command(check));
+    println!("  saved receipt metadata only; unsafe-review did not run a witness");
+}
+
+fn receipt_audit_command(check: &CheckOptions) -> String {
+    let mut parts = vec![
+        "unsafe-review".to_string(),
+        "receipt".to_string(),
+        "audit".to_string(),
+        "--root".to_string(),
+        shell_arg(&check.root.display().to_string()),
+    ];
+    if let Some(base) = &check.base {
+        parts.push("--base".to_string());
+        parts.push(shell_arg(base));
+    }
+    if let Some(diff) = &check.diff {
+        parts.push("--diff".to_string());
+        match diff {
+            DiffInput::File(path) => parts.push(shell_arg(&path.display().to_string())),
+            DiffInput::Stdin => parts.push("-".to_string()),
+        }
+    }
+    if let Some(max_cards) = check.max_cards {
+        parts.push("--max-cards".to_string());
+        parts.push(max_cards.to_string());
+    }
+    parts.push("--format".to_string());
+    parts.push("markdown".to_string());
+    parts.join(" ")
+}
+
+fn shell_arg(value: &str) -> String {
+    if value.chars().any(char::is_whitespace) {
+        format!("\"{}\"", value.replace('"', "\\\""))
+    } else {
+        value.to_string()
+    }
 }
 
 fn print_first_pr_overview(output: &AnalyzeOutput, out_dir: &Path) {
