@@ -27,7 +27,8 @@ pub(crate) fn scan_file(
     let lines: Vec<&str> = text.lines().collect();
     let parsed = super::syntax::parse_source(text.as_str());
     let extern_names = extern_fn_names(&lines);
-    let syntax_sites = detect_syntax_sites(&parsed, &extern_names);
+    let local_modules = local_module_names(&lines);
+    let syntax_sites = detect_syntax_sites(&parsed, &extern_names, &local_modules);
     let syntax_operation_lines = syntax_sites
         .iter()
         .filter(|site| site.kind == UnsafeSiteKind::Operation)
@@ -463,6 +464,19 @@ fn extern_fn_names(lines: &[&str]) -> BTreeSet<String> {
     names
 }
 
+fn local_module_names(lines: &[&str]) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
+    let mut state = LineCommentState::default();
+    for raw in lines {
+        let detection_line = line_for_text_detection(raw, &mut state);
+        let trimmed = detection_line.trim();
+        if let Some(name) = parse_mod_name(trimmed) {
+            names.insert(name);
+        }
+    }
+    names
+}
+
 fn insert_extern_call_paths(
     names: &mut BTreeSet<String>,
     module_stack: &[(String, usize)],
@@ -525,11 +539,14 @@ enum FfiBoundaryKind {
 fn ffi_boundary_applicability(
     line: &str,
     extern_names: &BTreeSet<String>,
+    local_modules: &BTreeSet<String>,
 ) -> Option<FfiBoundaryApplicability> {
     if !unsafe_block_contains_call(line) {
         return None;
     }
-    if let Some(call_path) = matching_call_path_prefix(line, "libc::") {
+    if !local_modules.contains("libc")
+        && let Some(call_path) = matching_call_path_prefix(line, "libc::")
+    {
         return Some(FfiBoundaryApplicability::known_foreign_path(call_path));
     }
     if let Some(call_path) = matching_extern_call_path(line, extern_names) {
@@ -784,6 +801,7 @@ struct DetectedSyntaxSite {
 fn detect_syntax_sites(
     parsed: &ParsedSource,
     extern_names: &BTreeSet<String>,
+    local_modules: &BTreeSet<String>,
 ) -> Vec<DetectedSyntaxSite> {
     let mut sites = Vec::new();
     let unsafe_block_ranges = unsafe_block_ranges(parsed);
@@ -795,6 +813,7 @@ fn detect_syntax_sites(
             &unsafe_block_ranges,
             &operation_block_ranges,
             extern_names,
+            local_modules,
         ) else {
             continue;
         };
@@ -1004,6 +1023,7 @@ fn detect_syntax_site(
     unsafe_block_ranges: &[(usize, usize)],
     operation_block_ranges: &BTreeSet<(usize, usize)>,
     extern_names: &BTreeSet<String>,
+    local_modules: &BTreeSet<String>,
 ) -> Option<(UnsafeSiteKind, OperationFamily)> {
     if !syntax_kind_can_be_unsafe_site(&fact.kind) {
         return None;
@@ -1050,7 +1070,7 @@ fn detect_syntax_site(
         "BLOCK_EXPR"
             if compact.starts_with("unsafe {")
                 && !operation_block_ranges.contains(&(fact.start, fact.end))
-                && ffi_boundary_applicability(&compact, extern_names).is_some() =>
+                && ffi_boundary_applicability(&compact, extern_names, local_modules).is_some() =>
         {
             Some((UnsafeSiteKind::FfiCall, OperationFamily::Ffi))
         }
@@ -1734,25 +1754,47 @@ mod tests {
             "crate::ffi::strlen".to_string(),
             "self::ffi::strlen".to_string(),
         ]);
+        let local_modules = BTreeSet::new();
+        let local_libc = BTreeSet::from(["libc".to_string()]);
 
         assert_eq!(
-            ffi_boundary_applicability("unsafe { strlen(ptr) }", &extern_names),
+            ffi_boundary_applicability("unsafe { strlen(ptr) }", &extern_names, &local_modules),
             Some(FfiBoundaryApplicability::same_file_extern("strlen"))
         );
         assert_eq!(
-            ffi_boundary_applicability("unsafe { ffi::strlen(ptr) }", &extern_names),
+            ffi_boundary_applicability(
+                "unsafe { ffi::strlen(ptr) }",
+                &extern_names,
+                &local_modules
+            ),
             Some(FfiBoundaryApplicability::same_file_extern("ffi::strlen"))
         );
         assert_eq!(
-            ffi_boundary_applicability("unsafe { other::ffi::strlen(ptr) }", &extern_names),
+            ffi_boundary_applicability(
+                "unsafe { other::ffi::strlen(ptr) }",
+                &extern_names,
+                &local_modules
+            ),
             None
         );
         assert_eq!(
-            ffi_boundary_applicability("unsafe { libc::strlen(ptr) }", &extern_names),
+            ffi_boundary_applicability(
+                "unsafe { libc::strlen(ptr) }",
+                &extern_names,
+                &local_modules
+            ),
             Some(FfiBoundaryApplicability::known_foreign_path("libc::strlen"))
         );
         assert_eq!(
-            ffi_boundary_applicability("unsafe { mylibc::strlen(ptr) }", &extern_names),
+            ffi_boundary_applicability("unsafe { libc::strlen(ptr) }", &extern_names, &local_libc),
+            None
+        );
+        assert_eq!(
+            ffi_boundary_applicability(
+                "unsafe { mylibc::strlen(ptr) }",
+                &extern_names,
+                &local_modules
+            ),
             None
         );
     }
@@ -1831,6 +1873,32 @@ mod tests {
         assert_eq!(sites.len(), 1, "unexpected sites: {sites:#?}");
         assert_eq!(sites[0].site.kind, UnsafeSiteKind::FfiCall);
         assert_eq!(sites[0].operation.family, OperationFamily::Ffi);
+        assert_eq!(sites[0].site.owner, Some("len".to_string()));
+        assert_eq!(sites[0].site.snippet, "unsafe { libc::strlen(ptr) }");
+        Ok(())
+    }
+
+    #[test]
+    fn syntax_detection_keeps_local_libc_module_calls_generic() -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "mod libc {\n    pub unsafe fn strlen(_ptr: *const i8) -> usize { 0 }\n}\n\npub fn len(ptr: *const i8) -> usize {\n    // SAFETY: fixture exercises a local module named libc, not a foreign call.\n    unsafe { libc::strlen(ptr) }\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+        let diff = crate::input::diff::parse_unified_diff(
+            "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -7,1 +7,1 @@\n+    unsafe { libc::strlen(ptr) }\n",
+        );
+
+        let rel = PathBuf::from("src/lib.rs");
+        let sites = scan_file(&root, &rel, Some(&diff), false)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert_eq!(sites.len(), 1, "unexpected sites: {sites:#?}");
+        assert_eq!(sites[0].site.kind, UnsafeSiteKind::Operation);
+        assert_eq!(sites[0].operation.family, OperationFamily::UnsafeFnCall);
         assert_eq!(sites[0].site.owner, Some("len".to_string()));
         assert_eq!(sites[0].site.snippet, "unsafe { libc::strlen(ptr) }");
         Ok(())

@@ -315,6 +315,7 @@ required_core_fixtures = [
   "ffi_qualified_call_sanitizer_route",
   "ffi_libc_call_sanitizer_route",
   "ffi_non_libc_wrapper_call_not_route",
+  "ffi_local_libc_module_call_not_route",
   "safe_code_no_cards",
   "safe_reference_deref_no_cards",
   "imports_not_unsafe_operations",
@@ -3486,6 +3487,16 @@ expected_hazard = "ffi_abi"
 fixture = "ffi_non_libc_wrapper_call_not_route"
 kind = "false_positive_control"
 claim = "local Rust wrapper calls whose module names only resemble libc remain generic unsafe function calls even when a same-named extern declaration exists"
+support_tier = "Witness routing"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+
+[[cases]]
+fixture = "ffi_local_libc_module_call_not_route"
+kind = "false_positive_control"
+claim = "local Rust wrapper calls from a same-file module named libc remain generic unsafe function calls instead of known foreign paths"
 support_tier = "Witness routing"
 expected_cards = 1
 expected_class = "guard_missing"

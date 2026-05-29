@@ -67,6 +67,20 @@ label_source = "fixture_golden"
 rationale = "A local Rust wrapper whose module name only resembles libc should keep generic unsafe-call review instead of gaining FFI sanitizer routing, even when a same-named extern declaration exists."
 
 [[samples]]
+id = "local-libc-module-wrapper-remains-unsafe-fn-call"
+fixture = "ffi_local_libc_module_call_not_route"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+expected_obligation_key = "callee-contract"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A same-file Rust module named libc should keep generic unsafe-call review instead of gaining known-foreign-path FFI sanitizer routing."
+
+[[samples]]
 id = "unchecked-constructor-availability-guard-present"
 fixture = "unchecked_constructor_availability_guard"
 kind = "positive"
