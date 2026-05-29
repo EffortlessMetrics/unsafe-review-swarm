@@ -76,6 +76,9 @@ when the raw pointer is reassigned before use.
 Unchecked-constructor availability evidence is pinned for same-receiver
 assertions, enclosing positive branches, and unavailable-path early returns, and
 rejects other receivers, bare observations, and closed positive branches.
+`get_unchecked_mut` get-probe evidence rejects stale same-slice targets when an
+early-return guard is followed by reassignment of the checked receiver before
+the unsafe access.
 
 Copy operation range evidence is intentionally conservative:
 `copy_nonoverlapping_slice_range_guard`,
