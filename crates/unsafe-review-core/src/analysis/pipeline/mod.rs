@@ -1553,6 +1553,25 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "bounds"
         ));
 
+        let shadowed_if_let_probe_index =
+            fixture_output("get_unchecked_mut_if_let_get_shadowed_index_not_guard")?;
+        let shadowed_if_let_probe_index_card = single_card(
+            "get_unchecked_mut_if_let_get_shadowed_index_not_guard",
+            &shadowed_if_let_probe_index,
+        )?;
+        assert_eq!(
+            shadowed_if_let_probe_index_card.operation.family,
+            OperationFamily::GetUnchecked
+        );
+        assert_eq!(
+            shadowed_if_let_probe_index_card.class,
+            ReviewClass::GuardMissing
+        );
+        assert!(!obligation_discharge_present(
+            shadowed_if_let_probe_index_card,
+            "bounds"
+        ));
+
         let stale_if_let_probe_receiver =
             fixture_output("get_unchecked_mut_if_let_get_reassigned_receiver_not_guard")?;
         let stale_if_let_probe_receiver_card = single_card(
