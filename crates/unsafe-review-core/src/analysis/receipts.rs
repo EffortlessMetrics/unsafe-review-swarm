@@ -1,5 +1,5 @@
 use crate::api::AnalyzeOutput;
-use crate::domain::{CardId, ReviewCard, WitnessEvidence, WitnessReceipt};
+use crate::domain::{CardId, ReviewCard, WitnessEvidence, WitnessReceipt, WitnessRoute};
 use crate::util::path_display;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -11,7 +11,13 @@ const AUDIT_TRUST_BOUNDARY: &str = "Static witness receipt audit only; this chec
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ReceiptIndex {
-    by_card_id: BTreeMap<String, WitnessEvidence>,
+    by_card_id: BTreeMap<String, ImportedReceipt>,
+}
+
+#[derive(Clone, Debug)]
+struct ImportedReceipt {
+    tool: String,
+    evidence: WitnessEvidence,
 }
 
 impl ReceiptIndex {
@@ -42,7 +48,13 @@ impl ReceiptIndex {
                 continue;
             }
             if by_card_id
-                .insert(receipt.card_id.clone(), receipt.evidence)
+                .insert(
+                    receipt.card_id.clone(),
+                    ImportedReceipt {
+                        tool: receipt.tool,
+                        evidence: receipt.evidence,
+                    },
+                )
                 .is_some()
             {
                 return Err(format!(
@@ -55,8 +67,16 @@ impl ReceiptIndex {
         Ok(Self { by_card_id })
     }
 
-    pub(crate) fn evidence_for(&self, id: &CardId) -> Option<WitnessEvidence> {
-        self.by_card_id.get(&id.0).cloned()
+    pub(crate) fn evidence_for(
+        &self,
+        id: &CardId,
+        routes: &[WitnessRoute],
+    ) -> Option<WitnessEvidence> {
+        let receipt = self.by_card_id.get(&id.0)?;
+        routes
+            .iter()
+            .any(|route| route.kind.as_str() == receipt.tool)
+            .then(|| receipt.evidence.clone())
     }
 }
 
@@ -211,6 +231,7 @@ struct ParsedReceipt {
     evidence: WitnessEvidence,
     expires_at: String,
     strength: String,
+    tool: String,
 }
 
 fn parse_receipt_file(path: &Path) -> Result<ParsedReceipt, String> {
@@ -226,6 +247,7 @@ fn parse_receipt_file(path: &Path) -> Result<ParsedReceipt, String> {
         evidence: WitnessEvidence::present(receipt.evidence_summary()),
         expires_at: receipt.expires_at.clone().unwrap_or_default(),
         strength: receipt.strength,
+        tool: receipt.tool,
     })
 }
 
@@ -499,6 +521,7 @@ mod tests {
     use super::*;
     use crate::analysis::pipeline;
     use crate::api::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope};
+    use crate::domain::WitnessKind;
     use std::fs;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -533,7 +556,7 @@ mod tests {
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
         let evidence = index
-            .evidence_for(&CardId(card_id.to_string()))
+            .evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri))
             .ok_or_else(|| "receipt evidence missing".to_string())?;
         assert!(evidence.present);
         assert!(evidence.summary.contains("miri"));
@@ -565,7 +588,11 @@ mod tests {
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
         assert_eq!(validated, 1);
-        assert!(index.evidence_for(&CardId(card_id.to_string())).is_none());
+        assert!(
+            index
+                .evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri))
+                .is_none()
+        );
         Ok(())
     }
 
@@ -590,7 +617,33 @@ mod tests {
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
         assert_eq!(validated, 1);
-        assert!(index.evidence_for(&CardId(card_id.to_string())).is_none());
+        assert!(
+            index
+                .evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri))
+                .is_none()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_index_skips_unrouted_tools_for_witness_evidence() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-unrouted-receipt-index")?;
+        let receipts = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipts).map_err(|err| format!("create receipt dir failed: {err}"))?;
+        let card_id =
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+        write_receipt(&receipts, "loom.json", card_id, "loom", "ran", "2026-08-18")?;
+
+        let index = ReceiptIndex::load_with_date(&root, "2026-05-18")?;
+        let validated = validate_receipts(&root)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+        assert_eq!(validated, 1);
+        assert!(
+            index
+                .evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri))
+                .is_none()
+        );
         Ok(())
     }
 
@@ -1090,5 +1143,14 @@ mod tests {
             ),
         )
         .map_err(|err| format!("write receipt {name} failed: {err}"))
+    }
+
+    fn routes_for(kind: WitnessKind) -> Vec<WitnessRoute> {
+        vec![WitnessRoute {
+            kind,
+            reason: "fixture route".to_string(),
+            command: None,
+            required: false,
+        }]
     }
 }

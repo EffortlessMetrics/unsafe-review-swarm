@@ -21,10 +21,12 @@ and limitations. The current implementation imports JSON receipts from:
 
 Each receipt is matched by exact counted `card_id`. A matching receipt marks the
 card's top-level witness evidence present and marks obligation-level witness
-evidence present only when the receipt strength records a saved witness run:
-`ran`, `test_targeted`, or `site_reached`. A `configured` receipt remains valid
-receipt metadata for audit, but it does not remove the missing witness gap.
-Receipt import does not discharge contracts, guards, or reach evidence.
+evidence present only when the receipt tool matches one of the current card's
+routed witness tools and the receipt strength records a saved witness run:
+`ran`, `test_targeted`, or `site_reached`. A `configured` receipt or a receipt
+whose tool is not routed for the current card remains valid receipt metadata for
+audit, but it does not remove the missing witness gap. Receipt import does not
+discharge contracts, guards, or reach evidence.
 
 The receipt shape is represented in the core SDK as the serde-backed
 `WitnessReceipt` DTO. Importers and future native adapters must use that same
@@ -164,12 +166,14 @@ calendar-valid `YYYY-MM-DD` date on or after the `recorded_at` date.
 
 ## Acceptance examples
 
-- A matching `ran`, `test_targeted`, or `site_reached` receipt removes the
-  `witness` missing-evidence item.
-- A matching `ran`, `test_targeted`, or `site_reached` receipt marks
-  obligation-level witness evidence present.
+- A matching routed-tool `ran`, `test_targeted`, or `site_reached` receipt
+  removes the `witness` missing-evidence item.
+- A matching routed-tool `ran`, `test_targeted`, or `site_reached` receipt
+  marks obligation-level witness evidence present.
 - A matching `configured` receipt validates and appears in receipt audit, but
   does not remove the `witness` missing-evidence item.
+- A matching wrong-tool receipt validates and appears in receipt audit, but does
+  not remove the `witness` missing-evidence item.
 - A receipt with unknown tool is rejected.
 - A receipt with unknown strength is rejected.
 - A receipt with uncounted card identity is rejected.

@@ -55,7 +55,7 @@ pub(super) fn build_card(
     let id = super::card_id(ctx.package, &scanned_site, &hazards, ctx.identity_counts);
     let witness_evidence = ctx
         .receipt_index
-        .evidence_for(&id)
+        .evidence_for(&id, &routes)
         .unwrap_or_else(crate::domain::WitnessEvidence::missing);
 
     if witness_evidence.present {
