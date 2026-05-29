@@ -265,8 +265,10 @@ identities:
 
 A receipt must include exact counted `card_id`, `tool`, `strength`, `author`,
 `recorded_at`, `expires_at`, and optional command/limitations details. Matching
-receipts mark witness evidence present, but they do not discharge missing
-contracts, guards, or reach evidence.
+receipts with `ran`, `test_targeted`, or `site_reached` strength mark witness
+evidence present, but they do not discharge missing contracts, guards, or reach
+evidence. A `configured` receipt remains valid audit metadata and does not
+remove the missing witness gap.
 
 The receipt JSON shape is backed by `unsafe_review_core::WitnessReceipt`, so SDK
 consumers and future native adapters should produce that same schema rather than

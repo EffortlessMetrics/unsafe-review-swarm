@@ -38,6 +38,9 @@ impl ReceiptIndex {
             if receipt.expires_at.as_str() < audit_date {
                 continue;
             }
+            if !imports_witness_evidence(&receipt.strength) {
+                continue;
+            }
             if by_card_id
                 .insert(receipt.card_id.clone(), receipt.evidence)
                 .is_some()
@@ -207,6 +210,7 @@ struct ParsedReceipt {
     card_id: String,
     evidence: WitnessEvidence,
     expires_at: String,
+    strength: String,
 }
 
 fn parse_receipt_file(path: &Path) -> Result<ParsedReceipt, String> {
@@ -221,7 +225,12 @@ fn parse_receipt_file(path: &Path) -> Result<ParsedReceipt, String> {
         card_id: receipt.card_id.clone(),
         evidence: WitnessEvidence::present(receipt.evidence_summary()),
         expires_at: receipt.expires_at.clone().unwrap_or_default(),
+        strength: receipt.strength,
     })
+}
+
+fn imports_witness_evidence(strength: &str) -> bool {
+    matches!(strength, "ran" | "test_targeted" | "site_reached")
 }
 
 fn audit_receipt_records(root: &Path) -> Result<Vec<AuditReceiptRecord>, String> {
@@ -549,6 +558,31 @@ mod tests {
             "miri",
             "ran",
             "2026-05-17",
+        )?;
+
+        let index = ReceiptIndex::load_with_date(&root, "2026-05-18")?;
+        let validated = validate_receipts(&root)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+        assert_eq!(validated, 1);
+        assert!(index.evidence_for(&CardId(card_id.to_string())).is_none());
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_index_skips_configured_receipts_for_witness_evidence() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-configured-receipt-index")?;
+        let receipts = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipts).map_err(|err| format!("create receipt dir failed: {err}"))?;
+        let card_id =
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+        write_receipt(
+            &receipts,
+            "configured.json",
+            card_id,
+            "miri",
+            "configured",
+            "2026-08-18",
         )?;
 
         let index = ReceiptIndex::load_with_date(&root, "2026-05-18")?;

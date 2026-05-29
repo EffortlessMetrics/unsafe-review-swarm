@@ -2864,6 +2864,30 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn configured_receipt_keeps_witness_gap_visible() -> Result<(), String> {
+        let root =
+            copy_fixture_to_temp("raw_pointer_alignment", "unsafe-review-configured-receipt")?;
+        let card_id = single_card("raw_pointer_alignment", &fixture_output_at(&root)?)?
+            .id
+            .0
+            .clone();
+        write_receipt_with_strength(&root, &card_id, "configured")?;
+
+        let output = fixture_output_at(&root)?;
+        let card = single_card("raw_pointer_alignment configured receipt", &output)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp fixture failed: {err}"))?;
+        assert!(!card.witness.present);
+        assert!(card.missing.iter().any(|missing| missing.kind == "witness"));
+        assert!(
+            card.obligation_evidence
+                .iter()
+                .all(|evidence| !evidence.witness.present)
+        );
+        Ok(())
+    }
+
+    #[test]
     fn receipted_fixture_keeps_static_guard_gap_visible() -> Result<(), String> {
         let output = fixture_output("raw_pointer_alignment_receipted")?;
         let card = single_card("raw_pointer_alignment_receipted", &output)?;
@@ -3001,6 +3025,14 @@ evidence = "test fixture"
     }
 
     fn write_receipt(root: &Path, card_id: &str) -> Result<(), String> {
+        write_receipt_with_strength(root, card_id, "ran")
+    }
+
+    fn write_receipt_with_strength(
+        root: &Path,
+        card_id: &str,
+        strength: &str,
+    ) -> Result<(), String> {
         let receipt_dir = root.join(".unsafe-review").join("receipts");
         fs::create_dir_all(&receipt_dir)
             .map_err(|err| format!("create {} failed: {err}", receipt_dir.display()))?;
@@ -3011,7 +3043,7 @@ evidence = "test fixture"
   "schema_version": "0.1",
   "card_id": "{card_id}",
   "tool": "miri",
-  "strength": "ran",
+  "strength": "{strength}",
   "author": "core/fixtures",
   "recorded_at": "2026-05-18T00:00:00Z",
   "expires_at": "2026-08-18",
