@@ -1268,6 +1268,7 @@ fn check_repair_queue_do_not_do(entry: &serde_json::Value) -> Result<(), String>
         "executable guard or discharge evidence",
         "comments or docs",
         "Miri proof",
+        "automatic safety repair",
         "ran an agent, ran witnesses, applied source edits, or posted comments",
         "unrelated unsafe code",
         "test mention as proof that the unsafe site executed",

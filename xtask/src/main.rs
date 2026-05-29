@@ -13867,7 +13867,7 @@ review_after = "2026-08-01"
     }
 
     fn repair_queue_do_not_do_fragment() -> &'static str {
-        r#""do_not_do":["do not widen unsafe code without reducing the missing evidence","do not suppress this card instead of adding, exposing, or explicitly waiving evidence","do not add a broad suppression","do not replace executable guard or discharge evidence with comments or docs","do not claim Miri proof unless the witness command is run and attached","do not claim unsafe-review ran an agent, ran witnesses, applied source edits, or posted comments","do not change unrelated unsafe code or public API behavior","do not treat a test mention as proof that the unsafe site executed"],"#
+        r#""do_not_do":["do not widen unsafe code without reducing the missing evidence","do not suppress this card instead of adding, exposing, or explicitly waiving evidence","do not add a broad suppression","do not replace executable guard or discharge evidence with comments or docs","do not claim Miri proof unless the witness command is run and attached","do not claim automatic safety repair from this packet","do not claim unsafe-review ran an agent, ran witnesses, applied source edits, or posted comments","do not change unrelated unsafe code or public API behavior","do not treat a test mention as proof that the unsafe site executed"],"#
     }
 
     fn add_repair_queue_boundaries(text: &str) -> String {

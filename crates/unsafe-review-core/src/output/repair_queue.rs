@@ -336,6 +336,7 @@ mod tests {
             "suppress this card",
             "broad suppression",
             "executable guard or discharge evidence",
+            "automatic safety repair",
             "ran an agent, ran witnesses, applied source edits, or posted comments",
             "unrelated unsafe code",
             "test mention as proof",
