@@ -1270,6 +1270,9 @@ fn outcome_compares_existing_json_snapshots_without_safety_claim() -> Result<(),
     assert!(markdown.contains("## Reviewer delta"));
     assert!(markdown.contains("- New cards: 1"));
     assert!(markdown.contains("- Receipt movement: 0 improved, 0 regressed"));
+    assert!(markdown.contains("## Movement reasons"));
+    assert!(markdown.contains("- `new`"));
+    assert!(markdown.contains("card appears in the after snapshot"));
     assert!(markdown.contains("Top remaining gaps"));
     assert!(
         markdown.contains("| Card | Class | Priority | Operation family | Missing | Next action |")

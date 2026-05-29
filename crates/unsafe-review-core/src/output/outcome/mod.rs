@@ -637,6 +637,8 @@ mod tests {
         assert!(markdown.contains("- New cards: 1"));
         assert!(markdown.contains("- Receipt movement: 0 improved, 0 regressed"));
         assert!(markdown.contains("Top remaining gaps"));
+        assert!(markdown.contains("## Movement reasons"));
+        assert!(markdown.contains("- `new` `UR-new-c1`: card appears in the after snapshot"));
         assert!(markdown.contains("| Status | Card | Reason | Before | After |"));
         assert!(markdown.contains("## Limitations"));
         assert!(markdown.contains("## Trust boundary"));
@@ -656,6 +658,9 @@ mod tests {
 
         assert!(markdown.contains(NO_CHANGED_GAPS_MESSAGE));
         assert!(markdown.contains(NO_CHANGED_GAPS_LIMITATION));
+        assert!(markdown.contains(
+            "No new, resolved, improved, or regressed ReviewCards in these saved snapshots."
+        ));
         assert!(!markdown.contains("All clear"));
         Ok(())
     }
