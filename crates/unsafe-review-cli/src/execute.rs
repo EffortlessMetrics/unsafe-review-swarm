@@ -14,7 +14,8 @@ use unsafe_review_core::{
     render_comment_plan, render_github_summary, render_human, render_json, render_lsp,
     render_markdown, render_outcome_json, render_outcome_markdown, render_policy_report_json,
     render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
-    render_receipt_audit_markdown, render_sarif, render_witness_plan, validate_witness_receipts,
+    render_receipt_audit_markdown, render_repair_queue, render_sarif, render_witness_plan,
+    validate_witness_receipts,
 };
 
 mod card_lookup;
@@ -25,7 +26,7 @@ const NO_CHANGED_GAPS_LIMITATION: &str =
     "This does not prove the repo safe, UB-free, Miri-clean, or that any unsafe site executed.";
 type FirstPrRenderer = fn(&AnalyzeOutput) -> String;
 
-const FIRST_PR_ARTIFACTS: [(&str, FirstPrRenderer); 7] = [
+const FIRST_PR_ARTIFACTS: [(&str, FirstPrRenderer); 8] = [
     ("cards.json", render_json),
     ("pr-summary.md", render_pr_summary),
     ("github-summary.md", render_github_summary),
@@ -33,6 +34,7 @@ const FIRST_PR_ARTIFACTS: [(&str, FirstPrRenderer); 7] = [
     ("comment-plan.json", render_comment_plan),
     ("witness-plan.md", render_witness_plan),
     ("lsp.json", render_lsp),
+    ("repair-queue.json", render_repair_queue),
 ];
 
 pub(crate) fn execute(command: Command) -> Result<(), String> {

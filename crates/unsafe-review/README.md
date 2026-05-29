@@ -73,6 +73,7 @@ cards.sarif
 comment-plan.json
 witness-plan.md
 lsp.json
+repair-queue.json
 ```
 
 The bundle is artifact-first:
@@ -86,6 +87,7 @@ The bundle is artifact-first:
 | `comment-plan.json` | Planned comments, not posted |
 | `witness-plan.md` | Suggested witness routes and limits |
 | `lsp.json` | Saved read-only editor projection |
+| `repair-queue.json` | Copy-only agent repair queue; no agent was run |
 
 ## Explain One Card
 

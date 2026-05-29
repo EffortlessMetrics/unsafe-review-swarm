@@ -147,6 +147,16 @@ fn repair_queue(card: &ReviewCard, readiness: &AgentReadiness) -> AgentRepairQue
     }
 }
 
+pub(crate) fn repair_queue_projection(card: &ReviewCard) -> AgentQueueProjection {
+    let allowed_repairs = allowed_repairs(card);
+    let agent_readiness = agent_readiness(card, allowed_repairs.has_card_scoped_repairs);
+    let repair_queue = repair_queue(card, &agent_readiness);
+    AgentQueueProjection {
+        agent_readiness,
+        repair_queue,
+    }
+}
+
 fn repair_queue_summary(buckets: &[&'static str], ready: bool) -> String {
     if buckets == ["review_only"] {
         return "No repair bucket selected; inspect the ReviewCard before delegating work."
@@ -392,17 +402,23 @@ struct AgentMissingEvidence<'a> {
     message: &'a str,
 }
 
-#[derive(Serialize)]
-struct AgentReadiness {
-    ready: bool,
-    state: &'static str,
-    reasons: Vec<String>,
+#[derive(Clone, Serialize)]
+pub(crate) struct AgentQueueProjection {
+    pub(crate) agent_readiness: AgentReadiness,
+    pub(crate) repair_queue: AgentRepairQueue,
 }
 
-#[derive(Serialize)]
-struct AgentRepairQueue {
-    buckets: Vec<&'static str>,
-    summary: String,
+#[derive(Clone, Serialize)]
+pub(crate) struct AgentReadiness {
+    pub(crate) ready: bool,
+    pub(crate) state: &'static str,
+    pub(crate) reasons: Vec<String>,
+}
+
+#[derive(Clone, Serialize)]
+pub(crate) struct AgentRepairQueue {
+    pub(crate) buckets: Vec<&'static str>,
+    pub(crate) summary: String,
 }
 
 impl AgentReadiness {

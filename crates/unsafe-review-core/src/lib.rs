@@ -19,7 +19,8 @@ pub use api::{
     render_comment_plan, render_github_summary, render_human, render_json, render_lsp,
     render_markdown, render_outcome_json, render_outcome_markdown, render_policy_report_json,
     render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
-    render_receipt_audit_markdown, render_sarif, render_witness_plan, validate_witness_receipts,
+    render_receipt_audit_markdown, render_repair_queue, render_sarif, render_witness_plan,
+    validate_witness_receipts,
 };
 pub use domain::{
     CardId, CargoCarefulReceiptInput, ConcurrencyReceiptInput, Confidence, ContractEvidence,

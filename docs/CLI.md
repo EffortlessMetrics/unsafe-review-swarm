@@ -98,6 +98,7 @@ target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
 target/unsafe-review/lsp.json
+target/unsafe-review/repair-queue.json
 ```
 
 Use `--out-dir <dir>` to choose another artifact directory, or `--diff file|-`
@@ -122,6 +123,12 @@ findings independently.
 | `comment-plan` | `unsafe-review check --base origin/main --format comment-plan --out target/unsafe-review/comment-plan.json` | artifact-only inline comment candidates with card ID, operation, next action, actionability, routes, and verify commands |
 | `lsp` | `unsafe-review check --base origin/main --format lsp --out target/unsafe-review/lsp.json` | saved editor diagnostics and hovers |
 | `witness-plan` | `unsafe-review check --base origin/main --format witness-plan --out target/unsafe-review/witness-plan.md` | reviewer-facing witness route plan |
+
+`repair-queue.json` is currently emitted by `first-pr`. It groups ReviewCards
+into copy-only guard, contract, test, witness, human-review, and
+do-not-auto-repair buckets, each pointing back to
+`unsafe-review context <card-id> --json`. It is not a standalone `--format`
+yet, and it does not run agents.
 
 The default human output is for terminal review. It names the card identity,
 operation family, operation expression, obligation evidence, witness route, next

@@ -606,6 +606,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("comment-plan.json"));
     assert!(stdout.contains("witness-plan.md"));
     assert!(stdout.contains("lsp.json"));
+    assert!(stdout.contains("repair-queue.json"));
     assert!(stdout.contains("Trust boundary:"));
     assert!(stdout.contains("static unsafe contract review only"));
     assert!(stdout.contains("not memory-safety proof"));
@@ -651,6 +652,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(github_summary.contains(&format!("- ID: `{card_id}`")));
     assert!(github_summary.contains("## Open next"));
     assert!(github_summary.contains("Full reviewer cockpit: `pr-summary.md`"));
+    assert!(github_summary.contains("Agent repair queue: `repair-queue.json`"));
     assert!(github_summary.contains("`comment-plan.json` is plan-only"));
     assert!(github_summary.contains("Full advisory bundle"));
     assert!(github_summary.contains("github-summary.md"));
@@ -708,6 +710,30 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             .as_str()
             .unwrap_or("")
             .contains("not a Miri result")
+    );
+
+    let repair_queue = parse_json(&fs::read_to_string(out_dir.join("repair-queue.json"))?)?;
+    assert_eq!(repair_queue["mode"], "aggregate_repair_queue");
+    assert_eq!(repair_queue["source"], "review_card");
+    assert_eq!(repair_queue["policy"], "advisory");
+    assert_eq!(repair_queue["summary"]["cards"], 1);
+    assert_eq!(
+        repair_queue["buckets"]["repairable_by_guard"][0]["card_id"],
+        card_id
+    );
+    assert_eq!(
+        repair_queue["buckets"]["requires_witness_receipt"][0]["card_id"],
+        card_id
+    );
+    assert_eq!(
+        repair_queue["buckets"]["repairable_by_guard"][0]["context_command"],
+        format!("unsafe-review context {card_id} --json")
+    );
+    assert!(
+        repair_queue["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not an automatic repair queue")
     );
 
     Ok(())
@@ -768,6 +794,7 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
     assert!(github_summary.contains("unsafe site executed"));
     assert!(github_summary.contains("## Open next"));
     assert!(github_summary.contains("Full reviewer cockpit: `pr-summary.md`"));
+    assert!(github_summary.contains("Agent repair queue: `repair-queue.json`"));
     assert!(github_summary.contains("Full advisory bundle"));
     assert!(!github_summary.contains("All clear"));
 
@@ -799,6 +826,22 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
             .as_str()
             .unwrap_or("")
             .contains("not a Miri result")
+    );
+
+    let repair_queue = parse_json(&fs::read_to_string(out_dir.join("repair-queue.json"))?)?;
+    assert_eq!(repair_queue["mode"], "aggregate_repair_queue");
+    assert_eq!(repair_queue["summary"]["cards"], 0);
+    assert_eq!(
+        repair_queue["buckets"]["repairable_by_guard"]
+            .as_array()
+            .map_or(1, Vec::len),
+        0
+    );
+    assert!(
+        repair_queue["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not an automatic repair queue")
     );
 
     Ok(())

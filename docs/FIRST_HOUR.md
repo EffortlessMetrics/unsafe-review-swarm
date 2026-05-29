@@ -71,6 +71,7 @@ target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
 target/unsafe-review/lsp.json
+target/unsafe-review/repair-queue.json
 ```
 
 `first-pr` is artifact-only: it does not run witness tools, post comments, edit

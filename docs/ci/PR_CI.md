@@ -134,6 +134,7 @@ target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
 target/unsafe-review/lsp.json
+target/unsafe-review/repair-queue.json
 ```
 
 The PR summary artifact is the reviewer front panel. It projects existing
@@ -157,6 +158,11 @@ Fixture-backed selected and not-selected examples are in
 The saved `lsp.json` artifact is a read-only projection for diagnostics,
 hovers, and command-only actions. It must not include `WorkspaceEdit`, source
 edits, witness execution, comment posting, or policy approval actions.
+
+The `repair-queue.json` artifact groups ReviewCards into copy-only agent handoff
+buckets such as guard, contract, test, witness receipt, human review, and
+do-not-auto-repair. It points back to `unsafe-review context <card-id> --json`
+and must not imply that unsafe-review ran an agent or applied a repair.
 
 The first-pr gate fails on infrastructure and artifact contract failures:
 
@@ -248,7 +254,7 @@ Default behavior of the example workflow:
 - runs `unsafe-review first-pr --base origin/<base>`;
 - verifies with `cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review`;
 - uploads `cards.json`, `pr-summary.md`, `github-summary.md`, `cards.sarif`,
-  `comment-plan.json`, `witness-plan.md`, and `lsp.json`;
+`comment-plan.json`, `witness-plan.md`, `lsp.json`, and `repair-queue.json`;
 - does not post comments;
 - does not run witnesses;
 - does not block on findings, only on artifact/tooling contract failures.

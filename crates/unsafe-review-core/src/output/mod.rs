@@ -8,6 +8,7 @@ pub(crate) mod markdown;
 pub(crate) mod outcome;
 pub(crate) mod policy_report;
 pub(crate) mod receipt_audit;
+pub(crate) mod repair_queue;
 pub(crate) mod sarif;
 pub(crate) mod witness_plan;
 

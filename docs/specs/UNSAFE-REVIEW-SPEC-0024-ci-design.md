@@ -261,6 +261,7 @@ target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
 target/unsafe-review/lsp.json
+target/unsafe-review/repair-queue.json
 ```
 
 The drop-in example workflow follows this shape. The live swarm advisory
@@ -582,6 +583,7 @@ cards.sarif exists and parses
 comment-plan.json exists and parses
 witness-plan.md exists
 lsp.json exists and parses
+repair-queue.json exists and parses
 
 card IDs align across artifacts
 result counts stay internally consistent
@@ -600,6 +602,9 @@ comment-plan includes trust boundary
 witness-plan includes route limits
 lsp.json contains read-only projections
 lsp.json code actions are command-only
+repair-queue.json references known ReviewCards
+repair-queue.json bucket reasons use the closed vocabulary
+repair-queue.json does not claim agent execution or repair success
 no WorkspaceEdit appears
 no positive overclaim wording appears
 ```
@@ -984,6 +989,7 @@ jobs:
             target/unsafe-review/comment-plan.json
             target/unsafe-review/witness-plan.md
             target/unsafe-review/lsp.json
+            target/unsafe-review/repair-queue.json
           if-no-files-found: error
 ```
 

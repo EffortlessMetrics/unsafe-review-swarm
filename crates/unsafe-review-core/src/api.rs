@@ -2,7 +2,7 @@ use crate::analysis::{pipeline, receipts};
 use crate::domain::{CardId, ReviewCard};
 use crate::output::{
     agent, badges, comment_plan, human, json, lsp, markdown, outcome, policy_report, receipt_audit,
-    sarif, witness_plan,
+    repair_queue, sarif, witness_plan,
 };
 use std::path::PathBuf;
 
@@ -165,6 +165,10 @@ pub fn project_editor(output: &AnalyzeOutput) -> lsp::EditorProjection {
 
 pub fn render_witness_plan(output: &AnalyzeOutput) -> String {
     witness_plan::render(output)
+}
+
+pub fn render_repair_queue(output: &AnalyzeOutput) -> String {
+    repair_queue::render(output)
 }
 
 pub fn render_badge_jsons(output: &AnalyzeOutput) -> (String, String) {

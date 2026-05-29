@@ -109,7 +109,7 @@ fn check_github_summary_artifact(
     super::require_text_contains(&text, "not site-execution proof", &path)?;
     super::require_text_contains(
         &text,
-        "Full advisory bundle (cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json)",
+        "Full advisory bundle (cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json, repair-queue.json)",
         &path,
     )?;
 
@@ -987,6 +987,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             );
         }
     }
+    check_repair_queue_artifact(dir, card_count, &card_ids, &card_projections)?;
 
     Ok(AdvisoryArtifactSummary {
         card_ids,
@@ -996,6 +997,189 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         open_actionable_gaps,
         high_priority_cards,
     })
+}
+
+fn check_repair_queue_artifact(
+    dir: &Path,
+    card_count: usize,
+    card_ids: &BTreeSet<String>,
+    card_projections: &BTreeMap<String, CardProjection>,
+) -> Result<(), String> {
+    let path = dir.join("repair-queue.json");
+    let repair_queue = super::parse_json_file(&path)?;
+    super::require_json_str(
+        &repair_queue,
+        "mode",
+        "aggregate_repair_queue",
+        "repair-queue.json",
+    )?;
+    super::require_json_str(&repair_queue, "tool", "unsafe-review", "repair-queue.json")?;
+    super::require_json_str(&repair_queue, "source", "review_card", "repair-queue.json")?;
+    super::require_json_str(&repair_queue, "policy", "advisory", "repair-queue.json")?;
+    let boundary = repair_queue
+        .get("trust_boundary")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "repair-queue.json is missing trust_boundary".to_string())?;
+    super::require_boundary_text(boundary, "repair-queue.json")?;
+
+    let summary_cards = super::json_usize_at(&repair_queue, "/summary/cards", "repair-queue.json")?;
+    if summary_cards != card_count {
+        return Err(format!(
+            "repair-queue.json summary.cards is {summary_cards}, but cards.json has {card_count}"
+        ));
+    }
+
+    let buckets = repair_queue
+        .get("buckets")
+        .ok_or_else(|| "repair-queue.json is missing buckets".to_string())?;
+    if !buckets.is_object() {
+        return Err("repair-queue.json buckets must be an object".to_string());
+    }
+
+    let mut queued_card_ids = BTreeSet::new();
+    for bucket in [
+        "repairable_by_guard",
+        "repairable_by_contract",
+        "repairable_by_test",
+        "requires_witness_receipt",
+        "requires_human_review",
+        "do_not_auto_repair",
+    ] {
+        let entries = super::json_array_at(
+            &repair_queue,
+            &format!("/buckets/{bucket}"),
+            "repair-queue.json",
+        )?;
+        let summary_count = super::json_usize_at(
+            &repair_queue,
+            &format!("/summary/{bucket}"),
+            "repair-queue.json",
+        )?;
+        if summary_count != entries.len() {
+            return Err(format!(
+                "repair-queue.json summary.{bucket} is {summary_count}, but bucket has {} entrie(s)",
+                entries.len()
+            ));
+        }
+        for entry in entries {
+            check_repair_queue_entry(entry, bucket, card_ids, card_projections)?;
+            if let Some(card_id) = entry.get("card_id").and_then(serde_json::Value::as_str) {
+                queued_card_ids.insert(card_id.to_string());
+            }
+        }
+    }
+    for card_id in card_ids {
+        if !queued_card_ids.contains(card_id) {
+            return Err(format!(
+                "repair-queue.json does not account for ReviewCard id `{card_id}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn check_repair_queue_entry(
+    entry: &serde_json::Value,
+    bucket: &str,
+    card_ids: &BTreeSet<String>,
+    card_projections: &BTreeMap<String, CardProjection>,
+) -> Result<(), String> {
+    let card_id = require_known_card_id(entry, "repair-queue.json entry", card_ids)?;
+    let card = card_projections
+        .get(card_id)
+        .ok_or_else(|| format!("repair-queue.json entry references unknown card id `{card_id}`"))?;
+    require_projected_str(entry, "class", &card.class_name, "repair-queue.json entry")?;
+    require_projected_str(entry, "priority", &card.priority, "repair-queue.json entry")?;
+    require_projected_str(
+        entry,
+        "confidence",
+        &card.confidence,
+        "repair-queue.json entry",
+    )?;
+    require_projected_str(
+        entry,
+        "operation_family",
+        &card.operation_family,
+        "repair-queue.json entry",
+    )?;
+    require_projected_str(
+        entry,
+        "operation",
+        &card.operation,
+        "repair-queue.json entry",
+    )?;
+    require_projected_str(entry, "path", &card.path, "repair-queue.json entry")?;
+    let line = super::json_usize_at(entry, "/line", "repair-queue.json entry")?;
+    if line as u64 != card.line {
+        return Err(format!(
+            "repair-queue.json entry `{card_id}` line must project cards.json line {}; got {line}",
+            card.line
+        ));
+    }
+    super::json_array_at(entry, "/missing_evidence", "repair-queue.json entry")?;
+    require_projected_string_array(
+        entry,
+        "missing_evidence",
+        &card.missing,
+        "repair-queue.json entry",
+    )?;
+    let reason =
+        super::require_non_empty_json_str(entry, "bucket_reason", "repair-queue.json entry")?;
+    require_expected_value(
+        reason,
+        expected_repair_queue_bucket_reason(bucket),
+        "repair-queue.json bucket_reason",
+    )?;
+    let context_command =
+        super::require_non_empty_json_str(entry, "context_command", "repair-queue.json entry")?;
+    require_expected_value(
+        context_command,
+        &format!("unsafe-review context {card_id} --json"),
+        "repair-queue.json context_command",
+    )?;
+    let boundary = entry
+        .get("trust_boundary")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "repair-queue.json entry is missing trust_boundary".to_string())?;
+    super::require_boundary_text(boundary, "repair-queue.json entry")?;
+    let readiness = entry
+        .get("agent_readiness")
+        .ok_or_else(|| "repair-queue.json entry is missing agent_readiness".to_string())?;
+    check_repair_queue_readiness(readiness, bucket)?;
+    Ok(())
+}
+
+fn expected_repair_queue_bucket_reason(bucket: &str) -> &'static str {
+    match bucket {
+        "repairable_by_guard" => "guard_evidence_missing",
+        "repairable_by_contract" => "contract_evidence_missing",
+        "repairable_by_test" => "reach_evidence_missing",
+        "requires_witness_receipt" => "witness_receipt_missing",
+        "requires_human_review" => "human_review_required",
+        "do_not_auto_repair" => "not_ready_for_automatic_repair",
+        _ => "",
+    }
+}
+
+fn check_repair_queue_readiness(readiness: &serde_json::Value, bucket: &str) -> Result<(), String> {
+    let Some(ready) = readiness.get("ready").and_then(serde_json::Value::as_bool) else {
+        return Err("repair-queue.json agent_readiness.ready must be a boolean".to_string());
+    };
+    super::require_non_empty_json_str(readiness, "state", "repair-queue.json agent_readiness")?;
+    let reasons = super::json_array_at(readiness, "/reasons", "repair-queue.json agent_readiness")?;
+    for reason in reasons {
+        if !reason.is_string() {
+            return Err(
+                "repair-queue.json agent_readiness.reasons entries must be strings".to_string(),
+            );
+        }
+    }
+    if bucket == "do_not_auto_repair" && ready {
+        return Err(
+            "repair-queue.json do_not_auto_repair entries must not be agent-ready".to_string(),
+        );
+    }
+    Ok(())
 }
 
 fn require_known_advisory_scope(scope: &str) -> Result<(), String> {
@@ -2850,6 +3034,7 @@ fn check_advisory_artifact_overclaims(dir: &Path) -> Result<(), String> {
         "comment-plan.json",
         "witness-plan.md",
         "lsp.json",
+        "repair-queue.json",
     ] {
         let path = dir.join(name);
         if path.is_file() {
@@ -2867,7 +3052,7 @@ fn check_advisory_artifact_overclaims(dir: &Path) -> Result<(), String> {
 fn is_machine_json_artifact(name: &str) -> bool {
     matches!(
         name,
-        "cards.json" | "cards.sarif" | "comment-plan.json" | "lsp.json"
+        "cards.json" | "cards.sarif" | "comment-plan.json" | "lsp.json" | "repair-queue.json"
     )
 }
 

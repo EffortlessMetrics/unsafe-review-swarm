@@ -184,7 +184,7 @@ pub(crate) fn render_github_summary(output: &AnalyzeOutput) -> String {
     render_github_summary_open_next(&mut out);
     out.push_str("---\n\n");
     out.push_str(
-        "Full advisory bundle (cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json) is attached as the workflow artifact.\n\n",
+        "Full advisory bundle (cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n",
     );
     out.push_str(
         "> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",
@@ -197,6 +197,7 @@ fn render_github_summary_open_next(out: &mut String) {
     out.push_str("- Full reviewer cockpit: `pr-summary.md`\n");
     out.push_str("- Machine-readable ReviewCards: `cards.json`\n");
     out.push_str("- Witness routes: `witness-plan.md`\n");
+    out.push_str("- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n");
     out.push_str(
         "- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n",
     );

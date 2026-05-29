@@ -93,8 +93,7 @@ Whole-file dumps are out of scope by default.
 
 ## Aggregate repair queue artifact
 
-A future first-pr cockpit may render an aggregate repair queue artifact, for
-example:
+The first-pr cockpit renders an aggregate repair queue artifact:
 
 ```text
 target/unsafe-review/repair-queue.json
@@ -125,8 +124,7 @@ source, post comments, execute witnesses, suppress cards, resolve cards, or
 claim proof, UB-free status, Miri-clean status, site execution, calibrated
 precision/recall, or policy readiness.
 
-Before `repair-queue.json` becomes part of the standard first-pr bundle, the
-artifact verifier must check that every queue entry references a known
+The artifact verifier must check that every queue entry references a known
 ReviewCard, every bucket reason is from a closed vocabulary, do-not-do
 boundaries are present, and no queue entry weakens the source card's missing
 evidence or trust boundary.

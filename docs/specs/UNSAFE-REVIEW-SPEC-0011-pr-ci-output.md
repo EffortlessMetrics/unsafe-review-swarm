@@ -105,6 +105,7 @@ target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
 target/unsafe-review/lsp.json
+target/unsafe-review/repair-queue.json
 ```
 
 The existing first-run lane already identifies this bundle and verifier as the public first-run cockpit surface.
@@ -379,6 +380,60 @@ approve PR
 block PR
 ```
 
+#### 3.8 `repair-queue.json`
+
+Aggregate copy-only agent handoff queue.
+
+Must include:
+
+```text
+mode = aggregate_repair_queue
+source = review_card
+policy = advisory
+trust_boundary
+summary counts
+bucketed card entries
+```
+
+Allowed buckets:
+
+```text
+repairable_by_guard
+repairable_by_contract
+repairable_by_test
+requires_witness_receipt
+requires_human_review
+do_not_auto_repair
+```
+
+Each entry must reference a known ReviewCard and project:
+
+```text
+card_id
+class
+priority
+confidence
+operation_family
+operation
+path
+line
+missing_evidence
+agent_readiness
+bucket_reason
+context_command
+trust_boundary
+```
+
+`context_command` must be exactly:
+
+```text
+unsafe-review context <card-id> --json
+```
+
+The queue must not run agents, edit source, post comments, execute witnesses,
+suppress cards, resolve cards, or claim proof, UB-free status, Miri-clean
+status, site execution, calibrated precision/recall, or policy readiness.
+
 ### 4. Gate outcomes
 
 The PR gate should report one of these states.
@@ -612,7 +667,7 @@ This is not Miri-clean status.
 The first-pr artifact verifier scans every required bundle artifact for positive
 overclaim wording, including `cards.json`, `pr-summary.md`,
 `github-summary.md`, `cards.sarif`, `comment-plan.json`, `witness-plan.md`, and
-`lsp.json`.
+`lsp.json`, and `repair-queue.json`.
 
 ### 8. Policy report relationship
 

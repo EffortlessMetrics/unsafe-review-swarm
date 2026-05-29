@@ -45,10 +45,12 @@ Implementations MAY use equivalent install/open commands by platform, but behavi
 
 - `cards.json`
 - `pr-summary.md`
+- `github-summary.md`
 - `cards.sarif`
 - `comment-plan.json`
 - `witness-plan.md`
 - `lsp.json` (saved projection; optional when no cards or no projection content)
+- `repair-queue.json`
 
 Bundle shape MUST pass
 `cargo run --locked -p xtask -- check-first-pr-artifacts <dir>`.
