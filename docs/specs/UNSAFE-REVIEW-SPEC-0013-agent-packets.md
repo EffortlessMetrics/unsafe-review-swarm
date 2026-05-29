@@ -113,7 +113,7 @@ The aggregate queue may group cards into bounded work buckets:
 - `do_not_auto_repair`
 
 Each entry must include the card ID, operation family, missing evidence summary,
-agent-readiness state, bucket reason, and a copyable
+agent-readiness state, bucket reason, do-not-do rules, and a copyable
 `unsafe-review context <card-id> --json` command. Cards may appear in more than
 one bucket only when the reasons are distinct and card-scoped, such as a card
 that is repairable by guard evidence but still requires a witness receipt for a

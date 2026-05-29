@@ -115,6 +115,7 @@ struct RepairQueueEntry {
     agent_readiness: RepairQueueReadiness,
     bucket_reason: &'static str,
     context_command: String,
+    do_not_do: &'static [&'static str],
     trust_boundary: &'static str,
 }
 
@@ -137,6 +138,7 @@ impl RepairQueueEntry {
             agent_readiness: RepairQueueReadiness::from(&projection.agent_readiness),
             bucket_reason: bucket_reason(bucket),
             context_command: format!("unsafe-review context {} --json", card.id),
+            do_not_do: agent::DO_NOT_DO,
             trust_boundary: TRUST_BOUNDARY,
         }
     }
@@ -268,6 +270,7 @@ mod tests {
                 .unwrap_or("")
                 .contains("not UB-free status")
         );
+        assert_repair_queue_boundaries(guard)?;
         Ok(())
     }
 
@@ -291,6 +294,8 @@ mod tests {
                 .map_err(|err| format!("render readiness reasons failed: {err}"))?
                 .contains("ffi")
         );
+        assert_repair_queue_boundaries(human)?;
+        assert_repair_queue_boundaries(no_auto)?;
         Ok(())
     }
 
@@ -311,5 +316,34 @@ mod tests {
 
     fn parse_json(text: &str) -> Result<serde_json::Value, String> {
         serde_json::from_str(text).map_err(|err| format!("JSON parse failed: {err}"))
+    }
+
+    fn assert_repair_queue_boundaries(entry: &serde_json::Value) -> Result<(), String> {
+        let do_not_do = entry["do_not_do"]
+            .as_array()
+            .ok_or("do_not_do should be an array")?;
+        for item in do_not_do {
+            let Some(text) = item.as_str() else {
+                return Err("do_not_do entries should be strings".to_string());
+            };
+            if !text.starts_with("do not ") {
+                return Err(format!("do_not_do entry must start with `do not`: {text}"));
+            }
+        }
+        let rules = serde_json::to_string(&entry["do_not_do"])
+            .map_err(|err| format!("render do_not_do failed: {err}"))?;
+        for expected in [
+            "suppress this card",
+            "broad suppression",
+            "executable guard or discharge evidence",
+            "ran an agent, ran witnesses, applied source edits, or posted comments",
+            "unrelated unsafe code",
+            "test mention as proof",
+        ] {
+            if !rules.contains(expected) {
+                return Err(format!("repair queue do_not_do must include `{expected}`"));
+            }
+        }
+        Ok(())
     }
 }

@@ -421,6 +421,7 @@ missing_evidence
 agent_readiness
 bucket_reason
 context_command
+do_not_do
 trust_boundary
 ```
 

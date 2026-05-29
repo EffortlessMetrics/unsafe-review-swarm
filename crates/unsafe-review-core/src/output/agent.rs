@@ -5,6 +5,16 @@ use serde::Serialize;
 const TRUST_BOUNDARY: &str = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.";
 const MAX_CONTEXT_EVIDENCE: usize = 3;
 const MAX_RELATED_TESTS: usize = 3;
+pub(crate) const DO_NOT_DO: &[&str] = &[
+    "do not widen unsafe code without reducing the missing evidence",
+    "do not suppress this card instead of adding, exposing, or explicitly waiving evidence",
+    "do not add a broad suppression",
+    "do not replace executable guard or discharge evidence with comments or docs",
+    "do not claim Miri proof unless the witness command is run and attached",
+    "do not claim unsafe-review ran an agent, ran witnesses, applied source edits, or posted comments",
+    "do not change unrelated unsafe code or public API behavior",
+    "do not treat a test mention as proof that the unsafe site executed",
+];
 
 pub(crate) fn render(card: &ReviewCard) -> String {
     render_pretty(&AgentPacket::from(card))
@@ -92,16 +102,7 @@ impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
             repair_scope: "this card only",
             witness_routes: card.routes.iter().map(AgentWitnessRoute::from).collect(),
             verify_commands: &card.next_action.verify_commands,
-            do_not_do: &[
-                "do not widen unsafe code without reducing the missing evidence",
-                "do not suppress this card instead of adding, exposing, or explicitly waiving evidence",
-                "do not add a broad suppression",
-                "do not replace executable guard or discharge evidence with comments or docs",
-                "do not claim Miri proof unless the witness command is run and attached",
-                "do not claim unsafe-review ran an agent, ran witnesses, applied source edits, or posted comments",
-                "do not change unrelated unsafe code or public API behavior",
-                "do not treat a test mention as proof that the unsafe site executed",
-            ],
+            do_not_do: DO_NOT_DO,
             stop_conditions: &[
                 "the missing evidence is present or explicitly waived with owner and expiry",
                 "the focused test or witness command has been run or marked unavailable",

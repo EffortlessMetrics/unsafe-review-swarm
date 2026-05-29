@@ -1137,6 +1137,7 @@ fn check_repair_queue_entry(
         &format!("unsafe-review context {card_id} --json"),
         "repair-queue.json context_command",
     )?;
+    check_repair_queue_do_not_do(entry)?;
     let boundary = entry
         .get("trust_boundary")
         .and_then(serde_json::Value::as_str)
@@ -1146,6 +1147,39 @@ fn check_repair_queue_entry(
         .get("agent_readiness")
         .ok_or_else(|| "repair-queue.json entry is missing agent_readiness".to_string())?;
     check_repair_queue_readiness(readiness, bucket)?;
+    Ok(())
+}
+
+fn check_repair_queue_do_not_do(entry: &serde_json::Value) -> Result<(), String> {
+    let rules = super::json_array_at(entry, "/do_not_do", "repair-queue.json entry")?;
+    for rule in rules {
+        let Some(text) = rule.as_str() else {
+            return Err("repair-queue.json entry do_not_do entries must be strings".to_string());
+        };
+        if !text.starts_with("do not ") {
+            return Err(format!(
+                "repair-queue.json entry do_not_do rule must start with `do not`: {text}"
+            ));
+        }
+    }
+    let rendered =
+        serde_json::to_string(rules).map_err(|err| format!("render do_not_do failed: {err}"))?;
+    for expected in [
+        "suppress this card",
+        "broad suppression",
+        "executable guard or discharge evidence",
+        "comments or docs",
+        "Miri proof",
+        "ran an agent, ran witnesses, applied source edits, or posted comments",
+        "unrelated unsafe code",
+        "test mention as proof that the unsafe site executed",
+    ] {
+        if !rendered.contains(expected) {
+            return Err(format!(
+                "repair-queue.json entry do_not_do must include boundary `{expected}`"
+            ));
+        }
+    }
     Ok(())
 }
 
