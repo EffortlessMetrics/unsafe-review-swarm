@@ -1,0 +1,79 @@
+[
+  {
+    "id": "UR-get-unchecked-mut-match-get-reassigned-receiver-not-guard-fixture-src-lib-rs-pick-after-stale-match-get-receiver-operation-get_unchecked-get-unchecked-c7a7d2b051de-bounds-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 10,
+      "column": 13,
+      "kind": "operation",
+      "owner": "pick_after_stale_match_get_receiver",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "Some(unsafe { values.get_unchecked_mut(index) })"
+    },
+    "operation": "Some(unsafe { values.get_unchecked_mut(index) })",
+    "operation_family": "get_unchecked",
+    "hazards": [
+      "bounds"
+    ],
+    "obligations": [
+      "index is in bounds for the collection"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "bounds",
+        "description": "index is in bounds for the collection",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No length or bounds guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `pick_after_stale_match_get_receiver`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "No visible local guard detected",
+    "reach": "1 related test file(s) mention owner `pick_after_stale_match_get_receiver`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test pick_after_stale_match_get_receiver",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test pick_after_stale_match_get_receiver",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose the local guard that discharges the `get_unchecked` safety obligation.",
+    "verify_commands": [
+      "cargo +nightly miri test pick_after_stale_match_get_receiver",
+      "cargo +nightly careful test pick_after_stale_match_get_receiver"
+    ]
+  }
+]

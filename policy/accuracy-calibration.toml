@@ -1305,6 +1305,7 @@ fixtures = [
   "get_unchecked_mut_let_else_get_reassigned_index_not_guard",
   "get_unchecked_mut_let_else_get_reassigned_receiver_not_guard",
   "get_unchecked_mut_match_get_reassigned_index_not_guard",
+  "get_unchecked_mut_match_get_reassigned_receiver_not_guard",
 ]
 dogfood_targets = []
 label_ledgers = [
@@ -1317,9 +1318,9 @@ len guards, top-level conjunctive len guards, and same-receiver get-probe guards
 including if-let, let-else, and match Some-arm forms, from missing,
 other-receiver, other-slice get-probe, disjunctive branch, post-check,
 observed-only, closed-branch, comment-only early-return, stale-index, stale-receiver, and open-branch,
-early-return, if-let, or let-else stale get-probe index or receiver controls,
-including compound stale-index mutation and shadowed index or receiver targets,
-in the listed fixtures.
+early-return, if-let, let-else, or match stale get-probe index or receiver
+controls, including compound stale-index mutation and shadowed index or receiver
+targets, in the listed fixtures.
 """
 forbidden_claims = [
   "broad get_unchecked soundness",

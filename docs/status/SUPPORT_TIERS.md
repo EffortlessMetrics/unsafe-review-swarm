@@ -83,6 +83,8 @@ It also rejects stale same-slice targets when an `if let Some(_)` guard is
 followed by receiver reassignment before `get_unchecked_mut`.
 The same stale-receiver control is pinned for `let Some(_) = get(index) else`
 early-return guards.
+Match `Some(_)` get-probe arms also reject receiver reassignment before the
+unsafe access.
 
 Copy operation range evidence is intentionally conservative:
 `copy_nonoverlapping_slice_range_guard`,
