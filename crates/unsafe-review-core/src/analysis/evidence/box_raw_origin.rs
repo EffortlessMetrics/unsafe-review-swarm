@@ -15,7 +15,7 @@ pub(super) fn has_drop_in_place_box_origin_evidence(expression: &str, lower: &st
     let Some(call_pos) = call_pos else {
         return false;
     };
-    has_same_pointer_box_into_raw_before(&compact[..call_pos], pointer)
+    BoxRawOriginApplicability::new(&compact[..call_pos], pointer).has_same_pointer_box_into_raw()
 }
 
 fn drop_in_place_argument(compact_expression: &str) -> Option<&str> {
@@ -48,27 +48,50 @@ pub(super) fn has_box_from_raw_origin_evidence(expression: &str, lower: &str) ->
     let Some(call_pos) = call_pos else {
         return false;
     };
-    has_same_pointer_box_into_raw_before(&compact[..call_pos], pointer)
+    BoxRawOriginApplicability::new(&compact[..call_pos], pointer).has_same_pointer_box_into_raw()
 }
 
-fn has_same_pointer_box_into_raw_before(before_call: &str, pointer: &str) -> bool {
-    let mut offset = 0usize;
-    for statement in before_call.split(';') {
-        let Some((left, right)) = statement.split_once('=') else {
+struct BoxRawOriginApplicability<'a> {
+    before_call: &'a str,
+    same_pointer_target: &'a str,
+}
+
+impl<'a> BoxRawOriginApplicability<'a> {
+    fn new(before_call: &'a str, pointer: &'a str) -> Self {
+        Self {
+            before_call,
+            same_pointer_target: pointer,
+        }
+    }
+
+    fn has_same_pointer_box_into_raw(&self) -> bool {
+        let mut offset = 0usize;
+        for statement in self.before_call.split(';') {
+            if self.statement_assigns_same_pointer_box_into_raw(statement)
+                && self.pointer_stays_fresh_after_origin(offset, statement)
+            {
+                return true;
+            }
             offset += statement.len() + 1;
-            continue;
+        }
+        false
+    }
+
+    fn statement_assigns_same_pointer_box_into_raw(&self, statement: &str) -> bool {
+        let Some((left, right)) = statement.split_once('=') else {
+            return false;
         };
         let Some(binding) = let_binding_name(left) else {
-            offset += statement.len() + 1;
-            continue;
+            return false;
         };
-        if binding == pointer && box_into_raw_argument(right).is_some() {
-            let after_origin = &before_call[(offset + statement.len()).min(before_call.len())..];
-            return !contains_simple_assignment_to(after_origin, pointer);
-        }
-        offset += statement.len() + 1;
+        binding == self.same_pointer_target && box_into_raw_argument(right).is_some()
     }
-    false
+
+    fn pointer_stays_fresh_after_origin(&self, offset: usize, statement: &str) -> bool {
+        let after_origin =
+            &self.before_call[(offset + statement.len()).min(self.before_call.len())..];
+        !contains_simple_assignment_to(after_origin, self.same_pointer_target)
+    }
 }
 
 fn box_from_raw_argument(compact_expression: &str) -> Option<&str> {
@@ -78,4 +101,28 @@ fn box_from_raw_argument(compact_expression: &str) -> Option<&str> {
     let argument_end = matching_call_argument_end(argument_text)?;
     let argument = &argument_text[..argument_end];
     (!argument.is_empty()).then_some(argument)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn origin_applicability_requires_same_pointer_target() {
+        let matching = BoxRawOriginApplicability::new("letptr=box::into_raw(value);", "ptr");
+        let other = BoxRawOriginApplicability::new("letother=box::into_raw(value);", "ptr");
+
+        assert!(matching.has_same_pointer_box_into_raw());
+        assert!(!other.has_same_pointer_box_into_raw());
+    }
+
+    #[test]
+    fn origin_applicability_rejects_stale_pointer_target() {
+        let stale = BoxRawOriginApplicability::new(
+            "letmutptr=box::into_raw(value);ptr=foreign_ptr;",
+            "ptr",
+        );
+
+        assert!(!stale.has_same_pointer_box_into_raw());
+    }
 }
