@@ -2919,6 +2919,13 @@ fn check_dogfood_index(
             ));
         };
         require_file(report)?;
+        let report_text = read_to_string(&workspace_path(report))?;
+        let report_keys = dogfood_report_triage_keys_text(report, &report_text)?;
+        if !report_keys.iter().any(|(target, _label)| target == id) {
+            return Err(format!(
+                "{DOGFOOD_INDEX} control_targets[{idx}] report `{report}` must include a triage row for target `{id}`"
+            ));
+        }
     }
 
     if json_array_at(&index, "/recorded_outcomes", DOGFOOD_INDEX)?.is_empty() {

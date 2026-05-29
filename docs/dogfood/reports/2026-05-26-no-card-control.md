@@ -43,7 +43,7 @@ check-first-pr-artifacts: ok
 
 | Target | Card or family | Primary label | Evidence | Follow-up |
 |---|---|---|---|---|
-| `fixtures/safe_code_no_cards` | zero-card first-pr bundle | `actionable` | The fixture emitted zero cards and the generated bundle preserved honest no-card wording. | Keep this as a false-positive control; do not promote it to real-crate precision evidence. |
+| `safe-code-no-cards-control` | zero-card first-pr bundle | `actionable` | The fixture emitted zero cards and the generated bundle preserved honest no-card wording. | Keep this as a false-positive control; do not promote it to real-crate precision evidence. |
 
 ## Trust boundary
 
