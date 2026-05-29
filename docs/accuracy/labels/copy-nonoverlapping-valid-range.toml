@@ -220,6 +220,19 @@ label_source = "fixture_golden"
 rationale = "Open-branch range evidence becomes stale when count is compound-reassigned before the copy."
 
 [[samples]]
+id = "copy-nonoverlapping-open-branch-shadowed-count-not-guard"
+fixture = "copy_nonoverlapping_slice_range_open_branch_shadowed_count_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Open-branch range evidence becomes stale when a later let-binding shadows the checked count before the copy."
+
+[[samples]]
 id = "copy-nonoverlapping-open-branch-reassigned-src-not-guard"
 fixture = "copy_nonoverlapping_slice_range_open_branch_reassigned_src_not_guard"
 kind = "false_positive_control"
