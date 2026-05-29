@@ -13,6 +13,7 @@ use super::transmute_operation::{
 use super::unsafe_impl::{
     is_impl_declaration_line, parse_impl_declaration_owner, parse_impl_owner, parse_impl_trait_name,
 };
+use super::unwrap_operation::unwrap_operation_family;
 use super::utf8_operation::utf8_operation_family;
 use super::vec_operation::vec_operation_family;
 use crate::domain::{OperationFamily, SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind};
@@ -368,8 +369,8 @@ fn detect_site(line: &str) -> Option<(UnsafeSiteKind, OperationFamily)> {
             OperationFamily::UnreachableUnchecked,
         ));
     }
-    if contains_call_name(line, "unwrap_unchecked") {
-        return Some((UnsafeSiteKind::Operation, OperationFamily::UnwrapUnchecked));
+    if let Some(family) = unwrap_operation_family(line) {
+        return Some((UnsafeSiteKind::Operation, family));
     }
     if contains_call_name(line, "from_raw") {
         return Some((UnsafeSiteKind::Operation, OperationFamily::BoxFromRaw));
