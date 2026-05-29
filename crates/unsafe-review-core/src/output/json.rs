@@ -244,6 +244,7 @@ mod tests {
         "raw_pointer_alignment",
         "raw_pointer_alignment_receipted",
         "raw_pointer_alignment_is_aligned_guard",
+        "raw_pointer_alignment_post_check_not_guard",
         "raw_pointer_alignment_observed_not_guard",
         "raw_pointer_alignment_closed_branch_not_guard",
         "raw_pointer_alignment_reassigned_pointer_not_guard",
