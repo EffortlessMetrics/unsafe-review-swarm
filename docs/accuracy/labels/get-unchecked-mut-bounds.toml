@@ -361,6 +361,20 @@ label_source = "fixture_golden"
 rationale = "Get-probe early-return evidence becomes stale when the checked index is reassigned before get_unchecked_mut."
 
 [[samples]]
+id = "get-unchecked-mut-get-probe-early-return-shadowed-index-not-guard"
+fixture = "get_unchecked_mut_get_probe_early_return_shadowed_index_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Get-probe early-return evidence becomes stale when the checked index is shadowed before get_unchecked_mut."
+
+[[samples]]
 id = "get-unchecked-mut-get-probe-early-return-reassigned-receiver-not-guard"
 fixture = "get_unchecked_mut_get_probe_early_return_reassigned_receiver_not_guard"
 kind = "false_positive_control"
