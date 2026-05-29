@@ -79,6 +79,8 @@ rejects other receivers, bare observations, and closed positive branches.
 `get_unchecked_mut` get-probe evidence rejects stale same-slice targets when an
 early-return guard is followed by reassignment of the checked receiver before
 the unsafe access.
+It also rejects early-return guard evidence when the checked receiver is
+shadowed before the unsafe access.
 It also rejects stale same-slice targets when an `if let Some(_)` guard is
 followed by receiver reassignment before `get_unchecked_mut`.
 The same stale-receiver control is pinned for `let Some(_) = get(index) else`

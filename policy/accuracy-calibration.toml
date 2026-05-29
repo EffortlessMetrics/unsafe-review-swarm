@@ -1300,6 +1300,7 @@ fixtures = [
   "get_unchecked_mut_get_probe_shadowed_receiver_not_guard",
   "get_unchecked_mut_get_probe_early_return_reassigned_index_not_guard",
   "get_unchecked_mut_get_probe_early_return_reassigned_receiver_not_guard",
+  "get_unchecked_mut_get_probe_early_return_shadowed_receiver_not_guard",
   "get_unchecked_mut_if_let_get_reassigned_index_not_guard",
   "get_unchecked_mut_if_let_get_reassigned_receiver_not_guard",
   "get_unchecked_mut_let_else_get_reassigned_index_not_guard",
@@ -1319,8 +1320,9 @@ including if-let, let-else, and match Some-arm forms, from missing,
 other-receiver, other-slice get-probe, disjunctive branch, post-check,
 observed-only, closed-branch, comment-only early-return, stale-index, stale-receiver, and open-branch,
 early-return, if-let, let-else, or match stale get-probe index or receiver
-controls, including compound stale-index mutation and shadowed index or receiver
-targets, in the listed fixtures.
+controls, including compound stale-index mutation, open-branch shadowed index or
+receiver targets, and early-return shadowed receiver targets, in the listed
+fixtures.
 """
 forbidden_claims = [
   "broad get_unchecked soundness",
