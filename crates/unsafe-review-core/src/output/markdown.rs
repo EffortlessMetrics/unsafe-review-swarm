@@ -181,6 +181,7 @@ pub(crate) fn render_github_summary(output: &AnalyzeOutput) -> String {
     out.push_str("## unsafe-review advisory summary\n\n");
     render_pr_summary_header_bullets(&mut out, output);
     render_pr_summary_top_card(&mut out, output);
+    render_github_summary_open_next(&mut out);
     out.push_str("---\n\n");
     out.push_str(
         "Full advisory bundle (cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json) is attached as the workflow artifact.\n\n",
@@ -189,6 +190,16 @@ pub(crate) fn render_github_summary(output: &AnalyzeOutput) -> String {
         "> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",
     );
     out
+}
+
+fn render_github_summary_open_next(out: &mut String) {
+    out.push_str("## Open next\n\n");
+    out.push_str("- Full reviewer cockpit: `pr-summary.md`\n");
+    out.push_str("- Machine-readable ReviewCards: `cards.json`\n");
+    out.push_str("- Witness routes: `witness-plan.md`\n");
+    out.push_str(
+        "- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n",
+    );
 }
 
 fn render_pr_summary_header_bullets(out: &mut String, output: &AnalyzeOutput) {
@@ -673,6 +684,25 @@ mod tests {
         assert!(rendered.contains("No witness route is recommended"));
         assert!(rendered.contains("not UB-free status"));
         assert!(!rendered.contains("All clear"));
+        Ok(())
+    }
+
+    #[test]
+    fn github_summary_points_to_artifacts_without_full_dump() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let rendered = render_github_summary(&output);
+
+        assert!(rendered.contains("## unsafe-review advisory summary"));
+        assert!(rendered.contains("## Top card"));
+        assert!(rendered.contains("## Open next"));
+        assert!(rendered.contains("- Full reviewer cockpit: `pr-summary.md`"));
+        assert!(rendered.contains("- Machine-readable ReviewCards: `cards.json`"));
+        assert!(rendered.contains("- Witness routes: `witness-plan.md`"));
+        assert!(rendered.contains("`comment-plan.json` is plan-only"));
+        assert!(rendered.contains("Full advisory bundle"));
+        assert!(!rendered.contains("# unsafe-review PR summary"));
+        assert!(!rendered.contains("## Card table"));
+        assert!(!rendered.contains("## Witness plan"));
         Ok(())
     }
 

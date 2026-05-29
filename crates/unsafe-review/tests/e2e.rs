@@ -649,6 +649,9 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     let github_summary = fs::read_to_string(out_dir.join("github-summary.md"))?;
     assert!(github_summary.contains("## unsafe-review advisory summary"));
     assert!(github_summary.contains(&format!("- ID: `{card_id}`")));
+    assert!(github_summary.contains("## Open next"));
+    assert!(github_summary.contains("Full reviewer cockpit: `pr-summary.md`"));
+    assert!(github_summary.contains("`comment-plan.json` is plan-only"));
     assert!(github_summary.contains("Full advisory bundle"));
     assert!(github_summary.contains("github-summary.md"));
     assert!(github_summary.contains("not memory-safety proof"));
@@ -763,6 +766,8 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
     assert!(github_summary.contains("No changed unsafe-review gaps were found."));
     assert!(github_summary.contains("This does not prove the repo safe"));
     assert!(github_summary.contains("unsafe site executed"));
+    assert!(github_summary.contains("## Open next"));
+    assert!(github_summary.contains("Full reviewer cockpit: `pr-summary.md`"));
     assert!(github_summary.contains("Full advisory bundle"));
     assert!(!github_summary.contains("All clear"));
 
