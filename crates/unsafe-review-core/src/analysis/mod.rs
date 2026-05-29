@@ -7,5 +7,6 @@ pub(crate) mod pipeline;
 pub(crate) mod receipts;
 pub(crate) mod scanner;
 mod set_len_shrink;
+mod static_mut;
 pub(crate) mod syntax;
 pub(crate) mod witness;

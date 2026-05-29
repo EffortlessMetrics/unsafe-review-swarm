@@ -1,5 +1,6 @@
 use super::atomic_pointer_state::is_atomic_pointer_state_transition;
 use super::ffi_boundary::ffi_boundary_applicability;
+use super::static_mut::{is_static_mut_item, parse_static_mut_name};
 use super::syntax::{ParsedSource, SyntaxNodeFact};
 use crate::domain::{OperationFamily, SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind};
 use crate::input::diff::DiffIndex;
@@ -542,22 +543,6 @@ fn detect_operation_family(line: &str) -> Option<OperationFamily> {
         return Some(OperationFamily::SliceFromRawParts);
     }
     None
-}
-
-fn is_static_mut_item(line: &str) -> bool {
-    let trimmed = line.trim_start();
-    if trimmed.starts_with("static mut ") {
-        return true;
-    }
-    if let Some(rest) = trimmed.strip_prefix("pub ") {
-        return rest.trim_start().starts_with("static mut ");
-    }
-    if trimmed.starts_with("pub(") {
-        return trimmed
-            .split_once(')')
-            .is_some_and(|(_visibility, rest)| rest.trim_start().starts_with("static mut "));
-    }
-    false
 }
 
 fn contains_call_name(line: &str, name: &str) -> bool {
@@ -1487,17 +1472,6 @@ fn parse_trait_name(line: &str) -> Option<String> {
     let marker = "trait ";
     let pos = line.find(marker)?;
     let rest = &line[pos + marker.len()..];
-    parse_ident(rest)
-}
-
-fn parse_static_mut_name(line: &str) -> Option<String> {
-    let mut rest = line.trim_start();
-    if let Some(after_pub) = rest.strip_prefix("pub ") {
-        rest = after_pub.trim_start();
-    } else if rest.starts_with("pub(") {
-        rest = rest.split_once(')')?.1.trim_start();
-    }
-    let rest = rest.strip_prefix("static mut ")?.trim_start();
     parse_ident(rest)
 }
 
