@@ -181,6 +181,7 @@ const SUPPORT_SUMMARY_REQUIRED_PHRASES: &[&str] = &[
 const DOGFOOD_MANIFEST: &str = "docs/dogfood/corpus.toml";
 const DOGFOOD_INDEX: &str = "docs/dogfood/index.json";
 const DOGFOOD_README: &str = "docs/dogfood/README.md";
+const DOGFOOD_FOLLOW_UP_SEEDS: &str = "docs/dogfood/follow-up-seeds.md";
 const DOGFOOD_REPORT_DIR: &str = "docs/dogfood/reports";
 const ACCURACY_CALIBRATION_POLICY: &str = "policy/accuracy-calibration.toml";
 const ACCURACY_CALIBRATION_REPORT: &str = "docs/accuracy/CALIBRATION_REPORT.md";
@@ -234,6 +235,16 @@ const DOGFOOD_TRIAGE_HEADER: &[&str] = &[
     "Primary label",
     "Evidence",
     "Follow-up",
+];
+const DOGFOOD_FOLLOW_UP_STATUSES: &[&str] = &["open", "done", "parked", "superseded"];
+const DOGFOOD_FOLLOW_UP_HEADER: &[&str] = &[
+    "Seed ID",
+    "Status",
+    "Target",
+    "Primary label",
+    "Source report",
+    "Next PR slice",
+    "Notes",
 ];
 const FUZZ_REQUIRED_FILES: &[&str] = &[
     "docs/FUZZING.md",
@@ -2153,6 +2164,7 @@ fn check_dogfood() -> Result<(), String> {
     check_dogfood_reports_indexed()?;
     check_dogfood_report_trust_boundaries()?;
     check_dogfood_report_overclaims()?;
+    check_dogfood_follow_up_seeds(&ids)?;
 
     println!(
         "check-dogfood: ok ({} targets, {} repositories)",
@@ -2230,26 +2242,7 @@ fn check_dogfood_report_overclaims() -> Result<(), String> {
 
 fn check_dogfood_reports_indexed() -> Result<(), String> {
     let readme = read_to_string(&workspace_path(DOGFOOD_README))?;
-    let report_dir = workspace_path(DOGFOOD_REPORT_DIR);
-    let mut reports = Vec::new();
-    for entry in fs::read_dir(&report_dir)
-        .map_err(|err| format!("read {DOGFOOD_REPORT_DIR} failed: {err}"))?
-    {
-        let entry =
-            entry.map_err(|err| format!("read {DOGFOOD_REPORT_DIR} entry failed: {err}"))?;
-        let path = entry.path();
-        if path.extension().and_then(|ext| ext.to_str()) != Some("md") {
-            continue;
-        }
-        let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
-            return Err(format!(
-                "{} report has non-UTF-8 file name: {}",
-                DOGFOOD_REPORT_DIR,
-                path.display()
-            ));
-        };
-        reports.push(file_name.to_string());
-    }
+    let reports = dogfood_report_names()?;
     check_dogfood_report_index_text(DOGFOOD_README, &readme, &reports)
 }
 
@@ -2295,6 +2288,182 @@ fn dogfood_report_links_from_text(text: &str) -> BTreeSet<String> {
         }
     }
     links
+}
+
+fn dogfood_report_names() -> Result<Vec<String>, String> {
+    let report_dir = workspace_path(DOGFOOD_REPORT_DIR);
+    let mut reports = Vec::new();
+    for entry in fs::read_dir(&report_dir)
+        .map_err(|err| format!("read {DOGFOOD_REPORT_DIR} failed: {err}"))?
+    {
+        let entry =
+            entry.map_err(|err| format!("read {DOGFOOD_REPORT_DIR} entry failed: {err}"))?;
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("md") {
+            continue;
+        }
+        let Some(file_name) = path.file_name().and_then(|name| name.to_str()) else {
+            return Err(format!(
+                "{} report has non-UTF-8 file name: {}",
+                DOGFOOD_REPORT_DIR,
+                path.display()
+            ));
+        };
+        reports.push(file_name.to_string());
+    }
+    reports.sort();
+    Ok(reports)
+}
+
+fn check_dogfood_follow_up_seeds(known_targets: &BTreeSet<String>) -> Result<(), String> {
+    let readme = read_to_string(&workspace_path(DOGFOOD_README))?;
+    if !readme.contains("follow-up-seeds.md") {
+        return Err(format!(
+            "{DOGFOOD_README} must link `{DOGFOOD_FOLLOW_UP_SEEDS}`"
+        ));
+    }
+    let text = read_to_string(&workspace_path(DOGFOOD_FOLLOW_UP_SEEDS))?;
+    let reports = dogfood_report_names()?;
+    check_dogfood_follow_up_seeds_text(DOGFOOD_FOLLOW_UP_SEEDS, &text, known_targets, &reports)?;
+    Ok(())
+}
+
+fn check_dogfood_follow_up_seeds_text(
+    path: &str,
+    text: &str,
+    known_targets: &BTreeSet<String>,
+    reports: &[String],
+) -> Result<usize, String> {
+    let lower = text.to_ascii_lowercase();
+    if !lower.contains("## trust boundary") {
+        return Err(format!("{path} must include a `## Trust boundary` section"));
+    }
+    if !lower.contains("not a proof")
+        || !lower.contains("ub-free")
+        || !lower.contains("miri-clean")
+        || !lower.contains("site execution")
+        || !lower.contains("calibrated")
+        || !lower.contains("witness")
+        || !lower.contains("policy")
+    {
+        return Err(format!(
+            "{path} trust boundary must preserve dogfood advisory limits"
+        ));
+    }
+
+    let report_set = reports.iter().map(String::as_str).collect::<BTreeSet<_>>();
+    let mut in_table = false;
+    let mut rows = 0usize;
+    let mut seed_ids = BTreeSet::new();
+    for (line_idx, line) in text.lines().enumerate() {
+        if !in_table {
+            if line.contains("| Seed ID |") {
+                let columns = markdown_table_columns(line);
+                if columns != DOGFOOD_FOLLOW_UP_HEADER {
+                    return Err(format!(
+                        "{path}:{} dogfood follow-up header must be `{}`",
+                        line_idx + 1,
+                        DOGFOOD_FOLLOW_UP_HEADER.join(" | ")
+                    ));
+                }
+                in_table = true;
+            }
+            continue;
+        }
+        if !line.trim_start().starts_with('|') {
+            break;
+        }
+        if line.contains("|---") {
+            continue;
+        }
+        let columns = markdown_table_columns(line);
+        if columns.len() != DOGFOOD_FOLLOW_UP_HEADER.len() {
+            return Err(format!(
+                "{path}:{} dogfood follow-up row must include Seed ID, Status, Target, Primary label, Source report, Next PR slice, and Notes columns",
+                line_idx + 1
+            ));
+        }
+        for (column_idx, column_name) in DOGFOOD_FOLLOW_UP_HEADER.iter().enumerate() {
+            if markdown_code_cell_value(columns[column_idx]).is_empty() {
+                return Err(format!(
+                    "{path}:{} dogfood follow-up row must include a non-empty {column_name} column",
+                    line_idx + 1
+                ));
+            }
+        }
+
+        let seed_id = markdown_code_cell_value(columns[0]);
+        if !seed_ids.insert(seed_id.clone()) {
+            return Err(format!(
+                "{path}:{} duplicate dogfood follow-up seed id `{seed_id}`",
+                line_idx + 1
+            ));
+        }
+
+        let status = markdown_code_cell_value(columns[1]);
+        if !DOGFOOD_FOLLOW_UP_STATUSES.contains(&status.as_str()) {
+            return Err(format!(
+                "{path}:{} unknown dogfood follow-up status `{status}`",
+                line_idx + 1
+            ));
+        }
+
+        let target = markdown_code_cell_value(columns[2]);
+        if !known_targets.contains(&target) {
+            return Err(format!(
+                "{path}:{} dogfood follow-up seed `{seed_id}` references unknown target `{target}`",
+                line_idx + 1
+            ));
+        }
+
+        let label = markdown_code_cell_value(columns[3]);
+        if !DOGFOOD_TRIAGE_LABELS.contains(&label.as_str()) {
+            return Err(format!(
+                "{path}:{} unknown dogfood follow-up label `{label}`",
+                line_idx + 1
+            ));
+        }
+
+        let report = markdown_report_link(columns[4]).ok_or_else(|| {
+            format!(
+                "{path}:{} dogfood follow-up seed `{seed_id}` source report must link a report",
+                line_idx + 1
+            )
+        })?;
+        let Some(report_name) = report.strip_prefix("reports/") else {
+            return Err(format!(
+                "{path}:{} dogfood follow-up seed `{seed_id}` source report must link under reports/",
+                line_idx + 1
+            ));
+        };
+        if !report_set.contains(report_name) {
+            return Err(format!(
+                "{path}:{} dogfood follow-up seed `{seed_id}` links missing report `{report}`",
+                line_idx + 1
+            ));
+        }
+
+        rows += 1;
+    }
+    if !in_table {
+        return Err(format!(
+            "{path} must include a dogfood follow-up seed table"
+        ));
+    }
+    if rows == 0 {
+        return Err(format!("{path} has a dogfood follow-up table with no rows"));
+    }
+    Ok(rows)
+}
+
+fn markdown_report_link(cell: &str) -> Option<String> {
+    if let Some(start) = cell.find("](") {
+        let after_open = &cell[start + 2..];
+        let end = after_open.find(')')?;
+        return Some(after_open[..end].to_string());
+    }
+    let value = markdown_code_cell_value(cell);
+    (!value.is_empty()).then_some(value)
 }
 
 fn check_dogfood_report_triage_labels() -> Result<(), String> {
@@ -8950,6 +9119,109 @@ impl WitnessKind {
 
         assert!(err.contains("dogfood triage header must be"));
         assert!(err.contains("Card or family"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_follow_up_seed_index_accepts_known_targets_labels_and_reports() -> Result<(), String>
+    {
+        let text = r#"
+# Dogfood follow-up seed index
+
+## Seeds
+
+| Seed ID | Status | Target | Primary label | Source report | Next PR slice | Notes |
+|---|---|---|---|---|---|---|
+| `dogfood-arrayvec-set-len` | `done` | `arrayvec-pr288` | `actionable` | [arrayvec rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md) | `analysis: keep vec_set_len regression pressure` | no new analyzer breadth |
+| `dogfood-mio-ffi-route` | `open` | `mio-pr1388` | `needs-route` | [mio route](reports/2026-05-26-mio-ffi-route-wording.md) | `analysis: split ffi route wording` | route stays advisory |
+
+## Trust boundary
+
+Dogfood follow-up seeds are static advisory review notes. They are not a proof
+of memory safety, not UB-free status, not Miri-clean status, not site execution
+evidence, not calibrated precision or recall, not witness adequacy, and not
+policy readiness.
+"#;
+        let targets = BTreeSet::from(["arrayvec-pr288".to_string(), "mio-pr1388".to_string()]);
+        let reports = vec![
+            "2026-05-26-arrayvec-vec-set-len-rerun.md".to_string(),
+            "2026-05-26-mio-ffi-route-wording.md".to_string(),
+        ];
+
+        let rows = check_dogfood_follow_up_seeds_text(
+            "docs/dogfood/follow-up-seeds.md",
+            text,
+            &targets,
+            &reports,
+        )?;
+
+        assert_eq!(rows, 2);
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_follow_up_seed_index_rejects_unknown_targets() -> Result<(), String> {
+        let text = r#"
+# Dogfood follow-up seed index
+
+## Seeds
+
+| Seed ID | Status | Target | Primary label | Source report | Next PR slice | Notes |
+|---|---|---|---|---|---|---|
+| `dogfood-missing` | `open` | `missing-target` | `needs-fixture` | [report](reports/2026-05-26-post-burst.md) | `analysis: add fixture` | no overclaim |
+
+## Trust boundary
+
+Dogfood follow-up seeds are static advisory review notes. They are not a proof
+of memory safety, not UB-free status, not Miri-clean status, not site execution
+evidence, not calibrated precision or recall, not witness adequacy, and not
+policy readiness.
+"#;
+        let targets = BTreeSet::from(["arrayvec-pr288".to_string()]);
+        let reports = vec!["2026-05-26-post-burst.md".to_string()];
+
+        let err = err_text(check_dogfood_follow_up_seeds_text(
+            "docs/dogfood/follow-up-seeds.md",
+            text,
+            &targets,
+            &reports,
+        ))?;
+
+        assert!(err.contains("unknown target"));
+        assert!(err.contains("missing-target"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_follow_up_seed_index_rejects_missing_report_links() -> Result<(), String> {
+        let text = r#"
+# Dogfood follow-up seed index
+
+## Seeds
+
+| Seed ID | Status | Target | Primary label | Source report | Next PR slice | Notes |
+|---|---|---|---|---|---|---|
+| `dogfood-missing-report` | `open` | `arrayvec-pr288` | `needs-fixture` | [report](reports/missing.md) | `analysis: add fixture` | no overclaim |
+
+## Trust boundary
+
+Dogfood follow-up seeds are static advisory review notes. They are not a proof
+of memory safety, not UB-free status, not Miri-clean status, not site execution
+evidence, not calibrated precision or recall, not witness adequacy, and not
+policy readiness.
+"#;
+        let targets = BTreeSet::from(["arrayvec-pr288".to_string()]);
+        let reports = vec!["2026-05-26-post-burst.md".to_string()];
+
+        let err = err_text(check_dogfood_follow_up_seeds_text(
+            "docs/dogfood/follow-up-seeds.md",
+            text,
+            &targets,
+            &reports,
+        ))?;
+
+        assert!(err.contains("links missing report"));
+        assert!(err.contains("reports/missing.md"));
         Ok(())
     }
 

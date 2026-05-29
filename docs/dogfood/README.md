@@ -11,7 +11,8 @@ The manifest is [`corpus.toml`](corpus.toml). The human-facing index is
 [`index.md`](index.md), with a machine-readable companion at
 [`index.json`](index.json). Reviewer usefulness notes live in
 [`usefulness-notes.md`](usefulness-notes.md). Dogfood report labels are defined
-in the [`triage taxonomy`](triage-taxonomy.md).
+in the [`triage taxonomy`](triage-taxonomy.md). Follow-up work seeds are tracked
+in [`follow-up-seeds.md`](follow-up-seeds.md).
 
 Snapshot reports:
 
@@ -31,6 +32,8 @@ Report requirements:
 - Every report must be linked from this README.
 - Triage tables that include `Primary label` must use a label from
   [`triage-taxonomy.md`](triage-taxonomy.md).
+- Follow-up seed rows must use known corpus targets, known triage labels, known
+  statuses, and source reports linked from this directory.
 - Every report must include a `## Trust boundary` section that names witness,
   safety, UB-free, Miri-clean, site-execution, calibration, and policy limits.
 
