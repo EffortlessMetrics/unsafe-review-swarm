@@ -413,6 +413,10 @@ fn audit_receipt_record(
         ));
     }
 
+    if receipt_imports_current_witness_evidence(&receipt, &statuses, &route_tools) {
+        statuses.insert("imports_witness_evidence".to_string());
+    }
+
     ReceiptAuditEntry {
         path,
         card_id: Some(receipt.card_id),
@@ -436,6 +440,19 @@ fn audit_receipt_record(
         }),
         route_tools,
     }
+}
+
+fn receipt_imports_current_witness_evidence(
+    receipt: &WitnessReceipt,
+    statuses: &BTreeSet<String>,
+    route_tools: &[String],
+) -> bool {
+    statuses.contains("matched")
+        && !statuses.contains("invalid")
+        && !statuses.contains("expired")
+        && !statuses.contains("duplicate")
+        && route_tools.iter().any(|tool| tool == &receipt.tool)
+        && imports_witness_evidence(&receipt.strength)
 }
 
 fn route_tools(card: &ReviewCard) -> BTreeSet<String> {
@@ -949,6 +966,12 @@ mod tests {
             matched_entry.command_hash.as_deref(),
             Some(expected_command_hash.as_str())
         );
+        assert!(
+            !matched_entry
+                .statuses
+                .iter()
+                .any(|status| status == "imports_witness_evidence")
+        );
         assert_eq!(
             matched_entry.recorded_at.as_deref(),
             Some("2025-12-18T00:00:00Z")
@@ -962,6 +985,149 @@ mod tests {
             .filter(|entry| entry.statuses.iter().any(|status| status == "duplicate"))
             .count();
         assert_eq!(duplicate_entries, 5);
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_audit_marks_only_importable_current_witness_receipts() -> Result<(), String> {
+        let importable_root = copy_fixture_to_temp(
+            "raw_pointer_alignment",
+            "unsafe-review-receipt-audit-importable",
+        )?;
+        let importable_output = analyze_fixture_root(&importable_root)?;
+        let importable_card_id = importable_output
+            .cards
+            .first()
+            .ok_or_else(|| "fixture produced no card".to_string())?
+            .id
+            .0
+            .clone();
+        let importable_dir = importable_root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&importable_dir)
+            .map_err(|err| format!("create receipt dir failed: {err}"))?;
+        write_receipt(
+            &importable_dir,
+            "miri-ran.json",
+            &importable_card_id,
+            "miri",
+            "ran",
+            "2026-08-18",
+        )?;
+
+        let importable_report = audit_receipts_with_date(&importable_output, "2026-05-18")?;
+        let importable_entry = importable_report
+            .receipts
+            .first()
+            .ok_or_else(|| "importable receipt entry missing".to_string())?;
+        assert!(
+            importable_entry
+                .statuses
+                .iter()
+                .any(|status| status == "imports_witness_evidence")
+        );
+
+        let configured_root = copy_fixture_to_temp(
+            "raw_pointer_alignment",
+            "unsafe-review-receipt-audit-configured",
+        )?;
+        let configured_output = analyze_fixture_root(&configured_root)?;
+        let configured_card_id = configured_output
+            .cards
+            .first()
+            .ok_or_else(|| "fixture produced no card".to_string())?
+            .id
+            .0
+            .clone();
+        let configured_dir = configured_root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&configured_dir)
+            .map_err(|err| format!("create receipt dir failed: {err}"))?;
+        write_receipt(
+            &configured_dir,
+            "miri-configured.json",
+            &configured_card_id,
+            "miri",
+            "configured",
+            "2026-08-18",
+        )?;
+
+        let configured_report = audit_receipts_with_date(&configured_output, "2026-05-18")?;
+        let configured_entry = configured_report
+            .receipts
+            .first()
+            .ok_or_else(|| "configured receipt entry missing".to_string())?;
+        assert!(
+            configured_entry
+                .statuses
+                .iter()
+                .any(|status| status == "matched")
+        );
+        assert!(
+            configured_entry
+                .statuses
+                .iter()
+                .any(|status| status == "weaker_than_required")
+        );
+        assert!(
+            !configured_entry
+                .statuses
+                .iter()
+                .any(|status| status == "imports_witness_evidence")
+        );
+
+        let wrong_tool_root = copy_fixture_to_temp(
+            "raw_pointer_alignment",
+            "unsafe-review-receipt-audit-wrong-tool-importability",
+        )?;
+        let wrong_tool_output = analyze_fixture_root(&wrong_tool_root)?;
+        let wrong_tool_card_id = wrong_tool_output
+            .cards
+            .first()
+            .ok_or_else(|| "fixture produced no card".to_string())?
+            .id
+            .0
+            .clone();
+        let wrong_tool_dir = wrong_tool_root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&wrong_tool_dir)
+            .map_err(|err| format!("create receipt dir failed: {err}"))?;
+        write_receipt(
+            &wrong_tool_dir,
+            "loom-ran.json",
+            &wrong_tool_card_id,
+            "loom",
+            "ran",
+            "2026-08-18",
+        )?;
+
+        let wrong_tool_report = audit_receipts_with_date(&wrong_tool_output, "2026-05-18")?;
+        let wrong_tool_entry = wrong_tool_report
+            .receipts
+            .first()
+            .ok_or_else(|| "wrong-tool receipt entry missing".to_string())?;
+        assert!(
+            wrong_tool_entry
+                .statuses
+                .iter()
+                .any(|status| status == "matched")
+        );
+        assert!(
+            wrong_tool_entry
+                .statuses
+                .iter()
+                .any(|status| status == "wrong_tool")
+        );
+        assert!(
+            !wrong_tool_entry
+                .statuses
+                .iter()
+                .any(|status| status == "imports_witness_evidence")
+        );
+
+        fs::remove_dir_all(&importable_root)
+            .map_err(|err| format!("remove importable temp root failed: {err}"))?;
+        fs::remove_dir_all(&configured_root)
+            .map_err(|err| format!("remove configured temp root failed: {err}"))?;
+        fs::remove_dir_all(&wrong_tool_root)
+            .map_err(|err| format!("remove wrong-tool temp root failed: {err}"))?;
         Ok(())
     }
 

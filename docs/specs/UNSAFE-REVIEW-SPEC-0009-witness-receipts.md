@@ -84,10 +84,15 @@ The CLI may audit receipt files against the current `ReviewCard` set. Receipt
 audit must report matched, unmatched, stale, expired, wrong-identity,
 wrong-tool, weaker-than-required, command-hash-mismatch, duplicate, and invalid
 receipt metadata without running witnesses, inferring site reach, making policy
-decisions, or claiming safety. Matched receipt entries include current card
-operation, missing-count, and next-action context. Audit entries include the
-current card's routed witness tools so a reviewer can compare the saved receipt
-tool against the ReviewCard route. Audit entries also include the saved
+decisions, or claiming safety. Audit must also mark the subset of receipts that
+would import as current ReviewCard witness evidence with
+`imports_witness_evidence`; this requires a current card match, a routed tool,
+saved-run strength (`ran`, `test_targeted`, or `site_reached`), no expiry, no
+validation error, and no duplicate receipt for the same card. Matched receipt
+entries include current card operation, missing-count, and next-action context.
+Audit entries include the current card's routed witness tools so a reviewer can
+compare the saved receipt tool against the ReviewCard route. Audit entries also
+include the saved
 `summary`, saved `author`, saved `recorded_at` timestamp, saved `command_hash`
 when present, saved per-receipt limitations, and surface command-hash
 mismatches as their own audit status so reviewers can compare receipt synopsis,
@@ -204,6 +209,9 @@ calendar-valid `YYYY-MM-DD` date on or after the `recorded_at` date.
   wrong-identity, wrong-tool, weaker-than-required, command-hash-mismatch,
   duplicate, and invalid receipts without executing witnesses or making policy
   decisions.
+- The CLI receipt-audit command marks only currently importable saved witness
+  receipts with `imports_witness_evidence`; matching `configured`,
+  wrong-tool, expired, invalid, or duplicate receipts remain audit metadata.
 - Receipt-audit JSON and Markdown include per-receipt `summary`, `author`,
   `recorded_at`, and limitation metadata plus report limitations that preserve
   the saved metadata boundary and state that matched receipts only improve

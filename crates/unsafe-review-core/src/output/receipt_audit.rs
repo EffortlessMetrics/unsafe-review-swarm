@@ -30,7 +30,14 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
         report.summary.invalid
     ));
     out.push_str("## Reviewer front panel\n\n");
-    out.push_str(&format!("- Matched receipts: {}\n", report.summary.matched));
+    out.push_str(&format!(
+        "- Matched receipt metadata: {}\n",
+        report.summary.matched
+    ));
+    out.push_str(&format!(
+        "- Receipts imported as current witness evidence: {}\n",
+        witness_importable_count(report)
+    ));
     out.push_str(&format!(
         "- Receipts without a current card match: {} unmatched, {} stale\n",
         report.summary.unmatched, report.summary.stale
@@ -97,6 +104,19 @@ fn problem_flags(summary: &crate::analysis::receipts::ReceiptAuditSummary) -> Ve
     .filter(|(_label, count)| *count > 0)
     .map(|(label, count)| format!("{label}: {count}"))
     .collect()
+}
+
+fn witness_importable_count(report: &ReceiptAuditReport) -> usize {
+    report
+        .receipts
+        .iter()
+        .filter(|receipt| {
+            receipt
+                .statuses
+                .iter()
+                .any(|status| status == "imports_witness_evidence")
+        })
+        .count()
 }
 
 fn receipt_row(receipt: &crate::analysis::receipts::ReceiptAuditEntry) -> String {
@@ -196,8 +216,8 @@ mod tests {
                 "matched receipts improve witness evidence only and do not erase missing contracts, guards, or reach evidence".to_string(),
             ],
             summary: ReceiptAuditSummary {
-                receipts: 2,
-                matched: 1,
+                receipts: 3,
+                matched: 2,
                 unmatched: 1,
                 expired: 0,
                 stale: 1,
@@ -229,6 +249,37 @@ mod tests {
                     ],
                     matched_card: None,
                     route_tools: Vec::new(),
+                },
+                ReceiptAuditEntry {
+                    path: ".unsafe-review/receipts/miri-ran.json".to_string(),
+                    card_id: Some(
+                        "UR-live-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                            .to_string(),
+                    ),
+                    receipt_tool: Some("miri".to_string()),
+                    strength: Some("ran".to_string()),
+                    summary: Some("focused witness passed".to_string()),
+                    author: Some("core/fixtures".to_string()),
+                    recorded_at: Some("2026-05-20T00:00:00Z".to_string()),
+                    expires_at: Some("2026-08-18".to_string()),
+                    command_hash: Some("3e163b0bce29ff2e".to_string()),
+                    limitations: vec!["fixture only".to_string()],
+                    statuses: vec![
+                        "imports_witness_evidence".to_string(),
+                        "matched".to_string(),
+                    ],
+                    issues: Vec::new(),
+                    matched_card: Some(ReceiptAuditCard {
+                        id: "UR-live-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                            .to_string(),
+                        class_name: "guard_missing",
+                        operation: "unsafe { ptr.cast::<Header>().read() }".to_string(),
+                        operation_family: "raw_pointer_read",
+                        missing_count: 2,
+                        next_action: "Add or expose guard | witness\nThen attach receipt"
+                            .to_string(),
+                    }),
+                    route_tools: vec!["miri".to_string(), "cargo-careful".to_string()],
                 },
                 ReceiptAuditEntry {
                     path: ".unsafe-review/receipts/weak-wrong-tool.json".to_string(),
@@ -274,9 +325,10 @@ mod tests {
         assert!(markdown.contains("# unsafe-review receipt audit"));
         assert!(markdown.contains("Audit date: `2026-05-26`"));
         assert!(markdown.contains("Command hash mismatch"));
-        assert!(markdown.contains("| 2 | 1 | 1 | 0 | 1 | 0 | 1 | 1 | 1 | 0 | 0 |"));
+        assert!(markdown.contains("| 3 | 2 | 1 | 0 | 1 | 0 | 1 | 1 | 1 | 0 | 0 |"));
         assert!(markdown.contains("## Reviewer front panel"));
-        assert!(markdown.contains("- Matched receipts: 1"));
+        assert!(markdown.contains("- Matched receipt metadata: 2"));
+        assert!(markdown.contains("- Receipts imported as current witness evidence: 1"));
         assert!(markdown.contains("- Receipts without a current card match: 1 unmatched, 1 stale"));
         assert!(markdown.contains(
             "- Problem flags: unmatched: 1; stale: 1; wrong tool: 1; weak strength: 1; command hash mismatch: 1"
@@ -291,10 +343,13 @@ mod tests {
             "| Status | Receipt | Card | Matched card | Tool | Strength | Summary | Author | Recorded | Expires | Command hash | Limitations | Routed tools | Issues |"
         ));
         assert!(markdown.contains("focused witness"));
+        assert!(markdown.contains("focused witness passed"));
         assert!(markdown.contains("`core/fixtures`"));
         assert!(markdown.contains("`2026-05-20T00:00:00Z`"));
         assert!(markdown.contains("`2026-08-18`"));
+        assert!(markdown.contains("imports_witness_evidence, matched"));
         assert!(markdown.contains("`4ce9d7c8eeb19a30`"));
+        assert!(markdown.contains("`3e163b0bce29ff2e`"));
         assert!(markdown.contains("fixture only"));
         assert!(markdown.contains("`miri`, `cargo-careful`"));
         assert!(markdown.contains("stale, unmatched"));

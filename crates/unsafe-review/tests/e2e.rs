@@ -1540,6 +1540,13 @@ fn receipt_audit_reports_matching_saved_receipts_without_running_witnesses()
             .iter()
             .any(|status| status == "matched")
     );
+    assert!(
+        receipt["statuses"]
+            .as_array()
+            .ok_or("statuses should be an array")?
+            .iter()
+            .any(|status| status == "imports_witness_evidence")
+    );
     assert_eq!(receipt["matched_card"]["class"], "guard_missing");
     assert_eq!(
         receipt["matched_card"]["operation"],
@@ -1574,7 +1581,8 @@ fn receipt_audit_reports_matching_saved_receipts_without_running_witnesses()
     let markdown = fs::read_to_string(audit_path)?;
     assert!(markdown.contains("# unsafe-review receipt audit"));
     assert!(markdown.contains("## Reviewer front panel"));
-    assert!(markdown.contains("- Matched receipts: 1"));
+    assert!(markdown.contains("- Matched receipt metadata: 1"));
+    assert!(markdown.contains("- Receipts imported as current witness evidence: 1"));
     assert!(markdown.contains("- Receipts without a current card match: 0 unmatched, 0 stale"));
     assert!(markdown.contains("- Problem flags: none"));
     assert!(markdown.contains("keep matching receipt metadata attached to the review record"));
@@ -1583,6 +1591,7 @@ fn receipt_audit_reports_matching_saved_receipts_without_running_witnesses()
     assert!(markdown.contains("Matched card"));
     assert!(markdown.contains("Summary"));
     assert!(markdown.contains("focused fixture witness passed"));
+    assert!(markdown.contains("imports_witness_evidence, matched"));
     assert!(markdown.contains("core/fixtures"));
     assert!(markdown.contains("2026-05-18T00:00:00Z"));
     assert!(markdown.contains("2026-08-18"));

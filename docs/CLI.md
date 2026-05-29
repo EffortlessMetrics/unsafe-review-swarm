@@ -427,8 +427,10 @@ evidence does not hide remaining gaps or saved scope limits. The summary,
 author, command hash, and limitations are saved metadata only, not proof that
 the command ran or covered the unsafe site. It is advisory only: it does not
 execute witness commands, infer site reach, make policy decisions, or claim
-safety. JSON and Markdown output include report-level limitations that keep the
-saved-metadata boundary explicit.
+safety. A receipt entry gets `imports_witness_evidence` only when it is a
+current-card match with a routed tool, saved-run strength, no expiry, no
+validation error, and no duplicate for that card. JSON and Markdown output
+include report-level limitations that keep the saved-metadata boundary explicit.
 When a receipt matches a card, the ReviewCard witness evidence summary also
 keeps the saved command hash visible when present.
 
