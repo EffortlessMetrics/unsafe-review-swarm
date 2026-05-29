@@ -288,6 +288,7 @@ mod tests {
         "nonnull_if_let_new_reassigned_ptr_not_guard",
         "nonnull_if_let_new_shadowed_ptr_not_guard",
         "nonnull_let_else_new_reassigned_ptr_not_guard",
+        "nonnull_let_else_new_shadowed_ptr_not_guard",
         "nonnull_match_new_reassigned_ptr_not_guard",
         "impl_trait_bound_owner_inference",
         "long_unsafe_fn_owner_inference",
