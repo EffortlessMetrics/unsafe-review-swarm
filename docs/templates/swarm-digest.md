@@ -42,9 +42,14 @@ Observed result:
 
 ## Dogfood observations
 
-| Target | Observation | Triage label | Follow-up |
-|---|---|---|---|
-| `<target>` |  | `actionable` / `noise` / `missed` / `needs-fixture` / `needs-doc` / `needs-route` / `needs-analyzer` |  |
+When an observation creates follow-up work, add or update the matching row in
+`docs/dogfood/follow-up-seeds.md`. Keep seed IDs stable enough to survive
+digest-to-PR handoff, and do not leave actionable dogfood pressure only in
+free-form prose.
+
+| Target | Observation | Triage label | Seed ID | Seed status | Source report | Follow-up |
+|---|---|---|---|---|---|---|
+| `<target>` |  | `actionable` / `noise` / `missed` / `needs-fixture` / `needs-doc` / `needs-route` / `needs-analyzer` / `needs-verifier` | `dogfood-...` | `open` / `done` / `parked` / `superseded` | `docs/dogfood/reports/...` |  |
 
 ## Validation
 
