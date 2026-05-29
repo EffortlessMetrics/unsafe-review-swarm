@@ -91,6 +91,46 @@ Bounded source context must stay small: unsafe site, nearby contract/guard
 summaries, related test mentions, witness route, and explicit trust boundary.
 Whole-file dumps are out of scope by default.
 
+## Aggregate repair queue artifact
+
+A future first-pr cockpit may render an aggregate repair queue artifact, for
+example:
+
+```text
+target/unsafe-review/repair-queue.json
+```
+
+That artifact must be a checked projection of the same ReviewCards and
+card-scoped agent packet metadata. It must not reclassify cards, invent new
+repairs, or become a second source of analyzer truth.
+
+The aggregate queue may group cards into bounded work buckets:
+
+- `repairable_by_guard`
+- `repairable_by_contract`
+- `repairable_by_test`
+- `requires_witness_receipt`
+- `requires_human_review`
+- `do_not_auto_repair`
+
+Each entry must include the card ID, operation family, missing evidence summary,
+agent-readiness state, bucket reason, and a copyable
+`unsafe-review context <card-id> --json` command. Cards may appear in more than
+one bucket only when the reasons are distinct and card-scoped, such as a card
+that is repairable by guard evidence but still requires a witness receipt for a
+stronger review signal.
+
+The aggregate artifact is still copy-only. It must not run an agent, edit
+source, post comments, execute witnesses, suppress cards, resolve cards, or
+claim proof, UB-free status, Miri-clean status, site execution, calibrated
+precision/recall, or policy readiness.
+
+Before `repair-queue.json` becomes part of the standard first-pr bundle, the
+artifact verifier must check that every queue entry references a known
+ReviewCard, every bucket reason is from a closed vocabulary, do-not-do
+boundaries are present, and no queue entry weakens the source card's missing
+evidence or trust boundary.
+
 ## Non-goals
 
 - no soundness claim
