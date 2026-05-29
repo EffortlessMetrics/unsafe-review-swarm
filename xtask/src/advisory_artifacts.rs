@@ -1220,7 +1220,27 @@ fn check_repair_queue_readiness(readiness: &serde_json::Value, bucket: &str) -> 
     let Some(ready) = readiness.get("ready").and_then(serde_json::Value::as_bool) else {
         return Err("repair-queue.json agent_readiness.ready must be a boolean".to_string());
     };
-    super::require_non_empty_json_str(readiness, "state", "repair-queue.json agent_readiness")?;
+    let state =
+        super::require_non_empty_json_str(readiness, "state", "repair-queue.json agent_readiness")?;
+    match state {
+        "ready" | "needs_human_review" | "not_recommended" => {}
+        _ => {
+            return Err(format!(
+                "repair-queue.json agent_readiness.state must be `ready`, `needs_human_review`, or `not_recommended`; got `{state}`"
+            ));
+        }
+    }
+    if ready && state != "ready" {
+        return Err(
+            "repair-queue.json agent_readiness.state must be `ready` when ready is true"
+                .to_string(),
+        );
+    }
+    if !ready && state == "ready" {
+        return Err(
+            "repair-queue.json agent_readiness.state `ready` requires ready = true".to_string(),
+        );
+    }
     let reasons = super::json_array_at(readiness, "/reasons", "repair-queue.json agent_readiness")?;
     if reasons.is_empty() {
         return Err("repair-queue.json agent_readiness.reasons must not be empty".to_string());

@@ -131,7 +131,9 @@ repair-queue vocabulary, every queue entry references a known ReviewCard, every
 bucket reason is from a closed vocabulary, do-not-do boundaries are present, and
 no queue entry weakens the source card's missing evidence or trust boundary.
 Each queue entry's `agent_readiness.reasons` must explain why the packet is or
-is not ready for bounded agent work.
+is not ready for bounded agent work. `agent_readiness.state` must be `ready`,
+`needs_human_review`, or `not_recommended`, and must agree with
+`agent_readiness.ready`.
 Entries in `requires_human_review` or `do_not_auto_repair` must not be marked
 agent-ready.
 
