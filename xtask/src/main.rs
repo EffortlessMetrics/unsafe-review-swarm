@@ -2324,7 +2324,14 @@ fn check_dogfood_follow_up_seeds(known_targets: &BTreeSet<String>) -> Result<(),
     }
     let text = read_to_string(&workspace_path(DOGFOOD_FOLLOW_UP_SEEDS))?;
     let reports = dogfood_report_names()?;
-    check_dogfood_follow_up_seeds_text(DOGFOOD_FOLLOW_UP_SEEDS, &text, known_targets, &reports)?;
+    let report_triage_keys = dogfood_report_triage_keys_by_report(&reports)?;
+    check_dogfood_follow_up_seeds_text(
+        DOGFOOD_FOLLOW_UP_SEEDS,
+        &text,
+        known_targets,
+        &reports,
+        &report_triage_keys,
+    )?;
     Ok(())
 }
 
@@ -2333,6 +2340,7 @@ fn check_dogfood_follow_up_seeds_text(
     text: &str,
     known_targets: &BTreeSet<String>,
     reports: &[String],
+    report_triage_keys: &BTreeMap<String, BTreeSet<(String, String)>>,
 ) -> Result<usize, String> {
     let lower = text.to_ascii_lowercase();
     if !lower.contains("## trust boundary") {
@@ -2442,6 +2450,18 @@ fn check_dogfood_follow_up_seeds_text(
                 line_idx + 1
             ));
         }
+        let triage_keys = report_triage_keys.get(report_name).ok_or_else(|| {
+            format!(
+                "{path}:{} dogfood follow-up seed `{seed_id}` links report `{report}` without parsed triage keys",
+                line_idx + 1
+            )
+        })?;
+        if !triage_keys.contains(&(target.clone(), label.clone())) {
+            return Err(format!(
+                "{path}:{} dogfood follow-up seed `{seed_id}` source report `{report}` must include a triage row for target `{target}` with primary label `{label}`",
+                line_idx + 1
+            ));
+        }
 
         rows += 1;
     }
@@ -2466,6 +2486,24 @@ fn markdown_report_link(cell: &str) -> Option<String> {
     (!value.is_empty()).then_some(value)
 }
 
+fn dogfood_report_triage_keys_by_report(
+    reports: &[String],
+) -> Result<BTreeMap<String, BTreeSet<(String, String)>>, String> {
+    let mut keys_by_report = BTreeMap::new();
+    for report in reports {
+        let path = workspace_path(DOGFOOD_REPORT_DIR).join(report);
+        let report_path = path.to_string_lossy().replace('\\', "/");
+        let text = read_to_string(&path)?;
+        keys_by_report.insert(
+            report.clone(),
+            dogfood_report_triage_keys_text(&report_path, &text)?
+                .into_iter()
+                .collect(),
+        );
+    }
+    Ok(keys_by_report)
+}
+
 fn check_dogfood_report_triage_labels() -> Result<(), String> {
     let report_dir = workspace_path(DOGFOOD_REPORT_DIR);
     if !report_dir.is_dir() {
@@ -2488,8 +2526,15 @@ fn check_dogfood_report_triage_labels() -> Result<(), String> {
 }
 
 fn check_dogfood_report_triage_labels_text(path: &str, text: &str) -> Result<usize, String> {
+    Ok(dogfood_report_triage_keys_text(path, text)?.len())
+}
+
+fn dogfood_report_triage_keys_text(
+    path: &str,
+    text: &str,
+) -> Result<Vec<(String, String)>, String> {
     let mut in_triage_table = false;
-    let mut rows = 0usize;
+    let mut rows = Vec::new();
     for (line_idx, line) in text.lines().enumerate() {
         if !in_triage_table {
             if line.contains("| Primary label |") {
@@ -2543,9 +2588,10 @@ fn check_dogfood_report_triage_labels_text(path: &str, text: &str) -> Result<usi
                 line_idx + 1
             ));
         }
-        rows += 1;
+        let target = markdown_code_cell_value(columns[0]);
+        rows.push((target, label));
     }
-    if in_triage_table && rows == 0 {
+    if in_triage_table && rows.is_empty() {
         return Err(format!("{path} has a dogfood triage table with no rows"));
     }
     Ok(rows)
@@ -9122,6 +9168,19 @@ impl WitnessKind {
         Ok(())
     }
 
+    fn dogfood_report_triage_keys_for_tests(
+        rows: &[(&str, &str, &str)],
+    ) -> BTreeMap<String, BTreeSet<(String, String)>> {
+        let mut reports = BTreeMap::new();
+        for (report, target, label) in rows {
+            reports
+                .entry((*report).to_string())
+                .or_insert_with(BTreeSet::new)
+                .insert(((*target).to_string(), (*label).to_string()));
+        }
+        reports
+    }
+
     #[test]
     fn dogfood_follow_up_seed_index_accepts_known_targets_labels_and_reports() -> Result<(), String>
     {
@@ -9147,12 +9206,25 @@ policy readiness.
             "2026-05-26-arrayvec-vec-set-len-rerun.md".to_string(),
             "2026-05-26-mio-ffi-route-wording.md".to_string(),
         ];
+        let report_triage_keys = dogfood_report_triage_keys_for_tests(&[
+            (
+                "2026-05-26-arrayvec-vec-set-len-rerun.md",
+                "arrayvec-pr288",
+                "actionable",
+            ),
+            (
+                "2026-05-26-mio-ffi-route-wording.md",
+                "mio-pr1388",
+                "needs-route",
+            ),
+        ]);
 
         let rows = check_dogfood_follow_up_seeds_text(
             "docs/dogfood/follow-up-seeds.md",
             text,
             &targets,
             &reports,
+            &report_triage_keys,
         )?;
 
         assert_eq!(rows, 2);
@@ -9179,12 +9251,18 @@ policy readiness.
 "#;
         let targets = BTreeSet::from(["arrayvec-pr288".to_string()]);
         let reports = vec!["2026-05-26-post-burst.md".to_string()];
+        let report_triage_keys = dogfood_report_triage_keys_for_tests(&[(
+            "2026-05-26-post-burst.md",
+            "arrayvec-pr288",
+            "actionable",
+        )]);
 
         let err = err_text(check_dogfood_follow_up_seeds_text(
             "docs/dogfood/follow-up-seeds.md",
             text,
             &targets,
             &reports,
+            &report_triage_keys,
         ))?;
 
         assert!(err.contains("unknown target"));
@@ -9212,16 +9290,64 @@ policy readiness.
 "#;
         let targets = BTreeSet::from(["arrayvec-pr288".to_string()]);
         let reports = vec!["2026-05-26-post-burst.md".to_string()];
+        let report_triage_keys = dogfood_report_triage_keys_for_tests(&[(
+            "2026-05-26-post-burst.md",
+            "arrayvec-pr288",
+            "actionable",
+        )]);
 
         let err = err_text(check_dogfood_follow_up_seeds_text(
             "docs/dogfood/follow-up-seeds.md",
             text,
             &targets,
             &reports,
+            &report_triage_keys,
         ))?;
 
         assert!(err.contains("links missing report"));
         assert!(err.contains("reports/missing.md"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_follow_up_seed_index_rejects_report_without_matching_triage_row()
+    -> Result<(), String> {
+        let text = r#"
+# Dogfood follow-up seed index
+
+## Seeds
+
+| Seed ID | Status | Target | Primary label | Source report | Next PR slice | Notes |
+|---|---|---|---|---|---|---|
+| `dogfood-wrong-report` | `open` | `arrayvec-pr288` | `needs-fixture` | [report](reports/2026-05-26-post-burst.md) | `analysis: add fixture` | no overclaim |
+
+## Trust boundary
+
+Dogfood follow-up seeds are static advisory review notes. They are not a proof
+of memory safety, not UB-free status, not Miri-clean status, not site execution
+evidence, not calibrated precision or recall, not witness adequacy, and not
+policy readiness.
+"#;
+        let targets = BTreeSet::from(["arrayvec-pr288".to_string()]);
+        let reports = vec!["2026-05-26-post-burst.md".to_string()];
+        let report_triage_keys = dogfood_report_triage_keys_for_tests(&[(
+            "2026-05-26-post-burst.md",
+            "arrayvec-pr288",
+            "actionable",
+        )]);
+
+        let err = err_text(check_dogfood_follow_up_seeds_text(
+            "docs/dogfood/follow-up-seeds.md",
+            text,
+            &targets,
+            &reports,
+            &report_triage_keys,
+        ))?;
+
+        assert!(err.contains("must include a triage row"));
+        assert!(err.contains("dogfood-wrong-report"));
+        assert!(err.contains("arrayvec-pr288"));
+        assert!(err.contains("needs-fixture"));
         Ok(())
     }
 
