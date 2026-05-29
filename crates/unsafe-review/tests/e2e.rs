@@ -2017,6 +2017,12 @@ fn policy_report_is_advisory_and_counts_baseline_state() -> Result<(), Box<dyn E
     assert_eq!(stdout_text(&markdown)?.trim(), "");
     let markdown = fs::read_to_string(markdown_path)?;
     assert!(markdown.contains("# unsafe-review policy report"));
+    assert!(markdown.contains("## Reviewer front panel"));
+    assert!(markdown.contains("- New unbaselined gaps: 0"));
+    assert!(markdown.contains("- Current ledger-covered cards: 1 baseline-known, 0 suppressed"));
+    assert!(markdown.contains("- Ledger cleanup: 1 resolved baseline entries"));
+    assert!(markdown.contains("consider pruning or updating resolved baseline entries"));
+    assert!(markdown.contains("advisory policy simulation only"));
     assert!(markdown.contains("## Classification explanations"));
     assert!(markdown.contains("Exact ReviewCard identity matched a baseline ledger entry"));
     assert!(markdown.contains("Next action"));

@@ -182,6 +182,7 @@ pub(crate) fn render_markdown(report: &PolicyReport) -> String {
     let mut out = String::new();
     markdown_sections::render_heading(&mut out);
     markdown_sections::render_summary(&mut out, report);
+    markdown_sections::render_reviewer_front_panel(&mut out, report);
     markdown_sections::render_classification_explanations(&mut out, report);
     markdown_sections::render_current_cards(&mut out, report);
 
@@ -233,6 +234,43 @@ mod markdown_sections {
             report.summary.resolved_baseline,
             report.summary.expired_suppressions
         ));
+    }
+
+    pub(super) fn render_reviewer_front_panel(out: &mut String, report: &PolicyReport) {
+        out.push_str("## Reviewer front panel\n\n");
+        out.push_str(&format!(
+            "- New unbaselined gaps: {}\n",
+            report.summary.new_gaps
+        ));
+        out.push_str(&format!(
+            "- Current ledger-covered cards: {} baseline-known, {} suppressed\n",
+            report.summary.baseline_known, report.summary.suppressed
+        ));
+        out.push_str(&format!(
+            "- Ledger cleanup: {} resolved baseline entries, {} expired suppression entries, {} invalid ledger entries\n",
+            report.summary.resolved_baseline,
+            report.summary.expired_suppressions,
+            report.summary.invalid_ledger_entries
+        ));
+        if report.summary.new_gaps > 0
+            || report.summary.expired_suppressions > 0
+            || report.summary.invalid_ledger_entries > 0
+        {
+            out.push_str(
+                "- Next action: review new gaps and stale ledger entries before treating this as no-new-debt evidence.\n",
+            );
+        } else if report.summary.resolved_baseline > 0 {
+            out.push_str(
+                "- Next action: consider pruning or updating resolved baseline entries after reviewer confirmation.\n",
+            );
+        } else {
+            out.push_str(
+                "- Next action: keep exact-card ledger entries current; no blocking decision was made.\n",
+            );
+        }
+        out.push_str(
+            "- Boundary: this is advisory policy simulation only; it does not enforce blocking policy.\n\n",
+        );
     }
 
     pub(super) fn render_classification_explanations(out: &mut String, report: &PolicyReport) {
@@ -486,6 +524,15 @@ mod tests {
         );
         assert!(card.next_action.contains("Add or expose"));
         let markdown = render_markdown(&report);
+        assert!(markdown.contains("## Reviewer front panel"));
+        assert!(markdown.contains("- New unbaselined gaps: 1"));
+        assert!(
+            markdown.contains("- Current ledger-covered cards: 0 baseline-known, 0 suppressed")
+        );
+        assert!(markdown.contains(
+            "review new gaps and stale ledger entries before treating this as no-new-debt evidence"
+        ));
+        assert!(markdown.contains("advisory policy simulation only"));
         assert!(markdown.contains("## Classification explanations"));
         assert!(markdown.contains("Exact ReviewCard identity was not found"));
         assert!(markdown.contains("Operation family | Operation"));
@@ -609,6 +656,8 @@ expires = "2026-01-01"
             Some("fixture")
         );
         let markdown = render_markdown(&report);
+        assert!(markdown.contains("## Reviewer front panel"));
+        assert!(markdown.contains("- Ledger cleanup: 1 resolved baseline entries, 1 expired suppression entries, 0 invalid ledger entries"));
         assert!(markdown.contains("| Card | Owner | Review after | Expires | Reason | Evidence |"));
         assert!(markdown.contains("## Expired suppression entries"));
         assert!(markdown.contains("fixture"));
