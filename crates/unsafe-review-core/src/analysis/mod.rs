@@ -1,5 +1,6 @@
 mod atomic_pointer_state;
 pub(crate) mod classify;
+mod copy_operation;
 pub(crate) mod evidence;
 mod ffi_boundary;
 pub(crate) mod obligations;

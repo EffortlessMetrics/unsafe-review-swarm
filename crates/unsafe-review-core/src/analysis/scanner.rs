@@ -1,4 +1,5 @@
 use super::atomic_pointer_state::is_atomic_pointer_state_transition;
+use super::copy_operation::copy_operation_family;
 use super::ffi_boundary::ffi_boundary_applicability;
 use super::static_mut::{is_static_mut_item, parse_static_mut_name};
 use super::syntax::{ParsedSource, SyntaxNodeFact};
@@ -523,21 +524,11 @@ fn is_import_item(line: &str) -> bool {
 }
 
 fn detect_operation_family(line: &str) -> Option<OperationFamily> {
-    let direct_mappings = [
-        ("copy_nonoverlapping", OperationFamily::CopyNonOverlapping),
-        ("set_len", OperationFamily::VecSetLen),
-    ];
-    if let Some((_, family)) = direct_mappings
-        .into_iter()
-        .find(|(call, _)| contains_call_name(line, call))
-    {
+    if let Some(family) = copy_operation_family(line) {
         return Some(family);
     }
-    if is_ptr_copy_call(line) {
-        return Some(OperationFamily::PtrCopy);
-    }
-    if is_ptr_replace_call(line) {
-        return Some(OperationFamily::PtrReplace);
+    if contains_call_name(line, "set_len") {
+        return Some(OperationFamily::VecSetLen);
     }
     if is_vec_from_raw_parts_call(line) {
         return Some(OperationFamily::VecFromRawParts);
@@ -604,21 +595,6 @@ fn is_maybeuninit_assume_init_call(line: &str) -> bool {
         || contains_call_name(line, "assume_init_ref")
         || contains_call_name(line, "assume_init_mut")
         || contains_call_name(line, "assume_init_drop")
-}
-
-fn is_ptr_copy_call(line: &str) -> bool {
-    let compact = compact_whitespace(line);
-    !compact.contains("copy_nonoverlapping")
-        && (compact.contains("ptr::copy(")
-            || compact.contains("core::ptr::copy(")
-            || compact.contains("std::ptr::copy("))
-}
-
-fn is_ptr_replace_call(line: &str) -> bool {
-    let compact = compact_whitespace(line);
-    compact.contains("ptr::replace(")
-        || compact.contains("core::ptr::replace(")
-        || compact.contains("std::ptr::replace(")
 }
 
 fn is_incomplete_multiline_transmute_copy(line: &str) -> bool {
