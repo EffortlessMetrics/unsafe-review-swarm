@@ -162,7 +162,7 @@ Current implementation checkpoint:
 | Family | Current helper/context | Status | Next useful pressure |
 |---|---|---|---|
 | `unwrap_unchecked` | Receiver/state applicability helpers in the analyzer evidence path | factored | Dogfood `hashbrown-pr693` only when a new stale or wrong-receiver shape appears. |
-| `str::from_utf8_unchecked` | Same-buffer UTF-8 validation applicability helpers | factored | Add prefix/suffix or alias controls only when fixture or dogfood evidence exposes them. |
+| `str::from_utf8_unchecked` | Same-buffer UTF-8 validation applicability helpers | factored | Existing fixtures pin wrong-buffer, prefix-only, suffix-only, observed-only, and stale validation as non-discharge evidence; add alias controls only from concrete fixture or dogfood pressure. |
 | `get_unchecked` / `get_unchecked_mut` | `GetUncheckedBoundsApplicability` for same receiver/index, top-level conjunctive open branches, early returns, and stale targets; disjunctive branches remain non-discharge controls | factored | Dogfood `arrayvec-pr137` or hashbrown targets before adding new probe shapes. |
 | `NonNull::new_unchecked` | `NonNullPointerContext` for same-pointer probes, top-level conjunctive non-null open branches, top-level disjunctive null early-return branches, and stale pointer checks; inverse branch shapes remain non-discharge controls | factored | Add cast/provenance or macro controls only from concrete fixtures. |
 | `MaybeUninit::assume_init` | `MaybeUninitSlotContext` for same-slot writes/new bindings, scope reach, and stale slot checks | factored | Partial-field and partial-array initialization are fixture-pinned as non-discharge evidence; add broader field-pattern recognition only as separate fixture-backed slices. |
