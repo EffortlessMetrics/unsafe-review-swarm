@@ -135,6 +135,20 @@ fn check_github_summary_artifact(
     )?;
     super::require_text_contains(&text, "- Policy mode: `advisory`", &path)?;
     super::require_text_contains(&text, "## Top card", &path)?;
+    super::require_text_contains(&text, "## Open next", &path)?;
+    super::require_text_contains(&text, "- Full reviewer cockpit: `pr-summary.md`", &path)?;
+    super::require_text_contains(&text, "- Machine-readable ReviewCards: `cards.json`", &path)?;
+    super::require_text_contains(&text, "- Witness routes: `witness-plan.md`", &path)?;
+    super::require_text_contains(
+        &text,
+        "- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.",
+        &path,
+    )?;
+    super::require_text_contains(
+        &text,
+        "- Comment budget: `comment-plan.json` is plan-only; no comments were posted.",
+        &path,
+    )?;
     super::require_text_contains(&text, "static unsafe contract review", &path)?;
     super::require_text_contains(&text, "not memory-safety proof", &path)?;
     super::require_text_contains(&text, "not UB-free status", &path)?;
