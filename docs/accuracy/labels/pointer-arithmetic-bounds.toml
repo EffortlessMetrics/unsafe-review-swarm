@@ -67,6 +67,20 @@ label_source = "fixture_golden"
 rationale = "A disjunctive positive branch can enter the pointer arithmetic without satisfying the bounds comparison, so it must not discharge bounds evidence."
 
 [[samples]]
+id = "pointer-arithmetic-closed-branch-bounds-missing"
+fixture = "pointer_arithmetic_closed_branch_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "pointer_arithmetic"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A closed positive branch observes the bounds predicate but does not dominate the later pointer arithmetic, so it must not discharge bounds evidence."
+
+[[samples]]
 id = "pointer-arithmetic-same-slice-end-bounds-present"
 fixture = "pointer_arithmetic_slice_end"
 kind = "positive"
