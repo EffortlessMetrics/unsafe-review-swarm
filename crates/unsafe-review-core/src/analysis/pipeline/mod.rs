@@ -166,6 +166,7 @@ fn next_action_summary(
         }
         crate::domain::ReviewClass::ContractMissing => "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.".to_string(),
         crate::domain::ReviewClass::GuardMissing if operation == "unknown" => "Review the unsafe site manually and add the missing obligation-specific guard once the contract is identified.".to_string(),
+        crate::domain::ReviewClass::GuardMissing if operation == "unsafe_fn_call" => "Review the `unsafe_fn_call` callee contract manually and add obligation-specific guard evidence for this call.".to_string(),
         crate::domain::ReviewClass::GuardMissing if operation == "inline_asm" => "Review the `inline_asm` register, memory, and target invariants manually; add explicit guard evidence, and attach a human deep-review receipt only as witness evidence.".to_string(),
         crate::domain::ReviewClass::GuardMissing if operation == "pin_unchecked" => "Review the `pin_unchecked` move-prevention and projection invariants manually; add explicit guard evidence, and attach a human deep-review receipt only as witness evidence.".to_string(),
         crate::domain::ReviewClass::GuardMissing => format!("Add or expose the local guard that discharges the `{operation}` safety obligation."),
@@ -891,6 +892,22 @@ mod tests {
         assert!(summary.contains("projection invariants"));
         assert!(summary.contains("guard evidence"));
         assert!(summary.contains("human deep-review receipt"));
+        assert!(!summary.contains("local guard that discharges"));
+    }
+
+    #[test]
+    fn unsafe_fn_call_guard_missing_next_action_routes_to_callee_contract_review() {
+        let human_route = [test_witness_route(WitnessKind::HumanDeepReview)];
+        let summary = next_action_summary(
+            &ReviewClass::GuardMissing,
+            "unsafe_fn_call",
+            false,
+            &human_route,
+        );
+
+        assert!(summary.contains("unsafe_fn_call"));
+        assert!(summary.contains("callee contract"));
+        assert!(summary.contains("obligation-specific guard evidence"));
         assert!(!summary.contains("local guard that discharges"));
     }
 

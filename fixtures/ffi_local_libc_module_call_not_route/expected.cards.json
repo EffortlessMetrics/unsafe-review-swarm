@@ -64,7 +64,7 @@
                     "Missing visible local guard for inferred safety obligations",
                     "No witness receipt imported for this card"
                 ],
-    "next_action":  "Add or expose the local guard that discharges the `unsafe_fn_call` safety obligation.",
+    "next_action":  "Review the `unsafe_fn_call` callee contract manually and add obligation-specific guard evidence for this call.",
     "verify_commands":  [
 
                         ]
