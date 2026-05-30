@@ -1,0 +1,11 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,7 @@
++use core::ptr::NonNull;
++
++pub fn expose_cast_nonnull(ptr: *mut u8) -> Option<NonNull<u16>> {
++    NonNull::new(ptr)?;
++    // SAFETY: fixture checks that pre-cast nullability evidence is not treated as same-target evidence.
++    Some(unsafe { NonNull::new_unchecked(ptr.cast::<u16>()) })
++}

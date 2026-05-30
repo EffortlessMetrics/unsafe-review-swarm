@@ -51,6 +51,19 @@ label_source = "fixture_golden"
 rationale = "Question-mark NonNull::new evidence becomes stale when a later `let ptr = ...` shadows the checked pointer before NonNull::new_unchecked."
 
 [[samples]]
+id = "nonnull-cast-checked-pointer-not-guard"
+fixture = "nonnull_cast_checked_pointer_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "non-null"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Question-mark NonNull::new evidence for a pre-cast pointer is not treated as same-target evidence for a cast expression passed to NonNull::new_unchecked; reviewers should keep cast/provenance uncertainty explicit."
+
+[[samples]]
 id = "nonnull-method-receiver-reassigned-not-guard"
 fixture = "nonnull_method_receiver_reassigned_not_guard"
 kind = "false_positive_control"

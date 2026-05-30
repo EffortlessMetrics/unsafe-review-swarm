@@ -392,6 +392,7 @@ required_core_fixtures = [
   "nonnull_new_guard",
   "nonnull_new_reassigned_ptr_not_guard",
   "nonnull_new_shadowed_ptr_not_guard",
+  "nonnull_cast_checked_pointer_not_guard",
   "nonnull_method_receiver_reassigned_not_guard",
   "nonnull_if_let_new_guard",
   "nonnull_let_else_new_guard",
@@ -4296,6 +4297,16 @@ expected_hazard = "pointer_validity"
 fixture = "nonnull_new_shadowed_ptr_not_guard"
 kind = "false_positive_control"
 claim = "NonNull::new question-mark evidence does not discharge the non-null obligation after the checked pointer is shadowed"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "nonnull_cast_checked_pointer_not_guard"
+kind = "false_positive_control"
+claim = "NonNull::new evidence for a pre-cast pointer does not discharge the non-null obligation for a cast expression passed to NonNull::new_unchecked"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
