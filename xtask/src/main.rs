@@ -9395,6 +9395,57 @@ policy readiness.
     }
 
     #[test]
+    fn dogfood_follow_up_seed_index_rejects_duplicate_seed_ids() -> Result<(), String> {
+        let text = r#"
+# Dogfood follow-up seed index
+
+## Seeds
+
+| Seed ID | Status | Target | Family/surface | Primary label | Source report | Next PR slice | Notes |
+|---|---|---|---|---|---|---|---|
+| `dogfood-arrayvec-set-len` | `open` | `arrayvec-pr288` | `vec_set_len` | `actionable` | [arrayvec rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md) | `analysis: keep vec_set_len regression pressure` | no new analyzer breadth |
+| `dogfood-arrayvec-set-len` | `done` | `mio-pr1388` | `ffi` | `needs-route` | [mio route](reports/2026-05-26-mio-ffi-route-wording.md) | `analysis: keep ffi route wording` | route stays advisory |
+
+## Trust boundary
+
+Dogfood follow-up seeds are static advisory review notes. They are not a proof
+of memory safety, not UB-free status, not Miri-clean status, not site execution
+evidence, not calibrated precision or recall, not witness adequacy, and not
+policy readiness.
+"#;
+        let targets = BTreeSet::from(["arrayvec-pr288".to_string(), "mio-pr1388".to_string()]);
+        let reports = vec![
+            "2026-05-26-arrayvec-vec-set-len-rerun.md".to_string(),
+            "2026-05-26-mio-ffi-route-wording.md".to_string(),
+        ];
+        let report_triage_keys = dogfood_report_triage_keys_for_tests(&[
+            (
+                "2026-05-26-arrayvec-vec-set-len-rerun.md",
+                "arrayvec-pr288",
+                "actionable",
+            ),
+            (
+                "2026-05-26-mio-ffi-route-wording.md",
+                "mio-pr1388",
+                "needs-route",
+            ),
+        ]);
+
+        let err = err_text(check_dogfood_follow_up_seeds_text(
+            "docs/dogfood/follow-up-seeds.md",
+            text,
+            &targets,
+            &dogfood_follow_up_family_surface_set_for_tests(),
+            &reports,
+            &report_triage_keys,
+        ))?;
+
+        assert!(err.contains("duplicate dogfood follow-up seed id"));
+        assert!(err.contains("dogfood-arrayvec-set-len"));
+        Ok(())
+    }
+
+    #[test]
     fn dogfood_follow_up_seed_index_rejects_unknown_targets() -> Result<(), String> {
         let text = r#"
 # Dogfood follow-up seed index
