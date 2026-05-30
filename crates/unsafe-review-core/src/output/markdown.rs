@@ -742,9 +742,19 @@ mod tests {
     fn github_summary_points_to_artifacts_without_full_dump() -> Result<(), String> {
         let output = fixture_output("raw_pointer_alignment")?;
         let rendered = render_github_summary(&output);
+        let card = output
+            .cards
+            .first()
+            .ok_or_else(|| "raw pointer fixture should emit a card".to_string())?;
 
         assert!(rendered.contains("## unsafe-review advisory summary"));
         assert!(rendered.contains("## Top card"));
+        assert!(rendered.contains(&format!("- ID: `{}`", card.id)));
+        assert!(rendered.contains(&format!("- Explain: `unsafe-review explain {}`", card.id)));
+        assert!(rendered.contains(&format!(
+            "- Agent context: `unsafe-review context {} --json`",
+            card.id
+        )));
         assert!(rendered.contains("## Open next"));
         assert!(rendered.contains("- Full reviewer cockpit: `pr-summary.md`"));
         assert!(rendered.contains("- Machine-readable ReviewCards: `cards.json`"));

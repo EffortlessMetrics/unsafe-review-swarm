@@ -150,6 +150,10 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     assert!(github_summary_text.contains("## unsafe-review advisory summary"));
     assert!(github_summary_text.contains("## Top card"));
     assert!(github_summary_text.contains(&format!("- ID: `{card_id}`")));
+    assert!(github_summary_text.contains(&format!("- Explain: `unsafe-review explain {card_id}`")));
+    assert!(github_summary_text.contains(&format!(
+        "- Agent context: `unsafe-review context {card_id} --json`"
+    )));
     assert!(github_summary_text.contains("## Open next"));
     assert!(github_summary_text.contains("Full reviewer cockpit: `pr-summary.md`"));
     assert!(github_summary_text.contains("not site-execution proof"));
@@ -684,6 +688,10 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     let github_summary = fs::read_to_string(out_dir.join("github-summary.md"))?;
     assert!(github_summary.contains("## unsafe-review advisory summary"));
     assert!(github_summary.contains(&format!("- ID: `{card_id}`")));
+    assert!(github_summary.contains(&format!("- Explain: `unsafe-review explain {card_id}`")));
+    assert!(github_summary.contains(&format!(
+        "- Agent context: `unsafe-review context {card_id} --json`"
+    )));
     assert!(github_summary.contains("## Open next"));
     assert!(github_summary.contains("Full reviewer cockpit: `pr-summary.md`"));
     assert!(github_summary.contains("Agent repair queue: `repair-queue.json`"));
