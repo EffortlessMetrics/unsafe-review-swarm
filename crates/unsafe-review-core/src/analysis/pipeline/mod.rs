@@ -2859,6 +2859,20 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn pointer_arithmetic_compound_offset_guard_is_not_discharged() -> Result<(), String> {
+        let output = fixture_output("pointer_arithmetic_compound_offset_not_guard")?;
+        let card = single_card("pointer_arithmetic_compound_offset_not_guard", &output)?;
+
+        assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+        assert_eq!(card.operation.family, OperationFamily::PointerArithmetic);
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert!(!card.discharge.present);
+        assert!(!obligation_discharge_present(card, "bounds"));
+        assert!(card.id.0.contains("add"));
+        Ok(())
+    }
+
+    #[test]
     fn pointer_arithmetic_disjunctive_bounds_branch_is_not_discharged() -> Result<(), String> {
         let output = fixture_output("pointer_arithmetic_disjunct_bounds_not_guard")?;
         let card = single_card("pointer_arithmetic_disjunct_bounds_not_guard", &output)?;
