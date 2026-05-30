@@ -2742,6 +2742,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "transmute_layout_conjunct_return_not_guard",
             "transmute_layout_mismatch_return_comment_not_guard",
             "transmute_copy_layout_conjunct_return_not_guard",
+            "transmute_copy_layout_mismatch_return_comment_not_guard",
         ] {
             let conjunct = fixture_output(fixture)?;
             let conjunct_card = single_card(fixture, &conjunct)?;

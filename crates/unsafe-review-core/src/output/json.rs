@@ -589,6 +589,7 @@ mod tests {
         "transmute_copy_layout_conjunct_branch_guard",
         "transmute_copy_layout_disjunct_branch_not_guard",
         "transmute_copy_layout_mismatch_return_guard",
+        "transmute_copy_layout_mismatch_return_comment_not_guard",
         "transmute_copy_layout_conjunct_return_not_guard",
         "transmute_copy_bool_valid_value_guard",
         "transmute_copy_bool_other_value_not_guard",

@@ -462,6 +462,21 @@ label_source = "fixture_golden"
 rationale = "An early return on mismatched source/destination size discharges layout evidence for the later transmute_copy."
 
 [[samples]]
+id = "transmute-copy-layout-mismatch-return-comment-not-layout"
+fixture = "transmute_copy_layout_mismatch_return_comment_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "layout"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A comment that says a transmute_copy layout mismatch should return is contract prose only; it does not create executable layout evidence."
+
+[[samples]]
 id = "transmute-copy-conjunct-layout-return-not-guard"
 fixture = "transmute_copy_layout_conjunct_return_not_guard"
 kind = "false_positive_control"
