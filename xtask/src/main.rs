@@ -2468,6 +2468,8 @@ fn check_dogfood_follow_up_seeds_text(
         if status == "parked" {
             check_parked_dogfood_follow_up_notes(path, line_idx + 1, &seed_id, &notes)?;
         }
+        let next_pr_slice = markdown_code_cell_value(columns[6]);
+        check_dogfood_follow_up_next_pr_slice(path, line_idx + 1, &seed_id, &next_pr_slice)?;
 
         let target = markdown_code_cell_value(columns[2]);
         if !known_targets.contains(&target) {
@@ -2535,6 +2537,31 @@ fn check_dogfood_follow_up_seeds_text(
         return Err(format!("{path} has a dogfood follow-up table with no rows"));
     }
     Ok(rows)
+}
+
+fn check_dogfood_follow_up_next_pr_slice(
+    path: &str,
+    line: usize,
+    seed_id: &str,
+    next_pr_slice: &str,
+) -> Result<(), String> {
+    let lower = next_pr_slice.to_ascii_lowercase();
+    for forbidden in [
+        "omnibus",
+        "broad recognizer",
+        "broad analyzer",
+        "all families",
+        "multiple families",
+        "catch-all",
+        "blanket",
+    ] {
+        if lower.contains(forbidden) {
+            return Err(format!(
+                "{path}:{line} dogfood follow-up seed `{seed_id}` next PR slice must stay narrow; found `{forbidden}`"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn check_parked_dogfood_follow_up_notes(
@@ -9633,6 +9660,47 @@ policy readiness.
         assert!(err.contains("parked dogfood follow-up seed"));
         assert!(err.contains("future pressure"));
         assert!(err.contains("dogfood-parked-ready-work"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_follow_up_seed_index_rejects_broad_next_pr_slice() -> Result<(), String> {
+        let text = r#"
+# Dogfood follow-up seed index
+
+## Seeds
+
+| Seed ID | Status | Target | Family/surface | Primary label | Source report | Next PR slice | Notes |
+|---|---|---|---|---|---|---|---|
+| `dogfood-broad-slice` | `open` | `arrayvec-pr288` | `vec_set_len` | `actionable` | [arrayvec rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md) | `analysis: broad analyzer expansion across all families` | keep review boundary |
+
+## Trust boundary
+
+Dogfood follow-up seeds are static advisory review notes. They are not a proof
+of memory safety, not UB-free status, not Miri-clean status, not site execution
+evidence, not calibrated precision or recall, not witness adequacy, and not
+policy readiness.
+"#;
+        let targets = BTreeSet::from(["arrayvec-pr288".to_string()]);
+        let reports = vec!["2026-05-26-arrayvec-vec-set-len-rerun.md".to_string()];
+        let report_triage_keys = dogfood_report_triage_keys_for_tests(&[(
+            "2026-05-26-arrayvec-vec-set-len-rerun.md",
+            "arrayvec-pr288",
+            "actionable",
+        )]);
+
+        let err = err_text(check_dogfood_follow_up_seeds_text(
+            "docs/dogfood/follow-up-seeds.md",
+            text,
+            &targets,
+            &dogfood_follow_up_family_surface_set_for_tests(),
+            &reports,
+            &report_triage_keys,
+        ))?;
+
+        assert!(err.contains("next PR slice must stay narrow"));
+        assert!(err.contains("broad analyzer"));
+        assert!(err.contains("dogfood-broad-slice"));
         Ok(())
     }
 
