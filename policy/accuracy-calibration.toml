@@ -757,6 +757,7 @@ fixtures = [
   "transmute_layout_conjunct_branch_guard",
   "transmute_layout_disjunct_branch_not_guard",
   "transmute_layout_mismatch_return_guard",
+  "transmute_layout_mismatch_return_comment_not_guard",
   "transmute_layout_conjunct_return_not_guard",
   "transmute_layout_closed_branch_not_guard",
   "transmute_layout_observed_not_guard",
@@ -813,7 +814,7 @@ transmute_copy top-level disjunctive invalid-byte early-return guards, from
 layout-only, disjunctive-layout, transmute_copy disjunctive-layout,
 transmute_copy disjunctive bool-domain branches, conjunctive-layout-return,
 transmute_copy conjunctive layout-return, transmute_copy conjunctive
-invalid-byte return, closed-layout, observed-layout, comment-only,
+invalid-byte return, comment-only layout-return, closed-layout, observed-layout, comment-only,
 transmute_copy comment-only, comment-only invalid-byte return, transmute_copy
 comment-only invalid-byte return, disjunctive-branch, conjunctive-return, other-value, prior-operation, observed, closed-branch,
 stale-byte, compound-stale-byte, shadowed-byte, transmute_copy

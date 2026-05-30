@@ -564,6 +564,7 @@ mod tests {
         "transmute_layout_conjunct_branch_guard",
         "transmute_layout_disjunct_branch_not_guard",
         "transmute_layout_mismatch_return_guard",
+        "transmute_layout_mismatch_return_comment_not_guard",
         "transmute_layout_conjunct_return_not_guard",
         "transmute_layout_closed_branch_not_guard",
         "transmute_layout_observed_not_guard",

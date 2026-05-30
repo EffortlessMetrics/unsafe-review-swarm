@@ -317,6 +317,7 @@ required_core_fixtures = [
   "transmute_layout_conjunct_branch_guard",
   "transmute_layout_disjunct_branch_not_guard",
   "transmute_layout_mismatch_return_guard",
+  "transmute_layout_mismatch_return_comment_not_guard",
   "transmute_layout_conjunct_return_not_guard",
   "transmute_layout_closed_branch_not_guard",
   "transmute_layout_observed_not_guard",
@@ -3565,6 +3566,16 @@ expected_hazard = "invalid_value"
 fixture = "transmute_layout_mismatch_return_guard"
 kind = "positive"
 claim = "transmute::<u8, bool> recognizes size_of layout mismatch early-return evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "transmute_layout_mismatch_return_comment_not_guard"
+kind = "false_positive_control"
+claim = "transmute::<u8, bool> rejects comment-only layout mismatch return text as layout guard evidence"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
