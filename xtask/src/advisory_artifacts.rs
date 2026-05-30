@@ -61,6 +61,20 @@ struct RepairQueueReadinessProjection {
 const COMMENT_PLAN_BODY_WORD_LIMIT: usize = 220;
 const COMMENT_PLAN_REVIEW_BUDGET: usize = 3;
 const COMMENT_PLAN_REVIEW_BUDGET_REASON: &str = "bounded reviewer noise";
+const COMMENT_PLAN_SELECTION_REASONS: &[&str] = &[
+    "actionable high-confidence review card",
+    "actionable high-priority review card",
+];
+const COMMENT_PLAN_NON_SELECTION_REASONS: &[&str] = &[
+    "outside changed hunk",
+    "class not eligible for inline comments",
+    "operation family unknown",
+    "confidence below inline comment threshold",
+    "priority/confidence below inline comment threshold",
+    "covered by selected family/obligation sibling",
+    "comment-plan max of three candidates reached",
+    "not selected by current inline comment policy",
+];
 const REPAIR_QUEUE_BUCKETS: [&str; 6] = [
     "repairable_by_guard",
     "repairable_by_safety_docs",
@@ -897,6 +911,11 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             "selection_reason",
             "comment-plan.json comment",
         )?;
+        require_allowed_value(
+            selection_reason,
+            COMMENT_PLAN_SELECTION_REASONS,
+            "comment-plan.json comment selection_reason",
+        )?;
         require_expected_value(
             selection_reason,
             expected_selection_reason(card_projection),
@@ -1007,6 +1026,11 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
                 card,
                 "reason",
                 "comment-plan.json not_selected",
+            )?;
+            require_allowed_value(
+                reason,
+                COMMENT_PLAN_NON_SELECTION_REASONS,
+                "comment-plan.json not_selected reason",
             )?;
             require_expected_value(
                 reason,
@@ -2033,6 +2057,16 @@ fn require_expected_value(actual: &str, expected: &str, context: &str) -> Result
         Ok(())
     } else {
         Err(format!("{context} must be `{expected}`; got `{actual}`"))
+    }
+}
+
+fn require_allowed_value(actual: &str, allowed: &[&str], context: &str) -> Result<(), String> {
+    if allowed.contains(&actual) {
+        Ok(())
+    } else {
+        Err(format!(
+            "{context} must use a known review-budget reason; got `{actual}`"
+        ))
     }
 }
 

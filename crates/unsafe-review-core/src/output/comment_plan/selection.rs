@@ -3,6 +3,17 @@ use crate::domain::{Confidence, OperationFamily, Priority, ReviewCard, ReviewCla
 const PLAN_BOUNDARY: &str = "Plan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision.";
 pub(super) const OPERATION_FAMILY_BUDGET_REASON: &str =
     "covered by selected family/obligation sibling";
+pub(super) const MAX_COMMENT_BUDGET_REASON: &str = "comment-plan max of three candidates reached";
+
+const SELECTED_HIGH_CONFIDENCE_REASON: &str = "actionable high-confidence review card";
+const SELECTED_HIGH_PRIORITY_REASON: &str = "actionable high-priority review card";
+const NOT_SELECTED_OUTSIDE_CHANGED_HUNK_REASON: &str = "outside changed hunk";
+const NOT_SELECTED_CLASS_INELIGIBLE_REASON: &str = "class not eligible for inline comments";
+const NOT_SELECTED_UNKNOWN_FAMILY_REASON: &str = "operation family unknown";
+const NOT_SELECTED_CONFIDENCE_REASON: &str = "confidence below inline comment threshold";
+const NOT_SELECTED_PRIORITY_CONFIDENCE_REASON: &str =
+    "priority/confidence below inline comment threshold";
+const NOT_SELECTED_POLICY_FALLBACK_REASON: &str = "not selected by current inline comment policy";
 
 pub(super) fn should_plan_comment(card: &ReviewCard) -> bool {
     card.site.changed
@@ -14,27 +25,27 @@ pub(super) fn should_plan_comment(card: &ReviewCard) -> bool {
 
 pub(super) fn non_selection_reason(card: &ReviewCard) -> &'static str {
     if !card.site.changed {
-        "outside changed hunk"
+        NOT_SELECTED_OUTSIDE_CHANGED_HUNK_REASON
     } else if !card.class.is_actionable() {
-        "class not eligible for inline comments"
+        NOT_SELECTED_CLASS_INELIGIBLE_REASON
     } else if matches!(card.operation.family, OperationFamily::Unknown) {
-        "operation family unknown"
+        NOT_SELECTED_UNKNOWN_FAMILY_REASON
     } else if matches!(card.confidence, Confidence::Low | Confidence::Unknown) {
-        "confidence below inline comment threshold"
+        NOT_SELECTED_CONFIDENCE_REASON
     } else if !(matches!(card.priority, Priority::High)
         || matches!(card.confidence, Confidence::High))
     {
-        "priority/confidence below inline comment threshold"
+        NOT_SELECTED_PRIORITY_CONFIDENCE_REASON
     } else {
-        "not selected by current inline comment policy"
+        NOT_SELECTED_POLICY_FALLBACK_REASON
     }
 }
 
 pub(super) fn selection_reason(card: &ReviewCard) -> &'static str {
     if matches!(card.confidence, Confidence::High) {
-        "actionable high-confidence review card"
+        SELECTED_HIGH_CONFIDENCE_REASON
     } else {
-        "actionable high-priority review card"
+        SELECTED_HIGH_PRIORITY_REASON
     }
 }
 

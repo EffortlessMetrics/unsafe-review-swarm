@@ -6,8 +6,8 @@ use serde::Serialize;
 use std::collections::BTreeSet;
 
 use super::selection::{
-    OPERATION_FAMILY_BUDGET_REASON, actionability, comment_body, non_selection_reason, relevance,
-    selection_reason, should_plan_comment,
+    MAX_COMMENT_BUDGET_REASON, OPERATION_FAMILY_BUDGET_REASON, actionability, comment_body,
+    non_selection_reason, relevance, selection_reason, should_plan_comment,
 };
 
 const MAX_PLANNED_COMMENTS: usize = 3;
@@ -49,7 +49,7 @@ impl From<&AnalyzeOutput> for CommentPlan {
                 } else {
                     not_selected.push(NotSelectedCard::from_reason(
                         card,
-                        "comment-plan max of three candidates reached",
+                        MAX_COMMENT_BUDGET_REASON,
                     ));
                 }
             } else {

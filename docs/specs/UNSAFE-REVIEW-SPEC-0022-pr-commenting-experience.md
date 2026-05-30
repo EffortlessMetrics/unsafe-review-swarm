@@ -102,6 +102,22 @@ must stay out of `comments[]` with reason `outside changed hunk`; this keeps
 future inline comments tied to PR review context without hiding the card from
 the artifact bundle.
 
+Selected `selection_reason` values use this closed vocabulary:
+
+- `actionable high-confidence review card`
+- `actionable high-priority review card`
+
+`not_selected[].reason` values use this closed vocabulary:
+
+- `outside changed hunk`
+- `class not eligible for inline comments`
+- `operation family unknown`
+- `confidence below inline comment threshold`
+- `priority/confidence below inline comment threshold`
+- `covered by selected family/obligation sibling`
+- `comment-plan max of three candidates reached`
+- `not selected by current inline comment policy`
+
 ## 6. Relevance and actionability
 
 Candidates carry transparent relevance metadata (for reviewer-noise control, not policy) and actionability taxonomy.
