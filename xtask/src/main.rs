@@ -2464,14 +2464,6 @@ fn check_dogfood_follow_up_seeds_text(
             ));
         }
 
-        let notes = markdown_code_cell_value(columns[7]);
-        if status == "parked" {
-            check_parked_dogfood_follow_up_notes(path, line_idx + 1, &seed_id, &notes)?;
-        } else if status == "done" {
-            check_done_dogfood_follow_up_notes(path, line_idx + 1, &seed_id, &notes)?;
-        } else if status == "superseded" {
-            check_superseded_dogfood_follow_up_notes(path, line_idx + 1, &seed_id, &notes)?;
-        }
         let next_pr_slice = markdown_code_cell_value(columns[6]);
         check_dogfood_follow_up_next_pr_slice(path, line_idx + 1, &seed_id, &next_pr_slice)?;
 
@@ -2530,6 +2522,17 @@ fn check_dogfood_follow_up_seeds_text(
             ));
         }
 
+        let notes = markdown_code_cell_value(columns[7]);
+        if status == "open" {
+            check_open_dogfood_follow_up_notes(path, line_idx + 1, &seed_id, &notes)?;
+        } else if status == "parked" {
+            check_parked_dogfood_follow_up_notes(path, line_idx + 1, &seed_id, &notes)?;
+        } else if status == "done" {
+            check_done_dogfood_follow_up_notes(path, line_idx + 1, &seed_id, &notes)?;
+        } else if status == "superseded" {
+            check_superseded_dogfood_follow_up_notes(path, line_idx + 1, &seed_id, &notes)?;
+        }
+
         rows += 1;
     }
     if !in_table {
@@ -2564,6 +2567,33 @@ fn check_dogfood_follow_up_next_pr_slice(
                 "{path}:{line} dogfood follow-up seed `{seed_id}` next PR slice must stay narrow; found `{forbidden}`"
             ));
         }
+    }
+    Ok(())
+}
+
+fn check_open_dogfood_follow_up_notes(
+    path: &str,
+    line: usize,
+    seed_id: &str,
+    notes: &str,
+) -> Result<(), String> {
+    let lower = notes.to_ascii_lowercase();
+    let explains_ready_slice = [
+        "ready",
+        "narrow",
+        "fixture",
+        "control",
+        "verifier",
+        "concrete",
+        "actionable",
+        "report-backed",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle));
+    if !explains_ready_slice {
+        return Err(format!(
+            "{path}:{line} open dogfood follow-up seed `{seed_id}` notes must explain why it is ready for a narrow fixture, verifier, or report-backed PR"
+        ));
     }
     Ok(())
 }
@@ -9492,7 +9522,7 @@ impl WitnessKind {
 | Seed ID | Status | Target | Family/surface | Primary label | Source report | Next PR slice | Notes |
 |---|---|---|---|---|---|---|---|
 | `dogfood-arrayvec-set-len` | `done` | `arrayvec-pr288` | `vec_set_len` | `actionable` | [arrayvec rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md) | `analysis: keep vec_set_len regression pressure` | Current follow-up is covered by fixture regression pressure. |
-| `dogfood-mio-ffi-route` | `open` | `mio-pr1388` | `ffi` | `needs-route` | [mio route](reports/2026-05-26-mio-ffi-route-wording.md) | `analysis: split ffi route wording` | route stays advisory |
+| `dogfood-mio-ffi-route` | `open` | `mio-pr1388` | `ffi` | `needs-route` | [mio route](reports/2026-05-26-mio-ffi-route-wording.md) | `analysis: split ffi route wording` | Ready for a narrow verifier PR; route stays advisory. |
 
 ## Trust boundary
 
@@ -9529,6 +9559,45 @@ policy readiness.
         )?;
 
         assert_eq!(rows, 2);
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_follow_up_seed_index_accepts_open_readiness_notes() -> Result<(), String> {
+        let text = r#"
+# Dogfood follow-up seed index
+
+## Seeds
+
+| Seed ID | Status | Target | Family/surface | Primary label | Source report | Next PR slice | Notes |
+|---|---|---|---|---|---|---|---|
+| `dogfood-open-ready` | `open` | `arrayvec-pr288` | `vec_set_len` | `actionable` | [arrayvec rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md) | `analysis: keep vec_set_len regression pressure` | Ready for a narrow fixture control from the linked report. |
+
+## Trust boundary
+
+Dogfood follow-up seeds are static advisory review notes. They are not a proof
+of memory safety, not UB-free status, not Miri-clean status, not site execution
+evidence, not calibrated precision or recall, not witness adequacy, and not
+policy readiness.
+"#;
+        let targets = BTreeSet::from(["arrayvec-pr288".to_string()]);
+        let reports = vec!["2026-05-26-arrayvec-vec-set-len-rerun.md".to_string()];
+        let report_triage_keys = dogfood_report_triage_keys_for_tests(&[(
+            "2026-05-26-arrayvec-vec-set-len-rerun.md",
+            "arrayvec-pr288",
+            "actionable",
+        )]);
+
+        let rows = check_dogfood_follow_up_seeds_text(
+            "docs/dogfood/follow-up-seeds.md",
+            text,
+            &targets,
+            &dogfood_follow_up_family_surface_set_for_tests(),
+            &reports,
+            &report_triage_keys,
+        )?;
+
+        assert_eq!(rows, 1);
         Ok(())
     }
 
@@ -9677,6 +9746,47 @@ Statuses:
     }
 
     #[test]
+    fn dogfood_follow_up_seed_index_rejects_open_without_readiness_note() -> Result<(), String> {
+        let text = r#"
+# Dogfood follow-up seed index
+
+## Seeds
+
+| Seed ID | Status | Target | Family/surface | Primary label | Source report | Next PR slice | Notes |
+|---|---|---|---|---|---|---|---|
+| `dogfood-open-without-readiness` | `open` | `arrayvec-pr288` | `vec_set_len` | `actionable` | [arrayvec rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md) | `analysis: keep vec_set_len regression pressure` | no overclaim |
+
+## Trust boundary
+
+Dogfood follow-up seeds are static advisory review notes. They are not a proof
+of memory safety, not UB-free status, not Miri-clean status, not site execution
+evidence, not calibrated precision or recall, not witness adequacy, and not
+policy readiness.
+"#;
+        let targets = BTreeSet::from(["arrayvec-pr288".to_string()]);
+        let reports = vec!["2026-05-26-arrayvec-vec-set-len-rerun.md".to_string()];
+        let report_triage_keys = dogfood_report_triage_keys_for_tests(&[(
+            "2026-05-26-arrayvec-vec-set-len-rerun.md",
+            "arrayvec-pr288",
+            "actionable",
+        )]);
+
+        let err = err_text(check_dogfood_follow_up_seeds_text(
+            "docs/dogfood/follow-up-seeds.md",
+            text,
+            &targets,
+            &dogfood_follow_up_family_surface_set_for_tests(),
+            &reports,
+            &report_triage_keys,
+        ))?;
+
+        assert!(err.contains("open dogfood follow-up seed"));
+        assert!(err.contains("ready for a narrow"));
+        assert!(err.contains("dogfood-open-without-readiness"));
+        Ok(())
+    }
+
+    #[test]
     fn dogfood_follow_up_seed_index_rejects_superseded_without_replacement_note()
     -> Result<(), String> {
         let text = r#"
@@ -9808,7 +9918,7 @@ policy readiness.
 
 | Seed ID | Status | Target | Family/surface | Primary label | Source report | Next PR slice | Notes |
 |---|---|---|---|---|---|---|---|
-| `dogfood-parked-ready-work` | `parked` | `arrayvec-pr288` | `vec_set_len` | `actionable` | [arrayvec rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md) | `analysis: implement broad recognizer` | ready to implement this recognizer now |
+| `dogfood-parked-ready-work` | `parked` | `arrayvec-pr288` | `vec_set_len` | `actionable` | [arrayvec rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md) | `analysis: wait for fixture pressure` | ready to implement this recognizer now |
 
 ## Trust boundary
 
@@ -9930,7 +10040,7 @@ policy readiness.
 
 | Seed ID | Status | Target | Family/surface | Primary label | Source report | Next PR slice | Notes |
 |---|---|---|---|---|---|---|---|
-| `dogfood-arrayvec-set-len` | `open` | `arrayvec-pr288` | `vec_set_len` | `actionable` | [arrayvec rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md) | `analysis: keep vec_set_len regression pressure` | no new analyzer breadth |
+| `dogfood-arrayvec-set-len` | `open` | `arrayvec-pr288` | `vec_set_len` | `actionable` | [arrayvec rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md) | `analysis: keep vec_set_len regression pressure` | Ready for a narrow fixture control. |
 | `dogfood-arrayvec-set-len` | `done` | `mio-pr1388` | `ffi` | `needs-route` | [mio route](reports/2026-05-26-mio-ffi-route-wording.md) | `analysis: keep ffi route wording` | route stays advisory |
 
 ## Trust boundary
