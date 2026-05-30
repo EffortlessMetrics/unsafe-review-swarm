@@ -2467,6 +2467,8 @@ fn check_dogfood_follow_up_seeds_text(
         let notes = markdown_code_cell_value(columns[7]);
         if status == "parked" {
             check_parked_dogfood_follow_up_notes(path, line_idx + 1, &seed_id, &notes)?;
+        } else if status == "done" {
+            check_done_dogfood_follow_up_notes(path, line_idx + 1, &seed_id, &notes)?;
         }
         let next_pr_slice = markdown_code_cell_value(columns[6]);
         check_dogfood_follow_up_next_pr_slice(path, line_idx + 1, &seed_id, &next_pr_slice)?;
@@ -2585,6 +2587,33 @@ fn check_parked_dogfood_follow_up_notes(
     if !explains_future_pressure {
         return Err(format!(
             "{path}:{line} parked dogfood follow-up seed `{seed_id}` notes must explain why it is future pressure rather than ready implementation work"
+        ));
+    }
+    Ok(())
+}
+
+fn check_done_dogfood_follow_up_notes(
+    path: &str,
+    line: usize,
+    seed_id: &str,
+    notes: &str,
+) -> Result<(), String> {
+    let lower = notes.to_ascii_lowercase();
+    let explains_done_coverage = [
+        "covered",
+        "landed",
+        "fixture",
+        "verifier",
+        "report",
+        "excluded",
+        "preserve",
+        "regression pressure",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle));
+    if !explains_done_coverage {
+        return Err(format!(
+            "{path}:{line} done dogfood follow-up seed `{seed_id}` notes must explain what landed, covers, or preserves the follow-up"
         ));
     }
     Ok(())
@@ -9436,7 +9465,7 @@ impl WitnessKind {
 
 | Seed ID | Status | Target | Family/surface | Primary label | Source report | Next PR slice | Notes |
 |---|---|---|---|---|---|---|---|
-| `dogfood-arrayvec-set-len` | `done` | `arrayvec-pr288` | `vec_set_len` | `actionable` | [arrayvec rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md) | `analysis: keep vec_set_len regression pressure` | no new analyzer breadth |
+| `dogfood-arrayvec-set-len` | `done` | `arrayvec-pr288` | `vec_set_len` | `actionable` | [arrayvec rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md) | `analysis: keep vec_set_len regression pressure` | Current follow-up is covered by fixture regression pressure. |
 | `dogfood-mio-ffi-route` | `open` | `mio-pr1388` | `ffi` | `needs-route` | [mio route](reports/2026-05-26-mio-ffi-route-wording.md) | `analysis: split ffi route wording` | route stays advisory |
 
 ## Trust boundary
@@ -9579,6 +9608,47 @@ Statuses:
         ))?;
 
         assert!(err.contains("documents unknown dogfood follow-up status `reviewing`"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_follow_up_seed_index_rejects_done_without_coverage_note() -> Result<(), String> {
+        let text = r#"
+# Dogfood follow-up seed index
+
+## Seeds
+
+| Seed ID | Status | Target | Family/surface | Primary label | Source report | Next PR slice | Notes |
+|---|---|---|---|---|---|---|---|
+| `dogfood-done-without-coverage` | `done` | `arrayvec-pr288` | `vec_set_len` | `actionable` | [arrayvec rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md) | `analysis: keep vec_set_len regression pressure` | no new analyzer breadth |
+
+## Trust boundary
+
+Dogfood follow-up seeds are static advisory review notes. They are not a proof
+of memory safety, not UB-free status, not Miri-clean status, not site execution
+evidence, not calibrated precision or recall, not witness adequacy, and not
+policy readiness.
+"#;
+        let targets = BTreeSet::from(["arrayvec-pr288".to_string()]);
+        let reports = vec!["2026-05-26-arrayvec-vec-set-len-rerun.md".to_string()];
+        let report_triage_keys = dogfood_report_triage_keys_for_tests(&[(
+            "2026-05-26-arrayvec-vec-set-len-rerun.md",
+            "arrayvec-pr288",
+            "actionable",
+        )]);
+
+        let err = err_text(check_dogfood_follow_up_seeds_text(
+            "docs/dogfood/follow-up-seeds.md",
+            text,
+            &targets,
+            &dogfood_follow_up_family_surface_set_for_tests(),
+            &reports,
+            &report_triage_keys,
+        ))?;
+
+        assert!(err.contains("done dogfood follow-up seed"));
+        assert!(err.contains("landed, covers, or preserves"));
+        assert!(err.contains("dogfood-done-without-coverage"));
         Ok(())
     }
 
