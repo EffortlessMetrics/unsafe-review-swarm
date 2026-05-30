@@ -340,6 +340,7 @@ required_core_fixtures = [
   "transmute_copy_layout_mismatch_return_guard",
   "transmute_copy_layout_conjunct_return_not_guard",
   "transmute_copy_bool_comment_not_guard",
+  "transmute_copy_bool_other_value_not_guard",
   "transmute_copy_bool_valid_value_guard",
   "transmute_copy_bool_conjunct_branch_guard",
   "transmute_copy_bool_disjunct_branch_not_guard",
@@ -3798,6 +3799,16 @@ expected_hazard = "invalid_value"
 fixture = "transmute_copy_bool_comment_not_guard"
 kind = "false_positive_control"
 claim = "transmute_copy::<u8, bool> treats referenced-byte bool-domain SAFETY comments as contract prose, not executable valid-value evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "transmute_copy_bool_other_value_not_guard"
+kind = "false_positive_control"
+claim = "transmute_copy::<u8, bool> rejects bool-domain evidence for a different referenced byte"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
