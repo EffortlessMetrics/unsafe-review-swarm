@@ -71,6 +71,16 @@ made stale by reassigning the checked vector before `set_len`, including
 capacity bindings measured before the reassignment.
 `Vec::set_len` initialization evidence now rejects unrelated initialization
 statements unless the evidence is tied to the receiver being lengthened.
+`Vec::set_len` initialized-range proof also includes slice-binding loop
+evidence through `vec_set_len_slice_binding_initialized_loop` and
+`vec_set_len_remaining_capacity_guard`, while
+`vec_set_len_other_slice_binding_not_guard`,
+`vec_set_len_partial_slice_binding_not_guard`,
+`vec_set_len_stale_slice_binding_not_guard`,
+`vec_set_len_single_index_init_not_guard`, and
+`vec_set_len_other_remaining_capacity_not_guard` keep wrong-target, partial,
+stale, single-index, and other-receiver initialization from discharging the
+extended-range obligation.
 `Vec::set_len` capacity evidence also recognizes narrow same-vector
 `reserve(additional)` and `try_reserve(additional)?` patterns for
 `len + additional`, and rejects those calls when `additional` is reassigned
@@ -95,6 +105,16 @@ The same stale-receiver control is pinned for `let Some(_) = get(index) else`
 early-return guards.
 Match `Some(_)` get-probe arms also reject receiver reassignment before the
 unsafe access.
+`MaybeUninit::assume_init` initialized-memory evidence is pinned for
+same-slot open-branch `write` and `MaybeUninit::new` evidence through
+`maybeuninit_assume_init_open_branch_write_guard` and
+`maybeuninit_assume_init_open_branch_new_guard`, while
+`maybeuninit_assume_init_closed_branch_write_not_guard`,
+`maybeuninit_assume_init_closed_branch_new_not_guard`,
+`maybeuninit_assume_init_partial_field_not_guard`, and
+`maybeuninit_assume_init_partial_array_not_guard` keep closed-branch,
+partial-field, and partial-array initialization from counting as full
+initialized-memory evidence.
 
 Copy operation range evidence is intentionally conservative:
 `copy_nonoverlapping_slice_range_guard`,
