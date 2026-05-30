@@ -54,8 +54,11 @@ impl<'a> PointerArithmeticBoundsApplicability<'a> {
         }
     }
 
-    fn target_stays_fresh_after(&self, evidence: &str) -> bool {
+    fn targets_stay_fresh_after(&self, bound_targets: &[String], evidence: &str) -> bool {
         !contains_simple_assignment_to(evidence, &self.offset)
+            && bound_targets
+                .iter()
+                .all(|target| !contains_simple_assignment_to(evidence, target))
     }
 }
 
@@ -70,8 +73,9 @@ fn has_pointer_arithmetic_bounds_assertion(
             let after_prefix = &context.before_operation[statement_start..];
             let statement_end = after_prefix.find(';').unwrap_or(after_prefix.len());
             let statement = &after_prefix[..statement_end];
-            if has_same_offset_bounds_condition(statement, &context.offset)
-                && context.target_stays_fresh_after(&after_prefix[statement_end..])
+            if let Some(bound_targets) =
+                same_offset_bounds_freshness_targets(statement, &context.offset)
+                && context.targets_stay_fresh_after(&bound_targets, &after_prefix[statement_end..])
             {
                 return true;
             }
@@ -101,9 +105,10 @@ fn has_pointer_arithmetic_bounds_open_branch(
         if let Some(brace_pos) = after_if.find('{') {
             let condition = &after_if[..brace_pos];
             let after_body_start = &after_if[brace_pos + 1..];
-            if has_same_offset_bounds_condition(condition, &context.offset)
+            if let Some(bound_targets) =
+                same_offset_bounds_freshness_targets(condition, &context.offset)
                 && branch_still_open_at_operation(after_body_start)
-                && context.target_stays_fresh_after(after_body_start)
+                && context.targets_stay_fresh_after(&bound_targets, after_body_start)
             {
                 return true;
             }
@@ -115,10 +120,12 @@ fn has_pointer_arithmetic_bounds_open_branch(
     false
 }
 
-fn has_same_offset_bounds_condition(condition: &str, offset: &str) -> bool {
+fn same_offset_bounds_freshness_targets(condition: &str, offset: &str) -> Option<Vec<String>> {
     if condition.contains("||") {
-        return false;
+        return None;
     }
+    let mut freshness_targets = Vec::new();
+    let mut matched = false;
     for op in [">=", "<=", "<", ">"] {
         let mut cursor = condition;
         let mut cursor_offset = 0usize;
@@ -127,17 +134,19 @@ fn has_same_offset_bounds_condition(condition: &str, offset: &str) -> bool {
             let op_end = op_start + op.len();
             let left = comparison_left_operand(condition, op_start);
             let right = comparison_right_operand(condition, op_end);
-            if (operand_is_target(left, offset) && operand_mentions_bounds(right))
-                || (operand_is_target(right, offset) && operand_mentions_bounds(left))
-            {
-                return true;
+            if operand_is_target(left, offset) && operand_mentions_bounds(right) {
+                matched = true;
+                push_bound_freshness_target(&mut freshness_targets, right);
+            } else if operand_is_target(right, offset) && operand_mentions_bounds(left) {
+                matched = true;
+                push_bound_freshness_target(&mut freshness_targets, left);
             }
             let next = pos + op.len();
             cursor_offset += next;
             cursor = &cursor[next..];
         }
     }
-    false
+    matched.then_some(freshness_targets)
 }
 
 fn comparison_left_operand(compact: &str, op_start: usize) -> &str {
@@ -150,7 +159,9 @@ fn comparison_left_operand(compact: &str, op_start: usize) -> &str {
 
 fn comparison_right_operand(compact: &str, op_end: usize) -> &str {
     let right = &compact[op_end..];
-    let end = right.find(['{', '}', ';', ',', '=']).unwrap_or(right.len());
+    let end = right
+        .find(['{', '}', ';', ',', '=', ')', '&', '|'])
+        .unwrap_or(right.len());
     &right[..end]
 }
 
@@ -163,8 +174,20 @@ fn operand_mentions_bounds(operand: &str) -> bool {
     operand.contains(".len()")
         || operand.contains(".capacity()")
         || operand.contains("num_ctrl_bytes()")
+        || operand.contains("num_ctrl_bytes(")
         || contains_identifier(&operand, "len")
         || contains_identifier(&operand, "capacity")
+}
+
+fn push_bound_freshness_target(targets: &mut Vec<String>, operand: &str) {
+    let operand = compact_code(operand);
+    if is_simple_bound_identifier(&operand) && !targets.iter().any(|target| target == &operand) {
+        targets.push(operand);
+    }
+}
+
+fn is_simple_bound_identifier(operand: &str) -> bool {
+    operand == "len" || operand == "capacity"
 }
 
 fn contains_identifier(text: &str, needle: &str) -> bool {
@@ -222,6 +245,18 @@ mod tests {
         assert!(!has_pointer_arithmetic_bounds_guard(
             "unsafe { self.ctrl.add(index) }",
             "debug_assert!(index < self.num_ctrl_bytes()); index = fallback; unsafe { self.ctrl.add(index) }",
+        ));
+    }
+
+    #[test]
+    fn pointer_arithmetic_bounds_guard_rejects_stale_bound_identifier() {
+        assert!(!has_pointer_arithmetic_bounds_guard(
+            "unsafe { self.ctrl.add(index) }",
+            "let mut len = self.num_ctrl_bytes(); debug_assert!(index < len); len = 0; unsafe { self.ctrl.add(index) }",
+        ));
+        assert!(has_pointer_arithmetic_bounds_guard(
+            "unsafe { self.ctrl.add(index) }",
+            "let len = self.num_ctrl_bytes(); debug_assert!(index < len); unsafe { self.ctrl.add(index) }",
         ));
     }
 

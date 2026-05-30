@@ -1,0 +1,35 @@
+pub struct Control {
+    ctrl: *const u8,
+    bytes: usize,
+}
+
+impl Control {
+    pub fn new(ctrl: *const u8, bytes: usize) -> Self {
+        Self { ctrl, bytes }
+    }
+
+    fn num_ctrl_bytes(&self) -> usize {
+        self.bytes
+    }
+
+    pub fn ctrl(&self, index: usize) -> *const u8 {
+        let mut len = self.num_ctrl_bytes();
+        debug_assert!(index < len);
+        len = 0;
+        let _ = len;
+        // SAFETY: this fixture intentionally mutates the checked bound.
+        unsafe { self.ctrl.add(index) }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Control;
+
+    #[test]
+    fn ctrl_mutates_checked_bound() {
+        let bytes = [0_u8; 4];
+        let control = Control::new(bytes.as_ptr(), bytes.len());
+        let _ = control.ctrl(0);
+    }
+}

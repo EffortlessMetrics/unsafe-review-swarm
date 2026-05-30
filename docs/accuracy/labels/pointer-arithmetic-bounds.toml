@@ -81,6 +81,20 @@ label_source = "fixture_golden"
 rationale = "A bounds guard for `index` does not discharge pointer arithmetic after `index` is compound-mutated before the unsafe operation."
 
 [[samples]]
+id = "pointer-arithmetic-stale-bound-bounds-missing"
+fixture = "pointer_arithmetic_stale_bound_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "pointer_arithmetic"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A bounds guard over `index < len` does not discharge pointer arithmetic after the local `len` bound is reassigned before the unsafe operation."
+
+[[samples]]
 id = "pointer-arithmetic-disjunct-bounds-missing"
 fixture = "pointer_arithmetic_disjunct_bounds_not_guard"
 kind = "false_positive_control"
