@@ -13946,6 +13946,38 @@ Snapshot reports:
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_repair_queue_cross_bucket_readiness_state_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-repair-queue-readiness-state-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+
+        let path = dir.join("repair-queue.json");
+        let mut repair_queue: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&path).map_err(|err| format!("read repair queue failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse repair queue failed: {err}"))?;
+        let readiness =
+            &mut repair_queue["buckets"]["requires_witness_receipt"][0]["agent_readiness"];
+        readiness["ready"] = serde_json::json!(false);
+        readiness["state"] = serde_json::json!("needs_human_review");
+        fs::write(&path, repair_queue.to_string())
+            .map_err(|err| format!("write repair queue failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = result.err().unwrap_or_default();
+        assert!(
+            err.contains(
+                "repair-queue.json card `card-1` has inconsistent agent_readiness.state across buckets"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn advisory_artifact_checker_rejects_repair_queue_cross_bucket_readiness_reason_drift()
     -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-artifacts-repair-queue-readiness-reason-drift")?;
