@@ -1260,19 +1260,24 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
 
     #[test]
     fn nonnull_is_null_branch_must_exit_to_count_as_guard() -> Result<(), String> {
-        let output = fixture_output("nonnull_is_null_nonreturning_not_guard")?;
-        let card = single_card("nonnull_is_null_nonreturning_not_guard", &output)?;
+        for fixture in [
+            "nonnull_is_null_nonreturning_not_guard",
+            "nonnull_is_null_return_comment_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
 
-        assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
-        assert_eq!(card.operation.family, OperationFamily::NonNullUnchecked);
-        assert_eq!(card.class, ReviewClass::GuardMissing);
-        assert!(!card.discharge.present);
-        assert!(!obligation_discharge_present(card, "non-null"));
-        assert!(
-            card.missing.iter().any(|missing| missing.kind == "guard"),
-            "observing null without exiting must not resolve this card's guard prompt"
-        );
-        assert!(card.id.0.contains("nonnull-unchecked"));
+            assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+            assert_eq!(card.operation.family, OperationFamily::NonNullUnchecked);
+            assert_eq!(card.class, ReviewClass::GuardMissing);
+            assert!(!card.discharge.present);
+            assert!(!obligation_discharge_present(card, "non-null"));
+            assert!(
+                card.missing.iter().any(|missing| missing.kind == "guard"),
+                "{fixture}: observing null without exiting must not resolve this card's guard prompt"
+            );
+            assert!(card.id.0.contains("nonnull-unchecked"));
+        }
         Ok(())
     }
 

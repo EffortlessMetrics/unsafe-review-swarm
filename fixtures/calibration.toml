@@ -392,6 +392,7 @@ required_core_fixtures = [
   "nonnull_match_new_guard",
   "nonnull_other_guard_not_evidence",
   "nonnull_is_null_nonreturning_not_guard",
+  "nonnull_is_null_return_comment_not_guard",
   "nonnull_is_null_disjunct_return_guard",
   "nonnull_is_null_conjunct_return_not_guard",
   "nonnull_is_null_reassigned_ptr_not_guard",
@@ -4299,6 +4300,16 @@ expected_hazard = "pointer_validity"
 fixture = "nonnull_is_null_nonreturning_not_guard"
 kind = "false_positive_control"
 claim = "same-pointer is_null observation without an early exit does not discharge the non-null obligation"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "nonnull_is_null_return_comment_not_guard"
+kind = "false_positive_control"
+claim = "comment-only return text in a same-pointer is_null branch does not discharge the non-null obligation"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

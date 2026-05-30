@@ -129,6 +129,19 @@ label_source = "fixture_golden"
 rationale = "A same-pointer is_null observation that does not exit the null path is not a dominating non-null guard."
 
 [[samples]]
+id = "nonnull-is-null-return-comment-not-guard"
+fixture = "nonnull_is_null_return_comment_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "non-null"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Comment-only return text inside a same-pointer is_null branch is not executable early-return evidence and must not discharge non-null evidence."
+
+[[samples]]
 id = "nonnull-is-null-disjunct-return-guard-present"
 fixture = "nonnull_is_null_disjunct_return_guard"
 kind = "positive"

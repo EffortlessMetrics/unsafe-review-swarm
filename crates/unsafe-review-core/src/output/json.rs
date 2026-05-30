@@ -285,6 +285,7 @@ mod tests {
         "nonnull_match_new_guard",
         "nonnull_other_guard_not_evidence",
         "nonnull_is_null_nonreturning_not_guard",
+        "nonnull_is_null_return_comment_not_guard",
         "nonnull_is_null_disjunct_return_guard",
         "nonnull_is_null_conjunct_return_not_guard",
         "nonnull_is_null_reassigned_ptr_not_guard",
