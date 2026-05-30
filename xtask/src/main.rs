@@ -237,10 +237,13 @@ const DOGFOOD_TRIAGE_HEADER: &[&str] = &[
     "Follow-up",
 ];
 const DOGFOOD_FOLLOW_UP_STATUSES: &[&str] = &["open", "done", "parked", "superseded"];
+const DOGFOOD_FOLLOW_UP_SURFACES: &[&str] =
+    &["comment_plan", "first_pr_projection", "repo_posture"];
 const DOGFOOD_FOLLOW_UP_HEADER: &[&str] = &[
     "Seed ID",
     "Status",
     "Target",
+    "Family/surface",
     "Primary label",
     "Source report",
     "Next PR slice",
@@ -2330,10 +2333,17 @@ fn check_dogfood_follow_up_seeds(known_targets: &BTreeSet<String>) -> Result<(),
     let text = read_to_string(&workspace_path(DOGFOOD_FOLLOW_UP_SEEDS))?;
     let reports = dogfood_report_names()?;
     let report_triage_keys = dogfood_report_triage_keys_by_report(&reports)?;
+    let mut known_families_or_surfaces = operation_family_registry_rows()?;
+    known_families_or_surfaces.extend(
+        DOGFOOD_FOLLOW_UP_SURFACES
+            .iter()
+            .map(|surface| (*surface).to_string()),
+    );
     check_dogfood_follow_up_seeds_text(
         DOGFOOD_FOLLOW_UP_SEEDS,
         &text,
         known_targets,
+        &known_families_or_surfaces,
         &reports,
         &report_triage_keys,
     )?;
@@ -2344,6 +2354,7 @@ fn check_dogfood_follow_up_seeds_text(
     path: &str,
     text: &str,
     known_targets: &BTreeSet<String>,
+    known_families_or_surfaces: &BTreeSet<String>,
     reports: &[String],
     report_triage_keys: &BTreeMap<String, BTreeSet<(String, String)>>,
 ) -> Result<usize, String> {
@@ -2392,7 +2403,7 @@ fn check_dogfood_follow_up_seeds_text(
         let columns = markdown_table_columns(line);
         if columns.len() != DOGFOOD_FOLLOW_UP_HEADER.len() {
             return Err(format!(
-                "{path}:{} dogfood follow-up row must include Seed ID, Status, Target, Primary label, Source report, Next PR slice, and Notes columns",
+                "{path}:{} dogfood follow-up row must include Seed ID, Status, Target, Family/surface, Primary label, Source report, Next PR slice, and Notes columns",
                 line_idx + 1
             ));
         }
@@ -2429,7 +2440,15 @@ fn check_dogfood_follow_up_seeds_text(
             ));
         }
 
-        let label = markdown_code_cell_value(columns[3]);
+        let family_or_surface = markdown_code_cell_value(columns[3]);
+        if !known_families_or_surfaces.contains(&family_or_surface) {
+            return Err(format!(
+                "{path}:{} dogfood follow-up seed `{seed_id}` references unknown family/surface `{family_or_surface}`",
+                line_idx + 1
+            ));
+        }
+
+        let label = markdown_code_cell_value(columns[4]);
         if !DOGFOOD_TRIAGE_LABELS.contains(&label.as_str()) {
             return Err(format!(
                 "{path}:{} unknown dogfood follow-up label `{label}`",
@@ -2437,7 +2456,7 @@ fn check_dogfood_follow_up_seeds_text(
             ));
         }
 
-        let report = markdown_report_link(columns[4]).ok_or_else(|| {
+        let report = markdown_report_link(columns[5]).ok_or_else(|| {
             format!(
                 "{path}:{} dogfood follow-up seed `{seed_id}` source report must link a report",
                 line_idx + 1
@@ -9188,6 +9207,15 @@ impl WitnessKind {
         reports
     }
 
+    fn dogfood_follow_up_family_surface_set_for_tests() -> BTreeSet<String> {
+        BTreeSet::from([
+            "comment_plan".to_string(),
+            "ffi".to_string(),
+            "first_pr_projection".to_string(),
+            "vec_set_len".to_string(),
+        ])
+    }
+
     #[test]
     fn dogfood_follow_up_seed_index_accepts_known_targets_labels_and_reports() -> Result<(), String>
     {
@@ -9196,10 +9224,10 @@ impl WitnessKind {
 
 ## Seeds
 
-| Seed ID | Status | Target | Primary label | Source report | Next PR slice | Notes |
-|---|---|---|---|---|---|---|
-| `dogfood-arrayvec-set-len` | `done` | `arrayvec-pr288` | `actionable` | [arrayvec rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md) | `analysis: keep vec_set_len regression pressure` | no new analyzer breadth |
-| `dogfood-mio-ffi-route` | `open` | `mio-pr1388` | `needs-route` | [mio route](reports/2026-05-26-mio-ffi-route-wording.md) | `analysis: split ffi route wording` | route stays advisory |
+| Seed ID | Status | Target | Family/surface | Primary label | Source report | Next PR slice | Notes |
+|---|---|---|---|---|---|---|---|
+| `dogfood-arrayvec-set-len` | `done` | `arrayvec-pr288` | `vec_set_len` | `actionable` | [arrayvec rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md) | `analysis: keep vec_set_len regression pressure` | no new analyzer breadth |
+| `dogfood-mio-ffi-route` | `open` | `mio-pr1388` | `ffi` | `needs-route` | [mio route](reports/2026-05-26-mio-ffi-route-wording.md) | `analysis: split ffi route wording` | route stays advisory |
 
 ## Trust boundary
 
@@ -9230,6 +9258,7 @@ policy readiness.
             "docs/dogfood/follow-up-seeds.md",
             text,
             &targets,
+            &dogfood_follow_up_family_surface_set_for_tests(),
             &reports,
             &report_triage_keys,
         )?;
@@ -9245,9 +9274,9 @@ policy readiness.
 
 ## Seeds
 
-| Seed ID | Status | Target | Primary label | Source report | Next PR slice | Notes |
-|---|---|---|---|---|---|---|
-| `dogfood-missing` | `open` | `missing-target` | `needs-fixture` | [report](reports/2026-05-26-post-burst.md) | `analysis: add fixture` | no overclaim |
+| Seed ID | Status | Target | Family/surface | Primary label | Source report | Next PR slice | Notes |
+|---|---|---|---|---|---|---|---|
+| `dogfood-missing` | `open` | `missing-target` | `vec_set_len` | `needs-fixture` | [report](reports/2026-05-26-post-burst.md) | `analysis: add fixture` | no overclaim |
 
 ## Trust boundary
 
@@ -9268,6 +9297,7 @@ policy readiness.
             "docs/dogfood/follow-up-seeds.md",
             text,
             &targets,
+            &dogfood_follow_up_family_surface_set_for_tests(),
             &reports,
             &report_triage_keys,
         ))?;
@@ -9278,15 +9308,55 @@ policy readiness.
     }
 
     #[test]
+    fn dogfood_follow_up_seed_index_rejects_unknown_family_or_surface() -> Result<(), String> {
+        let text = r#"
+# Dogfood follow-up seed index
+
+## Seeds
+
+| Seed ID | Status | Target | Family/surface | Primary label | Source report | Next PR slice | Notes |
+|---|---|---|---|---|---|---|---|
+| `dogfood-unknown-family` | `open` | `arrayvec-pr288` | `unknown_surface` | `needs-fixture` | [report](reports/2026-05-26-post-burst.md) | `analysis: add fixture` | no overclaim |
+
+## Trust boundary
+
+Dogfood follow-up seeds are static advisory review notes. They are not a proof
+of memory safety, not UB-free status, not Miri-clean status, not site execution
+evidence, not calibrated precision or recall, not witness adequacy, and not
+policy readiness.
+"#;
+        let targets = BTreeSet::from(["arrayvec-pr288".to_string()]);
+        let reports = vec!["2026-05-26-post-burst.md".to_string()];
+        let report_triage_keys = dogfood_report_triage_keys_for_tests(&[(
+            "2026-05-26-post-burst.md",
+            "arrayvec-pr288",
+            "needs-fixture",
+        )]);
+
+        let err = err_text(check_dogfood_follow_up_seeds_text(
+            "docs/dogfood/follow-up-seeds.md",
+            text,
+            &targets,
+            &dogfood_follow_up_family_surface_set_for_tests(),
+            &reports,
+            &report_triage_keys,
+        ))?;
+
+        assert!(err.contains("unknown family/surface"));
+        assert!(err.contains("unknown_surface"));
+        Ok(())
+    }
+
+    #[test]
     fn dogfood_follow_up_seed_index_rejects_missing_report_links() -> Result<(), String> {
         let text = r#"
 # Dogfood follow-up seed index
 
 ## Seeds
 
-| Seed ID | Status | Target | Primary label | Source report | Next PR slice | Notes |
-|---|---|---|---|---|---|---|
-| `dogfood-missing-report` | `open` | `arrayvec-pr288` | `needs-fixture` | [report](reports/missing.md) | `analysis: add fixture` | no overclaim |
+| Seed ID | Status | Target | Family/surface | Primary label | Source report | Next PR slice | Notes |
+|---|---|---|---|---|---|---|---|
+| `dogfood-missing-report` | `open` | `arrayvec-pr288` | `vec_set_len` | `needs-fixture` | [report](reports/missing.md) | `analysis: add fixture` | no overclaim |
 
 ## Trust boundary
 
@@ -9307,6 +9377,7 @@ policy readiness.
             "docs/dogfood/follow-up-seeds.md",
             text,
             &targets,
+            &dogfood_follow_up_family_surface_set_for_tests(),
             &reports,
             &report_triage_keys,
         ))?;
@@ -9324,9 +9395,9 @@ policy readiness.
 
 ## Seeds
 
-| Seed ID | Status | Target | Primary label | Source report | Next PR slice | Notes |
-|---|---|---|---|---|---|---|
-| `dogfood-wrong-report` | `open` | `arrayvec-pr288` | `needs-fixture` | [report](reports/2026-05-26-post-burst.md) | `analysis: add fixture` | no overclaim |
+| Seed ID | Status | Target | Family/surface | Primary label | Source report | Next PR slice | Notes |
+|---|---|---|---|---|---|---|---|
+| `dogfood-wrong-report` | `open` | `arrayvec-pr288` | `vec_set_len` | `needs-fixture` | [report](reports/2026-05-26-post-burst.md) | `analysis: add fixture` | no overclaim |
 
 ## Trust boundary
 
@@ -9347,6 +9418,7 @@ policy readiness.
             "docs/dogfood/follow-up-seeds.md",
             text,
             &targets,
+            &dogfood_follow_up_family_surface_set_for_tests(),
             &reports,
             &report_triage_keys,
         ))?;

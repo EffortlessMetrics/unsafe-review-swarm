@@ -34,9 +34,10 @@ Report requirements:
 - Every report must be linked from this README.
 - Triage tables that include `Primary label` must use a label from
   [`triage-taxonomy.md`](triage-taxonomy.md).
-- Follow-up seed rows must use known corpus targets, known triage labels, known
-  statuses, and source reports linked from this directory. The linked source
-  report must contain a triage row for the same target and primary label.
+- Follow-up seed rows must use known corpus targets, known operation-family or
+  projection-surface labels, known triage labels, known statuses, and source
+  reports linked from this directory. The linked source report must contain a
+  triage row for the same target and primary label.
 - Every report must include a `## Trust boundary` section that names witness,
   safety, UB-free, Miri-clean, site-execution, calibration, and policy limits.
 
