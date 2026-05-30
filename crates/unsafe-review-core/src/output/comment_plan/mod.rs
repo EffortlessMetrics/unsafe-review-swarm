@@ -39,6 +39,10 @@ mod tests {
             "actionable high-priority review card"
         );
         assert_eq!(
+            value["comments"][0]["selection_reason_code"],
+            "top_actionable_card"
+        );
+        assert_eq!(
             value["comments"][0]["actionability"],
             "specific_guard_missing"
         );
@@ -151,6 +155,7 @@ mod tests {
             value["not_selected"][0]["reason"],
             "comment-plan max of three candidates reached"
         );
+        assert_eq!(value["not_selected"][0]["reason_code"], "budget_exhausted");
         Ok(())
     }
 
@@ -183,8 +188,16 @@ mod tests {
             "covered by selected family/obligation sibling"
         );
         assert_eq!(
+            value["not_selected"][0]["reason_code"],
+            "covered_by_selected_family_obligation"
+        );
+        assert_eq!(
             value["not_selected"][1]["reason"],
             "covered by selected family/obligation sibling"
+        );
+        assert_eq!(
+            value["not_selected"][1]["reason_code"],
+            "covered_by_selected_family_obligation"
         );
         Ok(())
     }
@@ -236,6 +249,10 @@ mod tests {
         assert_eq!(value["not_selected"].as_array().map_or(0, Vec::len), 1);
         assert_review_budget_summary(&value, 0, 1)?;
         assert_eq!(value["not_selected"][0]["reason"], "outside changed hunk");
+        assert_eq!(
+            value["not_selected"][0]["reason_code"],
+            "outside_changed_hunk"
+        );
         assert_eq!(value["not_selected"][0]["changed_line"], false);
         assert_eq!(
             value["not_selected"][0]["actionability"],
@@ -267,6 +284,7 @@ mod tests {
             value["not_selected"][0]["reason"],
             "priority/confidence below inline comment threshold"
         );
+        assert_eq!(value["not_selected"][0]["reason_code"], "lower_relevance");
         Ok(())
     }
 
@@ -278,6 +296,10 @@ mod tests {
             selected["comments"][0]["selection_reason"],
             "actionable high-priority review card"
         );
+        assert_eq!(
+            selected["comments"][0]["selection_reason_code"],
+            "top_actionable_card"
+        );
         assert_eq!(selected["comments"][0]["relevance"], "medium");
 
         let not_selected = parse_json(&render(&fixture_output("ffi_sanitizer_route")?))?;
@@ -285,6 +307,10 @@ mod tests {
         assert_eq!(
             not_selected["not_selected"][0]["reason"],
             "priority/confidence below inline comment threshold"
+        );
+        assert_eq!(
+            not_selected["not_selected"][0]["reason_code"],
+            "lower_relevance"
         );
         assert_eq!(not_selected["not_selected"][0]["relevance"], "low");
 
@@ -312,6 +338,10 @@ mod tests {
         assert_eq!(
             value["not_selected"][0]["reason"],
             "operation family unknown"
+        );
+        assert_eq!(
+            value["not_selected"][0]["reason_code"],
+            "human_deep_review_only"
         );
         Ok(())
     }
@@ -344,6 +374,7 @@ mod tests {
         assert_eq!(value["summary"]["not_selected_count"], not_selected_count);
         assert_eq!(value["summary"]["budget"], 3);
         assert_eq!(value["summary"]["reason"], "bounded reviewer noise");
+        assert_eq!(value["summary"]["reason_code"], "bounded_reviewer_noise");
         Ok(())
     }
 }

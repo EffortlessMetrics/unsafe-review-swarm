@@ -54,7 +54,8 @@ The goal is reviewer leverage, not commenting on every card.
 - Mode is plan-only and policy is advisory.
 - Default candidate count is 0-3; hard max is 3.
 - `summary` records the bounded review budget:
-  `selected_count`, `not_selected_count`, `budget`, and `reason`.
+  `selected_count`, `not_selected_count`, `budget`, `reason`, and
+  `reason_code`.
 - Cards that are present but not selected for inline comments must appear in
   `not_selected[]` with a reason.
 - Every ReviewCard must be represented once, either in `comments[]` or
@@ -68,7 +69,7 @@ Each selected candidate includes required fields:
 - `changed_line`
 - `operation`, `operation_family`, `class`, `priority`, `confidence`
 - `next_action`, `witness_routes`, `verify_commands`
-- `selection_reason`, `actionability`, `relevance`
+- `selection_reason`, `selection_reason_code`, `actionability`, `relevance`
 - `body`, `trust_boundary`
 
 Each `not_selected` entry includes:
@@ -78,7 +79,7 @@ Each `not_selected` entry includes:
 - `operation`, `operation_family`, `class`, `priority`, `confidence`
 - `next_action`
 - `actionability`, `relevance`
-- `reason`
+- `reason`, `reason_code`
 
 ## 5. Selection rules
 
@@ -107,6 +108,10 @@ Selected `selection_reason` values use this closed vocabulary:
 - `actionable high-confidence review card`
 - `actionable high-priority review card`
 
+Selected `selection_reason_code` values use this closed vocabulary:
+
+- `top_actionable_card`
+
 `not_selected[].reason` values use this closed vocabulary:
 
 - `outside changed hunk`
@@ -117,6 +122,16 @@ Selected `selection_reason` values use this closed vocabulary:
 - `covered by selected family/obligation sibling`
 - `comment-plan max of three candidates reached`
 - `not selected by current inline comment policy`
+
+Summary and `not_selected[].reason_code` values use this closed vocabulary:
+
+- `bounded_reviewer_noise`
+- `outside_changed_hunk`
+- `human_deep_review_only`
+- `lower_relevance`
+- `covered_by_selected_family_obligation`
+- `budget_exhausted`
+- `not_selected_by_policy`
 
 ## 6. Relevance and actionability
 
@@ -191,18 +206,19 @@ document is a future-lane contract, not a live workflow.
 
 - over max comments
 - missing required fields
-- missing or mismatched `summary` review-budget counts
+- missing or mismatched `summary` review-budget counts or reason code
 - invalid/unknown `card_id`
 - invalid/unknown `not_selected.card_id`
 - a ReviewCard missing from both `comments[]` and `not_selected[]`
 - a `not_selected` card that is also present in `comments[]`
 - duplicate `card_id` or duplicate `path`/`line` inline anchors
 - invalid line/path
-- missing `next_action`, `selection_reason`, `actionability`, `relevance`, or
-  candidate `trust_boundary`
+- missing `next_action`, `selection_reason`, `selection_reason_code`,
+  `actionability`, `relevance`, or candidate `trust_boundary`
 - planned comments with `changed_line = false`
 - `not_selected[]` entries with `changed_line = false` whose reason is not
   `outside changed hunk`
+- missing, unknown, or drifted `not_selected[].reason_code`
 - drift between `not_selected` review context and the referenced ReviewCard
 - `relevance` outside the documented set (`high`, `medium`, `low`)
 - body text that drifts from the structured ReviewCard projection

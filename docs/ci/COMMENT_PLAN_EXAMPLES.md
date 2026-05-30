@@ -56,7 +56,8 @@ Representative fields:
     "selected_count": 1,
     "not_selected_count": 0,
     "budget": 3,
-    "reason": "bounded reviewer noise"
+    "reason": "bounded reviewer noise",
+    "reason_code": "bounded_reviewer_noise"
   },
   "comments": [
     {
@@ -66,6 +67,7 @@ Representative fields:
       "actionability": "specific_guard_missing",
       "relevance": "medium",
       "selection_reason": "actionable high-priority review card",
+      "selection_reason_code": "top_actionable_card",
       "next_action": "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.",
       "verify_commands": [
         "cargo +nightly miri test read_header",
@@ -100,6 +102,7 @@ the call site. The plan keeps the comment specific:
       "actionability": "specific_guard_missing",
       "relevance": "medium",
       "selection_reason": "actionable high-priority review card",
+      "selection_reason_code": "top_actionable_card",
       "next_action": "Add or expose the local guard that discharges the `copy_nonoverlapping` safety obligation."
     }
   ]
@@ -122,7 +125,8 @@ visible in `not_selected[]`:
     {
       "operation_family": "raw_pointer_read",
       "changed_line": true,
-"reason": "covered by selected family/obligation sibling"
+      "reason": "covered by selected family/obligation sibling",
+      "reason_code": "covered_by_selected_family_obligation"
     }
   ]
 }
@@ -159,7 +163,8 @@ changed unsafe operation. The card remains visible in the bundle.
       "next_action": "Add a precise public `# Safety` section that names the required caller obligations.",
       "actionability": "specific_contract_missing",
       "relevance": "high",
-      "reason": "operation family unknown"
+      "reason": "operation family unknown",
+      "reason_code": "human_deep_review_only"
     }
   ]
 }
@@ -191,7 +196,8 @@ Representative fields:
       "next_action": "Use sanitizer/cargo-careful or an explicit FFI boundary contract; Miri may not exercise this seam.",
       "actionability": "specific_witness_missing",
       "relevance": "low",
-      "reason": "priority/confidence below inline comment threshold"
+      "reason": "priority/confidence below inline comment threshold",
+      "reason_code": "lower_relevance"
     }
   ]
 }
@@ -212,7 +218,8 @@ planned comments and carries the no-card limitation:
     "selected_count": 0,
     "not_selected_count": 0,
     "budget": 3,
-    "reason": "bounded reviewer noise"
+    "reason": "bounded reviewer noise",
+    "reason_code": "bounded_reviewer_noise"
   },
   "comments": [],
   "no_changed_gaps": {
@@ -230,8 +237,9 @@ changed unsafe-review gaps.
 The verifier treats these as artifact contract rules:
 
 - at most three planned comments;
-- `summary.selected_count`, `summary.not_selected_count`, and
-  `summary.budget` must match the bounded review budget;
+- `summary.selected_count`, `summary.not_selected_count`,
+  `summary.budget`, and `summary.reason_code` must match the bounded review
+  budget;
 - one planned comment per `card_id`;
 - one planned comment per `path`/`line`;
 - `changed_line = true`, renderable locations only;
@@ -243,4 +251,6 @@ The verifier treats these as artifact contract rules:
   comment cards;
 - every selected and not-selected entry carries `actionability` and
   `relevance` (`high` / `medium` / `low`);
+- every selected entry carries a closed-vocabulary `selection_reason_code`;
+- every not-selected entry carries a closed-vocabulary `reason_code`;
 - trust-boundary text remains present.

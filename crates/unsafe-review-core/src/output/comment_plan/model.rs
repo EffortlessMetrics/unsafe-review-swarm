@@ -6,12 +6,15 @@ use serde::Serialize;
 use std::collections::BTreeSet;
 
 use super::selection::{
-    MAX_COMMENT_BUDGET_REASON, OPERATION_FAMILY_BUDGET_REASON, actionability, comment_body,
-    non_selection_reason, relevance, selection_reason, should_plan_comment,
+    MAX_COMMENT_BUDGET_REASON, OPERATION_FAMILY_BUDGET_REASON, ReviewBudgetReason, actionability,
+    comment_body, non_selection_reason, relevance, selection_reason, should_plan_comment,
 };
 
 const MAX_PLANNED_COMMENTS: usize = 3;
-const REVIEW_BUDGET_REASON: &str = "bounded reviewer noise";
+const REVIEW_BUDGET_REASON: ReviewBudgetReason = ReviewBudgetReason {
+    code: "bounded_reviewer_noise",
+    message: "bounded reviewer noise",
+};
 pub(super) const TRUST_BOUNDARY: &str = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.";
 
 #[derive(Serialize)]
@@ -69,7 +72,8 @@ impl From<&AnalyzeOutput> for CommentPlan {
                 selected_count: comments.len(),
                 not_selected_count: not_selected.len(),
                 budget: MAX_PLANNED_COMMENTS,
-                reason: REVIEW_BUDGET_REASON,
+                reason: REVIEW_BUDGET_REASON.message,
+                reason_code: REVIEW_BUDGET_REASON.code,
             },
             comments,
             not_selected,
@@ -114,6 +118,7 @@ pub(super) struct CommentPlanSummary {
     not_selected_count: usize,
     budget: usize,
     reason: &'static str,
+    reason_code: &'static str,
 }
 
 #[derive(Serialize)]
@@ -137,6 +142,7 @@ pub(super) struct PlannedComment {
     next_action: String,
     verify_commands: Vec<String>,
     selection_reason: &'static str,
+    selection_reason_code: &'static str,
     actionability: &'static str,
     relevance: &'static str,
     trust_boundary: &'static str,
@@ -145,6 +151,7 @@ pub(super) struct PlannedComment {
 
 impl From<&ReviewCard> for PlannedComment {
     fn from(card: &ReviewCard) -> Self {
+        let selection_reason = selection_reason(card);
         Self {
             card_id: card.id.0.clone(),
             path: path_display(&card.site.location.file),
@@ -158,7 +165,8 @@ impl From<&ReviewCard> for PlannedComment {
             witness_routes: card.routes.iter().map(PlannedWitnessRoute::from).collect(),
             next_action: card.next_action.summary.clone(),
             verify_commands: card.next_action.verify_commands.clone(),
-            selection_reason: selection_reason(card),
+            selection_reason: selection_reason.message,
+            selection_reason_code: selection_reason.code,
             actionability: actionability(card),
             relevance: relevance(card),
             trust_boundary: TRUST_BOUNDARY,
@@ -182,10 +190,11 @@ pub(super) struct NotSelectedCard {
     actionability: &'static str,
     relevance: &'static str,
     reason: &'static str,
+    reason_code: &'static str,
 }
 
 impl NotSelectedCard {
-    fn from_reason(card: &ReviewCard, reason: &'static str) -> Self {
+    fn from_reason(card: &ReviewCard, reason: ReviewBudgetReason) -> Self {
         Self {
             card_id: card.id.0.clone(),
             path: path_display(&card.site.location.file),
@@ -199,7 +208,8 @@ impl NotSelectedCard {
             next_action: card.next_action.summary.clone(),
             actionability: actionability(card),
             relevance: relevance(card),
-            reason,
+            reason: reason.message,
+            reason_code: reason.code,
         }
     }
 }

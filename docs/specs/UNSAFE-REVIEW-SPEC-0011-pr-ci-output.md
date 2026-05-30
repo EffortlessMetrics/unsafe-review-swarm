@@ -288,6 +288,7 @@ selected_count
 not_selected_count
 budget
 reason
+reason_code
 ```
 
 These fields describe the bounded reviewer-noise budget. They do not create a
@@ -309,6 +310,7 @@ next_action
 witness_routes
 verify_commands
 selection_reason
+selection_reason_code
 actionability
 relevance
 body
@@ -325,8 +327,23 @@ budget key remain visible in `not_selected[]` with an explicit budget reason.
 Each `not_selected` entry must reference a known card, must not repeat a
 planned comment card, and must include the ReviewCard operation, operation
 family, next action, actionability, relevance, `changed_line`, and a reason for
-staying out of the inline comment budget. Entries with `changed_line = false`
-must use reason `outside changed hunk`.
+staying out of the inline comment budget. Entries must also include a
+machine-readable `reason_code` so agents do not need to parse prose. Entries
+with `changed_line = false` must use reason `outside changed hunk` and
+`reason_code = outside_changed_hunk`.
+
+Review-budget reason codes are a closed vocabulary:
+
+```text
+bounded_reviewer_noise
+top_actionable_card
+outside_changed_hunk
+human_deep_review_only
+lower_relevance
+covered_by_selected_family_obligation
+budget_exhausted
+not_selected_by_policy
+```
 
 Every ReviewCard must be accounted for by either `comments[]` or
 `not_selected[]`. A card may be absent from inline comments, but it must not be

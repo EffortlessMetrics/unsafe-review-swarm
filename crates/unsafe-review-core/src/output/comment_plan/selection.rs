@@ -1,19 +1,54 @@
 use crate::domain::{Confidence, OperationFamily, Priority, ReviewCard, ReviewClass};
 
 const PLAN_BOUNDARY: &str = "Plan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision.";
-pub(super) const OPERATION_FAMILY_BUDGET_REASON: &str =
-    "covered by selected family/obligation sibling";
-pub(super) const MAX_COMMENT_BUDGET_REASON: &str = "comment-plan max of three candidates reached";
 
-const SELECTED_HIGH_CONFIDENCE_REASON: &str = "actionable high-confidence review card";
-const SELECTED_HIGH_PRIORITY_REASON: &str = "actionable high-priority review card";
-const NOT_SELECTED_OUTSIDE_CHANGED_HUNK_REASON: &str = "outside changed hunk";
-const NOT_SELECTED_CLASS_INELIGIBLE_REASON: &str = "class not eligible for inline comments";
-const NOT_SELECTED_UNKNOWN_FAMILY_REASON: &str = "operation family unknown";
-const NOT_SELECTED_CONFIDENCE_REASON: &str = "confidence below inline comment threshold";
-const NOT_SELECTED_PRIORITY_CONFIDENCE_REASON: &str =
-    "priority/confidence below inline comment threshold";
-const NOT_SELECTED_POLICY_FALLBACK_REASON: &str = "not selected by current inline comment policy";
+#[derive(Clone, Copy)]
+pub(super) struct ReviewBudgetReason {
+    pub(super) code: &'static str,
+    pub(super) message: &'static str,
+}
+
+pub(super) const OPERATION_FAMILY_BUDGET_REASON: ReviewBudgetReason = ReviewBudgetReason {
+    code: "covered_by_selected_family_obligation",
+    message: "covered by selected family/obligation sibling",
+};
+pub(super) const MAX_COMMENT_BUDGET_REASON: ReviewBudgetReason = ReviewBudgetReason {
+    code: "budget_exhausted",
+    message: "comment-plan max of three candidates reached",
+};
+
+const SELECTED_HIGH_CONFIDENCE_REASON: ReviewBudgetReason = ReviewBudgetReason {
+    code: "top_actionable_card",
+    message: "actionable high-confidence review card",
+};
+const SELECTED_HIGH_PRIORITY_REASON: ReviewBudgetReason = ReviewBudgetReason {
+    code: "top_actionable_card",
+    message: "actionable high-priority review card",
+};
+const NOT_SELECTED_OUTSIDE_CHANGED_HUNK_REASON: ReviewBudgetReason = ReviewBudgetReason {
+    code: "outside_changed_hunk",
+    message: "outside changed hunk",
+};
+const NOT_SELECTED_CLASS_INELIGIBLE_REASON: ReviewBudgetReason = ReviewBudgetReason {
+    code: "human_deep_review_only",
+    message: "class not eligible for inline comments",
+};
+const NOT_SELECTED_UNKNOWN_FAMILY_REASON: ReviewBudgetReason = ReviewBudgetReason {
+    code: "human_deep_review_only",
+    message: "operation family unknown",
+};
+const NOT_SELECTED_CONFIDENCE_REASON: ReviewBudgetReason = ReviewBudgetReason {
+    code: "lower_relevance",
+    message: "confidence below inline comment threshold",
+};
+const NOT_SELECTED_PRIORITY_CONFIDENCE_REASON: ReviewBudgetReason = ReviewBudgetReason {
+    code: "lower_relevance",
+    message: "priority/confidence below inline comment threshold",
+};
+const NOT_SELECTED_POLICY_FALLBACK_REASON: ReviewBudgetReason = ReviewBudgetReason {
+    code: "not_selected_by_policy",
+    message: "not selected by current inline comment policy",
+};
 
 pub(super) fn should_plan_comment(card: &ReviewCard) -> bool {
     card.site.changed
@@ -23,7 +58,7 @@ pub(super) fn should_plan_comment(card: &ReviewCard) -> bool {
         && !matches!(card.confidence, Confidence::Low | Confidence::Unknown)
 }
 
-pub(super) fn non_selection_reason(card: &ReviewCard) -> &'static str {
+pub(super) fn non_selection_reason(card: &ReviewCard) -> ReviewBudgetReason {
     if !card.site.changed {
         NOT_SELECTED_OUTSIDE_CHANGED_HUNK_REASON
     } else if !card.class.is_actionable() {
@@ -41,7 +76,7 @@ pub(super) fn non_selection_reason(card: &ReviewCard) -> &'static str {
     }
 }
 
-pub(super) fn selection_reason(card: &ReviewCard) -> &'static str {
+pub(super) fn selection_reason(card: &ReviewCard) -> ReviewBudgetReason {
     if matches!(card.confidence, Confidence::High) {
         SELECTED_HIGH_CONFIDENCE_REASON
     } else {

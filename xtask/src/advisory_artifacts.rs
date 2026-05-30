@@ -61,10 +61,12 @@ struct RepairQueueReadinessProjection {
 const COMMENT_PLAN_BODY_WORD_LIMIT: usize = 220;
 const COMMENT_PLAN_REVIEW_BUDGET: usize = 3;
 const COMMENT_PLAN_REVIEW_BUDGET_REASON: &str = "bounded reviewer noise";
+const COMMENT_PLAN_REVIEW_BUDGET_REASON_CODE: &str = "bounded_reviewer_noise";
 const COMMENT_PLAN_SELECTION_REASONS: &[&str] = &[
     "actionable high-confidence review card",
     "actionable high-priority review card",
 ];
+const COMMENT_PLAN_SELECTION_REASON_CODES: &[&str] = &["top_actionable_card"];
 const COMMENT_PLAN_NON_SELECTION_REASONS: &[&str] = &[
     "outside changed hunk",
     "class not eligible for inline comments",
@@ -74,6 +76,14 @@ const COMMENT_PLAN_NON_SELECTION_REASONS: &[&str] = &[
     "covered by selected family/obligation sibling",
     "comment-plan max of three candidates reached",
     "not selected by current inline comment policy",
+];
+const COMMENT_PLAN_NON_SELECTION_REASON_CODES: &[&str] = &[
+    "outside_changed_hunk",
+    "human_deep_review_only",
+    "lower_relevance",
+    "covered_by_selected_family_obligation",
+    "budget_exhausted",
+    "not_selected_by_policy",
 ];
 const REPAIR_QUEUE_BUCKETS: [&str; 6] = [
     "repairable_by_guard",
@@ -1150,6 +1160,21 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             expected_selection_reason(card_projection),
             "comment-plan.json comment selection_reason",
         )?;
+        let selection_reason_code = super::require_non_empty_json_str(
+            comment,
+            "selection_reason_code",
+            "comment-plan.json comment",
+        )?;
+        require_allowed_value(
+            selection_reason_code,
+            COMMENT_PLAN_SELECTION_REASON_CODES,
+            "comment-plan.json comment selection_reason_code",
+        )?;
+        require_expected_value(
+            selection_reason_code,
+            expected_selection_reason_code(card_projection),
+            "comment-plan.json comment selection_reason_code",
+        )?;
         let actionability = super::require_non_empty_json_str(
             comment,
             "actionability",
@@ -1271,6 +1296,26 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
                 ),
                 "comment-plan.json not_selected reason",
             )?;
+            let reason_code = super::require_non_empty_json_str(
+                card,
+                "reason_code",
+                "comment-plan.json not_selected",
+            )?;
+            require_allowed_value(
+                reason_code,
+                COMMENT_PLAN_NON_SELECTION_REASON_CODES,
+                "comment-plan.json not_selected reason_code",
+            )?;
+            require_expected_value(
+                reason_code,
+                expected_non_selection_reason_code(
+                    card_projection,
+                    comments.len(),
+                    &comment_budget_keys,
+                    changed_line,
+                ),
+                "comment-plan.json not_selected reason_code",
+            )?;
         }
     }
     for card_id in &card_ids {
@@ -1364,6 +1409,13 @@ fn require_comment_plan_summary(
         reason,
         COMMENT_PLAN_REVIEW_BUDGET_REASON,
         "comment-plan.json summary reason",
+    )?;
+    let reason_code =
+        super::require_non_empty_json_str(summary, "reason_code", "comment-plan.json summary")?;
+    require_expected_value(
+        reason_code,
+        COMMENT_PLAN_REVIEW_BUDGET_REASON_CODE,
+        "comment-plan.json summary reason_code",
     )?;
     Ok(())
 }
@@ -2326,6 +2378,10 @@ fn expected_selection_reason(card: &CardProjection) -> &'static str {
     }
 }
 
+fn expected_selection_reason_code(_card: &CardProjection) -> &'static str {
+    "top_actionable_card"
+}
+
 fn expected_non_selection_reason(
     card: &CardProjection,
     planned_count: usize,
@@ -2348,6 +2404,31 @@ fn expected_non_selection_reason(
         "comment-plan max of three candidates reached"
     } else {
         "not selected by current inline comment policy"
+    }
+}
+
+fn expected_non_selection_reason_code(
+    card: &CardProjection,
+    planned_count: usize,
+    selected_budget_keys: &BTreeSet<String>,
+    changed_line: bool,
+) -> &'static str {
+    if !changed_line {
+        "outside_changed_hunk"
+    } else if !class_is_actionable(&card.class_name) {
+        "human_deep_review_only"
+    } else if card.operation_family == "unknown" {
+        "human_deep_review_only"
+    } else if matches!(card.confidence.as_str(), "low" | "unknown") {
+        "lower_relevance"
+    } else if !(card.priority == "high" || card.confidence == "high") {
+        "lower_relevance"
+    } else if selected_budget_keys.contains(&comment_budget_key(card)) {
+        "covered_by_selected_family_obligation"
+    } else if planned_count >= 3 {
+        "budget_exhausted"
+    } else {
+        "not_selected_by_policy"
     }
 }
 
