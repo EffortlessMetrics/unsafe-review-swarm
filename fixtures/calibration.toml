@@ -258,6 +258,7 @@ required_core_fixtures = [
   "str_from_utf8_unchecked_suffix_validation_not_guard",
   "str_from_utf8_unchecked_is_ok_observed_not_guard",
   "str_from_utf8_unchecked_guard_then_reassigned_not_guard",
+  "str_from_utf8_unchecked_guard_then_mutated_not_guard",
   "str_from_utf8_unchecked_guard_then_shadowed_not_guard",
   "str_from_utf8_unchecked_if_let_ok_shadowed_not_guard",
   "str_from_utf8_unchecked_if_let_err_reassigned_not_guard",
@@ -2961,6 +2962,16 @@ expected_hazard = "invalid_value"
 fixture = "str_from_utf8_unchecked_guard_then_reassigned_not_guard"
 kind = "false_positive_control"
 claim = "str::from_utf8_unchecked does not accept UTF-8 validation evidence that is stale after buffer reassignment"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "str_from_utf8_unchecked_guard_then_mutated_not_guard"
+kind = "false_positive_control"
+claim = "str::from_utf8_unchecked does not accept UTF-8 validation evidence that is stale after direct buffer mutation"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

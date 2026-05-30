@@ -37,8 +37,42 @@ struct Utf8ValidationContext<'a> {
 }
 
 impl Utf8ValidationContext<'_> {
+    fn has_stale_argument(&self, text: &str) -> bool {
+        self.has_argument_assignment(text) || self.has_argument_mutation(text)
+    }
+
     fn has_argument_assignment(&self, text: &str) -> bool {
         has_assignment_to_identifier(text, self.argument_identifier)
+    }
+
+    fn has_argument_mutation(&self, text: &str) -> bool {
+        if self.argument_identifier.is_empty() {
+            return false;
+        }
+
+        let mutating_methods = [
+            "append",
+            "clear",
+            "dedup",
+            "dedup_by",
+            "dedup_by_key",
+            "drain",
+            "extend",
+            "extend_from_slice",
+            "insert",
+            "pop",
+            "push",
+            "remove",
+            "resize",
+            "resize_with",
+            "retain",
+            "splice",
+            "swap_remove",
+            "truncate",
+        ];
+        mutating_methods
+            .iter()
+            .any(|method| text.contains(&format!("{}.{method}(", self.argument_identifier)))
     }
 }
 
@@ -72,7 +106,7 @@ fn has_validation_is_ok_branch_guard(context: &Utf8ValidationContext<'_>) -> boo
                 _ => {}
             }
         }
-        if depth > 0 && !context.has_argument_assignment(after_guard) {
+        if depth > 0 && !context.has_stale_argument(after_guard) {
             return true;
         }
         search_from = guard_start + guard.len();
@@ -119,7 +153,7 @@ fn has_validation_if_let_ok_branch_guard(context: &Utf8ValidationContext<'_>) ->
                 _ => {}
             }
         }
-        if depth > 0 && !context.has_argument_assignment(after_open) {
+        if depth > 0 && !context.has_stale_argument(after_open) {
             return true;
         }
         search_from = validation_start + context.validation.len();
@@ -157,9 +191,7 @@ fn has_validation_let_else_ok_guard(context: &Utf8ValidationContext<'_>) -> bool
             .map_or((after_else, ""), |else_end| {
                 (&after_else[..else_end], &after_else[else_end + 1..])
             });
-        if contains_executable_return(else_body)
-            && !context.has_argument_assignment(after_else_body)
-        {
+        if contains_executable_return(else_body) && !context.has_stale_argument(after_else_body) {
             return true;
         }
         search_from = validation_start + context.validation.len();
@@ -197,9 +229,7 @@ fn has_validation_if_let_err_return_guard(context: &Utf8ValidationContext<'_>) -
             .map_or((after_open, ""), |body_end| {
                 (&after_open[..body_end], &after_open[body_end + 1..])
             });
-        if contains_executable_return(guard_body)
-            && !context.has_argument_assignment(after_guard_body)
-        {
+        if contains_executable_return(guard_body) && !context.has_stale_argument(after_guard_body) {
             return true;
         }
         search_from = validation_start + context.validation.len();
@@ -254,7 +284,7 @@ fn has_validation_match_ok_branch_guard(context: &Utf8ValidationContext<'_>) -> 
             continue;
         }
         let current_arm = &after_open[ok_pos..];
-        if current_arm.contains("=>") && !context.has_argument_assignment(current_arm) {
+        if current_arm.contains("=>") && !context.has_stale_argument(current_arm) {
             return true;
         }
 
@@ -275,8 +305,7 @@ fn has_validation_early_return_guard(context: &Utf8ValidationContext<'_>, predic
             .map_or((after_guard, ""), |body_end| {
                 (&after_guard[..body_end], &after_guard[body_end + 1..])
             });
-        if contains_executable_return(guard_body) && !context.has_argument_assignment(after_branch)
-        {
+        if contains_executable_return(guard_body) && !context.has_stale_argument(after_branch) {
             return true;
         }
         search_from = guard_start + guard.len();
@@ -324,7 +353,7 @@ fn has_validation_match_return_guard(context: &Utf8ValidationContext<'_>) -> boo
         };
         if body.contains("ok(")
             && err_arm_contains_executable_return(err_arm)
-            && !context.has_argument_assignment(after_block)
+            && !context.has_stale_argument(after_block)
         {
             return true;
         }

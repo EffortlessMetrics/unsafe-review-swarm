@@ -839,6 +839,7 @@ fixtures = [
   "str_from_utf8_unchecked_suffix_validation_not_guard",
   "str_from_utf8_unchecked_is_ok_observed_not_guard",
   "str_from_utf8_unchecked_guard_then_reassigned_not_guard",
+  "str_from_utf8_unchecked_guard_then_mutated_not_guard",
   "str_from_utf8_unchecked_guard_then_shadowed_not_guard",
   "str_from_utf8_unchecked_if_let_ok_shadowed_not_guard",
   "str_from_utf8_unchecked_if_let_err_reassigned_not_guard",
@@ -856,7 +857,8 @@ same-buffer validation before conversion, including if-let Ok branch validation
 if-let Err early-return validation, and let-else or match Ok-arm validation,
 from comment-only, post-validation, wrong-buffer, prefix-only, suffix-only,
 observed-only, reassigned-buffer, shadowed-buffer, and branch-scoped shadowed
-buffer stale controls in the listed fixtures.
+buffer stale controls, plus direct buffer mutation stale controls, in the listed
+fixtures.
 """
 forbidden_claims = [
   "broad UTF-8 safety",
