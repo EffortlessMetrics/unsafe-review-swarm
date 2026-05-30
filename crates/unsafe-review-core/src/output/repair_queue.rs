@@ -231,6 +231,7 @@ mod tests {
     use crate::api::{
         AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, PolicyMode, Scope, analyze,
     };
+    use crate::output::agent;
     use std::path::PathBuf;
 
     #[test]
@@ -441,6 +442,52 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn repair_queue_matches_agent_packet_projection_for_examples() -> Result<(), String> {
+        for fixture in [
+            "raw_pointer_alignment",
+            "vec_set_len",
+            "str_from_utf8_unchecked",
+            "maybeuninit_assume_init",
+            "nonnull_other_guard_not_evidence",
+            "ffi_sanitizer_route",
+            "atomic_pointer_state_swap",
+            "unsafe_impl_send",
+            "inline_asm_human_review",
+            "split_unsafe_block",
+        ] {
+            let output = fixture_output(fixture)?;
+            let Some(card) = output.cards.first() else {
+                return Err(format!("{fixture} should emit at least one card"));
+            };
+            let queue = parse_json(&render(&output))?;
+            let packet = parse_json(&agent::render(card))?;
+
+            let aggregate_buckets = repair_queue_buckets_for_card(&queue, &card.id.0)?;
+            let packet_buckets =
+                sorted_string_array(&packet["repair_queue"]["buckets"], "agent packet buckets")?;
+            assert_eq!(
+                aggregate_buckets, packet_buckets,
+                "{fixture} repair-queue buckets should match context packet buckets"
+            );
+
+            let aggregate_readiness = repair_queue_readiness_for_card(&queue, &card.id.0)?;
+            assert_eq!(
+                aggregate_readiness["ready"], packet["agent_readiness"]["ready"],
+                "{fixture} repair-queue readiness flag should match context packet"
+            );
+            assert_eq!(
+                aggregate_readiness["state"], packet["agent_readiness"]["state"],
+                "{fixture} repair-queue readiness state should match context packet"
+            );
+            assert_eq!(
+                aggregate_readiness["reasons"], packet["agent_readiness"]["reasons"],
+                "{fixture} repair-queue readiness reasons should match context packet"
+            );
+        }
+        Ok(())
+    }
+
     fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures")
@@ -475,6 +522,64 @@ mod tests {
             .collect::<Vec<_>>();
         names.sort();
         Ok(names)
+    }
+
+    fn repair_queue_buckets_for_card(
+        value: &serde_json::Value,
+        card_id: &str,
+    ) -> Result<Vec<String>, String> {
+        let buckets = value["buckets"]
+            .as_object()
+            .ok_or("repair queue buckets should be an object")?;
+        let mut names = Vec::new();
+        for (bucket, entries) in buckets {
+            let entries = entries
+                .as_array()
+                .ok_or_else(|| format!("repair queue bucket `{bucket}` should be an array"))?;
+            if entries
+                .iter()
+                .any(|entry| entry["card_id"].as_str() == Some(card_id))
+            {
+                names.push(bucket.clone());
+            }
+        }
+        names.sort();
+        Ok(names)
+    }
+
+    fn repair_queue_readiness_for_card<'a>(
+        value: &'a serde_json::Value,
+        card_id: &str,
+    ) -> Result<&'a serde_json::Value, String> {
+        let buckets = value["buckets"]
+            .as_object()
+            .ok_or("repair queue buckets should be an object")?;
+        for (bucket, entries) in buckets {
+            let entries = entries
+                .as_array()
+                .ok_or_else(|| format!("repair queue bucket `{bucket}` should be an array"))?;
+            for entry in entries {
+                if entry["card_id"].as_str() == Some(card_id) {
+                    return Ok(&entry["agent_readiness"]);
+                }
+            }
+        }
+        Err(format!("repair queue should contain card `{card_id}`"))
+    }
+
+    fn sorted_string_array(value: &serde_json::Value, label: &str) -> Result<Vec<String>, String> {
+        let mut values = value
+            .as_array()
+            .ok_or_else(|| format!("{label} should be an array"))?
+            .iter()
+            .map(|item| {
+                item.as_str()
+                    .map(str::to_string)
+                    .ok_or_else(|| format!("{label} entries should be strings"))
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        values.sort();
+        Ok(values)
     }
 
     fn sorted_bucket_names(names: &[&str]) -> Vec<String> {
