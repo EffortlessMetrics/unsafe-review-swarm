@@ -13,7 +13,7 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
     out.push_str("Static audit of saved witness receipt metadata against current ReviewCards.\n\n");
     out.push_str(&format!("Audit date: `{}`\n\n", report.audit_date));
     out.push_str("## Summary\n\n");
-    out.push_str("| Receipts | Matched | Unmatched | Expired | Stale | Wrong identity | Wrong tool | Weak strength | Command hash mismatch | Duplicate | Invalid |\n");
+    out.push_str("| Receipts | Matched | Unmatched | Expired | Stale | Wrong identity | Wrong tool | Weaker than route | Command hash mismatch | Duplicate | Invalid |\n");
     out.push_str("|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
     out.push_str(&format!(
         "| {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n\n",
@@ -95,7 +95,7 @@ fn problem_flags(summary: &crate::analysis::receipts::ReceiptAuditSummary) -> Ve
         ("expired", summary.expired),
         ("wrong identity", summary.wrong_identity),
         ("wrong tool", summary.wrong_tool),
-        ("weak strength", summary.weaker_than_required),
+        ("weaker than route", summary.weaker_than_required),
         ("command hash mismatch", summary.command_hash_mismatch),
         ("duplicate", summary.duplicate),
         ("invalid", summary.invalid),
@@ -331,7 +331,7 @@ mod tests {
         assert!(markdown.contains("- Receipts imported as current witness evidence: 1"));
         assert!(markdown.contains("- Receipts without a current card match: 1 unmatched, 1 stale"));
         assert!(markdown.contains(
-            "- Problem flags: unmatched: 1; stale: 1; wrong tool: 1; weak strength: 1; command hash mismatch: 1"
+            "- Problem flags: unmatched: 1; stale: 1; wrong tool: 1; weaker than route: 1; command hash mismatch: 1"
         ));
         assert!(markdown.contains(
             "review nonzero problem flags before treating saved receipts as current witness evidence"
