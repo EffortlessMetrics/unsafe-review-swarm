@@ -780,6 +780,8 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(summary.contains("- Missing/weak evidence:"));
     assert!(summary.contains("- Next reviewer action:"));
     assert!(summary.contains("- Witness route:"));
+    assert!(summary.contains("- Receipt audit: `receipt-audit.md`"));
+    assert!(summary.contains("no witness was run"));
     assert!(summary.contains(&format!("unsafe-review explain {card_id}")));
     assert!(summary.contains(&format!("unsafe-review context {card_id} --json")));
     assert!(summary.contains("## Trust boundary"));
@@ -973,6 +975,8 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
     assert!(summary.contains("No changed unsafe-review gaps were found."));
     assert!(summary.contains("This does not prove the repo safe"));
     assert!(summary.contains("unsafe site executed"));
+    assert!(summary.contains("- Receipt audit: `receipt-audit.md`"));
+    assert!(summary.contains("no witness was run"));
     assert!(!summary.contains("All clear"));
 
     let github_summary = fs::read_to_string(out_dir.join("github-summary.md"))?;

@@ -338,6 +338,9 @@ fn render_pr_summary_reviewer_cockpit(out: &mut String, output: &AnalyzeOutput) 
         } else {
             out.push_str("- Witness route: no focused witness route was selected; route this to human review.\n");
         }
+        out.push_str(
+            "- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n",
+        );
         out.push_str(&format!("- Explain: `unsafe-review explain {}`\n", card.id));
         out.push_str(&format!(
             "- Agent context: `unsafe-review context {} --json`\n",
@@ -347,6 +350,9 @@ fn render_pr_summary_reviewer_cockpit(out: &mut String, output: &AnalyzeOutput) 
         out.push_str("- Trust boundary: static unsafe contract review only; not proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n\n");
     } else {
         render_no_changed_gaps(out);
+        out.push_str(
+            "- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n\n",
+        );
     }
 }
 
@@ -721,6 +727,8 @@ mod tests {
         assert!(rendered.contains(
             "- Agent handoff: `ready`; buckets: `repairable_by_guard`, `requires_witness_receipt`; reasons: specific operation family"
         ));
+        assert!(rendered.contains("- Receipt audit: `receipt-audit.md`"));
+        assert!(rendered.contains("no witness was run"));
         assert!(rendered.contains("not Miri-clean status"));
         assert!(rendered.contains("not site-execution proof"));
         assert!(rendered.contains("not a proof of memory safety"));
@@ -738,6 +746,8 @@ mod tests {
         assert!(rendered.contains(NO_CHANGED_GAPS_MESSAGE));
         assert!(rendered.contains(NO_CHANGED_GAPS_LIMITATION));
         assert!(rendered.contains("No witness route is recommended"));
+        assert!(rendered.contains("- Receipt audit: `receipt-audit.md`"));
+        assert!(rendered.contains("no witness was run"));
         assert!(rendered.contains("not UB-free status"));
         assert!(!rendered.contains("All clear"));
         Ok(())

@@ -88,7 +88,8 @@ open target/unsafe-review/pr-summary.md   # or your editor of choice
 The summary is the reviewer front panel. It names the highest-priority changed
 unsafe-review gaps, their missing evidence, and a recommended next action per
 card. It also prints `Explain top card` and `Agent packet` commands for the most
-actionable card.
+actionable card, plus a `receipt-audit.md` cue for saved witness receipt
+metadata. The receipt cue is metadata-only; it does not mean a witness was run.
 
 If the summary says no changed unsafe-review gaps were found, you can stop
 here. That is the normal result for safe-only PRs and is not a safety claim.

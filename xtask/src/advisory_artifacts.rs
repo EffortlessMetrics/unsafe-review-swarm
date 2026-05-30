@@ -1025,6 +1025,11 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
     )?;
     super::require_text_contains(&pr_summary, "not UB-free status", &pr_summary_path)?;
     super::require_text_contains(&pr_summary, "not a Miri result", &pr_summary_path)?;
+    super::require_text_contains(
+        &pr_summary,
+        "- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.",
+        &pr_summary_path,
+    )?;
     if card_count == 0 {
         super::require_text_contains(
             &pr_summary,

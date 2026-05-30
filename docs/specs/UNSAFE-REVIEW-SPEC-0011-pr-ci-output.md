@@ -188,6 +188,8 @@ missing evidence summary
 witness route summary
   rows project ReviewCard id, primary route, route reason, and route command
   when available; commandless routes stay explicit manual review routes
+receipt audit cue pointing to `receipt-audit.md`
+  cue must say saved receipt metadata only and that no witness was run
 artifact links or paths
 trust boundary
 ```
