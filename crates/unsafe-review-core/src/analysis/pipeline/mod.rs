@@ -2721,6 +2721,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "transmute_copy_layout_size_guard",
             "transmute_copy_bool_comment_not_guard",
             "transmute_copy_bool_other_value_not_guard",
+            "transmute_copy_bool_prior_guarded_call_not_guard",
             "transmute_copy_bool_disjunct_branch_not_guard",
             "transmute_copy_bool_conjunct_return_not_guard",
             "transmute_copy_bool_value_observed_not_guard",

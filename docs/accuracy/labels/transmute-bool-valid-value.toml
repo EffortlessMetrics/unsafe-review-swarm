@@ -373,6 +373,21 @@ label_source = "fixture_golden"
 rationale = "Bool-domain evidence for another referenced byte does not discharge the valid-value obligation for transmute_copy of `value`."
 
 [[samples]]
+id = "transmute-copy-bool-prior-guarded-call-not-valid-value"
+fixture = "transmute_copy_bool_prior_guarded_call_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+expected_obligation_key = "valid-value"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Bool-domain evidence for an earlier transmute_copy operation does not discharge the valid-value obligation for a later transmute_copy of `other`."
+
+[[samples]]
 id = "transmute-copy-conjunct-layout-guard-present"
 fixture = "transmute_copy_layout_conjunct_branch_guard"
 kind = "positive"
