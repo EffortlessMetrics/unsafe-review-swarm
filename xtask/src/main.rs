@@ -2469,6 +2469,8 @@ fn check_dogfood_follow_up_seeds_text(
             check_parked_dogfood_follow_up_notes(path, line_idx + 1, &seed_id, &notes)?;
         } else if status == "done" {
             check_done_dogfood_follow_up_notes(path, line_idx + 1, &seed_id, &notes)?;
+        } else if status == "superseded" {
+            check_superseded_dogfood_follow_up_notes(path, line_idx + 1, &seed_id, &notes)?;
         }
         let next_pr_slice = markdown_code_cell_value(columns[6]);
         check_dogfood_follow_up_next_pr_slice(path, line_idx + 1, &seed_id, &next_pr_slice)?;
@@ -2614,6 +2616,30 @@ fn check_done_dogfood_follow_up_notes(
     if !explains_done_coverage {
         return Err(format!(
             "{path}:{line} done dogfood follow-up seed `{seed_id}` notes must explain what landed, covers, or preserves the follow-up"
+        ));
+    }
+    Ok(())
+}
+
+fn check_superseded_dogfood_follow_up_notes(
+    path: &str,
+    line: usize,
+    seed_id: &str,
+    notes: &str,
+) -> Result<(), String> {
+    let lower = notes.to_ascii_lowercase();
+    let explains_replacement = [
+        "superseded by",
+        "replaced by",
+        "newer seed",
+        "newer report",
+        "merged into",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle));
+    if !explains_replacement {
+        return Err(format!(
+            "{path}:{line} superseded dogfood follow-up seed `{seed_id}` notes must name the newer seed or report that replaces it"
         ));
     }
     Ok(())
@@ -9546,6 +9572,45 @@ policy readiness.
     }
 
     #[test]
+    fn dogfood_follow_up_seed_index_accepts_superseded_replacement_notes() -> Result<(), String> {
+        let text = r#"
+# Dogfood follow-up seed index
+
+## Seeds
+
+| Seed ID | Status | Target | Family/surface | Primary label | Source report | Next PR slice | Notes |
+|---|---|---|---|---|---|---|---|
+| `dogfood-superseded-seed` | `superseded` | `arrayvec-pr288` | `vec_set_len` | `actionable` | [arrayvec rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md) | `analysis: keep vec_set_len regression pressure` | Superseded by `dogfood-arrayvec-set-len` after the newer report narrowed the fixture pressure. |
+
+## Trust boundary
+
+Dogfood follow-up seeds are static advisory review notes. They are not a proof
+of memory safety, not UB-free status, not Miri-clean status, not site execution
+evidence, not calibrated precision or recall, not witness adequacy, and not
+policy readiness.
+"#;
+        let targets = BTreeSet::from(["arrayvec-pr288".to_string()]);
+        let reports = vec!["2026-05-26-arrayvec-vec-set-len-rerun.md".to_string()];
+        let report_triage_keys = dogfood_report_triage_keys_for_tests(&[(
+            "2026-05-26-arrayvec-vec-set-len-rerun.md",
+            "arrayvec-pr288",
+            "actionable",
+        )]);
+
+        let rows = check_dogfood_follow_up_seeds_text(
+            "docs/dogfood/follow-up-seeds.md",
+            text,
+            &targets,
+            &dogfood_follow_up_family_surface_set_for_tests(),
+            &reports,
+            &report_triage_keys,
+        )?;
+
+        assert_eq!(rows, 1);
+        Ok(())
+    }
+
+    #[test]
     fn dogfood_follow_up_status_glossary_accepts_closed_vocabulary() -> Result<(), String> {
         let text = r#"
 # Dogfood follow-up seed index
@@ -9608,6 +9673,48 @@ Statuses:
         ))?;
 
         assert!(err.contains("documents unknown dogfood follow-up status `reviewing`"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_follow_up_seed_index_rejects_superseded_without_replacement_note()
+    -> Result<(), String> {
+        let text = r#"
+# Dogfood follow-up seed index
+
+## Seeds
+
+| Seed ID | Status | Target | Family/surface | Primary label | Source report | Next PR slice | Notes |
+|---|---|---|---|---|---|---|---|
+| `dogfood-superseded-without-replacement` | `superseded` | `arrayvec-pr288` | `vec_set_len` | `actionable` | [arrayvec rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md) | `analysis: keep vec_set_len regression pressure` | no longer current |
+
+## Trust boundary
+
+Dogfood follow-up seeds are static advisory review notes. They are not a proof
+of memory safety, not UB-free status, not Miri-clean status, not site execution
+evidence, not calibrated precision or recall, not witness adequacy, and not
+policy readiness.
+"#;
+        let targets = BTreeSet::from(["arrayvec-pr288".to_string()]);
+        let reports = vec!["2026-05-26-arrayvec-vec-set-len-rerun.md".to_string()];
+        let report_triage_keys = dogfood_report_triage_keys_for_tests(&[(
+            "2026-05-26-arrayvec-vec-set-len-rerun.md",
+            "arrayvec-pr288",
+            "actionable",
+        )]);
+
+        let err = err_text(check_dogfood_follow_up_seeds_text(
+            "docs/dogfood/follow-up-seeds.md",
+            text,
+            &targets,
+            &dogfood_follow_up_family_surface_set_for_tests(),
+            &reports,
+            &report_triage_keys,
+        ))?;
+
+        assert!(err.contains("superseded dogfood follow-up seed"));
+        assert!(err.contains("newer seed or report"));
+        assert!(err.contains("dogfood-superseded-without-replacement"));
         Ok(())
     }
 
