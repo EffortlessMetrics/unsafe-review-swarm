@@ -116,6 +116,9 @@ fn has_pointer_arithmetic_bounds_open_branch(
 }
 
 fn has_same_offset_bounds_condition(condition: &str, offset: &str) -> bool {
+    if condition.contains("||") {
+        return false;
+    }
     for op in [">=", "<=", "<", ">"] {
         let mut cursor = condition;
         let mut cursor_offset = 0usize;
@@ -219,6 +222,18 @@ mod tests {
         assert!(!has_pointer_arithmetic_bounds_guard(
             "unsafe { self.ctrl.add(index) }",
             "debug_assert!(index < self.num_ctrl_bytes()); index = fallback; unsafe { self.ctrl.add(index) }",
+        ));
+    }
+
+    #[test]
+    fn pointer_arithmetic_bounds_guard_rejects_disjunctive_branch() {
+        assert!(!has_pointer_arithmetic_bounds_guard(
+            "unsafe { self.ctrl.add(index) }",
+            "if index < self.num_ctrl_bytes() || allow_unchecked {",
+        ));
+        assert!(has_pointer_arithmetic_bounds_guard(
+            "unsafe { self.ctrl.add(index) }",
+            "if index < self.num_ctrl_bytes() && allow_checked {",
         ));
     }
 

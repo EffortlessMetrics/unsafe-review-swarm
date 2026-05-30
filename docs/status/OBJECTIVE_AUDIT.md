@@ -34,6 +34,9 @@ lengthened.
 `len + additional` while rejecting stale `additional` and stale `new_len` facts.
 `Box::from_raw` and `ptr::drop_in_place` ownership evidence reject stale
 `Box::into_raw` origins when the raw pointer is reassigned before use.
+Pointer arithmetic bounds evidence recognizes narrow same-offset
+`num_ctrl_bytes` guards and same-slice end-pointer patterns while rejecting
+other-offset, stale-offset, and disjunctive positive-branch controls.
 Unchecked-constructor availability evidence now has fixture-backed controls for
 same-receiver assertions, enclosing positive branches, unavailable-path early
 returns, other receivers, bare observations, and closed branches.
@@ -54,7 +57,7 @@ The active calibration rail is now recorded in
 `.unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md`,
 `policy/accuracy-calibration.toml`, and
 `docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 34
-fixture-pinned claims, 398 calibration cases, 34 label ledgers, and 410 label
+fixture-pinned claims, 399 calibration cases, 34 label ledgers, and 411 label
 samples. It records zero dogfood-measured, labeled-calibrated, or
 policy-eligible claims. That is intentional: the current report is a
 claim-scoped fixture-pinned proof index, not a global precision/recall result

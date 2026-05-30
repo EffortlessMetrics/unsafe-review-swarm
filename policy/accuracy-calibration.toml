@@ -1373,6 +1373,7 @@ fixtures = [
   "pointer_arithmetic_num_ctrl_bytes_guard",
   "pointer_arithmetic_other_offset_not_guard",
   "pointer_arithmetic_reassigned_offset_not_guard",
+  "pointer_arithmetic_disjunct_bounds_not_guard",
   "pointer_arithmetic_slice_end",
 ]
 dogfood_targets = []
@@ -1384,7 +1385,7 @@ allowed_public_claim = """
 Fixture-pinned pointer arithmetic bounds evidence recognizes index <
 num_ctrl_bytes and same-slice end-pointer patterns in the listed fixtures,
 and rejects bounds guards for a different pointer offset or a stale reassigned
-offset.
+offset, plus disjunctive positive branches that may bypass the bounds guard.
 """
 forbidden_claims = [
   "broad pointer arithmetic soundness",
