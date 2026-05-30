@@ -166,6 +166,7 @@ fn next_action_summary(
         }
         crate::domain::ReviewClass::ContractMissing => "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.".to_string(),
         crate::domain::ReviewClass::GuardMissing if operation == "unknown" => "Review the unsafe site manually and add the missing obligation-specific guard once the contract is identified.".to_string(),
+        crate::domain::ReviewClass::GuardMissing if operation == "inline_asm" => "Review the `inline_asm` register, memory, and target invariants manually; add explicit guard evidence, and attach a human deep-review receipt only as witness evidence.".to_string(),
         crate::domain::ReviewClass::GuardMissing => format!("Add or expose the local guard that discharges the `{operation}` safety obligation."),
         crate::domain::ReviewClass::GuardedUnwitnessed
             if has_witness_route(routes, crate::domain::WitnessKind::HumanDeepReview) =>
@@ -855,6 +856,23 @@ mod tests {
         assert!(miri_supported.contains("cargo-careful"));
         assert!(miri_supported.contains("witness receipt"));
         assert!(!miri_supported.contains("human deep-review"));
+    }
+
+    #[test]
+    fn inline_asm_guard_missing_next_action_routes_to_manual_invariant_review() {
+        let human_route = [test_witness_route(WitnessKind::HumanDeepReview)];
+        let summary = next_action_summary(
+            &ReviewClass::GuardMissing,
+            "inline_asm",
+            false,
+            &human_route,
+        );
+
+        assert!(summary.contains("inline_asm"));
+        assert!(summary.contains("manually"));
+        assert!(summary.contains("guard evidence"));
+        assert!(summary.contains("human deep-review receipt"));
+        assert!(!summary.contains("local guard that discharges"));
     }
 
     #[test]

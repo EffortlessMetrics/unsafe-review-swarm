@@ -65,7 +65,7 @@
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Add or expose the local guard that discharges the `inline_asm` safety obligation.",
+    "next_action": "Review the `inline_asm` register, memory, and target invariants manually; add explicit guard evidence, and attach a human deep-review receipt only as witness evidence.",
     "verify_commands": []
   }
 ]
