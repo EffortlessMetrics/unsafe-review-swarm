@@ -185,6 +185,7 @@ const DOGFOOD_FOLLOW_UP_SEEDS: &str = "docs/dogfood/follow-up-seeds.md";
 const DOGFOOD_REPORT_DIR: &str = "docs/dogfood/reports";
 const ACCURACY_CALIBRATION_POLICY: &str = "policy/accuracy-calibration.toml";
 const ACCURACY_CALIBRATION_REPORT: &str = "docs/accuracy/CALIBRATION_REPORT.md";
+const OBJECTIVE_AUDIT: &str = "docs/status/OBJECTIVE_AUDIT.md";
 const ACCURACY_CLAIM_STATUSES: &[&str] = &[
     "fixture_pinned",
     "dogfood_measured",
@@ -1767,6 +1768,7 @@ fn check_calibration() -> Result<(), String> {
     let report_stats =
         accuracy_calibration_report_stats(&accuracy_policy, cases.len(), label_count)?;
     check_accuracy_calibration_report(&report_stats)?;
+    check_objective_audit_calibration_snapshot(&report_stats)?;
 
     println!(
         "check-calibration: ok ({} cases, {label_count} labels)",
@@ -2058,6 +2060,35 @@ fn check_accuracy_calibration_report(stats: &AccuracyCalibrationReportStats) -> 
     require_file(ACCURACY_CALIBRATION_REPORT)?;
     let text = read_to_string(&workspace_path(ACCURACY_CALIBRATION_REPORT))?;
     check_accuracy_calibration_report_text(ACCURACY_CALIBRATION_REPORT, &text, stats)
+}
+
+fn check_objective_audit_calibration_snapshot(
+    stats: &AccuracyCalibrationReportStats,
+) -> Result<(), String> {
+    require_file(OBJECTIVE_AUDIT)?;
+    let text = read_to_string(&workspace_path(OBJECTIVE_AUDIT))?;
+    check_objective_audit_calibration_snapshot_text(OBJECTIVE_AUDIT, &text, stats)
+}
+
+fn check_objective_audit_calibration_snapshot_text(
+    path: &str,
+    text: &str,
+    stats: &AccuracyCalibrationReportStats,
+) -> Result<(), String> {
+    let normalized = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    for expected in [
+        format!("{} fixture-pinned claims", stats.fixture_pinned_claims),
+        format!("{} calibration cases", stats.calibration_case_count),
+        format!("{} label ledgers", stats.label_ledger_count),
+        format!("{} label samples", stats.label_sample_count),
+    ] {
+        if !normalized.contains(&expected) {
+            return Err(format!(
+                "{path} is missing current calibration snapshot `{expected}`"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn check_accuracy_calibration_report_text(
@@ -7996,6 +8027,23 @@ jobs:
         };
 
         assert!(err.contains("- Label samples: 2"));
+        Ok(())
+    }
+
+    #[test]
+    fn objective_audit_rejects_stale_calibration_counts() -> Result<(), String> {
+        let stats = test_accuracy_report_stats();
+        let text = "The checked report currently records 1 fixture-pinned claims, 2 calibration cases, 1 label ledgers, and 1 label samples.";
+
+        let Err(err) = check_objective_audit_calibration_snapshot_text(
+            "docs/status/OBJECTIVE_AUDIT.md",
+            text,
+            &stats,
+        ) else {
+            return Err("stale objective audit label sample counts should fail".to_string());
+        };
+
+        assert!(err.contains("2 label samples"));
         Ok(())
     }
 
