@@ -434,6 +434,7 @@ mod tests {
         "pointer_arithmetic_num_ctrl_bytes_guard",
         "pointer_arithmetic_other_offset_not_guard",
         "pointer_arithmetic_reassigned_offset_not_guard",
+        "pointer_arithmetic_shadowed_offset_not_guard",
         "pointer_arithmetic_disjunct_bounds_not_guard",
         "pointer_arithmetic_closed_branch_not_guard",
         "pointer_arithmetic_slice_end",
