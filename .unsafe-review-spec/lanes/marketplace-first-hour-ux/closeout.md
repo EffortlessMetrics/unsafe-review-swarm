@@ -1,7 +1,6 @@
 # Marketplace and first-hour UX lane closeout
 
-Status: shipped (pending owner-side marketplace publication and
-analyzer-side comment-plan-actionability work)
+Status: shipped (pending owner-side marketplace publication)
 
 The lane took `unsafe-review` from "published on crates.io" to "a Rust
 maintainer can install it, wire it into PRs, see value, and optionally use
@@ -42,16 +41,21 @@ Status per work item below; PR receipts are listed where applicable.
 - `check-first-pr-artifacts` requires the fragment, rejects re-inclusion of
   the card table or witness plan, and caps its word count.
 
-## Comment-plan actionability — in_progress
+## Comment-plan actionability — done (#364, #368, #887, #898, #955, #957, #979, #1049)
 
-- Continues under `plans/post-0.2.0/comment-plan-quality.md`.
 - Documentation surface extended in #364 with copy-range and
   public-unsafe-fn-missing-safety fixture-backed examples.
 - #368 added `relevance` metadata to selected and not-selected
   `comment-plan.json` entries and made `check-first-pr-artifacts` reject
   missing or unknown relevance values.
-- Deeper analyzer-side selection and ranking work remains tracked
-  separately.
+- #887 added the bounded review-budget summary, #898 projected changed-line
+  budget anchors, #955 / #957 deduplicated selected inline candidates by
+  family and obligation, and #979 / #1049 pinned the closed reason-code
+  vocabulary for selected and not-selected cards.
+- `check-first-pr-artifacts` verifies card coverage, reason codes,
+  actionability, relevance, duplicate suppression, changed-line eligibility,
+  body boundaries, and advisory trust boundaries. Automatic posting remains
+  out of scope.
 
 ## Extension MVP spec — done (#358)
 
@@ -120,5 +124,6 @@ Status per work item below; PR receipts are listed where applicable.
   namespace, manual `gh workflow run editor-publish.yml --ref main`.
 - Editor extension store icon (`editors/vscode/icon.png`): optional, lands
   as a separate small follow-up once an icon binary exists.
-- `comment-plan-actionability` analyzer work: continues under
-  `plans/post-0.2.0/comment-plan-quality.md`.
+- Further analyzer selection/ranking changes are outside this first-hour UX
+  closeout and should land as separate dogfood-backed or evidence-applicability
+  PRs.

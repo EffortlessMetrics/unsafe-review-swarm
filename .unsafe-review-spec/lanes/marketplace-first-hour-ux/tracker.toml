@@ -112,15 +112,17 @@ proof = [
 
 [[work_item]]
 id = "comment-plan-actionability"
-status = "in_progress"
+status = "done"
 spec = "UNSAFE-REVIEW-SPEC-0022"
 plan = "plans/post-0.2.0/comment-plan-quality.md"
 description = """
-Continue the comment-plan-quality plan: selection_reason, actionability,
-relevance, not_selected[] reasons, capped bodies, no duplicates. #364
-expanded fixture-backed examples and #368 added relevance metadata plus
-artifact-verifier enforcement. Deeper analyzer-side selection and ranking
-work remains in scope. No posting.
+Complete the comment-plan-quality plan as a verified review-budget artifact:
+selected candidates and not_selected[] entries carry closed-vocabulary
+reason codes, actionability, relevance, capped bodies, changed-line anchoring,
+family/obligation dedupe, and verifier-backed card coverage. #364 expanded
+fixture-backed examples, #368 added relevance metadata, and the later cockpit
+budget rails through #1049 made selection and non-selection reasons
+machine-checkable. No posting.
 """
 proof = [
   "cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review",

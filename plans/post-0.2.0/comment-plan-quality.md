@@ -1,6 +1,6 @@
 # comment-plan quality implementation plan
 
-Status: proposed
+Status: implemented
 Owner: pr-comments
 Linked spec: ../../docs/specs/UNSAFE-REVIEW-SPEC-0022-pr-commenting-experience.md
 
@@ -11,17 +11,17 @@ plan without enabling automatic comment posting by default.
 
 ## Work item ladder
 
-1. Keep generated comment plans capped at three candidates.
-2. Add structured next actions, selection reasons, actionability metadata, and
-   candidate trust boundaries to every candidate.
-3. Reject duplicate card IDs, duplicate lines, and unsupported classes in the
-   artifact verifier.
-4. Enforce the hard 220-word body limit in the artifact verifier.
-5. Add fixture-backed examples for selected and not-selected cards, with
-   `not_selected` reasons in the plan artifact.
-6. Document a future trusted poster workflow that consumes verified artifacts
-   without rerunning analysis truth. The design lives in
-   `docs/ci/TRUSTED_COMMENT_POSTER.md`.
+1. Done: generated comment plans are capped at three candidates.
+2. Done: selected and not-selected entries carry structured next actions,
+   reason codes, actionability metadata, relevance, and trust boundaries.
+3. Done: the artifact verifier rejects duplicate card IDs, duplicate inline
+   anchors, unsupported classes, unknown operation-family comments, and card
+   coverage drift.
+4. Done: the artifact verifier enforces the hard 220-word body limit.
+5. Done: fixture-backed examples cover selected, not-selected, and no-card
+   shapes, including explicit `not_selected` reasons.
+6. Done: `docs/ci/TRUSTED_COMMENT_POSTER.md` documents a future trusted poster
+   workflow that consumes verified artifacts without rerunning analysis truth.
 
 ## Non-goals
 
