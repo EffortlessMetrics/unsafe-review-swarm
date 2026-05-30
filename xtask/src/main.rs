@@ -13832,6 +13832,35 @@ Snapshot reports:
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_repair_queue_bucket_reason_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-repair-queue-bucket-reason-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+
+        let path = dir.join("repair-queue.json");
+        let mut repair_queue: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&path).map_err(|err| format!("read repair queue failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse repair queue failed: {err}"))?;
+        repair_queue["buckets"]["requires_witness_receipt"][0]["bucket_reason"] =
+            serde_json::json!("guard_evidence_missing");
+        fs::write(&path, repair_queue.to_string())
+            .map_err(|err| format!("write repair queue failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = result.err().unwrap_or_default();
+        assert!(
+            err.contains(
+                "repair-queue.json bucket_reason must be `witness_receipt_missing`; got `guard_evidence_missing`"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn advisory_artifact_checker_rejects_agent_ready_human_review_queue_entries()
     -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-artifacts-repair-queue-human-ready")?;
