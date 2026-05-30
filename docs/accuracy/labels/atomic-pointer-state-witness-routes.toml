@@ -25,3 +25,18 @@ expected_discharge_state = "missing"
 expected_witness_route_kinds = ["loom", "shuttle"]
 label_source = "fixture_golden"
 rationale = "Atomic pointer state changes should route to Loom/Shuttle interleaving review for ordering and ownership invariants."
+
+[[samples]]
+id = "atomic-pointer-state-fetch-ops-routes-loom-shuttle"
+fixture = "atomic_pointer_state_fetch_ops"
+kind = "positive"
+expected_cards = 3
+expected_class = "requires_loom"
+expected_operation_family = "atomic_pointer_state"
+expected_hazard = "atomic_ordering"
+expected_obligation_key = "ordering"
+expected_contract_state = "missing"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["loom", "shuttle"]
+label_source = "fixture_golden"
+rationale = "Crossbeam dogfood fetch-and/or/xor pointer state transitions should route to Loom/Shuttle interleaving review without implying a model was run or proved."

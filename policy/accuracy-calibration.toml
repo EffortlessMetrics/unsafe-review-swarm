@@ -1222,6 +1222,7 @@ hazard = "atomic_ordering"
 support_tier = "Witness routing"
 fixtures = [
   "atomic_pointer_state_swap",
+  "atomic_pointer_state_fetch_ops",
 ]
 dogfood_targets = []
 label_ledgers = [
@@ -1231,7 +1232,7 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned atomic pointer state witness routing sends pointer state
 transition, ownership, and ordering invariants to Loom/Shuttle route
-suggestions in the listed fixture.
+suggestions in the listed fixtures.
 """
 forbidden_claims = [
   "atomic ordering correctness proof",
