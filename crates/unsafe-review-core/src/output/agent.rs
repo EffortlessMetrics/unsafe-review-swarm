@@ -1398,6 +1398,56 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn agent_packet_repair_queue_matches_aggregate_projection() -> Result<(), String> {
+        for fixture in [
+            "raw_pointer_alignment",
+            "public_unsafe_fn_missing_safety",
+            "ffi_sanitizer_route",
+            "atomic_pointer_state_fetch_ops",
+            "inline_asm_human_review",
+        ] {
+            let output = fixture_output(fixture)?;
+            let Some(card) = output.cards.first() else {
+                return Err(format!("fixture `{fixture}` should emit at least one card"));
+            };
+            let value = parse_json(&render(card))?;
+            let projection = repair_queue_projection(card);
+
+            assert_eq!(
+                json_string_array(&value["repair_queue"]["buckets"], "repair queue buckets")?,
+                projection
+                    .repair_queue
+                    .buckets
+                    .iter()
+                    .map(|bucket| (*bucket).to_string())
+                    .collect::<Vec<_>>(),
+                "{fixture} context packet must match aggregate repair queue buckets"
+            );
+            assert_eq!(
+                value["repair_queue"]["summary"].as_str(),
+                Some(projection.repair_queue.summary.as_str()),
+                "{fixture} context packet must match aggregate repair queue summary"
+            );
+            assert_eq!(
+                value["agent_readiness"]["ready"].as_bool(),
+                Some(projection.agent_readiness.ready),
+                "{fixture} context packet must match aggregate repair queue readiness"
+            );
+            assert_eq!(
+                value["agent_readiness"]["state"].as_str(),
+                Some(projection.agent_readiness.state),
+                "{fixture} context packet must match aggregate repair queue readiness state"
+            );
+            assert_eq!(
+                json_string_array(&value["agent_readiness"]["reasons"], "readiness reasons")?,
+                projection.agent_readiness.reasons,
+                "{fixture} context packet must match aggregate repair queue readiness reasons"
+            );
+        }
+        Ok(())
+    }
+
     fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures")
@@ -1415,6 +1465,20 @@ mod tests {
 
     fn parse_json(text: &str) -> Result<serde_json::Value, String> {
         serde_json::from_str(text).map_err(|err| format!("JSON parse failed: {err}"))
+    }
+
+    fn json_string_array(value: &serde_json::Value, field: &str) -> Result<Vec<String>, String> {
+        value
+            .as_array()
+            .ok_or_else(|| format!("{field} should be an array"))?
+            .iter()
+            .map(|entry| {
+                entry
+                    .as_str()
+                    .map(str::to_string)
+                    .ok_or_else(|| format!("{field} entries should be strings"))
+            })
+            .collect()
     }
 
     fn assert_agent_boundary_rules(value: &serde_json::Value) -> Result<(), String> {
