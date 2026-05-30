@@ -123,6 +123,20 @@ label_source = "fixture_golden"
 rationale = "Unavailable-path early returns discharge the non-NonNull new_unchecked callee-contract obligation."
 
 [[samples]]
+id = "unchecked-constructor-unavailable-return-comment-not-guard"
+fixture = "unchecked_constructor_unavailable_return_comment_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+expected_obligation_key = "callee-contract"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "Comment-only unavailable-path return wording does not discharge the non-NonNull new_unchecked callee-contract obligation."
+
+[[samples]]
 id = "unchecked-constructor-other-availability-not-guard"
 fixture = "unchecked_constructor_other_availability_not_guard"
 kind = "false_positive_control"

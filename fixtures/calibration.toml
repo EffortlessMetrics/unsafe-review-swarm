@@ -385,6 +385,7 @@ required_core_fixtures = [
   "unchecked_constructor_availability_guard",
   "unchecked_constructor_availability_assert_guard",
   "unchecked_constructor_unavailable_return_guard",
+  "unchecked_constructor_unavailable_return_comment_not_guard",
   "unchecked_constructor_other_availability_not_guard",
   "unchecked_constructor_availability_observed_not_guard",
   "unchecked_constructor_availability_closed_branch_not_guard",
@@ -4228,6 +4229,16 @@ claim = "non-NonNull new_unchecked constructors recognize unavailable-path early
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+
+[[cases]]
+fixture = "unchecked_constructor_unavailable_return_comment_not_guard"
+kind = "false_positive_control"
+claim = "new_unchecked constructor unavailable-path return comments do not discharge callee-contract evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
 expected_operation_family = "unsafe_fn_call"
 expected_hazard = "unknown"
 

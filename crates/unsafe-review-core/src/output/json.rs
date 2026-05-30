@@ -273,6 +273,7 @@ mod tests {
         "unchecked_constructor_availability_guard",
         "unchecked_constructor_availability_assert_guard",
         "unchecked_constructor_unavailable_return_guard",
+        "unchecked_constructor_unavailable_return_comment_not_guard",
         "unchecked_constructor_other_availability_not_guard",
         "unchecked_constructor_availability_observed_not_guard",
         "unchecked_constructor_availability_closed_branch_not_guard",

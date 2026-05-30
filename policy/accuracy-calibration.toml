@@ -1057,6 +1057,7 @@ fixtures = [
   "unchecked_constructor_availability_guard",
   "unchecked_constructor_availability_assert_guard",
   "unchecked_constructor_unavailable_return_guard",
+  "unchecked_constructor_unavailable_return_comment_not_guard",
   "unchecked_constructor_other_availability_not_guard",
   "unchecked_constructor_availability_observed_not_guard",
   "unchecked_constructor_availability_closed_branch_not_guard",
@@ -1069,8 +1070,8 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned generic unsafe function call callee-contract evidence
 distinguishes remaining-capacity and availability guards from missing,
-wrong-receiver, observed-only, closed-branch, and FFI-looking local-wrapper
-controls in the listed fixtures.
+wrong-receiver, observed-only, closed-branch, comment-only return, and
+FFI-looking local-wrapper controls in the listed fixtures.
 """
 forbidden_claims = [
   "callee contract soundness proof",

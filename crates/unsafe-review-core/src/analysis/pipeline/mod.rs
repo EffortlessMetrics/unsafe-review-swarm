@@ -1179,6 +1179,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "unchecked_constructor_other_availability_not_guard",
             "unchecked_constructor_availability_observed_not_guard",
             "unchecked_constructor_availability_closed_branch_not_guard",
+            "unchecked_constructor_unavailable_return_comment_not_guard",
         ] {
             let output = fixture_output(fixture)?;
             let card = single_card(fixture, &output)?;
