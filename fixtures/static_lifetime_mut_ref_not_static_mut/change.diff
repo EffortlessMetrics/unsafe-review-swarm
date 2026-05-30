@@ -1,0 +1,9 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,5 @@
++pub type StaticMutBytes = &'static mut [u8];
++
++pub fn take_static_mut(bytes: StaticMutBytes) -> usize {
++    bytes.len()
++}

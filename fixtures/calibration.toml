@@ -369,6 +369,7 @@ required_core_fixtures = [
   "safe_reference_deref_no_cards",
   "imports_not_unsafe_operations",
   "cfg_target_feature_not_operation",
+  "static_lifetime_mut_ref_not_static_mut",
   "target_feature_safety_docs",
   "target_feature_missing_safety_docs",
   "attributed_unsafe_fn_no_duplicate",
@@ -4064,6 +4065,13 @@ expected_cards = 0
 fixture = "cfg_target_feature_not_operation"
 kind = "false_positive_control"
 claim = "cfg target_feature predicates emit no review cards"
+support_tier = "Diff unsafe site inventory"
+expected_cards = 0
+
+[[cases]]
+fixture = "static_lifetime_mut_ref_not_static_mut"
+kind = "false_positive_control"
+claim = "`'static mut` reference type text emits no static_mut review card"
 support_tier = "Diff unsafe site inventory"
 expected_cards = 0
 

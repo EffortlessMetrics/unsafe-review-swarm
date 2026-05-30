@@ -1425,6 +1425,7 @@ fixtures = [
   "safe_reference_deref_no_cards",
   "imports_not_unsafe_operations",
   "cfg_target_feature_not_operation",
+  "static_lifetime_mut_ref_not_static_mut",
   "adjacent_unchanged_unsafe_fn_no_card",
 ]
 dogfood_targets = []
@@ -1433,8 +1434,9 @@ label_ledgers = [
 ]
 labeled_reports = []
 allowed_public_claim = """
-Fixture-pinned no-card behavior for the listed safe, import-only, cfg-only, and
-unchanged-adjacent fixtures emits zero ReviewCards without saying the repo is safe.
+Fixture-pinned no-card behavior for the listed safe, import-only, cfg-only,
+reference-type, and unchanged-adjacent fixtures emits zero ReviewCards without
+saying the repo is safe.
 """
 forbidden_claims = [
   "all clear",

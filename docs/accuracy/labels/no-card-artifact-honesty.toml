@@ -43,6 +43,14 @@ label_source = "fixture_golden"
 rationale = "A cfg target_feature predicate is configuration text, not a changed unsafe operation."
 
 [[samples]]
+id = "static-lifetime-mut-reference-emits-no-cards"
+fixture = "static_lifetime_mut_ref_not_static_mut"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "`'static mut` reference type text is not a `static mut` global item and should emit no ReviewCards."
+
+[[samples]]
 id = "adjacent-unchanged-unsafe-declaration-emits-no-cards"
 fixture = "adjacent_unchanged_unsafe_fn_no_card"
 kind = "false_positive_control"
