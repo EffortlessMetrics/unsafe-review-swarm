@@ -1448,6 +1448,28 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn agent_packet_marks_no_missing_cards_not_ready_for_repair() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let Some(mut card) = output.cards.first().cloned() else {
+            return Err("fixture should emit at least one card".to_string());
+        };
+        card.missing.clear();
+
+        let value = parse_json(&render(&card))?;
+        assert_eq!(value["agent_readiness"]["ready"], false);
+        assert_eq!(value["agent_readiness"]["state"], "not_recommended");
+        assert!(
+            serde_json::to_string(&value["agent_readiness"]["reasons"])
+                .map_err(|err| format!("render readiness reasons failed: {err}"))?
+                .contains("no missing evidence to repair")
+        );
+        let buckets = json_string_array(&value["repair_queue"]["buckets"], "repair queue buckets")?;
+        assert_eq!(buckets, vec!["requires_human_review", "do_not_auto_repair"]);
+        assert!(!buckets.iter().any(|bucket| bucket == "review_only"));
+        Ok(())
+    }
+
     fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures")

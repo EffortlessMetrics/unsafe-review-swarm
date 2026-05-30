@@ -488,6 +488,39 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn repair_queue_keeps_no_missing_cards_out_of_repairable_buckets() -> Result<(), String> {
+        let mut output = fixture_output("raw_pointer_alignment")?;
+        let Some(card) = output.cards.first_mut() else {
+            return Err("fixture should emit at least one card".to_string());
+        };
+        card.missing.clear();
+        let card = card.clone();
+
+        let queue = parse_json(&render(&output))?;
+        let packet = parse_json(&agent::render(&card))?;
+        let card_id = card.id.0.as_str();
+
+        let mut aggregate_buckets = repair_queue_buckets_for_card(&queue, card_id)?;
+        aggregate_buckets.sort();
+        assert_eq!(
+            aggregate_buckets,
+            vec!["do_not_auto_repair", "requires_human_review"]
+        );
+        assert_eq!(
+            sorted_string_array(&packet["repair_queue"]["buckets"], "agent packet buckets")?,
+            vec!["do_not_auto_repair", "requires_human_review"]
+        );
+        let aggregate_readiness = repair_queue_readiness_for_card(&queue, card_id)?;
+        assert_eq!(aggregate_readiness["ready"], false);
+        assert_eq!(aggregate_readiness["state"], "not_recommended");
+        assert_eq!(
+            aggregate_readiness["reasons"],
+            packet["agent_readiness"]["reasons"]
+        );
+        Ok(())
+    }
+
     fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures")

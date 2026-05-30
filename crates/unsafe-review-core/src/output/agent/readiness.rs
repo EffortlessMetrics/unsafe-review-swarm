@@ -10,6 +10,10 @@ pub(super) fn build(card: &ReviewCard, has_card_scoped_repairs: bool) -> AgentRe
         ));
         return AgentReadiness::not_ready("not_recommended", reasons);
     }
+    if card.missing.is_empty() {
+        reasons.push("card has no missing evidence to repair".to_string());
+        return AgentReadiness::not_ready("not_recommended", reasons);
+    }
     if matches!(
         card.class,
         ReviewClass::StaticUnknown
