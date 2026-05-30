@@ -26,7 +26,8 @@ const NO_CHANGED_GAPS_LIMITATION: &str =
     "This does not prove the repo safe, UB-free, Miri-clean, or that any unsafe site executed.";
 type FirstPrRenderer = fn(&AnalyzeOutput) -> String;
 
-const FIRST_PR_ARTIFACTS: [(&str, FirstPrRenderer); 8] = [
+const REVIEW_KIT_ARTIFACT: &str = "review-kit.json";
+const FIRST_PR_RENDERED_ARTIFACTS: [(&str, FirstPrRenderer); 8] = [
     ("cards.json", render_json),
     ("pr-summary.md", render_pr_summary),
     ("github-summary.md", render_github_summary),
@@ -35,6 +36,17 @@ const FIRST_PR_ARTIFACTS: [(&str, FirstPrRenderer); 8] = [
     ("witness-plan.md", render_witness_plan),
     ("lsp.json", render_lsp),
     ("repair-queue.json", render_repair_queue),
+];
+const FIRST_PR_ARTIFACTS: [&str; 9] = [
+    REVIEW_KIT_ARTIFACT,
+    "cards.json",
+    "pr-summary.md",
+    "github-summary.md",
+    "cards.sarif",
+    "comment-plan.json",
+    "witness-plan.md",
+    "lsp.json",
+    "repair-queue.json",
 ];
 
 pub(crate) fn execute(command: Command) -> Result<(), String> {
@@ -145,9 +157,13 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
 
     fs::create_dir_all(&options.out_dir)
         .map_err(|err| format!("create {} failed: {err}", options.out_dir.display()))?;
-    for (name, renderer) in FIRST_PR_ARTIFACTS {
+    for (name, renderer) in FIRST_PR_RENDERED_ARTIFACTS {
         write_artifact(&options.out_dir.join(name), renderer(&output))?;
     }
+    write_artifact(
+        &options.out_dir.join(REVIEW_KIT_ARTIFACT),
+        first_pr::render_review_kit_manifest(&output, &root, &check, &FIRST_PR_ARTIFACTS),
+    )?;
 
     first_pr::print_first_pr_report(
         &output,

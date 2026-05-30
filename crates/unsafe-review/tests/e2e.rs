@@ -641,6 +641,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("Explain top card:"));
     assert!(stdout.contains("Agent packet:"));
     assert!(stdout.contains("Artifacts:"));
+    assert!(stdout.contains("review-kit.json"));
     assert!(stdout.contains("cards.json"));
     assert!(stdout.contains("pr-summary.md"));
     assert!(stdout.contains("github-summary.md"));
@@ -677,6 +678,43 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains(" --json"));
     assert!(stdout.contains(card_id));
 
+    let review_kit = parse_json(&fs::read_to_string(out_dir.join("review-kit.json"))?)?;
+    assert_eq!(review_kit["schema_version"], "0.1");
+    assert_eq!(review_kit["tool"], "unsafe-review");
+    assert_eq!(review_kit["mode"], "review_kit_manifest");
+    assert_eq!(review_kit["source"], "first_pr");
+    assert_eq!(review_kit["policy"], "advisory");
+    assert_eq!(review_kit["scope"], "diff");
+    assert_eq!(review_kit["summary"]["cards"], 1);
+    assert_eq!(review_kit["summary"]["open_actionable_gaps"], 1);
+    assert_eq!(review_kit["top_card_id"], card_id);
+    assert!(
+        review_kit["artifacts"]
+            .as_array()
+            .map_or(false, |artifacts| artifacts
+                .iter()
+                .any(|artifact| artifact["path"] == "review-kit.json"))
+    );
+    assert!(
+        review_kit["artifacts"]
+            .as_array()
+            .map_or(false, |artifacts| artifacts
+                .iter()
+                .any(|artifact| artifact["path"] == "cards.json"))
+    );
+    assert!(
+        review_kit["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("does not reclassify ReviewCards")
+    );
+    assert!(
+        review_kit["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("did not run witnesses")
+    );
+
     let summary = fs::read_to_string(out_dir.join("pr-summary.md"))?;
     assert!(summary.contains("# unsafe-review PR summary"));
     assert!(summary.contains("## Reviewer cockpit"));
@@ -697,10 +735,12 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         "- Agent context: `unsafe-review context {card_id} --json`"
     )));
     assert!(github_summary.contains("## Open next"));
+    assert!(github_summary.contains("Review kit manifest: `review-kit.json`"));
     assert!(github_summary.contains("Full reviewer cockpit: `pr-summary.md`"));
     assert!(github_summary.contains("Agent repair queue: `repair-queue.json`"));
     assert!(github_summary.contains("`comment-plan.json` is plan-only"));
     assert!(github_summary.contains("Full advisory bundle"));
+    assert!(github_summary.contains("review-kit.json"));
     assert!(github_summary.contains("github-summary.md"));
     assert!(github_summary.contains("not memory-safety proof"));
     assert!(github_summary.contains("not site-execution proof"));
@@ -839,6 +879,19 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
             .contains("not a proof of memory safety")
     );
 
+    let review_kit = parse_json(&fs::read_to_string(out_dir.join("review-kit.json"))?)?;
+    assert_eq!(review_kit["schema_version"], "0.1");
+    assert_eq!(review_kit["mode"], "review_kit_manifest");
+    assert_eq!(review_kit["summary"]["cards"], 0);
+    assert_eq!(review_kit["summary"]["open_actionable_gaps"], 0);
+    assert!(review_kit["top_card_id"].is_null());
+    assert!(
+        review_kit["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not site-execution proof")
+    );
+
     let summary = fs::read_to_string(out_dir.join("pr-summary.md"))?;
     assert!(summary.contains("No changed unsafe-review gaps were found."));
     assert!(summary.contains("This does not prove the repo safe"));
@@ -851,9 +904,11 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
     assert!(github_summary.contains("This does not prove the repo safe"));
     assert!(github_summary.contains("unsafe site executed"));
     assert!(github_summary.contains("## Open next"));
+    assert!(github_summary.contains("Review kit manifest: `review-kit.json`"));
     assert!(github_summary.contains("Full reviewer cockpit: `pr-summary.md`"));
     assert!(github_summary.contains("Agent repair queue: `repair-queue.json`"));
     assert!(github_summary.contains("Full advisory bundle"));
+    assert!(github_summary.contains("review-kit.json"));
     assert!(!github_summary.contains("All clear"));
 
     let witness_plan = fs::read_to_string(out_dir.join("witness-plan.md"))?;

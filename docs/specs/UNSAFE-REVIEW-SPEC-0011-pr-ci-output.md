@@ -98,6 +98,7 @@ cargo run --locked -p xtask -- check-first-pr-artifacts \
 Then it should upload:
 
 ```text
+target/unsafe-review/review-kit.json
 target/unsafe-review/cards.json
 target/unsafe-review/pr-summary.md
 target/unsafe-review/github-summary.md
@@ -113,6 +114,31 @@ The existing first-run lane already identifies this bundle and verifier as the p
 The workflow should add a concise GitHub job summary, but should not post inline comments by default.
 
 ### 3. Required artifacts
+
+#### 3.0 `review-kit.json`
+
+Review-kit manifest and discovery index for the first-pr artifact bundle.
+
+Requirements:
+
+```text
+must parse as JSON
+must include schema_version = 0.1
+must include tool and tool_version
+must include source = first_pr
+must include policy = advisory
+must include scope matching cards.json
+must include base/head metadata when known
+must include card count and open actionable gap count matching cards.json
+must include top_card_id, or null only when no cards exist
+must list every required first-pr artifact with relative paths
+must include artifact kind, format, and schema_version/null metadata
+must include trust boundary wording
+```
+
+The manifest is a discovery projection. It must not reclassify ReviewCards or
+create a second source of truth for operation family, obligation, evidence,
+witness route, repair bucket, outcome, or policy posture.
 
 #### 3.1 `cards.json`
 
@@ -193,6 +219,7 @@ top actionable card, when present:
   explain handoff command
   bounded agent context handoff command
 full bundle artifact list
+review-kit manifest path
 trust boundary
 ```
 
@@ -712,8 +739,8 @@ This is not Miri-clean status.
 ```
 
 The first-pr artifact verifier scans every required bundle artifact for positive
-overclaim wording, including `cards.json`, `pr-summary.md`,
-`github-summary.md`, `cards.sarif`, `comment-plan.json`, `witness-plan.md`, and
+overclaim wording, including `review-kit.json`, `cards.json`, `pr-summary.md`,
+`github-summary.md`, `cards.sarif`, `comment-plan.json`, `witness-plan.md`,
 `lsp.json`, and `repair-queue.json`.
 
 ### 8. Policy report relationship

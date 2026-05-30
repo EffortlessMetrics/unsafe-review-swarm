@@ -230,7 +230,7 @@ pub(crate) fn render_github_summary(output: &AnalyzeOutput) -> String {
     render_github_summary_open_next(&mut out);
     out.push_str("---\n\n");
     out.push_str(
-        "Full advisory bundle (cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n",
+        "Full advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n",
     );
     out.push_str(
         "> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",
@@ -243,6 +243,7 @@ pub(crate) fn render_github_summary(output: &AnalyzeOutput) -> String {
 
 fn render_github_summary_open_next(out: &mut String) {
     out.push_str("## Open next\n\n");
+    out.push_str("- Review kit manifest: `review-kit.json`\n");
     out.push_str("- Full reviewer cockpit: `pr-summary.md`\n");
     out.push_str("- Machine-readable ReviewCards: `cards.json`\n");
     out.push_str("- Witness routes: `witness-plan.md`\n");
@@ -759,6 +760,7 @@ mod tests {
             card.id
         )));
         assert!(rendered.contains("## Open next"));
+        assert!(rendered.contains("- Review kit manifest: `review-kit.json`"));
         assert!(rendered.contains("- Full reviewer cockpit: `pr-summary.md`"));
         assert!(rendered.contains("- Machine-readable ReviewCards: `cards.json`"));
         assert!(rendered.contains("- Witness routes: `witness-plan.md`"));

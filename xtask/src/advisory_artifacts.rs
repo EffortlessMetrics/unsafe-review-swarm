@@ -1,5 +1,5 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::Path;
+use std::path::{Component, Path};
 
 struct AdvisoryArtifactSummary {
     card_ids: BTreeSet<String>,
@@ -83,6 +83,17 @@ const REPAIR_QUEUE_BUCKETS: [&str; 6] = [
     "requires_human_review",
     "do_not_auto_repair",
 ];
+const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 9] = [
+    "review-kit.json",
+    "cards.json",
+    "pr-summary.md",
+    "github-summary.md",
+    "cards.sarif",
+    "comment-plan.json",
+    "witness-plan.md",
+    "lsp.json",
+    "repair-queue.json",
+];
 const REPAIR_QUEUE_TRUST_BOUNDARY_LIMITS: [&str; 7] = [
     "not an automatic repair queue",
     "does not run agents",
@@ -128,6 +139,13 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         &summary.card_projections,
         &summary.repair_queue_projections,
     )?;
+    check_review_kit_manifest(
+        dir,
+        &summary.scope,
+        summary.card_count,
+        summary.open_actionable_gaps,
+        &summary.card_ids,
+    )?;
     check_advisory_artifact_overclaims(dir)?;
 
     println!("check-first-pr-artifacts: ok ({})", dir.display());
@@ -159,6 +177,7 @@ fn check_github_summary_artifact(
     super::require_text_contains(&text, "- Policy mode: `advisory`", &path)?;
     super::require_text_contains(&text, "## Top card", &path)?;
     super::require_text_contains(&text, "## Open next", &path)?;
+    super::require_text_contains(&text, "- Review kit manifest: `review-kit.json`", &path)?;
     super::require_text_contains(&text, "- Full reviewer cockpit: `pr-summary.md`", &path)?;
     super::require_text_contains(&text, "- Machine-readable ReviewCards: `cards.json`", &path)?;
     super::require_text_contains(&text, "- Witness routes: `witness-plan.md`", &path)?;
@@ -179,7 +198,7 @@ fn check_github_summary_artifact(
     super::require_text_contains(&text, "not site-execution proof", &path)?;
     super::require_text_contains(
         &text,
-        "Full advisory bundle (cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json, repair-queue.json)",
+        "Full advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json, repair-queue.json)",
         &path,
     )?;
 
@@ -219,6 +238,207 @@ fn check_github_summary_artifact(
     }
 
     Ok(())
+}
+
+fn check_review_kit_manifest(
+    dir: &Path,
+    scope: &str,
+    card_count: usize,
+    open_actionable_gaps: usize,
+    card_ids: &BTreeSet<String>,
+) -> Result<(), String> {
+    let path = dir.join("review-kit.json");
+    let review_kit = super::parse_json_file(&path)?;
+    super::require_json_str(&review_kit, "schema_version", "0.1", "review-kit.json")?;
+    super::require_json_str(&review_kit, "tool", "unsafe-review", "review-kit.json")?;
+    super::require_json_str(
+        &review_kit,
+        "mode",
+        "review_kit_manifest",
+        "review-kit.json",
+    )?;
+    super::require_json_str(&review_kit, "source", "first_pr", "review-kit.json")?;
+    super::require_json_str(&review_kit, "policy", "advisory", "review-kit.json")?;
+    super::require_json_str(&review_kit, "scope", scope, "review-kit.json")?;
+    super::require_non_empty_json_str(&review_kit, "tool_version", "review-kit.json")?;
+    let summary_cards = super::json_usize_at(&review_kit, "/summary/cards", "review-kit.json")?;
+    if summary_cards != card_count {
+        return Err(format!(
+            "review-kit.json summary.cards is {summary_cards}, but cards.json has {card_count}"
+        ));
+    }
+    let summary_open = super::json_usize_at(
+        &review_kit,
+        "/summary/open_actionable_gaps",
+        "review-kit.json",
+    )?;
+    if summary_open != open_actionable_gaps {
+        return Err(format!(
+            "review-kit.json summary.open_actionable_gaps is {summary_open}, but cards.json has {open_actionable_gaps}"
+        ));
+    }
+
+    match review_kit.get("top_card_id") {
+        Some(serde_json::Value::String(card_id)) => {
+            if !card_ids.contains(card_id) {
+                return Err(format!(
+                    "review-kit.json top_card_id `{card_id}` is not present in cards.json"
+                ));
+            }
+        }
+        Some(serde_json::Value::Null) if card_count == 0 => {}
+        Some(serde_json::Value::Null) => {
+            return Err(
+                "review-kit.json top_card_id must name a card when cards exist".to_string(),
+            );
+        }
+        _ => return Err("review-kit.json top_card_id must be a string or null".to_string()),
+    }
+
+    let boundary = review_kit
+        .get("trust_boundary")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "review-kit.json is missing trust_boundary".to_string())?;
+    super::require_boundary_text(boundary, "review-kit.json")?;
+    for expected in [
+        "not Miri-clean status",
+        "not site-execution proof",
+        "did not run witnesses",
+        "post comments",
+        "edit source",
+        "run an agent",
+        "enforce blocking policy",
+    ] {
+        if !super::text_contains_ignore_ascii_case(boundary, expected) {
+            return Err(format!(
+                "review-kit.json trust_boundary must include `{expected}`"
+            ));
+        }
+    }
+
+    let artifacts = super::json_array_at(&review_kit, "/artifacts", "review-kit.json")?;
+    let mut seen = BTreeSet::new();
+    for entry in artifacts {
+        let artifact_path =
+            super::require_non_empty_json_str(entry, "path", "review-kit.json artifact")?;
+        check_review_kit_artifact_path(artifact_path)?;
+        if !seen.insert(artifact_path.to_string()) {
+            return Err(format!(
+                "review-kit.json repeats artifact path `{artifact_path}`"
+            ));
+        }
+        if !dir.join(artifact_path).is_file() {
+            return Err(format!(
+                "review-kit.json lists missing artifact `{artifact_path}`"
+            ));
+        }
+        require_expected_value(
+            super::require_non_empty_json_str(entry, "kind", "review-kit.json artifact")?,
+            expected_review_kit_artifact_kind(artifact_path),
+            "review-kit.json artifact kind",
+        )?;
+        require_expected_value(
+            super::require_non_empty_json_str(entry, "format", "review-kit.json artifact")?,
+            expected_review_kit_artifact_format(artifact_path),
+            "review-kit.json artifact format",
+        )?;
+        check_review_kit_artifact_schema_version(entry, artifact_path)?;
+    }
+
+    let expected = FIRST_PR_BUNDLE_ARTIFACTS
+        .iter()
+        .map(|artifact| artifact.to_string())
+        .collect::<BTreeSet<_>>();
+    if seen != expected {
+        return Err(format!(
+            "review-kit.json artifact set must be {:?}; got {:?}",
+            expected, seen
+        ));
+    }
+    Ok(())
+}
+
+fn check_review_kit_artifact_path(path: &str) -> Result<(), String> {
+    let artifact = Path::new(path);
+    if artifact.is_absolute() {
+        return Err(format!(
+            "review-kit.json artifact path `{path}` must be relative"
+        ));
+    }
+    if artifact.components().any(|component| {
+        matches!(
+            component,
+            Component::ParentDir | Component::RootDir | Component::Prefix(_)
+        )
+    }) {
+        return Err(format!(
+            "review-kit.json artifact path `{path}` must not escape the artifact directory"
+        ));
+    }
+    Ok(())
+}
+
+fn expected_review_kit_artifact_kind(path: &str) -> &'static str {
+    match path {
+        "review-kit.json" => "review_kit_manifest",
+        "cards.json" => "review_cards",
+        "pr-summary.md" => "reviewer_summary",
+        "github-summary.md" => "github_summary",
+        "cards.sarif" => "sarif",
+        "comment-plan.json" => "comment_plan",
+        "witness-plan.md" => "witness_plan",
+        "lsp.json" => "saved_lsp",
+        "repair-queue.json" => "repair_queue",
+        _ => "unknown",
+    }
+}
+
+fn expected_review_kit_artifact_format(path: &str) -> &'static str {
+    match path {
+        "review-kit.json" | "cards.json" | "comment-plan.json" | "lsp.json"
+        | "repair-queue.json" => "json",
+        "pr-summary.md" | "github-summary.md" | "witness-plan.md" => "markdown",
+        "cards.sarif" => "sarif",
+        _ => "unknown",
+    }
+}
+
+fn check_review_kit_artifact_schema_version(
+    entry: &serde_json::Value,
+    path: &str,
+) -> Result<(), String> {
+    let Some(schema_version) = entry.get("schema_version") else {
+        return Err(format!(
+            "review-kit.json artifact `{path}` is missing schema_version"
+        ));
+    };
+    let expected = match path {
+        "review-kit.json" | "cards.json" | "comment-plan.json" | "lsp.json"
+        | "repair-queue.json" => Some("0.1"),
+        "cards.sarif" => Some("2.1.0"),
+        "pr-summary.md" | "github-summary.md" | "witness-plan.md" => None,
+        _ => {
+            return Err(format!("review-kit.json artifact `{path}` is unknown"));
+        }
+    };
+    match expected {
+        Some(expected) => {
+            let Some(actual) = schema_version.as_str() else {
+                return Err(format!(
+                    "review-kit.json artifact `{path}` schema_version must be `{expected}`"
+                ));
+            };
+            require_expected_value(
+                actual,
+                expected,
+                &format!("review-kit.json artifact `{path}` schema_version"),
+            )
+        }
+        None if schema_version.is_null() => Ok(()),
+        None => Err(format!(
+            "review-kit.json artifact `{path}` schema_version must be null for unversioned markdown"
+        )),
+    }
 }
 
 fn require_text_mentions_all_card_ids(
@@ -3435,6 +3655,7 @@ fn require_known_card_id<'a>(
 
 fn check_advisory_artifact_overclaims(dir: &Path) -> Result<(), String> {
     for name in [
+        "review-kit.json",
         "cards.json",
         "pr-summary.md",
         "github-summary.md",
@@ -3460,7 +3681,12 @@ fn check_advisory_artifact_overclaims(dir: &Path) -> Result<(), String> {
 fn is_machine_json_artifact(name: &str) -> bool {
     matches!(
         name,
-        "cards.json" | "cards.sarif" | "comment-plan.json" | "lsp.json" | "repair-queue.json"
+        "review-kit.json"
+            | "cards.json"
+            | "cards.sarif"
+            | "comment-plan.json"
+            | "lsp.json"
+            | "repair-queue.json"
     )
 }
 
