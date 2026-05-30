@@ -54,7 +54,7 @@ The active calibration rail is now recorded in
 `.unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md`,
 `policy/accuracy-calibration.toml`, and
 `docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 34
-fixture-pinned claims, 301 calibration cases, 34 label ledgers, and 311 label
+fixture-pinned claims, 396 calibration cases, 34 label ledgers, and 408 label
 samples. It records zero dogfood-measured, labeled-calibrated, or
 policy-eligible claims. That is intentional: the current report is a
 claim-scoped fixture-pinned proof index, not a global precision/recall result
@@ -62,6 +62,10 @@ or support-tier promotion. The latest MaybeUninit assume-init slice recognizes
 narrow same-slot `write`, open-branch `write`, and `MaybeUninit::new`
 initialization evidence while rejecting other-slot writes, closed conditional
 writes, and stale writes after reassignment.
+The latest `Vec::set_len` dogfood follow-up pins the `arrayvec#288`
+`Self::new()` capacity shape as a false-positive control: visible
+initialization evidence may be present, but capacity evidence remains missing
+when fixed-capacity storage is hidden behind an opaque constructor.
 
 Recent PR artifact hardening also improved the comment-plan surface: planned
 comments stay capped and deduplicated, selected cards carry next actions, and
@@ -127,7 +131,8 @@ These are not failures; they are the next unsupported or weakly verified areas:
   drop/deallocation invariants remain unsupported semantic work.
 - Real PR-diff dogfood shows `Vec::set_len` guard evidence still needs broader
   modeling; visible `MaybeUninit::new` initialization loops and const `CAP`
-  capacity facts now have fixture coverage, same-vector
+  capacity facts now have fixture coverage, opaque `Self::new()` capacity
+  evidence is pinned as missing, same-vector
   `Vec::with_capacity(new_len)`, narrow same-vector `reserve(additional)`, and
   narrow same-vector `try_reserve(additional)?` capacity evidence have fixture
   coverage, and unrelated capacity comparisons, local arguments merely named
