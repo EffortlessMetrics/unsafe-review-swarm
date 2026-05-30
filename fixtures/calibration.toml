@@ -79,6 +79,7 @@ required_core_fixtures = [
   "vec_set_len_call_result_init",
   "vec_set_len_shrink",
   "vec_set_len_last_index_shrink",
+  "vec_set_len_stale_last_index_shrink_not_guard",
   "vec_set_len_other_last_index_shrink_not_guard",
   "vec_set_len_start_bound_shrink",
   "vec_set_len_stale_start_bound_shrink_not_guard",
@@ -1178,6 +1179,16 @@ claim = "Vec::set_len recognizes last_index = self.len - 1 after a non-empty gua
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "vec_set_len_stale_last_index_shrink_not_guard"
+kind = "false_positive_control"
+claim = "Vec::set_len does not accept last_index shrink evidence after the checked vector receiver is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
 expected_operation_family = "vec_set_len"
 expected_hazard = "initialized_memory"
 

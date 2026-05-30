@@ -16,9 +16,7 @@ fn detects_zero_length_shrink(set_len_argument: &str) -> bool {
 }
 
 fn detects_last_index_shrink(before_call: &str, receiver: &str, set_len_argument: &str) -> bool {
-    set_len_argument == "last_index"
-        && has_last_index_minus_one_assignment(before_call, receiver)
-        && has_non_empty_or_empty_guard(before_call, receiver)
+    set_len_argument == "last_index" && has_fresh_last_index_shrink(before_call, receiver)
 }
 
 fn has_last_index_minus_one_assignment(before_call: &str, receiver: &str) -> bool {
@@ -26,12 +24,63 @@ fn has_last_index_minus_one_assignment(before_call: &str, receiver: &str) -> boo
         || before_call.contains(&format!("last_index={receiver}.len()-1"))
 }
 
+fn has_fresh_last_index_shrink(before_call: &str, receiver: &str) -> bool {
+    if !has_last_index_minus_one_assignment(before_call, receiver)
+        || !has_non_empty_or_empty_guard(before_call, receiver)
+    {
+        return false;
+    }
+
+    non_empty_or_empty_guard_tails(before_call, receiver)
+        .into_iter()
+        .filter(|after_guard| !contains_simple_assignment_to(after_guard, receiver))
+        .any(|_after_guard| {
+            last_index_assignment_tails(before_call, receiver)
+                .into_iter()
+                .any(|after_assignment| {
+                    ![receiver, "last_index"].iter().any(|identifier| {
+                        contains_simple_assignment_to(after_assignment, identifier)
+                    })
+                })
+        })
+}
+
+fn last_index_assignment_tails<'a>(before_call: &'a str, receiver: &str) -> Vec<&'a str> {
+    [
+        format!("last_index={receiver}.len-1"),
+        format!("last_index={receiver}.len()-1"),
+    ]
+    .into_iter()
+    .flat_map(|marker| marker_tails(before_call, &marker))
+    .collect()
+}
+
 fn has_non_empty_or_empty_guard(before_call: &str, receiver: &str) -> bool {
-    before_call.contains(&format!("{receiver}.len==0"))
-        || before_call.contains(&format!("{receiver}.len()==0"))
-        || before_call.contains(&format!("{receiver}.len>0"))
-        || before_call.contains(&format!("{receiver}.len()>0"))
-        || before_call.contains(&format!("!{receiver}.is_empty()"))
+    !non_empty_or_empty_guard_tails(before_call, receiver).is_empty()
+}
+
+fn non_empty_or_empty_guard_tails<'a>(before_call: &'a str, receiver: &str) -> Vec<&'a str> {
+    [
+        format!("{receiver}.len==0"),
+        format!("{receiver}.len()==0"),
+        format!("{receiver}.len>0"),
+        format!("{receiver}.len()>0"),
+        format!("!{receiver}.is_empty()"),
+    ]
+    .into_iter()
+    .flat_map(|marker| marker_tails(before_call, &marker))
+    .collect()
+}
+
+fn marker_tails<'a>(text: &'a str, marker: &str) -> Vec<&'a str> {
+    let mut tails = Vec::new();
+    let mut search_from = 0usize;
+    while let Some(offset) = text[search_from..].find(marker) {
+        let marker_end = search_from + offset + marker.len();
+        tails.push(&text[marker_end..]);
+        search_from = marker_end;
+    }
+    tails
 }
 
 fn detects_start_bounded_shrink(before_call: &str, receiver: &str, set_len_argument: &str) -> bool {

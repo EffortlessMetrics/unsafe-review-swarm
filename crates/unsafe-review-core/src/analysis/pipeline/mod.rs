@@ -2418,6 +2418,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "vec_set_len_cap_argument_not_guard",
             "vec_set_len_stale_capacity_binding_not_guard",
             "vec_set_len_stale_start_bound_shrink_not_guard",
+            "vec_set_len_stale_last_index_shrink_not_guard",
             "vec_set_len_reassigned_receiver_not_guard",
             "vec_set_len_reassigned_new_len_not_guard",
             "vec_set_len_compound_reassigned_new_len_not_guard",

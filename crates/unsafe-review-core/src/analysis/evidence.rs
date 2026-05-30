@@ -2696,6 +2696,36 @@ mod tests {
     }
 
     #[test]
+    fn set_len_last_index_shrink_rejects_stale_receiver() {
+        let obligations = vec![
+            SafetyObligation::new("capacity", "new length is at most capacity"),
+            SafetyObligation::new(
+                "initialized",
+                "elements in the extended range are initialized",
+            ),
+        ];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let set_len = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "if values.len() == 0 { return; }",
+                "let last_index = values.len() - 1;",
+                "values = Vec::new();",
+            ],
+            "values.set_len(last_index);",
+            vec![],
+        );
+
+        let evidence = obligation_evidence(&set_len, &obligations, &contract, &reach);
+
+        assert!(evidence.iter().all(|item| !item.discharge.present));
+    }
+
+    #[test]
     fn set_len_start_bound_shrink_discharges_capacity_and_initialized_obligations() {
         let obligations = vec![
             SafetyObligation::new("capacity", "new length is at most capacity"),
