@@ -266,12 +266,12 @@ fn outcome_reason(
 ) -> String {
     match (status, before, after) {
         ("new", None, Some(after)) => format!(
-            "card appears in the after snapshot as `{}` with {} missing evidence item(s)",
+            "new card: appears in the after snapshot as `{}` with {} missing evidence item(s)",
             after.class_name,
             after.missing.len()
         ),
         ("resolved", Some(before), None) => format!(
-            "card was present in the before snapshot as `{}` and is absent from the after snapshot",
+            "resolved card: was present in the before snapshot as `{}` and is absent from the after snapshot",
             before.class_name
         ),
         ("improved" | "regressed", Some(before), Some(after)) => {
@@ -552,6 +552,12 @@ mod tests {
         assert_eq!(report.cards.improved.len(), 1);
         assert_eq!(report.cards.regressed.len(), 1);
         assert_eq!(report.cards.unchanged.len(), 1);
+        assert!(report.cards.new[0].reason.starts_with("new card:"));
+        assert!(
+            report.cards.resolved[0]
+                .reason
+                .starts_with("resolved card:")
+        );
         assert!(
             report.cards.improved[0]
                 .reason
@@ -638,7 +644,7 @@ mod tests {
         assert!(markdown.contains("- Receipt movement: 0 improved, 0 regressed"));
         assert!(markdown.contains("Top remaining gaps"));
         assert!(markdown.contains("## Movement reasons"));
-        assert!(markdown.contains("- `new` `UR-new-c1`: card appears in the after snapshot"));
+        assert!(markdown.contains("- `new` `UR-new-c1`: new card: appears in the after snapshot"));
         assert!(markdown.contains("| Status | Card | Reason | Before | After |"));
         assert!(markdown.contains("## Limitations"));
         assert!(markdown.contains("## Trust boundary"));
