@@ -31,6 +31,8 @@ The guard rejects:
 - allowed public claim wording that omits the claim level,
 - forbidden claim lists that omit shared global precision, global recall, and
   memory-safety proof overclaim boundaries,
+- label-ledger trust boundaries that omit Miri-clean, site-execution,
+  calibrated precision/recall, witness-adequacy, or policy-readiness limits,
 - fixture-pinned claims that carry dogfood targets or labeled reports,
 - dogfood-measured claims without known dogfood target IDs,
 - labeled-calibrated or policy-eligible claims without checked report files,

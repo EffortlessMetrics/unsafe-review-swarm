@@ -52,6 +52,13 @@ const WITNESS_ROUTE_KINDS: &[&str] = &[
     "crux",
     "human-deep-review",
 ];
+const LABEL_TRUST_BOUNDARY_LIMITS: &[&str] = &[
+    "not Miri-clean status",
+    "not site execution evidence",
+    "not calibrated precision or recall",
+    "not witness adequacy",
+    "not policy readiness",
+];
 
 #[derive(Clone, Debug)]
 pub(crate) struct CalibrationFixtureCase {
@@ -287,6 +294,7 @@ fn validate_label_ledger(
     require_allowed(source_kind, LABEL_SOURCE_KINDS, path, "source_kind")?;
     let boundary = required_table_string(table, "trust_boundary", path, 0)?;
     super::require_boundary_text(boundary, path)?;
+    require_label_trust_boundary_limits(boundary, path)?;
     let samples = super::toml_array(value, "samples", path)?;
     if samples.is_empty() {
         return Err(format!("{path} must contain at least one sample"));
@@ -317,6 +325,15 @@ fn validate_label_ledger(
         fixtures,
         sample_keys,
     })
+}
+
+fn require_label_trust_boundary_limits(text: &str, path: &str) -> Result<(), String> {
+    for needle in LABEL_TRUST_BOUNDARY_LIMITS {
+        if !super::text_contains_ignore_ascii_case(text, needle) {
+            return Err(format!("{path} trust boundary is missing `{needle}`"));
+        }
+    }
+    Ok(())
 }
 
 fn validate_sample(
@@ -875,6 +892,66 @@ mod tests {
     use super::*;
 
     #[test]
+    fn label_ledger_rejects_incomplete_trust_boundary_limits() -> Result<(), String> {
+        let ledger = r#"
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "raw-pointer-read-alignment-evidence"
+operation_family = "raw_pointer_read"
+hazard = "alignment"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result."
+
+[[samples]]
+id = "minimal-boundary"
+fixture = "raw_pointer_alignment"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+expected_obligation_key = "alignment"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "The trust boundary must name the full accuracy-label no-overclaim posture."
+"#
+        .parse::<toml::Table>()
+        .map(toml::Value::Table)
+        .map_err(|err| format!("parse test ledger failed: {err}"))?;
+        let mut cases = BTreeMap::new();
+        cases.insert(
+            "raw_pointer_alignment".to_string(),
+            CalibrationFixtureCase {
+                kind: "positive".to_string(),
+                expected_cards: 1,
+                expected_class: Some("guard_missing".to_string()),
+                expected_operation_family: Some("raw_pointer_read".to_string()),
+                expected_hazard: Some("alignment".to_string()),
+            },
+        );
+        let claim = PolicyClaim {
+            operation_family: Some("raw_pointer_read".to_string()),
+            hazard: Some("alignment".to_string()),
+            fixtures: BTreeSet::from(["raw_pointer_alignment".to_string()]),
+            label_ledgers: BTreeSet::new(),
+        };
+
+        let result = validate_label_ledger(
+            "docs/accuracy/labels/test.toml",
+            &ledger,
+            "raw-pointer-read-alignment-evidence",
+            &claim,
+            &cases,
+        );
+
+        let err = result.err().unwrap_or_default();
+        assert!(err.contains("trust boundary"));
+        assert!(err.contains("not Miri-clean status"));
+        Ok(())
+    }
+
+    #[test]
     fn label_ledger_rejects_missing_witness_route_kind() -> Result<(), String> {
         let ledger = r#"
 schema_version = "0.1"
@@ -884,7 +961,7 @@ operation_family = "unsafe_impl_send_sync"
 hazard = "send_sync_invariant"
 partition = "fixture"
 source_kind = "fixture_golden"
-trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result."
+trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not calibrated precision or recall, not witness adequacy, and not policy readiness."
 
 [[samples]]
 id = "bad-route"
@@ -948,7 +1025,7 @@ operation_family = "unknown"
 hazard = "unknown"
 partition = "fixture"
 source_kind = "fixture_golden"
-trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result."
+trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not calibrated precision or recall, not witness adequacy, and not policy readiness."
 
 [[samples]]
 id = "bad-contract-state"
@@ -1012,7 +1089,7 @@ operation_family = "raw_pointer_read"
 hazard = "alignment"
 partition = "fixture"
 source_kind = "fixture_golden"
-trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result."
+trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not calibrated precision or recall, not witness adequacy, and not policy readiness."
 
 [[samples]]
 id = "bad-state"
@@ -1075,7 +1152,7 @@ operation_family = "raw_pointer_read"
 hazard = "alignment"
 partition = "fixture"
 source_kind = "fixture_golden"
-trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result."
+trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not calibrated precision or recall, not witness adequacy, and not policy readiness."
 
 [[samples]]
 id = "bad-owner"
@@ -1134,7 +1211,7 @@ operation_family = "raw_pointer_read"
 hazard = "alignment"
 partition = "fixture"
 source_kind = "fixture_golden"
-trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result."
+trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not calibrated precision or recall, not witness adequacy, and not policy readiness."
 
 [[samples]]
 id = "outside-claim-fixture"
@@ -1220,7 +1297,7 @@ operation_family = "raw_pointer_read"
 hazard = "alignment"
 partition = "fixture"
 source_kind = "fixture_golden"
-trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result."
+trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not calibrated precision or recall, not witness adequacy, and not policy readiness."
 
 [[samples]]
 id = "first"

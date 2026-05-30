@@ -124,6 +124,9 @@ not justify "all clear", safety, UB-free, Miri-clean, or site-execution wording.
 - fixture calibration manifest passes,
 - dogfood corpus manifest passes,
 - labeled sample ledger validates,
+- label ledger trust boundaries name memory-safety, UB-free, Miri-clean,
+  site-execution, calibrated precision/recall, witness-adequacy, and
+  policy-readiness limits,
 - `docs/accuracy/CALIBRATION_REPORT.md` renders and is checked for stale
   counts and no-overclaim boundary text by `check-calibration`,
 - claim entries pass promotion guardrails for status-specific evidence,

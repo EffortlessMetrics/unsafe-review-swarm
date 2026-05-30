@@ -7,7 +7,7 @@ partition = "fixture"
 source_kind = "fixture_golden"
 trust_boundary = """
 Static unsafe contract review only. These labels describe fixture-pinned
-ReviewCard evidence behavior; they are not a proof of memory safety, not UB-free status, and not a Miri result.
+ReviewCard evidence behavior; they are not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not calibrated precision or recall, not witness adequacy, and not policy readiness.
 """
 
 [[samples]]
