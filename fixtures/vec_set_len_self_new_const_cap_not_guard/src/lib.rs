@@ -1,0 +1,37 @@
+use core::mem::MaybeUninit;
+
+pub struct Buffer<const CAP: usize> {
+    xs: [MaybeUninit<u8>; CAP],
+    len: usize,
+}
+
+impl<const CAP: usize> Buffer<CAP> {
+    fn new() -> Self {
+        Self {
+            xs: [MaybeUninit::uninit(); CAP],
+            len: 0,
+        }
+    }
+
+    pub fn from_array(bytes: &[u8; CAP]) -> Self {
+        let mut out = Self::new();
+        for (dst, src) in out.xs.iter_mut().zip(bytes.iter()) {
+            *dst = MaybeUninit::new(*src);
+        }
+        // SAFETY: the loop above initializes every byte in `out`.
+        unsafe {
+            out.set_len(CAP);
+        }
+        out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Buffer;
+
+    #[test]
+    fn from_array_initializes_before_set_len() {
+        let _ = Buffer::<2>::from_array(b"hi");
+    }
+}

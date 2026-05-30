@@ -30,6 +30,7 @@ Statuses:
 | `dogfood-hashbrown-pr667-nonnull` | `parked` | `hashbrown-pr667` | `actionable` | [hashbrown NonNull follow-up](reports/2026-05-27-hashbrown-nonnull-follow-up.md) | `analysis: add nonnull macro or provenance control only when dogfood exposes it` | Existing stale and wrong-pointer controls cover current pressure; future macro/cast/provenance shapes need separate evidence. |
 | `dogfood-memchr-capped-target-feature` | `done` | `memchr-capped` | `actionable` | [memchr target-feature posture](reports/2026-05-28-memchr-target-feature-posture.md) | `output: keep target_feature cards contract-backed and unwitnessed` | Preserve target-feature docs as contract evidence without turning them into availability, site-execution, or Miri evidence. |
 | `dogfood-arrayvec-pr288-first-pr-projection` | `done` | `arrayvec-pr288` | `actionable` | [arrayvec first-pr projection smoke](reports/2026-05-28-arrayvec-first-pr-projection-smoke.md) | `output: rerun first-pr smoke after projection changes` | Use this target as regression pressure for first-pr, comment-plan, witness-plan, saved LSP, and agent-context projections. |
+| `dogfood-arrayvec-pr288-self-new-capacity` | `done` | `arrayvec-pr288` | `needs-fixture` | [arrayvec Self::new capacity control](reports/2026-05-29-arrayvec-self-new-capacity-control.md) | `analysis: pin self-new const-capacity set_len control` | Current follow-up is fixture `vec_set_len_self_new_const_cap_not_guard`; do not infer custom constructor capacity without visible same-receiver evidence. |
 
 ## Trust boundary
 

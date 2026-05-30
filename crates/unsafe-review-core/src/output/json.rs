@@ -477,6 +477,7 @@ mod tests {
         "vec_set_len",
         "vec_set_len_comment_not_guard",
         "vec_set_len_initialized_loop",
+        "vec_set_len_self_new_const_cap_not_guard",
         "vec_set_len_post_init_not_guard",
         "vec_set_len_slice_binding_initialized_loop",
         "vec_set_len_other_slice_binding_not_guard",

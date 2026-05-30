@@ -2439,6 +2439,23 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn vec_set_len_self_new_const_cap_keeps_capacity_missing() -> Result<(), String> {
+        let output = fixture_output("vec_set_len_self_new_const_cap_not_guard")?;
+        let card = single_card("vec_set_len_self_new_const_cap_not_guard", &output)?;
+
+        assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+        assert_eq!(card.operation.family, OperationFamily::VecSetLen);
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert!(!obligation_discharge_present(card, "capacity"));
+        assert!(obligation_discharge_present(card, "initialized"));
+        assert!(
+            card.missing.iter().any(|missing| missing.kind == "guard"),
+            "opaque Self::new capacity evidence must keep the guard prompt"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn vec_set_len_accepts_pre_call_initialized_range_evidence() -> Result<(), String> {
         for fixture in [
             "vec_set_len_initialized_loop",

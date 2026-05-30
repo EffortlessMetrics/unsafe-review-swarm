@@ -470,6 +470,7 @@ fixtures = [
   "vec_set_len",
   "vec_set_len_comment_not_guard",
   "vec_set_len_initialized_loop",
+  "vec_set_len_self_new_const_cap_not_guard",
   "vec_set_len_slice_binding_initialized_loop",
   "vec_set_len_other_slice_binding_not_guard",
   "vec_set_len_partial_slice_binding_not_guard",
@@ -508,7 +509,7 @@ allowed_public_claim = """
 Fixture-pinned Vec::set_len initialized-range evidence distinguishes initialized
 loop, same-vector slice-binding loop, call-result, same-vector shrink,
 zero-clear, and capacity-only reserve/try_reserve evidence from comment-only,
-post-init, unrelated-initialization, other-slice, partial-slice,
+opaque-constructor capacity, post-init, unrelated-initialization, other-slice, partial-slice,
 stale-slice-binding, single-index initialization, unrelated-capacity,
 unrelated-const-cap, other-receiver shrink, stale-receiver,
 stale-with-capacity receiver, stale-with-capacity new length, stale-new-len,
