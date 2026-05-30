@@ -6,7 +6,7 @@
   "confidence": "medium",
   "site": {
     "file": "src/lib.rs",
-    "line": 22,
+    "line": 23,
     "column": 13,
     "kind": "operation",
     "owner": "from_array",
