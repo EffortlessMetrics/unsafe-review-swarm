@@ -300,6 +300,147 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn repair_queue_covers_operation_family_examples() -> Result<(), String> {
+        struct Case {
+            fixture: &'static str,
+            operation_family: &'static str,
+            buckets: &'static [&'static str],
+            ready: bool,
+        }
+
+        for case in [
+            Case {
+                fixture: "raw_pointer_alignment",
+                operation_family: "raw_pointer_read",
+                buckets: &["repairable_by_guard", "requires_witness_receipt"],
+                ready: true,
+            },
+            Case {
+                fixture: "vec_set_len",
+                operation_family: "vec_set_len",
+                buckets: &["repairable_by_guard", "requires_witness_receipt"],
+                ready: true,
+            },
+            Case {
+                fixture: "str_from_utf8_unchecked",
+                operation_family: "str_from_utf8_unchecked",
+                buckets: &["repairable_by_guard", "requires_witness_receipt"],
+                ready: true,
+            },
+            Case {
+                fixture: "maybeuninit_assume_init",
+                operation_family: "maybe_uninit_assume_init",
+                buckets: &["repairable_by_guard", "requires_witness_receipt"],
+                ready: true,
+            },
+            Case {
+                fixture: "nonnull_other_guard_not_evidence",
+                operation_family: "nonnull_unchecked",
+                buckets: &["repairable_by_guard", "requires_witness_receipt"],
+                ready: true,
+            },
+            Case {
+                fixture: "ffi_sanitizer_route",
+                operation_family: "ffi",
+                buckets: &[
+                    "repairable_by_guard",
+                    "repairable_by_test",
+                    "requires_witness_receipt",
+                    "requires_human_review",
+                    "do_not_auto_repair",
+                ],
+                ready: false,
+            },
+            Case {
+                fixture: "atomic_pointer_state_swap",
+                operation_family: "atomic_pointer_state",
+                buckets: &[
+                    "repairable_by_guard",
+                    "repairable_by_safety_docs",
+                    "requires_witness_receipt",
+                    "requires_human_review",
+                    "do_not_auto_repair",
+                ],
+                ready: false,
+            },
+            Case {
+                fixture: "unsafe_impl_send",
+                operation_family: "unsafe_impl_send_sync",
+                buckets: &[
+                    "repairable_by_guard",
+                    "requires_witness_receipt",
+                    "requires_human_review",
+                    "do_not_auto_repair",
+                ],
+                ready: false,
+            },
+            Case {
+                fixture: "inline_asm_human_review",
+                operation_family: "inline_asm",
+                buckets: &[
+                    "repairable_by_guard",
+                    "requires_witness_receipt",
+                    "requires_human_review",
+                    "do_not_auto_repair",
+                ],
+                ready: false,
+            },
+            Case {
+                fixture: "split_unsafe_block",
+                operation_family: "unknown",
+                buckets: &[
+                    "repairable_by_guard",
+                    "repairable_by_safety_docs",
+                    "repairable_by_test",
+                    "requires_witness_receipt",
+                    "requires_human_review",
+                    "do_not_auto_repair",
+                ],
+                ready: false,
+            },
+        ] {
+            let output = fixture_output(case.fixture)?;
+            let value = parse_json(&render(&output))?;
+            assert_eq!(
+                value["summary"]["cards"], 1,
+                "{} should produce one repair-queue card",
+                case.fixture
+            );
+            assert_eq!(
+                non_empty_buckets(&value)?,
+                sorted_bucket_names(case.buckets),
+                "{} should project the expected repair queue buckets",
+                case.fixture
+            );
+
+            for bucket in case.buckets {
+                let entries = value["buckets"][*bucket].as_array().ok_or_else(|| {
+                    format!("{} bucket `{bucket}` should be an array", case.fixture)
+                })?;
+                assert_eq!(
+                    entries.len(),
+                    1,
+                    "{} bucket `{bucket}` should contain one card",
+                    case.fixture
+                );
+                let entry = &entries[0];
+                assert_eq!(
+                    entry["operation_family"], case.operation_family,
+                    "{} bucket `{bucket}` should keep the card operation family",
+                    case.fixture
+                );
+                assert_eq!(
+                    entry["agent_readiness"]["ready"], case.ready,
+                    "{} bucket `{bucket}` should keep the agent readiness",
+                    case.fixture
+                );
+                assert_repair_queue_boundaries(entry)?;
+            }
+        }
+        Ok(())
+    }
+
     fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures")
@@ -317,6 +458,32 @@ mod tests {
 
     fn parse_json(text: &str) -> Result<serde_json::Value, String> {
         serde_json::from_str(text).map_err(|err| format!("JSON parse failed: {err}"))
+    }
+
+    fn non_empty_buckets(value: &serde_json::Value) -> Result<Vec<String>, String> {
+        let buckets = value["buckets"]
+            .as_object()
+            .ok_or("repair queue buckets should be an object")?;
+        let mut names = buckets
+            .iter()
+            .filter_map(|(name, entries)| {
+                entries
+                    .as_array()
+                    .is_some_and(|entries| !entries.is_empty())
+                    .then(|| name.clone())
+            })
+            .collect::<Vec<_>>();
+        names.sort();
+        Ok(names)
+    }
+
+    fn sorted_bucket_names(names: &[&str]) -> Vec<String> {
+        let mut names = names
+            .iter()
+            .map(|name| (*name).to_string())
+            .collect::<Vec<_>>();
+        names.sort();
+        names
     }
 
     fn assert_repair_queue_boundaries(entry: &serde_json::Value) -> Result<(), String> {

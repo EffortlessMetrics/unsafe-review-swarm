@@ -43,6 +43,26 @@ The useful fields for an agent handoff are:
   executable guard/discharge evidence with comments or docs.
 - `stop_conditions`: when the agent should stop and hand the result back.
 
+## Repair Queue Examples
+
+`repair-queue.json` aggregates the same card-scoped packet metadata. These
+fixture-backed examples show how operation families should land in queue
+buckets; the buckets are handoff labels, not proof, source edits, comments, or
+witness execution.
+
+| Fixture | Operation family | Non-empty buckets | Agent-ready |
+|---|---|---|---|
+| `raw_pointer_alignment` | `raw_pointer_read` | `repairable_by_guard`, `requires_witness_receipt` | yes |
+| `vec_set_len` | `vec_set_len` | `repairable_by_guard`, `requires_witness_receipt` | yes |
+| `str_from_utf8_unchecked` | `str_from_utf8_unchecked` | `repairable_by_guard`, `requires_witness_receipt` | yes |
+| `maybeuninit_assume_init` | `maybe_uninit_assume_init` | `repairable_by_guard`, `requires_witness_receipt` | yes |
+| `nonnull_other_guard_not_evidence` | `nonnull_unchecked` | `repairable_by_guard`, `requires_witness_receipt` | yes |
+| `ffi_sanitizer_route` | `ffi` | `repairable_by_guard`, `repairable_by_test`, `requires_witness_receipt`, `requires_human_review`, `do_not_auto_repair` | no |
+| `atomic_pointer_state_swap` | `atomic_pointer_state` | `repairable_by_guard`, `repairable_by_safety_docs`, `requires_witness_receipt`, `requires_human_review`, `do_not_auto_repair` | no |
+| `unsafe_impl_send` | `unsafe_impl_send_sync` | `repairable_by_guard`, `requires_witness_receipt`, `requires_human_review`, `do_not_auto_repair` | no |
+| `inline_asm_human_review` | `inline_asm` | `repairable_by_guard`, `requires_witness_receipt`, `requires_human_review`, `do_not_auto_repair` | no |
+| `split_unsafe_block` | `unknown` | `repairable_by_guard`, `repairable_by_safety_docs`, `repairable_by_test`, `requires_witness_receipt`, `requires_human_review`, `do_not_auto_repair` | no |
+
 ## Raw Pointer Alignment
 
 Fixture proof:
