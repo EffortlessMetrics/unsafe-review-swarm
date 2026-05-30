@@ -495,6 +495,8 @@ mod tests {
         "vec_set_len_capacity_observed_not_guard",
         "vec_set_len_unrelated_capacity_comparison_not_guard",
         "vec_set_len_unrelated_const_cap_not_guard",
+        "vec_set_len_capacity_binding",
+        "vec_set_len_stale_capacity_binding_not_guard",
         "vec_set_len_remaining_capacity_guard",
         "vec_set_len_other_remaining_capacity_not_guard",
         "vec_set_len_cap_argument_not_guard",

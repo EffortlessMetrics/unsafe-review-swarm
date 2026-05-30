@@ -283,18 +283,34 @@ impl<'a> SetLenCapacityContext<'a> {
     }
 
     fn capacity_bindings(&self) -> Vec<&'a str> {
-        self.before_call
-            .split(';')
-            .filter_map(|statement| {
-                let (left, right) = statement.split_once('=')?;
-                let binding = let_binding_name(left)?;
-                let right = right.trim();
-                ((right == format!("{}.capacity()", self.same_vec_target)
-                    || right == format!("{}.cap()", self.same_vec_target))
-                    && !binding.is_empty())
-                .then_some(binding)
-            })
-            .collect()
+        let mut bindings = Vec::new();
+        let mut consumed = 0usize;
+        for statement in self.before_call.split_inclusive(';') {
+            let statement_without_semicolon = statement.trim_end_matches(';');
+            let Some((left, right)) = statement_without_semicolon.split_once('=') else {
+                consumed += statement.len();
+                continue;
+            };
+            let Some(binding) = let_binding_name(left) else {
+                consumed += statement.len();
+                continue;
+            };
+            let right = right.trim();
+            let after_binding =
+                &self.before_call[(consumed + statement.len()).min(self.before_call.len())..];
+            if (right == format!("{}.capacity()", self.same_vec_target)
+                || right == format!("{}.cap()", self.same_vec_target))
+                && !binding.is_empty()
+                && !has_assignment_to_any_identifier(
+                    after_binding,
+                    &[self.same_vec_target, binding],
+                )
+            {
+                bindings.push(binding);
+            }
+            consumed += statement.len();
+        }
+        bindings
     }
 
     fn has_remaining_capacity_guard(&self) -> bool {

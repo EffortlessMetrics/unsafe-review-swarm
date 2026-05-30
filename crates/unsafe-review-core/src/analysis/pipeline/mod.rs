@@ -2416,6 +2416,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "vec_set_len_capacity_observed_not_guard",
             "vec_set_len_unrelated_capacity_comparison_not_guard",
             "vec_set_len_cap_argument_not_guard",
+            "vec_set_len_stale_capacity_binding_not_guard",
             "vec_set_len_reassigned_receiver_not_guard",
             "vec_set_len_reassigned_new_len_not_guard",
             "vec_set_len_compound_reassigned_new_len_not_guard",
@@ -2491,6 +2492,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     #[test]
     fn vec_set_len_capacity_only_evidence_keeps_initialized_range_gap() -> Result<(), String> {
         for fixture in [
+            "vec_set_len_capacity_binding",
             "vec_set_len_with_capacity",
             "vec_set_len_reserve_capacity",
             "vec_set_len_try_reserve_capacity",

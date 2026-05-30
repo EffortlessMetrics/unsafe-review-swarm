@@ -1,0 +1,22 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,17 @@
++pub fn reset_after_capacity_binding(mut values: Vec<u8>, new_len: usize) -> Vec<u8> {
++    let capacity = values.capacity();
++    values = Vec::new();
++    assert!(new_len <= capacity);
++    // SAFETY: capacity was measured before the Vec receiver was reassigned.
++    unsafe { values.set_len(new_len) };
++    values
++}
++
++#[cfg(test)]
++mod tests {
++    use super::reset_after_capacity_binding;
++
++    #[test]
++    fn mentions_reset_after_capacity_binding() {
++        let _ = stringify!(reset_after_capacity_binding);
++    }
++}

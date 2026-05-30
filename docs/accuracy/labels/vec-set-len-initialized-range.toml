@@ -151,6 +151,36 @@ label_source = "fixture_golden"
 rationale = "An unrelated capacity comparison must not discharge the target Vec::set_len initialized range."
 
 [[samples]]
+id = "vec-set-len-capacity-binding-present"
+fixture = "vec_set_len_capacity_binding"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "capacity"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A fresh same-vector capacity binding used in a new-length bound discharges the Vec::set_len capacity obligation but not initialized-range evidence."
+
+[[samples]]
+id = "vec-set-len-stale-capacity-binding-missing"
+fixture = "vec_set_len_stale_capacity_binding_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "capacity"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A capacity binding measured before the Vec receiver is reassigned does not prove capacity for the later Vec::set_len target."
+
+[[samples]]
 id = "vec-set-len-cap-argument-missing"
 fixture = "vec_set_len_cap_argument_not_guard"
 kind = "false_positive_control"

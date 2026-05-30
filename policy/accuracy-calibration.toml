@@ -478,6 +478,8 @@ fixtures = [
   "vec_set_len_single_index_init_not_guard",
   "vec_set_len_capacity_observed_not_guard",
   "vec_set_len_unrelated_capacity_comparison_not_guard",
+  "vec_set_len_capacity_binding",
+  "vec_set_len_stale_capacity_binding_not_guard",
   "vec_set_len_cap_argument_not_guard",
   "vec_set_len_unrelated_const_cap_not_guard",
   "vec_set_len_reassigned_receiver_not_guard",
@@ -511,7 +513,7 @@ loop, same-vector slice-binding loop, call-result, same-vector shrink,
 zero-clear, and capacity-only reserve/try_reserve evidence from comment-only,
 opaque-constructor capacity, post-init, unrelated-initialization, other-slice, partial-slice,
 stale-slice-binding, single-index initialization, unrelated-capacity,
-unrelated-const-cap, other-receiver shrink, stale-receiver,
+capacity-binding staleness, unrelated-const-cap, other-receiver shrink, stale-receiver,
 stale-with-capacity receiver, stale-with-capacity new length, stale-new-len,
 compound-stale-new-len, stale-additional, and cap-name-only controls in the
 listed fixtures.
