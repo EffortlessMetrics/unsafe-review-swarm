@@ -13946,6 +13946,42 @@ Snapshot reports:
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_missing_repair_queue_do_not_do_boundary()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-repair-queue-missing-boundary")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+
+        let path = dir.join("repair-queue.json");
+        let mut repair_queue: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&path).map_err(|err| format!("read repair queue failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse repair queue failed: {err}"))?;
+        let rules = repair_queue["buckets"]["repairable_by_guard"][0]["do_not_do"]
+            .as_array_mut()
+            .ok_or_else(|| "repair queue fixture must include do_not_do".to_string())?;
+        rules.retain(|rule| {
+            !rule
+                .as_str()
+                .is_some_and(|text| text.contains("automatic safety repair"))
+        });
+        fs::write(&path, repair_queue.to_string())
+            .map_err(|err| format!("write repair queue failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = result.err().unwrap_or_default();
+        assert!(
+            err.contains(
+                "repair-queue.json entry do_not_do must include boundary `automatic safety repair`"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn advisory_artifact_checker_rejects_cards_schema_drift() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-artifacts-cards-schema-drift")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
