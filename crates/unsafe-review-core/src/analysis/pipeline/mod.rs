@@ -1263,6 +1263,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
         for fixture in [
             "nonnull_new_reassigned_ptr_not_guard",
             "nonnull_new_shadowed_ptr_not_guard",
+            "nonnull_method_receiver_reassigned_not_guard",
             "nonnull_is_null_reassigned_ptr_not_guard",
             "nonnull_is_null_shadowed_ptr_not_guard",
             "nonnull_is_null_open_branch_shadowed_ptr_not_guard",

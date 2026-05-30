@@ -631,6 +631,15 @@ mod tests {
             "NonNull::new_unchecked(bucket.as_ptr())",
             vec![],
         );
+        let stale_method_guard = site_with_family(
+            OperationFamily::NonNullUnchecked,
+            vec![
+                "if bucket.as_ptr().is_null() { return None; }",
+                "bucket = Vec::new();",
+            ],
+            "NonNull::new_unchecked(bucket.as_ptr())",
+            vec![],
+        );
         let post_guard = site_with_family(
             OperationFamily::NonNullUnchecked,
             vec![],
@@ -700,6 +709,11 @@ mod tests {
         );
         assert!(
             obligation_evidence(&method_guard, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            !obligation_evidence(&stale_method_guard, &obligations, &contract, &reach)[0]
                 .discharge
                 .present
         );

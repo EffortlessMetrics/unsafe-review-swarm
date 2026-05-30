@@ -279,6 +279,7 @@ mod tests {
         "nonnull_new_guard",
         "nonnull_new_reassigned_ptr_not_guard",
         "nonnull_new_shadowed_ptr_not_guard",
+        "nonnull_method_receiver_reassigned_not_guard",
         "nonnull_if_let_new_guard",
         "nonnull_let_else_new_guard",
         "nonnull_match_new_guard",

@@ -51,6 +51,19 @@ label_source = "fixture_golden"
 rationale = "Question-mark NonNull::new evidence becomes stale when a later `let ptr = ...` shadows the checked pointer before NonNull::new_unchecked."
 
 [[samples]]
+id = "nonnull-method-receiver-reassigned-not-guard"
+fixture = "nonnull_method_receiver_reassigned_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "nonnull_unchecked"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "non-null"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Nullability evidence for a pointer returned by a receiver method becomes stale when the checked receiver is reassigned before NonNull::new_unchecked."
+
+[[samples]]
 id = "nonnull-if-let-new-guard-present"
 fixture = "nonnull_if_let_new_guard"
 kind = "positive"

@@ -5,7 +5,7 @@ use super::{
     branch_still_open_at_operation, code_before_operation, compact_code,
     condition_has_top_level_conjunct, condition_has_top_level_disjunct, contains_executable_return,
     contains_simple_assignment_to, ends_with_some_pattern, match_some_branch_after_marker,
-    matching_code_block_end, strip_block_comments_and_literals,
+    matching_code_block_end, receiver_before_marker, strip_block_comments_and_literals,
 };
 
 pub(super) fn has_nullability_guard(site: &ScannedSite, lower: &str) -> bool {
@@ -26,20 +26,25 @@ struct NonNullPointerContext<'a> {
     compact: &'a str,
     same_pointer_target: String,
     same_pointer_new_probe: String,
+    stale_assignment_targets: Vec<String>,
 }
 
 impl<'a> NonNullPointerContext<'a> {
     fn new(compact: &'a str, arg: String) -> Self {
         let same_pointer_new_probe = format!("nonnull::new({arg})");
+        let stale_assignment_targets = stale_assignment_targets(&arg);
         Self {
             compact,
             same_pointer_target: arg,
             same_pointer_new_probe,
+            stale_assignment_targets,
         }
     }
 
     fn has_stale_pointer_assignment(&self, text: &str) -> bool {
-        contains_simple_assignment_to(text, &self.same_pointer_target)
+        self.stale_assignment_targets
+            .iter()
+            .any(|target| contains_simple_assignment_to(text, target))
     }
 
     fn pointer_stays_fresh_after(&self, evidence: &str) -> bool {
@@ -132,6 +137,18 @@ impl<'a> NonNullPointerContext<'a> {
                 && self.open_branch_preserves_applicability(after_guard)
         })
     }
+}
+
+fn stale_assignment_targets(arg: &str) -> Vec<String> {
+    let mut targets = vec![arg.to_string()];
+    for marker in [".as_ptr()", ".as_mut_ptr()", ".cast::<", ".cast()"] {
+        if let Some(receiver) = receiver_before_marker(arg, marker)
+            && !targets.iter().any(|target| target == receiver)
+        {
+            targets.push(receiver.to_string());
+        }
+    }
+    targets
 }
 
 fn nonnull_new_unchecked_argument(expression: &str) -> Option<String> {

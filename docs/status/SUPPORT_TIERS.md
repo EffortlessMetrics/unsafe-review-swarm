@@ -32,6 +32,7 @@ Recent `NonNull::new_unchecked` nullability additions include
 `nonnull_if_let_new_guard`, `nonnull_let_else_new_guard`,
 `nonnull_match_new_guard`, `nonnull_new_reassigned_ptr_not_guard`,
 `nonnull_new_shadowed_ptr_not_guard`,
+`nonnull_method_receiver_reassigned_not_guard`,
 `nonnull_is_null_disjunct_return_guard`,
 `nonnull_is_null_conjunct_return_not_guard`,
 `nonnull_is_null_reassigned_ptr_not_guard`,
@@ -46,6 +47,8 @@ Recent `NonNull::new_unchecked` nullability additions include
 open-branch guards and null early-return guards, including the top-level
 conjunctive/disjunctive boolean shapes that dominate the operation, while
 rejecting inverse, stale, or shadowed checked-pointer evidence.
+Method-receiver nullability evidence is also stale when the checked receiver is
+reassigned before `NonNull::new_unchecked`.
 Recent guard-evidence additions include
 `raw_pointer_alignment_is_aligned_guard`,
 `raw_pointer_alignment_observed_not_guard`,

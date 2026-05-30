@@ -645,6 +645,7 @@ fixtures = [
   "nonnull_new_guard",
   "nonnull_new_reassigned_ptr_not_guard",
   "nonnull_new_shadowed_ptr_not_guard",
+  "nonnull_method_receiver_reassigned_not_guard",
   "nonnull_if_let_new_guard",
   "nonnull_let_else_new_guard",
   "nonnull_match_new_guard",
@@ -680,7 +681,8 @@ forms, plus same-pointer non-null open branches, top-level conjunctive non-null
 open branches, and null early-return branches including top-level disjunctive
 null branches, from conjunctive null-return, disjunctive non-null-branch,
 wrong-pointer, observed-only, non-returning is_null, post-check, and stale
-or shadowed pointer controls in the listed fixtures.
+or shadowed pointer controls, including stale method-receiver nullability
+evidence, in the listed fixtures.
 """
 forbidden_claims = [
   "broad NonNull soundness",

@@ -1,0 +1,23 @@
+use core::ptr::NonNull;
+
+pub fn expose_nonnull_after_bucket_reset(
+    mut bucket: Vec<u8>,
+    replacement: Vec<u8>,
+) -> Option<NonNull<u8>> {
+    if bucket.as_mut_ptr().is_null() {
+        return None;
+    }
+    bucket = replacement;
+    // SAFETY: fixture checks that stale method-receiver nullability evidence is rejected.
+    Some(unsafe { NonNull::new_unchecked(bucket.as_mut_ptr()) })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::expose_nonnull_after_bucket_reset;
+
+    #[test]
+    fn mentions_expose_nonnull_after_bucket_reset() {
+        let _ = stringify!(expose_nonnull_after_bucket_reset);
+    }
+}
