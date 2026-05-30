@@ -1,8 +1,9 @@
 use super::{
     any_compact_if_condition, branch_still_open_at_operation, compact_code,
     condition_has_top_level_conjunct, condition_has_top_level_disjunct, contains_executable_return,
-    contains_simple_assignment_to, matching_call_argument_end, matching_code_block_end,
-    receiver_before_marker, split_top_level_arguments, strip_block_comments_and_literals,
+    contains_simple_assignment_to, is_receiver_path_char, matching_call_argument_end,
+    matching_code_block_end, receiver_before_marker, split_top_level_arguments,
+    strip_block_comments_and_literals,
 };
 
 pub(super) fn has_copy_slice_range_evidence(expression: &str, before_call: &str) -> bool {
@@ -73,9 +74,51 @@ impl CopyRangeBoundTarget {
     }
 
     fn has_stale_target_assignment(&self, text: &str) -> bool {
-        contains_simple_assignment_to(text, &self.slice_receiver)
-            || contains_simple_assignment_to(text, &self.count)
+        contains_assignment_to_copy_target(text, &self.slice_receiver)
+            || contains_assignment_to_copy_target(text, &self.count)
     }
+}
+
+fn contains_assignment_to_copy_target(compact: &str, target: &str) -> bool {
+    contains_simple_assignment_to(compact, target)
+        || contains_assignment_to_receiver_path(compact, target)
+}
+
+fn contains_assignment_to_receiver_path(compact: &str, path: &str) -> bool {
+    if path.is_empty() {
+        return false;
+    }
+    let mut cursor = compact;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(path) {
+        let start = offset + pos;
+        let after_path_start = start + path.len();
+        let before = compact[..start].chars().next_back();
+        let after_path = &compact[after_path_start..];
+        if before.is_none_or(|ch| !is_receiver_path_char(ch))
+            && starts_assignment_operator(after_path)
+        {
+            return true;
+        }
+        let next = pos + path.len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
+}
+
+fn starts_assignment_operator(value: &str) -> bool {
+    value.starts_with("<<=")
+        || value.starts_with(">>=")
+        || value.starts_with("+=")
+        || value.starts_with("-=")
+        || value.starts_with("*=")
+        || value.starts_with("/=")
+        || value.starts_with("%=")
+        || value.starts_with("&=")
+        || value.starts_with("|=")
+        || value.starts_with("^=")
+        || (value.starts_with('=') && !value.starts_with("==") && !value.starts_with("=>"))
 }
 
 fn copy_call_arguments(expression: &str) -> Option<(String, String, String)> {

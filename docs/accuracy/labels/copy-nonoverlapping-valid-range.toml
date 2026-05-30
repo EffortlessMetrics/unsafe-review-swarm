@@ -389,6 +389,19 @@ label_source = "fixture_golden"
 rationale = "Length evidence for the original source slice does not discharge valid-range evidence after source reassignment."
 
 [[samples]]
+id = "copy-nonoverlapping-reassigned-src-path-not-guard"
+fixture = "copy_nonoverlapping_slice_range_reassigned_src_path_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Length evidence for the original source path, such as `buffers.src`, does not discharge valid-range evidence after source path reassignment."
+
+[[samples]]
 id = "copy-nonoverlapping-shadowed-src-not-guard"
 fixture = "copy_nonoverlapping_slice_range_shadowed_src_not_guard"
 kind = "false_positive_control"
