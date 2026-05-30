@@ -673,6 +673,7 @@ Top card:
 - Route: Miri / cargo-careful
 
 Open:
+- `target/unsafe-review/review-kit.json`
 - `target/unsafe-review/pr-summary.md`
 - `target/unsafe-review/github-summary.md`
 - `target/unsafe-review/witness-plan.md`

@@ -255,8 +255,10 @@ cargo run --locked -p xtask -- check-first-pr-artifacts \
 Artifacts:
 
 ```text
+target/unsafe-review/review-kit.json
 target/unsafe-review/cards.json
 target/unsafe-review/pr-summary.md
+target/unsafe-review/github-summary.md
 target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
@@ -987,6 +989,7 @@ jobs:
         with:
           name: unsafe-review-first-pr
           path: |
+            target/unsafe-review/review-kit.json
             target/unsafe-review/cards.json
             target/unsafe-review/pr-summary.md
             target/unsafe-review/github-summary.md

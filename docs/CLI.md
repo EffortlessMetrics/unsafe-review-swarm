@@ -91,6 +91,7 @@ unsafe-review first-pr --base origin/main
 By default this writes:
 
 ```text
+target/unsafe-review/review-kit.json
 target/unsafe-review/cards.json
 target/unsafe-review/pr-summary.md
 target/unsafe-review/github-summary.md

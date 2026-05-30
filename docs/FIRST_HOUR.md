@@ -64,6 +64,7 @@ unsafe-review first-pr --base origin/main
 This writes the advisory PR bundle:
 
 ```text
+target/unsafe-review/review-kit.json
 target/unsafe-review/cards.json
 target/unsafe-review/pr-summary.md
 target/unsafe-review/github-summary.md

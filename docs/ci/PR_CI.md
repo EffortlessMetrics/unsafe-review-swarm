@@ -127,6 +127,7 @@ cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review
 The bundle contains:
 
 ```text
+target/unsafe-review/review-kit.json
 target/unsafe-review/cards.json
 target/unsafe-review/pr-summary.md
 target/unsafe-review/github-summary.md
@@ -136,6 +137,10 @@ target/unsafe-review/witness-plan.md
 target/unsafe-review/lsp.json
 target/unsafe-review/repair-queue.json
 ```
+
+The review-kit manifest is the discovery index for the first-pr bundle. It
+lists the generated artifacts, top card, counts, and trust boundary without
+creating a second ReviewCard truth.
 
 The PR summary artifact is the reviewer front panel. It projects existing
 ReviewCards only: counts, top card, card table, witness plan, and the trust
