@@ -595,6 +595,7 @@ mod tests {
         "transmute_copy_bool_conjunct_branch_guard",
         "transmute_copy_bool_disjunct_branch_not_guard",
         "transmute_copy_bool_invalid_return_guard",
+        "transmute_copy_bool_invalid_return_comment_not_guard",
         "transmute_copy_bool_disjunct_return_guard",
         "transmute_copy_bool_conjunct_return_not_guard",
         "transmute_copy_bool_value_observed_not_guard",
