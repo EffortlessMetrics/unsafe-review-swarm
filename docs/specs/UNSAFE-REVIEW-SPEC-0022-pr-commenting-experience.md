@@ -94,9 +94,9 @@ Never select suppressed, `baseline_known`, `static_unknown`, or
 `operation_family: "unknown"` cards. Prefer actionable changed unsafe
 operations that name specific missing evidence and a concrete next action.
 Additional cards in an already-selected operation family and missing-obligation
-set remain in `not_selected[]` with reason `operation family and obligation
-already selected for comment-plan budget`; this preserves the review budget
-without hiding the underlying ReviewCards.
+set remain in `not_selected[]` with reason `covered by selected
+family/obligation sibling`; this preserves the review budget without hiding the
+underlying ReviewCards.
 Cards that are present in the ReviewCard set but lack a changed-line anchor
 must stay out of `comments[]` with reason `outside changed hunk`; this keeps
 future inline comments tied to PR review context without hiding the card from
