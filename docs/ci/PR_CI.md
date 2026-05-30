@@ -134,6 +134,7 @@ target/unsafe-review/github-summary.md
 target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
+target/unsafe-review/receipt-audit.md
 target/unsafe-review/lsp.json
 target/unsafe-review/repair-queue.json
 ```
@@ -159,6 +160,10 @@ The comment-plan artifact is a plan of candidate high-signal inline comments.
 It is not posted by default.
 Fixture-backed selected and not-selected examples are in
 [COMMENT_PLAN_EXAMPLES.md](COMMENT_PLAN_EXAMPLES.md).
+
+The `receipt-audit.md` artifact checks saved witness receipt metadata against
+the current ReviewCards. It does not run witnesses and does not turn a receipt
+into proof of site execution, memory safety, UB-free status, or repo safety.
 
 The saved `lsp.json` artifact is a read-only projection for diagnostics,
 hovers, and command-only actions. It must not include `WorkspaceEdit`, source

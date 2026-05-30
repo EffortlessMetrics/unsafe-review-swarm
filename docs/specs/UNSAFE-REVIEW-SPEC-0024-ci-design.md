@@ -262,6 +262,7 @@ target/unsafe-review/github-summary.md
 target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
+target/unsafe-review/receipt-audit.md
 target/unsafe-review/lsp.json
 target/unsafe-review/repair-queue.json
 ```
@@ -605,6 +606,9 @@ comment-plan carries structured next action, actionability, relevance, and witne
 comment-plan comment bodies stay within the hard 220-word limit
 comment-plan includes trust boundary
 witness-plan includes route limits
+receipt-audit.md exists
+receipt-audit includes saved-receipt metadata summary and trust boundary
+receipt-audit does not claim witness execution, site execution, proof, or safety
 lsp.json contains read-only projections
 lsp.json code actions are command-only
 repair-queue.json schema_version is checked
@@ -701,6 +705,7 @@ Top card:
 Open:
 - `target/unsafe-review/pr-summary.md`
 - `target/unsafe-review/witness-plan.md`
+- `target/unsafe-review/receipt-audit.md`
 
 Trust boundary:
 Static unsafe contract review only. Not memory-safety proof, not UB-free status,
@@ -996,6 +1001,7 @@ jobs:
             target/unsafe-review/cards.sarif
             target/unsafe-review/comment-plan.json
             target/unsafe-review/witness-plan.md
+            target/unsafe-review/receipt-audit.md
             target/unsafe-review/lsp.json
             target/unsafe-review/repair-queue.json
           if-no-files-found: error

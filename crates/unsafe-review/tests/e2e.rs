@@ -648,6 +648,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("cards.sarif"));
     assert!(stdout.contains("comment-plan.json"));
     assert!(stdout.contains("witness-plan.md"));
+    assert!(stdout.contains("receipt-audit.md"));
     assert!(stdout.contains("lsp.json"));
     assert!(stdout.contains("repair-queue.json"));
     assert!(stdout.contains("Trust boundary:"));
@@ -753,6 +754,13 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
                 .any(|artifact| artifact["path"] == "cards.json"))
     );
     assert!(
+        review_kit["artifacts"]
+            .as_array()
+            .map_or(false, |artifacts| artifacts
+                .iter()
+                .any(|artifact| artifact["path"] == "receipt-audit.md"))
+    );
+    assert!(
         review_kit["trust_boundary"]
             .as_str()
             .unwrap_or("")
@@ -788,10 +796,12 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(github_summary.contains("Review kit manifest: `review-kit.json`"));
     assert!(github_summary.contains("Full reviewer cockpit: `pr-summary.md`"));
     assert!(github_summary.contains("Agent repair queue: `repair-queue.json`"));
+    assert!(github_summary.contains("Receipt audit: `receipt-audit.md`"));
     assert!(github_summary.contains("`comment-plan.json` is plan-only"));
     assert!(github_summary.contains("Full advisory bundle"));
     assert!(github_summary.contains("review-kit.json"));
     assert!(github_summary.contains("github-summary.md"));
+    assert!(github_summary.contains("receipt-audit.md"));
     assert!(github_summary.contains("not memory-safety proof"));
     assert!(github_summary.contains("not site-execution proof"));
     assert!(github_summary.contains("unsafe-review did not run witnesses"));
@@ -800,6 +810,15 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(github_summary.contains("enforce blocking policy"));
     assert!(!github_summary.contains("# unsafe-review PR summary"));
     assert!(!github_summary.contains("## Card table"));
+
+    let receipt_audit = fs::read_to_string(out_dir.join("receipt-audit.md"))?;
+    assert!(receipt_audit.contains("# unsafe-review receipt audit"));
+    assert!(receipt_audit.contains("Static audit of saved witness receipt metadata"));
+    assert!(receipt_audit.contains("## Reviewer front panel"));
+    assert!(receipt_audit.contains("No receipt files found."));
+    assert!(receipt_audit.contains("does not execute witnesses"));
+    assert!(receipt_audit.contains("does not prove site reach"));
+    assert!(receipt_audit.contains("matched receipts improve witness evidence only"));
 
     let sarif = parse_json(&fs::read_to_string(out_dir.join("cards.sarif"))?)?;
     assert_eq!(sarif["version"], "2.1.0");
@@ -965,9 +984,16 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
     assert!(github_summary.contains("Review kit manifest: `review-kit.json`"));
     assert!(github_summary.contains("Full reviewer cockpit: `pr-summary.md`"));
     assert!(github_summary.contains("Agent repair queue: `repair-queue.json`"));
+    assert!(github_summary.contains("Receipt audit: `receipt-audit.md`"));
     assert!(github_summary.contains("Full advisory bundle"));
     assert!(github_summary.contains("review-kit.json"));
     assert!(!github_summary.contains("All clear"));
+
+    let receipt_audit = fs::read_to_string(out_dir.join("receipt-audit.md"))?;
+    assert!(receipt_audit.contains("# unsafe-review receipt audit"));
+    assert!(receipt_audit.contains("No receipt files found."));
+    assert!(receipt_audit.contains("does not execute witnesses"));
+    assert!(receipt_audit.contains("does not prove site reach"));
 
     let witness_plan = fs::read_to_string(out_dir.join("witness-plan.md"))?;
     assert!(witness_plan.contains("No changed unsafe-review gaps were found."));

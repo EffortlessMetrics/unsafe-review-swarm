@@ -230,7 +230,7 @@ pub(crate) fn render_github_summary(output: &AnalyzeOutput) -> String {
     render_github_summary_open_next(&mut out);
     out.push_str("---\n\n");
     out.push_str(
-        "Full advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n",
+        "Full advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n",
     );
     out.push_str(
         "> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",
@@ -247,6 +247,7 @@ fn render_github_summary_open_next(out: &mut String) {
     out.push_str("- Full reviewer cockpit: `pr-summary.md`\n");
     out.push_str("- Machine-readable ReviewCards: `cards.json`\n");
     out.push_str("- Witness routes: `witness-plan.md`\n");
+    out.push_str("- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n");
     out.push_str("- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n");
     out.push_str(
         "- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n",
@@ -764,8 +765,11 @@ mod tests {
         assert!(rendered.contains("- Full reviewer cockpit: `pr-summary.md`"));
         assert!(rendered.contains("- Machine-readable ReviewCards: `cards.json`"));
         assert!(rendered.contains("- Witness routes: `witness-plan.md`"));
+        assert!(rendered.contains("- Receipt audit: `receipt-audit.md`"));
+        assert!(rendered.contains("no witness was run"));
         assert!(rendered.contains("`comment-plan.json` is plan-only"));
         assert!(rendered.contains("Full advisory bundle"));
+        assert!(rendered.contains("receipt-audit.md"));
         assert!(rendered.contains("unsafe-review did not run witnesses"));
         assert!(rendered.contains("post comments"));
         assert!(rendered.contains("edit source"));

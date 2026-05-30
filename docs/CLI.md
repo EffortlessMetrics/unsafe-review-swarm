@@ -98,6 +98,7 @@ target/unsafe-review/github-summary.md
 target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
+target/unsafe-review/receipt-audit.md
 target/unsafe-review/lsp.json
 target/unsafe-review/repair-queue.json
 ```
@@ -109,10 +110,10 @@ The command analyzes once and renders every artifact from the same
 `ReviewCard`s. It stays advisory-only: it does not execute witness tools, post
 comments, edit source, or enforce blocking policy.
 
-The terminal handoff also prints a matching `unsafe-review receipt audit`
-command so reviewers can check whether saved witness receipt metadata still
-matches the current first-pr cards. The audit is metadata-only and does not run
-the witness.
+The bundle also includes `receipt-audit.md`, and the terminal handoff prints the
+matching `unsafe-review receipt audit` command so reviewers can check whether
+saved witness receipt metadata still matches the current first-pr cards. The
+audit is metadata-only and does not run the witness.
 
 ## Output Formats
 

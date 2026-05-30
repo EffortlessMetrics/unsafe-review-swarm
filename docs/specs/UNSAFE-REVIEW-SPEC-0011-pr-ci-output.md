@@ -105,6 +105,7 @@ target/unsafe-review/github-summary.md
 target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
+target/unsafe-review/receipt-audit.md
 target/unsafe-review/lsp.json
 target/unsafe-review/repair-queue.json
 ```
@@ -396,7 +397,30 @@ what this route cannot prove
 receipt hint
 ```
 
-#### 3.7 `lsp.json`
+#### 3.7 `receipt-audit.md`
+
+Reviewer-readable saved witness receipt metadata audit.
+
+Must include:
+
+```text
+summary counts
+reviewer front panel
+receipt quality buckets
+trust boundary
+```
+
+The artifact is a static audit of saved receipt metadata against current
+ReviewCards. It may report matched, unmatched, stale, expired, wrong identity,
+wrong tool, weaker-than-route, command-hash mismatch, duplicate, or invalid
+receipt metadata.
+
+Matched receipts improve witness evidence only. They must not erase missing
+contract, guard, or reach evidence, and they must not claim witness execution,
+site execution, proof, UB-free status, Miri-clean status, source edits,
+comments, or blocking policy.
+
+#### 3.8 `lsp.json`
 
 Saved editor/LLM projection.
 
@@ -455,7 +479,7 @@ approve PR
 block PR
 ```
 
-#### 3.8 `repair-queue.json`
+#### 3.9 `repair-queue.json`
 
 Aggregate copy-only agent handoff queue.
 
@@ -700,6 +724,7 @@ Open:
 - `target/unsafe-review/pr-summary.md`
 - `target/unsafe-review/github-summary.md`
 - `target/unsafe-review/witness-plan.md`
+- `target/unsafe-review/receipt-audit.md` (saved receipt metadata only; no witness was run)
 - `target/unsafe-review/repair-queue.json` (copy-only; no agent was run)
 
 Trust boundary:
@@ -765,7 +790,7 @@ This is not Miri-clean status.
 The first-pr artifact verifier scans every required bundle artifact for positive
 overclaim wording, including `review-kit.json`, `cards.json`, `pr-summary.md`,
 `github-summary.md`, `cards.sarif`, `comment-plan.json`, `witness-plan.md`,
-`lsp.json`, and `repair-queue.json`.
+`receipt-audit.md`, `lsp.json`, and `repair-queue.json`.
 
 ### 8. Policy report relationship
 

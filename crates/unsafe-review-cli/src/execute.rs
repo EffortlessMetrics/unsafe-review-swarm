@@ -27,6 +27,7 @@ const NO_CHANGED_GAPS_LIMITATION: &str =
 type FirstPrRenderer = fn(&AnalyzeOutput) -> String;
 
 const REVIEW_KIT_ARTIFACT: &str = "review-kit.json";
+const RECEIPT_AUDIT_ARTIFACT: &str = "receipt-audit.md";
 const FIRST_PR_RENDERED_ARTIFACTS: [(&str, FirstPrRenderer); 8] = [
     ("cards.json", render_json),
     ("pr-summary.md", render_pr_summary),
@@ -37,7 +38,7 @@ const FIRST_PR_RENDERED_ARTIFACTS: [(&str, FirstPrRenderer); 8] = [
     ("lsp.json", render_lsp),
     ("repair-queue.json", render_repair_queue),
 ];
-const FIRST_PR_ARTIFACTS: [&str; 9] = [
+const FIRST_PR_ARTIFACTS: [&str; 10] = [
     REVIEW_KIT_ARTIFACT,
     "cards.json",
     "pr-summary.md",
@@ -45,6 +46,7 @@ const FIRST_PR_ARTIFACTS: [&str; 9] = [
     "cards.sarif",
     "comment-plan.json",
     "witness-plan.md",
+    RECEIPT_AUDIT_ARTIFACT,
     "lsp.json",
     "repair-queue.json",
 ];
@@ -148,6 +150,15 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     let output = analyze(AnalyzeInput {
         root: root.clone(),
         scope: Scope::Diff,
+        diff: diff.clone(),
+        mode: AnalysisMode::Draft,
+        policy: PolicyMode::Advisory,
+        include_unchanged_tests: true,
+        max_cards: check.max_cards,
+    })?;
+    let receipt_audit = audit_witness_receipts(AnalyzeInput {
+        root: root.clone(),
+        scope: Scope::Diff,
         diff,
         mode: AnalysisMode::Draft,
         policy: PolicyMode::Advisory,
@@ -160,6 +171,10 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     for (name, renderer) in FIRST_PR_RENDERED_ARTIFACTS {
         write_artifact(&options.out_dir.join(name), renderer(&output))?;
     }
+    write_artifact(
+        &options.out_dir.join(RECEIPT_AUDIT_ARTIFACT),
+        render_receipt_audit_markdown(&receipt_audit),
+    )?;
     write_artifact(
         &options.out_dir.join(REVIEW_KIT_ARTIFACT),
         first_pr::render_review_kit_manifest(&output, &root, &check, &FIRST_PR_ARTIFACTS),

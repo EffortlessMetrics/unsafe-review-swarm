@@ -48,6 +48,7 @@ target/unsafe-review/github-summary.md
 target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
+target/unsafe-review/receipt-audit.md
 target/unsafe-review/lsp.json
 target/unsafe-review/repair-queue.json
 ```
@@ -134,9 +135,10 @@ what unsafe-review is not claiming:
 unsafe-review explain <card-id>
 ```
 
-It also prints a matching `unsafe-review receipt audit` command for checking
-saved witness receipt metadata against the current first-pr cards. That audit
-does not run Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux.
+It also writes `receipt-audit.md` and prints the matching
+`unsafe-review receipt audit` command for checking saved witness receipt metadata
+against the current first-pr cards. That audit does not run Miri, cargo-careful,
+sanitizers, Loom, Shuttle, Kani, or Crux.
 
 Run the `context --json` command when handing the bounded card packet to an
 agent:

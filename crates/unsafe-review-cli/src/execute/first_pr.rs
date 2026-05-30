@@ -239,6 +239,7 @@ fn artifact_kind(path: &str) -> &'static str {
         "cards.sarif" => "sarif",
         "comment-plan.json" => "comment_plan",
         "witness-plan.md" => "witness_plan",
+        "receipt-audit.md" => "receipt_audit",
         "lsp.json" => "saved_lsp",
         "repair-queue.json" => "repair_queue",
         _ => "unknown",

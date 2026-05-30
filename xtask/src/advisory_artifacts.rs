@@ -93,7 +93,7 @@ const REPAIR_QUEUE_BUCKETS: [&str; 6] = [
     "requires_human_review",
     "do_not_auto_repair",
 ];
-const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 9] = [
+const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 10] = [
     "review-kit.json",
     "cards.json",
     "pr-summary.md",
@@ -101,6 +101,7 @@ const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 9] = [
     "cards.sarif",
     "comment-plan.json",
     "witness-plan.md",
+    "receipt-audit.md",
     "lsp.json",
     "repair-queue.json",
 ];
@@ -134,6 +135,7 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         summary.open_actionable_gaps,
         &summary.card_projections,
     )?;
+    check_receipt_audit_artifact(dir)?;
     check_lsp_artifact(dir, &summary)?;
     check_github_summary_artifact(
         dir,
@@ -193,6 +195,11 @@ fn check_github_summary_artifact(
     super::require_text_contains(&text, "- Witness routes: `witness-plan.md`", &path)?;
     super::require_text_contains(
         &text,
+        "- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.",
+        &path,
+    )?;
+    super::require_text_contains(
+        &text,
         "- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.",
         &path,
     )?;
@@ -208,7 +215,7 @@ fn check_github_summary_artifact(
     super::require_text_contains(&text, "not site-execution proof", &path)?;
     super::require_text_contains(
         &text,
-        "Full advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, lsp.json, repair-queue.json)",
+        "Full advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, lsp.json, repair-queue.json)",
         &path,
     )?;
 
@@ -246,6 +253,30 @@ fn check_github_summary_artifact(
     } else {
         require_markdown_top_card_projection(&text, &path, card_projections)?;
     }
+
+    Ok(())
+}
+
+fn check_receipt_audit_artifact(dir: &Path) -> Result<(), String> {
+    let path = dir.join("receipt-audit.md");
+    let text = super::read_to_string(&path)?;
+
+    super::require_text_contains(&text, "# unsafe-review receipt audit", &path)?;
+    super::require_text_contains(
+        &text,
+        "Static audit of saved witness receipt metadata",
+        &path,
+    )?;
+    super::require_text_contains(&text, "## Summary", &path)?;
+    super::require_text_contains(&text, "## Reviewer front panel", &path)?;
+    super::require_text_contains(&text, "## Trust boundary", &path)?;
+    super::require_text_contains(&text, "does not execute witnesses", &path)?;
+    super::require_text_contains(&text, "does not prove site reach", &path)?;
+    super::require_text_contains(
+        &text,
+        "matched receipts improve witness evidence only",
+        &path,
+    )?;
 
     Ok(())
 }
@@ -513,6 +544,7 @@ fn expected_review_kit_artifact_kind(path: &str) -> &'static str {
         "cards.sarif" => "sarif",
         "comment-plan.json" => "comment_plan",
         "witness-plan.md" => "witness_plan",
+        "receipt-audit.md" => "receipt_audit",
         "lsp.json" => "saved_lsp",
         "repair-queue.json" => "repair_queue",
         _ => "unknown",
@@ -523,7 +555,9 @@ fn expected_review_kit_artifact_format(path: &str) -> &'static str {
     match path {
         "review-kit.json" | "cards.json" | "comment-plan.json" | "lsp.json"
         | "repair-queue.json" => "json",
-        "pr-summary.md" | "github-summary.md" | "witness-plan.md" => "markdown",
+        "pr-summary.md" | "github-summary.md" | "witness-plan.md" | "receipt-audit.md" => {
+            "markdown"
+        }
         "cards.sarif" => "sarif",
         _ => "unknown",
     }
@@ -542,7 +576,7 @@ fn check_review_kit_artifact_schema_version(
         "review-kit.json" | "cards.json" | "comment-plan.json" | "lsp.json"
         | "repair-queue.json" => Some("0.1"),
         "cards.sarif" => Some("2.1.0"),
-        "pr-summary.md" | "github-summary.md" | "witness-plan.md" => None,
+        "pr-summary.md" | "github-summary.md" | "witness-plan.md" | "receipt-audit.md" => None,
         _ => {
             return Err(format!("review-kit.json artifact `{path}` is unknown"));
         }
@@ -3859,6 +3893,7 @@ fn check_advisory_artifact_overclaims(dir: &Path) -> Result<(), String> {
         "cards.sarif",
         "comment-plan.json",
         "witness-plan.md",
+        "receipt-audit.md",
         "lsp.json",
         "repair-queue.json",
     ] {
