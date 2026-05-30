@@ -157,6 +157,10 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     assert!(github_summary_text.contains("## Open next"));
     assert!(github_summary_text.contains("Full reviewer cockpit: `pr-summary.md`"));
     assert!(github_summary_text.contains("not site-execution proof"));
+    assert!(github_summary_text.contains("unsafe-review did not run witnesses"));
+    assert!(github_summary_text.contains("post comments"));
+    assert!(github_summary_text.contains("edit source"));
+    assert!(github_summary_text.contains("enforce blocking policy"));
     assert!(!github_summary_text.contains("# unsafe-review PR summary"));
     assert!(!github_summary_text.contains("## Card table"));
     assert!(!github_summary_text.contains("## Witness plan"));
@@ -700,6 +704,10 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(github_summary.contains("github-summary.md"));
     assert!(github_summary.contains("not memory-safety proof"));
     assert!(github_summary.contains("not site-execution proof"));
+    assert!(github_summary.contains("unsafe-review did not run witnesses"));
+    assert!(github_summary.contains("post comments"));
+    assert!(github_summary.contains("edit source"));
+    assert!(github_summary.contains("enforce blocking policy"));
     assert!(!github_summary.contains("# unsafe-review PR summary"));
     assert!(!github_summary.contains("## Card table"));
 

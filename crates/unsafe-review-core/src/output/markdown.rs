@@ -235,6 +235,9 @@ pub(crate) fn render_github_summary(output: &AnalyzeOutput) -> String {
     out.push_str(
         "> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",
     );
+    out.push_str(
+        "> Execution boundary: unsafe-review did not run witnesses, post comments, edit source, run an agent, or enforce blocking policy.\n",
+    );
     out
 }
 
@@ -761,6 +764,10 @@ mod tests {
         assert!(rendered.contains("- Witness routes: `witness-plan.md`"));
         assert!(rendered.contains("`comment-plan.json` is plan-only"));
         assert!(rendered.contains("Full advisory bundle"));
+        assert!(rendered.contains("unsafe-review did not run witnesses"));
+        assert!(rendered.contains("post comments"));
+        assert!(rendered.contains("edit source"));
+        assert!(rendered.contains("enforce blocking policy"));
         assert!(!rendered.contains("# unsafe-review PR summary"));
         assert!(!rendered.contains("## Card table"));
         assert!(!rendered.contains("## Witness plan"));
