@@ -253,6 +253,7 @@ required_core_fixtures = [
   "str_from_utf8_unchecked_if_let_ok_guard",
   "str_from_utf8_unchecked_if_let_err_return_guard",
   "str_from_utf8_unchecked_is_err_return_guard",
+  "str_from_utf8_unchecked_is_err_return_comment_not_guard",
   "str_from_utf8_unchecked_question_mark_guard",
   "str_from_utf8_unchecked_match_return_guard",
   "str_from_utf8_unchecked_let_else_ok_guard",
@@ -2925,6 +2926,16 @@ claim = "str::from_utf8_unchecked recognizes same-buffer from_utf8 is_err early-
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "str_from_utf8_unchecked_is_err_return_comment_not_guard"
+kind = "false_positive_control"
+claim = "str::from_utf8_unchecked does not treat comment-only return text in an is_err branch as UTF-8 validation evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
 expected_operation_family = "str_from_utf8_unchecked"
 expected_hazard = "invalid_value"
 

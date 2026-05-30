@@ -237,6 +237,8 @@ rejection,
 validation before `str::from_utf8_unchecked`,
 `str_from_utf8_unchecked_if_let_err_return_guard` for same-buffer if-let `Err`
 early-return validation,
+`str_from_utf8_unchecked_is_err_return_comment_not_guard` for rejecting
+comment-only return text inside an `is_err` branch,
 `str_from_utf8_unchecked_let_else_ok_guard` for same-buffer let-else `Ok`
 validation,
 `str_from_utf8_unchecked_match_ok_guard` for same-buffer match `Ok` arm
