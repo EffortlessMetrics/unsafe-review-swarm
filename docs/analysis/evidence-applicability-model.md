@@ -193,15 +193,27 @@ wording gap.
 | `#[target_feature]` | Owner/caller docs may be contract evidence for the annotated function; cfg predicates, docs, and witness routes are not runtime availability or site-execution proof. | route-heavy | Use memchr dogfood only for concrete contract, ranking, or wording drift. |
 | `static mut` | Global mutable-state cards stay tied to the same static owner and route aliasing/synchronization obligations to review. | route-heavy | Add a dogfood target only if a real PR exposes actionable `static mut` review cards. |
 
-Original extraction sequence, retained as the preferred order for auditing or
-extending these families:
+Audit and extension sequence after the current helper extraction:
 
-1. `unwrap_unchecked`: same receiver, open branch, stale guard.
-2. `str::from_utf8_unchecked`: same buffer, stale buffer, validation branch.
-3. `get_unchecked`: same receiver and index.
-4. `NonNull::new_unchecked`: same pointer and stale pointer.
-5. `MaybeUninit::assume_init`: same slot and branch openness.
-6. `Vec::set_len`: same receiver, initialized range, and freshness.
+1. `unwrap_unchecked`: audit same-receiver, open-branch, and stale-guard
+   controls only when a fixture or dogfood card exposes drift.
+2. `str::from_utf8_unchecked`: audit same-buffer, stale-buffer, prefix/suffix,
+   and other-buffer controls before adding broader validation shapes.
+3. `get_unchecked`: audit same receiver/index, stale target, and branch
+   dominance controls before adding new probe patterns.
+4. `NonNull::new_unchecked`: audit same-pointer and stale-pointer controls;
+   keep nullability distinct from liveness and provenance evidence.
+5. `MaybeUninit::assume_init`: audit same-slot, branch-openness, partial-init,
+   and stale-write controls before recognizing broader field or array patterns.
+6. `Vec::set_len`: audit same-receiver, initialized-range, capacity-context,
+   and freshness controls before adding new loop or call-result shapes.
+7. `transmute` / `zeroed`: audit layout evidence separately from valid-value
+   and valid-zero evidence before broadening type-domain recognition.
+8. Copy/range and raw-parts families: audit same source/destination/count or
+   same pointer/len/cap ownership before adding new range abstractions.
+9. Route-heavy families such as FFI, unsafe impls, `#[target_feature]`, and
+   `static mut`: change wording or ownership handling only from concrete
+   fixture or dogfood pressure.
 
 Each helper PR should include:
 
