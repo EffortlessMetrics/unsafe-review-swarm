@@ -55,6 +55,13 @@ impl WitnessEvidence {
         }
     }
 
+    pub fn missing_with(summary: impl Into<String>) -> Self {
+        Self {
+            present: false,
+            summary: summary.into(),
+        }
+    }
+
     pub fn present(summary: impl Into<String>) -> Self {
         Self {
             present: true,

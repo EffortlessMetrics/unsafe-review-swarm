@@ -12,12 +12,21 @@ const AUDIT_TRUST_BOUNDARY: &str = "Static witness receipt audit only; this chec
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ReceiptIndex {
     by_card_id: BTreeMap<String, ImportedReceipt>,
+    metadata_by_card_id: BTreeMap<String, ReceiptMetadata>,
+    audit_date: Option<String>,
 }
 
 #[derive(Clone, Debug)]
 struct ImportedReceipt {
     tool: String,
     evidence: WitnessEvidence,
+}
+
+#[derive(Clone, Debug)]
+struct ReceiptMetadata {
+    tool: String,
+    strength: String,
+    expires_at: String,
 }
 
 impl ReceiptIndex {
@@ -32,6 +41,7 @@ impl ReceiptIndex {
             return Ok(Self::default());
         }
         let mut by_card_id = BTreeMap::new();
+        let mut metadata_by_card_id = BTreeMap::new();
         let entries =
             fs::read_dir(&dir).map_err(|err| format!("read {} failed: {err}", dir.display()))?;
         for entry in entries {
@@ -41,6 +51,13 @@ impl ReceiptIndex {
                 continue;
             }
             let receipt = parse_receipt_file(&path)?;
+            metadata_by_card_id
+                .entry(receipt.card_id.clone())
+                .or_insert_with(|| ReceiptMetadata {
+                    tool: receipt.tool.clone(),
+                    strength: receipt.strength.clone(),
+                    expires_at: receipt.expires_at.clone(),
+                });
             if receipt.expires_at.as_str() < audit_date {
                 continue;
             }
@@ -64,19 +81,53 @@ impl ReceiptIndex {
                 ));
             }
         }
-        Ok(Self { by_card_id })
+        Ok(Self {
+            by_card_id,
+            metadata_by_card_id,
+            audit_date: Some(audit_date.to_string()),
+        })
     }
 
-    pub(crate) fn evidence_for(
+    pub(crate) fn witness_evidence_for(
         &self,
         id: &CardId,
         routes: &[WitnessRoute],
-    ) -> Option<WitnessEvidence> {
-        let receipt = self.by_card_id.get(&id.0)?;
-        routes
+    ) -> WitnessEvidence {
+        let route_tools = routes
             .iter()
-            .any(|route| route.kind.as_str() == receipt.tool)
-            .then(|| receipt.evidence.clone())
+            .map(|route| route.kind.as_str())
+            .collect::<Vec<_>>();
+        if let Some(receipt) = self.by_card_id.get(&id.0) {
+            if route_tools.iter().any(|tool| *tool == receipt.tool) {
+                return receipt.evidence.clone();
+            }
+            return WitnessEvidence::missing_with(format!(
+                "Saved `{}` receipt for this card does not match routed witness tools: {}",
+                receipt.tool,
+                route_tools.join(", ")
+            ));
+        }
+
+        let Some(metadata) = self.metadata_by_card_id.get(&id.0) else {
+            return WitnessEvidence::missing();
+        };
+        if self
+            .audit_date
+            .as_deref()
+            .is_some_and(|audit_date| metadata.expires_at.as_str() < audit_date)
+        {
+            return WitnessEvidence::missing_with(format!(
+                "Saved `{}` receipt for this card is expired; attach a current matching witness receipt",
+                metadata.tool
+            ));
+        }
+        if !imports_witness_evidence(&metadata.strength) {
+            return WitnessEvidence::missing_with(format!(
+                "Saved `{}` receipt for this card has `{}` strength; attach a saved witness run receipt",
+                metadata.tool, metadata.strength
+            ));
+        }
+        WitnessEvidence::missing()
     }
 }
 
@@ -573,8 +624,7 @@ mod tests {
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
         let evidence = index
-            .evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri))
-            .ok_or_else(|| "receipt evidence missing".to_string())?;
+            .witness_evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri));
         assert!(evidence.present);
         assert!(evidence.summary.contains("miri"));
         assert!(evidence.summary.contains("ran"));
@@ -605,11 +655,10 @@ mod tests {
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
         assert_eq!(validated, 1);
-        assert!(
-            index
-                .evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri))
-                .is_none()
-        );
+        let evidence = index
+            .witness_evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri));
+        assert!(!evidence.present);
+        assert!(evidence.summary.contains("expired"));
         Ok(())
     }
 
@@ -634,11 +683,10 @@ mod tests {
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
         assert_eq!(validated, 1);
-        assert!(
-            index
-                .evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri))
-                .is_none()
-        );
+        let evidence = index
+            .witness_evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri));
+        assert!(!evidence.present);
+        assert!(evidence.summary.contains("configured"));
         Ok(())
     }
 
@@ -656,11 +704,15 @@ mod tests {
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
         assert_eq!(validated, 1);
+        let evidence = index
+            .witness_evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri));
+        assert!(!evidence.present);
         assert!(
-            index
-                .evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri))
-                .is_none()
+            evidence
+                .summary
+                .contains("does not match routed witness tools")
         );
+        assert!(evidence.summary.contains("loom"));
         Ok(())
     }
 

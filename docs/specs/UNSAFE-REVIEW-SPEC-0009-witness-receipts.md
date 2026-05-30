@@ -23,10 +23,12 @@ Each receipt is matched by exact counted `card_id`. A matching receipt marks the
 card's top-level witness evidence present and marks obligation-level witness
 evidence present only when the receipt tool matches one of the current card's
 routed witness tools and the receipt strength records a saved witness run:
-`ran`, `test_targeted`, or `site_reached`. A `configured` receipt or a receipt
-whose tool is not routed for the current card remains valid receipt metadata for
-audit, but it does not remove the missing witness gap. Receipt import does not
-discharge contracts, guards, or reach evidence.
+`ran`, `test_targeted`, or `site_reached`. A `configured`, expired, or
+wrong-tool receipt remains valid receipt metadata for audit, but it does not
+remove the missing witness gap. Card-level witness summaries should surface that
+same-card metadata-only state so reviewers can see why a saved receipt did not
+import as current witness evidence. Receipt import does not discharge contracts,
+guards, or reach evidence.
 
 The receipt shape is represented in the core SDK as the serde-backed
 `WitnessReceipt` DTO. Importers and future native adapters must use that same

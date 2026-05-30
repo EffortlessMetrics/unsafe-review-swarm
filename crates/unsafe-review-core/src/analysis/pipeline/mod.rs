@@ -3302,6 +3302,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp fixture failed: {err}"))?;
         assert!(!card.witness.present);
+        assert!(card.witness.summary.contains("configured"));
         assert!(card.missing.iter().any(|missing| missing.kind == "witness"));
         assert!(
             card.obligation_evidence
@@ -3326,6 +3327,12 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp fixture failed: {err}"))?;
         assert!(!card.witness.present);
+        assert!(
+            card.witness
+                .summary
+                .contains("does not match routed witness tools")
+        );
+        assert!(card.witness.summary.contains("loom"));
         assert!(card.missing.iter().any(|missing| missing.kind == "witness"));
         assert!(
             card.obligation_evidence

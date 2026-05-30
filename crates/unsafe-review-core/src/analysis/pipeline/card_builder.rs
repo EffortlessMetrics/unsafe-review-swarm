@@ -53,10 +53,7 @@ pub(super) fn build_card(
         .collect::<Vec<_>>();
 
     let id = super::card_id(ctx.package, &scanned_site, &hazards, ctx.identity_counts);
-    let witness_evidence = ctx
-        .receipt_index
-        .evidence_for(&id, &routes)
-        .unwrap_or_else(crate::domain::WitnessEvidence::missing);
+    let witness_evidence = ctx.receipt_index.witness_evidence_for(&id, &routes);
 
     if witness_evidence.present {
         for evidence in &mut obligation_evidence {
