@@ -1499,8 +1499,9 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "bounds"
         ));
 
-        let stale_return_probe_receiver =
-            fixture_output("get_unchecked_mut_get_probe_early_return_reassigned_receiver_not_guard")?;
+        let stale_return_probe_receiver = fixture_output(
+            "get_unchecked_mut_get_probe_early_return_reassigned_receiver_not_guard",
+        )?;
         let stale_return_probe_receiver_card = single_card(
             "get_unchecked_mut_get_probe_early_return_reassigned_receiver_not_guard",
             &stale_return_probe_receiver,
@@ -2811,6 +2812,20 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
         assert_eq!(card.operation.family, OperationFamily::PointerArithmetic);
         assert_eq!(card.class, ReviewClass::GuardedUnwitnessed);
         assert!(card.discharge.present);
+        assert!(card.id.0.contains("add"));
+        Ok(())
+    }
+
+    #[test]
+    fn pointer_arithmetic_other_offset_guard_is_not_discharged() -> Result<(), String> {
+        let output = fixture_output("pointer_arithmetic_other_offset_not_guard")?;
+        let card = single_card("pointer_arithmetic_other_offset_not_guard", &output)?;
+
+        assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+        assert_eq!(card.operation.family, OperationFamily::PointerArithmetic);
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert!(!card.discharge.present);
+        assert!(!obligation_discharge_present(card, "bounds"));
         assert!(card.id.0.contains("add"));
         Ok(())
     }

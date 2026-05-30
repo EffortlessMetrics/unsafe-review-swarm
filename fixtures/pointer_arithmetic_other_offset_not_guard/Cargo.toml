@@ -1,0 +1,4 @@
+[package]
+name = "pointer-arithmetic-other-offset-not-guard-fixture"
+version = "0.0.0"
+edition = "2024"

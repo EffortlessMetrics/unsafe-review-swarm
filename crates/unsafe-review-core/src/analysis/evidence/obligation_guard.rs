@@ -1,7 +1,8 @@
 use super::{
     code_before_operation, get_unchecked_receiver_and_index, has_copy_slice_range_evidence,
     has_get_unchecked_bounds_guard, has_length_or_bounds_guard,
-    has_raw_pointer_read_bounds_evidence, has_write_bytes_bounds_evidence, set_len,
+    has_pointer_arithmetic_bounds_guard, has_raw_pointer_read_bounds_evidence,
+    has_write_bytes_bounds_evidence, set_len,
 };
 use crate::analysis::scanner::ScannedSite;
 use crate::domain::OperationFamily;
@@ -38,6 +39,9 @@ pub(super) fn has_bounds_guard(site: &ScannedSite, lower: &str) -> bool {
         }
         // A generic length comparison does not prove both copy source and destination ranges.
         return false;
+    }
+    if site.operation.family == OperationFamily::PointerArithmetic {
+        return has_pointer_arithmetic_bounds_guard(&site.operation.expression, &guard_scope);
     }
     has_length_or_bounds_guard(&guard_scope)
 }

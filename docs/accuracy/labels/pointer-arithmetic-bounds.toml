@@ -25,6 +25,20 @@ label_source = "fixture_golden"
 rationale = "An index < num_ctrl_bytes guard discharges pointer-arithmetic bounds evidence without importing a witness receipt."
 
 [[samples]]
+id = "pointer-arithmetic-other-offset-bounds-missing"
+fixture = "pointer_arithmetic_other_offset_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "pointer_arithmetic"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A bounds guard for `other` does not discharge pointer arithmetic that advances by `index`."
+
+[[samples]]
 id = "pointer-arithmetic-same-slice-end-bounds-present"
 fixture = "pointer_arithmetic_slice_end"
 kind = "positive"

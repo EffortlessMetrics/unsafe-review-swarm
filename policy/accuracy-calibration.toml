@@ -1371,6 +1371,7 @@ hazard = "bounds"
 support_tier = "Core operation smoke slice"
 fixtures = [
   "pointer_arithmetic_num_ctrl_bytes_guard",
+  "pointer_arithmetic_other_offset_not_guard",
   "pointer_arithmetic_slice_end",
 ]
 dogfood_targets = []
@@ -1380,7 +1381,8 @@ label_ledgers = [
 labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned pointer arithmetic bounds evidence recognizes index <
-num_ctrl_bytes and same-slice end-pointer patterns in the listed fixtures.
+num_ctrl_bytes and same-slice end-pointer patterns in the listed fixtures,
+and rejects a bounds guard for a different pointer offset.
 """
 forbidden_claims = [
   "broad pointer arithmetic soundness",

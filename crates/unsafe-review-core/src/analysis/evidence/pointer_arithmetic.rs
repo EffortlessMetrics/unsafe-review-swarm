@@ -1,4 +1,19 @@
-use super::{compact_code, strip_block_comments_and_literals};
+use super::{
+    branch_still_open_at_operation, compact_code, contains_simple_assignment_to,
+    matching_call_argument_end, receiver_before_marker, strip_block_comments_and_literals,
+};
+
+pub(super) fn has_pointer_arithmetic_bounds_guard(expression: &str, lower: &str) -> bool {
+    let Some(offset) = pointer_arithmetic_offset(expression) else {
+        return false;
+    };
+    let lower = strip_block_comments_and_literals(lower);
+    let compact = compact_code(&lower);
+    let context = PointerArithmeticBoundsApplicability::new(&compact, offset);
+
+    has_pointer_arithmetic_bounds_assertion(&context)
+        || has_pointer_arithmetic_bounds_open_branch(&context)
+}
 
 pub(super) fn has_slice_end_pointer_arithmetic_evidence(lower: &str) -> bool {
     let lower = strip_block_comments_and_literals(lower);
@@ -7,6 +22,155 @@ pub(super) fn has_slice_end_pointer_arithmetic_evidence(lower: &str) -> bool {
         .lines()
         .filter_map(SliceEndPointerArithmeticApplicability::from_line)
         .any(|context| context.has_same_slice_end_pointer(&compact))
+}
+
+fn pointer_arithmetic_offset(expression: &str) -> Option<String> {
+    let compact = compact_code(&expression.to_ascii_lowercase());
+    for marker in [".add(", ".offset("] {
+        let Some(_receiver) = receiver_before_marker(&compact, marker) else {
+            continue;
+        };
+        let call_pos = compact.find(marker)? + marker.len();
+        let argument_text = &compact[call_pos..];
+        let argument_end = matching_call_argument_end(argument_text)?;
+        let offset = &argument_text[..argument_end];
+        if !offset.is_empty() {
+            return Some(offset.to_string());
+        }
+    }
+    None
+}
+
+struct PointerArithmeticBoundsApplicability<'a> {
+    before_operation: &'a str,
+    offset: String,
+}
+
+impl<'a> PointerArithmeticBoundsApplicability<'a> {
+    fn new(before_operation: &'a str, offset: String) -> Self {
+        Self {
+            before_operation,
+            offset,
+        }
+    }
+
+    fn target_stays_fresh_after(&self, evidence: &str) -> bool {
+        !contains_simple_assignment_to(evidence, &self.offset)
+    }
+}
+
+fn has_pointer_arithmetic_bounds_assertion(
+    context: &PointerArithmeticBoundsApplicability<'_>,
+) -> bool {
+    ["assert!(", "debug_assert!("].into_iter().any(|prefix| {
+        let mut cursor = context.before_operation;
+        let mut offset = 0usize;
+        while let Some(pos) = cursor.find(prefix) {
+            let statement_start = offset + pos + prefix.len();
+            let after_prefix = &context.before_operation[statement_start..];
+            let statement_end = after_prefix.find(';').unwrap_or(after_prefix.len());
+            let statement = &after_prefix[..statement_end];
+            if has_same_offset_bounds_condition(statement, &context.offset)
+                && context.target_stays_fresh_after(&after_prefix[statement_end..])
+            {
+                return true;
+            }
+            let next = pos + prefix.len();
+            offset += next;
+            cursor = &cursor[next..];
+        }
+        false
+    })
+}
+
+fn has_pointer_arithmetic_bounds_open_branch(
+    context: &PointerArithmeticBoundsApplicability<'_>,
+) -> bool {
+    let mut cursor = context.before_operation;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find("if") {
+        let start = offset + pos;
+        let before = context.before_operation[..start].chars().next_back();
+        if before.is_some_and(is_receiver_path_char) {
+            let next = pos + 2;
+            offset += next;
+            cursor = &cursor[next..];
+            continue;
+        }
+        let after_if = &context.before_operation[start + 2..];
+        if let Some(brace_pos) = after_if.find('{') {
+            let condition = &after_if[..brace_pos];
+            let after_body_start = &after_if[brace_pos + 1..];
+            if has_same_offset_bounds_condition(condition, &context.offset)
+                && branch_still_open_at_operation(after_body_start)
+                && context.target_stays_fresh_after(after_body_start)
+            {
+                return true;
+            }
+        }
+        let next = pos + 2;
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
+}
+
+fn has_same_offset_bounds_condition(condition: &str, offset: &str) -> bool {
+    for op in [">=", "<=", "<", ">"] {
+        let mut cursor = condition;
+        let mut cursor_offset = 0usize;
+        while let Some(pos) = cursor.find(op) {
+            let op_start = cursor_offset + pos;
+            let op_end = op_start + op.len();
+            let left = comparison_left_operand(condition, op_start);
+            let right = comparison_right_operand(condition, op_end);
+            if (operand_is_target(left, offset) && operand_mentions_bounds(right))
+                || (operand_is_target(right, offset) && operand_mentions_bounds(left))
+            {
+                return true;
+            }
+            let next = pos + op.len();
+            cursor_offset += next;
+            cursor = &cursor[next..];
+        }
+    }
+    false
+}
+
+fn comparison_left_operand(compact: &str, op_start: usize) -> &str {
+    let left = &compact[..op_start];
+    let start = left
+        .rfind(['{', ';', ',', '=', '!'])
+        .map_or(0, |idx| idx + 1);
+    &left[start..]
+}
+
+fn comparison_right_operand(compact: &str, op_end: usize) -> &str {
+    let right = &compact[op_end..];
+    let end = right.find(['{', '}', ';', ',', '=']).unwrap_or(right.len());
+    &right[..end]
+}
+
+fn operand_is_target(operand: &str, target: &str) -> bool {
+    compact_code(operand) == target
+}
+
+fn operand_mentions_bounds(operand: &str) -> bool {
+    let operand = compact_code(operand);
+    operand.contains(".len()")
+        || operand.contains(".capacity()")
+        || operand.contains("num_ctrl_bytes()")
+        || contains_identifier(&operand, "len")
+        || contains_identifier(&operand, "capacity")
+}
+
+fn contains_identifier(text: &str, needle: &str) -> bool {
+    text.split(|ch: char| !(ch == '_' || ch.is_ascii_alphanumeric()))
+        .any(|token| token == needle)
+}
+
+fn is_receiver_path_char(ch: char) -> bool {
+    ch == '_' || ch == ':' || ch == '.' || ch.is_ascii_alphanumeric()
 }
 
 struct SliceEndPointerArithmeticApplicability {
@@ -37,6 +201,26 @@ impl SliceEndPointerArithmeticApplicability {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pointer_arithmetic_bounds_guard_uses_same_offset() {
+        assert!(has_pointer_arithmetic_bounds_guard(
+            "unsafe { self.ctrl.add(index) }",
+            "debug_assert!(index < self.num_ctrl_bytes()); unsafe { self.ctrl.add(index) }",
+        ));
+        assert!(!has_pointer_arithmetic_bounds_guard(
+            "unsafe { self.ctrl.add(index) }",
+            "debug_assert!(other < self.num_ctrl_bytes()); unsafe { self.ctrl.add(index) }",
+        ));
+    }
+
+    #[test]
+    fn pointer_arithmetic_bounds_guard_rejects_stale_offset() {
+        assert!(!has_pointer_arithmetic_bounds_guard(
+            "unsafe { self.ctrl.add(index) }",
+            "debug_assert!(index < self.num_ctrl_bytes()); index = fallback; unsafe { self.ctrl.add(index) }",
+        ));
+    }
 
     #[test]
     fn applicability_uses_same_binding_and_slice_length() -> Result<(), String> {
