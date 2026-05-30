@@ -250,6 +250,7 @@ Fixture proof:
 - `maybeuninit_assume_init_write_guard`
 - `maybeuninit_assume_init_open_branch_write_guard`
 - `maybeuninit_assume_init_stale_write_not_guard`
+- `maybeuninit_assume_init_stale_field_write_not_guard`
 - `maybeuninit_assume_init_comment_not_guard`
 
 Packet focus:

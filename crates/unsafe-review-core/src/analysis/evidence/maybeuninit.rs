@@ -1,6 +1,6 @@
 use super::{
     any_marker_occurrence, code_before_operation, compact_code, contains_simple_assignment_to,
-    receiver_before_marker, strip_block_comments_and_literals,
+    is_receiver_path_char, receiver_before_marker, strip_block_comments_and_literals,
 };
 use crate::domain::{EvidenceState, OperationFamily};
 
@@ -76,6 +76,7 @@ impl<'a> MaybeUninitSlotContext<'a> {
 
     fn has_stale_slot_assignment(&self, text: &str) -> bool {
         contains_simple_assignment_to(text, &self.same_slot_target)
+            || contains_assignment_to_receiver_path(text, &self.same_slot_target)
     }
 
     fn slot_stays_initialized_after(&self, evidence: &str) -> bool {
@@ -119,6 +120,43 @@ impl<'a> MaybeUninitSlotContext<'a> {
             false
         })
     }
+}
+
+fn contains_assignment_to_receiver_path(compact: &str, path: &str) -> bool {
+    if path.is_empty() {
+        return false;
+    }
+    let mut cursor = compact;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(path) {
+        let start = offset + pos;
+        let after_path_start = start + path.len();
+        let before = compact[..start].chars().next_back();
+        let after_path = &compact[after_path_start..];
+        if before.is_none_or(|ch| !is_receiver_path_char(ch))
+            && starts_assignment_operator(after_path)
+        {
+            return true;
+        }
+        let next = pos + path.len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
+}
+
+fn starts_assignment_operator(value: &str) -> bool {
+    value.starts_with("<<=")
+        || value.starts_with(">>=")
+        || value.starts_with("+=")
+        || value.starts_with("-=")
+        || value.starts_with("*=")
+        || value.starts_with("/=")
+        || value.starts_with("%=")
+        || value.starts_with("&=")
+        || value.starts_with("|=")
+        || value.starts_with("^=")
+        || (value.starts_with('=') && !value.starts_with("==") && !value.starts_with("=>"))
 }
 
 fn maybeuninit_binding_left_declares_receiver(left: &str, receiver: &str) -> bool {

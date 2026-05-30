@@ -1140,6 +1140,12 @@ mod tests {
             "unsafe { slot.assume_init() }",
             vec![],
         );
+        let stale_field_slot = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec!["self.slot.write(7);", "self.slot = MaybeUninit::uninit();"],
+            "unsafe { self.slot.assume_init() }",
+            vec![],
+        );
         let stale_new_slot = site_with_family(
             OperationFamily::MaybeUninitAssumeInit,
             vec![
@@ -1165,6 +1171,8 @@ mod tests {
         let other_evidence =
             obligation_evidence(&other_slot_write, &obligations, &contract, &reach);
         let stale_evidence = obligation_evidence(&stale_slot, &obligations, &contract, &reach);
+        let stale_field_evidence =
+            obligation_evidence(&stale_field_slot, &obligations, &contract, &reach);
         let stale_new_evidence =
             obligation_evidence(&stale_new_slot, &obligations, &contract, &reach);
         let open_evidence =
@@ -1173,6 +1181,7 @@ mod tests {
         assert!(!closed_evidence[0].discharge.present);
         assert!(!other_evidence[0].discharge.present);
         assert!(!stale_evidence[0].discharge.present);
+        assert!(!stale_field_evidence[0].discharge.present);
         assert!(!stale_new_evidence[0].discharge.present);
         assert!(open_evidence[0].discharge.present);
     }

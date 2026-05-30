@@ -475,6 +475,7 @@ mod tests {
         "maybeuninit_assume_init_closed_branch_new_not_guard",
         "maybeuninit_assume_init_other_slot_write_not_guard",
         "maybeuninit_assume_init_stale_write_not_guard",
+        "maybeuninit_assume_init_stale_field_write_not_guard",
         "maybeuninit_assume_init_stale_new_not_guard",
         "maybeuninit_assume_init_shadowed_slot_not_guard",
         "maybeuninit_assume_init_partial_field_not_guard",
