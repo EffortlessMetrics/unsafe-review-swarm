@@ -83,6 +83,15 @@ const REPAIR_QUEUE_BUCKETS: [&str; 6] = [
     "requires_human_review",
     "do_not_auto_repair",
 ];
+const REPAIR_QUEUE_TRUST_BOUNDARY_LIMITS: [&str; 7] = [
+    "not an automatic repair queue",
+    "does not run agents",
+    "does not run witnesses",
+    "does not edit source",
+    "does not post comments",
+    "does not suppress cards",
+    "does not resolve cards",
+];
 
 pub(crate) fn check_advisory_artifacts(dir: &Path) -> Result<(), String> {
     check_advisory_artifact_set(dir)?;
@@ -1161,7 +1170,7 @@ fn check_repair_queue_artifact(
         .get("trust_boundary")
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| "repair-queue.json is missing trust_boundary".to_string())?;
-    super::require_boundary_text(boundary, "repair-queue.json")?;
+    check_repair_queue_trust_boundary(boundary, "repair-queue.json")?;
 
     let summary_cards = super::json_usize_at(&repair_queue, "/summary/cards", "repair-queue.json")?;
     if summary_cards != card_count {
@@ -1295,7 +1304,7 @@ fn check_repair_queue_entry(
         .get("trust_boundary")
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| "repair-queue.json entry is missing trust_boundary".to_string())?;
-    super::require_boundary_text(boundary, "repair-queue.json entry")?;
+    check_repair_queue_trust_boundary(boundary, "repair-queue.json entry")?;
     let readiness = entry
         .get("agent_readiness")
         .ok_or_else(|| "repair-queue.json entry is missing agent_readiness".to_string())?;
@@ -1335,6 +1344,18 @@ fn check_repair_queue_do_not_do(entry: &serde_json::Value) -> Result<(), String>
         if !rendered.contains(expected) {
             return Err(format!(
                 "repair-queue.json entry do_not_do must include boundary `{expected}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn check_repair_queue_trust_boundary(text: &str, context: &str) -> Result<(), String> {
+    super::require_boundary_text(text, context)?;
+    for expected in REPAIR_QUEUE_TRUST_BOUNDARY_LIMITS {
+        if !super::text_contains_ignore_ascii_case(text, expected) {
+            return Err(format!(
+                "{context} trust_boundary must include `{expected}`"
             ));
         }
     }

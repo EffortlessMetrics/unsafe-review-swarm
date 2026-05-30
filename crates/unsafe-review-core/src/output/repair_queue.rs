@@ -4,7 +4,7 @@ use crate::output::agent;
 use crate::util::path_display;
 use serde::Serialize;
 
-const TRUST_BOUNDARY: &str = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue.";
+const TRUST_BOUNDARY: &str = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue. It does not run agents, does not run witnesses, does not edit source, does not post comments, does not suppress cards, and does not resolve cards.";
 
 pub(crate) fn render(output: &AnalyzeOutput) -> String {
     render_pretty(&RepairQueueArtifact::from(output))
@@ -271,6 +271,18 @@ mod tests {
                 .as_str()
                 .unwrap_or("")
                 .contains("not UB-free status")
+        );
+        assert!(
+            guard["trust_boundary"]
+                .as_str()
+                .unwrap_or("")
+                .contains("does not run agents")
+        );
+        assert!(
+            guard["trust_boundary"]
+                .as_str()
+                .unwrap_or("")
+                .contains("does not edit source")
         );
         assert_repair_queue_boundaries(guard)?;
         Ok(())

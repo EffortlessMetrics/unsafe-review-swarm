@@ -14978,6 +14978,65 @@ Snapshot reports:
     }
 
     #[test]
+    fn advisory_artifact_checker_rejects_repair_queue_top_level_boundary_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-repair-queue-top-boundary-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+
+        let path = dir.join("repair-queue.json");
+        let mut repair_queue: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&path).map_err(|err| format!("read repair queue failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse repair queue failed: {err}"))?;
+        repair_queue["trust_boundary"] = serde_json::json!(
+            "static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"
+        );
+        fs::write(&path, repair_queue.to_string())
+            .map_err(|err| format!("write repair queue failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = result.err().unwrap_or_default();
+        assert!(
+            err.contains("repair-queue.json trust_boundary must include `does not run agents`"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn advisory_artifact_checker_rejects_repair_queue_entry_boundary_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-repair-queue-entry-boundary-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+
+        let path = dir.join("repair-queue.json");
+        let mut repair_queue: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&path).map_err(|err| format!("read repair queue failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse repair queue failed: {err}"))?;
+        repair_queue["buckets"]["repairable_by_guard"][0]["trust_boundary"] = serde_json::json!(
+            "static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"
+        );
+        fs::write(&path, repair_queue.to_string())
+            .map_err(|err| format!("write repair queue failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = result.err().unwrap_or_default();
+        assert!(
+            err.contains(
+                "repair-queue.json entry trust_boundary must include `does not run agents`"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn advisory_artifact_checker_rejects_cards_schema_drift() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-artifacts-cards-schema-drift")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -15160,6 +15219,10 @@ review_after = "2026-08-01"
         r#""do_not_do":["do not widen unsafe code without reducing the missing evidence","do not suppress this card instead of adding, exposing, or explicitly waiving evidence","do not add a broad suppression","do not replace executable guard or discharge evidence with comments or docs","do not claim Miri proof unless the witness command is run and attached","do not claim automatic safety repair from this packet","do not claim unsafe-review ran an agent, ran witnesses, applied source edits, or posted comments","do not change unrelated unsafe code or public API behavior","do not treat a test mention as proof that the unsafe site executed"],"#
     }
 
+    fn repair_queue_trust_boundary() -> &'static str {
+        "static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue. It does not run agents, does not run witnesses, does not edit source, does not post comments, does not suppress cards, and does not resolve cards"
+    }
+
     fn add_repair_queue_boundaries(text: &str) -> String {
         text.replace(
             "\"context_command\":\"unsafe-review context card-1 --json\",\"trust_boundary\"",
@@ -15174,6 +15237,10 @@ review_after = "2026-08-01"
                 "\"context_command\":\"unsafe-review context card-2 --json\",{}\"trust_boundary\"",
                 repair_queue_do_not_do_fragment()
             ),
+        )
+        .replace(
+            "static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue",
+            repair_queue_trust_boundary(),
         )
     }
 
@@ -15317,7 +15384,7 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write github summary failed: {err}"))?;
         fs::write(
             dir.join("repair-queue.json"),
-            r#"{"schema_version":"0.1","tool":"unsafe-review","mode":"aggregate_repair_queue","source":"review_card","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue","summary":{"cards":0,"repairable_by_guard":0,"repairable_by_safety_docs":0,"repairable_by_test":0,"requires_witness_receipt":0,"requires_human_review":0,"do_not_auto_repair":0},"buckets":{"repairable_by_guard":[],"repairable_by_safety_docs":[],"repairable_by_test":[],"requires_witness_receipt":[],"requires_human_review":[],"do_not_auto_repair":[]}}"#,
+            add_repair_queue_boundaries(r#"{"schema_version":"0.1","tool":"unsafe-review","mode":"aggregate_repair_queue","source":"review_card","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue","summary":{"cards":0,"repairable_by_guard":0,"repairable_by_safety_docs":0,"repairable_by_test":0,"requires_witness_receipt":0,"requires_human_review":0,"do_not_auto_repair":0},"buckets":{"repairable_by_guard":[],"repairable_by_safety_docs":[],"repairable_by_test":[],"requires_witness_receipt":[],"requires_human_review":[],"do_not_auto_repair":[]}}"#),
         )
         .map_err(|err| format!("write repair queue failed: {err}"))?;
         Ok(())
