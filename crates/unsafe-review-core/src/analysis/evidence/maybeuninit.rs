@@ -1,6 +1,7 @@
+use super::operation_scope::source_before_operation;
 use super::{
-    any_marker_occurrence, code_before_operation, compact_code, contains_simple_assignment_to,
-    is_receiver_path_char, receiver_before_marker, strip_block_comments_and_literals,
+    any_marker_occurrence, compact_code, contains_simple_assignment_to, is_receiver_path_char,
+    receiver_before_marker, strip_block_comments_and_literals,
 };
 use crate::domain::{EvidenceState, OperationFamily};
 
@@ -27,15 +28,16 @@ pub(super) fn has_maybeuninit_assume_init_initialization_evidence(
     let Some(receiver) = maybeuninit_assume_init_receiver(expression) else {
         return false;
     };
-    let Some(before_operation) = code_before_operation(lower, expression) else {
+    let Some(before_operation) = source_before_operation(lower, expression) else {
         return false;
     };
-    let compact = compact_code(&strip_block_comments_and_literals(&before_operation));
+    let cleaned = strip_block_comments_and_literals(&before_operation);
+    let compact = compact_code(&cleaned);
     let receiver = compact_code(&receiver);
     if receiver.is_empty() {
         return false;
     }
-    let context = MaybeUninitSlotContext::new(&compact, receiver);
+    let context = MaybeUninitSlotContext::new(&cleaned, &compact, receiver);
 
     context.has_write_evidence() || context.has_new_binding_evidence()
 }
@@ -55,15 +57,17 @@ fn maybeuninit_assume_init_receiver(expression: &str) -> Option<String> {
 }
 
 struct MaybeUninitSlotContext<'a> {
+    cleaned: &'a str,
     compact: &'a str,
     same_slot_target: String,
     same_slot_write_marker: String,
 }
 
 impl<'a> MaybeUninitSlotContext<'a> {
-    fn new(compact: &'a str, receiver: String) -> Self {
+    fn new(cleaned: &'a str, compact: &'a str, receiver: String) -> Self {
         let same_slot_write_marker = format!("{receiver}.write(");
         Self {
+            cleaned,
             compact,
             same_slot_target: receiver,
             same_slot_write_marker,
@@ -103,22 +107,29 @@ impl<'a> MaybeUninitSlotContext<'a> {
     }
 
     fn has_new_binding_evidence(&self) -> bool {
-        any_marker_occurrence(self.compact, "::new(", |call_pos, after_call| {
-            let statement_start = self.compact[..call_pos]
+        let mut search_from = 0usize;
+        while let Some(offset) = self.cleaned[search_from..].find("::new(") {
+            let call_pos = search_from + offset;
+            let statement_start = self.cleaned[..call_pos]
                 .rfind([';', '{', '}'])
                 .map_or(0, |idx| idx + 1);
-            let before_call = &self.compact[statement_start..call_pos];
+            let before_call = &self.cleaned[statement_start..call_pos];
             let Some((left, right)) = before_call.rsplit_once('=') else {
-                return false;
+                search_from = call_pos + "::new(".len();
+                continue;
             };
             if right.contains("maybeuninit")
                 && maybeuninit_binding_left_declares_receiver(left, &self.same_slot_target)
-                && self.slot_evidence_preserves_applicability(call_pos, after_call)
             {
-                return true;
+                let compact_call_pos = compact_code(&self.cleaned[..call_pos]).len();
+                let after_call = &self.compact[compact_call_pos..];
+                if self.slot_evidence_preserves_applicability(compact_call_pos, after_call) {
+                    return true;
+                }
             }
-            false
-        })
+            search_from = call_pos + "::new(".len();
+        }
+        false
     }
 }
 
@@ -160,10 +171,19 @@ fn starts_assignment_operator(value: &str) -> bool {
 }
 
 fn maybeuninit_binding_left_declares_receiver(left: &str, receiver: &str) -> bool {
-    left == format!("let{receiver}")
-        || left == format!("letmut{receiver}")
-        || left.starts_with(&format!("let{receiver}:"))
-        || left.starts_with(&format!("letmut{receiver}:"))
+    let Some(after_let) = left.trim().strip_prefix("let ") else {
+        return false;
+    };
+    let after_mut = after_let
+        .trim_start()
+        .strip_prefix("mut ")
+        .unwrap_or(after_let)
+        .trim_start();
+    if !after_mut.starts_with(receiver) {
+        return false;
+    }
+    let suffix = after_mut[receiver.len()..].trim_start();
+    suffix.is_empty() || suffix.starts_with(':')
 }
 
 fn maybeuninit_evidence_scope_reaches_operation(compact: &str, evidence_pos: usize) -> bool {

@@ -1,6 +1,6 @@
 # Objective audit
 
-Date: 2026-05-28
+Date: 2026-05-30
 Status: active objective partially achieved; fixture-pinned calibration rail is
 installed; dogfood-backed evidence remains experimental; continue broader
 calibration before support-tier or policy promotion
@@ -58,7 +58,7 @@ The active calibration rail is now recorded in
 `.unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md`,
 `policy/accuracy-calibration.toml`, and
 `docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 34
-fixture-pinned claims, 421 calibration cases, 34 label ledgers, and 434 label
+fixture-pinned claims, 423 calibration cases, 34 label ledgers, and 436 label
 samples. It records zero dogfood-measured, labeled-calibrated, or
 policy-eligible claims. That is intentional: the current report is a
 claim-scoped fixture-pinned proof index, not a global precision/recall result
