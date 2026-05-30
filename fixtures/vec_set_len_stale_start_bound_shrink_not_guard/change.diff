@@ -1,0 +1,25 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,19 @@
++pub fn reset_then_keep_prefix(mut values: Vec<u8>, start: usize, end: usize) -> Vec<u8> {
++    let len = values.len();
++    values = Vec::new();
++    assert!(start <= end);
++    assert!(end <= len);
++    // SAFETY: fixture checks that a stale length binding is not shrink evidence.
++    unsafe {
++        values.set_len(start);
++    }
++    values
++}
++
++#[cfg(test)]
++mod tests {
++    use super::reset_then_keep_prefix;
++
++    #[test]
++    fn mentions_reset_then_keep_prefix() {
++        let _ = stringify!(reset_then_keep_prefix);
++    }
++}

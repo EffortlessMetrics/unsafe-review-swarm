@@ -357,6 +357,21 @@ label_source = "fixture_golden"
 rationale = "A start/end bound proving the new length is within current len is shrink evidence for Vec::set_len."
 
 [[samples]]
+id = "vec-set-len-stale-start-bound-shrink-missing"
+fixture = "vec_set_len_stale_start_bound_shrink_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A start/end shrink bound tied to a length binding measured before the Vec receiver is reassigned does not prove the later Vec::set_len target shrinks within initialized range."
+
+[[samples]]
 id = "vec-set-len-zero-clear-present"
 fixture = "vec_set_len_zero_clear"
 kind = "positive"

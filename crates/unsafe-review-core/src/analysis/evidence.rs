@@ -50,7 +50,7 @@ mod write_bytes;
 mod zeroed;
 
 use self::alignment_discharge::alignment_discharge_state;
-use self::assignment_syntax::contains_simple_assignment_to;
+pub(crate) use self::assignment_syntax::contains_simple_assignment_to;
 use self::boolean_condition::{
     any_compact_if_condition, condition_has_top_level_conjunct, condition_has_top_level_disjunct,
 };
@@ -2742,6 +2742,37 @@ mod tests {
         let set_len = site_with_family(
             OperationFamily::VecSetLen,
             vec!["let len = values.len();", "assert!(start <= end);"],
+            "values.set_len(start);",
+            vec![],
+        );
+
+        let evidence = obligation_evidence(&set_len, &obligations, &contract, &reach);
+
+        assert!(evidence.iter().all(|item| !item.discharge.present));
+    }
+
+    #[test]
+    fn set_len_start_bound_shrink_rejects_stale_len_binding() {
+        let obligations = vec![
+            SafetyObligation::new("capacity", "new length is at most capacity"),
+            SafetyObligation::new(
+                "initialized",
+                "elements in the extended range are initialized",
+            ),
+        ];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let set_len = site_with_family(
+            OperationFamily::VecSetLen,
+            vec![
+                "let len = values.len();",
+                "values = Vec::new();",
+                "assert!(start <= end);",
+                "assert!(end <= len);",
+            ],
             "values.set_len(start);",
             vec![],
         );

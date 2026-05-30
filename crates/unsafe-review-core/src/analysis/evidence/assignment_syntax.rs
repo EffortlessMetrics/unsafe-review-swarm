@@ -1,6 +1,6 @@
 use super::{is_receiver_path_char, is_simple_identifier};
 
-pub(super) fn contains_simple_assignment_to(compact: &str, name: &str) -> bool {
+pub(crate) fn contains_simple_assignment_to(compact: &str, name: &str) -> bool {
     if !is_simple_identifier(name) {
         return false;
     }

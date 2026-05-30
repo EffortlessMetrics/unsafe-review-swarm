@@ -1,3 +1,5 @@
+use super::evidence::contains_simple_assignment_to;
+
 pub(super) fn has_set_len_shrink_evidence(
     before_call: &str,
     receiver: &str,
@@ -33,9 +35,7 @@ fn has_non_empty_or_empty_guard(before_call: &str, receiver: &str) -> bool {
 }
 
 fn detects_start_bounded_shrink(before_call: &str, receiver: &str, set_len_argument: &str) -> bool {
-    set_len_argument == "start"
-        && has_start_bounds(before_call)
-        && has_len_binding(before_call, receiver)
+    set_len_argument == "start" && has_fresh_start_bound_len_binding(before_call, receiver)
 }
 
 fn has_start_bounds(before_call: &str) -> bool {
@@ -46,6 +46,28 @@ fn has_start_bounds(before_call: &str) -> bool {
 fn has_len_binding(before_call: &str, receiver: &str) -> bool {
     before_call.contains(&format!("len={receiver}.len()"))
         || before_call.contains(&format!("letlen={receiver}.len()"))
+}
+
+fn has_fresh_start_bound_len_binding(before_call: &str, receiver: &str) -> bool {
+    for marker in [
+        format!("len={receiver}.len()"),
+        format!("letlen={receiver}.len()"),
+    ] {
+        let mut search_from = 0usize;
+        while let Some(offset) = before_call[search_from..].find(&marker) {
+            let binding_end = search_from + offset + marker.len();
+            let after_binding = &before_call[binding_end..];
+            if has_start_bounds(after_binding)
+                && !["start", "end", "len", receiver]
+                    .iter()
+                    .any(|identifier| contains_simple_assignment_to(after_binding, identifier))
+            {
+                return true;
+            }
+            search_from = binding_end;
+        }
+    }
+    false
 }
 
 fn detects_new_len_shrink(before_call: &str, receiver: &str, set_len_argument: &str) -> bool {
