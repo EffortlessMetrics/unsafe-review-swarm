@@ -433,6 +433,7 @@ mod tests {
         "inline_asm_human_review",
         "pointer_arithmetic_num_ctrl_bytes_guard",
         "pointer_arithmetic_other_offset_not_guard",
+        "pointer_arithmetic_reassigned_offset_not_guard",
         "pointer_arithmetic_slice_end",
         "slice_from_raw_parts_mut",
         "slice_from_raw_parts_mut_maybeuninit",

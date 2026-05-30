@@ -281,6 +281,7 @@ required_core_fixtures = [
   "raw_pointer_read_reassigned_origin_not_guard",
   "pointer_arithmetic_num_ctrl_bytes_guard",
   "pointer_arithmetic_other_offset_not_guard",
+  "pointer_arithmetic_reassigned_offset_not_guard",
   "pointer_arithmetic_slice_end",
   "slice_from_raw_parts_mut",
   "slice_from_raw_parts_mut_maybeuninit",
@@ -3185,6 +3186,16 @@ expected_hazard = "bounds"
 fixture = "pointer_arithmetic_other_offset_not_guard"
 kind = "false_positive_control"
 claim = "pointer arithmetic rejects bounds checks for a different offset"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "pointer_arithmetic"
+expected_hazard = "bounds"
+
+[[cases]]
+fixture = "pointer_arithmetic_reassigned_offset_not_guard"
+kind = "false_positive_control"
+claim = "pointer arithmetic rejects stale offset bounds checks after reassignment"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
