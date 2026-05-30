@@ -325,6 +325,7 @@ required_core_fixtures = [
   "transmute_bool_conjunct_branch_guard",
   "transmute_bool_disjunct_branch_not_guard",
   "transmute_bool_invalid_return_guard",
+  "transmute_bool_invalid_return_comment_not_guard",
   "transmute_bool_disjunct_return_guard",
   "transmute_bool_conjunct_return_not_guard",
   "transmute_bool_other_value_not_guard",
@@ -3646,6 +3647,16 @@ claim = "transmute::<u8, bool> recognizes explicit size_of layout evidence and u
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "transmute_bool_invalid_return_comment_not_guard"
+kind = "false_positive_control"
+claim = "transmute::<u8, bool> rejects comment-only invalid-byte return text as valid-value guard evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
 expected_operation_family = "transmute"
 expected_hazard = "invalid_value"
 

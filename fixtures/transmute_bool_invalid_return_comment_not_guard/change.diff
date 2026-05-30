@@ -1,0 +1,25 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,18 @@
++pub fn byte_to_bool_with_commented_return(value: u8) -> bool {
++    assert_eq!(core::mem::size_of::<u8>(), core::mem::size_of::<bool>());
++    if value > 1 {
++        // return false for invalid bool byte patterns before transmute.
++        observe_invalid_byte(value);
++    }
++    // SAFETY: this fixture intentionally leaves the invalid byte branch without an executable return guard.
++    unsafe { core::mem::transmute::<u8, bool>(value) }
++}
++
++fn observe_invalid_byte(_value: u8) {}
++
++#[cfg(test)]
++mod tests {
++    use super::byte_to_bool_with_commented_return;
++
++    #[test]
++    fn converts_known_bool_byte() {
++        let _value = byte_to_bool_with_commented_return(1);
++    }
++}

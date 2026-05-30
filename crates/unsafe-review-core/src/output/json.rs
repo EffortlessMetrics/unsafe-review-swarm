@@ -572,6 +572,7 @@ mod tests {
         "transmute_bool_conjunct_branch_guard",
         "transmute_bool_disjunct_branch_not_guard",
         "transmute_bool_invalid_return_guard",
+        "transmute_bool_invalid_return_comment_not_guard",
         "transmute_bool_disjunct_return_guard",
         "transmute_bool_conjunct_return_not_guard",
         "transmute_bool_other_value_not_guard",
