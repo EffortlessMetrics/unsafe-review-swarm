@@ -3704,6 +3704,16 @@ fn check_fixture_next_action(
                 "{card_context} guard_missing next_action must not suggest documentation or comments as a substitute for guard evidence"
             ));
         }
+        if has_human_deep_review_route
+            && requires_manual_review_guard_missing_wording(operation_family)
+            && (normalized.contains("local guard that discharges")
+                || !normalized.contains("manual")
+                || !normalized.contains("guard evidence"))
+        {
+            return Err(format!(
+                "{card_context} human-deep-review guard_missing next_action for operation_family `{operation_family}` must name manual review and guard evidence instead of generic local-guard discharge"
+            ));
+        }
     }
     match class_name {
         "requires_loom" if !normalized.contains("loom") || !normalized.contains("shuttle") => {
@@ -3822,6 +3832,13 @@ fn check_fixture_next_action(
     }
 
     Ok(())
+}
+
+fn requires_manual_review_guard_missing_wording(operation_family: &str) -> bool {
+    matches!(
+        operation_family,
+        "inline_asm" | "pin_unchecked" | "unsafe_fn_call"
+    )
 }
 
 fn check_fixture_witness_routes(
@@ -7527,6 +7544,36 @@ jobs:
         };
 
         assert!(err.contains("guard_missing"));
+        assert!(err.contains("guard evidence"));
+        Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_rejects_generic_manual_route_guard_next_action() -> Result<(), String>
+    {
+        let mut card = test_fixture_card(
+            "UR-inline-asm-human-review-src-lib-rs-pause-once-operation-inline_asm-asm-a6c6a5d4bbb1-inline_asm-c1",
+        )?;
+        card["operation_family"] = serde_json::Value::String("inline_asm".to_string());
+        card["witness_routes"][0]["kind"] =
+            serde_json::Value::String("human-deep-review".to_string());
+        card["witness_routes"][0]["command"] = serde_json::Value::Null;
+        card["next_action"] = serde_json::Value::String(
+            "Add or expose the local guard that discharges the `inline_asm` safety obligation."
+                .to_string(),
+        );
+
+        let Err(err) = check_fixture_next_action(
+            "fixtures/inline_asm_human_review/expected.cards.json",
+            0,
+            &card,
+            "inline_asm",
+        ) else {
+            return Err("generic manual-route guard next_action should fail".to_string());
+        };
+
+        assert!(err.contains("human-deep-review guard_missing"));
+        assert!(err.contains("manual review"));
         assert!(err.contains("guard evidence"));
         Ok(())
     }
