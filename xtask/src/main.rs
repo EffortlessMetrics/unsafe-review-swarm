@@ -9566,6 +9566,47 @@ policy readiness.
     }
 
     #[test]
+    fn dogfood_follow_up_seed_index_rejects_report_links_outside_reports_dir() -> Result<(), String>
+    {
+        let text = r#"
+# Dogfood follow-up seed index
+
+## Seeds
+
+| Seed ID | Status | Target | Family/surface | Primary label | Source report | Next PR slice | Notes |
+|---|---|---|---|---|---|---|---|
+| `dogfood-outside-report-dir` | `open` | `arrayvec-pr288` | `vec_set_len` | `needs-fixture` | [report](../handoffs/2026-05-26-post-burst-analyzer-audit.md) | `analysis: add fixture` | no overclaim |
+
+## Trust boundary
+
+Dogfood follow-up seeds are static advisory review notes. They are not a proof
+of memory safety, not UB-free status, not Miri-clean status, not site execution
+evidence, not calibrated precision or recall, not witness adequacy, and not
+policy readiness.
+"#;
+        let targets = BTreeSet::from(["arrayvec-pr288".to_string()]);
+        let reports = vec!["2026-05-26-post-burst.md".to_string()];
+        let report_triage_keys = dogfood_report_triage_keys_for_tests(&[(
+            "2026-05-26-post-burst.md",
+            "arrayvec-pr288",
+            "needs-fixture",
+        )]);
+
+        let err = err_text(check_dogfood_follow_up_seeds_text(
+            "docs/dogfood/follow-up-seeds.md",
+            text,
+            &targets,
+            &dogfood_follow_up_family_surface_set_for_tests(),
+            &reports,
+            &report_triage_keys,
+        ))?;
+
+        assert!(err.contains("source report must link under reports/"));
+        assert!(err.contains("dogfood-outside-report-dir"));
+        Ok(())
+    }
+
+    #[test]
     fn dogfood_follow_up_seed_index_rejects_report_without_matching_triage_row()
     -> Result<(), String> {
         let text = r#"
