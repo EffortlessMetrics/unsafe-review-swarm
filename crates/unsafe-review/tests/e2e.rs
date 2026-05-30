@@ -688,6 +688,56 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(review_kit["summary"]["cards"], 1);
     assert_eq!(review_kit["summary"]["open_actionable_gaps"], 1);
     assert_eq!(review_kit["top_card_id"], card_id);
+    assert_eq!(review_kit["handoff"]["reviewer_summary"], "pr-summary.md");
+    assert_eq!(review_kit["handoff"]["top_card"]["card_id"], card_id);
+    assert!(
+        review_kit["handoff"]["top_card"]["explain"]
+            .as_str()
+            .unwrap_or("")
+            .contains("unsafe-review explain --root")
+    );
+    assert!(
+        review_kit["handoff"]["top_card"]["explain"]
+            .as_str()
+            .unwrap_or("")
+            .contains(card_id)
+    );
+    assert!(
+        review_kit["handoff"]["top_card"]["context_json"]
+            .as_str()
+            .unwrap_or("")
+            .contains("unsafe-review context --root")
+    );
+    assert!(
+        review_kit["handoff"]["top_card"]["context_json"]
+            .as_str()
+            .unwrap_or("")
+            .contains(card_id)
+    );
+    assert!(
+        review_kit["handoff"]["top_card"]["context_json"]
+            .as_str()
+            .unwrap_or("")
+            .contains("--json")
+    );
+    assert!(
+        review_kit["handoff"]["receipt_audit_markdown"]
+            .as_str()
+            .unwrap_or("")
+            .contains("unsafe-review receipt audit --root")
+    );
+    assert!(
+        review_kit["handoff"]["receipt_audit_markdown"]
+            .as_str()
+            .unwrap_or("")
+            .contains("--format markdown")
+    );
+    assert!(
+        review_kit["handoff"]["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("did not run witnesses")
+    );
     assert!(
         review_kit["artifacts"]
             .as_array()
@@ -885,6 +935,14 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
     assert_eq!(review_kit["summary"]["cards"], 0);
     assert_eq!(review_kit["summary"]["open_actionable_gaps"], 0);
     assert!(review_kit["top_card_id"].is_null());
+    assert_eq!(review_kit["handoff"]["reviewer_summary"], "pr-summary.md");
+    assert!(review_kit["handoff"]["top_card"].is_null());
+    assert!(
+        review_kit["handoff"]["receipt_audit_markdown"]
+            .as_str()
+            .unwrap_or("")
+            .contains("--format markdown")
+    );
     assert!(
         review_kit["trust_boundary"]
             .as_str()

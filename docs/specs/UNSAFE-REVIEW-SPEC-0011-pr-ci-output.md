@@ -131,6 +131,8 @@ must include scope matching cards.json
 must include base/head metadata when known
 must include card count and open actionable gap count matching cards.json
 must include top_card_id, or null only when no cards exist
+must include copy-only handoff commands for the reviewer summary, receipt audit,
+  and top-card explain/context commands when a top card exists
 must list every required first-pr artifact with relative paths
 must include artifact kind, format, and schema_version/null metadata
 must include trust boundary wording
@@ -139,6 +141,10 @@ must include trust boundary wording
 The manifest is a discovery projection. It must not reclassify ReviewCards or
 create a second source of truth for operation family, obligation, evidence,
 witness route, repair bucket, outcome, or policy posture.
+
+The handoff commands are reviewer and agent discovery aids only. They must not
+imply that unsafe-review ran witnesses, ran an agent, posted comments, edited
+source, or enforced blocking policy.
 
 #### 3.1 `cards.json`
 

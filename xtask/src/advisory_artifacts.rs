@@ -288,22 +288,23 @@ fn check_review_kit_manifest(
         ));
     }
 
-    match review_kit.get("top_card_id") {
+    let top_card_id = match review_kit.get("top_card_id") {
         Some(serde_json::Value::String(card_id)) => {
             if !card_ids.contains(card_id) {
                 return Err(format!(
                     "review-kit.json top_card_id `{card_id}` is not present in cards.json"
                 ));
             }
+            Some(card_id.clone())
         }
-        Some(serde_json::Value::Null) if card_count == 0 => {}
+        Some(serde_json::Value::Null) if card_count == 0 => None,
         Some(serde_json::Value::Null) => {
             return Err(
                 "review-kit.json top_card_id must name a card when cards exist".to_string(),
             );
         }
         _ => return Err("review-kit.json top_card_id must be a string or null".to_string()),
-    }
+    };
 
     let boundary = review_kit
         .get("trust_boundary")
@@ -325,6 +326,8 @@ fn check_review_kit_manifest(
             ));
         }
     }
+
+    check_review_kit_handoff(&review_kit, top_card_id.as_deref(), card_count)?;
 
     let artifacts = super::json_array_at(&review_kit, "/artifacts", "review-kit.json")?;
     let mut seen = BTreeSet::new();
@@ -365,6 +368,119 @@ fn check_review_kit_manifest(
             expected, seen
         ));
     }
+    Ok(())
+}
+
+fn check_review_kit_handoff(
+    review_kit: &serde_json::Value,
+    top_card_id: Option<&str>,
+    card_count: usize,
+) -> Result<(), String> {
+    let handoff = review_kit
+        .get("handoff")
+        .ok_or_else(|| "review-kit.json is missing handoff".to_string())?;
+    if !handoff.is_object() {
+        return Err("review-kit.json handoff must be an object".to_string());
+    }
+
+    require_expected_value(
+        super::require_non_empty_json_str(handoff, "reviewer_summary", "review-kit.json handoff")?,
+        "pr-summary.md",
+        "review-kit.json handoff reviewer_summary",
+    )?;
+
+    let receipt_command = super::require_non_empty_json_str(
+        handoff,
+        "receipt_audit_markdown",
+        "review-kit.json handoff",
+    )?;
+    if !receipt_command.starts_with("unsafe-review receipt audit ") {
+        return Err(
+            "review-kit.json handoff receipt_audit_markdown must start with `unsafe-review receipt audit`"
+                .to_string(),
+        );
+    }
+    if !receipt_command.contains("--format markdown") {
+        return Err(
+            "review-kit.json handoff receipt_audit_markdown must include `--format markdown`"
+                .to_string(),
+        );
+    }
+
+    check_review_kit_top_card_handoff(handoff, top_card_id, card_count)?;
+
+    let boundary =
+        super::require_non_empty_json_str(handoff, "trust_boundary", "review-kit.json handoff")?;
+    for expected in [
+        "did not run witnesses",
+        "run agents",
+        "post comments",
+        "edit source",
+        "blocking policy",
+    ] {
+        if !super::text_contains_ignore_ascii_case(boundary, expected) {
+            return Err(format!(
+                "review-kit.json handoff trust_boundary must include `{expected}`"
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn check_review_kit_top_card_handoff(
+    handoff: &serde_json::Value,
+    top_card_id: Option<&str>,
+    card_count: usize,
+) -> Result<(), String> {
+    let Some(top_card) = handoff.get("top_card") else {
+        return Err("review-kit.json handoff is missing top_card".to_string());
+    };
+    if card_count == 0 {
+        if top_card.is_null() {
+            return Ok(());
+        }
+        return Err(
+            "review-kit.json handoff top_card must be null when no cards exist".to_string(),
+        );
+    }
+
+    if !top_card.is_object() {
+        return Err(
+            "review-kit.json handoff top_card must be an object when cards exist".to_string(),
+        );
+    }
+    let handoff_card_id =
+        super::require_non_empty_json_str(top_card, "card_id", "review-kit.json handoff top_card")?;
+    if Some(handoff_card_id) != top_card_id {
+        return Err(format!(
+            "review-kit.json handoff top_card card_id `{handoff_card_id}` does not match top_card_id `{}`",
+            top_card_id.unwrap_or("<missing>")
+        ));
+    }
+
+    let explain =
+        super::require_non_empty_json_str(top_card, "explain", "review-kit.json handoff top_card")?;
+    if !explain.starts_with("unsafe-review explain ") || !explain.contains(handoff_card_id) {
+        return Err(format!(
+            "review-kit.json handoff top_card explain must reference `{handoff_card_id}`"
+        ));
+    }
+
+    let context_json = super::require_non_empty_json_str(
+        top_card,
+        "context_json",
+        "review-kit.json handoff top_card",
+    )?;
+    if !context_json.starts_with("unsafe-review context ")
+        || !context_json.contains(handoff_card_id)
+        || !context_json.contains("--json")
+    {
+        return Err(format!(
+            "review-kit.json handoff top_card context_json must reference `{handoff_card_id}` and include `--json`"
+        ));
+    }
+
     Ok(())
 }
 

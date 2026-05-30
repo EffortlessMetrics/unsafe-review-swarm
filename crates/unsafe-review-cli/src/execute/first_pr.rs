@@ -165,6 +165,7 @@ pub(super) fn render_review_kit_manifest(
             "open_actionable_gaps": output.summary.open_actionable_gaps,
         },
         "top_card_id": output.cards.first().map(|card| card.id.to_string()),
+        "handoff": review_kit_handoff(output, root, check),
         "artifacts": artifacts
             .iter()
             .map(|path| artifact_entry(path))
@@ -173,6 +174,27 @@ pub(super) fn render_review_kit_manifest(
     });
     serde_json::to_string_pretty(&value).unwrap_or_else(|err| {
         format!("{{\n  \"error\": \"review kit serialization failed: {err}\"\n}}")
+    })
+}
+
+fn review_kit_handoff(
+    output: &AnalyzeOutput,
+    root: &Path,
+    check: &CheckOptions,
+) -> serde_json::Value {
+    let top_card = output.cards.first().map(|card| {
+        json!({
+            "card_id": card.id.to_string(),
+            "explain": explain_command(root, &card.id),
+            "context_json": context_command(root, &card.id),
+        })
+    });
+
+    json!({
+        "reviewer_summary": "pr-summary.md",
+        "receipt_audit_markdown": receipt_audit_command(check),
+        "top_card": top_card,
+        "trust_boundary": "Copy-only review-kit handoff commands; unsafe-review did not run witnesses, run agents, post comments, edit source, or enforce blocking policy.",
     })
 }
 
@@ -319,6 +341,26 @@ mod tests {
         assert_eq!(value["scope"], "diff");
         assert_eq!(value["base_ref"], "origin/main");
         assert!(value["top_card_id"].is_null());
+        assert_eq!(value["handoff"]["reviewer_summary"], "pr-summary.md");
+        assert!(
+            value["handoff"]["receipt_audit_markdown"]
+                .as_str()
+                .unwrap_or("")
+                .contains("unsafe-review receipt audit --root fixtures/safe_code_no_cards")
+        );
+        assert!(
+            value["handoff"]["receipt_audit_markdown"]
+                .as_str()
+                .unwrap_or("")
+                .contains("--format markdown")
+        );
+        assert!(value["handoff"]["top_card"].is_null());
+        assert!(
+            value["handoff"]["trust_boundary"]
+                .as_str()
+                .unwrap_or("")
+                .contains("did not run witnesses")
+        );
         assert_eq!(value["artifacts"][0]["path"], "review-kit.json");
         assert_eq!(value["artifacts"][1]["schema_version"], "0.1");
         assert!(value["artifacts"][2]["schema_version"].is_null());

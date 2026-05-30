@@ -10723,6 +10723,58 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_handoff_context_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-handoff-context-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&path).map_err(|err| format!("read review kit failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse review kit failed: {err}"))?;
+        review_kit["handoff"]["top_card"]["context_json"] =
+            serde_json::json!("unsafe-review context missing-card --json");
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = result.expect_err("top-card handoff drift should fail verification");
+        assert!(
+            err.contains("review-kit.json handoff top_card context_json"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_receipt_handoff_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-receipt-handoff-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&path).map_err(|err| format!("read review kit failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse review kit failed: {err}"))?;
+        review_kit["handoff"]["receipt_audit_markdown"] =
+            serde_json::json!("cargo +nightly miri test");
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = result.expect_err("receipt-audit handoff drift should fail verification");
+        assert!(
+            err.contains("review-kit.json handoff receipt_audit_markdown"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_review_kit_missing_artifact() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-missing-artifact")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -10750,6 +10802,36 @@ Snapshot reports:
         let err = result.expect_err("missing review-kit artifact should fail verification");
         assert!(
             err.contains("review-kit.json lists missing artifact `sidecar.json`"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_zero_card_review_kit_handoff_top_card()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-zero-card-review-kit-top-card")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_zero_card_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&path).map_err(|err| format!("read review kit failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse review kit failed: {err}"))?;
+        review_kit["handoff"]["top_card"] = serde_json::json!({
+            "card_id": "card-1",
+            "explain": "unsafe-review explain card-1",
+            "context_json": "unsafe-review context card-1 --json"
+        });
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = result.expect_err("zero-card top-card handoff should fail verification");
+        assert!(
+            err.contains("review-kit.json handoff top_card must be null"),
             "{err}"
         );
         Ok(())
@@ -15432,6 +15514,15 @@ review_after = "2026-08-01"
         open_actionable_gaps: usize,
         top_card_id: Option<&str>,
     ) -> Result<(), String> {
+        let top_card_handoff = top_card_id
+            .map(|card_id| {
+                serde_json::json!({
+                    "card_id": card_id,
+                    "explain": format!("unsafe-review explain {card_id}"),
+                    "context_json": format!("unsafe-review context {card_id} --json"),
+                })
+            })
+            .unwrap_or(serde_json::Value::Null);
         let value = serde_json::json!({
             "schema_version": "0.1",
             "tool": "unsafe-review",
@@ -15447,6 +15538,12 @@ review_after = "2026-08-01"
                 "open_actionable_gaps": open_actionable_gaps,
             },
             "top_card_id": top_card_id,
+            "handoff": {
+                "reviewer_summary": "pr-summary.md",
+                "receipt_audit_markdown": "unsafe-review receipt audit --root fixtures/raw_pointer_alignment --base origin/main --format markdown",
+                "top_card": top_card_handoff,
+                "trust_boundary": "Copy-only review-kit handoff commands; unsafe-review did not run witnesses, run agents, post comments, edit source, or enforce blocking policy."
+            },
             "artifacts": [
                 {"path":"review-kit.json","kind":"review_kit_manifest","format":"json","schema_version":"0.1"},
                 {"path":"cards.json","kind":"review_cards","format":"json","schema_version":"0.1"},
