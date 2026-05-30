@@ -2464,6 +2464,11 @@ fn check_dogfood_follow_up_seeds_text(
             ));
         }
 
+        let notes = markdown_code_cell_value(columns[7]);
+        if status == "parked" {
+            check_parked_dogfood_follow_up_notes(path, line_idx + 1, &seed_id, &notes)?;
+        }
+
         let target = markdown_code_cell_value(columns[2]);
         if !known_targets.contains(&target) {
             return Err(format!(
@@ -2530,6 +2535,32 @@ fn check_dogfood_follow_up_seeds_text(
         return Err(format!("{path} has a dogfood follow-up table with no rows"));
     }
     Ok(rows)
+}
+
+fn check_parked_dogfood_follow_up_notes(
+    path: &str,
+    line: usize,
+    seed_id: &str,
+    notes: &str,
+) -> Result<(), String> {
+    let lower = notes.to_ascii_lowercase();
+    let explains_future_pressure = [
+        "future",
+        "not enough evidence",
+        "without a matching real card",
+        "until real dogfood",
+        "separate evidence",
+        "does not exercise",
+        "only when dogfood exposes",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle));
+    if !explains_future_pressure {
+        return Err(format!(
+            "{path}:{line} parked dogfood follow-up seed `{seed_id}` notes must explain why it is future pressure rather than ready implementation work"
+        ));
+    }
+    Ok(())
 }
 
 fn check_dogfood_follow_up_status_glossary(path: &str, text: &str) -> Result<(), String> {
@@ -9420,6 +9451,45 @@ policy readiness.
     }
 
     #[test]
+    fn dogfood_follow_up_seed_index_accepts_parked_future_pressure_notes() -> Result<(), String> {
+        let text = r#"
+# Dogfood follow-up seed index
+
+## Seeds
+
+| Seed ID | Status | Target | Family/surface | Primary label | Source report | Next PR slice | Notes |
+|---|---|---|---|---|---|---|---|
+| `dogfood-parked-future` | `parked` | `arrayvec-pr288` | `vec_set_len` | `actionable` | [arrayvec rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md) | `analysis: wait for future dogfood pressure` | Parked for future pressure; add a fixture only when dogfood exposes a concrete stale or wrong-target shape. |
+
+## Trust boundary
+
+Dogfood follow-up seeds are static advisory review notes. They are not a proof
+of memory safety, not UB-free status, not Miri-clean status, not site execution
+evidence, not calibrated precision or recall, not witness adequacy, and not
+policy readiness.
+"#;
+        let targets = BTreeSet::from(["arrayvec-pr288".to_string()]);
+        let reports = vec!["2026-05-26-arrayvec-vec-set-len-rerun.md".to_string()];
+        let report_triage_keys = dogfood_report_triage_keys_for_tests(&[(
+            "2026-05-26-arrayvec-vec-set-len-rerun.md",
+            "arrayvec-pr288",
+            "actionable",
+        )]);
+
+        let rows = check_dogfood_follow_up_seeds_text(
+            "docs/dogfood/follow-up-seeds.md",
+            text,
+            &targets,
+            &dogfood_follow_up_family_surface_set_for_tests(),
+            &reports,
+            &report_triage_keys,
+        )?;
+
+        assert_eq!(rows, 1);
+        Ok(())
+    }
+
+    #[test]
     fn dogfood_follow_up_status_glossary_accepts_closed_vocabulary() -> Result<(), String> {
         let text = r#"
 # Dogfood follow-up seed index
@@ -9522,6 +9592,47 @@ policy readiness.
 
         assert!(err.contains("unknown dogfood follow-up status"));
         assert!(err.contains("reviewing"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_follow_up_seed_index_rejects_parked_without_scope_boundary() -> Result<(), String> {
+        let text = r#"
+# Dogfood follow-up seed index
+
+## Seeds
+
+| Seed ID | Status | Target | Family/surface | Primary label | Source report | Next PR slice | Notes |
+|---|---|---|---|---|---|---|---|
+| `dogfood-parked-ready-work` | `parked` | `arrayvec-pr288` | `vec_set_len` | `actionable` | [arrayvec rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md) | `analysis: implement broad recognizer` | ready to implement this recognizer now |
+
+## Trust boundary
+
+Dogfood follow-up seeds are static advisory review notes. They are not a proof
+of memory safety, not UB-free status, not Miri-clean status, not site execution
+evidence, not calibrated precision or recall, not witness adequacy, and not
+policy readiness.
+"#;
+        let targets = BTreeSet::from(["arrayvec-pr288".to_string()]);
+        let reports = vec!["2026-05-26-arrayvec-vec-set-len-rerun.md".to_string()];
+        let report_triage_keys = dogfood_report_triage_keys_for_tests(&[(
+            "2026-05-26-arrayvec-vec-set-len-rerun.md",
+            "arrayvec-pr288",
+            "actionable",
+        )]);
+
+        let err = err_text(check_dogfood_follow_up_seeds_text(
+            "docs/dogfood/follow-up-seeds.md",
+            text,
+            &targets,
+            &dogfood_follow_up_family_surface_set_for_tests(),
+            &reports,
+            &report_triage_keys,
+        ))?;
+
+        assert!(err.contains("parked dogfood follow-up seed"));
+        assert!(err.contains("future pressure"));
+        assert!(err.contains("dogfood-parked-ready-work"));
         Ok(())
     }
 
