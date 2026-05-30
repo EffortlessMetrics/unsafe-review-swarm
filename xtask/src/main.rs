@@ -2331,6 +2331,7 @@ fn check_dogfood_follow_up_seeds(known_targets: &BTreeSet<String>) -> Result<(),
         ));
     }
     let text = read_to_string(&workspace_path(DOGFOOD_FOLLOW_UP_SEEDS))?;
+    check_dogfood_follow_up_status_glossary(DOGFOOD_FOLLOW_UP_SEEDS, &text)?;
     let reports = dogfood_report_names()?;
     let report_triage_keys = dogfood_report_triage_keys_by_report(&reports)?;
     let mut known_families_or_surfaces = operation_family_registry_rows()?;
@@ -2498,6 +2499,62 @@ fn check_dogfood_follow_up_seeds_text(
         return Err(format!("{path} has a dogfood follow-up table with no rows"));
     }
     Ok(rows)
+}
+
+fn check_dogfood_follow_up_status_glossary(path: &str, text: &str) -> Result<(), String> {
+    let mut in_statuses = false;
+    let mut documented = BTreeSet::new();
+    for (line_idx, line) in text.lines().enumerate() {
+        let trimmed = line.trim();
+        if trimmed == "Statuses:" {
+            in_statuses = true;
+            continue;
+        }
+        if in_statuses && trimmed.starts_with("## ") {
+            break;
+        }
+        if !in_statuses || !trimmed.starts_with("- `") {
+            continue;
+        }
+        let status = first_markdown_code_span(trimmed).ok_or_else(|| {
+            format!(
+                "{path}:{} dogfood follow-up status bullet must start with a code-spanned status",
+                line_idx + 1
+            )
+        })?;
+        if !DOGFOOD_FOLLOW_UP_STATUSES.contains(&status.as_str()) {
+            return Err(format!(
+                "{path}:{} documents unknown dogfood follow-up status `{status}`",
+                line_idx + 1
+            ));
+        }
+        if !documented.insert(status.clone()) {
+            return Err(format!(
+                "{path}:{} documents duplicate dogfood follow-up status `{status}`",
+                line_idx + 1
+            ));
+        }
+    }
+    if !in_statuses {
+        return Err(format!(
+            "{path} must document dogfood follow-up statuses before the seed table"
+        ));
+    }
+    for status in DOGFOOD_FOLLOW_UP_STATUSES {
+        if !documented.contains(*status) {
+            return Err(format!(
+                "{path} must document dogfood follow-up status `{status}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn first_markdown_code_span(text: &str) -> Option<String> {
+    let start = text.find('`')?;
+    let rest = &text[start + 1..];
+    let end = rest.find('`')?;
+    Some(rest[..end].to_string())
 }
 
 fn markdown_report_link(cell: &str) -> Option<String> {
@@ -9311,6 +9368,72 @@ policy readiness.
         )?;
 
         assert_eq!(rows, 2);
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_follow_up_status_glossary_accepts_closed_vocabulary() -> Result<(), String> {
+        let text = r#"
+# Dogfood follow-up seed index
+
+Statuses:
+
+- `open`: ready for a narrow swarm PR.
+- `done`: the linked report's follow-up has landed.
+- `parked`: recorded for future pressure.
+- `superseded`: replaced by a newer seed or report.
+
+## Seeds
+"#;
+
+        check_dogfood_follow_up_status_glossary("docs/dogfood/follow-up-seeds.md", text)
+    }
+
+    #[test]
+    fn dogfood_follow_up_status_glossary_rejects_missing_status() -> Result<(), String> {
+        let text = r#"
+# Dogfood follow-up seed index
+
+Statuses:
+
+- `open`: ready for a narrow swarm PR.
+- `done`: the linked report's follow-up has landed.
+- `parked`: recorded for future pressure.
+
+## Seeds
+"#;
+
+        let err = err_text(check_dogfood_follow_up_status_glossary(
+            "docs/dogfood/follow-up-seeds.md",
+            text,
+        ))?;
+
+        assert!(err.contains("must document dogfood follow-up status `superseded`"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_follow_up_status_glossary_rejects_unknown_status() -> Result<(), String> {
+        let text = r#"
+# Dogfood follow-up seed index
+
+Statuses:
+
+- `open`: ready for a narrow swarm PR.
+- `done`: the linked report's follow-up has landed.
+- `parked`: recorded for future pressure.
+- `superseded`: replaced by a newer seed or report.
+- `reviewing`: waiting on a reviewer.
+
+## Seeds
+"#;
+
+        let err = err_text(check_dogfood_follow_up_status_glossary(
+            "docs/dogfood/follow-up-seeds.md",
+            text,
+        ))?;
+
+        assert!(err.contains("documents unknown dogfood follow-up status `reviewing`"));
         Ok(())
     }
 
