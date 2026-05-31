@@ -1474,8 +1474,9 @@ fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<()
     assert!(repo_markdown.contains("## Top operation families"));
     assert!(repo_markdown.contains("| `raw_pointer_read` | 1 |"));
     assert!(repo_markdown.contains(
-        "| ID | Class | Operation family | Operation | Missing evidence | Route | Next action |"
+        "| ID | Class | Location | Operation family | Operation | Missing evidence | Route | Next action |"
     ));
+    assert!(repo_markdown.contains("src/lib.rs:8"));
     assert!(repo_markdown.contains("unsafe { ptr.cast::<Header>().read() }"));
     assert!(repo_markdown.contains("## Trust boundary"));
     assert!(repo_markdown.contains("Add or expose the local guard"));
