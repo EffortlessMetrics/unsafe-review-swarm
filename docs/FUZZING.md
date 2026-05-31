@@ -11,26 +11,29 @@ cargo install cargo-fuzz
 cargo fuzz run analyze
 ```
 
-The `analyze` target treats fuzz bytes as a temporary `src/lib.rs`, synthesizes a
-unified diff that adds that file, runs the core analyzer with byte-selected
-scope/mode/max-card/diff-source settings, always also runs a repo scan, and
-checks that ReviewCard-derived renderers keep producing parseable JSON or
+The `analyze` target treats fuzz bytes as a temporary fixture repo, synthesizes a
+unified diff that adds `src/lib.rs`, runs the core analyzer with byte-selected
+scope/mode/policy/max-card/diff-source settings, always also runs a repo scan,
+and checks that ReviewCard-derived renderers keep producing parseable JSON or
 non-empty text artifacts.
 
-The first two input bytes are interpreted as a small config header:
+The first bytes are interpreted as a small config header:
 
-- bit 0 toggles `Scope::Diff` / `Scope::Repo`
-- bit 1 toggles the default mode from `AnalysisMode::Draft` to `AnalysisMode::Ready`
-- bit 2 can emit a diff with no generated hunk (diff-tail only)
-- bit 3 toggles bounded `max_cards` (`1..=128`) / `None`
-- bit 4 extends mode selection to `AnalysisMode::Instant` (with bit 1 off) or `AnalysisMode::Repo` (with bit 1 on)
-- bit 5 toggles `DiffSource::Text` / `DiffSource::File` for the synthesized diff
+- byte 0 bit 0 toggles `Scope::Diff` / `Scope::Repo`
+- byte 0 bit 2 can emit a diff with no generated hunk (diff-tail only)
+- byte 0 bit 3 toggles bounded `max_cards` (`1..=128`) / `None`
+- byte 0 bit 4 toggles `include_unchanged_tests`
+- byte 0 bit 5 toggles `DiffSource::Text` / `DiffSource::File`
+- byte 0 bit 6 toggles optional witness receipt audit rendering
 - byte 1 seeds the bounded `max_cards` value
+- byte 2 selects `AnalysisMode::Instant`, `Draft`, `Ready`, or `Repo`
+- byte 3 selects `PolicyMode::Advisory`, `NoNewDebt`, or `Blocking`
 
-The remaining bytes after the two-byte header are UTF-8-lossy text input for
-source/diff synthesis. Legacy corpus entries without an intentional binary header
-are still useful because their first two source bytes become deterministic config
-bytes.
+For inputs with at least two bytes, up to the first four bytes are consumed as
+config. Shorter inputs use the default config. The remaining bytes are
+UTF-8-lossy text input for source/diff/test synthesis. Legacy corpus entries
+without an intentional binary header are still useful because their first bytes
+become deterministic config bytes.
 
 Inputs can optionally include this marker on its own line (LF or CRLF line endings are both accepted):
 
@@ -39,9 +42,12 @@ Inputs can optionally include this marker on its own line (LF or CRLF line endin
 ```
 
 Text before the marker becomes the generated `src/lib.rs`. Text after the marker
-is appended to the synthesized unified diff. This lets the corpus exercise both
-source parsing and diff parsing while keeping the harness source-based and
-stable-only.
+is appended to the synthesized unified diff. Inputs can also include a
+`---TESTS---` marker after the source/diff material; text after that marker is
+written to `tests/fuzz.rs` so the harness can exercise unchanged-test discovery
+when that config bit is enabled. This lets the corpus exercise source parsing,
+diff parsing, file-backed diffs, projection rendering, policy reporting, and
+receipt-audit rendering while keeping the harness source-based and stable-only.
 
 The harness caps source and appended diff text to bounded byte sizes and trims
 only at UTF-8 character boundaries. It writes temporary fixtures under the
