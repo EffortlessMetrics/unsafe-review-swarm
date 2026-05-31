@@ -475,6 +475,7 @@ mod tests {
         "maybeuninit_assume_init_closed_branch_write_not_guard",
         "maybeuninit_assume_init_read_closed_branch_write_not_guard",
         "maybeuninit_assume_init_ref_closed_branch_write_not_guard",
+        "maybeuninit_assume_init_mut_closed_branch_write_not_guard",
         "maybeuninit_assume_init_new_guard",
         "maybeuninit_assume_init_open_branch_new_guard",
         "maybeuninit_assume_init_closed_branch_new_not_guard",

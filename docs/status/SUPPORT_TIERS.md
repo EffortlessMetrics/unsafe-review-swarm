@@ -134,9 +134,10 @@ by shadowing from discharging initialized-memory evidence and
 `maybeuninit_assume_init_ref_other_slot_write_not_guard` keeps a write to a
 different slot from discharging `assume_init_ref` initialized-memory evidence.
 `MaybeUninit::assume_init_mut` pins same-slot `write` evidence through
-`maybeuninit_assume_init_mut_write_guard`, while
-`maybeuninit_assume_init_mut_stale_write_not_guard` keeps a write made stale by
-reassignment from discharging initialized-memory evidence and
+`maybeuninit_assume_init_mut_write_guard`, rejects closed conditional write
+evidence through `maybeuninit_assume_init_mut_closed_branch_write_not_guard`,
+and `maybeuninit_assume_init_mut_stale_write_not_guard` keeps a write made
+stale by reassignment from discharging initialized-memory evidence and
 `maybeuninit_assume_init_mut_shadowed_slot_not_guard` keeps a write made stale
 by shadowing from discharging initialized-memory evidence and
 `maybeuninit_assume_init_mut_other_slot_write_not_guard` keeps a write to a
