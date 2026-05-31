@@ -82,6 +82,20 @@ impl CopyRangeBoundTarget {
 fn contains_assignment_to_copy_target(compact: &str, target: &str) -> bool {
     contains_simple_assignment_to(compact, target)
         || contains_assignment_to_receiver_path(compact, target)
+        || contains_assignment_to_parent_receiver_path(compact, target)
+}
+
+fn contains_assignment_to_parent_receiver_path(compact: &str, path: &str) -> bool {
+    let mut prefix = path;
+    while let Some(dot) = prefix.rfind('.') {
+        prefix = &prefix[..dot];
+        if contains_simple_assignment_to(compact, prefix)
+            || contains_assignment_to_receiver_path(compact, prefix)
+        {
+            return true;
+        }
+    }
+    false
 }
 
 fn contains_assignment_to_receiver_path(compact: &str, path: &str) -> bool {
