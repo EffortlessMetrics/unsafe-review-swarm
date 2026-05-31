@@ -313,7 +313,41 @@ diff --git a/src/second.rs b/src/second.rs
     }
 
     fn any_line() -> impl Strategy<Value = String> {
-        "[[:alnum:]_ (){};.,/*-]{0,40}".prop_map(|line: String| line.replace('\n', ""))
+        "[[:alnum:]_ (){};.,/*+-]{0,40}".prop_map(|line: String| line.replace('\n', ""))
+    }
+
+    fn append_diff_lines(diff: &mut String, lines: Vec<DiffLine>, start: usize) -> BTreeSet<usize> {
+        let mut expected = BTreeSet::new();
+        let mut new_line = start;
+
+        for line in lines {
+            match line {
+                DiffLine::Context(text) => {
+                    diff.push(' ');
+                    diff.push_str(&text);
+                    diff.push('\n');
+                    new_line = new_line.saturating_add(1);
+                }
+                DiffLine::Added(text) => {
+                    diff.push('+');
+                    diff.push_str(&text);
+                    diff.push('\n');
+                    expected.insert(new_line);
+                    new_line = new_line.saturating_add(1);
+                }
+                DiffLine::Removed(text) => {
+                    diff.push('-');
+                    diff.push_str(&text);
+                    diff.push('\n');
+                }
+                DiffLine::EmptyContext => {
+                    diff.push('\n');
+                    new_line = new_line.saturating_add(1);
+                }
+            }
+        }
+
+        expected
     }
 
     proptest! {
@@ -326,35 +360,7 @@ diff --git a/src/second.rs b/src/second.rs
             let mut diff = format!(
                 "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1,1 +{start},1 @@\n"
             );
-            let mut expected = BTreeSet::new();
-            let mut new_line = start;
-
-            for line in lines {
-                match line {
-                    DiffLine::Context(text) => {
-                        diff.push(' ');
-                        diff.push_str(&text);
-                        diff.push('\n');
-                        new_line = new_line.saturating_add(1);
-                    }
-                    DiffLine::Added(text) => {
-                        diff.push('+');
-                        diff.push_str(&text);
-                        diff.push('\n');
-                        expected.insert(new_line);
-                        new_line = new_line.saturating_add(1);
-                    }
-                    DiffLine::Removed(text) => {
-                        diff.push('-');
-                        diff.push_str(&text);
-                        diff.push('\n');
-                    }
-                    DiffLine::EmptyContext => {
-                        diff.push('\n');
-                        new_line = new_line.saturating_add(1);
-                    }
-                }
-            }
+            let expected = append_diff_lines(&mut diff, lines, start);
 
             let parsed = parse_unified_diff(&diff);
             let actual = parsed.changed_lines.get(&path).cloned().unwrap_or_default();
@@ -374,35 +380,7 @@ diff --git a/src/second.rs b/src/second.rs
 @@ -1,1 +{start},1 @@
 "
             );
-            let mut expected = BTreeSet::new();
-            let mut new_line = start;
-
-            for line in lines {
-                match line {
-                    DiffLine::Context(text) => {
-                        diff.push(' ');
-                        diff.push_str(&text);
-                        diff.push('\n');
-                        new_line = new_line.saturating_add(1);
-                    }
-                    DiffLine::Added(text) => {
-                        diff.push('+');
-                        diff.push_str(&text);
-                        diff.push('\n');
-                        expected.insert(new_line);
-                        new_line = new_line.saturating_add(1);
-                    }
-                    DiffLine::Removed(text) => {
-                        diff.push('-');
-                        diff.push_str(&text);
-                        diff.push('\n');
-                    }
-                    DiffLine::EmptyContext => {
-                        diff.push('\n');
-                        new_line = new_line.saturating_add(1);
-                    }
-                }
-            }
+            let expected = append_diff_lines(&mut diff, lines, start);
 
             let parsed = parse_unified_diff(&diff);
             let actual = parsed.changed_lines.get(&path).cloned().unwrap_or_default();
@@ -450,6 +428,29 @@ diff --git a/src/second.rs b/src/second.rs
         }
 
         #[test]
+        fn repeated_file_hunks_union_added_lines_after_each_hunk_header(
+            first_start in 1usize..250,
+            second_start in 251usize..500,
+            first_lines in prop::collection::vec(diff_line_strategy(), 0..40),
+            second_lines in prop::collection::vec(diff_line_strategy(), 0..40),
+        ) {
+            let path = PathBuf::from("src/lib.rs");
+            let mut diff = format!(
+                "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1,1 +{first_start},1 @@\n"
+            );
+            let mut expected = append_diff_lines(&mut diff, first_lines, first_start);
+
+            diff.push_str(&format!("@@ -1,1 +{second_start},1 @@\n"));
+            expected.extend(append_diff_lines(&mut diff, second_lines, second_start));
+
+            let parsed = parse_unified_diff(&diff);
+            let actual = parsed.changed_lines.get(&path).cloned().unwrap_or_default();
+
+            prop_assert!(parsed.contains_file(&path));
+            prop_assert_eq!(actual, expected);
+        }
+
+        #[test]
         fn multi_file_hunks_keep_added_lines_scoped_to_their_file(
             first_start in 1usize..250,
             second_start in 251usize..500,
@@ -462,66 +463,12 @@ diff --git a/src/second.rs b/src/second.rs
                 "diff --git a/src/first.rs b/src/first.rs\n--- a/src/first.rs\n+++ b/src/first.rs\n@@ -1,1 +{first_start},1 @@\n"
             );
 
-            let mut first_expected = BTreeSet::new();
-            let mut first_new_line = first_start;
-            for line in first_lines {
-                match line {
-                    DiffLine::Context(text) => {
-                        diff.push(' ');
-                        diff.push_str(&text);
-                        diff.push('\n');
-                        first_new_line = first_new_line.saturating_add(1);
-                    }
-                    DiffLine::Added(text) => {
-                        diff.push('+');
-                        diff.push_str(&text);
-                        diff.push('\n');
-                        first_expected.insert(first_new_line);
-                        first_new_line = first_new_line.saturating_add(1);
-                    }
-                    DiffLine::Removed(text) => {
-                        diff.push('-');
-                        diff.push_str(&text);
-                        diff.push('\n');
-                    }
-                    DiffLine::EmptyContext => {
-                        diff.push('\n');
-                        first_new_line = first_new_line.saturating_add(1);
-                    }
-                }
-            }
+            let first_expected = append_diff_lines(&mut diff, first_lines, first_start);
 
             diff.push_str(&format!(
                 "diff --git a/src/second.rs b/src/second.rs\n--- a/src/second.rs\n+++ b/src/second.rs\n@@ -1,1 +{second_start},1 @@\n"
             ));
-            let mut second_expected = BTreeSet::new();
-            let mut second_new_line = second_start;
-            for line in second_lines {
-                match line {
-                    DiffLine::Context(text) => {
-                        diff.push(' ');
-                        diff.push_str(&text);
-                        diff.push('\n');
-                        second_new_line = second_new_line.saturating_add(1);
-                    }
-                    DiffLine::Added(text) => {
-                        diff.push('+');
-                        diff.push_str(&text);
-                        diff.push('\n');
-                        second_expected.insert(second_new_line);
-                        second_new_line = second_new_line.saturating_add(1);
-                    }
-                    DiffLine::Removed(text) => {
-                        diff.push('-');
-                        diff.push_str(&text);
-                        diff.push('\n');
-                    }
-                    DiffLine::EmptyContext => {
-                        diff.push('\n');
-                        second_new_line = second_new_line.saturating_add(1);
-                    }
-                }
-            }
+            let second_expected = append_diff_lines(&mut diff, second_lines, second_start);
 
             let parsed = parse_unified_diff(&diff);
             let first_actual = parsed.changed_lines.get(&first_path).cloned().unwrap_or_default();
