@@ -2391,6 +2391,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "maybeuninit_assume_init_read_stale_write_not_guard",
             "maybeuninit_assume_init_ref_stale_write_not_guard",
             "maybeuninit_assume_init_mut_stale_write_not_guard",
+            "maybeuninit_assume_init_drop_stale_write_not_guard",
             "maybeuninit_assume_init_read_other_slot_write_not_guard",
             "maybeuninit_assume_init_ref_other_slot_write_not_guard",
             "maybeuninit_assume_init_mut_other_slot_write_not_guard",
