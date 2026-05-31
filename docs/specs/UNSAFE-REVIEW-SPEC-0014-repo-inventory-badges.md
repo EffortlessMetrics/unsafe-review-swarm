@@ -16,6 +16,20 @@ Repo mode is a static posture snapshot projected from `ReviewCard`s. It reports
 repo-scope summary counts, card JSON, Markdown posture reports, advisory policy,
 and the static-review trust boundary.
 
+Repo mode supports bounded file selection before analysis. `--include` and
+`--exclude` are repeatable glob filters over root-relative Rust paths. Empty
+include filters mean all discovered Rust files are eligible before excludes.
+Repo discovery respects gitignore files by default, supports an explicit
+opt-out for ignored Rust files, and skips common non-review trees by default:
+`.git`, `.github`, `.unsafe-review*`, `target`, `node_modules`, `vendor`,
+`build`, `dist`, and any directory named `generated`.
+
+`--list-files` is a dry run over the same discovery and filtering pipeline. It
+prints the selected root-relative Rust files and exits without creating
+ReviewCards or running witness tools. `--max-files` truncates the selected
+file list after deterministic ordering and applies to both dry-run listing and
+repo analysis input.
+
 Repo JSON uses this top-level contract:
 
 ```text
@@ -121,6 +135,7 @@ the current `unsafe-review badges` repo projection.
 - fixture-backed examples for positive and negative cases
 - JSON output contract coverage
 - CLI e2e coverage for repo JSON and badge JSON
+- CLI e2e coverage for repo file-selection dry runs
 - CLI e2e coverage for outcome comparison JSON/Markdown
 - policy documentation when behavior is configurable
 
@@ -128,6 +143,8 @@ the current `unsafe-review badges` repo projection.
 
 - Repo JSON for a fixture reports `scope = repo`, advisory policy, open-gap
   counts, cards, and the trust boundary.
+- Repo file-list dry runs honor include/exclude filters, gitignore defaults,
+  large-repo default skips, and max-file truncation without analyzing files.
 - Repo Markdown for a fixture reports repo posture, summary counts, top card
   classes, operation families, witness routes, cards with concrete operation
   expressions and next actions, and the trust boundary.

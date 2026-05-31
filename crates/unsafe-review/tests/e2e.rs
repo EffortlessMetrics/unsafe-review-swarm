@@ -1136,12 +1136,17 @@ fn repo_help_reports_repo_specific_scale_guidance() -> Result<(), Box<dyn Error>
 
     assert!(text.contains("unsafe-review repo: advisory unsafe contract review"));
     assert!(text.contains("What repo scans today:"));
-    assert!(text.contains("Repo mode scans all discovered Rust files"));
+    assert!(text.contains("Repo mode scans the selected Rust files"));
     assert!(text.contains("--base and --diff are accepted"));
-    assert!(text.contains("Include/exclude globs, --list-files"));
+    assert!(text.contains("--include <glob>"));
+    assert!(text.contains("--exclude <glob>"));
+    assert!(text.contains("--list-files prints selected Rust files"));
+    assert!(text.contains("--max-files <N>"));
     assert!(text.contains("partial artifacts are not preserved yet"));
+    assert!(text.contains("Progress heartbeats and status artifacts are not implemented yet"));
     assert!(text.contains("Trust boundary:"));
     assert!(!text.contains("unsafe-review: cheap unsafe contract review for Rust"));
+    assert!(!text.contains("Include/exclude globs, --list-files, progress heartbeats"));
 
     Ok(())
 }
@@ -1172,6 +1177,58 @@ fn check_reports_missing_diff_file_as_cli_failure() -> Result<(), Box<dyn Error>
         stderr.contains("missing.diff"),
         "stderr should include the missing diff path: {stderr}"
     );
+
+    Ok(())
+}
+
+#[test]
+fn repo_list_files_honors_selection_controls() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-repo-list-files")?;
+    write_e2e_file(temp.path(), "src/lib.rs")?;
+    write_e2e_file(temp.path(), "packages/pkg/src/lib.rs")?;
+    write_e2e_file(temp.path(), "packages/pkg/src/skip.rs")?;
+    write_e2e_file(temp.path(), "vendor/pkg/lib.rs")?;
+    write_e2e_file(temp.path(), "build/out/lib.rs")?;
+    write_e2e_file(temp.path(), "crates/pkg/generated/lib.rs")?;
+    write_e2e_file(temp.path(), "ignored/lib.rs")?;
+    fs::write(temp.path().join(".gitignore"), "ignored/\n")?;
+
+    let output = run_success([
+        os("repo"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--include"),
+        os("src/**/*.rs"),
+        os("--include"),
+        os("packages/**/*.rs"),
+        os("--exclude"),
+        os("packages/**/skip.rs"),
+        os("--list-files"),
+        os("--max-files"),
+        os("2"),
+    ])?;
+    let text = stdout_text(&output)?;
+
+    assert!(text.contains("unsafe-review repo file list"));
+    assert!(text.contains("files: 2"));
+    assert!(text.contains("src/lib.rs"));
+    assert!(text.contains("packages/pkg/src/lib.rs"));
+    assert!(!text.contains("skip.rs"));
+    assert!(!text.contains("vendor/pkg/lib.rs"));
+    assert!(!text.contains("build/out/lib.rs"));
+    assert!(!text.contains("generated/lib.rs"));
+    assert!(!text.contains("ignored/lib.rs"));
+
+    let ignored = run_success([
+        os("repo"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--include"),
+        os("ignored/**/*.rs"),
+        os("--list-files"),
+        os("--no-respect-gitignore"),
+    ])?;
+    assert!(stdout_text(&ignored)?.contains("ignored/lib.rs"));
 
     Ok(())
 }
@@ -2508,6 +2565,15 @@ review_after = "2026-08-01"
 "#
         ),
     )?;
+    Ok(())
+}
+
+fn write_e2e_file(root: &Path, rel: &str) -> Result<(), Box<dyn Error>> {
+    let path = root.join(rel);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(path, "unsafe fn fixture_data() {}\n")?;
     Ok(())
 }
 

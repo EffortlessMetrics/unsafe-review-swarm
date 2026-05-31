@@ -232,6 +232,42 @@ unsafe-review repo --format json
 unsafe-review repo --format markdown --out target/unsafe-review/repo-posture.md
 ```
 
+For large or mixed repositories, bound the scan with repo-only file selection
+controls:
+
+```bash
+unsafe-review repo \
+  --root . \
+  --include 'src/**/*.rs' \
+  --include 'packages/**/*.rs' \
+  --exclude 'vendor/**' \
+  --exclude 'build/**' \
+  --exclude '**/generated/**' \
+  --format markdown \
+  --out target/unsafe-review/repo-posture.md
+```
+
+`--include` and `--exclude` are repeatable glob filters over root-relative Rust
+paths. Repo discovery respects gitignore files by default; use
+`--no-respect-gitignore` only when the review intentionally includes ignored
+Rust files. Repo discovery also skips common large or generated directories by
+default: `.git`, `.github`, `.unsafe-review*`, `target`, `node_modules`,
+`vendor`, `build`, `dist`, and `generated`.
+
+Use `--list-files` as a dry run before scanning a large repo:
+
+```bash
+unsafe-review repo \
+  --root . \
+  --include 'src/**/*.rs' \
+  --exclude '**/generated/**' \
+  --list-files
+```
+
+`--list-files` prints the selected root-relative Rust files and exits without
+running analysis. `--max-files <n>` truncates the selected file list after
+sorting, so it bounds both `--list-files` output and repo analysis input.
+
 Badge JSON reports open review gaps, not raw unsafe usage and not safety status:
 
 ```bash

@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use unsafe_review_core::PolicyMode;
+use unsafe_review_core::{DiscoveryOptions, PolicyMode};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum DiffInput {
@@ -60,6 +60,23 @@ impl Default for FirstPrOptions {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct RepoOptions {
+    pub check: CheckOptions,
+    pub discovery: DiscoveryOptions,
+    pub list_files: bool,
+}
+
+impl Default for RepoOptions {
+    fn default() -> Self {
+        Self {
+            check: CheckOptions::default(),
+            discovery: DiscoveryOptions::repo_defaults(),
+            list_files: false,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ReceiptTemplateOptions {
     pub card_id: String,
@@ -105,7 +122,7 @@ pub(crate) enum Command {
         root: PathBuf,
     },
     Check(CheckOptions),
-    Repo(CheckOptions),
+    Repo(RepoOptions),
     Pilot(CheckOptions),
     FirstPr(FirstPrOptions),
     Badges {

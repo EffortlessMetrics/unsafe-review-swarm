@@ -1,6 +1,6 @@
 use crate::command::{
     CheckOptions, Command, DiffInput, FirstPrOptions, Format, OutcomeOptions,
-    ReceiptTemplateOptions, SavedOutputReceiptOptions,
+    ReceiptTemplateOptions, RepoOptions, SavedOutputReceiptOptions,
 };
 use std::fs;
 use std::io::{self, Read};
@@ -8,11 +8,12 @@ use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
 use unsafe_review_core::{
     AnalysisMode, AnalyzeInput, AnalyzeOutput, CardId, CargoCarefulReceiptInput,
-    ConcurrencyReceiptInput, DiffSource, MiriReceiptInput, PolicyMode, ProofReceiptInput,
-    SanitizerReceiptInput, Scope, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze,
-    audit_witness_receipts, compare_outcome_json, evaluate_policy_report, render_badge_jsons,
-    render_comment_plan, render_github_summary, render_human, render_json, render_lsp,
-    render_markdown, render_outcome_json, render_outcome_markdown, render_policy_report_json,
+    ConcurrencyReceiptInput, DiffSource, DiscoveryOptions, MiriReceiptInput, PolicyMode,
+    ProofReceiptInput, SanitizerReceiptInput, Scope, WITNESS_RECEIPT_SCHEMA_VERSION,
+    WitnessReceipt, analyze, analyze_with_discovery, audit_witness_receipts, compare_outcome_json,
+    discover_repo_files, evaluate_policy_report, render_badge_jsons, render_comment_plan,
+    render_github_summary, render_human, render_json, render_lsp, render_markdown,
+    render_outcome_json, render_outcome_markdown, render_policy_report_json,
     render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
     render_receipt_audit_markdown, render_repair_queue, render_sarif, render_witness_plan,
     validate_witness_receipts,
@@ -70,9 +71,19 @@ pub(crate) fn execute(command: Command) -> Result<(), String> {
             Ok(())
         }
         Command::Doctor { root } => doctor(&root),
-        Command::Check(options) => run_check(options, Scope::Diff, AnalysisMode::Draft),
-        Command::Repo(options) => run_check(options, Scope::Repo, AnalysisMode::Repo),
-        Command::Pilot(options) => run_check(options, Scope::Diff, AnalysisMode::Draft),
+        Command::Check(options) => run_check(
+            options,
+            Scope::Diff,
+            AnalysisMode::Draft,
+            DiscoveryOptions::default(),
+        ),
+        Command::Repo(options) => repo(options),
+        Command::Pilot(options) => run_check(
+            options,
+            Scope::Diff,
+            AnalysisMode::Draft,
+            DiscoveryOptions::default(),
+        ),
         Command::FirstPr(options) => first_pr(options),
         Command::Badges { root, out } => badges(&root, &out),
         Command::Explain { root, id, format } => explain(&root, &id, format),
@@ -122,18 +133,26 @@ fn print_support() {
     println!("- docs/status/SUPPORT_TIERS.md");
 }
 
-fn run_check(options: CheckOptions, scope: Scope, mode: AnalysisMode) -> Result<(), String> {
+fn run_check(
+    options: CheckOptions,
+    scope: Scope,
+    mode: AnalysisMode,
+    discovery: DiscoveryOptions,
+) -> Result<(), String> {
     let diff = diff_source(&options)?;
     let policy = options.policy.clone();
-    let output = analyze(AnalyzeInput {
-        root: options.root,
-        scope,
-        diff,
-        mode,
-        policy,
-        include_unchanged_tests: true,
-        max_cards: options.max_cards,
-    })?;
+    let output = analyze_with_discovery(
+        AnalyzeInput {
+            root: options.root,
+            scope,
+            diff,
+            mode,
+            policy,
+            include_unchanged_tests: true,
+            max_cards: options.max_cards,
+        },
+        discovery,
+    )?;
     let rendered = render_with_format(&output, &options.format);
     if let Some(path) = options.out {
         ensure_parent_dir(&path)?;
@@ -144,6 +163,45 @@ fn run_check(options: CheckOptions, scope: Scope, mode: AnalysisMode) -> Result<
     }
     enforce_policy(&output)?;
     Ok(())
+}
+
+fn repo(options: RepoOptions) -> Result<(), String> {
+    if options.list_files {
+        return repo_list_files(options);
+    }
+    run_check(
+        options.check,
+        Scope::Repo,
+        AnalysisMode::Repo,
+        options.discovery,
+    )
+}
+
+fn repo_list_files(options: RepoOptions) -> Result<(), String> {
+    let root = options.check.root.clone();
+    let files = discover_repo_files(root.clone(), options.discovery)?;
+    let rendered = render_repo_file_list(&root, &files);
+    if let Some(path) = options.check.out {
+        ensure_parent_dir(&path)?;
+        fs::write(&path, rendered)
+            .map_err(|err| format!("write {} failed: {err}", path.display()))?;
+    } else {
+        print!("{rendered}");
+    }
+    Ok(())
+}
+
+fn render_repo_file_list(root: &Path, files: &[PathBuf]) -> String {
+    let mut rendered = format!(
+        "unsafe-review repo file list\nroot: {}\nfiles: {}\n",
+        root.display(),
+        files.len()
+    );
+    for file in files {
+        rendered.push_str(&file.display().to_string());
+        rendered.push('\n');
+    }
+    rendered
 }
 
 fn first_pr(options: FirstPrOptions) -> Result<(), String> {
@@ -737,7 +795,7 @@ fn print_help() {
         "  check   [--root .] [--base origin/main | --diff file|-] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file]"
     );
     println!(
-        "  repo    [--root .] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file]"
+        "  repo    [--root .] [--include glob] [--exclude glob] [--list-files] [--respect-gitignore|--no-respect-gitignore] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
     );
     println!(
         "  first-pr [--root .] [--base origin/main|--diff file|-] [--out-dir target/unsafe-review] [--max-cards N]"
@@ -790,23 +848,28 @@ fn print_repo_help() {
     println!();
     println!("Usage:");
     println!(
-        "  unsafe-review repo [--root .] [--base origin/main | --diff file|-] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
+        "  unsafe-review repo [--root .] [--include glob] [--exclude glob] [--list-files] [--respect-gitignore|--no-respect-gitignore] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
     );
     println!();
     println!("What repo scans today:");
+    println!("- Discovers *.rs files under --root, defaulting to the current directory.");
     println!(
-        "- Recursively discovers *.rs files under --root, defaulting to the current directory."
+        "- Discovery respects gitignore files by default and skips .git, .github, .unsafe-review*, target, node_modules, vendor, build, dist, and generated directories."
     );
     println!(
-        "- Built-in skipped directories are .git, target, .unsafe-review, .unsafe-review-spec, .github, and node_modules."
-    );
-    println!(
-        "- Repo mode scans all discovered Rust files; --base and --diff are accepted by the shared parser but do not make repo a diff-only scan."
+        "- Repo mode scans the selected Rust files; --base and --diff are accepted by the shared parser but do not make repo a diff-only scan."
     );
     println!("- Use check or first-pr when you want changed-file review from --base or --diff.");
     println!();
     println!("Options:");
     println!("- --root <dir> chooses the repository or subdirectory to scan.");
+    println!("- --include <glob> adds a root-relative Rust file include filter.");
+    println!("- --exclude <glob> removes root-relative Rust files from the selection.");
+    println!(
+        "- --respect-gitignore is the default; --no-respect-gitignore includes ignored Rust files."
+    );
+    println!("- --list-files prints selected Rust files and exits without analysis.");
+    println!("- --max-files <N> truncates the selected file list before analysis.");
     println!(
         "- --format <name> chooses human, json, markdown, pr-summary, github-summary, sarif, comment-plan, lsp, or witness-plan output."
     );
@@ -814,18 +877,13 @@ fn print_repo_help() {
         "- --policy advisory is the default; --policy no-new-debt exits nonzero for open actionable gaps."
     );
     println!("- --out <file> writes the rendered report to a file instead of stdout.");
-    println!("- --max-cards <N> stops after N cards are collected; it is not file selection.");
+    println!("- --max-cards <N> stops after N cards are collected; it does not limit discovery.");
     println!();
     println!("Large-repo guidance:");
     println!(
-        "- Prefer a scoped --root such as src, crates, or a package directory for large repositories."
+        "- Prefer scoped roots or include/exclude filters such as --include 'src/**/*.rs' and --exclude '**/generated/**'."
     );
-    println!(
-        "- Include/exclude globs, --list-files, progress heartbeats, and status artifacts are not implemented yet."
-    );
-    println!(
-        "- Generated, vendored, build, and dist trees outside the current skipped list may still be scanned unless you choose a narrower --root."
-    );
+    println!("- Use --list-files before a large scan to confirm the selected Rust files.");
     println!();
     println!("Output and cancellation:");
     println!("- Rendering happens after analysis completes.");
@@ -835,6 +893,7 @@ fn print_repo_help() {
     println!(
         "- If a long scan is interrupted or times out, the current command may leave no useful report."
     );
+    println!("- Progress heartbeats and status artifacts are not implemented yet.");
     println!();
     println!("Trust boundary:");
     println!(

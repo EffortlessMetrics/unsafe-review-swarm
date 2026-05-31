@@ -1,4 +1,6 @@
-use crate::command::{CheckOptions, Command, DiffInput, FirstPrOptions, Format, OutcomeOptions};
+use crate::command::{
+    CheckOptions, Command, DiffInput, FirstPrOptions, Format, OutcomeOptions, RepoOptions,
+};
 use std::path::PathBuf;
 use unsafe_review_core::PolicyMode;
 
@@ -29,7 +31,7 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
         "doctor" => parse_doctor(rest),
         "check" => parse_check(rest).map(Command::Check),
         "first-pr" | "review" => parse_first_pr(rest).map(Command::FirstPr),
-        "repo" => parse_check(rest).map(Command::Repo),
+        "repo" => parse_repo(rest).map(Command::Repo),
         "pilot" => parse_check(rest).map(|mut options| {
             options.max_cards = Some(options.max_cards.unwrap_or(5));
             Command::Pilot(options)
@@ -117,6 +119,67 @@ fn parse_check(args: Vec<String>) -> Result<CheckOptions, String> {
         idx += check_parse::apply_check_arg(&args, idx, &mut options)?;
     }
     validate_check_options(&options)?;
+    Ok(options)
+}
+
+fn parse_repo(args: Vec<String>) -> Result<RepoOptions, String> {
+    let mut options = RepoOptions::default();
+    let mut idx = 0usize;
+    while idx < args.len() {
+        if let Some(consumed) = check_parse::try_apply_check_arg(&args, idx, &mut options.check)? {
+            idx += consumed;
+            continue;
+        }
+        match args[idx].as_str() {
+            "--include" => {
+                idx += 1;
+                options
+                    .discovery
+                    .include
+                    .push(value(&args, idx, "--include")?.to_string());
+            }
+            arg if arg.starts_with("--include=") => {
+                options
+                    .discovery
+                    .include
+                    .push(inline_value(arg, "--include")?.to_string());
+            }
+            "--exclude" => {
+                idx += 1;
+                options
+                    .discovery
+                    .exclude
+                    .push(value(&args, idx, "--exclude")?.to_string());
+            }
+            arg if arg.starts_with("--exclude=") => {
+                options
+                    .discovery
+                    .exclude
+                    .push(inline_value(arg, "--exclude")?.to_string());
+            }
+            "--list-files" => {
+                options.list_files = true;
+            }
+            "--respect-gitignore" => {
+                options.discovery.respect_gitignore = true;
+            }
+            "--no-respect-gitignore" | "--no-gitignore" => {
+                options.discovery.respect_gitignore = false;
+            }
+            "--max-files" => {
+                idx += 1;
+                options.discovery.max_files =
+                    Some(parse_max_files(value(&args, idx, "--max-files")?)?);
+            }
+            arg if arg.starts_with("--max-files=") => {
+                options.discovery.max_files =
+                    Some(parse_max_files(inline_value(arg, "--max-files")?)?);
+            }
+            other => return Err(format!("unknown repo argument `{other}`")),
+        }
+        idx += 1;
+    }
+    validate_check_options(&options.check)?;
     Ok(options)
 }
 
@@ -353,6 +416,11 @@ fn parse_max_cards(raw: &str) -> Result<usize, String> {
         .map_err(|err| format!("invalid --max-cards `{raw}`: {err}"))
 }
 
+fn parse_max_files(raw: &str) -> Result<usize, String> {
+    raw.parse::<usize>()
+        .map_err(|err| format!("invalid --max-files `{raw}`: {err}"))
+}
+
 fn parse_format(raw: &str) -> Result<Format, String> {
     match raw {
         "human" => Ok(Format::Human),
@@ -490,6 +558,48 @@ mod tests {
         };
         assert_eq!(options.format, Format::GithubSummary);
         Ok(())
+    }
+
+    #[test]
+    fn parses_repo_file_selection_options() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "repo",
+            "--root=.",
+            "--include",
+            "src/**/*.rs",
+            "--include=packages/**/*.rs",
+            "--exclude",
+            "vendor/**",
+            "--exclude=**/generated/**",
+            "--list-files",
+            "--max-files=25",
+            "--no-respect-gitignore",
+        ]))?;
+
+        let Command::Repo(options) = command else {
+            return Err("expected repo command".to_string());
+        };
+        assert_eq!(options.check.root, PathBuf::from("."));
+        assert_eq!(
+            options.discovery.include,
+            vec!["src/**/*.rs".to_string(), "packages/**/*.rs".to_string()]
+        );
+        assert_eq!(
+            options.discovery.exclude,
+            vec!["vendor/**".to_string(), "**/generated/**".to_string()]
+        );
+        assert_eq!(options.discovery.max_files, Some(25));
+        assert!(!options.discovery.respect_gitignore);
+        assert!(options.list_files);
+        Ok(())
+    }
+
+    #[test]
+    fn check_rejects_repo_only_file_selection_options() {
+        let command = parse(args(["unsafe-review", "check", "--include", "src/**/*.rs"]));
+
+        assert_eq!(command, Err("unknown argument `--include`".to_string()));
     }
 
     #[test]
