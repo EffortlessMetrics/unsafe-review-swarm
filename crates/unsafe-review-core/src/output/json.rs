@@ -237,6 +237,7 @@ fn scope_str(output: &AnalyzeOutput) -> &'static str {
 mod tests {
     use super::*;
     use crate::api::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, analyze};
+    use std::collections::BTreeSet;
     use std::fs;
     use std::path::PathBuf;
 
@@ -298,6 +299,7 @@ mod tests {
         "nonnull_is_null_open_branch_shadowed_ptr_not_guard",
         "nonnull_observed_not_guard",
         "nonnull_post_check_not_guard",
+        "nonnull_cast_checked_pointer_not_guard",
         "nonnull_if_let_new_reassigned_ptr_not_guard",
         "nonnull_if_let_new_shadowed_ptr_not_guard",
         "nonnull_let_else_new_reassigned_ptr_not_guard",
@@ -495,6 +497,10 @@ mod tests {
         "maybeuninit_assume_init",
         "maybeuninit_assume_init_comment_not_guard",
         "maybeuninit_assume_init_write_guard",
+        "maybeuninit_assume_init_read_write_guard",
+        "maybeuninit_assume_init_ref_write_guard",
+        "maybeuninit_assume_init_mut_write_guard",
+        "maybeuninit_assume_init_drop_write_guard",
         "maybeuninit_assume_init_open_branch_write_guard",
         "maybeuninit_assume_init_read_open_branch_write_guard",
         "maybeuninit_assume_init_ref_open_branch_write_guard",
@@ -514,6 +520,7 @@ mod tests {
         "maybeuninit_assume_init_read_new_guard",
         "maybeuninit_assume_init_ref_new_guard",
         "maybeuninit_assume_init_mut_method_new_guard",
+        "maybeuninit_assume_init_mut_new_guard",
         "maybeuninit_assume_init_drop_new_guard",
         "maybeuninit_assume_init_closed_branch_new_not_guard",
         "maybeuninit_assume_init_read_closed_branch_new_not_guard",
@@ -521,7 +528,15 @@ mod tests {
         "maybeuninit_assume_init_mut_closed_branch_new_not_guard",
         "maybeuninit_assume_init_drop_closed_branch_new_not_guard",
         "maybeuninit_assume_init_other_slot_write_not_guard",
+        "maybeuninit_assume_init_read_other_slot_write_not_guard",
+        "maybeuninit_assume_init_ref_other_slot_write_not_guard",
+        "maybeuninit_assume_init_mut_other_slot_write_not_guard",
+        "maybeuninit_assume_init_drop_other_slot_write_not_guard",
         "maybeuninit_assume_init_stale_write_not_guard",
+        "maybeuninit_assume_init_read_stale_write_not_guard",
+        "maybeuninit_assume_init_ref_stale_write_not_guard",
+        "maybeuninit_assume_init_mut_stale_write_not_guard",
+        "maybeuninit_assume_init_drop_stale_write_not_guard",
         "maybeuninit_assume_init_stale_field_write_not_guard",
         "maybeuninit_assume_init_stale_new_not_guard",
         "maybeuninit_assume_init_read_stale_new_not_guard",
@@ -533,6 +548,7 @@ mod tests {
         "maybeuninit_assume_init_ref_shadowed_slot_not_guard",
         "maybeuninit_assume_init_mut_shadowed_slot_not_guard",
         "maybeuninit_assume_init_drop_shadowed_slot_not_guard",
+        "maybeuninit_assume_init_mutslot_new_not_guard",
         "maybeuninit_assume_init_read_mutslot_new_not_guard",
         "maybeuninit_assume_init_ref_mutslot_new_not_guard",
         "maybeuninit_assume_init_mut_mutslot_new_not_guard",
@@ -585,6 +601,7 @@ mod tests {
         "drop_in_place_box_origin",
         "drop_in_place_reassigned_origin_not_guard",
         "atomic_pointer_state_swap",
+        "atomic_pointer_state_fetch_ops",
         "unwrap_unchecked_result",
         "unwrap_unchecked_infallible_result",
         "unwrap_unchecked_other_infallible_not_guard",
@@ -673,6 +690,7 @@ mod tests {
         "ffi_qualified_call_sanitizer_route",
         "ffi_libc_call_sanitizer_route",
         "ffi_non_libc_wrapper_call_not_route",
+        "ffi_local_libc_module_call_not_route",
         "get_unchecked_mut_bounds",
         "get_unchecked_mut_len_guard",
         "get_unchecked_mut_conjunct_len_guard",
@@ -713,6 +731,7 @@ mod tests {
         "get_unchecked_mut_match_get_shadowed_index_not_guard",
         "get_unchecked_mut_match_get_reassigned_receiver_not_guard",
         "get_unchecked_mut_match_get_shadowed_receiver_not_guard",
+        "static_lifetime_mut_ref_not_static_mut",
         "pin_new_unchecked",
     ];
 
@@ -772,6 +791,49 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn calibration_policy_fixtures_have_json_card_goldens() -> Result<(), String> {
+        let registered = FIXTURE_GOLDENS
+            .iter()
+            .copied()
+            .collect::<BTreeSet<&'static str>>();
+        let policy_path = workspace_root().join("policy/accuracy-calibration.toml");
+        let policy_text = fs::read_to_string(&policy_path)
+            .map_err(|err| format!("read {} failed: {err}", policy_path.display()))?;
+        let policy: toml::Value = toml::from_str(&policy_text)
+            .map_err(|err| format!("parse {} failed: {err}", policy_path.display()))?;
+        let claims = policy
+            .get("claim")
+            .and_then(toml::Value::as_array)
+            .ok_or_else(|| "policy/accuracy-calibration.toml is missing [[claim]]".to_string())?;
+
+        let mut missing = BTreeSet::new();
+        for claim in claims {
+            let Some(fixtures) = claim.get("fixtures").and_then(toml::Value::as_array) else {
+                continue;
+            };
+            for fixture in fixtures {
+                let fixture = fixture
+                    .as_str()
+                    .ok_or_else(|| "policy fixture entry must be a string".to_string())?;
+                if fixture_root(fixture).join("expected.cards.json").exists()
+                    && !registered.contains(fixture)
+                {
+                    missing.insert(fixture.to_owned());
+                }
+            }
+        }
+
+        if !missing.is_empty() {
+            return Err(format!(
+                "calibration fixture(s) with expected.cards.json are missing JSON golden coverage: {}",
+                missing.into_iter().collect::<Vec<_>>().join(", ")
+            ));
+        }
+
+        Ok(())
+    }
+
     fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
         let root = fixture_root(name);
         analyze(AnalyzeInput {
@@ -793,9 +855,11 @@ mod tests {
     }
 
     fn fixture_root(name: &str) -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../fixtures")
-            .join(name)
+        workspace_root().join("fixtures").join(name)
+    }
+
+    fn workspace_root() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
     }
 
     fn parse_json(text: &str) -> Result<serde_json::Value, String> {
