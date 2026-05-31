@@ -767,6 +767,7 @@ fixtures = [
   "maybeuninit_assume_init_mut_shadowed_slot_not_guard",
   "maybeuninit_assume_init_drop_shadowed_slot_not_guard",
   "maybeuninit_assume_init_mutslot_new_not_guard",
+  "maybeuninit_assume_init_read_mutslot_new_not_guard",
   "maybeuninit_assume_init_partial_field_not_guard",
   "maybeuninit_assume_init_partial_array_not_guard",
   "maybeuninit_assume_init_read",
@@ -793,9 +794,10 @@ writes including assume_init_read, assume_init_ref, assume_init_mut, and
 assume_init_drop, stale write/new including stale assume_init_read,
 assume_init_ref, assume_init_mut, and assume_init_drop MaybeUninit::new evidence
 and stale assume_init_read, assume_init_ref, assume_init_mut, and
-assume_init_drop writes, stale field-slot writes, shadowed writes including assume_init_read,
-assume_init_ref, assume_init_mut, and assume_init_drop, and partial
-field or array-element initialization evidence,
+assume_init_drop writes, stale field-slot writes, shadowed writes including
+assume_init_read, assume_init_ref, assume_init_mut, and assume_init_drop,
+prefixed-slot MaybeUninit::new evidence including assume_init_read, and
+partial field or array-element initialization evidence,
 and routes the listed fixtures to Miri/cargo-careful witness suggestions.
 """
 forbidden_claims = [

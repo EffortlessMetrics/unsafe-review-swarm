@@ -613,6 +613,20 @@ label_source = "fixture_golden"
 rationale = "A MaybeUninit::new binding for a prefixed identifier like `mutslot` must not be mistaken for `let mut slot` same-slot initialization evidence."
 
 [[samples]]
+id = "maybeuninit-assume-init-read-mutslot-new-not-initialized"
+fixture = "maybeuninit_assume_init_read_mutslot_new_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "maybe_uninit_assume_init"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A MaybeUninit::new binding for a prefixed identifier like `mutslot` must not be mistaken for `let mut slot` same-slot initialization evidence before assume_init_read."
+
+[[samples]]
 id = "maybeuninit-assume-init-partial-field-not-initialized"
 fixture = "maybeuninit_assume_init_partial_field_not_guard"
 kind = "false_positive_control"

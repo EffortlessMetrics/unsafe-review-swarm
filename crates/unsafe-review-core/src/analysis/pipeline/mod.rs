@@ -2416,6 +2416,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "maybeuninit_assume_init_mut_shadowed_slot_not_guard",
             "maybeuninit_assume_init_drop_shadowed_slot_not_guard",
             "maybeuninit_assume_init_mutslot_new_not_guard",
+            "maybeuninit_assume_init_read_mutslot_new_not_guard",
             "maybeuninit_assume_init_partial_field_not_guard",
             "maybeuninit_assume_init_partial_array_not_guard",
         ] {
