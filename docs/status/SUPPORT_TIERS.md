@@ -179,6 +179,7 @@ evidence, while
 `copy_nonoverlapping_slice_range_shadowed_src_not_guard`,
 `copy_nonoverlapping_slice_range_reassigned_dst_not_guard`,
 `copy_nonoverlapping_slice_range_reassigned_dst_path_not_guard`,
+`copy_nonoverlapping_slice_range_shadowed_dst_path_not_guard`,
 `copy_nonoverlapping_slice_range_shadowed_dst_not_guard`,
 `ptr_copy_slice_range_reassigned_count_not_guard`,
 `ptr_copy_slice_range_shadowed_count_not_guard`,
