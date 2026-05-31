@@ -9,8 +9,9 @@ use std::process::Command as ProcessCommand;
 use unsafe_review_core::{
     AnalysisMode, AnalyzeInput, AnalyzeOutput, CardId, CargoCarefulReceiptInput,
     ConcurrencyReceiptInput, DiffSource, DiscoveryOptions, MiriReceiptInput, PolicyMode,
-    ProofReceiptInput, SanitizerReceiptInput, Scope, WITNESS_RECEIPT_SCHEMA_VERSION,
-    WitnessReceipt, analyze, analyze_with_discovery, audit_witness_receipts, compare_outcome_json,
+    ProofReceiptInput, RepoScanStatus, SanitizerReceiptInput, Scope,
+    WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze, analyze_with_discovery,
+    analyze_with_discovery_and_progress, audit_witness_receipts, compare_outcome_json,
     discover_repo_files, evaluate_policy_report, render_badge_jsons, render_comment_plan,
     render_github_summary, render_human, render_json, render_lsp, render_markdown,
     render_outcome_json, render_outcome_markdown, render_policy_report_json,
@@ -169,12 +170,38 @@ fn repo(options: RepoOptions) -> Result<(), String> {
     if options.list_files {
         return repo_list_files(options);
     }
-    run_check(
-        options.check,
-        Scope::Repo,
-        AnalysisMode::Repo,
+    run_repo_check(options)
+}
+
+fn run_repo_check(options: RepoOptions) -> Result<(), String> {
+    let check = options.check;
+    let diff = diff_source(&check)?;
+    let policy = check.policy.clone();
+    let status_path = check.out.as_deref().map(repo_status_path);
+    let mut reporter = RepoStatusReporter::new(status_path, options.progress);
+    let output = analyze_with_discovery_and_progress(
+        AnalyzeInput {
+            root: check.root,
+            scope: Scope::Repo,
+            diff,
+            mode: AnalysisMode::Repo,
+            policy,
+            include_unchanged_tests: true,
+            max_cards: check.max_cards,
+        },
         options.discovery,
-    )
+        |status| reporter.record(status),
+    )?;
+    let rendered = render_with_format(&output, &check.format);
+    if let Some(path) = check.out {
+        ensure_parent_dir(&path)?;
+        fs::write(&path, rendered)
+            .map_err(|err| format!("write {} failed: {err}", path.display()))?;
+    } else {
+        println!("{rendered}");
+    }
+    enforce_policy(&output)?;
+    Ok(())
 }
 
 fn repo_list_files(options: RepoOptions) -> Result<(), String> {
@@ -202,6 +229,104 @@ fn render_repo_file_list(root: &Path, files: &[PathBuf]) -> String {
         rendered.push('\n');
     }
     rendered
+}
+
+struct RepoStatusReporter {
+    status_path: Option<PathBuf>,
+    progress: bool,
+    last_phase: Option<String>,
+    last_discovery_heartbeat: usize,
+    last_scan_heartbeat: usize,
+}
+
+impl RepoStatusReporter {
+    fn new(status_path: Option<PathBuf>, progress: bool) -> Self {
+        Self {
+            status_path,
+            progress,
+            last_phase: None,
+            last_discovery_heartbeat: 0,
+            last_scan_heartbeat: 0,
+        }
+    }
+
+    fn record(&mut self, status: &RepoScanStatus) -> Result<(), String> {
+        if let Some(path) = &self.status_path {
+            ensure_parent_dir(path)?;
+            fs::write(path, render_repo_scan_status(status)?)
+                .map_err(|err| format!("write {} failed: {err}", path.display()))?;
+        }
+        if self.progress && self.should_print(status) {
+            eprintln!("{}", format_repo_progress(status));
+        }
+        Ok(())
+    }
+
+    fn should_print(&mut self, status: &RepoScanStatus) -> bool {
+        let phase = status.phase.as_str();
+        let phase_changed = self.last_phase.as_deref() != Some(phase);
+        if phase_changed {
+            self.last_phase = Some(phase.to_string());
+            return true;
+        }
+        if status.completed {
+            return true;
+        }
+        if status.files_scanned >= self.last_scan_heartbeat + 100 {
+            self.last_scan_heartbeat = status.files_scanned;
+            return true;
+        }
+        if status.files_discovered >= self.last_discovery_heartbeat + 100 {
+            self.last_discovery_heartbeat = status.files_discovered;
+            return true;
+        }
+        false
+    }
+}
+
+fn render_repo_scan_status(status: &RepoScanStatus) -> Result<String, String> {
+    let value = serde_json::json!({
+        "schema_version": status.schema_version.as_str(),
+        "phase": status.phase.as_str(),
+        "elapsed_ms": status.elapsed_ms,
+        "files_discovered": status.files_discovered,
+        "files_scanned": status.files_scanned,
+        "cards_found": status.cards_found,
+        "last_path": status.last_path.as_ref().map(|path| path.display().to_string()),
+        "completed": status.completed,
+    });
+    let mut rendered = serde_json::to_string_pretty(&value)
+        .map_err(|err| format!("render repo status JSON failed: {err}"))?;
+    rendered.push('\n');
+    Ok(rendered)
+}
+
+fn format_repo_progress(status: &RepoScanStatus) -> String {
+    let last_path = status
+        .last_path
+        .as_ref()
+        .map(|path| path.display().to_string())
+        .unwrap_or_else(|| "-".to_string());
+    format!(
+        "unsafe-review repo: phase={} elapsed_ms={} files_discovered={} files_scanned={} cards_found={} last_path={} completed={}",
+        status.phase.as_str(),
+        status.elapsed_ms,
+        status.files_discovered,
+        status.files_scanned,
+        status.cards_found,
+        last_path,
+        status.completed,
+    )
+}
+
+fn repo_status_path(out: &Path) -> PathBuf {
+    if let Some(file_name) = out.file_name() {
+        let mut status_file_name = file_name.to_os_string();
+        status_file_name.push(".status.json");
+        out.with_file_name(status_file_name)
+    } else {
+        PathBuf::from(format!("{}.status.json", out.display()))
+    }
 }
 
 fn first_pr(options: FirstPrOptions) -> Result<(), String> {
@@ -795,7 +920,7 @@ fn print_help() {
         "  check   [--root .] [--base origin/main | --diff file|-] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file]"
     );
     println!(
-        "  repo    [--root .] [--include glob] [--exclude glob] [--list-files] [--respect-gitignore|--no-respect-gitignore] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
+        "  repo    [--root .] [--include glob] [--exclude glob] [--list-files] [--progress] [--respect-gitignore|--no-respect-gitignore] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
     );
     println!(
         "  first-pr [--root .] [--base origin/main|--diff file|-] [--out-dir target/unsafe-review] [--max-cards N]"
@@ -848,7 +973,7 @@ fn print_repo_help() {
     println!();
     println!("Usage:");
     println!(
-        "  unsafe-review repo [--root .] [--include glob] [--exclude glob] [--list-files] [--respect-gitignore|--no-respect-gitignore] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
+        "  unsafe-review repo [--root .] [--include glob] [--exclude glob] [--list-files] [--progress] [--respect-gitignore|--no-respect-gitignore] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
     );
     println!();
     println!("What repo scans today:");
@@ -869,6 +994,7 @@ fn print_repo_help() {
         "- --respect-gitignore is the default; --no-respect-gitignore includes ignored Rust files."
     );
     println!("- --list-files prints selected Rust files and exits without analysis.");
+    println!("- --progress prints scan-status heartbeats to stderr during analysis.");
     println!("- --max-files <N> truncates the selected file list before analysis.");
     println!(
         "- --format <name> chooses human, json, markdown, pr-summary, github-summary, sarif, comment-plan, lsp, or witness-plan output."
@@ -888,12 +1014,14 @@ fn print_repo_help() {
     println!("Output and cancellation:");
     println!("- Rendering happens after analysis completes.");
     println!(
-        "- --out is written after analysis completes; reports are not streamed and partial artifacts are not preserved yet."
+        "- --out is written after analysis completes and also writes <out>.status.json while analysis runs."
     );
     println!(
-        "- If a long scan is interrupted or times out, the current command may leave no useful report."
+        "- The status sidecar records phase, elapsed time, discovered files, scanned files, cards found, last path, and completion."
     );
-    println!("- Progress heartbeats and status artifacts are not implemented yet.");
+    println!(
+        "- Reports are not streamed; partial report artifacts and interruption preservation are not implemented yet."
+    );
     println!();
     println!("Trust boundary:");
     println!(

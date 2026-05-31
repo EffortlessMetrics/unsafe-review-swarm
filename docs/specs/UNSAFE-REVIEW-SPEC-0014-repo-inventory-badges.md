@@ -30,6 +30,15 @@ ReviewCards or running witness tools. `--max-files` truncates the selected
 file list after deterministic ordering and applies to both dry-run listing and
 repo analysis input.
 
+When repo analysis writes a report through `--out`, it also updates a
+`<out>.status.json` sidecar while discovery and scanning run. The sidecar is
+operational scan status, not a second ReviewCard truth. It records
+`schema_version`, `phase`, `elapsed_ms`, `files_discovered`, `files_scanned`,
+`cards_found`, `last_path`, and `completed`. `--progress` prints stderr
+heartbeats from the same status stream. Reports are still rendered after
+analysis completes; partial report artifacts and interruption preservation are
+outside this status-surface contract.
+
 Repo JSON uses this top-level contract:
 
 ```text
@@ -136,6 +145,7 @@ the current `unsafe-review badges` repo projection.
 - JSON output contract coverage
 - CLI e2e coverage for repo JSON and badge JSON
 - CLI e2e coverage for repo file-selection dry runs
+- CLI e2e coverage for repo status sidecars and progress heartbeats
 - CLI e2e coverage for outcome comparison JSON/Markdown
 - policy documentation when behavior is configurable
 
@@ -145,6 +155,8 @@ the current `unsafe-review badges` repo projection.
   counts, cards, and the trust boundary.
 - Repo file-list dry runs honor include/exclude filters, gitignore defaults,
   large-repo default skips, and max-file truncation without analyzing files.
+- Repo `--out` writes `<out>.status.json` with complete scan status on
+  successful analysis, and `--progress` prints a final completion heartbeat.
 - Repo Markdown for a fixture reports repo posture, summary counts, top card
   classes, operation families, witness routes, cards with direct `path:line`
   source locations, concrete operation expressions and next actions, and the

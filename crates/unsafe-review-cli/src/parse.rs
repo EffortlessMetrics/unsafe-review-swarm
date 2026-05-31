@@ -160,6 +160,9 @@ fn parse_repo(args: Vec<String>) -> Result<RepoOptions, String> {
             "--list-files" => {
                 options.list_files = true;
             }
+            "--progress" => {
+                options.progress = true;
+            }
             "--respect-gitignore" => {
                 options.discovery.respect_gitignore = true;
             }
@@ -592,6 +595,18 @@ mod tests {
         assert_eq!(options.discovery.max_files, Some(25));
         assert!(!options.discovery.respect_gitignore);
         assert!(options.list_files);
+        assert!(!options.progress);
+        Ok(())
+    }
+
+    #[test]
+    fn parses_repo_progress_option() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "repo", "--progress"]))?;
+
+        let Command::Repo(options) = command else {
+            return Err("expected repo command".to_string());
+        };
+        assert!(options.progress);
         Ok(())
     }
 
@@ -600,6 +615,13 @@ mod tests {
         let command = parse(args(["unsafe-review", "check", "--include", "src/**/*.rs"]));
 
         assert_eq!(command, Err("unknown argument `--include`".to_string()));
+    }
+
+    #[test]
+    fn check_rejects_repo_only_progress_option() {
+        let command = parse(args(["unsafe-review", "check", "--progress"]));
+
+        assert_eq!(command, Err("unknown argument `--progress`".to_string()));
     }
 
     #[test]

@@ -57,6 +57,35 @@ pub enum DiffSource {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RepoScanPhase {
+    Discovering,
+    Scanning,
+    Complete,
+}
+
+impl RepoScanPhase {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Discovering => "discovering",
+            Self::Scanning => "scanning",
+            Self::Complete => "complete",
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RepoScanStatus {
+    pub schema_version: String,
+    pub phase: RepoScanPhase,
+    pub elapsed_ms: u64,
+    pub files_discovered: usize,
+    pub files_scanned: usize,
+    pub cards_found: usize,
+    pub last_path: Option<PathBuf>,
+    pub completed: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DiscoveryOptions {
     pub include: Vec<String>,
     pub exclude: Vec<String>,
@@ -149,6 +178,17 @@ pub fn analyze_with_discovery(
     discovery: DiscoveryOptions,
 ) -> Result<AnalyzeOutput, String> {
     pipeline::analyze_with_discovery(input, discovery)
+}
+
+pub fn analyze_with_discovery_and_progress<F>(
+    input: AnalyzeInput,
+    discovery: DiscoveryOptions,
+    progress: F,
+) -> Result<AnalyzeOutput, String>
+where
+    F: FnMut(&RepoScanStatus) -> Result<(), String>,
+{
+    pipeline::analyze_with_discovery_and_progress(input, discovery, progress)
 }
 
 pub fn discover_repo_files(

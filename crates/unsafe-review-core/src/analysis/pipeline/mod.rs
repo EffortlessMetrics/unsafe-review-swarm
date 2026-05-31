@@ -2,7 +2,8 @@ mod card_builder;
 
 use super::{receipts, scanner};
 use crate::api::{
-    AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, DiscoveryOptions, Scope, Summary,
+    AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, DiscoveryOptions, RepoScanPhase,
+    RepoScanStatus, Scope, Summary,
 };
 use crate::domain::{CardId, ReviewCard};
 use crate::input::{diff, workspace};
@@ -10,22 +11,35 @@ use crate::policy::PolicyState;
 use crate::util::{slug, stable_hash_hex};
 use std::collections::BTreeMap;
 use std::fs;
+use std::path::{Path, PathBuf};
+use std::time::Instant;
 
 pub(crate) fn analyze(input: AnalyzeInput) -> Result<AnalyzeOutput, String> {
     let discovery = default_discovery_for(&input);
-    analyze_with_receipts(input, true, discovery)
+    analyze_with_receipts(input, true, discovery, None)
 }
 
 pub(crate) fn analyze_with_discovery(
     input: AnalyzeInput,
     discovery: DiscoveryOptions,
 ) -> Result<AnalyzeOutput, String> {
-    analyze_with_receipts(input, true, discovery)
+    analyze_with_receipts(input, true, discovery, None)
+}
+
+pub(crate) fn analyze_with_discovery_and_progress<F>(
+    input: AnalyzeInput,
+    discovery: DiscoveryOptions,
+    mut progress: F,
+) -> Result<AnalyzeOutput, String>
+where
+    F: FnMut(&RepoScanStatus) -> Result<(), String>,
+{
+    analyze_with_receipts(input, true, discovery, Some(&mut progress))
 }
 
 pub(crate) fn analyze_without_receipts(input: AnalyzeInput) -> Result<AnalyzeOutput, String> {
     let discovery = default_discovery_for(&input);
-    analyze_with_receipts(input, false, discovery)
+    analyze_with_receipts(input, false, discovery, None)
 }
 
 fn default_discovery_for(input: &AnalyzeInput) -> DiscoveryOptions {
@@ -40,10 +54,39 @@ fn analyze_with_receipts(
     input: AnalyzeInput,
     import_receipts: bool,
     discovery: DiscoveryOptions,
+    mut progress: Option<&mut dyn FnMut(&RepoScanStatus) -> Result<(), String>>,
 ) -> Result<AnalyzeOutput, String> {
+    let started = Instant::now();
     let repo_mode = matches!(input.scope, Scope::Repo) || matches!(input.mode, AnalysisMode::Repo);
     let diff_index = load_diff_index(&input.diff)?;
-    let all_rust_files = workspace::discover_rust_files(&input.root, &discovery)?;
+    emit_repo_status(
+        &mut progress,
+        repo_status(RepoScanPhase::Discovering, &started, 0, 0, 0, None, false),
+    )?;
+    let mut discovered_files = 0usize;
+    let all_rust_files = {
+        let mut discovery_progress = |count: usize, path: &Path| {
+            discovered_files = count;
+            emit_repo_status(
+                &mut progress,
+                repo_status(
+                    RepoScanPhase::Discovering,
+                    &started,
+                    discovered_files,
+                    0,
+                    0,
+                    Some(path.to_path_buf()),
+                    false,
+                ),
+            )
+        };
+        workspace::discover_rust_files_with_progress(
+            &input.root,
+            &discovery,
+            Some(&mut discovery_progress),
+        )?
+    };
+    discovered_files = all_rust_files.len();
     let package = package_name(&input.root);
     let policy_state = PolicyState::load(&input.root)?;
     let receipt_index = if import_receipts {
@@ -64,11 +107,38 @@ fn analyze_with_receipts(
     let mut cards = Vec::new();
     let mut identity_counts = BTreeMap::new();
     let max_cards = input.max_cards.unwrap_or(usize::MAX);
+    let mut files_scanned = 0usize;
+    let mut last_scanned_path = None;
+    emit_repo_status(
+        &mut progress,
+        repo_status(
+            RepoScanPhase::Scanning,
+            &started,
+            discovered_files,
+            files_scanned,
+            cards.len(),
+            None,
+            false,
+        ),
+    )?;
     'files: for rel in &candidate_files {
         if cards.len() >= max_cards {
             break;
         }
+        emit_repo_status(
+            &mut progress,
+            repo_status(
+                RepoScanPhase::Scanning,
+                &started,
+                discovered_files,
+                files_scanned,
+                cards.len(),
+                Some(rel.clone()),
+                false,
+            ),
+        )?;
         let scanned = scanner::scan_file(&input.root, rel, Some(&diff_index), repo_mode)?;
+        files_scanned += 1;
         let mut build_ctx = card_builder::CardBuildContext {
             root: &input.root,
             package: &package,
@@ -76,11 +146,29 @@ fn analyze_with_receipts(
             policy_state: &policy_state,
             identity_counts: &mut identity_counts,
         };
+        let mut reached_max_cards = false;
         for scanned_site in scanned {
             cards.push(card_builder::build_card(&mut build_ctx, scanned_site));
             if cards.len() >= max_cards {
-                break 'files;
+                reached_max_cards = true;
+                break;
             }
+        }
+        emit_repo_status(
+            &mut progress,
+            repo_status(
+                RepoScanPhase::Scanning,
+                &started,
+                discovered_files,
+                files_scanned,
+                cards.len(),
+                Some(rel.clone()),
+                false,
+            ),
+        )?;
+        last_scanned_path = Some(rel.clone());
+        if reached_max_cards {
+            break 'files;
         }
     }
     cards.sort_by(|left, right| {
@@ -91,6 +179,18 @@ fn analyze_with_receipts(
             .then(left.site.location.line.cmp(&right.site.location.line))
     });
     let summary = summarize(all_rust_files.len(), candidate_files.len(), &cards);
+    emit_repo_status(
+        &mut progress,
+        repo_status(
+            RepoScanPhase::Complete,
+            &started,
+            discovered_files,
+            files_scanned,
+            cards.len(),
+            last_scanned_path,
+            true,
+        ),
+    )?;
     Ok(AnalyzeOutput {
         schema_version: "0.1".to_string(),
         tool: "unsafe-review".to_string(),
@@ -101,6 +201,37 @@ fn analyze_with_receipts(
         summary,
         cards,
     })
+}
+
+fn emit_repo_status(
+    progress: &mut Option<&mut dyn FnMut(&RepoScanStatus) -> Result<(), String>>,
+    status: RepoScanStatus,
+) -> Result<(), String> {
+    if let Some(progress) = progress.as_deref_mut() {
+        progress(&status)?;
+    }
+    Ok(())
+}
+
+fn repo_status(
+    phase: RepoScanPhase,
+    started: &Instant,
+    files_discovered: usize,
+    files_scanned: usize,
+    cards_found: usize,
+    last_path: Option<PathBuf>,
+    completed: bool,
+) -> RepoScanStatus {
+    RepoScanStatus {
+        schema_version: "repo-scan-status/v1".to_string(),
+        phase,
+        elapsed_ms: started.elapsed().as_millis().try_into().unwrap_or(u64::MAX),
+        files_discovered,
+        files_scanned,
+        cards_found,
+        last_path,
+        completed,
+    }
 }
 
 fn package_name(root: &std::path::Path) -> String {
@@ -1016,6 +1147,62 @@ mod tests {
             output.cards[0].site.location.file,
             PathBuf::from("src/lib.rs")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn repo_scan_status_reports_discovery_scanning_and_completion() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-repo-status")?;
+        fs::create_dir_all(root.join("src")).map_err(|err| format!("create src failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"repo-status-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "pub unsafe fn read_header(ptr: *const u8) -> u32 { unsafe { ptr.cast::<u32>().read() } }\n",
+        )
+        .map_err(|err| format!("write src file failed: {err}"))?;
+
+        let mut statuses = Vec::new();
+        let output = analyze_with_discovery_and_progress(
+            AnalyzeInput {
+                root: root.clone(),
+                scope: Scope::Repo,
+                diff: DiffSource::NoneRepoScan,
+                mode: AnalysisMode::Repo,
+                policy: PolicyMode::Advisory,
+                include_unchanged_tests: true,
+                max_cards: None,
+            },
+            DiscoveryOptions::repo_defaults(),
+            |status| {
+                statuses.push(status.clone());
+                Ok(())
+            },
+        )?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            statuses
+                .iter()
+                .any(|status| status.phase == RepoScanPhase::Discovering)
+        );
+        assert!(
+            statuses
+                .iter()
+                .any(|status| status.phase == RepoScanPhase::Scanning)
+        );
+        let complete = statuses
+            .last()
+            .ok_or_else(|| "expected at least one repo scan status".to_string())?;
+        assert_eq!(complete.phase, RepoScanPhase::Complete);
+        assert!(complete.completed);
+        assert_eq!(complete.files_discovered, 1);
+        assert_eq!(complete.files_scanned, 1);
+        assert_eq!(complete.cards_found, output.cards.len());
+        assert_eq!(complete.last_path, Some(PathBuf::from("src/lib.rs")));
         Ok(())
     }
 

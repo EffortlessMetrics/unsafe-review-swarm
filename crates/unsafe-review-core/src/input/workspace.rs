@@ -7,6 +7,14 @@ pub(crate) fn discover_rust_files(
     root: &Path,
     options: &DiscoveryOptions,
 ) -> Result<Vec<PathBuf>, String> {
+    discover_rust_files_with_progress(root, options, None)
+}
+
+pub(crate) fn discover_rust_files_with_progress(
+    root: &Path,
+    options: &DiscoveryOptions,
+    mut progress: Option<&mut dyn FnMut(usize, &Path) -> Result<(), String>>,
+) -> Result<Vec<PathBuf>, String> {
     let matcher = DiscoveryMatcher::new(options)?;
     let mut out = Vec::new();
     let root_for_filter = root.to_path_buf();
@@ -39,6 +47,12 @@ pub(crate) fn discover_rust_files(
         let rel = path.strip_prefix(root).unwrap_or(path).to_path_buf();
         if matcher.allows(&rel) {
             out.push(rel);
+            if let Some(progress) = progress.as_deref_mut() {
+                progress(
+                    out.len(),
+                    out.last().expect("just pushed a discovered file"),
+                )?;
+            }
         }
     }
     out.sort_by(|left, right| {

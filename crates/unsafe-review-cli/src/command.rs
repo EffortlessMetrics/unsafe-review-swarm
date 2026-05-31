@@ -65,6 +65,7 @@ pub(crate) struct RepoOptions {
     pub check: CheckOptions,
     pub discovery: DiscoveryOptions,
     pub list_files: bool,
+    pub progress: bool,
 }
 
 impl Default for RepoOptions {
@@ -73,6 +74,7 @@ impl Default for RepoOptions {
             check: CheckOptions::default(),
             discovery: DiscoveryOptions::repo_defaults(),
             list_files: false,
+            progress: false,
         }
     }
 }

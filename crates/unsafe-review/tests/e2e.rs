@@ -1141,12 +1141,13 @@ fn repo_help_reports_repo_specific_scale_guidance() -> Result<(), Box<dyn Error>
     assert!(text.contains("--include <glob>"));
     assert!(text.contains("--exclude <glob>"));
     assert!(text.contains("--list-files prints selected Rust files"));
+    assert!(text.contains("--progress prints scan-status heartbeats"));
     assert!(text.contains("--max-files <N>"));
-    assert!(text.contains("partial artifacts are not preserved yet"));
-    assert!(text.contains("Progress heartbeats and status artifacts are not implemented yet"));
+    assert!(text.contains("partial report artifacts and interruption preservation"));
+    assert!(text.contains("<out>.status.json"));
     assert!(text.contains("Trust boundary:"));
     assert!(!text.contains("unsafe-review: cheap unsafe contract review for Rust"));
-    assert!(!text.contains("Include/exclude globs, --list-files, progress heartbeats"));
+    assert!(!text.contains("status artifacts are not implemented yet"));
 
     Ok(())
 }
@@ -1482,6 +1483,45 @@ fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<()
     assert!(repo_markdown.contains("Add or expose the local guard"));
     assert!(repo_markdown.contains("not raw unsafe usage"));
     assert!(repo_markdown.contains("not UB-free status"));
+
+    Ok(())
+}
+
+#[test]
+fn repo_progress_writes_status_sidecar_for_out_reports() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-repo-status-e2e")?;
+    let report_path = temp.path().join("repo.json");
+    let status_path = temp.path().join("repo.json.status.json");
+
+    let output = run_success([
+        os("repo"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+        os("--out"),
+        report_path.as_os_str().to_os_string(),
+        os("--progress"),
+    ])?;
+
+    assert_eq!(stdout_text(&output)?.trim(), "");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("unsafe-review repo: phase=complete"),
+        "stderr should include a final progress heartbeat: {stderr}"
+    );
+    let report = parse_json(&fs::read_to_string(&report_path)?)?;
+    assert_eq!(report["scope"], "repo");
+    let status = parse_json(&fs::read_to_string(&status_path)?)?;
+    assert_eq!(status["schema_version"], "repo-scan-status/v1");
+    assert_eq!(status["phase"], "complete");
+    assert_eq!(status["completed"], true);
+    assert_eq!(status["files_discovered"], 1);
+    assert_eq!(status["files_scanned"], 1);
+    assert_eq!(status["cards_found"], 1);
+    assert_eq!(status["last_path"], "src/lib.rs");
+    assert!(status["elapsed_ms"].as_u64().is_some());
 
     Ok(())
 }
