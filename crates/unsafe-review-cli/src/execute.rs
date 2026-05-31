@@ -15,7 +15,6 @@ use unsafe_review_core::{
     analyze_with_discovery_and_progress, audit_witness_receipts, compare_outcome_json,
     discover_repo_files, evaluate_policy_report, read_manual_candidate, render_badge_jsons,
     render_comment_plan, render_github_summary, render_human, render_json, render_lsp,
-    render_manual_candidate_context, render_manual_candidate_explain,
     render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
     render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
     render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,

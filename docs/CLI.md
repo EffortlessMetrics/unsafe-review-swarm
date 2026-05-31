@@ -268,6 +268,12 @@ after rendering, the partial report is kept at `<out>.partial`; if the process
 is interrupted before rendering, the latest status sidecar is the durable
 artifact.
 
+Repo Markdown also includes a related sink cluster section. The cluster section
+groups existing ReviewCards by source file and inferred owner/helper so a
+reviewer can inspect nearby unsafe sinks together. It is a report-only triage
+view; it is not a call graph, not proof of a shared root cause, and not a new
+analyzer finding source.
+
 For large or mixed repositories, bound the scan with repo-only file selection
 controls:
 

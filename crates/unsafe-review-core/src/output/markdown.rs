@@ -4,7 +4,7 @@ use crate::domain::ReviewCard;
 use crate::output::agent;
 use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
 use crate::util::path_display;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 const DEFAULT_REVIEW_ROUTE: &str = "human-deep-review";
 const REPAIR_QUEUE_BUCKET_ORDER: [&str; 6] = [
@@ -91,6 +91,8 @@ fn render_repo_posture(output: &AnalyzeOutput) -> String {
     out.push_str("## Witness routes\n\n");
     render_counts_table(&mut out, "Route", route_counts(output));
 
+    render_related_sink_clusters(&mut out, output);
+
     out.push_str("## Cards\n\n");
     if output.cards.is_empty() {
         out.push_str("No repo-scope unsafe-review cards found.\n\n");
@@ -150,6 +152,137 @@ fn operation_counts(output: &AnalyzeOutput) -> BTreeMap<String, usize> {
 
 fn route_counts(output: &AnalyzeOutput) -> BTreeMap<String, usize> {
     count_by(output, |card| repo_primary_route(card).to_string())
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct RelatedSinkCluster {
+    file: String,
+    owner: String,
+    line_span: String,
+    card_ids: Vec<String>,
+    families: Vec<String>,
+    classes: Vec<String>,
+    routes: Vec<String>,
+}
+
+fn render_related_sink_clusters(out: &mut String, output: &AnalyzeOutput) {
+    out.push_str("## Related sink clusters\n\n");
+    out.push_str("Grouped from existing ReviewCards by source file and inferred owner/helper. This is a report-only triage view, not a call graph and not proof of a shared root cause.\n\n");
+
+    let clusters = related_sink_clusters(output);
+    if clusters.is_empty() {
+        out.push_str("No multi-card file/owner clusters found.\n\n");
+        return;
+    }
+
+    out.push_str(
+        "| File | Owner/helper | Lines | Cards | Operation families | Classes | Routes |\n",
+    );
+    out.push_str("|---|---|---:|---|---|---|---|\n");
+    for cluster in clusters {
+        out.push_str(&format!(
+            "| `{}` | `{}` | `{}` | {} | {} | {} | {} |\n",
+            md_cell(&cluster.file),
+            md_cell(&cluster.owner),
+            md_cell(&cluster.line_span),
+            render_backtick_string_list(&cluster.card_ids, 4),
+            render_backtick_string_list(&cluster.families, 4),
+            render_backtick_string_list(&cluster.classes, 4),
+            render_backtick_string_list(&cluster.routes, 4)
+        ));
+    }
+    out.push('\n');
+}
+
+fn related_sink_clusters(output: &AnalyzeOutput) -> Vec<RelatedSinkCluster> {
+    let mut grouped: BTreeMap<(String, String), Vec<&ReviewCard>> = BTreeMap::new();
+    for card in &output.cards {
+        let file = path_display(&card.site.location.file);
+        let owner = card
+            .site
+            .owner
+            .as_deref()
+            .unwrap_or("(unknown owner)")
+            .to_string();
+        grouped.entry((file, owner)).or_default().push(card);
+    }
+
+    let mut clusters = Vec::new();
+    for ((file, owner), mut cards) in grouped {
+        if cards.len() < 2 {
+            continue;
+        }
+        cards.sort_by(|left, right| {
+            left.site
+                .location
+                .line
+                .cmp(&right.site.location.line)
+                .then_with(|| left.id.0.cmp(&right.id.0))
+        });
+        clusters.push(RelatedSinkCluster {
+            file,
+            owner,
+            line_span: related_line_span(&cards),
+            card_ids: cards.iter().map(|card| card.id.to_string()).collect(),
+            families: unique_cluster_values(&cards, |card| card.operation.family.as_str()),
+            classes: unique_cluster_values(&cards, |card| card.class.as_str()),
+            routes: unique_cluster_values(&cards, repo_primary_route),
+        });
+    }
+
+    clusters.sort_by(|left, right| {
+        right
+            .card_ids
+            .len()
+            .cmp(&left.card_ids.len())
+            .then_with(|| left.file.cmp(&right.file))
+            .then_with(|| left.owner.cmp(&right.owner))
+    });
+    clusters
+}
+
+fn related_line_span(cards: &[&ReviewCard]) -> String {
+    let start = cards
+        .iter()
+        .map(|card| card.site.location.line)
+        .min()
+        .unwrap_or(0);
+    let end = cards
+        .iter()
+        .map(|card| card.site.location.line)
+        .max()
+        .unwrap_or(0);
+    if start == end {
+        start.to_string()
+    } else {
+        format!("{start}-{end}")
+    }
+}
+
+fn unique_cluster_values<F>(cards: &[&ReviewCard], value_for_card: F) -> Vec<String>
+where
+    F: Fn(&ReviewCard) -> &str,
+{
+    let values = cards
+        .iter()
+        .map(|card| value_for_card(card).to_string())
+        .collect::<BTreeSet<_>>();
+    values.into_iter().collect()
+}
+
+fn render_backtick_string_list(values: &[String], limit: usize) -> String {
+    if values.is_empty() {
+        return "`none`".to_string();
+    }
+    let mut rendered = values
+        .iter()
+        .take(limit)
+        .map(|value| format!("`{}`", md_cell(value)))
+        .collect::<Vec<_>>();
+    if values.len() > limit {
+        rendered.push(format!("+{} more", values.len() - limit));
+    }
+    rendered.join(", ")
 }
 
 fn diff_primary_route(card: &ReviewCard) -> &str {
@@ -812,6 +945,8 @@ mod tests {
         assert!(rendered.contains("## Top operation families"));
         assert!(rendered.contains("| `raw_pointer_read` | 1 |"));
         assert!(rendered.contains("## Witness routes"));
+        assert!(rendered.contains("## Related sink clusters"));
+        assert!(rendered.contains("No multi-card file/owner clusters found."));
         assert!(rendered.contains(
             "| ID | Class | Location | Operation family | Operation | Missing evidence | Route | Next action |"
         ));
@@ -821,6 +956,24 @@ mod tests {
         assert!(rendered.contains("## Trust boundary"));
         assert!(rendered.contains("not raw unsafe usage"));
         assert!(rendered.contains("not UB-free status"));
+        Ok(())
+    }
+
+    #[test]
+    fn repo_posture_markdown_groups_related_sink_clusters() -> Result<(), String> {
+        let output = repo_fixture_output("duplicate_raw_pointer_reads")?;
+        let rendered = render(&output);
+
+        assert!(rendered.contains("## Related sink clusters"));
+        assert!(rendered.contains("report-only triage view"));
+        assert!(rendered.contains("not a call graph"));
+        assert!(rendered.contains("| File | Owner/helper | Lines | Cards |"));
+        assert!(rendered.contains("| `src/lib.rs` | `read_two_headers` | `7-9` |"));
+        assert!(rendered.contains("`raw_pointer_read`"));
+        assert!(rendered.contains("`guard_missing`"));
+        assert!(rendered.contains("`miri`"));
+        assert!(rendered.contains("-c1`"));
+        assert!(rendered.contains("-c2`"));
         Ok(())
     }
 
