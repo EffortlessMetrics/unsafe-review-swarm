@@ -2301,6 +2301,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "ptr_copy_slice_range_shadowed_src_not_guard",
             "ptr_copy_slice_range_reassigned_dst_not_guard",
             "ptr_copy_slice_range_reassigned_dst_path_not_guard",
+            "ptr_copy_slice_range_shadowed_dst_path_not_guard",
             "ptr_copy_slice_range_shadowed_dst_not_guard",
         ] {
             let output = fixture_output(fixture)?;

@@ -454,6 +454,19 @@ label_source = "fixture_golden"
 rationale = "Length evidence for the original destination receiver path does not discharge valid-range evidence after that destination path is reassigned."
 
 [[samples]]
+id = "ptr-copy-shadowed-dst-path-not-guard"
+fixture = "ptr_copy_slice_range_shadowed_dst_path_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Length evidence for the original destination receiver path does not discharge valid-range evidence after the destination path parent is shadowed."
+
+[[samples]]
 id = "ptr-copy-shadowed-dst-not-guard"
 fixture = "ptr_copy_slice_range_shadowed_dst_not_guard"
 kind = "false_positive_control"
