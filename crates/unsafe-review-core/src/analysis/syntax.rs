@@ -163,6 +163,16 @@ mod tests {
         assert!(parsed.nodes.iter().any(|node| node.kind == "SOURCE_FILE"));
     }
 
+    fn unicode_line() -> impl Strategy<Value = String> {
+        proptest::collection::vec(
+            any::<char>().prop_filter("generated lines must not include newlines", |ch| {
+                *ch != '\n'
+            }),
+            0..24,
+        )
+        .prop_map(|chars| chars.into_iter().collect())
+    }
+
     proptest! {
         #[test]
         fn line_column_tracks_ascii_newlines(lines in proptest::collection::vec("[ -~]{0,24}", 1..30)) {
@@ -176,6 +186,37 @@ mod tests {
                     prop_assert_eq!(position.line, line_index + 1);
                     prop_assert_eq!(position.column, column_offset + 1);
                 }
+                line_start = line_start.saturating_add(line.len()).saturating_add(1);
+            }
+        }
+
+        #[test]
+        fn line_column_tracks_unicode_columns_and_clamps_inside_scalars(
+            lines in proptest::collection::vec(unicode_line(), 1..30),
+        ) {
+            let text = lines.join("\n");
+            let line_starts = line_starts(&text);
+            let mut line_start = 0usize;
+
+            for (line_index, line) in lines.iter().enumerate() {
+                for (char_index, (byte_offset, ch)) in line.char_indices().enumerate() {
+                    let absolute_offset = line_start + byte_offset;
+                    let position = line_column(&text, absolute_offset, &line_starts);
+                    prop_assert_eq!(position.line, line_index + 1);
+                    prop_assert_eq!(position.column, char_index + 1);
+
+                    for interior_byte in 1..ch.len_utf8() {
+                        let clamped = line_column(&text, absolute_offset + interior_byte, &line_starts);
+                        prop_assert_eq!(clamped.line, line_index + 1);
+                        prop_assert_eq!(clamped.column, char_index + 1);
+                    }
+                }
+
+                let line_end = line_start + line.len();
+                let end_position = line_column(&text, line_end, &line_starts);
+                prop_assert_eq!(end_position.line, line_index + 1);
+                prop_assert_eq!(end_position.column, line.chars().count() + 1);
+
                 line_start = line_start.saturating_add(line.len()).saturating_add(1);
             }
         }
