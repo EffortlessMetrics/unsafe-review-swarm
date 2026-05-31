@@ -10,7 +10,7 @@ mod tests {
     use crate::api::{
         AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, PolicyMode, Scope, analyze,
     };
-    use crate::domain::OperationFamily;
+    use crate::domain::{Confidence, OperationFamily, Priority, ReviewClass};
     use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
     use std::path::PathBuf;
 
@@ -285,6 +285,89 @@ mod tests {
             "priority/confidence below inline comment threshold"
         );
         assert_eq!(value["not_selected"][0]["reason_code"], "lower_relevance");
+        Ok(())
+    }
+
+    #[test]
+    fn comment_plan_prefers_high_confidence_selection_reason() -> Result<(), String> {
+        let mut output = fixture_output("raw_pointer_alignment")?;
+        let card = output
+            .cards
+            .first_mut()
+            .ok_or_else(|| "fixture should emit one card".to_string())?;
+        card.priority = Priority::Medium;
+        card.confidence = Confidence::High;
+
+        let value = parse_json(&render(&output))?;
+
+        assert_eq!(value["comments"].as_array().map_or(0, Vec::len), 1);
+        assert_review_budget_summary(&value, 1, 0)?;
+        assert_eq!(
+            value["comments"][0]["selection_reason"],
+            "actionable high-confidence review card"
+        );
+        assert_eq!(
+            value["comments"][0]["selection_reason_code"],
+            "top_actionable_card"
+        );
+        assert_eq!(value["comments"][0]["priority"], "medium");
+        assert_eq!(value["comments"][0]["confidence"], "high");
+        assert_eq!(value["comments"][0]["relevance"], "medium");
+        Ok(())
+    }
+
+    #[test]
+    fn comment_plan_explains_non_actionable_cards_before_relevance() -> Result<(), String> {
+        let mut output = fixture_output("raw_pointer_alignment")?;
+        let card = output
+            .cards
+            .first_mut()
+            .ok_or_else(|| "fixture should emit one card".to_string())?;
+        card.class = ReviewClass::GuardedAndWitnessed;
+        card.confidence = Confidence::High;
+
+        let value = parse_json(&render(&output))?;
+
+        assert_eq!(value["comments"].as_array().map_or(1, Vec::len), 0);
+        assert_eq!(value["not_selected"].as_array().map_or(0, Vec::len), 1);
+        assert_review_budget_summary(&value, 0, 1)?;
+        assert_eq!(value["not_selected"][0]["class"], "guarded_and_witnessed");
+        assert_eq!(value["not_selected"][0]["actionability"], "not_actionable");
+        assert_eq!(
+            value["not_selected"][0]["reason"],
+            "class not eligible for inline comments"
+        );
+        assert_eq!(
+            value["not_selected"][0]["reason_code"],
+            "human_deep_review_only"
+        );
+        assert_eq!(value["not_selected"][0]["relevance"], "high");
+        Ok(())
+    }
+
+    #[test]
+    fn comment_plan_explains_low_confidence_before_priority_relevance() -> Result<(), String> {
+        let mut output = fixture_output("raw_pointer_alignment")?;
+        let card = output
+            .cards
+            .first_mut()
+            .ok_or_else(|| "fixture should emit one card".to_string())?;
+        card.priority = Priority::High;
+        card.confidence = Confidence::Low;
+
+        let value = parse_json(&render(&output))?;
+
+        assert_eq!(value["comments"].as_array().map_or(1, Vec::len), 0);
+        assert_eq!(value["not_selected"].as_array().map_or(0, Vec::len), 1);
+        assert_review_budget_summary(&value, 0, 1)?;
+        assert_eq!(value["not_selected"][0]["priority"], "high");
+        assert_eq!(value["not_selected"][0]["confidence"], "low");
+        assert_eq!(
+            value["not_selected"][0]["reason"],
+            "confidence below inline comment threshold"
+        );
+        assert_eq!(value["not_selected"][0]["reason_code"], "lower_relevance");
+        assert_eq!(value["not_selected"][0]["relevance"], "low");
         Ok(())
     }
 
