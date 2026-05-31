@@ -125,6 +125,8 @@ by reassignment from discharging initialized-memory evidence.
 `maybeuninit_assume_init_ref_write_guard`.
 `MaybeUninit::assume_init_mut` pins same-slot `write` evidence through
 `maybeuninit_assume_init_mut_write_guard`.
+`MaybeUninit::assume_init_drop` pins same-slot `write` evidence through
+`maybeuninit_assume_init_drop_write_guard`.
 
 Copy operation range evidence is intentionally conservative:
 `copy_nonoverlapping_slice_range_guard`,
