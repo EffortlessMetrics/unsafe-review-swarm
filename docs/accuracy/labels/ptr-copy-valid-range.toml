@@ -207,6 +207,19 @@ label_source = "fixture_golden"
 rationale = "Invalid-range early-return evidence becomes stale when the source receiver path is reassigned before the copy."
 
 [[samples]]
+id = "ptr-copy-disjunctive-return-shadowed-src-path-not-guard"
+fixture = "ptr_copy_slice_range_disjunctive_early_return_shadowed_src_path_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Invalid-range early-return evidence becomes stale when a later let-binding shadows the checked source receiver path before the copy."
+
+[[samples]]
 id = "ptr-copy-disjunctive-return-shadowed-src-not-guard"
 fixture = "ptr_copy_slice_range_disjunctive_early_return_shadowed_src_not_guard"
 kind = "false_positive_control"
@@ -231,6 +244,32 @@ expected_obligation_key = "valid-range"
 expected_discharge_state = "missing"
 label_source = "fixture_golden"
 rationale = "Invalid-range early-return evidence becomes stale when the destination slice is reassigned before the copy."
+
+[[samples]]
+id = "ptr-copy-disjunctive-return-reassigned-dst-path-not-guard"
+fixture = "ptr_copy_slice_range_disjunctive_early_return_reassigned_dst_path_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Invalid-range early-return evidence becomes stale when the destination receiver path is reassigned before the copy."
+
+[[samples]]
+id = "ptr-copy-disjunctive-return-shadowed-dst-path-not-guard"
+fixture = "ptr_copy_slice_range_disjunctive_early_return_shadowed_dst_path_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Invalid-range early-return evidence becomes stale when a later let-binding shadows the checked destination receiver path before the copy."
 
 [[samples]]
 id = "ptr-copy-disjunctive-return-shadowed-dst-not-guard"
