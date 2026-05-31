@@ -23,6 +23,7 @@ reviewer = "manual"
 date = "2026-05-31"
 scope = "first-pr review packet"
 artifact_set = "target/dogfood-work/arrayvec-pr288.first-pr-smoke"
+cards_artifact = "fixtures/vec_set_len_self_new_const_cap_not_guard/expected.cards.json"
 trust_boundary = "Static unsafe contract review measurement input; not calibrated, not a proof of memory safety, not UB-free status, not a Miri result, not site execution evidence, not witness adequacy, and not policy readiness."
 
 [[cards]]
@@ -42,9 +43,27 @@ next_step = "Create a follow-up seed before changing analyzer behavior."
 ```
 
 `artifact_set` is optional when the report records the artifact location
-directly. `card_id` is optional only for missed-card observations that have no
-ReviewCard yet. Follow-up PRs may add stricter reference validation for reports,
-targets, card IDs, and artifact paths.
+directly. `cards_artifact` is optional and should name a checked-in JSON card
+snapshot when card IDs need mechanical validation; local `target/` artifacts
+remain report evidence, not CI-readable source-of-truth files. `card_id` is
+optional unless `cards_artifact` is present. Missed-card observations do not
+have a ReviewCard yet.
+
+## Checked References
+
+`cargo run --locked -p xtask -- check-dogfood` verifies committed judgment
+files:
+
+- `target` exists in the dogfood corpus manifest.
+- `report` links under `reports/` and the report file exists.
+- `family` and `expected_family` are known operation families or review-kit
+  surfaces.
+- `judgment` and missed-card `status` use the closed vocabularies below.
+- `trust_boundary` preserves static-review, memory-safety, not UB-free status,
+  not-a-Miri-result, site-execution, witness-adequacy, precision/recall, and
+  policy limits.
+- if `cards_artifact` is present, every card judgment must name a `card_id`
+  that exists in that checked-in snapshot.
 
 ## Judgment Labels
 

@@ -204,6 +204,7 @@ const DOGFOOD_MANIFEST: &str = "docs/dogfood/corpus.toml";
 const DOGFOOD_INDEX: &str = "docs/dogfood/index.json";
 const DOGFOOD_README: &str = "docs/dogfood/README.md";
 const DOGFOOD_FOLLOW_UP_SEEDS: &str = "docs/dogfood/follow-up-seeds.md";
+const DOGFOOD_JUDGMENT_DIR: &str = "docs/dogfood/judgments";
 const DOGFOOD_JUDGMENTS_README: &str = "docs/dogfood/judgments/README.md";
 const DOGFOOD_REPORT_DIR: &str = "docs/dogfood/reports";
 const ACCURACY_CALIBRATION_POLICY: &str = "policy/accuracy-calibration.toml";
@@ -263,6 +264,17 @@ const DOGFOOD_TRIAGE_HEADER: &[&str] = &[
 const DOGFOOD_FOLLOW_UP_STATUSES: &[&str] = &["open", "done", "parked", "superseded"];
 const DOGFOOD_FOLLOW_UP_SURFACES: &[&str] =
     &["comment_plan", "first_pr_projection", "repo_posture"];
+const DOGFOOD_JUDGMENT_SURFACES: &[&str] = &[
+    "comment_plan",
+    "context_packet",
+    "first_pr_projection",
+    "github_summary",
+    "pr_summary",
+    "receipt_audit",
+    "repair_queue",
+    "repo_posture",
+    "witness_plan",
+];
 const DOGFOOD_JUDGMENT_LABELS: &[&str] = &[
     "actionable",
     "noise",
@@ -272,6 +284,7 @@ const DOGFOOD_JUDGMENT_LABELS: &[&str] = &[
     "good-agent-task",
     "bad-agent-task",
 ];
+const DOGFOOD_MISSED_JUDGMENT_STATUSES: &[&str] = &["open", "converted", "deferred", "superseded"];
 const DOGFOOD_FOLLOW_UP_HEADER: &[&str] = &[
     "Seed ID",
     "Status",
@@ -2257,6 +2270,7 @@ fn check_dogfood() -> Result<(), String> {
     check_dogfood_report_overclaims()?;
     check_dogfood_follow_up_seeds(&ids)?;
     check_dogfood_judgment_schema_docs()?;
+    check_dogfood_judgments(&ids)?;
 
     println!(
         "check-dogfood: ok ({} targets, {} repositories)",
@@ -2264,6 +2278,370 @@ fn check_dogfood() -> Result<(), String> {
         repositories.len()
     );
     Ok(())
+}
+
+fn check_dogfood_judgments(known_targets: &BTreeSet<String>) -> Result<(), String> {
+    let judgment_dir = workspace_path(DOGFOOD_JUDGMENT_DIR);
+    if !judgment_dir.is_dir() {
+        return Err(format!("{DOGFOOD_JUDGMENT_DIR} is missing"));
+    }
+
+    let reports = dogfood_report_names()?;
+    let known_families_or_surfaces = dogfood_known_families_or_surfaces()?;
+    let mut judgment_files = Vec::new();
+    for entry in fs::read_dir(&judgment_dir)
+        .map_err(|err| format!("read {DOGFOOD_JUDGMENT_DIR} failed: {err}"))?
+    {
+        let entry =
+            entry.map_err(|err| format!("read {DOGFOOD_JUDGMENT_DIR} entry failed: {err}"))?;
+        let path = entry.path();
+        if path.file_name().and_then(|name| name.to_str()) == Some("README.md") {
+            continue;
+        }
+        if path.extension().and_then(|ext| ext.to_str()) != Some("toml") {
+            return Err(format!(
+                "{} may contain only README.md and *.toml judgment files; found {}",
+                DOGFOOD_JUDGMENT_DIR,
+                path.display()
+            ));
+        }
+        judgment_files.push(path);
+    }
+    judgment_files.sort();
+
+    for path in judgment_files {
+        let judgment_path = path.to_string_lossy().replace('\\', "/");
+        let text = read_to_string(&path)?;
+        check_dogfood_judgment_text(
+            &judgment_path,
+            &text,
+            known_targets,
+            &known_families_or_surfaces,
+            &reports,
+        )?;
+    }
+
+    Ok(())
+}
+
+fn dogfood_known_families_or_surfaces() -> Result<BTreeSet<String>, String> {
+    let mut known = operation_family_registry_rows()?;
+    known.extend(
+        DOGFOOD_FOLLOW_UP_SURFACES
+            .iter()
+            .map(|surface| (*surface).to_string()),
+    );
+    known.extend(
+        DOGFOOD_JUDGMENT_SURFACES
+            .iter()
+            .map(|surface| (*surface).to_string()),
+    );
+    Ok(known)
+}
+
+fn check_dogfood_judgment_text(
+    path: &str,
+    text: &str,
+    known_targets: &BTreeSet<String>,
+    known_families_or_surfaces: &BTreeSet<String>,
+    reports: &[String],
+) -> Result<usize, String> {
+    reject_positive_overclaims(Path::new(path), text)?;
+    let value = text
+        .parse::<toml::Table>()
+        .map(toml::Value::Table)
+        .map_err(|err| format!("parse {path} failed: {err}"))?;
+    check_dogfood_judgment_value(
+        path,
+        &value,
+        known_targets,
+        known_families_or_surfaces,
+        reports,
+    )
+}
+
+fn check_dogfood_judgment_value(
+    path: &str,
+    value: &toml::Value,
+    known_targets: &BTreeSet<String>,
+    known_families_or_surfaces: &BTreeSet<String>,
+    reports: &[String],
+) -> Result<usize, String> {
+    let schema_version = required_toml_string(value, "schema_version", path)?;
+    if schema_version != "1.0" {
+        return Err(format!(
+            "{path} unsupported dogfood judgment schema_version `{schema_version}`"
+        ));
+    }
+
+    let target = required_toml_string(value, "target", path)?;
+    if !known_targets.contains(target) {
+        return Err(format!(
+            "{path} references unknown dogfood target `{target}`"
+        ));
+    }
+
+    let report = required_toml_string(value, "report", path)?;
+    check_dogfood_judgment_report(path, report, reports)?;
+    required_toml_string(value, "reviewer", path)?;
+    let date = required_toml_string(value, "date", path)?;
+    check_dogfood_judgment_date(path, date)?;
+    required_toml_string(value, "scope", path)?;
+
+    let trust_boundary = required_toml_string(value, "trust_boundary", path)?;
+    check_dogfood_judgment_trust_boundary(path, trust_boundary)?;
+
+    let card_ids = if let Some(cards_artifact) =
+        optional_nonempty_toml_string(value, "cards_artifact", path)?
+    {
+        check_dogfood_judgment_relative_path(path, "cards_artifact", cards_artifact)?;
+        Some(dogfood_card_ids_from_artifact(path, cards_artifact)?)
+    } else {
+        None
+    };
+
+    let mut rows = 0usize;
+    if let Some(cards) = optional_toml_array(value, "cards", path)? {
+        for (idx, card) in cards.iter().enumerate() {
+            let table = toml_table(card, path, "cards", idx)?;
+            check_dogfood_judgment_card(
+                path,
+                table,
+                idx,
+                known_families_or_surfaces,
+                card_ids.as_ref(),
+            )?;
+            rows += 1;
+        }
+    }
+    if let Some(missed) = optional_toml_array(value, "missed", path)? {
+        for (idx, missed) in missed.iter().enumerate() {
+            let table = toml_table(missed, path, "missed", idx)?;
+            check_dogfood_missed_judgment(path, table, idx, known_families_or_surfaces)?;
+            rows += 1;
+        }
+    }
+
+    if rows == 0 {
+        return Err(format!(
+            "{path} must include at least one `[[cards]]` or `[[missed]]` judgment"
+        ));
+    }
+    Ok(rows)
+}
+
+fn check_dogfood_judgment_report(
+    path: &str,
+    report: &str,
+    reports: &[String],
+) -> Result<(), String> {
+    check_dogfood_judgment_relative_path(path, "report", report)?;
+    let Some(report_name) = report.strip_prefix("reports/") else {
+        return Err(format!("{path} report must link under reports/"));
+    };
+    let report_set = reports.iter().map(String::as_str).collect::<BTreeSet<_>>();
+    if !report_set.contains(report_name) {
+        return Err(format!("{path} links missing dogfood report `{report}`"));
+    }
+    Ok(())
+}
+
+fn check_dogfood_judgment_date(path: &str, date: &str) -> Result<(), String> {
+    let bytes = date.as_bytes();
+    let valid = bytes.len() == 10
+        && bytes[4] == b'-'
+        && bytes[7] == b'-'
+        && bytes
+            .iter()
+            .enumerate()
+            .all(|(idx, byte)| idx == 4 || idx == 7 || byte.is_ascii_digit());
+    if valid {
+        Ok(())
+    } else {
+        Err(format!("{path} date `{date}` must use YYYY-MM-DD"))
+    }
+}
+
+fn check_dogfood_judgment_trust_boundary(path: &str, text: &str) -> Result<(), String> {
+    require_boundary_text(text, path)?;
+    let lower = text.to_ascii_lowercase();
+    for needle in [
+        "not calibrated",
+        "precision",
+        "recall",
+        "site execution",
+        "witness adequacy",
+        "policy readiness",
+    ] {
+        if !lower.contains(needle) {
+            return Err(format!("{path} trust_boundary must document `{needle}`"));
+        }
+    }
+    Ok(())
+}
+
+fn check_dogfood_judgment_card(
+    path: &str,
+    table: &toml::map::Map<String, toml::Value>,
+    idx: usize,
+    known_families_or_surfaces: &BTreeSet<String>,
+    card_ids: Option<&BTreeSet<String>>,
+) -> Result<(), String> {
+    let family = required_table_string(table, "family", path, "cards", idx)?;
+    if !known_families_or_surfaces.contains(family) {
+        return Err(format!(
+            "{path} cards[{idx}] references unknown family/surface `{family}`"
+        ));
+    }
+    let judgment = required_table_string(table, "judgment", path, "cards", idx)?;
+    if !DOGFOOD_JUDGMENT_LABELS.contains(&judgment) {
+        return Err(format!(
+            "{path} cards[{idx}] uses unknown judgment `{judgment}`"
+        ));
+    }
+    required_table_string(table, "reason", path, "cards", idx)?;
+    required_table_string(table, "next_step", path, "cards", idx)?;
+
+    if let Some(card_ids) = card_ids {
+        let card_id = required_table_string(table, "card_id", path, "cards", idx)?;
+        if !card_ids.contains(card_id) {
+            return Err(format!(
+                "{path} cards[{idx}] card_id `{card_id}` is not present in cards_artifact"
+            ));
+        }
+    } else if let Some(card_id) = table.get("card_id") {
+        let Some(card_id) = card_id.as_str() else {
+            return Err(format!("{path} cards[{idx}] `card_id` must be a string"));
+        };
+        if card_id.trim().is_empty() {
+            return Err(format!("{path} cards[{idx}] string `card_id` is empty"));
+        }
+    }
+
+    Ok(())
+}
+
+fn check_dogfood_missed_judgment(
+    path: &str,
+    table: &toml::map::Map<String, toml::Value>,
+    idx: usize,
+    known_families_or_surfaces: &BTreeSet<String>,
+) -> Result<(), String> {
+    let file = required_table_string(table, "file", path, "missed", idx)?;
+    check_dogfood_judgment_relative_path(path, "missed.file", file)?;
+    let Some(line) = table.get("line").and_then(toml::Value::as_integer) else {
+        return Err(format!("{path} missed[{idx}] is missing integer `line`"));
+    };
+    if line <= 0 {
+        return Err(format!("{path} missed[{idx}] line must be positive"));
+    }
+    let expected_family = required_table_string(table, "expected_family", path, "missed", idx)?;
+    if !known_families_or_surfaces.contains(expected_family) {
+        return Err(format!(
+            "{path} missed[{idx}] references unknown expected_family `{expected_family}`"
+        ));
+    }
+    let status = required_table_string(table, "status", path, "missed", idx)?;
+    if !DOGFOOD_MISSED_JUDGMENT_STATUSES.contains(&status) {
+        return Err(format!(
+            "{path} missed[{idx}] uses unknown status `{status}`"
+        ));
+    }
+    required_table_string(table, "reason", path, "missed", idx)?;
+    required_table_string(table, "next_step", path, "missed", idx)?;
+    Ok(())
+}
+
+fn optional_toml_array<'a>(
+    value: &'a toml::Value,
+    key: &str,
+    path: &str,
+) -> Result<Option<&'a Vec<toml::Value>>, String> {
+    let Some(value) = value.get(key) else {
+        return Ok(None);
+    };
+    value
+        .as_array()
+        .ok_or_else(|| format!("{path} `{key}` must be an array"))
+        .map(Some)
+}
+
+fn optional_nonempty_toml_string<'a>(
+    value: &'a toml::Value,
+    key: &str,
+    path: &str,
+) -> Result<Option<&'a str>, String> {
+    let Some(value) = value.get(key) else {
+        return Ok(None);
+    };
+    let Some(value) = value.as_str() else {
+        return Err(format!("{path} `{key}` must be a string"));
+    };
+    if value.trim().is_empty() {
+        return Err(format!("{path} string key `{key}` is empty"));
+    }
+    Ok(Some(value))
+}
+
+fn check_dogfood_judgment_relative_path(
+    path: &str,
+    field: &str,
+    value: &str,
+) -> Result<(), String> {
+    if value.starts_with('/') || has_windows_path(value) || value.contains("..") {
+        return Err(format!(
+            "{path} `{field}` path must be relative, forward-slash only, and stay inside the workspace: {value}"
+        ));
+    }
+    Ok(())
+}
+
+fn dogfood_card_ids_from_artifact(
+    path: &str,
+    cards_artifact: &str,
+) -> Result<BTreeSet<String>, String> {
+    let artifact_path = workspace_path(cards_artifact);
+    let text = read_to_string(&artifact_path)?;
+    let value: serde_json::Value = serde_json::from_str(&text)
+        .map_err(|err| format!("parse {cards_artifact} for {path} failed: {err}"))?;
+    dogfood_card_ids_from_json_value(path, cards_artifact, &value)
+}
+
+fn dogfood_card_ids_from_json_value(
+    path: &str,
+    cards_artifact: &str,
+    value: &serde_json::Value,
+) -> Result<BTreeSet<String>, String> {
+    let cards = if let Some(cards) = value.as_array() {
+        cards
+    } else {
+        value
+            .get("cards")
+            .and_then(serde_json::Value::as_array)
+            .ok_or_else(|| {
+                format!("{path} cards_artifact `{cards_artifact}` must contain a cards array")
+            })?
+    };
+    if cards.is_empty() {
+        return Err(format!(
+            "{path} cards_artifact `{cards_artifact}` has no cards"
+        ));
+    }
+    let mut ids = BTreeSet::new();
+    for (idx, card) in cards.iter().enumerate() {
+        let Some(id) = card.get("id").and_then(serde_json::Value::as_str) else {
+            return Err(format!(
+                "{path} cards_artifact `{cards_artifact}` cards[{idx}] is missing string `id`"
+            ));
+        };
+        if id.trim().is_empty() {
+            return Err(format!(
+                "{path} cards_artifact `{cards_artifact}` cards[{idx}] id is empty"
+            ));
+        }
+        ids.insert(id.to_string());
+    }
+    Ok(ids)
 }
 
 fn check_dogfood_judgment_schema_docs() -> Result<(), String> {
@@ -2313,6 +2691,7 @@ fn check_dogfood_judgment_schema_docs() -> Result<(), String> {
         "date",
         "scope",
         "trust_boundary",
+        "cards_artifact",
         "[[cards]]",
         "card_id",
         "family",
@@ -9652,6 +10031,304 @@ impl WitnessKind {
             "first_pr_projection".to_string(),
             "vec_set_len".to_string(),
         ])
+    }
+
+    fn dogfood_judgment_targets_for_tests() -> BTreeSet<String> {
+        BTreeSet::from(["arrayvec-pr288".to_string(), "mio-pr1388".to_string()])
+    }
+
+    fn dogfood_judgment_families_for_tests() -> BTreeSet<String> {
+        BTreeSet::from([
+            "ffi".to_string(),
+            "repair_queue".to_string(),
+            "vec_set_len".to_string(),
+        ])
+    }
+
+    fn dogfood_judgment_reports_for_tests() -> Vec<String> {
+        vec![
+            "2026-05-28-arrayvec-first-pr-projection-smoke.md".to_string(),
+            "2026-05-26-mio-ffi-route-wording.md".to_string(),
+        ]
+    }
+
+    fn dogfood_judgment_boundary_for_tests() -> &'static str {
+        "Static unsafe contract review measurement input; not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not site execution evidence, not witness adequacy, and not policy readiness."
+    }
+
+    #[test]
+    fn dogfood_judgment_accepts_known_target_report_and_card_label() -> Result<(), String> {
+        let text = format!(
+            r#"
+schema_version = "1.0"
+target = "arrayvec-pr288"
+report = "reports/2026-05-28-arrayvec-first-pr-projection-smoke.md"
+reviewer = "manual"
+date = "2026-05-31"
+scope = "first-pr review packet"
+trust_boundary = "{}"
+
+[[cards]]
+card_id = "UR-arrayvec-src-array-string-rs-from-byte-string-operation-vec_set_len-set-len-073a0fa631f6-initialized_memory-c1"
+family = "vec_set_len"
+judgment = "actionable"
+reason = "The card names the initialized-memory obligation and a concrete next action."
+next_step = "Record this as a usefulness sample without promoting calibration."
+"#,
+            dogfood_judgment_boundary_for_tests()
+        );
+
+        let rows = check_dogfood_judgment_text(
+            "docs/dogfood/judgments/arrayvec-pr288.toml",
+            &text,
+            &dogfood_judgment_targets_for_tests(),
+            &dogfood_judgment_families_for_tests(),
+            &dogfood_judgment_reports_for_tests(),
+        )?;
+
+        assert_eq!(rows, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_judgment_accepts_missed_obligation_sample() -> Result<(), String> {
+        let text = format!(
+            r#"
+schema_version = "1.0"
+target = "mio-pr1388"
+report = "reports/2026-05-26-mio-ffi-route-wording.md"
+reviewer = "manual"
+date = "2026-05-31"
+scope = "manual missed-card review"
+trust_boundary = "{}"
+
+[[missed]]
+file = "src/sys/unix/sockaddr.rs"
+line = 42
+expected_family = "ffi"
+status = "open"
+reason = "Manual review found a changed FFI boundary that needs a follow-up seed."
+next_step = "Open one report-backed seed before changing analyzer behavior."
+"#,
+            dogfood_judgment_boundary_for_tests()
+        );
+
+        let rows = check_dogfood_judgment_text(
+            "docs/dogfood/judgments/mio-pr1388.toml",
+            &text,
+            &dogfood_judgment_targets_for_tests(),
+            &dogfood_judgment_families_for_tests(),
+            &dogfood_judgment_reports_for_tests(),
+        )?;
+
+        assert_eq!(rows, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_judgment_accepts_card_ids_from_checked_artifact() -> Result<(), String> {
+        let text = format!(
+            r#"
+schema_version = "1.0"
+target = "arrayvec-pr288"
+report = "reports/2026-05-28-arrayvec-first-pr-projection-smoke.md"
+reviewer = "manual"
+date = "2026-05-31"
+scope = "first-pr review packet"
+cards_artifact = "fixtures/vec_set_len_self_new_const_cap_not_guard/expected.cards.json"
+trust_boundary = "{}"
+
+[[cards]]
+card_id = "UR-vec-set-len-self-new-const-cap-not-guard-src-lib-rs-from-array-operation-vec_set_len-set-len-3ba2e696cbd8-initialized_memory-c1"
+family = "vec_set_len"
+judgment = "actionable"
+reason = "The artifact-backed card identifies the initialized-memory obligation."
+next_step = "Use as a checked usefulness sample only."
+"#,
+            dogfood_judgment_boundary_for_tests()
+        );
+
+        let rows = check_dogfood_judgment_text(
+            "docs/dogfood/judgments/arrayvec-pr288.toml",
+            &text,
+            &dogfood_judgment_targets_for_tests(),
+            &dogfood_judgment_families_for_tests(),
+            &dogfood_judgment_reports_for_tests(),
+        )?;
+
+        assert_eq!(rows, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_judgment_rejects_unknown_target() -> Result<(), String> {
+        let text = format!(
+            r#"
+schema_version = "1.0"
+target = "unknown-target"
+report = "reports/2026-05-28-arrayvec-first-pr-projection-smoke.md"
+reviewer = "manual"
+date = "2026-05-31"
+scope = "first-pr review packet"
+trust_boundary = "{}"
+
+[[cards]]
+family = "vec_set_len"
+judgment = "actionable"
+reason = "The card has a concrete next action."
+next_step = "Record a usefulness sample."
+"#,
+            dogfood_judgment_boundary_for_tests()
+        );
+
+        let err = err_text(check_dogfood_judgment_text(
+            "docs/dogfood/judgments/unknown-target.toml",
+            &text,
+            &dogfood_judgment_targets_for_tests(),
+            &dogfood_judgment_families_for_tests(),
+            &dogfood_judgment_reports_for_tests(),
+        ))?;
+
+        assert!(err.contains("unknown dogfood target"));
+        assert!(err.contains("unknown-target"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_judgment_rejects_unknown_judgment_label() -> Result<(), String> {
+        let text = format!(
+            r#"
+schema_version = "1.0"
+target = "arrayvec-pr288"
+report = "reports/2026-05-28-arrayvec-first-pr-projection-smoke.md"
+reviewer = "manual"
+date = "2026-05-31"
+scope = "first-pr review packet"
+trust_boundary = "{}"
+
+[[cards]]
+family = "vec_set_len"
+judgment = "maybe-useful"
+reason = "The card has a concrete next action."
+next_step = "Record a usefulness sample."
+"#,
+            dogfood_judgment_boundary_for_tests()
+        );
+
+        let err = err_text(check_dogfood_judgment_text(
+            "docs/dogfood/judgments/arrayvec-pr288.toml",
+            &text,
+            &dogfood_judgment_targets_for_tests(),
+            &dogfood_judgment_families_for_tests(),
+            &dogfood_judgment_reports_for_tests(),
+        ))?;
+
+        assert!(err.contains("unknown judgment"));
+        assert!(err.contains("maybe-useful"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_judgment_rejects_missing_report() -> Result<(), String> {
+        let text = format!(
+            r#"
+schema_version = "1.0"
+target = "arrayvec-pr288"
+report = "reports/missing.md"
+reviewer = "manual"
+date = "2026-05-31"
+scope = "first-pr review packet"
+trust_boundary = "{}"
+
+[[cards]]
+family = "vec_set_len"
+judgment = "actionable"
+reason = "The card has a concrete next action."
+next_step = "Record a usefulness sample."
+"#,
+            dogfood_judgment_boundary_for_tests()
+        );
+
+        let err = err_text(check_dogfood_judgment_text(
+            "docs/dogfood/judgments/arrayvec-pr288.toml",
+            &text,
+            &dogfood_judgment_targets_for_tests(),
+            &dogfood_judgment_families_for_tests(),
+            &dogfood_judgment_reports_for_tests(),
+        ))?;
+
+        assert!(err.contains("links missing dogfood report"));
+        assert!(err.contains("reports/missing.md"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_judgment_rejects_overclaim_wording() -> Result<(), String> {
+        let text = format!(
+            r#"
+schema_version = "1.0"
+target = "arrayvec-pr288"
+report = "reports/2026-05-28-arrayvec-first-pr-projection-smoke.md"
+reviewer = "manual"
+date = "2026-05-31"
+scope = "first-pr review packet"
+trust_boundary = "{}"
+
+[[cards]]
+family = "vec_set_len"
+judgment = "actionable"
+reason = "The card makes this safe to merge."
+next_step = "Record a usefulness sample."
+"#,
+            dogfood_judgment_boundary_for_tests()
+        );
+
+        let err = err_text(check_dogfood_judgment_text(
+            "docs/dogfood/judgments/arrayvec-pr288.toml",
+            &text,
+            &dogfood_judgment_targets_for_tests(),
+            &dogfood_judgment_families_for_tests(),
+            &dogfood_judgment_reports_for_tests(),
+        ))?;
+
+        assert!(err.contains("safe to merge"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_judgment_rejects_card_id_missing_from_checked_artifact() -> Result<(), String> {
+        let text = format!(
+            r#"
+schema_version = "1.0"
+target = "arrayvec-pr288"
+report = "reports/2026-05-28-arrayvec-first-pr-projection-smoke.md"
+reviewer = "manual"
+date = "2026-05-31"
+scope = "first-pr review packet"
+cards_artifact = "fixtures/vec_set_len_self_new_const_cap_not_guard/expected.cards.json"
+trust_boundary = "{}"
+
+[[cards]]
+card_id = "UR-missing-card"
+family = "vec_set_len"
+judgment = "actionable"
+reason = "The card has a concrete next action."
+next_step = "Record a usefulness sample."
+"#,
+            dogfood_judgment_boundary_for_tests()
+        );
+
+        let err = err_text(check_dogfood_judgment_text(
+            "docs/dogfood/judgments/arrayvec-pr288.toml",
+            &text,
+            &dogfood_judgment_targets_for_tests(),
+            &dogfood_judgment_families_for_tests(),
+            &dogfood_judgment_reports_for_tests(),
+        ))?;
+
+        assert!(err.contains("not present in cards_artifact"));
+        assert!(err.contains("UR-missing-card"));
+        Ok(())
     }
 
     #[test]

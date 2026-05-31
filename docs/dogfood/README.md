@@ -42,6 +42,8 @@ Report requirements:
 - Reviewer judgments record manual usefulness samples for selected dogfood
   targets. They are measurement inputs only; they are not calibration,
   precision/recall, policy readiness, witness adequacy, or safety evidence.
+  Committed judgment files must reference known targets, linked reports, known
+  card families or review-kit surfaces, and the advisory trust boundary.
 - Every report must include a `## Trust boundary` section that names witness,
   safety, UB-free, Miri-clean, site-execution, calibration, and policy limits.
 
