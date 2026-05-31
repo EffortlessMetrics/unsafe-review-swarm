@@ -739,27 +739,43 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             .unwrap_or("")
             .contains("did not run witnesses")
     );
-    assert!(
-        review_kit["artifacts"]
-            .as_array()
-            .map_or(false, |artifacts| artifacts
-                .iter()
-                .any(|artifact| artifact["path"] == "review-kit.json"))
-    );
-    assert!(
-        review_kit["artifacts"]
-            .as_array()
-            .map_or(false, |artifacts| artifacts
-                .iter()
-                .any(|artifact| artifact["path"] == "cards.json"))
-    );
-    assert!(
-        review_kit["artifacts"]
-            .as_array()
-            .map_or(false, |artifacts| artifacts
-                .iter()
-                .any(|artifact| artifact["path"] == "receipt-audit.md"))
-    );
+    let artifacts = json_array(&review_kit["artifacts"], "review_kit.artifacts")?;
+    for expected in [
+        "review-kit.json",
+        "cards.json",
+        "pr-summary.md",
+        "github-summary.md",
+        "cards.sarif",
+        "comment-plan.json",
+        "witness-plan.md",
+        "receipt-audit.md",
+        "lsp.json",
+        "repair-queue.json",
+    ] {
+        let Some(entry) = artifacts
+            .iter()
+            .find(|artifact| artifact["path"] == expected)
+        else {
+            return Err(format!("review-kit.json is missing artifact entry `{expected}`").into());
+        };
+        assert!(
+            out_dir.join(expected).is_file(),
+            "review-kit.json listed missing artifact `{expected}`"
+        );
+        if expected.ends_with(".json") {
+            assert_eq!(entry["format"], "json");
+        } else if expected.ends_with(".md") {
+            assert_eq!(entry["format"], "markdown");
+        } else if expected.ends_with(".sarif") {
+            assert_eq!(entry["format"], "sarif");
+        }
+        match expected {
+            "review-kit.json" | "cards.json" | "comment-plan.json" | "lsp.json"
+            | "repair-queue.json" => assert_eq!(entry["schema_version"], "0.1"),
+            "cards.sarif" => assert_eq!(entry["schema_version"], "2.1.0"),
+            _ => assert!(entry["schema_version"].is_null()),
+        }
+    }
     assert!(
         review_kit["trust_boundary"]
             .as_str()
@@ -2379,6 +2395,12 @@ fn json_str<'a>(value: &'a Value, path: &str) -> Result<&'a str, Box<dyn Error>>
     value
         .as_str()
         .ok_or_else(|| format!("{path} should be a string").into())
+}
+
+fn json_array<'a>(value: &'a Value, path: &str) -> Result<&'a Vec<Value>, Box<dyn Error>> {
+    value
+        .as_array()
+        .ok_or_else(|| format!("{path} should be an array").into())
 }
 
 fn fixture_root(name: &str) -> PathBuf {
