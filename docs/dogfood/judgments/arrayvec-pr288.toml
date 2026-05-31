@@ -1,0 +1,45 @@
+schema_version = "1.0"
+target = "arrayvec-pr288"
+report = "reports/2026-05-28-arrayvec-first-pr-projection-smoke.md"
+reviewer = "manual"
+date = "2026-05-31"
+scope = "first-pr reviewer cockpit usefulness sample"
+artifact_set = "target/dogfood-work/arrayvec-pr288.first-pr-smoke"
+trust_boundary = "Static unsafe contract review measurement input; not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not witness adequacy, and not policy readiness."
+
+[[cards]]
+card_id = "UR-arrayvec-src-array-string-rs-from-byte-string-operation-vec_set_len-set-len-073a0fa631f6-initialized_memory-c1"
+family = "vec_set_len"
+judgment = "actionable"
+reason = "The top card identifies the Vec::set_len initialized-memory review obligation, reports found static evidence, and keeps missing witness evidence explicit."
+next_step = "Keep this as a reviewer-usefulness sample; require judged denominator data before any accuracy metric wording."
+
+[[cards]]
+family = "pr_summary"
+judgment = "actionable"
+reason = "The reviewer cockpit names the top card, missing witness evidence, advisory Miri route, explain command, context command, and trust boundary from the same ReviewCard bundle."
+next_step = "Use this target as projection regression pressure when PR-summary, explain, context, or trust-boundary wording changes."
+
+[[cards]]
+family = "github_summary"
+judgment = "actionable"
+reason = "The CI doorway stays bounded and points to the full reviewer cockpit instead of duplicating the complete card table."
+next_step = "Keep the GitHub summary capped for reviewer-noise control and continue routing detail to artifacts."
+
+[[cards]]
+family = "comment_plan"
+judgment = "actionable"
+reason = "The comment plan selected no inline comments and kept all eight cards visible as artifact-only review context with low-relevance threshold reasons."
+next_step = "Preserve this as a low-noise review-budget sample rather than treating no planned comments as no review work."
+
+[[cards]]
+family = "witness_plan"
+judgment = "actionable"
+reason = "The witness plan names advisory routes for the Vec::set_len cards while preserving the no-witness-execution boundary."
+next_step = "Keep witness routes as suggested evidence paths until a saved receipt is imported and audited."
+
+[[cards]]
+family = "context_packet"
+judgment = "uncertain"
+reason = "The report verifies that the cockpit exposes a context command, but it does not inspect the JSON packet or run an agent repair dry run."
+next_step = "Record a separate agent-repair experiment before treating this target as evidence that context packets are good bounded tasks."
