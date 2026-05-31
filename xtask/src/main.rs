@@ -204,6 +204,7 @@ const DOGFOOD_MANIFEST: &str = "docs/dogfood/corpus.toml";
 const DOGFOOD_INDEX: &str = "docs/dogfood/index.json";
 const DOGFOOD_README: &str = "docs/dogfood/README.md";
 const DOGFOOD_FOLLOW_UP_SEEDS: &str = "docs/dogfood/follow-up-seeds.md";
+const DOGFOOD_JUDGMENTS_README: &str = "docs/dogfood/judgments/README.md";
 const DOGFOOD_REPORT_DIR: &str = "docs/dogfood/reports";
 const ACCURACY_CALIBRATION_POLICY: &str = "policy/accuracy-calibration.toml";
 const ACCURACY_CALIBRATION_REPORT: &str = "docs/accuracy/CALIBRATION_REPORT.md";
@@ -262,6 +263,15 @@ const DOGFOOD_TRIAGE_HEADER: &[&str] = &[
 const DOGFOOD_FOLLOW_UP_STATUSES: &[&str] = &["open", "done", "parked", "superseded"];
 const DOGFOOD_FOLLOW_UP_SURFACES: &[&str] =
     &["comment_plan", "first_pr_projection", "repo_posture"];
+const DOGFOOD_JUDGMENT_LABELS: &[&str] = &[
+    "actionable",
+    "noise",
+    "missed",
+    "uncertain",
+    "human-only",
+    "good-agent-task",
+    "bad-agent-task",
+];
 const DOGFOOD_FOLLOW_UP_HEADER: &[&str] = &[
     "Seed ID",
     "Status",
@@ -2246,12 +2256,80 @@ fn check_dogfood() -> Result<(), String> {
     check_dogfood_report_trust_boundaries()?;
     check_dogfood_report_overclaims()?;
     check_dogfood_follow_up_seeds(&ids)?;
+    check_dogfood_judgment_schema_docs()?;
 
     println!(
         "check-dogfood: ok ({} targets, {} repositories)",
         targets.len(),
         repositories.len()
     );
+    Ok(())
+}
+
+fn check_dogfood_judgment_schema_docs() -> Result<(), String> {
+    let readme = read_to_string(&workspace_path(DOGFOOD_README))?;
+    if !readme.contains("judgments/README.md") {
+        return Err(format!(
+            "{DOGFOOD_README} must link `{DOGFOOD_JUDGMENTS_README}`"
+        ));
+    }
+
+    let path = workspace_path(DOGFOOD_JUDGMENTS_README);
+    let text = read_to_string(&path)?;
+    require_boundary_text(&text, DOGFOOD_JUDGMENTS_README)?;
+    reject_positive_overclaims(&path, &text)?;
+
+    let lower = text.to_ascii_lowercase();
+    for needle in [
+        "docs/dogfood/judgments/<target>.toml",
+        "not calibrated",
+        "precision",
+        "recall",
+        "site execution",
+        "witness adequacy",
+        "policy readiness",
+    ] {
+        if !lower.contains(needle) {
+            return Err(format!(
+                "{DOGFOOD_JUDGMENTS_README} must document `{needle}`"
+            ));
+        }
+    }
+
+    for label in DOGFOOD_JUDGMENT_LABELS {
+        let needle = format!("`{label}`");
+        if !text.contains(&needle) {
+            return Err(format!(
+                "{DOGFOOD_JUDGMENTS_README} must document reviewer judgment label `{label}`"
+            ));
+        }
+    }
+
+    for field in [
+        "schema_version",
+        "target",
+        "report",
+        "reviewer",
+        "date",
+        "scope",
+        "trust_boundary",
+        "[[cards]]",
+        "card_id",
+        "family",
+        "judgment",
+        "reason",
+        "next_step",
+        "[[missed]]",
+        "expected_family",
+        "status",
+    ] {
+        if !text.contains(field) {
+            return Err(format!(
+                "{DOGFOOD_JUDGMENTS_README} must document reviewer judgment field `{field}`"
+            ));
+        }
+    }
+
     Ok(())
 }
 

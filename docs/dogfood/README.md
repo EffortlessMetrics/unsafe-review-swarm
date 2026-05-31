@@ -13,7 +13,8 @@ The manifest is [`corpus.toml`](corpus.toml). The human-facing index is
 [`index.json`](index.json). Reviewer usefulness notes live in
 [`usefulness-notes.md`](usefulness-notes.md). Dogfood report labels are defined
 in the [`triage taxonomy`](triage-taxonomy.md). Follow-up work seeds are tracked
-in [`follow-up-seeds.md`](follow-up-seeds.md).
+in [`follow-up-seeds.md`](follow-up-seeds.md). Reviewer judgment files follow
+the [`dogfood judgment schema`](judgments/README.md).
 
 Snapshot reports:
 
@@ -38,6 +39,9 @@ Report requirements:
   projection-surface labels, known triage labels, known statuses, and source
   reports linked from this directory. The linked source report must contain a
   triage row for the same target and primary label.
+- Reviewer judgments record manual usefulness samples for selected dogfood
+  targets. They are measurement inputs only; they are not calibration,
+  precision/recall, policy readiness, witness adequacy, or safety evidence.
 - Every report must include a `## Trust boundary` section that names witness,
   safety, UB-free, Miri-clean, site-execution, calibration, and policy limits.
 
