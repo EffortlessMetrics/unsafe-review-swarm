@@ -174,19 +174,24 @@ evidence, while
 `copy_nonoverlapping_slice_range_reassigned_count_not_guard`,
 `copy_nonoverlapping_slice_range_shadowed_count_not_guard`,
 `copy_nonoverlapping_slice_range_reassigned_src_not_guard`,
+`copy_nonoverlapping_slice_range_reassigned_src_path_not_guard`,
 `copy_nonoverlapping_slice_range_shadowed_src_not_guard`,
 `copy_nonoverlapping_slice_range_reassigned_dst_not_guard`,
+`copy_nonoverlapping_slice_range_reassigned_dst_path_not_guard`,
 `copy_nonoverlapping_slice_range_shadowed_dst_not_guard`,
 `ptr_copy_slice_range_reassigned_count_not_guard`,
 `ptr_copy_slice_range_shadowed_count_not_guard`,
 `ptr_copy_slice_range_reassigned_src_not_guard`,
+`ptr_copy_slice_range_reassigned_src_path_not_guard`,
 `ptr_copy_slice_range_shadowed_src_not_guard`,
 `ptr_copy_slice_range_reassigned_dst_not_guard`,
+`ptr_copy_slice_range_reassigned_dst_path_not_guard`,
 `ptr_copy_slice_range_shadowed_dst_not_guard`,
 `copy_nonoverlapping_other_len_not_guard`, and `ptr_copy_other_len_not_guard`
 pin that one-sided, closed-branch, disjunctive positive-branch, comment-only
-early-return text, stale count, shadowed count, stale receiver, shadowed receiver, stale open-branch, or unrelated
-slice length assertions do not discharge the source/destination range obligation.
+early-return text, stale count, shadowed count, stale receiver or receiver
+path, shadowed receiver, stale open-branch, or unrelated slice length assertions
+do not discharge the source/destination range obligation.
 
 | Capability | Tier | Surface | Proof | Known limits |
 |---|---|---|---|---|
