@@ -232,13 +232,15 @@ unsafe-review repo --format json
 unsafe-review repo --format markdown --out target/unsafe-review/repo-posture.md
 ```
 
-When `repo` writes a report with `--out`, it also updates
+When `repo` writes a report with `--out`, it renders to `<out>.partial` and
+renames that file to `<out>` only after a successful render. It also updates
 `<out>.status.json` while analysis runs. The status sidecar records the scan
 phase, elapsed time, discovered files, scanned files, cards found, last path,
-and whether analysis completed. Add `--progress` to print a small stderr
-heartbeat from the same status stream. Report rendering still happens after
-analysis completes; partial report files and interruption preservation are a
-separate deferred surface.
+completion, and normal errors. Add `--progress` to print a small stderr
+heartbeat from the same status stream. If a normal write or rename error occurs
+after rendering, the partial report is kept at `<out>.partial`; if the process
+is interrupted before rendering, the latest status sidecar is the durable
+artifact.
 
 For large or mixed repositories, bound the scan with repo-only file selection
 controls:
