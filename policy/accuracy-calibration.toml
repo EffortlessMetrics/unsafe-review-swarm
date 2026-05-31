@@ -738,6 +738,7 @@ fixtures = [
   "maybeuninit_assume_init_open_branch_write_guard",
   "maybeuninit_assume_init_read_open_branch_write_guard",
   "maybeuninit_assume_init_ref_open_branch_write_guard",
+  "maybeuninit_assume_init_mut_open_branch_write_guard",
   "maybeuninit_assume_init_open_branch_new_guard",
   "maybeuninit_assume_init_read_open_branch_new_guard",
   "maybeuninit_assume_init_ref_open_branch_new_guard",
@@ -800,7 +801,7 @@ assume_init, assume_init_read, assume_init_ref, assume_init_mut, and
 assume_init_drop, recognizes same-slot MaybeUninit::new evidence for
 assume_init, assume_init_read, assume_init_ref, assume_init_mut, and
 assume_init_drop, recognizes open-branch assume_init write/new forms,
-open-branch assume_init_read and assume_init_ref write evidence, and
+open-branch assume_init_read, assume_init_ref, and assume_init_mut write evidence, and
 open-branch assume_init_read, assume_init_ref, assume_init_mut, and
 assume_init_drop MaybeUninit::new evidence,
 rejects comment-only, closed-branch assume_init write/new
