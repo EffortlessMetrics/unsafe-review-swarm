@@ -140,6 +140,8 @@ evidence through `maybeuninit_assume_init_read_shadowed_slot_not_guard`.
 `MaybeUninit::assume_init_ref` pins same-slot `write` evidence through
 `maybeuninit_assume_init_ref_write_guard`, pins same-slot `MaybeUninit::new`
 evidence through `maybeuninit_assume_init_ref_new_guard`, pins open-branch
+`write` evidence through
+`maybeuninit_assume_init_ref_open_branch_write_guard`, pins open-branch
 `MaybeUninit::new` evidence through
 `maybeuninit_assume_init_ref_open_branch_new_guard`, rejects closed conditional write
 evidence through `maybeuninit_assume_init_ref_closed_branch_write_not_guard`,

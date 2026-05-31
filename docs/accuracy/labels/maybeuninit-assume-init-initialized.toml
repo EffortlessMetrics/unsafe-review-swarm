@@ -193,6 +193,20 @@ label_source = "fixture_golden"
 rationale = "A same-slot write in the same open branch as assume_init_read is narrow initialized-memory evidence, leaving only witness evidence missing."
 
 [[samples]]
+id = "maybeuninit-assume-init-ref-open-branch-write-initialized"
+fixture = "maybeuninit_assume_init_ref_open_branch_write_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "maybe_uninit_assume_init"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-slot write in the same open branch as assume_init_ref is narrow initialized-memory evidence, leaving only witness evidence missing."
+
+[[samples]]
 id = "maybeuninit-assume-init-open-branch-new-initialized"
 fixture = "maybeuninit_assume_init_open_branch_new_guard"
 kind = "positive"

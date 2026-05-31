@@ -473,6 +473,7 @@ mod tests {
         "maybeuninit_assume_init_write_guard",
         "maybeuninit_assume_init_open_branch_write_guard",
         "maybeuninit_assume_init_read_open_branch_write_guard",
+        "maybeuninit_assume_init_ref_open_branch_write_guard",
         "maybeuninit_assume_init_open_branch_new_guard",
         "maybeuninit_assume_init_read_open_branch_new_guard",
         "maybeuninit_assume_init_ref_open_branch_new_guard",
