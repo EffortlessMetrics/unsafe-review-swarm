@@ -1,0 +1,21 @@
+use core::mem::MaybeUninit;
+
+pub fn borrow_after_closed_branch(init: bool) -> u32 {
+    let mut slot = MaybeUninit::<u32>::uninit();
+    if init {
+        slot.write(7);
+    }
+    // SAFETY: fixture checks that a closed conditional write is not enough evidence.
+    let value = unsafe { slot.assume_init_ref() };
+    *value
+}
+
+#[cfg(test)]
+mod tests {
+    use super::borrow_after_closed_branch;
+
+    #[test]
+    fn mentions_borrow_after_closed_branch() {
+        let _ = core::mem::size_of_val(&(borrow_after_closed_branch as fn(bool) -> u32));
+    }
+}
