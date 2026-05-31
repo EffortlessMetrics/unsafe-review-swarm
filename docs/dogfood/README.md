@@ -14,7 +14,8 @@ The manifest is [`corpus.toml`](corpus.toml). The human-facing index is
 [`usefulness-notes.md`](usefulness-notes.md). Dogfood report labels are defined
 in the [`triage taxonomy`](triage-taxonomy.md). Follow-up work seeds are tracked
 in [`follow-up-seeds.md`](follow-up-seeds.md). Reviewer judgment files follow
-the [`dogfood judgment schema`](judgments/README.md).
+the [`dogfood judgment schema`](judgments/README.md). Card-scoped agent repair
+dry runs follow the [`agent repair experiment protocol`](agent-repair-experiments.md).
 
 Snapshot reports:
 
@@ -44,6 +45,10 @@ Report requirements:
   precision/recall, policy readiness, witness adequacy, or safety evidence.
   Committed judgment files must reference known targets, linked reports, known
   card families or review-kit surfaces, and the advisory trust boundary.
+- Agent repair experiments measure whether one ReviewCard context packet and one
+  repair-queue item produce a bounded, reviewable dry run. They are manual
+  experiments only; `unsafe-review` does not run an agent, execute witnesses,
+  edit source, post comments, suppress cards, resolve cards, or enforce policy.
 - Every report must include a `## Trust boundary` section that names witness,
   safety, UB-free, Miri-clean, site-execution, calibration, and policy limits.
 
