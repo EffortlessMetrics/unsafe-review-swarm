@@ -1,6 +1,7 @@
 use crate::command::{
-    CheckOptions, Command, DiffInput, FirstPrOptions, Format, OutcomeOptions,
-    ReceiptTemplateOptions, RepoOptions, SavedOutputReceiptOptions,
+    CandidateCommand, CandidateImportOptions, CandidateWitnessPlanOptions, CheckOptions, Command,
+    DiffInput, FirstPrOptions, Format, OutcomeOptions, ReceiptTemplateOptions, RepoOptions,
+    SavedOutputReceiptOptions,
 };
 use std::fs;
 use std::io::{self, Read};
@@ -12,12 +13,13 @@ use unsafe_review_core::{
     ProofReceiptInput, RepoScanStatus, SanitizerReceiptInput, Scope,
     WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze, analyze_with_discovery,
     analyze_with_discovery_and_progress, audit_witness_receipts, compare_outcome_json,
-    discover_repo_files, evaluate_policy_report, render_badge_jsons, render_comment_plan,
-    render_github_summary, render_human, render_json, render_lsp, render_markdown,
-    render_outcome_json, render_outcome_markdown, render_policy_report_json,
-    render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
-    render_receipt_audit_markdown, render_repair_queue, render_sarif, render_witness_plan,
-    validate_witness_receipts,
+    discover_repo_files, evaluate_policy_report, read_manual_candidate, render_badge_jsons,
+    render_comment_plan, render_github_summary, render_human, render_json, render_lsp,
+    render_manual_candidate_context, render_manual_candidate_explain,
+    render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
+    render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
+    render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,
+    render_repair_queue, render_sarif, render_witness_plan, validate_witness_receipts,
 };
 
 mod card_lookup;
@@ -89,6 +91,7 @@ pub(crate) fn execute(command: Command) -> Result<(), String> {
         Command::Badges { root, out } => badges(&root, &out),
         Command::Explain { root, id, format } => explain(&root, &id, format),
         Command::Context { root, id } => context(&root, &id),
+        Command::Candidate(command) => candidate(command),
         Command::ReceiptTemplate(options) => receipt_template(options),
         Command::ReceiptValidate { root } => receipt_validate(&root),
         Command::ReceiptAudit(options) => receipt_audit(options),
@@ -761,10 +764,18 @@ fn badges(root: &Path, out: &Path) -> Result<(), String> {
 fn explain(root: &Path, id: &str, format: Format) -> Result<(), String> {
     let output = card_lookup::analyze_repo_cards(root)?;
     let id = CardId(id.to_string());
-    let detail = card_lookup::explain_text(&output, &id)?;
+    let detail = match card_lookup::explain_text(&output, &id) {
+        Ok(detail) => detail,
+        Err(_) => card_lookup::manual_candidate_explain(root, &id.0)?
+            .ok_or_else(|| format!("card `{id}` not found"))?,
+    };
     match format {
         Format::Json => {
-            let packet = card_lookup::context_packet(&output, &id)?;
+            let packet = match card_lookup::context_packet(&output, &id) {
+                Ok(packet) => packet,
+                Err(_) => card_lookup::manual_candidate_context(root, &id.0)?
+                    .ok_or_else(|| format!("card `{id}` not found"))?,
+            };
             println!("{packet}");
         }
         _ => println!("{detail}"),
@@ -775,8 +786,55 @@ fn explain(root: &Path, id: &str, format: Format) -> Result<(), String> {
 fn context(root: &Path, id: &str) -> Result<(), String> {
     let output = card_lookup::analyze_repo_cards(root)?;
     let id = CardId(id.to_string());
-    let packet = card_lookup::context_packet(&output, &id)?;
+    let packet = match card_lookup::context_packet(&output, &id) {
+        Ok(packet) => packet,
+        Err(_) => card_lookup::manual_candidate_context(root, &id.0)?
+            .ok_or_else(|| format!("card `{id}` not found"))?,
+    };
     println!("{packet}");
+    Ok(())
+}
+
+fn candidate(command: CandidateCommand) -> Result<(), String> {
+    match command {
+        CandidateCommand::Import(options) => candidate_import(options),
+        CandidateCommand::WitnessPlan(options) => candidate_witness_plan(options),
+    }
+}
+
+fn candidate_import(options: CandidateImportOptions) -> Result<(), String> {
+    let candidate = read_manual_candidate(&options.input)?;
+    let rendered = candidate.to_pretty_json()?;
+    if let Some(out) = options.out {
+        ensure_parent_dir(&out)?;
+        fs::write(&out, rendered)
+            .map_err(|err| format!("write manual candidate {} failed: {err}", out.display()))?;
+        println!("wrote manual candidate: {}", out.display());
+        println!("id: {}", candidate.id);
+        println!("source: manual");
+        println!("manual_candidate: true");
+        println!("trust boundary: {}", candidate.trust_boundary);
+    } else {
+        print!("{rendered}");
+    }
+    Ok(())
+}
+
+fn candidate_witness_plan(options: CandidateWitnessPlanOptions) -> Result<(), String> {
+    let candidate = unsafe_review_core::load_manual_candidate(&options.root, &options.id)?
+        .ok_or_else(|| format!("manual candidate `{}` not found", options.id))?;
+    let rendered = render_manual_candidate_witness_plan(&candidate);
+    if let Some(out) = options.out {
+        ensure_parent_dir(&out)?;
+        fs::write(&out, rendered).map_err(|err| {
+            format!(
+                "write manual candidate witness plan {} failed: {err}",
+                out.display()
+            )
+        })?;
+    } else {
+        print!("{rendered}");
+    }
     Ok(())
 }
 
@@ -1050,6 +1108,10 @@ fn print_help() {
     println!("  badges  [--root .] [--out badges]");
     println!("  explain [--root .] [--json|--format json] <card-id>");
     println!("  context [--root .] [--json|--format json] <card-id>");
+    println!(
+        "  candidate import <manual-candidate.json> [--out .unsafe-review/candidates/<id>.json]"
+    );
+    println!("  candidate witness-plan [--root .] <candidate-id> [--out file]");
     println!("  support");
     println!(
         "  outcome --before <cards.json> --after <cards.json> [--format json|markdown] [--out file]"

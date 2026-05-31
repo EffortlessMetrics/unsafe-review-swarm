@@ -603,6 +603,82 @@ fn context_packet_queues_contract_gaps_for_public_safety_docs() -> Result<(), Bo
 }
 
 #[test]
+fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_marker()
+-> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-manual-candidate-e2e")?;
+    let input = temp.path().join("candidate.json");
+    let out = temp.path().join(".unsafe-review/candidates/R4R2-S001.json");
+    fs::create_dir_all(out.parent().ok_or("candidate output missing parent")?)?;
+    fs::write(&input, manual_candidate_json())?;
+
+    let imported = run_success([
+        os("candidate"),
+        os("import"),
+        input.as_os_str().to_os_string(),
+        os("--out"),
+        out.as_os_str().to_os_string(),
+    ])?;
+    let imported_stdout = stdout_text(&imported)?;
+    assert!(imported_stdout.contains("wrote manual candidate"));
+    assert!(imported_stdout.contains("source: manual"));
+
+    let canonical = parse_json(&fs::read_to_string(&out)?)?;
+    assert_eq!(canonical["schema_version"], "manual-candidate/v1");
+    assert_eq!(canonical["source"], "manual");
+    assert_eq!(canonical["manual_candidate"], true);
+    assert_eq!(canonical["id"], "R4R2-S001");
+
+    let explain = run_success([
+        os("explain"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("R4R2-S001"),
+    ])?;
+    let explain = stdout_text(&explain)?;
+    assert!(explain.contains("unsafe-review manual candidate"));
+    assert!(explain.contains("Source: `manual`"));
+    assert!(explain.contains("Analyzer-discovered: `false`"));
+    assert!(explain.contains("not analyzer-discovered"));
+
+    let explain_json = run_success([
+        os("explain"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--json"),
+        os("R4R2-S001"),
+    ])?;
+    let explain_packet = parse_json(&stdout_text(&explain_json)?)?;
+    assert_eq!(explain_packet["source"], "manual");
+    assert_eq!(explain_packet["manual_candidate"], true);
+    assert_eq!(explain_packet["analyzer_discovered"], false);
+
+    let context = run_success([
+        os("context"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("R4R2-S001"),
+    ])?;
+    let context_packet = parse_json(&stdout_text(&context)?)?;
+    assert_eq!(context_packet["source"], "manual");
+    assert_eq!(context_packet["manual_candidate"], true);
+
+    let witness_plan = run_success([
+        os("candidate"),
+        os("witness-plan"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("R4R2-S001"),
+    ])?;
+    let witness_plan = stdout_text(&witness_plan)?;
+    assert!(witness_plan.contains("manual candidate witness plan"));
+    assert!(witness_plan.contains("does not run witnesses"));
+    assert!(witness_plan.contains("unsafe-review receipt template R4R2-S001"));
+    assert!(witness_plan.contains("not analyzer-discovered"));
+
+    Ok(())
+}
+
+#[test]
 fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment");
     let temp = TempDir::new("unsafe-review-first-pr-e2e")?;
@@ -2683,6 +2759,33 @@ fn write_e2e_file(root: &Path, rel: &str) -> Result<(), Box<dyn Error>> {
     }
     fs::write(path, "unsafe fn fixture_data() {}\n")?;
     Ok(())
+}
+
+fn manual_candidate_json() -> &'static str {
+    r#"{
+  "schema_version": "manual-candidate/v1",
+  "id": "R4R2-S001",
+  "title": "TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes",
+  "location": {
+    "file": "src/runtime/webcore/TextDecoder.rs",
+    "line": 237
+  },
+  "operation_family": "raw_pointer_read",
+  "unsafe_operation": "core::slice::from_raw_parts",
+  "invariant": "&[u8] memory must not be concurrently mutated",
+  "safe_caller": "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))",
+  "evidence": [
+    {
+      "kind": "runtime_witness",
+      "path": "target/unsafe-scout/textdecoder-shared-race-route.out"
+    },
+    {
+      "kind": "model",
+      "path": "target/unsafe-scout/miri-textdecoder-shared-slice.out"
+    }
+  ],
+  "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
+}"#
 }
 
 struct TempDir {

@@ -1,5 +1,6 @@
 use crate::command::{
-    CheckOptions, Command, DiffInput, FirstPrOptions, Format, OutcomeOptions, RepoOptions,
+    CandidateCommand, CandidateImportOptions, CandidateWitnessPlanOptions, CheckOptions, Command,
+    DiffInput, FirstPrOptions, Format, OutcomeOptions, RepoOptions,
 };
 use std::path::PathBuf;
 use unsafe_review_core::PolicyMode;
@@ -39,6 +40,7 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
         "badges" => parse_badges(rest),
         "explain" => parse_explain(rest),
         "context" => parse_context(rest),
+        "candidate" => parse_candidate(rest).map(Command::Candidate),
         "outcome" => parse_outcome(rest).map(Command::Outcome),
         "policy" => policy::parse_policy_command(rest),
         "receipt" => receipt::parse_receipt(rest),
@@ -48,6 +50,82 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
             "unknown command `{other}`. Run `unsafe-review --help`."
         )),
     }
+}
+
+fn parse_candidate(args: Vec<String>) -> Result<CandidateCommand, String> {
+    let mut rest = args.into_iter();
+    let Some(subcommand) = rest.next() else {
+        return Err("missing candidate subcommand".to_string());
+    };
+    let rest = rest.collect::<Vec<_>>();
+    match subcommand.as_str() {
+        "import" => parse_candidate_import(rest).map(CandidateCommand::Import),
+        "witness-plan" => parse_candidate_witness_plan(rest).map(CandidateCommand::WitnessPlan),
+        other => Err(format!("unknown candidate subcommand `{other}`")),
+    }
+}
+
+fn parse_candidate_import(args: Vec<String>) -> Result<CandidateImportOptions, String> {
+    let mut input: Option<PathBuf> = None;
+    let mut out = None;
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--out" => {
+                idx += 1;
+                out = Some(parse_path_value(&args, idx, "--out")?);
+            }
+            arg if arg.starts_with("--out=") => {
+                out = Some(parse_inline_path_value(arg, "--out")?);
+            }
+            value if value.starts_with('-') => {
+                return Err(format!("unknown candidate import argument `{value}`"));
+            }
+            value => {
+                set_single_path(&mut input, value, "manual candidate input")?;
+            }
+        }
+        idx += 1;
+    }
+    Ok(CandidateImportOptions {
+        input: input.ok_or_else(|| "missing manual candidate input".to_string())?,
+        out,
+    })
+}
+
+fn parse_candidate_witness_plan(args: Vec<String>) -> Result<CandidateWitnessPlanOptions, String> {
+    let mut root = PathBuf::from(".");
+    let mut id: Option<String> = None;
+    let mut out = None;
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--root" => {
+                idx += 1;
+                root = parse_path_value(&args, idx, "--root")?;
+            }
+            arg if arg.starts_with("--root=") => {
+                root = parse_inline_path_value(arg, "--root")?;
+            }
+            "--out" => {
+                idx += 1;
+                out = Some(parse_path_value(&args, idx, "--out")?);
+            }
+            arg if arg.starts_with("--out=") => {
+                out = Some(parse_inline_path_value(arg, "--out")?);
+            }
+            value if value.starts_with('-') => {
+                return Err(format!("unknown candidate witness-plan argument `{value}`"));
+            }
+            value => set_card_id(&mut id, value)?,
+        }
+        idx += 1;
+    }
+    Ok(CandidateWitnessPlanOptions {
+        root,
+        id: id.ok_or_else(|| "missing manual candidate id".to_string())?,
+        out,
+    })
 }
 
 fn has_help_flag(args: &[String]) -> bool {
@@ -414,6 +492,13 @@ fn set_card_id(id: &mut Option<String>, value: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn set_single_path(path: &mut Option<PathBuf>, value: &str, name: &str) -> Result<(), String> {
+    if path.replace(PathBuf::from(value)).is_some() {
+        return Err(format!("expected exactly one {name}"));
+    }
+    Ok(())
+}
+
 fn parse_max_cards(raw: &str) -> Result<usize, String> {
     raw.parse::<usize>()
         .map_err(|err| format!("invalid --max-cards `{raw}`: {err}"))
@@ -560,6 +645,52 @@ mod tests {
             return Err("expected check command".to_string());
         };
         assert_eq!(options.format, Format::GithubSummary);
+        Ok(())
+    }
+
+    #[test]
+    fn parses_candidate_import_command() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "candidate",
+            "import",
+            "candidate.json",
+            "--out",
+            ".unsafe-review/candidates/R4R2-S001.json",
+        ]))?;
+
+        let Command::Candidate(CandidateCommand::Import(options)) = command else {
+            return Err("expected candidate import command".to_string());
+        };
+        assert_eq!(options.input, PathBuf::from("candidate.json"));
+        assert_eq!(
+            options.out,
+            Some(PathBuf::from(".unsafe-review/candidates/R4R2-S001.json"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parses_candidate_witness_plan_command() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "candidate",
+            "witness-plan",
+            "--root",
+            ".",
+            "R4R2-S001",
+            "--out=target/manual-witness-plan.md",
+        ]))?;
+
+        let Command::Candidate(CandidateCommand::WitnessPlan(options)) = command else {
+            return Err("expected candidate witness-plan command".to_string());
+        };
+        assert_eq!(options.root, PathBuf::from("."));
+        assert_eq!(options.id, "R4R2-S001");
+        assert_eq!(
+            options.out,
+            Some(PathBuf::from("target/manual-witness-plan.md"))
+        );
         Ok(())
     }
 
