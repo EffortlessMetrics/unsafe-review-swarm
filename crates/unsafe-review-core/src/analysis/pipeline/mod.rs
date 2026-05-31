@@ -1,7 +1,9 @@
 mod card_builder;
 
 use super::{receipts, scanner};
-use crate::api::{AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, Scope, Summary};
+use crate::api::{
+    AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, DiscoveryOptions, Scope, Summary,
+};
 use crate::domain::{CardId, ReviewCard};
 use crate::input::{diff, workspace};
 use crate::policy::PolicyState;
@@ -10,20 +12,38 @@ use std::collections::BTreeMap;
 use std::fs;
 
 pub(crate) fn analyze(input: AnalyzeInput) -> Result<AnalyzeOutput, String> {
-    analyze_with_receipts(input, true)
+    let discovery = default_discovery_for(&input);
+    analyze_with_receipts(input, true, discovery)
+}
+
+pub(crate) fn analyze_with_discovery(
+    input: AnalyzeInput,
+    discovery: DiscoveryOptions,
+) -> Result<AnalyzeOutput, String> {
+    analyze_with_receipts(input, true, discovery)
 }
 
 pub(crate) fn analyze_without_receipts(input: AnalyzeInput) -> Result<AnalyzeOutput, String> {
-    analyze_with_receipts(input, false)
+    let discovery = default_discovery_for(&input);
+    analyze_with_receipts(input, false, discovery)
+}
+
+fn default_discovery_for(input: &AnalyzeInput) -> DiscoveryOptions {
+    if matches!(input.scope, Scope::Repo) || matches!(input.mode, AnalysisMode::Repo) {
+        DiscoveryOptions::repo_defaults()
+    } else {
+        DiscoveryOptions::default()
+    }
 }
 
 fn analyze_with_receipts(
     input: AnalyzeInput,
     import_receipts: bool,
+    discovery: DiscoveryOptions,
 ) -> Result<AnalyzeOutput, String> {
     let repo_mode = matches!(input.scope, Scope::Repo) || matches!(input.mode, AnalysisMode::Repo);
     let diff_index = load_diff_index(&input.diff)?;
-    let all_rust_files = workspace::discover_rust_files(&input.root)?;
+    let all_rust_files = workspace::discover_rust_files(&input.root, &discovery)?;
     let package = package_name(&input.root);
     let policy_state = PolicyState::load(&input.root)?;
     let receipt_index = if import_receipts {
@@ -383,7 +403,7 @@ fn is_ident_continue(ch: char) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::{AnalysisMode, DiffSource, PolicyMode, Scope};
+    use crate::api::{AnalysisMode, DiffSource, DiscoveryOptions, PolicyMode, Scope};
     use crate::domain::{
         HazardKind, OperationFamily, Priority, ReviewCard, ReviewClass, UnsafeSiteKind,
         WitnessKind, WitnessRoute,
@@ -949,6 +969,53 @@ mod tests {
             PathBuf::from("src/lib.rs")
         );
         assert_eq!(output.cards[0].site.owner, Some("source_root".to_string()));
+        Ok(())
+    }
+
+    #[test]
+    fn repo_scan_honors_discovery_filters_before_analysis() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-filtered-repo")?;
+        fs::create_dir_all(root.join("src")).map_err(|err| format!("create src failed: {err}"))?;
+        fs::create_dir_all(root.join("packages/pkg/src"))
+            .map_err(|err| format!("create package src failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"filtered-repo-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
+        fs::write(root.join("src/lib.rs"), "pub unsafe fn selected() {}\n")
+            .map_err(|err| format!("write src file failed: {err}"))?;
+        fs::write(
+            root.join("packages/pkg/src/lib.rs"),
+            "pub unsafe fn excluded() {}\n",
+        )
+        .map_err(|err| format!("write package file failed: {err}"))?;
+
+        let output = analyze_with_discovery(
+            AnalyzeInput {
+                root: root.clone(),
+                scope: Scope::Repo,
+                diff: DiffSource::NoneRepoScan,
+                mode: AnalysisMode::Repo,
+                policy: PolicyMode::Advisory,
+                include_unchanged_tests: true,
+                max_cards: None,
+            },
+            DiscoveryOptions {
+                include: vec!["src/**/*.rs".to_string(), "packages/**/*.rs".to_string()],
+                exclude: vec!["packages/**".to_string()],
+                ..DiscoveryOptions::repo_defaults()
+            },
+        )?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert_eq!(output.summary.rust_files, 1);
+        assert_eq!(output.summary.changed_rust_files, 1);
+        assert_eq!(output.cards.len(), 1);
+        assert_eq!(
+            output.cards[0].site.location.file,
+            PathBuf::from("src/lib.rs")
+        );
         Ok(())
     }
 
