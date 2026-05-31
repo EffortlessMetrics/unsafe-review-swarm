@@ -558,13 +558,31 @@ fn contains_call_name(line: &str, name: &str) -> bool {
 }
 
 fn unsafe_block_contains_call(line: &str) -> bool {
-    let Some((_before, after_unsafe)) = line.split_once("unsafe") else {
+    let Some(after_unsafe) = unsafe_keyword_tail(line) else {
         return false;
     };
     let Some((_before_block, after_open)) = after_unsafe.split_once('{') else {
         return false;
     };
     after_open.contains('(') && after_open.contains(')')
+}
+
+fn unsafe_keyword_tail(line: &str) -> Option<&str> {
+    let mut cursor = line;
+    while let Some(pos) = cursor.find("unsafe") {
+        let before = cursor[..pos].chars().next_back();
+        let after = &cursor[pos + "unsafe".len()..];
+        let starts_on_boundary = before.is_none_or(|ch| !is_ident_continue(ch));
+        let ends_on_boundary = after.chars().next().is_none_or(|ch| !is_ident_continue(ch));
+        if starts_on_boundary && ends_on_boundary {
+            return Some(after);
+        }
+        cursor = &after[after
+            .char_indices()
+            .next()
+            .map_or(after.len(), |(idx, ch)| idx + ch.len_utf8())..];
+    }
+    None
 }
 
 fn call_suffix(after_name: &str) -> bool {
@@ -1432,6 +1450,22 @@ mod tests {
         assert_eq!(
             detect_site(extern_line.trim()),
             Some((UnsafeSiteKind::ExternBlock, OperationFamily::Ffi))
+        );
+    }
+
+    #[test]
+    fn text_detection_ignores_unsafe_substrings_in_safe_identifiers() {
+        assert_eq!(
+            detect_site("let output = unsafe_review_core::analyze(AnalyzeInput { root, scope })?;"),
+            None
+        );
+        assert_eq!(
+            detect_site("after_unsafe.split_once('{').map(|(_open, after)| after)"),
+            None
+        );
+        assert_eq!(
+            detect_site("unsafe { ffi::call(ptr) }"),
+            Some((UnsafeSiteKind::Operation, OperationFamily::UnsafeFnCall))
         );
     }
 
