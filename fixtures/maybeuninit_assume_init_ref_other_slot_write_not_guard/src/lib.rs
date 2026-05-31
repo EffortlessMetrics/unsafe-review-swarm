@@ -1,0 +1,20 @@
+use core::mem::MaybeUninit;
+
+pub fn borrow_after_other_slot_write(value: u32) {
+    let slot = MaybeUninit::<u32>::uninit();
+    let mut other = MaybeUninit::<u32>::uninit();
+    other.write(value);
+    // SAFETY: this fixture intentionally initializes a different slot.
+    let _value = unsafe { slot.assume_init_ref() };
+}
+
+#[cfg(test)]
+mod tests {
+    use super::borrow_after_other_slot_write;
+
+    #[test]
+    fn mentions_borrow_after_other_slot_write() {
+        let _ = core::mem::size_of_val(&(borrow_after_other_slot_write as fn(u32)));
+    }
+}
+
