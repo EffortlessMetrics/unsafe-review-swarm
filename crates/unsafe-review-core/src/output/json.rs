@@ -489,6 +489,7 @@ mod tests {
         "maybeuninit_assume_init_stale_field_write_not_guard",
         "maybeuninit_assume_init_stale_new_not_guard",
         "maybeuninit_assume_init_read_stale_new_not_guard",
+        "maybeuninit_assume_init_ref_stale_new_not_guard",
         "maybeuninit_assume_init_shadowed_slot_not_guard",
         "maybeuninit_assume_init_read_shadowed_slot_not_guard",
         "maybeuninit_assume_init_ref_shadowed_slot_not_guard",
