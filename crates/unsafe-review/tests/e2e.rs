@@ -739,27 +739,43 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             .unwrap_or("")
             .contains("did not run witnesses")
     );
-    assert!(
-        review_kit["artifacts"]
-            .as_array()
-            .map_or(false, |artifacts| artifacts
-                .iter()
-                .any(|artifact| artifact["path"] == "review-kit.json"))
-    );
-    assert!(
-        review_kit["artifacts"]
-            .as_array()
-            .map_or(false, |artifacts| artifacts
-                .iter()
-                .any(|artifact| artifact["path"] == "cards.json"))
-    );
-    assert!(
-        review_kit["artifacts"]
-            .as_array()
-            .map_or(false, |artifacts| artifacts
-                .iter()
-                .any(|artifact| artifact["path"] == "receipt-audit.md"))
-    );
+    let artifacts = json_array(&review_kit["artifacts"], "review_kit.artifacts")?;
+    for expected in [
+        "review-kit.json",
+        "cards.json",
+        "pr-summary.md",
+        "github-summary.md",
+        "cards.sarif",
+        "comment-plan.json",
+        "witness-plan.md",
+        "receipt-audit.md",
+        "lsp.json",
+        "repair-queue.json",
+    ] {
+        let Some(entry) = artifacts
+            .iter()
+            .find(|artifact| artifact["path"] == expected)
+        else {
+            return Err(format!("review-kit.json is missing artifact entry `{expected}`").into());
+        };
+        assert!(
+            out_dir.join(expected).is_file(),
+            "review-kit.json listed missing artifact `{expected}`"
+        );
+        if expected.ends_with(".json") {
+            assert_eq!(entry["format"], "json");
+        } else if expected.ends_with(".md") {
+            assert_eq!(entry["format"], "markdown");
+        } else if expected.ends_with(".sarif") {
+            assert_eq!(entry["format"], "sarif");
+        }
+        match expected {
+            "review-kit.json" | "cards.json" | "comment-plan.json" | "lsp.json"
+            | "repair-queue.json" => assert_eq!(entry["schema_version"], "0.1"),
+            "cards.sarif" => assert_eq!(entry["schema_version"], "2.1.0"),
+            _ => assert!(entry["schema_version"].is_null()),
+        }
+    }
     assert!(
         review_kit["trust_boundary"]
             .as_str()
@@ -1308,6 +1324,12 @@ fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<()
         main_badge["counts"]["unsuppressed_evidence_quality_findings"],
         0
     );
+    assert_eq!(main_badge["counts"]["evidence_quality_contract_missing"], 0);
+    assert_eq!(main_badge["counts"]["evidence_quality_guard_missing"], 0);
+    assert_eq!(
+        main_badge["counts"]["evidence_quality_guarded_unwitnessed"],
+        0
+    );
     assert_ne!(main_badge["message"], "safe");
 
     let plus_badge = parse_json(&fs::read_to_string(
@@ -1327,6 +1349,29 @@ fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<()
         plus_badge["counts"]["unsuppressed_evidence_quality_findings"],
         1
     );
+    assert_eq!(plus_badge["counts"]["evidence_quality_contract_missing"], 0);
+    assert_eq!(plus_badge["counts"]["evidence_quality_guard_missing"], 1);
+    assert_eq!(
+        plus_badge["counts"]["evidence_quality_guarded_unwitnessed"],
+        0
+    );
+    let evidence_quality_component_count = json_usize(
+        &plus_badge["counts"]["evidence_quality_contract_missing"],
+        "evidence_quality_contract_missing",
+    )? + json_usize(
+        &plus_badge["counts"]["evidence_quality_guard_missing"],
+        "evidence_quality_guard_missing",
+    )? + json_usize(
+        &plus_badge["counts"]["evidence_quality_guarded_unwitnessed"],
+        "evidence_quality_guarded_unwitnessed",
+    )?;
+    assert_eq!(
+        json_usize(
+            &plus_badge["counts"]["unsuppressed_evidence_quality_findings"],
+            "unsuppressed_evidence_quality_findings",
+        )?,
+        evidence_quality_component_count
+    );
     let main_count = main_badge["message"]
         .as_str()
         .ok_or("main badge message missing")?
@@ -1338,6 +1383,7 @@ fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<()
         .parse::<usize>()
         .map_err(|err| format!("plus badge message parse failed: {err}"))?;
     assert!(plus_count >= main_count);
+    assert_eq!(plus_count, main_count + evidence_quality_component_count);
     assert_ne!(plus_badge["message"], "UB-free");
 
     let repo_markdown = run_success([
@@ -2375,10 +2421,24 @@ fn parse_json(text: &str) -> Result<Value, Box<dyn Error>> {
     Ok(serde_json::from_str(text)?)
 }
 
+fn json_usize(value: &Value, field: &str) -> Result<usize, Box<dyn Error>> {
+    Ok(value
+        .as_u64()
+        .ok_or_else(|| format!("{field} must be an unsigned count"))?
+        .try_into()
+        .map_err(|_| format!("{field} does not fit in usize"))?)
+}
+
 fn json_str<'a>(value: &'a Value, path: &str) -> Result<&'a str, Box<dyn Error>> {
     value
         .as_str()
         .ok_or_else(|| format!("{path} should be a string").into())
+}
+
+fn json_array<'a>(value: &'a Value, path: &str) -> Result<&'a Vec<Value>, Box<dyn Error>> {
+    value
+        .as_array()
+        .ok_or_else(|| format!("{path} should be an array").into())
 }
 
 fn fixture_root(name: &str) -> PathBuf {
