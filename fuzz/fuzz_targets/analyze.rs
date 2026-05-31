@@ -6,8 +6,9 @@ use std::fs;
 use std::hash::{Hash, Hasher};
 use std::path::Path;
 use unsafe_review_core::{
-    AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, analyze, render_human,
-    render_json, render_markdown,
+    AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, analyze, render_badge_jsons,
+    render_comment_plan, render_human, render_json, render_lsp, render_markdown, render_pr_summary,
+    render_repair_queue, render_sarif, render_witness_plan,
 };
 
 const MAX_SOURCE_BYTES: usize = 16 * 1024;
@@ -29,24 +30,40 @@ fuzz_target!(|data: &[u8]| {
     }
 
     let diff = changed_lib_diff(source, diff_tail, config.emit_empty_hunk);
-    run_analysis(AnalyzeInput {
-        root: root.clone(),
-        scope: config.scope,
-        diff: DiffSource::Text(diff),
-        mode: config.mode,
-        policy: PolicyMode::Advisory,
-        include_unchanged_tests: true,
-        max_cards: config.max_cards,
-    });
-    run_analysis(AnalyzeInput {
-        root: root.clone(),
-        scope: Scope::Repo,
-        diff: DiffSource::NoneRepoScan,
-        mode: AnalysisMode::Repo,
-        policy: PolicyMode::Advisory,
-        include_unchanged_tests: true,
-        max_cards: Some(64),
-    });
+    let diff_source = if config.diff_file {
+        let diff_path = root.join("change.diff");
+        if fs::write(&diff_path, &diff).is_err() {
+            return;
+        }
+        DiffSource::File(diff_path)
+    } else {
+        DiffSource::Text(diff)
+    };
+
+    run_analysis(
+        AnalyzeInput {
+            root: root.clone(),
+            scope: config.scope,
+            diff: diff_source,
+            mode: config.mode,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: config.max_cards,
+        },
+        config.max_cards,
+    );
+    run_analysis(
+        AnalyzeInput {
+            root: root.clone(),
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: Some(64),
+        },
+        Some(64),
+    );
 });
 
 struct FuzzConfig {
@@ -54,6 +71,12 @@ struct FuzzConfig {
     mode: AnalysisMode,
     max_cards: Option<usize>,
     emit_empty_hunk: bool,
+    diff_file: bool,
+}
+
+fn assert_json_parses(json: &str, label: &str) {
+    let parsed = serde_json::from_str::<serde_json::Value>(json);
+    assert!(parsed.is_ok(), "rendered {label} must parse");
 }
 
 fn parse_config(data: &[u8]) -> (FuzzConfig, &[u8]) {
@@ -64,6 +87,7 @@ fn parse_config(data: &[u8]) -> (FuzzConfig, &[u8]) {
                 mode: AnalysisMode::Draft,
                 max_cards: Some(64),
                 emit_empty_hunk: false,
+                diff_file: false,
             },
             data,
         );
@@ -76,10 +100,11 @@ fn parse_config(data: &[u8]) -> (FuzzConfig, &[u8]) {
     } else {
         Scope::Repo
     };
-    let mode = if header & 2 == 0 {
-        AnalysisMode::Draft
-    } else {
-        AnalysisMode::Ready
+    let mode = match (header & 2 != 0, header & 16 != 0) {
+        (false, true) => AnalysisMode::Instant,
+        (true, true) => AnalysisMode::Repo,
+        (false, false) => AnalysisMode::Draft,
+        (true, false) => AnalysisMode::Ready,
     };
     let emit_empty_hunk = header & 4 != 0;
     let max_cards = if header & 8 == 0 {
@@ -87,6 +112,7 @@ fn parse_config(data: &[u8]) -> (FuzzConfig, &[u8]) {
     } else {
         None
     };
+    let diff_file = header & 32 != 0;
 
     (
         FuzzConfig {
@@ -94,6 +120,7 @@ fn parse_config(data: &[u8]) -> (FuzzConfig, &[u8]) {
             mode,
             max_cards,
             emit_empty_hunk,
+            diff_file,
         },
         &data[2..],
     )
@@ -177,11 +204,28 @@ fn changed_lib_diff(source: &str, diff_tail: &str, emit_empty_hunk: bool) -> Str
     diff
 }
 
-fn run_analysis(input: AnalyzeInput) {
+fn run_analysis(input: AnalyzeInput, max_cards: Option<usize>) {
     if let Ok(output) = analyze(input) {
-        let json = render_json(&output);
-        let parsed = serde_json::from_str::<serde_json::Value>(&json);
-        assert!(parsed.is_ok(), "rendered analysis JSON must parse");
+        assert_eq!(
+            output.summary.cards,
+            output.cards.len(),
+            "summary card count must match ReviewCard list length"
+        );
+        if let Some(max_cards) = max_cards {
+            assert!(
+                output.cards.len() <= max_cards,
+                "analysis must honor configured max_cards"
+            );
+        }
+        assert_json_parses(&render_json(&output), "analysis JSON");
+        assert_json_parses(&render_sarif(&output), "SARIF JSON");
+        assert_json_parses(&render_comment_plan(&output), "comment plan JSON");
+        assert_json_parses(&render_lsp(&output), "LSP JSON");
+        assert_json_parses(&render_repair_queue(&output), "repair queue JSON");
+
+        let (badge, badge_plus) = render_badge_jsons(&output);
+        assert_json_parses(&badge, "badge JSON");
+        assert_json_parses(&badge_plus, "badge plus JSON");
 
         let human = render_human(&output);
         assert!(
@@ -193,6 +237,18 @@ fn run_analysis(input: AnalyzeInput) {
         assert!(
             !markdown.trim().is_empty(),
             "rendered markdown output must not be empty"
+        );
+
+        let pr_summary = render_pr_summary(&output);
+        assert!(
+            !pr_summary.trim().is_empty(),
+            "rendered PR summary output must not be empty"
+        );
+
+        let witness_plan = render_witness_plan(&output);
+        assert!(
+            !witness_plan.trim().is_empty(),
+            "rendered witness plan output must not be empty"
         );
     }
 }
