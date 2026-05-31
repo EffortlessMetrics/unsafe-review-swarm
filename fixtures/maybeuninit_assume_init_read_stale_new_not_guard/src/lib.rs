@@ -1,0 +1,19 @@
+use core::mem::MaybeUninit;
+
+pub fn read_after_stale_new() -> u32 {
+    let mut slot = MaybeUninit::new(7_u32);
+    slot = MaybeUninit::uninit();
+    // SAFETY: fixture checks that stale MaybeUninit::new evidence does not
+    // initialize the current slot before assume_init_read.
+    unsafe { slot.assume_init_read() }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::read_after_stale_new;
+
+    #[test]
+    fn mentions_read_after_stale_new() {
+        let _ = core::mem::size_of_val(&(read_after_stale_new as fn() -> u32));
+    }
+}

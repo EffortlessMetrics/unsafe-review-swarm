@@ -58,7 +58,7 @@ The active calibration rail is now recorded in
 `.unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md`,
 `policy/accuracy-calibration.toml`, and
 `docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 34
-fixture-pinned claims, 468 calibration cases, 34 label ledgers, and 481 label
+fixture-pinned claims, 469 calibration cases, 34 label ledgers, and 482 label
 samples. It records zero dogfood-measured, labeled-calibrated, or
 policy-eligible claims. That is intentional: the current report is a
 claim-scoped fixture-pinned proof index, not a global precision/recall result
@@ -71,7 +71,8 @@ other-slot writes for `assume_init`, `assume_init_read`, `assume_init_ref`,
 `assume_init`, `assume_init_read`, `assume_init_ref`, `assume_init_mut`, and
 `assume_init_drop`, and stale writes for `assume_init`, `assume_init_read`,
 `assume_init_ref`, `assume_init_mut`, and `assume_init_drop` after
-reassignment, closed conditional `MaybeUninit::new` evidence for `assume_init`,
+reassignment, stale `MaybeUninit::new` evidence for `assume_init` and
+`assume_init_read`, closed conditional `MaybeUninit::new` evidence for `assume_init`,
 `assume_init_read`, `assume_init_ref`, `assume_init_mut`, and `assume_init_drop`,
 plus shadowed slot evidence for `assume_init`,
 `assume_init_read`, `assume_init_ref`, `assume_init_mut`, and
@@ -155,7 +156,7 @@ These are not failures; they are the next unsupported or weakly verified areas:
   `arrayvec#288` has a rerun receipt;
   `MaybeUninit::assume_init` now has fixture coverage for same-slot `write` and
   `MaybeUninit::new` initialization evidence while still rejecting other-slot
-  and stale writes;
+  writes, stale writes, and stale `MaybeUninit::new` evidence;
   non-zero shrink and `set_len(0)` clear evidence also have fixture and
   dogfood-rerun coverage, start-bound shrink evidence has fixture and
   `rust-smallvec#277` dogfood-rerun coverage, and last-index shrink evidence

@@ -122,6 +122,9 @@ initialized-memory evidence.
 evidence through `maybeuninit_assume_init_read_closed_branch_write_not_guard`,
 rejects closed conditional `MaybeUninit::new` evidence through
 `maybeuninit_assume_init_read_closed_branch_new_not_guard`,
+keeps `MaybeUninit::new` evidence made stale by reassignment from discharging
+initialized-memory evidence through
+`maybeuninit_assume_init_read_stale_new_not_guard`,
 keeps writes made stale by reassignment from discharging initialized-memory
 evidence through `maybeuninit_assume_init_read_stale_write_not_guard`, and
 keeps writes made stale by shadowing from discharging initialized-memory
