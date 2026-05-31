@@ -1,0 +1,20 @@
+use core::mem::MaybeUninit;
+
+pub fn drop_after_other_slot_write(value: String) {
+    let mut slot = MaybeUninit::<String>::uninit();
+    let mut other = MaybeUninit::<String>::uninit();
+    other.write(value);
+    // SAFETY: this fixture intentionally initializes a different slot.
+    unsafe { slot.assume_init_drop() }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::drop_after_other_slot_write;
+
+    #[test]
+    fn mentions_drop_after_other_slot_write() {
+        let _ = core::mem::size_of_val(&(drop_after_other_slot_write as fn(String)));
+    }
+}
+

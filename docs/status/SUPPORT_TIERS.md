@@ -130,7 +130,9 @@ different slot from discharging `assume_init_ref` initialized-memory evidence.
 `maybeuninit_assume_init_mut_other_slot_write_not_guard` keeps a write to a
 different slot from discharging `assume_init_mut` initialized-memory evidence.
 `MaybeUninit::assume_init_drop` pins same-slot `write` evidence through
-`maybeuninit_assume_init_drop_write_guard`.
+`maybeuninit_assume_init_drop_write_guard`, while
+`maybeuninit_assume_init_drop_other_slot_write_not_guard` keeps a write to a
+different slot from discharging `assume_init_drop` initialized-memory evidence.
 
 Copy operation range evidence is intentionally conservative:
 `copy_nonoverlapping_slice_range_guard`,
