@@ -177,9 +177,11 @@ fn run_repo_check(options: RepoOptions) -> Result<(), String> {
     let check = options.check;
     let diff = diff_source(&check)?;
     let policy = check.policy.clone();
-    let status_path = check.out.as_deref().map(repo_status_path);
+    let report_path = check.out.clone();
+    let partial_path = report_path.as_deref().map(repo_partial_path);
+    let status_path = report_path.as_deref().map(repo_status_path);
     let mut reporter = RepoStatusReporter::new(status_path, options.progress);
-    let output = analyze_with_discovery_and_progress(
+    let output = match analyze_with_discovery_and_progress(
         AnalyzeInput {
             root: check.root,
             scope: Scope::Repo,
@@ -191,12 +193,22 @@ fn run_repo_check(options: RepoOptions) -> Result<(), String> {
         },
         options.discovery,
         |status| reporter.record(status),
-    )?;
+    ) {
+        Ok(output) => output,
+        Err(err) => {
+            return Err(repo_incomplete_error(
+                &mut reporter,
+                &err,
+                partial_path.as_deref(),
+            ));
+        }
+    };
     let rendered = render_with_format(&output, &check.format);
-    if let Some(path) = check.out {
-        ensure_parent_dir(&path)?;
-        fs::write(&path, rendered)
-            .map_err(|err| format!("write {} failed: {err}", path.display()))?;
+    if let Some(path) = report_path {
+        let partial = partial_path.expect("repo out path has a partial path");
+        if let Err(err) = write_repo_report(&path, &partial, rendered) {
+            return Err(repo_incomplete_error(&mut reporter, &err, Some(&partial)));
+        }
     } else {
         println!("{rendered}");
     }
@@ -234,6 +246,7 @@ fn render_repo_file_list(root: &Path, files: &[PathBuf]) -> String {
 struct RepoStatusReporter {
     status_path: Option<PathBuf>,
     progress: bool,
+    last_status: Option<RepoScanStatus>,
     last_phase: Option<String>,
     last_discovery_heartbeat: usize,
     last_scan_heartbeat: usize,
@@ -244,6 +257,7 @@ impl RepoStatusReporter {
         Self {
             status_path,
             progress,
+            last_status: None,
             last_phase: None,
             last_discovery_heartbeat: 0,
             last_scan_heartbeat: 0,
@@ -251,6 +265,7 @@ impl RepoStatusReporter {
     }
 
     fn record(&mut self, status: &RepoScanStatus) -> Result<(), String> {
+        self.last_status = Some(status.clone());
         if let Some(path) = &self.status_path {
             ensure_parent_dir(path)?;
             fs::write(path, render_repo_scan_status(status)?)
@@ -260,6 +275,27 @@ impl RepoStatusReporter {
             eprintln!("{}", format_repo_progress(status));
         }
         Ok(())
+    }
+
+    fn record_incomplete(
+        &mut self,
+        error: &str,
+        partial_path: Option<&Path>,
+    ) -> Result<Option<PathBuf>, String> {
+        let Some(path) = self.status_path.clone() else {
+            return Ok(None);
+        };
+        ensure_parent_dir(&path)?;
+        fs::write(
+            &path,
+            render_repo_scan_incomplete_status(
+                self.last_status.as_ref(),
+                error,
+                partial_path.filter(|path| path.exists()),
+            )?,
+        )
+        .map_err(|err| format!("write {} failed: {err}", path.display()))?;
+        Ok(Some(path))
     }
 
     fn should_print(&mut self, status: &RepoScanStatus) -> bool {
@@ -294,6 +330,35 @@ fn render_repo_scan_status(status: &RepoScanStatus) -> Result<String, String> {
         "cards_found": status.cards_found,
         "last_path": status.last_path.as_ref().map(|path| path.display().to_string()),
         "completed": status.completed,
+        "error": null,
+        "partial_path": null,
+    });
+    let mut rendered = serde_json::to_string_pretty(&value)
+        .map_err(|err| format!("render repo status JSON failed: {err}"))?;
+    rendered.push('\n');
+    Ok(rendered)
+}
+
+fn render_repo_scan_incomplete_status(
+    status: Option<&RepoScanStatus>,
+    error: &str,
+    partial_path: Option<&Path>,
+) -> Result<String, String> {
+    let value = serde_json::json!({
+        "schema_version": status
+            .map(|status| status.schema_version.as_str())
+            .unwrap_or("repo-scan-status/v1"),
+        "phase": "failed",
+        "elapsed_ms": status.map_or(0, |status| status.elapsed_ms),
+        "files_discovered": status.map_or(0, |status| status.files_discovered),
+        "files_scanned": status.map_or(0, |status| status.files_scanned),
+        "cards_found": status.map_or(0, |status| status.cards_found),
+        "last_path": status
+            .and_then(|status| status.last_path.as_ref())
+            .map(|path| path.display().to_string()),
+        "completed": false,
+        "error": error,
+        "partial_path": partial_path.map(|path| path.display().to_string()),
     });
     let mut rendered = serde_json::to_string_pretty(&value)
         .map_err(|err| format!("render repo status JSON failed: {err}"))?;
@@ -320,13 +385,68 @@ fn format_repo_progress(status: &RepoScanStatus) -> String {
 }
 
 fn repo_status_path(out: &Path) -> PathBuf {
+    out_with_suffix(out, ".status.json")
+}
+
+fn repo_partial_path(out: &Path) -> PathBuf {
+    out_with_suffix(out, ".partial")
+}
+
+fn out_with_suffix(out: &Path, suffix: &str) -> PathBuf {
     if let Some(file_name) = out.file_name() {
-        let mut status_file_name = file_name.to_os_string();
-        status_file_name.push(".status.json");
-        out.with_file_name(status_file_name)
+        let mut suffixed_file_name = file_name.to_os_string();
+        suffixed_file_name.push(suffix);
+        out.with_file_name(suffixed_file_name)
     } else {
-        PathBuf::from(format!("{}.status.json", out.display()))
+        PathBuf::from(format!("{}{}", out.display(), suffix))
     }
+}
+
+fn write_repo_report(path: &Path, partial_path: &Path, rendered: String) -> Result<(), String> {
+    ensure_parent_dir(partial_path)?;
+    fs::write(partial_path, rendered).map_err(|err| {
+        format!(
+            "write partial repo report {} failed: {err}",
+            partial_path.display()
+        )
+    })?;
+    fs::rename(partial_path, path).map_err(|err| {
+        format!(
+            "rename partial repo report {} to {} failed: {err}",
+            partial_path.display(),
+            path.display()
+        )
+    })?;
+    Ok(())
+}
+
+fn repo_incomplete_error(
+    reporter: &mut RepoStatusReporter,
+    error: &str,
+    partial_path: Option<&Path>,
+) -> String {
+    let mut message = error.to_string();
+    match reporter.record_incomplete(error, partial_path) {
+        Ok(Some(status_path)) => {
+            message.push_str(&format!(
+                "; incomplete repo status written to {}",
+                status_path.display()
+            ));
+        }
+        Ok(None) => {}
+        Err(status_err) => {
+            message.push_str(&format!(
+                "; failed to update incomplete repo status: {status_err}"
+            ));
+        }
+    }
+    if let Some(partial_path) = partial_path.filter(|path| path.exists()) {
+        message.push_str(&format!(
+            "; partial repo report kept at {}",
+            partial_path.display()
+        ));
+    }
+    message
 }
 
 fn first_pr(options: FirstPrOptions) -> Result<(), String> {
@@ -1012,15 +1132,17 @@ fn print_repo_help() {
     println!("- Use --list-files before a large scan to confirm the selected Rust files.");
     println!();
     println!("Output and cancellation:");
-    println!("- Rendering happens after analysis completes.");
     println!(
-        "- --out is written after analysis completes and also writes <out>.status.json while analysis runs."
+        "- --out renders to <out>.partial, then renames it to <out> only after a successful render."
     );
     println!(
-        "- The status sidecar records phase, elapsed time, discovered files, scanned files, cards found, last path, and completion."
+        "- <out>.status.json records phase, elapsed time, discovered files, scanned files, cards found, last path, completion, and normal errors."
     );
     println!(
-        "- Reports are not streamed; partial report artifacts and interruption preservation are not implemented yet."
+        "- On normal errors, incomplete status is kept; if a rendered partial report exists, it is left at <out>.partial."
+    );
+    println!(
+        "- If interrupted before rendering, the latest status sidecar is the durable artifact; a dedicated signal handler is deferred."
     );
     println!();
     println!("Trust boundary:");

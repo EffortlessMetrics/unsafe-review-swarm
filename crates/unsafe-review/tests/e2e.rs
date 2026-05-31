@@ -1143,8 +1143,10 @@ fn repo_help_reports_repo_specific_scale_guidance() -> Result<(), Box<dyn Error>
     assert!(text.contains("--list-files prints selected Rust files"));
     assert!(text.contains("--progress prints scan-status heartbeats"));
     assert!(text.contains("--max-files <N>"));
-    assert!(text.contains("partial report artifacts and interruption preservation"));
+    assert!(text.contains("<out>.partial"));
     assert!(text.contains("<out>.status.json"));
+    assert!(text.contains("incomplete status is kept"));
+    assert!(text.contains("dedicated signal handler is deferred"));
     assert!(text.contains("Trust boundary:"));
     assert!(!text.contains("unsafe-review: cheap unsafe contract review for Rust"));
     assert!(!text.contains("status artifacts are not implemented yet"));
@@ -1492,6 +1494,7 @@ fn repo_progress_writes_status_sidecar_for_out_reports() -> Result<(), Box<dyn E
     let fixture = fixture_root("raw_pointer_alignment");
     let temp = TempDir::new("unsafe-review-repo-status-e2e")?;
     let report_path = temp.path().join("repo.json");
+    let partial_path = temp.path().join("repo.json.partial");
     let status_path = temp.path().join("repo.json.status.json");
 
     let output = run_success([
@@ -1513,6 +1516,10 @@ fn repo_progress_writes_status_sidecar_for_out_reports() -> Result<(), Box<dyn E
     );
     let report = parse_json(&fs::read_to_string(&report_path)?)?;
     assert_eq!(report["scope"], "repo");
+    assert!(
+        !partial_path.exists(),
+        "successful repo output should promote and remove the partial report"
+    );
     let status = parse_json(&fs::read_to_string(&status_path)?)?;
     assert_eq!(status["schema_version"], "repo-scan-status/v1");
     assert_eq!(status["phase"], "complete");
@@ -1522,6 +1529,66 @@ fn repo_progress_writes_status_sidecar_for_out_reports() -> Result<(), Box<dyn E
     assert_eq!(status["cards_found"], 1);
     assert_eq!(status["last_path"], "src/lib.rs");
     assert!(status["elapsed_ms"].as_u64().is_some());
+    assert!(status["error"].is_null());
+    assert!(status["partial_path"].is_null());
+
+    Ok(())
+}
+
+#[test]
+fn repo_output_failure_keeps_partial_and_marks_status_incomplete() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-repo-partial-e2e")?;
+    let report_path = temp.path().join("repo.json");
+    let partial_path = temp.path().join("repo.json.partial");
+    let status_path = temp.path().join("repo.json.status.json");
+    fs::create_dir(&report_path)?;
+
+    let output = run_failure([
+        os("repo"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+        os("--out"),
+        report_path.as_os_str().to_os_string(),
+    ])?;
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("rename partial repo report"),
+        "stderr should explain the failed promotion: {stderr}"
+    );
+    assert!(
+        stderr.contains("incomplete repo status written to"),
+        "stderr should point to the incomplete status sidecar: {stderr}"
+    );
+    assert!(
+        stderr.contains("partial repo report kept at"),
+        "stderr should point to the retained partial report: {stderr}"
+    );
+    assert!(partial_path.exists(), "partial report should be retained");
+    let partial = parse_json(&fs::read_to_string(&partial_path)?)?;
+    assert_eq!(partial["scope"], "repo");
+    let status = parse_json(&fs::read_to_string(&status_path)?)?;
+    assert_eq!(status["schema_version"], "repo-scan-status/v1");
+    assert_eq!(status["phase"], "failed");
+    assert_eq!(status["completed"], false);
+    assert_eq!(status["files_discovered"], 1);
+    assert_eq!(status["files_scanned"], 1);
+    assert_eq!(status["cards_found"], 1);
+    assert!(
+        status["error"]
+            .as_str()
+            .unwrap_or("")
+            .contains("rename partial repo report")
+    );
+    assert!(
+        status["partial_path"]
+            .as_str()
+            .unwrap_or("")
+            .ends_with("repo.json.partial")
+    );
 
     Ok(())
 }

@@ -96,3 +96,12 @@ policy_impact = [
   "policy/accuracy-calibration.toml",
   "policy/public-surfaces.toml",
 ]
+
+[[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0027"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0027-manual-candidate-cards.md"
+status = "proposed"
+owner = "product / cli"
+linked_proposal = "UNSAFE-REVIEW-PROP-0002"
+linked_spec = "UNSAFE-REVIEW-SPEC-0020"

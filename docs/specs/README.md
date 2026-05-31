@@ -35,6 +35,7 @@ Specs define behavior. They do not carry the PR queue.
 24. [CI design](UNSAFE-REVIEW-SPEC-0024-ci-design.md)
 25. [Docs automation](UNSAFE-REVIEW-SPEC-0025-docs-automation.md)
 26. [Accuracy validation and calibration](UNSAFE-REVIEW-SPEC-0026-accuracy-validation-and-calibration.md)
+27. [Manual candidate cards](UNSAFE-REVIEW-SPEC-0027-manual-candidate-cards.md)
 
 
 ## Appendices
