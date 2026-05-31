@@ -25,8 +25,8 @@ calibration exists and support tiers are explicitly promoted.
 | Surface | Current posture | Evidence | Not claimed |
 |---|---|---|---|
 | ReviewCard schema, identity, and core card slices | Experimental | Fixture-backed; selected analyzer rules are dogfood-backed | Stable schema compatibility, broad precision/recall, or safety |
-| First-run CLI path: `doctor`, `first-pr` / `review`, `explain`, and saved artifacts | Experimental | Fixture-backed CLI e2e coverage and release-readiness proof; 0.2.0 target is public usability | Proof, policy authority, source edits, witness execution, or live editor integration |
-| PR artifacts: cards JSON, PR summary, SARIF, comment-plan, witness-plan, and saved LSP JSON | Experimental | Fixture-backed and workflow-verified; advisory artifact loop is dogfoodable | Automatic comments, branch protection, witness execution, source edits, or policy gating |
+| First-run CLI path: `doctor`, `first-pr` / `review`, `explain`, `context`, and saved artifacts | Experimental | Fixture-backed CLI e2e coverage and release-readiness proof; 0.3.0 target is advisory review cockpit | Proof, policy authority, source edits, witness execution, agent execution, or live editor integration |
+| PR artifacts: review-kit manifest, cards JSON, PR summary, bounded GitHub summary, SARIF, comment-plan, witness-plan, receipt audit, saved LSP JSON, and repair queue | Experimental | Fixture-backed and workflow-verified; advisory artifact loop is dogfoodable | Automatic comments, branch protection, witness execution, source edits, agent execution, repair success, or policy gating |
 | Saved LSP projection and agent packet | Experimental | Fixture-backed and e2e-covered read-only projections from `ReviewCard` | Live editor integration, agent execution, source edits, or repair success |
 | Witness routes and saved-output receipt import | Experimental | Fixture-backed route table plus saved-output receipt adapters | Running Miri/cargo-careful/sanitizers/Loom/Kani, site reach, or witness success beyond imported receipt scope |
 | Repo posture, badge JSON, outcome comparison, and policy report | Experimental | Fixture-backed; outcome comparison has limited saved-snapshot dogfood | Safety badge, release-grade dashboard, default no-new-debt, or blocking policy |
@@ -35,11 +35,12 @@ calibration exists and support tiers are explicitly promoted.
 
 ## Current Release Target
 
-0.2.0 is public usability: install, run `doctor`, run one `first-pr` command,
-open one summary, explain one `ReviewCard`, inspect `unsafe-review support`, and
-take one concrete review action. It is not a policy gate, live LSP release,
-witness runner, or proof claim. See
-[`0.2.0 Public Usability Target`](../releases/0.2.0-public-usability.md).
+0.3.0 is the advisory review cockpit target: install, run `doctor`, run one
+`first-pr` command, open the review kit, inspect the bounded GitHub doorway,
+explain one `ReviewCard`, generate one `context` packet, inspect
+`unsafe-review support`, and take one concrete review action. It is not a
+policy gate, live LSP release, witness runner, agent runner, or proof claim.
+See [`0.3.0 Advisory Review Cockpit Target`](../releases/0.3.0-advisory-review-cockpit.md).
 
 ## Promotion Posture
 
