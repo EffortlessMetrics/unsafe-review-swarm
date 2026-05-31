@@ -1308,6 +1308,12 @@ fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<()
         main_badge["counts"]["unsuppressed_evidence_quality_findings"],
         0
     );
+    assert_eq!(main_badge["counts"]["evidence_quality_contract_missing"], 0);
+    assert_eq!(main_badge["counts"]["evidence_quality_guard_missing"], 0);
+    assert_eq!(
+        main_badge["counts"]["evidence_quality_guarded_unwitnessed"],
+        0
+    );
     assert_ne!(main_badge["message"], "safe");
 
     let plus_badge = parse_json(&fs::read_to_string(
@@ -1327,6 +1333,29 @@ fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<()
         plus_badge["counts"]["unsuppressed_evidence_quality_findings"],
         1
     );
+    assert_eq!(plus_badge["counts"]["evidence_quality_contract_missing"], 0);
+    assert_eq!(plus_badge["counts"]["evidence_quality_guard_missing"], 1);
+    assert_eq!(
+        plus_badge["counts"]["evidence_quality_guarded_unwitnessed"],
+        0
+    );
+    let evidence_quality_component_count = json_usize(
+        &plus_badge["counts"]["evidence_quality_contract_missing"],
+        "evidence_quality_contract_missing",
+    )? + json_usize(
+        &plus_badge["counts"]["evidence_quality_guard_missing"],
+        "evidence_quality_guard_missing",
+    )? + json_usize(
+        &plus_badge["counts"]["evidence_quality_guarded_unwitnessed"],
+        "evidence_quality_guarded_unwitnessed",
+    )?;
+    assert_eq!(
+        json_usize(
+            &plus_badge["counts"]["unsuppressed_evidence_quality_findings"],
+            "unsuppressed_evidence_quality_findings",
+        )?,
+        evidence_quality_component_count
+    );
     let main_count = main_badge["message"]
         .as_str()
         .ok_or("main badge message missing")?
@@ -1338,6 +1367,7 @@ fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<()
         .parse::<usize>()
         .map_err(|err| format!("plus badge message parse failed: {err}"))?;
     assert!(plus_count >= main_count);
+    assert_eq!(plus_count, main_count + evidence_quality_component_count);
     assert_ne!(plus_badge["message"], "UB-free");
 
     let repo_markdown = run_success([
@@ -2373,6 +2403,14 @@ fn stdout_text(output: &Output) -> Result<String, Box<dyn Error>> {
 
 fn parse_json(text: &str) -> Result<Value, Box<dyn Error>> {
     Ok(serde_json::from_str(text)?)
+}
+
+fn json_usize(value: &Value, field: &str) -> Result<usize, Box<dyn Error>> {
+    Ok(value
+        .as_u64()
+        .ok_or_else(|| format!("{field} must be an unsigned count"))?
+        .try_into()
+        .map_err(|_| format!("{field} does not fit in usize"))?)
 }
 
 fn json_str<'a>(value: &'a Value, path: &str) -> Result<&'a str, Box<dyn Error>> {

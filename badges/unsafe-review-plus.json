@@ -11,6 +11,9 @@
   "counts": {
     "unsuppressed_review_gaps": 479,
     "unsuppressed_evidence_quality_findings": 462,
+    "evidence_quality_contract_missing": 32,
+    "evidence_quality_guard_missing": 359,
+    "evidence_quality_guarded_unwitnessed": 71,
     "suppressed_review_gaps": 0,
     "suppressed_evidence_quality_findings": 0,
     "intentional_findings": 0,
