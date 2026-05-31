@@ -13,15 +13,17 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
     if rest.is_empty() {
         return Ok(Command::Help);
     }
-    if rest
-        .iter()
-        .any(|arg| matches!(arg.as_str(), "--help" | "-h"))
-    {
+    let command = rest.remove(0);
+    if matches!(command.as_str(), "--help" | "-h" | "help") {
         return Ok(Command::Help);
     }
-    let command = rest.remove(0);
+    if command == "repo" && (has_help_flag(&rest) || is_exact_help_word(&rest)) {
+        return Ok(Command::RepoHelp);
+    }
+    if has_help_flag(&rest) {
+        return Ok(Command::Help);
+    }
     match command.as_str() {
-        "--help" | "-h" | "help" => Ok(Command::Help),
         "--version" | "-V" => Ok(Command::Version),
         "support" => parse_support(rest),
         "doctor" => parse_doctor(rest),
@@ -44,6 +46,15 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
             "unknown command `{other}`. Run `unsafe-review --help`."
         )),
     }
+}
+
+fn has_help_flag(args: &[String]) -> bool {
+    args.iter()
+        .any(|arg| matches!(arg.as_str(), "--help" | "-h"))
+}
+
+fn is_exact_help_word(args: &[String]) -> bool {
+    matches!(args, [arg] if arg == "help")
 }
 
 fn parse_support(args: Vec<String>) -> Result<Command, String> {
@@ -435,6 +446,23 @@ mod tests {
         assert_eq!(
             parse(args(["unsafe-review", "receipt", "audit", "-h"]))?,
             Command::Help
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parses_repo_help_as_repo_specific_help() -> Result<(), String> {
+        assert_eq!(
+            parse(args(["unsafe-review", "repo", "--help"]))?,
+            Command::RepoHelp
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "repo", "-h"]))?,
+            Command::RepoHelp
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "repo", "help"]))?,
+            Command::RepoHelp
         );
         Ok(())
     }

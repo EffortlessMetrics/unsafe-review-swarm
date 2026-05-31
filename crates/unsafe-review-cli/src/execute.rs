@@ -57,6 +57,10 @@ pub(crate) fn execute(command: Command) -> Result<(), String> {
             print_help();
             Ok(())
         }
+        Command::RepoHelp => {
+            print_repo_help();
+            Ok(())
+        }
         Command::Version => {
             println!("unsafe-review {}", env!("CARGO_PKG_VERSION"));
             Ok(())
@@ -778,6 +782,66 @@ fn print_help() {
     println!();
     println!(
         "Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and not Miri-clean status."
+    );
+}
+
+fn print_repo_help() {
+    println!("unsafe-review repo: advisory unsafe contract review for a whole Rust repo");
+    println!();
+    println!("Usage:");
+    println!(
+        "  unsafe-review repo [--root .] [--base origin/main | --diff file|-] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
+    );
+    println!();
+    println!("What repo scans today:");
+    println!(
+        "- Recursively discovers *.rs files under --root, defaulting to the current directory."
+    );
+    println!(
+        "- Built-in skipped directories are .git, target, .unsafe-review, .unsafe-review-spec, .github, and node_modules."
+    );
+    println!(
+        "- Repo mode scans all discovered Rust files; --base and --diff are accepted by the shared parser but do not make repo a diff-only scan."
+    );
+    println!("- Use check or first-pr when you want changed-file review from --base or --diff.");
+    println!();
+    println!("Options:");
+    println!("- --root <dir> chooses the repository or subdirectory to scan.");
+    println!(
+        "- --format <name> chooses human, json, markdown, pr-summary, github-summary, sarif, comment-plan, lsp, or witness-plan output."
+    );
+    println!(
+        "- --policy advisory is the default; --policy no-new-debt exits nonzero for open actionable gaps."
+    );
+    println!("- --out <file> writes the rendered report to a file instead of stdout.");
+    println!("- --max-cards <N> stops after N cards are collected; it is not file selection.");
+    println!();
+    println!("Large-repo guidance:");
+    println!(
+        "- Prefer a scoped --root such as src, crates, or a package directory for large repositories."
+    );
+    println!(
+        "- Include/exclude globs, --list-files, progress heartbeats, and status artifacts are not implemented yet."
+    );
+    println!(
+        "- Generated, vendored, build, and dist trees outside the current skipped list may still be scanned unless you choose a narrower --root."
+    );
+    println!();
+    println!("Output and cancellation:");
+    println!("- Rendering happens after analysis completes.");
+    println!(
+        "- --out is written after analysis completes; reports are not streamed and partial artifacts are not preserved yet."
+    );
+    println!(
+        "- If a long scan is interrupted or times out, the current command may leave no useful report."
+    );
+    println!();
+    println!("Trust boundary:");
+    println!(
+        "- ReviewCards are advisory static findings, not memory-safety proof, not UB-free status, and not Miri-clean status."
+    );
+    println!(
+        "- unsafe-review does not execute witnesses, post comments, edit source, or enforce blocking policy by default."
     );
 }
 

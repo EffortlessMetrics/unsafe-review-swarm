@@ -98,6 +98,7 @@ pub(crate) struct OutcomeOptions {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Command {
     Help,
+    RepoHelp,
     Version,
     Support,
     Doctor {

@@ -1130,6 +1130,23 @@ fn help_reports_first_run_trust_boundary_without_overclaims() -> Result<(), Box<
 }
 
 #[test]
+fn repo_help_reports_repo_specific_scale_guidance() -> Result<(), Box<dyn Error>> {
+    let output = run_success([os("repo"), os("--help")])?;
+    let text = stdout_text(&output)?;
+
+    assert!(text.contains("unsafe-review repo: advisory unsafe contract review"));
+    assert!(text.contains("What repo scans today:"));
+    assert!(text.contains("Repo mode scans all discovered Rust files"));
+    assert!(text.contains("--base and --diff are accepted"));
+    assert!(text.contains("Include/exclude globs, --list-files"));
+    assert!(text.contains("partial artifacts are not preserved yet"));
+    assert!(text.contains("Trust boundary:"));
+    assert!(!text.contains("unsafe-review: cheap unsafe contract review for Rust"));
+
+    Ok(())
+}
+
+#[test]
 fn check_reports_missing_diff_file_as_cli_failure() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("safe_code_no_cards");
     let missing_diff = fixture.join("missing.diff");
