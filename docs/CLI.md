@@ -223,6 +223,32 @@ edit source. See
 [Agent packet examples](explanation/agent-packet-examples.md) for
 fixture-backed examples of repair-ready and human-review-only packets.
 
+## Manual Candidates
+
+Import a manually discovered advisory candidate:
+
+```bash
+unsafe-review candidate import target/unsafe-scout/textdecoder-candidate.json \
+  --out .unsafe-review/candidates/R4R2-S001.json
+```
+
+The imported artifact is canonicalized with `source = "manual"` and
+`manual_candidate = true`. It remains advisory and must not be described as an
+analyzer-discovered finding.
+
+After import, `explain` and `context` can load the candidate by ID from
+`.unsafe-review/candidates/` when no analyzer ReviewCard with that ID exists:
+
+```bash
+unsafe-review explain R4R2-S001
+unsafe-review context R4R2-S001
+unsafe-review candidate witness-plan R4R2-S001
+```
+
+Manual candidate projections preserve the manual marker and external evidence
+references. They do not execute witnesses, post comments, edit source, enforce
+policy, prove UB, prove site execution, or prove repository safety.
+
 ## Repo Posture And Badges
 
 Repo mode scans the workspace and reports static open unsafe-review gaps:

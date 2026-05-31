@@ -6,6 +6,7 @@
 
 mod analysis;
 pub mod api;
+mod candidate;
 mod domain;
 mod input;
 mod output;
@@ -22,6 +23,12 @@ pub use api::{
     render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
     render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,
     render_repair_queue, render_sarif, render_witness_plan, validate_witness_receipts,
+};
+pub use candidate::{
+    MANUAL_CANDIDATE_SCHEMA_VERSION, ManualCandidate, ManualCandidateEvidence,
+    ManualCandidateLocation, load_manual_candidate, manual_candidate_path, read_manual_candidate,
+    render_manual_candidate_context, render_manual_candidate_explain,
+    render_manual_candidate_witness_plan,
 };
 pub use domain::{
     CardId, CargoCarefulReceiptInput, ConcurrencyReceiptInput, Confidence, ContractEvidence,
