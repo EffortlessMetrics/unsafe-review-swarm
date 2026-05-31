@@ -1,0 +1,5 @@
+[package]
+name = "maybeuninit-assume-init-read-write-guard"
+version = "0.0.0"
+edition = "2024"
+publish = false

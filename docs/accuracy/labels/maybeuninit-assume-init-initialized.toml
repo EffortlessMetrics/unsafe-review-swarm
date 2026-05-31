@@ -53,6 +53,20 @@ label_source = "fixture_golden"
 rationale = "A same-slot write before assume_init is narrow initialized-memory evidence, leaving only witness evidence missing."
 
 [[samples]]
+id = "maybeuninit-assume-init-read-write-initialized"
+fixture = "maybeuninit_assume_init_read_write_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "maybe_uninit_assume_init"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-slot write before assume_init_read is narrow initialized-memory evidence, leaving only witness evidence missing."
+
+[[samples]]
 id = "maybeuninit-assume-init-open-branch-write-initialized"
 fixture = "maybeuninit_assume_init_open_branch_write_guard"
 kind = "positive"
@@ -163,6 +177,20 @@ expected_discharge_state = "missing"
 expected_witness_route_kinds = ["miri", "cargo-careful"]
 label_source = "fixture_golden"
 rationale = "A same-slot write made stale by reassigning the MaybeUninit before assume_init does not discharge initialized-memory evidence."
+
+[[samples]]
+id = "maybeuninit-assume-init-read-stale-write-not-initialized"
+fixture = "maybeuninit_assume_init_read_stale_write_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "maybe_uninit_assume_init"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-slot write made stale by reassigning the MaybeUninit before assume_init_read does not discharge initialized-memory evidence."
 
 [[samples]]
 id = "maybeuninit-assume-init-stale-field-write-not-initialized"

@@ -727,6 +727,7 @@ fixtures = [
   "maybeuninit_assume_init",
   "maybeuninit_assume_init_comment_not_guard",
   "maybeuninit_assume_init_write_guard",
+  "maybeuninit_assume_init_read_write_guard",
   "maybeuninit_assume_init_open_branch_write_guard",
   "maybeuninit_assume_init_open_branch_new_guard",
   "maybeuninit_assume_init_closed_branch_write_not_guard",
@@ -735,6 +736,7 @@ fixtures = [
   "maybeuninit_assume_init_mut_new_guard",
   "maybeuninit_assume_init_other_slot_write_not_guard",
   "maybeuninit_assume_init_stale_write_not_guard",
+  "maybeuninit_assume_init_read_stale_write_not_guard",
   "maybeuninit_assume_init_stale_field_write_not_guard",
   "maybeuninit_assume_init_stale_new_not_guard",
   "maybeuninit_assume_init_shadowed_slot_not_guard",
@@ -754,10 +756,11 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned MaybeUninit::assume_init family evidence reports missing
 initialized-memory discharge, recognizes narrow same-slot write and
-MaybeUninit::new evidence including open-branch forms, rejects comment-only,
-closed-branch write/new, other-slot writes, stale write/new, stale field-slot
-writes, and partial field or array-element initialization evidence, and routes the listed fixtures to
-Miri/cargo-careful witness suggestions.
+MaybeUninit::new evidence including assume_init_read same-slot writes and
+open-branch forms, rejects comment-only, closed-branch write/new, other-slot
+writes, stale write/new including stale assume_init_read writes, stale
+field-slot writes, and partial field or array-element initialization evidence,
+and routes the listed fixtures to Miri/cargo-careful witness suggestions.
 """
 forbidden_claims = [
   "broad MaybeUninit soundness",

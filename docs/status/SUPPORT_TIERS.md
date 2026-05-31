@@ -117,6 +117,10 @@ same-slot open-branch `write` and `MaybeUninit::new` evidence through
 `maybeuninit_assume_init_partial_array_not_guard` keep closed-branch,
 partial-field, and partial-array initialization from counting as full
 initialized-memory evidence.
+`MaybeUninit::assume_init_read` also pins same-slot `write` evidence through
+`maybeuninit_assume_init_read_write_guard` while
+`maybeuninit_assume_init_read_stale_write_not_guard` keeps a write made stale
+by reassignment from discharging initialized-memory evidence.
 
 Copy operation range evidence is intentionally conservative:
 `copy_nonoverlapping_slice_range_guard`,
