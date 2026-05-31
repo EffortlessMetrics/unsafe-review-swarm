@@ -1,0 +1,4 @@
+[package]
+name = "maybeuninit-assume-init-ref-open-branch-new-guard-fixture"
+version = "0.1.0"
+edition = "2024"
