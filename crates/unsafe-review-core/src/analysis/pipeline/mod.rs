@@ -2390,6 +2390,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "maybeuninit_assume_init_mut_closed_branch_write_not_guard",
             "maybeuninit_assume_init_drop_closed_branch_write_not_guard",
             "maybeuninit_assume_init_closed_branch_new_not_guard",
+            "maybeuninit_assume_init_read_closed_branch_new_not_guard",
             "maybeuninit_assume_init_other_slot_write_not_guard",
             "maybeuninit_assume_init_stale_write_not_guard",
             "maybeuninit_assume_init_read_stale_write_not_guard",
