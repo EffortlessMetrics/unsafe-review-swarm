@@ -146,8 +146,9 @@ the current `unsafe-review badges` repo projection.
 - Repo file-list dry runs honor include/exclude filters, gitignore defaults,
   large-repo default skips, and max-file truncation without analyzing files.
 - Repo Markdown for a fixture reports repo posture, summary counts, top card
-  classes, operation families, witness routes, cards with concrete operation
-  expressions and next actions, and the trust boundary.
+  classes, operation families, witness routes, cards with direct `path:line`
+  source locations, concrete operation expressions and next actions, and the
+  trust boundary.
 - Badge JSON for a fixture reports open unsafe-review gaps rather than raw
   unsafe count or safe/unsafe status.
 - The `unsafe-review+` badge message equals `unsuppressed_review_gaps` plus the

@@ -96,15 +96,16 @@ fn render_repo_posture(output: &AnalyzeOutput) -> String {
         out.push_str("No repo-scope unsafe-review cards found.\n\n");
     } else {
         out.push_str(
-            "| ID | Class | Operation family | Operation | Missing evidence | Route | Next action |\n",
+            "| ID | Class | Location | Operation family | Operation | Missing evidence | Route | Next action |\n",
         );
-        out.push_str("|---|---|---|---|---|---|---|\n");
+        out.push_str("|---|---|---|---|---|---|---|---|\n");
         for card in &output.cards {
             let route = repo_primary_route(card);
             out.push_str(&format!(
-                "| `{}` | `{}` | `{}` | `{}` | {} | `{}` | {} |\n",
+                "| `{}` | `{}` | {} | `{}` | `{}` | {} | `{}` | {} |\n",
                 md_cell(&card.id.to_string()),
                 card.class.as_str(),
+                md_cell(&card_location(card)),
                 card.operation.family.as_str(),
                 md_cell(&one_line(&card.operation.expression)),
                 md_cell(&missing_summary(card)),
@@ -118,6 +119,14 @@ fn render_repo_posture(output: &AnalyzeOutput) -> String {
     out.push_str("## Trust boundary\n\n");
     out.push_str("This is static repo posture evidence from unsafe-review cards. It counts open review gaps, not raw unsafe usage, not memory-safety proof, not UB-free status, and not a Miri result unless a witness receipt is attached.\n");
     out
+}
+
+fn card_location(card: &ReviewCard) -> String {
+    format!(
+        "{}:{}",
+        path_display(&card.site.location.file),
+        card.site.location.line
+    )
 }
 
 fn count_by<F>(output: &AnalyzeOutput, mut value_for_card: F) -> BTreeMap<String, usize>
@@ -804,8 +813,9 @@ mod tests {
         assert!(rendered.contains("| `raw_pointer_read` | 1 |"));
         assert!(rendered.contains("## Witness routes"));
         assert!(rendered.contains(
-            "| ID | Class | Operation family | Operation | Missing evidence | Route | Next action |"
+            "| ID | Class | Location | Operation family | Operation | Missing evidence | Route | Next action |"
         ));
+        assert!(rendered.contains("src/lib.rs:8"));
         assert!(rendered.contains("unsafe { ptr.cast::<Header>().read() }"));
         assert!(rendered.contains("Add or expose the local guard"));
         assert!(rendered.contains("## Trust boundary"));
