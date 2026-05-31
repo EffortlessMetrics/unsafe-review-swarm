@@ -5,6 +5,7 @@ what not to do next. Do not put active specs here.
 
 | Handoff | Date | Scope |
 |---|---|---|
+| [Source 0.3.0 publication sync](2026-05-31-source-0.3.0-publication-sync.md) | 2026-05-31 | mirrors source 0.3.0 release metadata, records source publication receipt PR #504, and updates the source-sync checkpoint without importing source badge counts |
 | [Swarm roadmap](2026-05-24-swarm-roadmap.md) | 2026-05-24 | swarm-internal roadmap posture, operating rule, trust-boundary reminders, and active execution pointer |
 | [Post-burst analyzer audit](2026-05-26-post-burst-analyzer-audit.md) | 2026-05-26 | operation-family audit after analyzer/calibration burst, false-positive controls, missing controls, dogfood seeds, and no-promotion boundary |
 | [Source 0.2.1 publication sync](2026-05-26-source-0.2.1-publication-sync.md) | 2026-05-26 | mirrors source 0.2.1 release metadata, records source publication receipt PR #498, and updates the source-sync checkpoint without importing source badge counts |

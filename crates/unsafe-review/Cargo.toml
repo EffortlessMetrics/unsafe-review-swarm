@@ -1,6 +1,6 @@
 [package]
 name = "unsafe-review"
-version = "0.2.1"
+version = "0.3.0"
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -13,8 +13,8 @@ categories = ["command-line-utilities", "development-tools", "development-tools:
 readme = "README.md"
 
 [dependencies]
-unsafe-review-cli = { path = "../unsafe-review-cli", version = "0.2.1" }
-unsafe-review-core = { path = "../unsafe-review-core", version = "0.2.1" }
+unsafe-review-cli = { path = "../unsafe-review-cli", version = "0.3.0" }
+unsafe-review-core = { path = "../unsafe-review-core", version = "0.3.0" }
 
 [dev-dependencies]
 serde_json = "1"
