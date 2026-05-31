@@ -65,6 +65,7 @@ required_core_fixtures = [
   "maybeuninit_assume_init_stale_new_not_guard",
   "maybeuninit_assume_init_read_stale_new_not_guard",
   "maybeuninit_assume_init_ref_stale_new_not_guard",
+  "maybeuninit_assume_init_mut_stale_new_not_guard",
   "maybeuninit_assume_init_shadowed_slot_not_guard",
   "maybeuninit_assume_init_read_shadowed_slot_not_guard",
   "maybeuninit_assume_init_ref_shadowed_slot_not_guard",
@@ -1098,6 +1099,16 @@ expected_hazard = "initialized_memory"
 fixture = "maybeuninit_assume_init_ref_stale_new_not_guard"
 kind = "false_positive_control"
 claim = "MaybeUninit::assume_init_ref rejects stale same-slot MaybeUninit::new evidence after reassignment"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "maybe_uninit_assume_init"
+expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "maybeuninit_assume_init_mut_stale_new_not_guard"
+kind = "false_positive_control"
+claim = "MaybeUninit::assume_init_mut rejects stale same-slot MaybeUninit::new evidence after reassignment"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

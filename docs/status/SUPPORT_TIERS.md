@@ -148,6 +148,9 @@ different slot from discharging `assume_init_ref` initialized-memory evidence.
 evidence through `maybeuninit_assume_init_mut_closed_branch_write_not_guard`,
 rejects closed conditional `MaybeUninit::new` evidence through
 `maybeuninit_assume_init_mut_closed_branch_new_not_guard`,
+keeps `MaybeUninit::new` evidence made stale by reassignment from discharging
+initialized-memory evidence through
+`maybeuninit_assume_init_mut_stale_new_not_guard`,
 and `maybeuninit_assume_init_mut_stale_write_not_guard` keeps a write made
 stale by reassignment from discharging initialized-memory evidence and
 `maybeuninit_assume_init_mut_shadowed_slot_not_guard` keeps a write made stale
