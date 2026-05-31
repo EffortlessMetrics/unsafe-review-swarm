@@ -222,3 +222,36 @@ pub fn collect_context(output: &AnalyzeOutput, id: &CardId) -> Option<String> {
 pub use outcome::OutcomeReport;
 pub use policy_report::PolicyReport;
 pub use receipts::ReceiptAuditReport;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn analysis_mode_strings_cover_every_variant() {
+        assert_eq!(AnalysisMode::Instant.as_str(), "instant");
+        assert_eq!(AnalysisMode::Draft.as_str(), "draft");
+        assert_eq!(AnalysisMode::Ready.as_str(), "ready");
+        assert_eq!(AnalysisMode::Repo.as_str(), "repo");
+    }
+
+    #[test]
+    fn policy_mode_strings_cover_every_variant() {
+        assert_eq!(PolicyMode::Advisory.as_str(), "advisory");
+        assert_eq!(PolicyMode::NoNewDebt.as_str(), "no-new-debt");
+        assert_eq!(PolicyMode::Blocking.as_str(), "blocking");
+    }
+
+    #[test]
+    fn analyze_input_default_is_advisory_diff_draft_with_unchanged_tests() {
+        let input = AnalyzeInput::default();
+
+        assert_eq!(input.root, PathBuf::from("."));
+        assert_eq!(input.scope, Scope::Diff);
+        assert_eq!(input.diff, DiffSource::NoneRepoScan);
+        assert_eq!(input.mode, AnalysisMode::Draft);
+        assert_eq!(input.policy, PolicyMode::Advisory);
+        assert!(input.include_unchanged_tests);
+        assert_eq!(input.max_cards, None);
+    }
+}

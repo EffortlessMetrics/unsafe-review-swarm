@@ -120,3 +120,84 @@ pub struct UnsafeSite {
     pub changed: bool,
     pub snippet: String,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unsafe_site_kind_strings_cover_every_variant() {
+        let cases = [
+            (UnsafeSiteKind::UnsafeBlock, "unsafe_block"),
+            (UnsafeSiteKind::UnsafeFn, "unsafe_fn"),
+            (UnsafeSiteKind::UnsafeTrait, "unsafe_trait"),
+            (UnsafeSiteKind::UnsafeImpl, "unsafe_impl"),
+            (UnsafeSiteKind::UnsafeImplSend, "unsafe_impl_send"),
+            (UnsafeSiteKind::UnsafeImplSync, "unsafe_impl_sync"),
+            (UnsafeSiteKind::ExternBlock, "extern_block"),
+            (UnsafeSiteKind::FfiCall, "ffi_call"),
+            (UnsafeSiteKind::StaticMut, "static_mut"),
+            (UnsafeSiteKind::Operation, "operation"),
+        ];
+
+        for (kind, expected) in cases {
+            assert_eq!(kind.as_str(), expected);
+        }
+    }
+
+    #[test]
+    fn operation_family_strings_cover_every_variant() {
+        let cases = [
+            (OperationFamily::RawPointerDeref, "raw_pointer_deref"),
+            (OperationFamily::RawPointerRead, "raw_pointer_read"),
+            (
+                OperationFamily::RawPointerReadUnaligned,
+                "raw_pointer_read_unaligned",
+            ),
+            (OperationFamily::RawPointerWrite, "raw_pointer_write"),
+            (
+                OperationFamily::RawPointerWriteUnaligned,
+                "raw_pointer_write_unaligned",
+            ),
+            (OperationFamily::PointerArithmetic, "pointer_arithmetic"),
+            (OperationFamily::PtrCopy, "ptr_copy"),
+            (OperationFamily::PtrReplace, "ptr_replace"),
+            (OperationFamily::CopyNonOverlapping, "copy_nonoverlapping"),
+            (OperationFamily::SliceFromRawParts, "slice_from_raw_parts"),
+            (OperationFamily::VecFromRawParts, "vec_from_raw_parts"),
+            (
+                OperationFamily::StrFromUtf8Unchecked,
+                "str_from_utf8_unchecked",
+            ),
+            (
+                OperationFamily::MaybeUninitAssumeInit,
+                "maybe_uninit_assume_init",
+            ),
+            (OperationFamily::VecSetLen, "vec_set_len"),
+            (OperationFamily::Transmute, "transmute"),
+            (OperationFamily::Zeroed, "zeroed"),
+            (OperationFamily::DropInPlace, "drop_in_place"),
+            (OperationFamily::AtomicPointerState, "atomic_pointer_state"),
+            (OperationFamily::UnwrapUnchecked, "unwrap_unchecked"),
+            (
+                OperationFamily::UnreachableUnchecked,
+                "unreachable_unchecked",
+            ),
+            (OperationFamily::UnsafeFnCall, "unsafe_fn_call"),
+            (OperationFamily::BoxFromRaw, "box_from_raw"),
+            (OperationFamily::NonNullUnchecked, "nonnull_unchecked"),
+            (OperationFamily::PinUnchecked, "pin_unchecked"),
+            (OperationFamily::GetUnchecked, "get_unchecked"),
+            (OperationFamily::UnsafeImplSendSync, "unsafe_impl_send_sync"),
+            (OperationFamily::Ffi, "ffi"),
+            (OperationFamily::StaticMut, "static_mut"),
+            (OperationFamily::InlineAsm, "inline_asm"),
+            (OperationFamily::TargetFeature, "target_feature"),
+            (OperationFamily::Unknown, "unknown"),
+        ];
+
+        for (family, expected) in cases {
+            assert_eq!(family.as_str(), expected);
+        }
+    }
+}
