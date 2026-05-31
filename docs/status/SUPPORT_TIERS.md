@@ -143,6 +143,8 @@ different slot from discharging `assume_init_mut` initialized-memory evidence.
 `maybeuninit_assume_init_drop_write_guard`, while
 `maybeuninit_assume_init_drop_stale_write_not_guard` keeps a write made stale by
 reassignment from discharging initialized-memory evidence and
+`maybeuninit_assume_init_drop_shadowed_slot_not_guard` keeps a write made stale
+by shadowing from discharging initialized-memory evidence and
 `maybeuninit_assume_init_drop_other_slot_write_not_guard` keeps a write to a
 different slot from discharging `assume_init_drop` initialized-memory evidence.
 

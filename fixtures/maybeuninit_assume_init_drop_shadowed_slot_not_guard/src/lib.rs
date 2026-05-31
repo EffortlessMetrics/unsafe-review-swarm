@@ -1,0 +1,19 @@
+use core::mem::MaybeUninit;
+
+pub fn drop_shadowed(value: String) {
+    let mut slot = MaybeUninit::<String>::uninit();
+    slot.write(value);
+    let mut slot = MaybeUninit::<String>::uninit();
+    // SAFETY: this fixture checks that shadowed writes do not initialize the current slot.
+    unsafe { slot.assume_init_drop() }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::drop_shadowed;
+
+    #[test]
+    fn mentions_drop_shadowed() {
+        let _ = core::mem::size_of_val(&(drop_shadowed as fn(String)));
+    }
+}
