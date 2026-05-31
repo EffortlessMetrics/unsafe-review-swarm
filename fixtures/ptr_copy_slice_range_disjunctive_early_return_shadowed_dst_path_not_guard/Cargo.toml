@@ -1,0 +1,4 @@
+[package]
+name = "ptr-copy-slice-range-disjunctive-early-return-shadowed-dst-path-not-guard"
+version = "0.1.0"
+edition = "2021"

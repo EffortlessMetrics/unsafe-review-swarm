@@ -241,8 +241,11 @@ required_core_fixtures = [
   "ptr_copy_slice_range_disjunctive_early_return_shadowed_count_not_guard",
   "ptr_copy_slice_range_disjunctive_early_return_reassigned_src_not_guard",
   "ptr_copy_slice_range_disjunctive_early_return_reassigned_src_path_not_guard",
+  "ptr_copy_slice_range_disjunctive_early_return_shadowed_src_path_not_guard",
   "ptr_copy_slice_range_disjunctive_early_return_shadowed_src_not_guard",
   "ptr_copy_slice_range_disjunctive_early_return_reassigned_dst_not_guard",
+  "ptr_copy_slice_range_disjunctive_early_return_reassigned_dst_path_not_guard",
+  "ptr_copy_slice_range_disjunctive_early_return_shadowed_dst_path_not_guard",
   "ptr_copy_slice_range_disjunctive_early_return_shadowed_dst_not_guard",
   "ptr_copy_slice_range_open_branch_reassigned_count_not_guard",
   "ptr_copy_slice_range_open_branch_compound_reassigned_count_not_guard",
@@ -3333,6 +3336,16 @@ expected_operation_family = "ptr_copy"
 expected_hazard = "pointer_validity"
 
 [[cases]]
+fixture = "ptr_copy_slice_range_disjunctive_early_return_shadowed_src_path_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy rejects stale disjunctive invalid-range early-return source path evidence after the source receiver path is shadowed"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
 fixture = "ptr_copy_slice_range_disjunctive_early_return_shadowed_src_not_guard"
 kind = "false_positive_control"
 claim = "ptr::copy rejects stale disjunctive invalid-range early-return source evidence after the source receiver is shadowed"
@@ -3346,6 +3359,26 @@ expected_hazard = "pointer_validity"
 fixture = "ptr_copy_slice_range_disjunctive_early_return_reassigned_dst_not_guard"
 kind = "false_positive_control"
 claim = "ptr::copy rejects stale disjunctive invalid-range early-return destination evidence after the destination receiver is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_disjunctive_early_return_reassigned_dst_path_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy rejects stale disjunctive invalid-range early-return destination path evidence after the destination receiver path is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "ptr_copy_slice_range_disjunctive_early_return_shadowed_dst_path_not_guard"
+kind = "false_positive_control"
+claim = "ptr::copy rejects stale disjunctive invalid-range early-return destination path evidence after the destination receiver path is shadowed"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

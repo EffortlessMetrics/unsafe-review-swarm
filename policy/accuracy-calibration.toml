@@ -459,7 +459,7 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned copy_nonoverlapping valid-range evidence distinguishes same-call
 source and destination length evidence from stale, partial, closed-branch,
-comment-only, compound-stale-count, shadowed-count, shadowed-receiver, and unrelated-length controls in the listed
+comment-only, compound-stale-count, shadowed-count, shadowed-receiver, stale-receiver-path, shadowed-receiver-path, and unrelated-length controls in the listed
 fixtures, while non-overlap remains a separate missing obligation.
 """
 forbidden_claims = [
@@ -606,8 +606,11 @@ fixtures = [
   "ptr_copy_slice_range_disjunctive_early_return_shadowed_count_not_guard",
   "ptr_copy_slice_range_disjunctive_early_return_reassigned_src_not_guard",
   "ptr_copy_slice_range_disjunctive_early_return_reassigned_src_path_not_guard",
+  "ptr_copy_slice_range_disjunctive_early_return_shadowed_src_path_not_guard",
   "ptr_copy_slice_range_disjunctive_early_return_shadowed_src_not_guard",
   "ptr_copy_slice_range_disjunctive_early_return_reassigned_dst_not_guard",
+  "ptr_copy_slice_range_disjunctive_early_return_reassigned_dst_path_not_guard",
+  "ptr_copy_slice_range_disjunctive_early_return_shadowed_dst_path_not_guard",
   "ptr_copy_slice_range_disjunctive_early_return_shadowed_dst_not_guard",
   "ptr_copy_slice_range_open_branch_reassigned_count_not_guard",
   "ptr_copy_slice_range_open_branch_compound_reassigned_count_not_guard",
@@ -642,7 +645,7 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned ptr::copy valid-range evidence distinguishes same-call source and
 destination length evidence from stale, partial, closed-branch, comment-only,
-compound-stale-count, shadowed-count, shadowed-receiver, and unrelated-length
+compound-stale-count, shadowed-count, shadowed-receiver, stale-receiver-path, shadowed-receiver-path, and unrelated-length
 controls in the listed fixtures, while initialized-memory remains a separate
 missing obligation.
 """
