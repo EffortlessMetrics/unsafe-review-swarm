@@ -261,3 +261,15 @@ jobs:
           echo "router_reason=${{ needs.route-rust-small.outputs.router_reason }}"
           echo "router_error=${{ needs.route-rust-small.outputs.router_error }}"
           test "$status" = "success"
+
+  rust-required-result-compat:
+    name: Unsafe Review Rust Result
+    runs-on: ubuntu-latest
+    needs: [rust-small-result]
+    if: always()
+    steps:
+      - name: Mirror routed Rust result for branch protection
+        run: |
+          set -euo pipefail
+          echo "rust_small_result=${{ needs.rust-small-result.result }}"
+          test "${{ needs.rust-small-result.result }}" = "success"
