@@ -2359,6 +2359,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "maybeuninit_assume_init_open_branch_write_guard",
             "maybeuninit_assume_init_open_branch_new_guard",
             "maybeuninit_assume_init_new_guard",
+            "maybeuninit_assume_init_read_new_guard",
             "maybeuninit_assume_init_mut_new_guard",
         ] {
             let output = fixture_output(fixture)?;
