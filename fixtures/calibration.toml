@@ -239,6 +239,7 @@ required_core_fixtures = [
   "copy_nonoverlapping_slice_range_disjunctive_early_return_shadowed_count_not_guard",
   "copy_nonoverlapping_slice_range_disjunctive_early_return_reassigned_src_not_guard",
   "copy_nonoverlapping_slice_range_disjunctive_early_return_reassigned_src_path_not_guard",
+  "copy_nonoverlapping_slice_range_disjunctive_early_return_shadowed_src_path_not_guard",
   "copy_nonoverlapping_slice_range_disjunctive_early_return_shadowed_src_not_guard",
   "copy_nonoverlapping_slice_range_disjunctive_early_return_reassigned_dst_not_guard",
   "copy_nonoverlapping_slice_range_disjunctive_early_return_reassigned_dst_path_not_guard",
@@ -2389,6 +2390,16 @@ expected_hazard = "aliasing_or_provenance"
 fixture = "copy_nonoverlapping_slice_range_disjunctive_early_return_reassigned_src_path_not_guard"
 kind = "false_positive_control"
 claim = "copy_nonoverlapping rejects stale disjunctive invalid-range early-return source path evidence after the source receiver path is reassigned"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "copy_nonoverlapping"
+expected_hazard = "aliasing_or_provenance"
+
+[[cases]]
+fixture = "copy_nonoverlapping_slice_range_disjunctive_early_return_shadowed_src_path_not_guard"
+kind = "false_positive_control"
+claim = "copy_nonoverlapping rejects stale disjunctive invalid-range early-return source path evidence after the source receiver path is shadowed"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
