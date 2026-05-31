@@ -1,0 +1,40 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -0,0 +1,36 @@
++pub struct Buffers<'a> {
++    pub src: &'a [u8],
++    pub dst: &'a mut [u8],
++}
++
++pub fn copy_overlapping_checked<'a>(
++    buffers: &mut Buffers<'a>,
++    count: usize,
++    fallback: &'a [u8],
++) {
++    if count > buffers.src.len() || count > buffers.dst.len() {
++        return;
++    }
++    buffers.src = fallback;
++    // SAFETY: fixture checks that stale disjunctive early-return source path
++    // guards are not range evidence for overlapping copy.
++    unsafe { core::ptr::copy(buffers.src.as_ptr(), buffers.dst.as_mut_ptr(), count) }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::{copy_overlapping_checked, Buffers};
++
++    #[test]
++    fn copies_from_reassigned_source_path() {
++        let original = [9_u8, 9, 9, 9];
++        let fallback = [1_u8, 2, 3, 4];
++        let mut dst = [0_u8; 4];
++        let mut buffers = Buffers {
++            src: &original,
++            dst: &mut dst,
++        };
++        copy_overlapping_checked(&mut buffers, fallback.len(), &fallback);
++        assert_eq!(&*buffers.dst, fallback.as_slice());
++    }
++}
