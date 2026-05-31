@@ -1,0 +1,79 @@
+[
+    {
+        "id":  "UR-maybeuninit-assume-init-mut-write-guard-fixture-src-lib-rs-mutate-written-operation-maybe_uninit_assume_init-assume-init-mut-cae9f6e6b524-initialized_memory-c1",
+        "class":  "guarded_unwitnessed",
+        "priority":  "medium",
+        "confidence":  "medium",
+        "site":  {
+                     "file":  "src/lib.rs",
+                     "line":  7,
+                     "column":  5,
+                     "kind":  "operation",
+                     "owner":  "mutate_written",
+                     "visibility":  "private",
+                     "public_api_surface":  false,
+                     "snippet":  "let value = unsafe { slot.assume_init_mut() };"
+                 },
+        "operation":  "let value = unsafe { slot.assume_init_mut() };",
+        "operation_family":  "maybe_uninit_assume_init",
+        "hazards":  [
+                        "initialized_memory",
+                        "invalid_value"
+                    ],
+        "obligations":  [
+                            "all fields/elements are initialized and valid before `assume_init`"
+                        ],
+        "obligation_evidence":  [
+                                    {
+                                        "key":  "initialized",
+                                        "description":  "all fields/elements are initialized and valid before `assume_init`",
+                                        "contract":  {
+                                                         "present":  true,
+                                                         "state":  "present",
+                                                         "summary":  "Nearby `SAFETY:` comment was detected"
+                                                     },
+                                        "discharge":  {
+                                                          "present":  true,
+                                                          "state":  "present",
+                                                          "summary":  "MaybeUninit initialization evidence was detected before assume_init"
+                                                      },
+                                        "reach":  {
+                                                      "present":  true,
+                                                      "state":  "present",
+                                                      "summary":  "1 related test file(s) mention owner `mutate_written`"
+                                                  },
+                                        "witness":  {
+                                                        "present":  false,
+                                                        "state":  "missing",
+                                                        "summary":  "No imported witness receipt was found"
+                                                    }
+                                    }
+                                ],
+        "contract":  "Nearby `SAFETY:` comment was detected",
+        "discharge":  "All inferred safety obligations have visible local discharge evidence",
+        "reach":  "1 related test file(s) mention owner `mutate_written`",
+        "witness":  "No imported witness receipt was found",
+        "witness_routes":  [
+                               {
+                                   "kind":  "miri",
+                                   "reason":  "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+                                   "command":  "cargo +nightly miri test mutate_written",
+                                   "required":  false
+                               },
+                               {
+                                   "kind":  "cargo-careful",
+                                   "reason":  "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+                                   "command":  "cargo +nightly careful test mutate_written",
+                                   "required":  false
+                               }
+                           ],
+        "missing":  [
+                        "No witness receipt imported for this card"
+                    ],
+        "next_action":  "Attach a focused Miri or cargo-careful witness receipt or mark the static limitation explicitly.",
+        "verify_commands":  [
+                                "cargo +nightly miri test mutate_written",
+                                "cargo +nightly careful test mutate_written"
+                            ]
+    }
+]
