@@ -2285,6 +2285,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "copy_nonoverlapping_slice_range_shadowed_dst_not_guard",
             "ptr_copy_slice_range_open_branch_reassigned_count_not_guard",
             "ptr_copy_slice_range_open_branch_reassigned_dst_not_guard",
+            "ptr_copy_slice_range_open_branch_reassigned_src_path_not_guard",
             "ptr_copy_slice_range_disjunctive_early_return_reassigned_count_not_guard",
             "ptr_copy_slice_range_disjunctive_early_return_compound_reassigned_count_not_guard",
             "ptr_copy_slice_range_disjunctive_early_return_shadowed_count_not_guard",
