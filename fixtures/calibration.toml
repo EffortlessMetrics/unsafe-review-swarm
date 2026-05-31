@@ -46,6 +46,7 @@ required_core_fixtures = [
   "maybeuninit_assume_init_drop_closed_branch_write_not_guard",
   "maybeuninit_assume_init_closed_branch_new_not_guard",
   "maybeuninit_assume_init_read_closed_branch_new_not_guard",
+  "maybeuninit_assume_init_ref_closed_branch_new_not_guard",
   "maybeuninit_assume_init_new_guard",
   "maybeuninit_assume_init_mut_new_guard",
   "maybeuninit_assume_init_other_slot_write_not_guard",
@@ -903,6 +904,16 @@ expected_hazard = "initialized_memory"
 fixture = "maybeuninit_assume_init_read_closed_branch_new_not_guard"
 kind = "false_positive_control"
 claim = "MaybeUninit::assume_init_read rejects closed conditional MaybeUninit::new evidence before the assume_init_read operation"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "maybe_uninit_assume_init"
+expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "maybeuninit_assume_init_ref_closed_branch_new_not_guard"
+kind = "false_positive_control"
+claim = "MaybeUninit::assume_init_ref rejects closed conditional MaybeUninit::new evidence before the assume_init_ref operation"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
