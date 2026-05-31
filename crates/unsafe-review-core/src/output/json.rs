@@ -482,6 +482,7 @@ mod tests {
         "maybeuninit_assume_init_closed_branch_new_not_guard",
         "maybeuninit_assume_init_read_closed_branch_new_not_guard",
         "maybeuninit_assume_init_ref_closed_branch_new_not_guard",
+        "maybeuninit_assume_init_mut_closed_branch_new_not_guard",
         "maybeuninit_assume_init_other_slot_write_not_guard",
         "maybeuninit_assume_init_stale_write_not_guard",
         "maybeuninit_assume_init_stale_field_write_not_guard",
