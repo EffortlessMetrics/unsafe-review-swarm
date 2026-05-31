@@ -16,6 +16,7 @@ If you are new to the repository, read in this order:
 | PR review lane | `UNSAFE-REVIEW-SPEC-0011` | `UNSAFE-REVIEW-SPEC-0019`, active goal, implementation plan |
 | Analyzer evidence change | `UNSAFE-REVIEW-SPEC-0004`, `0005`, `0006` | operation-family appendix, `UNSAFE-REVIEW-SPEC-0016` |
 | Witness routing/receipts | `UNSAFE-REVIEW-SPEC-0008`, `0009` | `UNSAFE-REVIEW-SPEC-0011`, `UNSAFE-REVIEW-SPEC-0019` |
+| Manual candidate ledger | `UNSAFE-REVIEW-SPEC-0027` | `UNSAFE-REVIEW-SPEC-0002`, `0008`, `0009`, `0013` |
 | First-run UX / first-pr cockpit | `UNSAFE-REVIEW-SPEC-0019` | `UNSAFE-REVIEW-SPEC-0011`, `0012`, `0013` |
 | LSP / IDE projection | `UNSAFE-REVIEW-SPEC-0012` | `UNSAFE-REVIEW-SPEC-0013`, `UNSAFE-REVIEW-SPEC-0019` |
 | Agent packet projection | `UNSAFE-REVIEW-SPEC-0013` | `UNSAFE-REVIEW-SPEC-0006`, `0012`, `0019` |
