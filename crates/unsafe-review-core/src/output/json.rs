@@ -500,6 +500,7 @@ mod tests {
         "maybeuninit_assume_init_read_mutslot_new_not_guard",
         "maybeuninit_assume_init_ref_mutslot_new_not_guard",
         "maybeuninit_assume_init_mut_mutslot_new_not_guard",
+        "maybeuninit_assume_init_drop_mutslot_new_not_guard",
         "maybeuninit_assume_init_partial_field_not_guard",
         "maybeuninit_assume_init_partial_array_not_guard",
         "maybeuninit_assume_init_read",
