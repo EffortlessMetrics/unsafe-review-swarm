@@ -16,11 +16,11 @@
 | Editor extension MVP | publishable saved-lsp viewer extension scope and non-goals | `docs/editor/extension-mvp.md` |
 | Editor marketplace publication | owner pre-publication checklist and manual publish workflow | `docs/editor/marketplace-publication.md`, `.github/workflows/editor-publish.yml` |
 | Proposals | why a workstream exists | `docs/proposals/` |
-| Releases | release targets, readiness notes, and publication receipts | `docs/releases/` |
+| Releases | release targets, readiness notes, publication receipts, and crates.io patch runbooks | `docs/releases/`, `docs/releases/CRATES_IO_PATCH_RELEASE.md` |
 | Specs | behavior contracts | `docs/specs/` |
 | ADRs | durable architecture decisions | `docs/adr/` |
 | Templates | reusable proposal, spec, plan, closeout, swarm digest, and publication receipt skeletons | `docs/templates/` |
-| Contribution process | swarm-to-main routing and source PR requirements | `docs/contributing/SWARM_TO_MAIN.md` |
+| Contribution process | swarm-to-main routing, source PR requirements, and source history catch-up | `docs/contributing/SWARM_TO_MAIN.md`, `docs/contributing/SOURCE_HISTORY_CATCHUP.md` |
 | Spec style | durable source-of-truth ownership boundaries and artifact role split | `docs/spec-style.md` |
 | Spec rails guide | contributor workflow for source-of-truth rails and tool-state boundaries | `docs/contributing/spec-rails.md` |
 | Implementation plans | PR-sized sequence and proof commands | `plans/` |

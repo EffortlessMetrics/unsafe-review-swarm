@@ -5,9 +5,18 @@ what not to do next. Do not put active specs here.
 
 | Handoff | Date | Scope |
 |---|---|---|
+| [Source 0.3.1 publication sync](2026-05-31-source-0.3.1-publication-sync.md) | 2026-05-31 | mirrors source 0.3.1 README/image hotfix release metadata, records source publication receipt PR #507, source history repair PR #505, and updates the source-sync checkpoint without importing source badge counts |
+| [Release 0.3.1 publication receipt](2026-05-31-release-0.3.1-publication.md) | 2026-05-31 | published 0.3.1 crates.io README/image hotfix, docs.rs checks, install smoke, first-pr full bundle smoke, explain/context/support smoke, tag, and trust boundary |
+| [Release 0.3.1 preparation](2026-05-31-release-0.3.1-preparation.md) | 2026-05-31 | crates.io README/image package-surface hotfix after source history repair, synchronized 0.3.1 version bump, validation checklist, and manual publish order |
+| [Swarm history catch-up](2026-05-31-swarm-history-catchup.md) | 2026-05-31 | source history-preserving merge from unsafe-review-swarm/main; must be merge-committed, not squashed |
+| [Source history catch-up process](2026-05-31-source-history-catchup-process.md) | 2026-05-31 | process docs for source history repair, crates.io patch release preconditions, and the rule that history repair precedes package hotfix publication |
 | [Source 0.3.0 publication sync](2026-05-31-source-0.3.0-publication-sync.md) | 2026-05-31 | mirrors source 0.3.0 release metadata, records source publication receipt PR #504, and updates the source-sync checkpoint without importing source badge counts |
+| [Release 0.3.0 publication receipt](2026-05-31-release-0.3.0-publication.md) | 2026-05-31 | published 0.3.0 crates, docs.rs checks, install smoke, first-pr full bundle smoke, explain/context/support smoke, badge smoke, tag, and trust boundary |
+| [Release 0.3.0 preparation](2026-05-31-release-0.3.0-preparation.md) | 2026-05-31 | advisory review cockpit release preparation, version bumps, full review-kit smoke, explain/context/support smoke, dry-run limits, and manual publish order |
 | [Swarm roadmap](2026-05-24-swarm-roadmap.md) | 2026-05-24 | swarm-internal roadmap posture, operating rule, trust-boundary reminders, and active execution pointer |
 | [Post-burst analyzer audit](2026-05-26-post-burst-analyzer-audit.md) | 2026-05-26 | operation-family audit after analyzer/calibration burst, false-positive controls, missing controls, dogfood seeds, and no-promotion boundary |
+| [Release 0.2.1 publication receipt](2026-05-26-release-0.2.1-publication.md) | 2026-05-26 | published 0.2.1 crates, install smoke, first-pr artifact smoke, explain/support smoke, badge smoke, docs.rs checks, tag, and trust boundary |
+| [Release 0.2.1 preparation](2026-05-26-release-0.2.1-preparation.md) | 2026-05-26 | patch release preparation for public presentation, package-visible badge semantics, crate version bumps, dry-run limits, and manual publish order |
 | [Source 0.2.1 publication sync](2026-05-26-source-0.2.1-publication-sync.md) | 2026-05-26 | mirrors source 0.2.1 release metadata, records source publication receipt PR #498, and updates the source-sync checkpoint without importing source badge counts |
 | [Source badge and README promotion sync](2026-05-26-source-badge-readme-promotion-sync.md) | 2026-05-26 | acknowledges source badge/README promotion PRs #492-#496, aligns remaining swarm README alt text, and updates the source-sync checkpoint |
 | [Source Dependabot sync](2026-05-26-source-dependabot-sync.md) | 2026-05-26 | mirrors source Dependabot PRs #490/#491 into swarm and updates the source-sync checkpoint |

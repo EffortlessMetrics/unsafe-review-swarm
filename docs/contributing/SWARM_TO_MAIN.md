@@ -147,8 +147,14 @@ A swarm slice is eligible for source promotion only after it has:
 - no automatic comments,
 - no blocking policy by default.
 
-Promotion should recreate or cherry-pick the exact behavior onto current source
-`main`. Do not merge a stale swarm branch directly into source.
+Normal promotion should recreate or cherry-pick the exact behavior onto current
+source `main`. Do not merge a stale swarm branch directly into source for
+routine promotion.
+
+Exceptional source-history repair is different. If source is structurally behind
+swarm and missing source-relevant reviewed history or tree state, use
+`docs/contributing/SOURCE_HISTORY_CATCHUP.md`, preserve swarm ancestry, and
+require merge-commit mode.
 
 ## Source PR naming
 
@@ -179,6 +185,29 @@ that records:
 
 Promotion batches should stay reviewable. Prefer several narrow source PRs over
 one large release-time cutover.
+
+## History-preserving catch-up
+
+Most source promotions should stay narrow and curated. When source has drifted
+hundreds of reviewed swarm commits behind, or when source is missing
+product-relevant swarm commits that already landed in the workbench, use the
+history catch-up runbook instead of another curated copy or squash promotion.
+
+A history catch-up PR must:
+
+- merge `unsafe-review-swarm/main` into `unsafe-review/main` with a real merge,
+- preserve swarm PR-squashed commits as ancestry,
+- resolve conflicts explicitly,
+- verify key source-relevant swarm commits are reachable,
+- explain any remaining source/swarm tree differences,
+- be merged with a merge commit.
+
+Do not squash a history catch-up PR. If merge commits are blocked by repository
+settings or branch policy, stop and fix that policy friction before merging.
+
+An `ours` merge is only for pure ancestry bookkeeping when source tree state is
+already known-equivalent. It is not valid when source is missing reviewed swarm
+tree changes that need to land in source.
 
 ## Standing boundaries
 
