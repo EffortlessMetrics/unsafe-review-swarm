@@ -205,17 +205,21 @@ fn context_slice(lines: &[&str], start: usize, end: usize) -> Vec<String> {
         .collect()
 }
 
+#[derive(Clone, Debug)]
+struct StringDetectionState {
+    raw_hashes: Option<usize>,
+    escaped: bool,
+}
+
 #[derive(Default)]
 struct LineCommentState {
     block_depth: usize,
+    string: Option<StringDetectionState>,
 }
 
 fn line_for_text_detection(line: &str, state: &mut LineCommentState) -> String {
     let mut out = String::with_capacity(line.len());
     let mut chars = line.chars().peekable();
-    let mut in_string = false;
-    let mut string_hashes = 0usize;
-    let mut escaped = false;
 
     while let Some(ch) = chars.next() {
         if state.block_depth > 0 {
@@ -229,21 +233,22 @@ fn line_for_text_detection(line: &str, state: &mut LineCommentState) -> String {
             continue;
         }
 
-        if in_string {
-            if string_hashes == 0 {
-                if escaped {
-                    escaped = false;
-                } else if ch == '\\' {
-                    escaped = true;
-                } else if ch == '"' {
-                    in_string = false;
-                    out.push('"');
+        if let Some(string) = &mut state.string {
+            let mut closed = false;
+            if let Some(raw_hashes) = string.raw_hashes {
+                if ch == '"' && raw_string_hashes_at_end(&mut chars, raw_hashes) {
+                    closed = true;
                 }
-                continue;
+            } else if string.escaped {
+                string.escaped = false;
+            } else if ch == '\\' {
+                string.escaped = true;
+            } else if ch == '"' {
+                closed = true;
             }
 
-            if ch == '"' && raw_string_hashes_at_end(&mut chars, string_hashes) {
-                in_string = false;
+            if closed {
+                state.string = None;
                 out.push('"');
             }
             continue;
@@ -257,6 +262,10 @@ fn line_for_text_detection(line: &str, state: &mut LineCommentState) -> String {
             let _ = chars.next();
             continue;
         }
+        if ch == '\'' && consume_char_literal(&mut chars) {
+            out.push('\'');
+            continue;
+        }
         if ch == 'r'
             && let Some(hashes) = raw_string_hashes_at_start(&mut chars)
         {
@@ -264,15 +273,18 @@ fn line_for_text_detection(line: &str, state: &mut LineCommentState) -> String {
                 let _ = chars.next();
             }
             let _ = chars.next();
-            in_string = true;
-            string_hashes = hashes;
+            state.string = Some(StringDetectionState {
+                raw_hashes: Some(hashes),
+                escaped: false,
+            });
             out.push('"');
             continue;
         }
         if ch == '"' {
-            in_string = true;
-            string_hashes = 0;
-            escaped = false;
+            state.string = Some(StringDetectionState {
+                raw_hashes: None,
+                escaped: false,
+            });
             out.push('"');
             continue;
         }
@@ -280,6 +292,33 @@ fn line_for_text_detection(line: &str, state: &mut LineCommentState) -> String {
     }
 
     out
+}
+
+fn consume_char_literal<I>(chars: &mut std::iter::Peekable<I>) -> bool
+where
+    I: Iterator<Item = char> + Clone,
+{
+    let mut clone = chars.clone();
+    let Some(first) = clone.next() else {
+        return false;
+    };
+    if first == '\n' || first == '\r' {
+        return false;
+    }
+    if first == '\\' {
+        let Some(escaped) = clone.next() else {
+            return false;
+        };
+        if escaped == '\n' || escaped == '\r' {
+            return false;
+        }
+    }
+    if clone.next() != Some('\'') {
+        return false;
+    }
+
+    while chars.next() != Some('\'') {}
+    true
 }
 
 fn raw_string_hashes_at_start<I>(chars: &mut std::iter::Peekable<I>) -> Option<usize>
@@ -558,13 +597,31 @@ fn contains_call_name(line: &str, name: &str) -> bool {
 }
 
 fn unsafe_block_contains_call(line: &str) -> bool {
-    let Some((_before, after_unsafe)) = line.split_once("unsafe") else {
+    let Some(after_unsafe) = unsafe_keyword_tail(line) else {
         return false;
     };
     let Some((_before_block, after_open)) = after_unsafe.split_once('{') else {
         return false;
     };
     after_open.contains('(') && after_open.contains(')')
+}
+
+fn unsafe_keyword_tail(line: &str) -> Option<&str> {
+    let mut cursor = line;
+    while let Some(pos) = cursor.find("unsafe") {
+        let before = cursor[..pos].chars().next_back();
+        let after = &cursor[pos + "unsafe".len()..];
+        let starts_on_boundary = before.is_none_or(|ch| !is_ident_continue(ch));
+        let ends_on_boundary = after.chars().next().is_none_or(|ch| !is_ident_continue(ch));
+        if starts_on_boundary && ends_on_boundary {
+            return Some(after);
+        }
+        cursor = &after[after
+            .char_indices()
+            .next()
+            .map_or(after.len(), |(idx, ch)| idx + ch.len_utf8())..];
+    }
+    None
 }
 
 fn call_suffix(after_name: &str) -> bool {
@@ -1432,6 +1489,22 @@ mod tests {
         assert_eq!(
             detect_site(extern_line.trim()),
             Some((UnsafeSiteKind::ExternBlock, OperationFamily::Ffi))
+        );
+    }
+
+    #[test]
+    fn text_detection_ignores_unsafe_substrings_in_safe_identifiers() {
+        assert_eq!(
+            detect_site("let output = unsafe_review_core::analyze(AnalyzeInput { root, scope })?;"),
+            None
+        );
+        assert_eq!(
+            detect_site("after_unsafe.split_once('{').map(|(_open, after)| after)"),
+            None
+        );
+        assert_eq!(
+            detect_site("unsafe { ffi::call(ptr) }"),
+            Some((UnsafeSiteKind::Operation, OperationFamily::UnsafeFnCall))
         );
     }
 
@@ -2376,6 +2449,71 @@ impl<T> Tagged<T> {\n\
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert!(sites.is_empty(), "unexpected sites: {sites:#?}");
         Ok(())
+    }
+
+    #[test]
+    fn scan_file_ignores_multiline_string_literal_unsafe_text() -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "pub fn fixture_text() -> (&'static str, &'static str) {\n    let raw = r#\"\n        pub unsafe fn fake_api(ptr: *const u8) -> u8 {\n            unsafe { core::ptr::read(ptr) }\n        }\n    \"#;\n    let cooked = \"\n        unsafe { core::mem::transmute::<u32, i32>(value) }\n    \";\n    (raw, cooked)\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+
+        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(sites.is_empty(), "unexpected sites: {sites:#?}");
+        Ok(())
+    }
+
+    #[test]
+    fn scan_file_does_not_report_detector_literal_matchers() -> Result<(), String> {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let sites = scan_file(&root, &PathBuf::from("src/analysis/scanner.rs"), None, true)?;
+
+        assert!(
+            sites.iter().all(|site| {
+                !(site.site.owner.as_deref() == Some("detect_site")
+                    && site.site.snippet.starts_with("if line.contains("))
+            }),
+            "detector literal matchers should not be reported: {sites:#?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn scan_file_ignores_unsafe_words_inside_contains_string_literals() -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "pub fn detector(line: &str) -> bool {\n    if line.contains(\"unsafe impl\") { return true; }\n    line.contains(\"ptr::read\")\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+
+        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(sites.is_empty(), "unexpected sites: {sites:#?}");
+        Ok(())
+    }
+
+    #[test]
+    fn text_detection_strips_inline_string_literals() {
+        let mut state = LineCommentState::default();
+
+        assert_eq!(
+            line_for_text_detection("if line.contains(\"unsafe impl\") {", &mut state),
+            "if line.contains(\"\") {"
+        );
+        assert_eq!(
+            syntax_detection_text("line.contains ( \"ptr::read\" )"),
+            "line.contains( \"\" )"
+        );
     }
 
     #[test]

@@ -58,6 +58,9 @@ additional repo-contract fields remain advisory projection metadata:
 - `unsafe-review.json` reports the numeric open-gap count as `<n>`
 - `unsafe-review-plus.json` reports the numeric repair-plus-quality count as
   `<open_actionable_gaps + contract_missing + guard_missing + guarded_unwitnessed>`
+  and exposes the `contract_missing`, `guard_missing`, and
+  `guarded_unwitnessed` components in its `counts` object so the aggregate is
+  auditable without re-running analysis.
 
 Badges count unresolved review evidence. They never claim the repository is
 safe, UB-free, Miri-clean, or policy-compliant.
@@ -94,7 +97,8 @@ Badge meanings are fixed:
 
 - `unsafe-review`: open unsafe-review gap count
 - `unsafe-review+`: open unsafe-review gap count plus missing-or-weak evidence
-  findings
+  findings, with component counts for contract-missing, guard-missing, and
+  guarded-unwitnessed evidence quality signals
 
 Badges must never imply that the repo is sound, memory-safe, UB-free,
 Miri-clean, verified, all clear, policy-ready, or that any unsafe site executed.
@@ -129,6 +133,9 @@ the current `unsafe-review badges` repo projection.
   expressions and next actions, and the trust boundary.
 - Badge JSON for a fixture reports open unsafe-review gaps rather than raw
   unsafe count or safe/unsafe status.
+- The `unsafe-review+` badge message equals `unsuppressed_review_gaps` plus the
+  `evidence_quality_contract_missing`, `evidence_quality_guard_missing`, and
+  `evidence_quality_guarded_unwitnessed` component counts.
 - Outcome comparison between a no-card snapshot and a one-card snapshot reports
   one `new` card and preserves the static-review trust boundary.
 - Outcome JSON includes `schema_version`, deterministic `before_id` and
