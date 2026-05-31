@@ -2353,6 +2353,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
         for fixture in [
             "maybeuninit_assume_init_write_guard",
             "maybeuninit_assume_init_read_write_guard",
+            "maybeuninit_assume_init_ref_write_guard",
             "maybeuninit_assume_init_open_branch_write_guard",
             "maybeuninit_assume_init_open_branch_new_guard",
             "maybeuninit_assume_init_new_guard",
