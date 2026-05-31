@@ -1,0 +1,23 @@
+use core::mem::MaybeUninit;
+
+pub fn drop_new_inside_branch(init: bool) -> bool {
+    if init {
+        let mut slot = MaybeUninit::new(String::from("initialized"));
+        // SAFETY: this branch creates the initialized slot before
+        // assume_init_drop.
+        unsafe { slot.assume_init_drop() };
+        true
+    } else {
+        false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::drop_new_inside_branch;
+
+    #[test]
+    fn mentions_drop_new_inside_branch() {
+        let _ = stringify!(drop_new_inside_branch);
+    }
+}
