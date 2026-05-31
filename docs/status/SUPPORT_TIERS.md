@@ -140,6 +140,9 @@ rejects closed conditional `MaybeUninit::new` evidence through
 keeps `MaybeUninit::new` evidence made stale by reassignment from discharging
 initialized-memory evidence through
 `maybeuninit_assume_init_ref_stale_new_not_guard`,
+keeps prefixed-slot `MaybeUninit::new` evidence from discharging
+initialized-memory evidence through
+`maybeuninit_assume_init_ref_mutslot_new_not_guard`,
 and `maybeuninit_assume_init_ref_stale_write_not_guard` keeps a write made
 stale by reassignment from discharging initialized-memory evidence and
 `maybeuninit_assume_init_ref_shadowed_slot_not_guard` keeps a write made stale
