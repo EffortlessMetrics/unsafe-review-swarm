@@ -73,13 +73,19 @@ pub(super) fn build_card(
         priority = Priority::Low;
     }
 
-    let next_action = NextAction {
-        summary: super::next_action_summary(
+    let next_action_summary = if is_js_buffer_reentry_heuristic(&scanned_site.operation.expression)
+    {
+        "JS-backed buffer descriptor is captured before a possible JS reentry point and materialized afterward; parse options before capture or re-fetch/copy bytes after reentry, then attach a focused sanitizer/runtime receipt if available.".to_string()
+    } else {
+        super::next_action_summary(
             &class,
             scanned_site.operation.family.as_str(),
             scanned_site.site.public_api_surface,
             &routes,
-        ),
+        )
+    };
+    let next_action = NextAction {
+        summary: next_action_summary,
         verify_commands,
     };
 
@@ -109,4 +115,8 @@ pub(super) fn build_card(
         next_action,
         related_tests,
     }
+}
+
+fn is_js_buffer_reentry_heuristic(expression: &str) -> bool {
+    expression.contains("JS-backed buffer descriptor captured before possible JS reentry")
 }

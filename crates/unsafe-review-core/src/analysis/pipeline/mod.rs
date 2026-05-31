@@ -2120,6 +2120,124 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn js_buffer_reentry_after_descriptor_capture_emits_advisory_card() -> Result<(), String> {
+        let output = temp_source_output(
+            "unsafe-review-js-buffer-reentry",
+            r#"
+pub struct JSValue;
+pub struct GlobalObject;
+pub struct Options;
+pub struct StringOrBuffer;
+
+impl StringOrBuffer {
+    pub fn from_js(_global: &mut GlobalObject, _value: JSValue) -> Result<Self, ()> {
+        Ok(Self)
+    }
+
+    pub fn byte_slice(&self) -> &[u8] {
+        &[]
+    }
+}
+
+impl Options {
+    pub fn get(&self, _global: &mut GlobalObject, _name: &str) -> Result<i32, ()> {
+        Ok(1)
+    }
+}
+
+pub fn zstd_sync(
+    global: &mut GlobalObject,
+    arg0: JSValue,
+    options: Options,
+) -> Result<usize, ()> {
+    let input = StringOrBuffer::from_js(global, arg0)?;
+    let level = options.get(global, "level")?;
+    native_compress(&input, level)
+}
+
+fn native_compress(input: &StringOrBuffer, level: i32) -> Result<usize, ()> {
+    let bytes = input.byte_slice();
+    Ok(bytes.len() + level as usize)
+}
+"#,
+        )?;
+        let card = single_card("js_buffer_reentry", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::UnsafeFnCall);
+        assert_eq!(card.class, ReviewClass::ContractMissing);
+        assert_eq!(card.site.owner.as_deref(), Some("zstd_sync"));
+        assert!(
+            card.operation
+                .expression
+                .contains("JS-backed buffer descriptor")
+        );
+        assert!(
+            card.operation
+                .expression
+                .contains("StringOrBuffer::from_js")
+        );
+        assert!(card.operation.expression.contains("options.get"));
+        assert!(card.operation.expression.contains("native_compress"));
+        assert!(
+            card.next_action
+                .summary
+                .contains("parse options before capture")
+        );
+        assert!(
+            card.routes
+                .iter()
+                .any(|route| route.kind == WitnessKind::HumanDeepReview)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn js_buffer_reentry_heuristic_respects_capture_before_reentry_order() -> Result<(), String> {
+        let output = temp_source_output(
+            "unsafe-review-js-buffer-reentry-negative",
+            r#"
+pub struct JSValue;
+pub struct GlobalObject;
+pub struct Options;
+pub struct StringOrBuffer;
+
+impl StringOrBuffer {
+    pub fn from_js(_global: &mut GlobalObject, _value: JSValue) -> Result<Self, ()> {
+        Ok(Self)
+    }
+
+    pub fn byte_slice(&self) -> &[u8] {
+        &[]
+    }
+}
+
+impl Options {
+    pub fn get(&self, _global: &mut GlobalObject, _name: &str) -> Result<i32, ()> {
+        Ok(1)
+    }
+}
+
+pub fn zstd_sync(
+    global: &mut GlobalObject,
+    arg0: JSValue,
+    options: Options,
+) -> Result<usize, ()> {
+    let level = options.get(global, "level")?;
+    let input = StringOrBuffer::from_js(global, arg0)?;
+    let bytes = input.byte_slice();
+    Ok(bytes.len() + level as usize)
+}
+"#,
+        )?;
+
+        assert!(
+            output.cards.is_empty(),
+            "parsing options before descriptor capture should not trigger the reentry heuristic"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn vec_from_raw_parts_uses_vec_operation_family() -> Result<(), String> {
         let output = fixture_output("vec_from_raw_parts")?;
         let card = single_card("vec_from_raw_parts", &output)?;
@@ -3788,6 +3906,36 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             ));
         }
         Ok(&output.cards[0])
+    }
+
+    fn temp_source_output(prefix: &str, source: &str) -> Result<AnalyzeOutput, String> {
+        let root = unique_temp_dir(prefix)?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp fixture failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"js-buffer-reentry-fixture\"\nversion = \"0.0.0\"\nedition = \"2021\"\n",
+        )
+        .map_err(|err| format!("write temp Cargo.toml failed: {err}"))?;
+        fs::write(root.join("src/lib.rs"), source)
+            .map_err(|err| format!("write temp source failed: {err}"))?;
+
+        let output = analyze(AnalyzeInput {
+            root: root.clone(),
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: None,
+        });
+        let cleanup =
+            fs::remove_dir_all(&root).map_err(|err| format!("remove temp fixture failed: {err}"));
+        match (output, cleanup) {
+            (Ok(output), Ok(())) => Ok(output),
+            (Err(err), _) => Err(err),
+            (Ok(_), Err(err)) => Err(err),
+        }
     }
 
     fn obligation_discharge_present(card: &ReviewCard, key: &str) -> bool {
