@@ -1,0 +1,4 @@
+[package]
+name = "copy-nonoverlapping-slice-range-disjunctive-early-return-reassigned-src-path-not-guard"
+version = "0.1.0"
+edition = "2021"
