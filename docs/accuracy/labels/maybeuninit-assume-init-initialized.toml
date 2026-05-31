@@ -221,6 +221,20 @@ label_source = "fixture_golden"
 rationale = "A same-slot MaybeUninit::new binding in the same open branch as assume_init_ref is narrow initialized-memory evidence, leaving only witness evidence missing."
 
 [[samples]]
+id = "maybeuninit-assume-init-mut-open-branch-new-initialized"
+fixture = "maybeuninit_assume_init_mut_open_branch_new_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "maybe_uninit_assume_init"
+expected_hazard = "initialized_memory"
+expected_obligation_key = "initialized"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-slot MaybeUninit::new binding in the same open branch as assume_init_mut is narrow initialized-memory evidence, leaving only witness evidence missing."
+
+[[samples]]
 id = "maybeuninit-assume-init-closed-branch-write-not-initialized"
 fixture = "maybeuninit_assume_init_closed_branch_write_not_guard"
 kind = "false_positive_control"

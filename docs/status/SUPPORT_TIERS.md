@@ -157,7 +157,9 @@ by shadowing from discharging initialized-memory evidence and
 different slot from discharging `assume_init_ref` initialized-memory evidence.
 `MaybeUninit::assume_init_mut` pins same-slot `write` evidence through
 `maybeuninit_assume_init_mut_write_guard`, pins same-slot `MaybeUninit::new`
-evidence through `maybeuninit_assume_init_mut_method_new_guard`, rejects closed conditional write
+evidence through `maybeuninit_assume_init_mut_method_new_guard`, pins
+open-branch `MaybeUninit::new` evidence through
+`maybeuninit_assume_init_mut_open_branch_new_guard`, rejects closed conditional write
 evidence through `maybeuninit_assume_init_mut_closed_branch_write_not_guard`,
 rejects closed conditional `MaybeUninit::new` evidence through
 `maybeuninit_assume_init_mut_closed_branch_new_not_guard`,
