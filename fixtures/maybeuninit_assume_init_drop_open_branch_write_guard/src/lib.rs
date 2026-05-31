@@ -1,0 +1,23 @@
+use core::mem::MaybeUninit;
+
+pub fn drop_write_inside_branch(init: bool) -> bool {
+    let mut slot = MaybeUninit::<String>::uninit();
+    if init {
+        slot.write(String::from("initialized"));
+        // SAFETY: this branch writes the slot before assume_init_drop.
+        unsafe { slot.assume_init_drop() };
+        true
+    } else {
+        false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::drop_write_inside_branch;
+
+    #[test]
+    fn mentions_drop_write_inside_branch() {
+        let _ = stringify!(drop_write_inside_branch);
+    }
+}
