@@ -750,6 +750,7 @@ fixtures = [
   "maybeuninit_assume_init_new_guard",
   "maybeuninit_assume_init_read_new_guard",
   "maybeuninit_assume_init_ref_new_guard",
+  "maybeuninit_assume_init_mut_method_new_guard",
   "maybeuninit_assume_init_mut_new_guard",
   "maybeuninit_assume_init_other_slot_write_not_guard",
   "maybeuninit_assume_init_stale_write_not_guard",
@@ -790,8 +791,8 @@ Fixture-pinned MaybeUninit::assume_init family evidence reports missing
 initialized-memory discharge, recognizes narrow same-slot writes for
 assume_init, assume_init_read, assume_init_ref, assume_init_mut, and
 assume_init_drop, recognizes same-slot MaybeUninit::new evidence for
-assume_init, assume_init_read, and assume_init_ref, recognizes open-branch
-assume_init write/new forms, rejects comment-only, closed-branch assume_init write/new
+assume_init, assume_init_read, assume_init_ref, and assume_init_mut, recognizes
+open-branch assume_init write/new forms, rejects comment-only, closed-branch assume_init write/new
 and closed-branch assume_init_read, assume_init_ref, assume_init_mut, and
 assume_init_drop MaybeUninit::new evidence, closed-branch
 assume_init_read, assume_init_ref, assume_init_mut, and assume_init_drop write
