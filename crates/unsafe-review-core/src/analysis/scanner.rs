@@ -10,9 +10,7 @@ use super::target_feature::is_target_feature_attribute;
 use super::transmute_operation::{
     is_incomplete_multiline_transmute_copy, transmute_operation_family,
 };
-use super::unsafe_impl::{
-    is_impl_declaration_line, parse_impl_declaration_owner, parse_impl_owner, parse_impl_trait_name,
-};
+use super::unsafe_impl::{parse_impl_owner, parse_impl_trait_name};
 use super::unwrap_operation::unwrap_operation_family;
 use super::utf8_operation::utf8_operation_family;
 use super::vec_operation::vec_operation_family;
@@ -23,7 +21,17 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const OWNER_SCAN_LIMIT: usize = 160;
+mod item_names;
+mod owner_context;
+mod text_detection;
+
+use self::item_names::{parse_fn_name, parse_mod_name, parse_trait_name};
+#[cfg(test)]
+use self::owner_context::find_owner_declaration_index;
+use self::owner_context::{
+    context_before_site, find_extern_block_owner, find_following_fn_owner, find_owner,
+};
+use self::text_detection::{LineCommentState, line_for_text_detection};
 
 #[derive(Clone, Debug)]
 pub(crate) struct ScannedSite {
@@ -428,151 +436,6 @@ fn context_slice(lines: &[&str], start: usize, end: usize) -> Vec<String> {
         .iter()
         .map(|line| line.trim().to_string())
         .collect()
-}
-
-#[derive(Clone, Debug)]
-struct StringDetectionState {
-    raw_hashes: Option<usize>,
-    escaped: bool,
-}
-
-#[derive(Default)]
-struct LineCommentState {
-    block_depth: usize,
-    string: Option<StringDetectionState>,
-}
-
-fn line_for_text_detection(line: &str, state: &mut LineCommentState) -> String {
-    let mut out = String::with_capacity(line.len());
-    let mut chars = line.chars().peekable();
-
-    while let Some(ch) = chars.next() {
-        if state.block_depth > 0 {
-            if ch == '/' && chars.peek() == Some(&'*') {
-                state.block_depth += 1;
-                let _ = chars.next();
-            } else if ch == '*' && chars.peek() == Some(&'/') {
-                state.block_depth = state.block_depth.saturating_sub(1);
-                let _ = chars.next();
-            }
-            continue;
-        }
-
-        if let Some(string) = &mut state.string {
-            let mut closed = false;
-            if let Some(raw_hashes) = string.raw_hashes {
-                if ch == '"' && raw_string_hashes_at_end(&mut chars, raw_hashes) {
-                    closed = true;
-                }
-            } else if string.escaped {
-                string.escaped = false;
-            } else if ch == '\\' {
-                string.escaped = true;
-            } else if ch == '"' {
-                closed = true;
-            }
-
-            if closed {
-                state.string = None;
-                out.push('"');
-            }
-            continue;
-        }
-
-        if ch == '/' && chars.peek() == Some(&'/') {
-            break;
-        }
-        if ch == '/' && chars.peek() == Some(&'*') {
-            state.block_depth += 1;
-            let _ = chars.next();
-            continue;
-        }
-        if ch == '\'' && consume_char_literal(&mut chars) {
-            out.push('\'');
-            continue;
-        }
-        if ch == 'r'
-            && let Some(hashes) = raw_string_hashes_at_start(&mut chars)
-        {
-            for _ in 0..hashes {
-                let _ = chars.next();
-            }
-            let _ = chars.next();
-            state.string = Some(StringDetectionState {
-                raw_hashes: Some(hashes),
-                escaped: false,
-            });
-            out.push('"');
-            continue;
-        }
-        if ch == '"' {
-            state.string = Some(StringDetectionState {
-                raw_hashes: None,
-                escaped: false,
-            });
-            out.push('"');
-            continue;
-        }
-        out.push(ch);
-    }
-
-    out
-}
-
-fn consume_char_literal<I>(chars: &mut std::iter::Peekable<I>) -> bool
-where
-    I: Iterator<Item = char> + Clone,
-{
-    let mut clone = chars.clone();
-    let Some(first) = clone.next() else {
-        return false;
-    };
-    if first == '\n' || first == '\r' {
-        return false;
-    }
-    if first == '\\' {
-        let Some(escaped) = clone.next() else {
-            return false;
-        };
-        if escaped == '\n' || escaped == '\r' {
-            return false;
-        }
-    }
-    if clone.next() != Some('\'') {
-        return false;
-    }
-
-    while chars.next() != Some('\'') {}
-    true
-}
-
-fn raw_string_hashes_at_start<I>(chars: &mut std::iter::Peekable<I>) -> Option<usize>
-where
-    I: Iterator<Item = char> + Clone,
-{
-    let mut clone = chars.clone();
-    let mut hashes = 0usize;
-    while clone.peek() == Some(&'#') {
-        hashes += 1;
-        let _ = clone.next();
-    }
-    (clone.peek() == Some(&'"')).then_some(hashes)
-}
-
-fn raw_string_hashes_at_end<I>(chars: &mut std::iter::Peekable<I>, hashes: usize) -> bool
-where
-    I: Iterator<Item = char> + Clone,
-{
-    let mut clone = chars.clone();
-    for _ in 0..hashes {
-        if clone.next() != Some('#') {
-            return false;
-        }
-    }
-    for _ in 0..hashes {
-        let _ = chars.next();
-    }
-    true
 }
 
 fn detect_site(line: &str) -> Option<(UnsafeSiteKind, OperationFamily)> {
@@ -1432,214 +1295,6 @@ fn is_public_api_surface(kind: &UnsafeSiteKind, snippet: &str) -> bool {
         return false;
     }
     is_public_surface(snippet)
-}
-
-fn find_owner(lines: &[&str], idx: usize) -> Option<String> {
-    for (line_idx, raw) in lines[..=idx]
-        .iter()
-        .enumerate()
-        .rev()
-        .take(OWNER_SCAN_LIMIT)
-    {
-        let line = raw.trim();
-        if is_comment_line(line) {
-            continue;
-        }
-        if let Some(name) = parse_fn_name(line)
-            && declaration_encloses_line(lines, line_idx, idx)
-        {
-            return Some(name);
-        }
-        if let Some(name) = parse_trait_name(line)
-            && declaration_encloses_line(lines, line_idx, idx)
-        {
-            return Some(name);
-        }
-        if let Some(name) = parse_impl_declaration_owner(line)
-            && declaration_encloses_line(lines, line_idx, idx)
-        {
-            return Some(name);
-        }
-        if let Some(name) = parse_macro_rules_name(line)
-            && declaration_encloses_line(lines, line_idx, idx)
-        {
-            return Some(name);
-        }
-        if is_impl_declaration_line(line) && declaration_encloses_line(lines, line_idx, idx) {
-            return Some("impl".to_string());
-        }
-    }
-    None
-}
-
-fn find_following_fn_owner(lines: &[&str], idx: usize) -> Option<String> {
-    for line in lines.iter().skip(idx + 1).take(8) {
-        let trimmed = line.trim_start();
-        if trimmed.is_empty()
-            || trimmed.starts_with("#[")
-            || trimmed.starts_with("///")
-            || trimmed.starts_with("//")
-        {
-            continue;
-        }
-        return parse_fn_name(trimmed);
-    }
-    None
-}
-
-fn find_extern_block_owner(lines: &[&str], idx: usize) -> Option<String> {
-    for line in lines.iter().skip(idx).take(16) {
-        let trimmed = line.trim_start();
-        if trimmed.is_empty()
-            || trimmed.starts_with("#[")
-            || trimmed.starts_with("///")
-            || trimmed.starts_with("//")
-        {
-            continue;
-        }
-        if let Some(name) = parse_fn_name(trimmed) {
-            return Some(name);
-        }
-        if trimmed.contains('}') {
-            break;
-        }
-    }
-    None
-}
-
-fn context_before_site(lines: &[&str], idx: usize) -> Vec<String> {
-    let mut start = idx.saturating_sub(8);
-    if let Some(owner_idx) = find_owner_declaration_index(lines, idx) {
-        start = start.min(owner_doc_start(lines, owner_idx));
-    }
-    context_slice(lines, start, idx.min(lines.len()))
-}
-
-fn find_owner_declaration_index(lines: &[&str], idx: usize) -> Option<usize> {
-    let limit = idx.min(lines.len().saturating_sub(1));
-    for (line_idx, raw) in lines[..=limit]
-        .iter()
-        .enumerate()
-        .rev()
-        .take(OWNER_SCAN_LIMIT)
-    {
-        let line = raw.trim();
-        if is_comment_line(line) {
-            continue;
-        }
-        if (parse_fn_name(line).is_some()
-            || parse_trait_name(line).is_some()
-            || parse_impl_declaration_owner(line).is_some()
-            || parse_macro_rules_name(line).is_some())
-            && declaration_encloses_line(lines, line_idx, idx)
-        {
-            return Some(line_idx);
-        }
-    }
-    None
-}
-
-fn declaration_encloses_line(lines: &[&str], decl_idx: usize, idx: usize) -> bool {
-    if decl_idx == idx {
-        return true;
-    }
-
-    let mut state = LineCommentState::default();
-    let mut depth = 0isize;
-    let mut opened = false;
-    for (line_idx, raw) in lines
-        .iter()
-        .enumerate()
-        .take(idx.saturating_add(1))
-        .skip(decl_idx)
-    {
-        let code = line_for_text_detection(raw, &mut state);
-        for ch in code.chars() {
-            match ch {
-                '{' => {
-                    depth += 1;
-                    opened = true;
-                }
-                '}' => {
-                    depth -= 1;
-                    if opened && depth <= 0 && line_idx < idx {
-                        return false;
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-    opened && depth > 0
-}
-
-fn is_comment_line(line: &str) -> bool {
-    line.starts_with("//") || line.starts_with("/*") || line.starts_with('*')
-}
-
-fn owner_doc_start(lines: &[&str], decl_idx: usize) -> usize {
-    let mut start = decl_idx;
-    let mut idx = decl_idx;
-    while idx > 0 {
-        let previous = lines[idx - 1].trim_start();
-        if previous.starts_with("///")
-            || previous.starts_with("//!")
-            || previous.starts_with("#[doc")
-            || previous.starts_with("#[")
-            || previous.is_empty()
-        {
-            start = idx - 1;
-            idx -= 1;
-            continue;
-        }
-        break;
-    }
-    start
-}
-
-fn parse_fn_name(line: &str) -> Option<String> {
-    let marker = "fn ";
-    let pos = line.find(marker)?;
-    let rest = &line[pos + marker.len()..];
-    parse_ident(rest)
-}
-
-fn parse_mod_name(line: &str) -> Option<String> {
-    let mut rest = line.trim_start();
-    if let Some(after_pub) = rest.strip_prefix("pub ") {
-        rest = after_pub.trim_start();
-    } else if let Some(after_pub) = rest.strip_prefix("pub(") {
-        let after_pub = after_pub.trim_start();
-        if let Some((_visibility, after_visibility)) = after_pub.split_once(')') {
-            rest = after_visibility.trim_start();
-        }
-    }
-    let rest = rest.strip_prefix("mod ")?.trim_start();
-    parse_ident(rest)
-}
-
-fn parse_trait_name(line: &str) -> Option<String> {
-    let marker = "trait ";
-    let pos = line.find(marker)?;
-    let rest = &line[pos + marker.len()..];
-    parse_ident(rest)
-}
-
-fn parse_macro_rules_name(line: &str) -> Option<String> {
-    let rest = line.trim_start().strip_prefix("macro_rules!")?.trim_start();
-    parse_ident(rest)
-}
-
-fn parse_ident(rest: &str) -> Option<String> {
-    let mut name = String::new();
-    for ch in rest.chars() {
-        if ch == '_' || ch.is_ascii_alphanumeric() {
-            name.push(ch);
-        } else {
-            break;
-        }
-    }
-    (!name.is_empty()).then_some(name)
 }
 
 #[cfg(test)]
