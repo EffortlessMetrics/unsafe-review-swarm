@@ -39,6 +39,7 @@ required_core_fixtures = [
   "maybeuninit_assume_init_drop_write_guard",
   "maybeuninit_assume_init_open_branch_write_guard",
   "maybeuninit_assume_init_open_branch_new_guard",
+  "maybeuninit_assume_init_read_open_branch_new_guard",
   "maybeuninit_assume_init_closed_branch_write_not_guard",
   "maybeuninit_assume_init_read_closed_branch_write_not_guard",
   "maybeuninit_assume_init_ref_closed_branch_write_not_guard",
@@ -848,6 +849,16 @@ expected_hazard = "initialized_memory"
 fixture = "maybeuninit_assume_init_open_branch_new_guard"
 kind = "positive"
 claim = "MaybeUninit::assume_init recognizes same-slot MaybeUninit::new evidence in an open branch containing the assume_init operation"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "maybe_uninit_assume_init"
+expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "maybeuninit_assume_init_read_open_branch_new_guard"
+kind = "positive"
+claim = "MaybeUninit::assume_init_read recognizes same-slot MaybeUninit::new evidence in an open branch containing the assume_init_read operation"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
