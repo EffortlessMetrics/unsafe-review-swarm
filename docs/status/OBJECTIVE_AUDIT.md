@@ -58,14 +58,15 @@ The active calibration rail is now recorded in
 `.unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md`,
 `policy/accuracy-calibration.toml`, and
 `docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 34
-fixture-pinned claims, 446 calibration cases, 34 label ledgers, and 459 label
+fixture-pinned claims, 447 calibration cases, 34 label ledgers, and 460 label
 samples. It records zero dogfood-measured, labeled-calibrated, or
 policy-eligible claims. That is intentional: the current report is a
 claim-scoped fixture-pinned proof index, not a global precision/recall result
 or support-tier promotion. The latest MaybeUninit assume-init slice recognizes
 narrow same-slot `write`, open-branch `write`, and `MaybeUninit::new`
-initialization evidence while rejecting other-slot writes, closed conditional
-writes, and stale writes after reassignment.
+initialization evidence while rejecting other-slot writes for `assume_init` and
+`assume_init_read`, closed conditional writes, and stale writes after
+reassignment.
 The latest `Vec::set_len` dogfood follow-up pins the `arrayvec#288`
 `Self::new()` capacity shape as a false-positive control: visible
 initialization evidence may be present, but capacity evidence remains missing
@@ -144,7 +145,8 @@ These are not failures; they are the next unsupported or weakly verified areas:
   `set_len`;
   `arrayvec#288` has a rerun receipt;
   `MaybeUninit::assume_init` now has fixture coverage for same-slot `write` and
-  `MaybeUninit::new` initialization evidence while still rejecting stale writes;
+  `MaybeUninit::new` initialization evidence while still rejecting other-slot
+  and stale writes;
   non-zero shrink and `set_len(0)` clear evidence also have fixture and
   dogfood-rerun coverage, start-bound shrink evidence has fixture and
   `rust-smallvec#277` dogfood-rerun coverage, and last-index shrink evidence

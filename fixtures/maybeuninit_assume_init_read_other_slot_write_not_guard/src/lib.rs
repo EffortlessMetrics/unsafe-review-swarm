@@ -1,0 +1,19 @@
+use core::mem::MaybeUninit;
+
+pub fn read_after_other_slot_write(value: u32) -> u32 {
+    let slot = MaybeUninit::<u32>::uninit();
+    let mut other = MaybeUninit::<u32>::uninit();
+    other.write(value);
+    // SAFETY: this fixture intentionally initializes a different slot.
+    unsafe { slot.assume_init_read() }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::read_after_other_slot_write;
+
+    #[test]
+    fn mentions_read_after_other_slot_write() {
+        let _ = core::mem::size_of_val(&(read_after_other_slot_write as fn(u32) -> u32));
+    }
+}
