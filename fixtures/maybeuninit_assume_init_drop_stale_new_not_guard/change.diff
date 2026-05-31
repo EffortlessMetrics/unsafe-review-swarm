@@ -1,0 +1,24 @@
+diff --git a/src/lib.rs b/src/lib.rs
+index 0000000..1111111 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -0,0 +1,19 @@
++use core::mem::MaybeUninit;
++
++pub fn drop_after_stale_new() {
++    let mut slot = MaybeUninit::new(String::from("initialized"));
++    slot = MaybeUninit::uninit();
++    // SAFETY: fixture checks that stale MaybeUninit::new evidence does not
++    // initialize the current slot before assume_init_drop.
++    unsafe { slot.assume_init_drop() }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::drop_after_stale_new;
++
++    #[test]
++    fn mentions_drop_after_stale_new() {
++        let _ = core::mem::size_of_val(&(drop_after_stale_new as fn()));
++    }
++}
