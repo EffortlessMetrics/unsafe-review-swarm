@@ -4,9 +4,12 @@ use serde::Serialize;
 pub(crate) fn render(output: &AnalyzeOutput) -> (String, String) {
     let base_count = output.summary.open_actionable_gaps;
     let base_color = badge_color(base_count);
-    let weak_evidence_findings = output.summary.contract_missing
-        + output.summary.guard_missing
-        + output.summary.guarded_unwitnessed;
+    let evidence_quality = EvidenceQualityCounts {
+        contract_missing: output.summary.contract_missing,
+        guard_missing: output.summary.guard_missing,
+        guarded_unwitnessed: output.summary.guarded_unwitnessed,
+    };
+    let weak_evidence_findings = evidence_quality.total();
     let plus_count = base_count + weak_evidence_findings;
     let plus_color = badge_color(plus_count);
     let main = badge(
@@ -19,6 +22,9 @@ pub(crate) fn render(output: &AnalyzeOutput) -> (String, String) {
         BadgeCounts {
             unsuppressed_review_gaps: base_count,
             unsuppressed_evidence_quality_findings: 0,
+            evidence_quality_contract_missing: 0,
+            evidence_quality_guard_missing: 0,
+            evidence_quality_guarded_unwitnessed: 0,
             suppressed_review_gaps: 0,
             suppressed_evidence_quality_findings: 0,
             intentional_findings: 0,
@@ -36,6 +42,9 @@ pub(crate) fn render(output: &AnalyzeOutput) -> (String, String) {
         BadgeCounts {
             unsuppressed_review_gaps: base_count,
             unsuppressed_evidence_quality_findings: weak_evidence_findings,
+            evidence_quality_contract_missing: evidence_quality.contract_missing,
+            evidence_quality_guard_missing: evidence_quality.guard_missing,
+            evidence_quality_guarded_unwitnessed: evidence_quality.guarded_unwitnessed,
             suppressed_review_gaps: 0,
             suppressed_evidence_quality_findings: 0,
             intentional_findings: 0,
@@ -44,6 +53,19 @@ pub(crate) fn render(output: &AnalyzeOutput) -> (String, String) {
         },
     );
     (render_pretty(&main), render_pretty(&plus))
+}
+
+#[derive(Clone, Copy)]
+struct EvidenceQualityCounts {
+    contract_missing: usize,
+    guard_missing: usize,
+    guarded_unwitnessed: usize,
+}
+
+impl EvidenceQualityCounts {
+    fn total(self) -> usize {
+        self.contract_missing + self.guard_missing + self.guarded_unwitnessed
+    }
 }
 
 fn badge_color(open_actionable_gaps: usize) -> &'static str {
@@ -108,6 +130,9 @@ struct BadgeJson<'a> {
 struct BadgeCounts {
     unsuppressed_review_gaps: usize,
     unsuppressed_evidence_quality_findings: usize,
+    evidence_quality_contract_missing: usize,
+    evidence_quality_guard_missing: usize,
+    evidence_quality_guarded_unwitnessed: usize,
     suppressed_review_gaps: usize,
     suppressed_evidence_quality_findings: usize,
     intentional_findings: usize,
@@ -138,6 +163,9 @@ mod tests {
         assert_eq!(main["color"], "yellow");
         assert_eq!(main["counts"]["unsuppressed_review_gaps"], 1);
         assert_eq!(main["counts"]["unsuppressed_evidence_quality_findings"], 0);
+        assert_eq!(main["counts"]["evidence_quality_contract_missing"], 0);
+        assert_eq!(main["counts"]["evidence_quality_guard_missing"], 0);
+        assert_eq!(main["counts"]["evidence_quality_guarded_unwitnessed"], 0);
         assert_ne!(main["message"], "safe");
 
         assert_eq!(plus["schemaVersion"], 1);
@@ -153,6 +181,10 @@ mod tests {
         assert_eq!(plus["color"], "yellow");
         assert_eq!(plus["counts"]["unsuppressed_review_gaps"], 1);
         assert_eq!(plus["counts"]["unsuppressed_evidence_quality_findings"], 1);
+        assert_eq!(plus["counts"]["evidence_quality_contract_missing"], 0);
+        assert_eq!(plus["counts"]["evidence_quality_guard_missing"], 1);
+        assert_eq!(plus["counts"]["evidence_quality_guarded_unwitnessed"], 0);
+        assert_eq!(plus["message"], badge_count_sum(&plus)?.to_string());
         assert_ne!(plus["message"], "UB-free");
         Ok(())
     }
@@ -187,6 +219,21 @@ mod tests {
             assert_badge_endpoint_contract("unsafe-review", "unsafe_review", &main)?;
             assert_badge_endpoint_contract("unsafe-review+", "unsafe_review_plus", &plus)?;
         }
+
+        Ok(())
+    }
+
+    #[test]
+    fn unsafe_review_plus_count_matches_component_breakdown() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let (_main, plus) = render(&output);
+        let plus = parse_json(&plus)?;
+
+        assert_eq!(plus["message"], badge_count_sum(&plus)?.to_string());
+        assert_eq!(plus["counts"]["unsuppressed_review_gaps"], 1);
+        assert_eq!(plus["counts"]["evidence_quality_contract_missing"], 0);
+        assert_eq!(plus["counts"]["evidence_quality_guard_missing"], 1);
+        assert_eq!(plus["counts"]["evidence_quality_guarded_unwitnessed"], 0);
 
         Ok(())
     }
@@ -244,6 +291,35 @@ mod tests {
             include_unchanged_tests: true,
             max_cards: None,
         })
+    }
+
+    fn badge_count_sum(badge: &serde_json::Value) -> Result<usize, String> {
+        let counts = &badge["counts"];
+        let mut total = json_usize(
+            &counts["unsuppressed_review_gaps"],
+            "unsuppressed_review_gaps",
+        )?;
+        total += json_usize(
+            &counts["evidence_quality_contract_missing"],
+            "evidence_quality_contract_missing",
+        )?;
+        total += json_usize(
+            &counts["evidence_quality_guard_missing"],
+            "evidence_quality_guard_missing",
+        )?;
+        total += json_usize(
+            &counts["evidence_quality_guarded_unwitnessed"],
+            "evidence_quality_guarded_unwitnessed",
+        )?;
+        Ok(total)
+    }
+
+    fn json_usize(value: &serde_json::Value, field: &str) -> Result<usize, String> {
+        value
+            .as_u64()
+            .ok_or_else(|| format!("{field} must be an unsigned count"))?
+            .try_into()
+            .map_err(|_| format!("{field} does not fit in usize"))
     }
 
     fn parse_json(text: &str) -> Result<serde_json::Value, String> {
