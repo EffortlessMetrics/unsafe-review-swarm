@@ -732,6 +732,7 @@ fixtures = [
   "maybeuninit_assume_init_ref_write_guard",
   "maybeuninit_assume_init_ref_other_slot_write_not_guard",
   "maybeuninit_assume_init_mut_write_guard",
+  "maybeuninit_assume_init_mut_other_slot_write_not_guard",
   "maybeuninit_assume_init_drop_write_guard",
   "maybeuninit_assume_init_open_branch_write_guard",
   "maybeuninit_assume_init_open_branch_new_guard",
@@ -764,7 +765,7 @@ initialized-memory discharge, recognizes narrow same-slot write and
 MaybeUninit::new evidence including assume_init_read, assume_init_ref,
 assume_init_mut, and assume_init_drop same-slot writes and
 open-branch forms, rejects comment-only, closed-branch write/new, other-slot
-writes including assume_init_read and assume_init_ref, stale write/new including stale assume_init_read writes, stale
+writes including assume_init_read, assume_init_ref, and assume_init_mut, stale write/new including stale assume_init_read writes, stale
 field-slot writes, and partial field or array-element initialization evidence,
 and routes the listed fixtures to Miri/cargo-careful witness suggestions.
 """

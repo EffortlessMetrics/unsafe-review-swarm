@@ -58,7 +58,7 @@ The active calibration rail is now recorded in
 `.unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md`,
 `policy/accuracy-calibration.toml`, and
 `docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 34
-fixture-pinned claims, 451 calibration cases, 34 label ledgers, and 464 label
+fixture-pinned claims, 452 calibration cases, 34 label ledgers, and 465 label
 samples. It records zero dogfood-measured, labeled-calibrated, or
 policy-eligible claims. That is intentional: the current report is a
 claim-scoped fixture-pinned proof index, not a global precision/recall result
@@ -66,8 +66,8 @@ or support-tier promotion. The latest MaybeUninit assume-init slice recognizes
 narrow same-slot `write` evidence for `assume_init`, `assume_init_read`,
 `assume_init_ref`, `assume_init_mut`, and `assume_init_drop`, open-branch
 `write`, and `MaybeUninit::new` initialization evidence while rejecting
-other-slot writes for `assume_init`, `assume_init_read`, and
-`assume_init_ref`, closed conditional writes, and stale writes after
+other-slot writes for `assume_init`, `assume_init_read`, `assume_init_ref`,
+and `assume_init_mut`, closed conditional writes, and stale writes after
 reassignment.
 The latest `Vec::set_len` dogfood follow-up pins the `arrayvec#288`
 `Self::new()` capacity shape as a false-positive control: visible
