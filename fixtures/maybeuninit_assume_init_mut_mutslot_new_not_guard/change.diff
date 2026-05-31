@@ -1,0 +1,25 @@
+diff --git a/src/lib.rs b/src/lib.rs
+index 0000000..1111111 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -0,0 +1,20 @@
++use core::mem::MaybeUninit;
++
++pub fn mutably_borrow_after_prefixed_slot() {
++    let mutslot = MaybeUninit::new(7_u32);
++    let mut slot = MaybeUninit::<u32>::uninit();
++    let _ = mutslot;
++    // SAFETY: fixture intentionally initializes `mutslot`, not `slot`, before
++    // assume_init_mut.
++    let _value = unsafe { slot.assume_init_mut() };
++}
++
++#[cfg(test)]
++mod tests {
++    use super::mutably_borrow_after_prefixed_slot;
++
++    #[test]
++    fn mentions_mutably_borrow_after_prefixed_slot() {
++        let _ = core::mem::size_of_val(&(mutably_borrow_after_prefixed_slot as fn()));
++    }
++}
