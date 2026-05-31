@@ -2363,6 +2363,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "maybeuninit_assume_init_ref_new_guard",
             "maybeuninit_assume_init_mut_method_new_guard",
             "maybeuninit_assume_init_mut_new_guard",
+            "maybeuninit_assume_init_drop_new_guard",
         ] {
             let output = fixture_output(fixture)?;
             let card = single_card(fixture, &output)?;
