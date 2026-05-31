@@ -127,6 +127,8 @@ by shadowing from discharging initialized-memory evidence.
 `maybeuninit_assume_init_ref_write_guard`, while
 `maybeuninit_assume_init_ref_stale_write_not_guard` keeps a write made stale by
 reassignment from discharging initialized-memory evidence and
+`maybeuninit_assume_init_ref_shadowed_slot_not_guard` keeps a write made stale
+by shadowing from discharging initialized-memory evidence and
 `maybeuninit_assume_init_ref_other_slot_write_not_guard` keeps a write to a
 different slot from discharging `assume_init_ref` initialized-memory evidence.
 `MaybeUninit::assume_init_mut` pins same-slot `write` evidence through

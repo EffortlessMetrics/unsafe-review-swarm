@@ -751,6 +751,7 @@ fixtures = [
   "maybeuninit_assume_init_stale_new_not_guard",
   "maybeuninit_assume_init_shadowed_slot_not_guard",
   "maybeuninit_assume_init_read_shadowed_slot_not_guard",
+  "maybeuninit_assume_init_ref_shadowed_slot_not_guard",
   "maybeuninit_assume_init_mutslot_new_not_guard",
   "maybeuninit_assume_init_partial_field_not_guard",
   "maybeuninit_assume_init_partial_array_not_guard",
@@ -773,7 +774,8 @@ open-branch forms, rejects comment-only, closed-branch write/new, other-slot
 writes including assume_init_read, assume_init_ref, assume_init_mut, and
 assume_init_drop, stale write/new including stale assume_init_read,
 assume_init_ref, assume_init_mut, and assume_init_drop writes, stale
-field-slot writes, shadowed writes including assume_init_read, and partial
+field-slot writes, shadowed writes including assume_init_read and
+assume_init_ref, and partial
 field or array-element initialization evidence,
 and routes the listed fixtures to Miri/cargo-careful witness suggestions.
 """
