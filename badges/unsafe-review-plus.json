@@ -5,19 +5,19 @@
   "scope": "repo",
   "basis": "open_actionable_review_gaps_plus_evidence_quality_findings",
   "label": "unsafe-review+",
-  "message": "1005",
+  "message": "1007",
   "status": "fail",
   "color": "orange",
   "counts": {
-    "unsuppressed_review_gaps": 511,
-    "unsuppressed_evidence_quality_findings": 494,
+    "unsuppressed_review_gaps": 512,
+    "unsuppressed_evidence_quality_findings": 495,
     "evidence_quality_contract_missing": 26,
     "evidence_quality_guard_missing": 386,
-    "evidence_quality_guarded_unwitnessed": 82,
+    "evidence_quality_guarded_unwitnessed": 83,
     "suppressed_review_gaps": 0,
     "suppressed_evidence_quality_findings": 0,
     "intentional_findings": 0,
     "unknowns": 0,
-    "analyzed_unsafe_seams": 511
+    "analyzed_unsafe_seams": 512
   }
 }
