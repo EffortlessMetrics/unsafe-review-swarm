@@ -5,6 +5,7 @@ what not to do next. Do not put active specs here.
 
 | Handoff | Date | Scope |
 |---|---|---|
+| [Source repo dogfood release sync](2026-06-01-source-repo-dogfood-release-sync.md) | 2026-06-01 | acknowledges source PRs #513/#514, preserves source/swarm history reachability, mirrors source release-gate hygiene, and updates the source-sync checkpoint without claiming publication |
 | [Source evidence-quality badge sync](2026-06-01-source-evidence-quality-badge-sync.md) | 2026-06-01 | mirrors source PR #512 evidence-quality badge count semantics and updates the source-sync checkpoint without claiming publication, proof, or policy readiness |
 | [Source repo dogfood promotion sync](2026-06-01-source-repo-dogfood-promotion-sync.md) | 2026-06-01 | acknowledges source PR #511 repo-dogfood promotion with history preserved, mirrors source validation cleanups, and updates the source-sync checkpoint without claiming publication |
 | [Source badge payload sync](2026-06-01-source-badge-payload-sync.md) | 2026-06-01 | mirrors source PR #510 badge payload hardening and updates the source-sync checkpoint without claiming publication, proof, or policy readiness |
