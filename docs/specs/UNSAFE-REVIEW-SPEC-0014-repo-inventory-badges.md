@@ -41,7 +41,9 @@ same status stream. On normal analysis, write, or rename errors, the command
 marks status incomplete and keeps any rendered partial report at
 `<out>.partial`. If the process receives Unix SIGTERM/SIGINT before rendering,
 the command writes `phase = terminated`, records the signal, and leaves the
-latest status sidecar as the durable artifact.
+latest status sidecar as the durable artifact. When completed-file card output
+is available, the command also writes the latest partial report snapshot to
+`<out>.partial` and records that path in the terminated status.
 
 Repo JSON uses this top-level contract:
 
@@ -162,8 +164,9 @@ the current `unsafe-review badges` repo projection.
 - Repo `--out` writes `<out>.status.json` with complete scan status on
   successful analysis, promotes `<out>.partial` to `<out>` only after successful
   rendering, marks status incomplete on normal output errors, records
-  `phase = terminated` plus `signal = SIGTERM` on Unix SIGTERM, and
-  `--progress` prints a final completion heartbeat.
+  `phase = terminated` plus `signal = SIGTERM` on Unix SIGTERM, keeps a
+  completed-file partial report snapshot when one exists, and `--progress`
+  prints a final completion heartbeat.
 - Repo Markdown for a fixture reports repo posture, summary counts, top card
   classes, operation families, witness routes, cards with direct `path:line`
   source locations, concrete operation expressions and next actions, and the

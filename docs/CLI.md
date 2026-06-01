@@ -286,8 +286,10 @@ completion, normal errors, and Unix interruption signals. Add `--progress` to
 print a small stderr heartbeat from the same status stream. If a normal write
 or rename error occurs after rendering, the partial report is kept at
 `<out>.partial`. On Unix SIGTERM/SIGINT before rendering, `repo` records
-`phase = terminated` and the signal in `<out>.status.json` when `--out` is set;
-without `--out`, it prints an interruption diagnostic to stderr.
+`phase = terminated` and the signal in `<out>.status.json` when `--out` is set.
+If at least one file finished scanning, `repo` also writes the latest
+completed-file report snapshot to `<out>.partial` and records that path in the
+status sidecar. Without `--out`, it prints an interruption diagnostic to stderr.
 
 Repo Markdown also includes a related sink cluster section. The cluster section
 groups existing ReviewCards by source file and inferred owner/helper so a

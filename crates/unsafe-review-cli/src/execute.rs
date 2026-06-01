@@ -19,9 +19,9 @@ use std::time::Duration;
 use unsafe_review_core::{
     AnalysisMode, AnalyzeInput, AnalyzeOutput, CardId, CargoCarefulReceiptInput,
     ConcurrencyReceiptInput, DiffSource, DiscoveryOptions, MiriReceiptInput, PolicyMode,
-    ProofReceiptInput, RepoScanStatus, SanitizerReceiptInput, Scope,
+    ProofReceiptInput, RepoScanEvent, RepoScanPhase, RepoScanStatus, SanitizerReceiptInput, Scope,
     WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze, analyze_with_discovery,
-    analyze_with_discovery_and_progress, audit_witness_receipts, compare_outcome_json,
+    analyze_with_discovery_and_repo_events, audit_witness_receipts, compare_outcome_json,
     discover_repo_files, evaluate_policy_report, read_manual_candidate, render_badge_jsons,
     render_comment_plan, render_github_summary, render_human, render_json, render_lsp,
     render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
@@ -191,10 +191,14 @@ fn run_repo_check(options: RepoOptions) -> Result<(), String> {
     let report_path = check.out.clone();
     let partial_path = report_path.as_deref().map(repo_partial_path);
     let status_path = report_path.as_deref().map(repo_status_path);
-    let mut reporter =
-        RepoStatusReporter::new(status_path, partial_path.clone(), options.progress)?;
+    let mut reporter = RepoStatusReporter::new(
+        status_path,
+        partial_path.clone(),
+        options.progress,
+        check.format.clone(),
+    )?;
     maybe_pause_for_repo_interrupt_test();
-    let output = match analyze_with_discovery_and_progress(
+    let output = match analyze_with_discovery_and_repo_events(
         AnalyzeInput {
             root: check.root,
             scope: Scope::Repo,
@@ -205,7 +209,7 @@ fn run_repo_check(options: RepoOptions) -> Result<(), String> {
             max_cards: check.max_cards,
         },
         options.discovery,
-        |status| reporter.record(status),
+        |event| reporter.record_event(event),
     ) {
         Ok(output) => output,
         Err(err) => {
@@ -260,6 +264,7 @@ struct RepoStatusReporter {
     status_path: Option<PathBuf>,
     progress: bool,
     last_status: Arc<Mutex<Option<RepoScanStatus>>>,
+    partial_output: Arc<Mutex<Option<AnalyzeOutput>>>,
     last_phase: Option<String>,
     last_discovery_heartbeat: usize,
     last_scan_heartbeat: usize,
@@ -271,17 +276,22 @@ impl RepoStatusReporter {
         status_path: Option<PathBuf>,
         partial_path: Option<PathBuf>,
         progress: bool,
+        format: Format,
     ) -> Result<Self, String> {
         let last_status = Arc::new(Mutex::new(None));
+        let partial_output = Arc::new(Mutex::new(None));
         let signal_guard = install_repo_signal_guard(
             status_path.clone(),
             partial_path.clone(),
             last_status.clone(),
+            partial_output.clone(),
+            format,
         )?;
         Ok(Self {
             status_path,
             progress,
             last_status,
+            partial_output,
             last_phase: None,
             last_discovery_heartbeat: 0,
             last_scan_heartbeat: 0,
@@ -289,11 +299,20 @@ impl RepoStatusReporter {
         })
     }
 
-    fn record(&mut self, status: &RepoScanStatus) -> Result<(), String> {
+    fn record_event(&mut self, event: &RepoScanEvent) -> Result<(), String> {
+        let status = &event.status;
         *self
             .last_status
             .lock()
             .map_err(|_| "repo status lock poisoned".to_string())? = Some(status.clone());
+        if let Some(output) = &event.partial_output {
+            *self
+                .partial_output
+                .lock()
+                .map_err(|_| "repo partial output lock poisoned".to_string())? =
+                Some(output.clone());
+        }
+        maybe_pause_for_repo_interrupt_after_scan(status);
         if let Some(path) = &self.status_path {
             ensure_parent_dir(path)?;
             fs::write(path, render_repo_scan_status(status)?)
@@ -358,11 +377,22 @@ struct RepoSignalState {
     status_path: Option<PathBuf>,
     partial_path: Option<PathBuf>,
     last_status: Arc<Mutex<Option<RepoScanStatus>>>,
+    partial_output: Arc<Mutex<Option<AnalyzeOutput>>>,
+    format: Format,
+}
+
+#[cfg(unix)]
+struct RepoInterruptedArtifacts {
+    status_path: PathBuf,
+    partial_path: Option<PathBuf>,
 }
 
 #[cfg(unix)]
 impl RepoSignalState {
-    fn record_interrupted(&self, signal_name: &str) -> Result<Option<PathBuf>, String> {
+    fn record_interrupted(
+        &self,
+        signal_name: &str,
+    ) -> Result<Option<RepoInterruptedArtifacts>, String> {
         let Some(path) = self.status_path.as_ref() else {
             return Ok(None);
         };
@@ -371,16 +401,38 @@ impl RepoSignalState {
             .lock()
             .map_err(|_| "repo status lock poisoned".to_string())?
             .clone();
+        let partial_path = self.write_interrupted_partial()?;
         ensure_parent_dir(path)?;
         fs::write(
             path,
             render_repo_scan_interrupted_status(
                 last_status.as_ref(),
                 signal_name,
-                self.partial_path.as_deref().filter(|path| path.exists()),
+                partial_path.as_deref(),
             )?,
         )
         .map_err(|err| format!("write {} failed: {err}", path.display()))?;
+        Ok(Some(RepoInterruptedArtifacts {
+            status_path: path.clone(),
+            partial_path,
+        }))
+    }
+
+    fn write_interrupted_partial(&self) -> Result<Option<PathBuf>, String> {
+        let Some(path) = self.partial_path.as_ref() else {
+            return Ok(None);
+        };
+        let partial_output = self
+            .partial_output
+            .lock()
+            .map_err(|_| "repo partial output lock poisoned".to_string())?
+            .clone();
+        let Some(output) = partial_output else {
+            return Ok(None);
+        };
+        ensure_parent_dir(path)?;
+        fs::write(path, render_with_format(&output, &self.format))
+            .map_err(|err| format!("write partial repo report {} failed: {err}", path.display()))?;
         Ok(Some(path.clone()))
     }
 }
@@ -408,8 +460,16 @@ fn install_repo_signal_guard(
     status_path: Option<PathBuf>,
     partial_path: Option<PathBuf>,
     last_status: Arc<Mutex<Option<RepoScanStatus>>>,
+    partial_output: Arc<Mutex<Option<AnalyzeOutput>>>,
+    format: Format,
 ) -> Result<Option<RepoSignalGuard>, String> {
-    install_repo_signal_guard_impl(status_path, partial_path, last_status)
+    install_repo_signal_guard_impl(
+        status_path,
+        partial_path,
+        last_status,
+        partial_output,
+        format,
+    )
 }
 
 #[cfg(unix)]
@@ -417,11 +477,15 @@ fn install_repo_signal_guard_impl(
     status_path: Option<PathBuf>,
     partial_path: Option<PathBuf>,
     last_status: Arc<Mutex<Option<RepoScanStatus>>>,
+    partial_output: Arc<Mutex<Option<AnalyzeOutput>>>,
+    format: Format,
 ) -> Result<Option<RepoSignalGuard>, String> {
     let state = RepoSignalState {
         status_path,
         partial_path,
         last_status,
+        partial_output,
+        format,
     };
     let mut signals = Signals::new([SIGTERM, SIGINT])
         .map_err(|err| format!("install repo signal handler failed: {err}"))?;
@@ -430,10 +494,18 @@ fn install_repo_signal_guard_impl(
         if let Some(signal) = signals.forever().next() {
             let signal_name = repo_signal_name(signal);
             match state.record_interrupted(signal_name) {
-                Ok(Some(status_path)) => eprintln!(
-                    "unsafe-review repo: interrupted by {signal_name}; incomplete repo status written to {}",
-                    status_path.display()
-                ),
+                Ok(Some(artifacts)) => {
+                    eprintln!(
+                        "unsafe-review repo: interrupted by {signal_name}; incomplete repo status written to {}",
+                        artifacts.status_path.display()
+                    );
+                    if let Some(partial_path) = artifacts.partial_path {
+                        eprintln!(
+                            "unsafe-review repo: partial repo report kept at {}",
+                            partial_path.display()
+                        );
+                    }
+                }
                 Ok(None) => eprintln!(
                     "unsafe-review repo: interrupted by {signal_name}; rerun with --out to keep <out>.status.json"
                 ),
@@ -455,6 +527,8 @@ fn install_repo_signal_guard_impl(
     _status_path: Option<PathBuf>,
     _partial_path: Option<PathBuf>,
     _last_status: Arc<Mutex<Option<RepoScanStatus>>>,
+    _partial_output: Arc<Mutex<Option<AnalyzeOutput>>>,
+    _format: Format,
 ) -> Result<Option<RepoSignalGuard>, String> {
     Ok(None)
 }
@@ -641,6 +715,32 @@ fn maybe_pause_for_repo_interrupt_test() {
 
 #[cfg(not(debug_assertions))]
 fn maybe_pause_for_repo_interrupt_test() {}
+
+#[cfg(debug_assertions)]
+fn maybe_pause_for_repo_interrupt_after_scan(status: &RepoScanStatus) {
+    let Ok(raw_threshold) =
+        std::env::var("UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_AFTER_SCANNED")
+    else {
+        return;
+    };
+    let Ok(threshold) = raw_threshold.parse::<usize>() else {
+        return;
+    };
+    if status.phase != RepoScanPhase::Scanning
+        || status.completed
+        || status.files_scanned < threshold
+    {
+        return;
+    }
+    let ms = std::env::var("UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_MS")
+        .ok()
+        .and_then(|raw| raw.parse::<u64>().ok())
+        .unwrap_or(5_000);
+    std::thread::sleep(Duration::from_millis(ms));
+}
+
+#[cfg(not(debug_assertions))]
+fn maybe_pause_for_repo_interrupt_after_scan(_status: &RepoScanStatus) {}
 
 fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     let mut check = options.check;
@@ -1394,8 +1494,9 @@ fn print_repo_help() {
         "- On normal errors, incomplete status is kept; if a rendered partial report exists, it is left at <out>.partial."
     );
     println!(
-        "- On Unix SIGTERM/SIGINT, repo records phase=terminated and the signal in <out>.status.json when --out is set; without --out it prints an interruption diagnostic to stderr."
+        "- On Unix SIGTERM/SIGINT, repo records phase=terminated and the signal in <out>.status.json when --out is set; after completed files it also keeps the latest partial report at <out>.partial."
     );
+    println!("- Without --out, Unix SIGTERM/SIGINT prints an interruption diagnostic to stderr.");
     println!();
     println!("Trust boundary:");
     println!(

@@ -157,6 +157,12 @@ pub struct AnalyzeOutput {
     pub cards: Vec<ReviewCard>,
 }
 
+#[derive(Clone, Debug)]
+pub struct RepoScanEvent {
+    pub status: RepoScanStatus,
+    pub partial_output: Option<AnalyzeOutput>,
+}
+
 pub fn analyze(input: AnalyzeInput) -> Result<AnalyzeOutput, String> {
     pipeline::analyze(input)
 }
@@ -177,6 +183,17 @@ where
     F: FnMut(&RepoScanStatus) -> Result<(), String>,
 {
     pipeline::analyze_with_discovery_and_progress(input, discovery, progress)
+}
+
+pub fn analyze_with_discovery_and_repo_events<F>(
+    input: AnalyzeInput,
+    discovery: DiscoveryOptions,
+    events: F,
+) -> Result<AnalyzeOutput, String>
+where
+    F: FnMut(&RepoScanEvent) -> Result<(), String>,
+{
+    pipeline::analyze_with_discovery_and_repo_events(input, discovery, events)
 }
 
 pub fn discover_repo_files(

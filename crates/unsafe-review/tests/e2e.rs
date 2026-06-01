@@ -1860,6 +1860,91 @@ fn repo_sigterm_writes_interrupted_status_sidecar() -> Result<(), Box<dyn Error>
     Ok(())
 }
 
+#[cfg(unix)]
+#[test]
+fn repo_sigterm_keeps_completed_file_partial_report() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-repo-sigterm-partial-e2e")?;
+    let scan_root = temp.path().join("fixture");
+    copy_dir_all(&fixture, &scan_root)?;
+    fs::write(scan_root.join("src/z_safe.rs"), "pub fn safe() {}\n")?;
+    let report_path = temp.path().join("repo.json");
+    let partial_path = temp.path().join("repo.json.partial");
+    let status_path = temp.path().join("repo.json.status.json");
+
+    let child = Command::new(env!("CARGO_BIN_EXE_unsafe-review"))
+        .args([
+            os("repo"),
+            os("--root"),
+            scan_root.as_os_str().to_os_string(),
+            os("--format"),
+            os("json"),
+            os("--out"),
+            report_path.as_os_str().to_os_string(),
+        ])
+        .env(
+            "UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_AFTER_SCANNED",
+            "1",
+        )
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+
+    std::thread::sleep(Duration::from_millis(500));
+    let kill_status = Command::new("kill")
+        .arg("-TERM")
+        .arg(child.id().to_string())
+        .status()?;
+    assert!(kill_status.success(), "kill -TERM should succeed");
+
+    let output = child.wait_with_output()?;
+    assert_eq!(output.status.code(), Some(143));
+    assert_eq!(stdout_text(&output)?.trim(), "");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("interrupted by SIGTERM"),
+        "stderr should explain SIGTERM interruption: {stderr}"
+    );
+    assert!(
+        stderr.contains("incomplete repo status written to"),
+        "stderr should point to the status sidecar: {stderr}"
+    );
+    assert!(
+        stderr.contains("partial repo report kept at"),
+        "stderr should point to the retained partial report: {stderr}"
+    );
+    assert!(
+        !report_path.exists(),
+        "final report should not look successful"
+    );
+    assert!(
+        partial_path.exists(),
+        "SIGTERM after a completed file should retain a partial report"
+    );
+    let partial = parse_json(&fs::read_to_string(&partial_path)?)?;
+    assert_eq!(partial["scope"], "repo");
+    assert_eq!(partial["summary"]["rust_files"], 2);
+    assert_eq!(partial["summary"]["cards"], 1);
+    assert_eq!(partial["cards"][0]["site"]["file"], "src/lib.rs");
+
+    let status = parse_json(&fs::read_to_string(&status_path)?)?;
+    assert_eq!(status["schema_version"], "repo-scan-status/v1");
+    assert_eq!(status["phase"], "terminated");
+    assert_eq!(status["completed"], false);
+    assert_eq!(status["signal"], "SIGTERM");
+    assert_eq!(status["files_discovered"], 2);
+    assert_eq!(status["files_scanned"], 1);
+    assert_eq!(status["cards_found"], 1);
+    assert!(
+        status["partial_path"]
+            .as_str()
+            .unwrap_or("")
+            .ends_with("repo.json.partial")
+    );
+
+    Ok(())
+}
+
 #[test]
 fn safe_repo_human_output_stays_quiet() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("safe_code_no_cards");
