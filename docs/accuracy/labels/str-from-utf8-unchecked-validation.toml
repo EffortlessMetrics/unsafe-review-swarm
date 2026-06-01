@@ -338,6 +338,19 @@ label_source = "fixture_golden"
 rationale = "A match Ok-arm validation mention inside comments is not executable same-buffer UTF-8 guard evidence."
 
 [[samples]]
+id = "utf8-unchecked-match-ok-string-not-guard"
+fixture = "str_from_utf8_unchecked_match_ok_string_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "utf8"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A match Ok-arm validation mention inside a string literal is not executable same-buffer UTF-8 guard evidence."
+
+[[samples]]
 id = "utf8-unchecked-post-validation-not-guard"
 fixture = "str_from_utf8_unchecked_post_validation_not_guard"
 kind = "false_positive_control"

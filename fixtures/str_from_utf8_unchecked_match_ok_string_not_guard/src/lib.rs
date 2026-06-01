@@ -1,0 +1,20 @@
+pub fn decode(bytes: &[u8]) -> &str {
+    let _note =
+        "match core::str::from_utf8(bytes) { Ok(_) => unsafe { core::str::from_utf8_unchecked(bytes) }, Err(_) => \"\" }";
+    record_invalid();
+
+    // SAFETY: this fixture intentionally keeps match Ok-arm validation text in a string literal only.
+    unsafe { core::str::from_utf8_unchecked(bytes) }
+}
+
+fn record_invalid() {}
+
+#[cfg(test)]
+mod tests {
+    use super::decode;
+
+    #[test]
+    fn decodes_ascii() {
+        assert_eq!(decode(b"ok"), "ok");
+    }
+}

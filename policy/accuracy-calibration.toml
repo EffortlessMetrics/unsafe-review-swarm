@@ -954,6 +954,7 @@ fixtures = [
   "str_from_utf8_unchecked_let_else_ok_guard",
   "str_from_utf8_unchecked_match_ok_guard",
   "str_from_utf8_unchecked_match_ok_comment_not_guard",
+  "str_from_utf8_unchecked_match_ok_string_not_guard",
   "str_from_utf8_unchecked_post_validation_not_guard",
   "str_from_utf8_unchecked_other_buffer_not_guard",
   "str_from_utf8_unchecked_prefix_validation_not_guard",

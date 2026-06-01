@@ -480,6 +480,7 @@ mod tests {
         "str_from_utf8_unchecked_let_else_ok_shadowed_not_guard",
         "str_from_utf8_unchecked_match_ok_guard",
         "str_from_utf8_unchecked_match_ok_comment_not_guard",
+        "str_from_utf8_unchecked_match_ok_string_not_guard",
         "str_from_utf8_unchecked_match_ok_reassigned_not_guard",
         "str_from_utf8_unchecked_match_ok_shadowed_not_guard",
         "zeroed_invalid_value",
