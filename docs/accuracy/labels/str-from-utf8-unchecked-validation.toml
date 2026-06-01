@@ -286,6 +286,19 @@ label_source = "fixture_golden"
 rationale = "A same-buffer from_utf8 let-else Ok guard with a returning else block discharges UTF-8 evidence before the unchecked conversion."
 
 [[samples]]
+id = "utf8-unchecked-let-else-ok-comment-not-guard"
+fixture = "str_from_utf8_unchecked_let_else_ok_comment_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "utf8"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A let-else Ok validation mention inside comments is not executable same-buffer UTF-8 guard evidence."
+
+[[samples]]
 id = "utf8-unchecked-match-ok-validation-present"
 fixture = "str_from_utf8_unchecked_match_ok_guard"
 kind = "positive"
