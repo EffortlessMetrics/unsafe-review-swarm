@@ -2098,6 +2098,25 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "bounds"
         ));
 
+        let shadowed_if_let_probe_receiver_path =
+            fixture_output("get_unchecked_mut_if_let_get_shadowed_receiver_path_not_guard")?;
+        let shadowed_if_let_probe_receiver_path_card = single_card(
+            "get_unchecked_mut_if_let_get_shadowed_receiver_path_not_guard",
+            &shadowed_if_let_probe_receiver_path,
+        )?;
+        assert_eq!(
+            shadowed_if_let_probe_receiver_path_card.operation.family,
+            OperationFamily::GetUnchecked
+        );
+        assert_eq!(
+            shadowed_if_let_probe_receiver_path_card.class,
+            ReviewClass::GuardMissing
+        );
+        assert!(!obligation_discharge_present(
+            shadowed_if_let_probe_receiver_path_card,
+            "bounds"
+        ));
+
         let shadowed_if_let_probe_receiver =
             fixture_output("get_unchecked_mut_if_let_get_shadowed_receiver_not_guard")?;
         let shadowed_if_let_probe_receiver_card = single_card(
