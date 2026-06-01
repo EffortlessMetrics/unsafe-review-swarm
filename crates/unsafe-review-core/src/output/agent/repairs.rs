@@ -1,4 +1,4 @@
-use super::AllowedRepairs;
+use super::queue::AllowedRepairs;
 use crate::domain::{OperationFamily, ReviewCard};
 
 pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
