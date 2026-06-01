@@ -23,6 +23,7 @@ use std::path::PathBuf;
 mod file_scan;
 mod item_names;
 mod owner_context;
+mod scan_site;
 mod text_detection;
 
 use self::item_names::{parse_fn_name, parse_mod_name, parse_trait_name};

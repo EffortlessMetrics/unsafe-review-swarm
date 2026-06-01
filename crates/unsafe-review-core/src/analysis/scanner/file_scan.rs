@@ -1,13 +1,10 @@
 use super::{
-    ScannedSite, context_before_site, context_slice, detect_js_buffer_reentry_sites, detect_site,
-    detect_syntax_sites, extern_fn_names, fallback_unsafe_block_contains_specific_operation,
-    find_extern_block_owner, find_following_fn_owner, find_owner, first_non_ws_column,
-    is_incomplete_multiline_transmute_copy, is_public_api_surface, line_for_text_detection,
-    local_module_names, operation_block_start_lines, parse_static_mut_name, site_key,
-    syntax_operation_covers_fallback, syntax_owner, syntax_site_covers_fallback,
-    syntax_site_uses_exact_range, visibility_for_snippet,
+    ScannedSite, detect_js_buffer_reentry_sites, detect_site, detect_syntax_sites, extern_fn_names,
+    fallback_unsafe_block_contains_specific_operation, is_incomplete_multiline_transmute_copy,
+    line_for_text_detection, local_module_names, operation_block_start_lines, scan_site, site_key,
+    syntax_operation_covers_fallback, syntax_site_covers_fallback,
 };
-use crate::domain::{OperationFamily, SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind};
+use crate::domain::{OperationFamily, UnsafeSiteKind};
 use crate::input::diff::DiffIndex;
 use std::collections::BTreeSet;
 use std::fs;
@@ -120,11 +117,10 @@ fn fallback_sites(
             continue;
         }
         seen.insert(site_key(line_no, &kind, &family));
-        if !line_is_changed(rel, diff, repo_mode, line_no, line_no, &kind) {
-            continue;
-        }
-        out.push(fallback_scanned_site(
+        if let Some(site) = scan_site::fallback_site(scan_site::FallbackSiteInput {
             rel,
+            diff,
+            repo_mode,
             lines,
             idx,
             raw,
@@ -132,7 +128,9 @@ fn fallback_sites(
             detection_trimmed,
             kind,
             family,
-        ));
+        }) {
+            out.push(site);
+        }
     }
     out
 }
@@ -157,43 +155,6 @@ fn fallback_is_shadowed_by_syntax(
             && syntax_index.covers_specific_operation(line_no, lines, idx))
 }
 
-fn fallback_scanned_site(
-    rel: &PathBuf,
-    lines: &[&str],
-    idx: usize,
-    raw: &str,
-    trimmed: &str,
-    detection_trimmed: &str,
-    kind: UnsafeSiteKind,
-    family: OperationFamily,
-) -> ScannedSite {
-    let line_no = idx + 1;
-    let owner = match (&kind, &family) {
-        (UnsafeSiteKind::ExternBlock, OperationFamily::Ffi) => find_extern_block_owner(lines, idx),
-        (UnsafeSiteKind::Operation, OperationFamily::TargetFeature) => {
-            find_following_fn_owner(lines, idx)
-        }
-        (UnsafeSiteKind::StaticMut, OperationFamily::StaticMut) => {
-            parse_static_mut_name(detection_trimmed)
-        }
-        _ => None,
-    }
-    .or_else(|| find_owner(lines, idx));
-
-    scanned_site(
-        rel,
-        line_no,
-        first_non_ws_column(raw),
-        kind,
-        owner,
-        family,
-        trimmed,
-        trimmed,
-        context_before_site(lines, idx),
-        context_slice(lines, idx + 1, (idx + 8).min(lines.len())),
-    )
-}
-
 fn syntax_backfill_sites(
     rel: &PathBuf,
     diff: Option<&DiffIndex>,
@@ -214,94 +175,9 @@ fn syntax_backfill_sites(
         if !seen.insert(site_key(detected.line, &detected.kind, &detected.family)) {
             continue;
         }
-        if !line_is_changed(
-            rel,
-            diff,
-            repo_mode,
-            detected.line,
-            detected.end_line,
-            &detected.kind,
-        ) {
-            continue;
+        if let Some(site) = scan_site::syntax_site(rel, diff, repo_mode, lines, detected) {
+            out.push(site);
         }
-        out.push(syntax_scanned_site(rel, lines, detected));
     }
     out
-}
-
-fn syntax_scanned_site(
-    rel: &PathBuf,
-    lines: &[&str],
-    detected: super::DetectedSyntaxSite,
-) -> ScannedSite {
-    let idx = detected.line.saturating_sub(1);
-    let owner = syntax_owner(&detected, lines, idx);
-    let context_after = context_slice(
-        lines,
-        (idx + 1).min(lines.len()),
-        (idx + 8).min(lines.len()),
-    );
-    scanned_site(
-        rel,
-        detected.line,
-        detected.column,
-        detected.kind,
-        owner,
-        detected.family,
-        &detected.source_snippet,
-        &detected.card_snippet,
-        context_before_site(lines, idx),
-        context_after,
-    )
-}
-
-fn line_is_changed(
-    rel: &PathBuf,
-    diff: Option<&DiffIndex>,
-    repo_mode: bool,
-    start_line: usize,
-    end_line: usize,
-    kind: &UnsafeSiteKind,
-) -> bool {
-    diff.is_none_or(|d| {
-        repo_mode
-            || if syntax_site_uses_exact_range(kind) {
-                d.contains_in_range(rel, start_line, end_line)
-            } else {
-                d.contains_near(rel, start_line)
-            }
-    })
-}
-
-fn scanned_site(
-    rel: &PathBuf,
-    line: usize,
-    column: usize,
-    kind: UnsafeSiteKind,
-    owner: Option<String>,
-    family: OperationFamily,
-    source_snippet: &str,
-    card_snippet: &str,
-    context_before: Vec<String>,
-    context_after: Vec<String>,
-) -> ScannedSite {
-    let visibility = visibility_for_snippet(source_snippet).to_string();
-    let public_api_surface = is_public_api_surface(&kind, source_snippet);
-    ScannedSite {
-        site: UnsafeSite {
-            location: SourceLocation::new(rel.clone(), line, column),
-            kind,
-            owner,
-            visibility,
-            public_api_surface,
-            changed: true,
-            snippet: card_snippet.to_string(),
-        },
-        operation: UnsafeOperation {
-            family,
-            expression: card_snippet.to_string(),
-        },
-        context_before,
-        context_after,
-    }
 }
