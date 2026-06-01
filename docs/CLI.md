@@ -282,11 +282,12 @@ When `repo` writes a report with `--out`, it renders to `<out>.partial` and
 renames that file to `<out>` only after a successful render. It also updates
 `<out>.status.json` while analysis runs. The status sidecar records the scan
 phase, elapsed time, discovered files, scanned files, cards found, last path,
-completion, and normal errors. Add `--progress` to print a small stderr
-heartbeat from the same status stream. If a normal write or rename error occurs
-after rendering, the partial report is kept at `<out>.partial`; if the process
-is interrupted before rendering, the latest status sidecar is the durable
-artifact.
+completion, normal errors, and Unix interruption signals. Add `--progress` to
+print a small stderr heartbeat from the same status stream. If a normal write
+or rename error occurs after rendering, the partial report is kept at
+`<out>.partial`. On Unix SIGTERM/SIGINT before rendering, `repo` records
+`phase = terminated` and the signal in `<out>.status.json` when `--out` is set;
+without `--out`, it prints an interruption diagnostic to stderr.
 
 Repo Markdown also includes a related sink cluster section. The cluster section
 groups existing ReviewCards by source file and inferred owner/helper so a

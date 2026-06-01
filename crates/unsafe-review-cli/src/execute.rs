@@ -3,10 +3,19 @@ use crate::command::{
     DiffInput, FirstPrOptions, Format, OutcomeOptions, ReceiptTemplateOptions, RepoOptions,
     SavedOutputReceiptOptions,
 };
+#[cfg(unix)]
+use signal_hook::consts::signal::{SIGINT, SIGTERM};
+#[cfg(unix)]
+use signal_hook::iterator::{Handle as SignalHandle, Signals};
 use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 use std::process::Command as ProcessCommand;
+use std::sync::{Arc, Mutex};
+#[cfg(unix)]
+use std::thread;
+#[cfg(debug_assertions)]
+use std::time::Duration;
 use unsafe_review_core::{
     AnalysisMode, AnalyzeInput, AnalyzeOutput, CardId, CargoCarefulReceiptInput,
     ConcurrencyReceiptInput, DiffSource, DiscoveryOptions, MiriReceiptInput, PolicyMode,
@@ -182,7 +191,9 @@ fn run_repo_check(options: RepoOptions) -> Result<(), String> {
     let report_path = check.out.clone();
     let partial_path = report_path.as_deref().map(repo_partial_path);
     let status_path = report_path.as_deref().map(repo_status_path);
-    let mut reporter = RepoStatusReporter::new(status_path, options.progress);
+    let mut reporter =
+        RepoStatusReporter::new(status_path, partial_path.clone(), options.progress)?;
+    maybe_pause_for_repo_interrupt_test();
     let output = match analyze_with_discovery_and_progress(
         AnalyzeInput {
             root: check.root,
@@ -248,26 +259,41 @@ fn render_repo_file_list(root: &Path, files: &[PathBuf]) -> String {
 struct RepoStatusReporter {
     status_path: Option<PathBuf>,
     progress: bool,
-    last_status: Option<RepoScanStatus>,
+    last_status: Arc<Mutex<Option<RepoScanStatus>>>,
     last_phase: Option<String>,
     last_discovery_heartbeat: usize,
     last_scan_heartbeat: usize,
+    _signal_guard: Option<RepoSignalGuard>,
 }
 
 impl RepoStatusReporter {
-    fn new(status_path: Option<PathBuf>, progress: bool) -> Self {
-        Self {
+    fn new(
+        status_path: Option<PathBuf>,
+        partial_path: Option<PathBuf>,
+        progress: bool,
+    ) -> Result<Self, String> {
+        let last_status = Arc::new(Mutex::new(None));
+        let signal_guard = install_repo_signal_guard(
+            status_path.clone(),
+            partial_path.clone(),
+            last_status.clone(),
+        )?;
+        Ok(Self {
             status_path,
             progress,
-            last_status: None,
+            last_status,
             last_phase: None,
             last_discovery_heartbeat: 0,
             last_scan_heartbeat: 0,
-        }
+            _signal_guard: signal_guard,
+        })
     }
 
     fn record(&mut self, status: &RepoScanStatus) -> Result<(), String> {
-        self.last_status = Some(status.clone());
+        *self
+            .last_status
+            .lock()
+            .map_err(|_| "repo status lock poisoned".to_string())? = Some(status.clone());
         if let Some(path) = &self.status_path {
             ensure_parent_dir(path)?;
             fs::write(path, render_repo_scan_status(status)?)
@@ -288,10 +314,15 @@ impl RepoStatusReporter {
             return Ok(None);
         };
         ensure_parent_dir(&path)?;
+        let last_status = self
+            .last_status
+            .lock()
+            .map_err(|_| "repo status lock poisoned".to_string())?
+            .clone();
         fs::write(
             &path,
             render_repo_scan_incomplete_status(
-                self.last_status.as_ref(),
+                last_status.as_ref(),
                 error,
                 partial_path.filter(|path| path.exists()),
             )?,
@@ -322,6 +353,121 @@ impl RepoStatusReporter {
     }
 }
 
+#[cfg(unix)]
+struct RepoSignalState {
+    status_path: Option<PathBuf>,
+    partial_path: Option<PathBuf>,
+    last_status: Arc<Mutex<Option<RepoScanStatus>>>,
+}
+
+#[cfg(unix)]
+impl RepoSignalState {
+    fn record_interrupted(&self, signal_name: &str) -> Result<Option<PathBuf>, String> {
+        let Some(path) = self.status_path.as_ref() else {
+            return Ok(None);
+        };
+        let last_status = self
+            .last_status
+            .lock()
+            .map_err(|_| "repo status lock poisoned".to_string())?
+            .clone();
+        ensure_parent_dir(path)?;
+        fs::write(
+            path,
+            render_repo_scan_interrupted_status(
+                last_status.as_ref(),
+                signal_name,
+                self.partial_path.as_deref().filter(|path| path.exists()),
+            )?,
+        )
+        .map_err(|err| format!("write {} failed: {err}", path.display()))?;
+        Ok(Some(path.clone()))
+    }
+}
+
+#[cfg(unix)]
+struct RepoSignalGuard {
+    handle: SignalHandle,
+    thread: Option<thread::JoinHandle<()>>,
+}
+
+#[cfg(not(unix))]
+struct RepoSignalGuard;
+
+#[cfg(unix)]
+impl Drop for RepoSignalGuard {
+    fn drop(&mut self) {
+        self.handle.close();
+        if let Some(thread) = self.thread.take() {
+            let _joined = thread.join();
+        }
+    }
+}
+
+fn install_repo_signal_guard(
+    status_path: Option<PathBuf>,
+    partial_path: Option<PathBuf>,
+    last_status: Arc<Mutex<Option<RepoScanStatus>>>,
+) -> Result<Option<RepoSignalGuard>, String> {
+    install_repo_signal_guard_impl(status_path, partial_path, last_status)
+}
+
+#[cfg(unix)]
+fn install_repo_signal_guard_impl(
+    status_path: Option<PathBuf>,
+    partial_path: Option<PathBuf>,
+    last_status: Arc<Mutex<Option<RepoScanStatus>>>,
+) -> Result<Option<RepoSignalGuard>, String> {
+    let state = RepoSignalState {
+        status_path,
+        partial_path,
+        last_status,
+    };
+    let mut signals = Signals::new([SIGTERM, SIGINT])
+        .map_err(|err| format!("install repo signal handler failed: {err}"))?;
+    let handle = signals.handle();
+    let thread = thread::spawn(move || {
+        if let Some(signal) = signals.forever().next() {
+            let signal_name = repo_signal_name(signal);
+            match state.record_interrupted(signal_name) {
+                Ok(Some(status_path)) => eprintln!(
+                    "unsafe-review repo: interrupted by {signal_name}; incomplete repo status written to {}",
+                    status_path.display()
+                ),
+                Ok(None) => eprintln!(
+                    "unsafe-review repo: interrupted by {signal_name}; rerun with --out to keep <out>.status.json"
+                ),
+                Err(err) => eprintln!(
+                    "unsafe-review repo: interrupted by {signal_name}; failed to write incomplete repo status: {err}"
+                ),
+            }
+            std::process::exit(128 + signal);
+        }
+    });
+    Ok(Some(RepoSignalGuard {
+        handle,
+        thread: Some(thread),
+    }))
+}
+
+#[cfg(not(unix))]
+fn install_repo_signal_guard_impl(
+    _status_path: Option<PathBuf>,
+    _partial_path: Option<PathBuf>,
+    _last_status: Arc<Mutex<Option<RepoScanStatus>>>,
+) -> Result<Option<RepoSignalGuard>, String> {
+    Ok(None)
+}
+
+#[cfg(unix)]
+fn repo_signal_name(signal: i32) -> &'static str {
+    match signal {
+        SIGTERM => "SIGTERM",
+        SIGINT => "SIGINT",
+        _ => "signal",
+    }
+}
+
 fn render_repo_scan_status(status: &RepoScanStatus) -> Result<String, String> {
     let value = serde_json::json!({
         "schema_version": status.schema_version.as_str(),
@@ -333,6 +479,7 @@ fn render_repo_scan_status(status: &RepoScanStatus) -> Result<String, String> {
         "last_path": status.last_path.as_ref().map(|path| path.display().to_string()),
         "completed": status.completed,
         "error": null,
+        "signal": null,
         "partial_path": null,
     });
     let mut rendered = serde_json::to_string_pretty(&value)
@@ -360,6 +507,36 @@ fn render_repo_scan_incomplete_status(
             .map(|path| path.display().to_string()),
         "completed": false,
         "error": error,
+        "signal": null,
+        "partial_path": partial_path.map(|path| path.display().to_string()),
+    });
+    let mut rendered = serde_json::to_string_pretty(&value)
+        .map_err(|err| format!("render repo status JSON failed: {err}"))?;
+    rendered.push('\n');
+    Ok(rendered)
+}
+
+#[cfg(unix)]
+fn render_repo_scan_interrupted_status(
+    status: Option<&RepoScanStatus>,
+    signal_name: &str,
+    partial_path: Option<&Path>,
+) -> Result<String, String> {
+    let value = serde_json::json!({
+        "schema_version": status
+            .map(|status| status.schema_version.as_str())
+            .unwrap_or("repo-scan-status/v1"),
+        "phase": "terminated",
+        "elapsed_ms": status.map_or(0, |status| status.elapsed_ms),
+        "files_discovered": status.map_or(0, |status| status.files_discovered),
+        "files_scanned": status.map_or(0, |status| status.files_scanned),
+        "cards_found": status.map_or(0, |status| status.cards_found),
+        "last_path": status
+            .and_then(|status| status.last_path.as_ref())
+            .map(|path| path.display().to_string()),
+        "completed": false,
+        "error": format!("repo scan interrupted by {signal_name}"),
+        "signal": signal_name,
         "partial_path": partial_path.map(|path| path.display().to_string()),
     });
     let mut rendered = serde_json::to_string_pretty(&value)
@@ -450,6 +627,20 @@ fn repo_incomplete_error(
     }
     message
 }
+
+#[cfg(debug_assertions)]
+fn maybe_pause_for_repo_interrupt_test() {
+    let Ok(raw) = std::env::var("UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_MS") else {
+        return;
+    };
+    let Ok(ms) = raw.parse::<u64>() else {
+        return;
+    };
+    std::thread::sleep(Duration::from_millis(ms));
+}
+
+#[cfg(not(debug_assertions))]
+fn maybe_pause_for_repo_interrupt_test() {}
 
 fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     let mut check = options.check;
@@ -1197,13 +1388,13 @@ fn print_repo_help() {
         "- --out renders to <out>.partial, then renames it to <out> only after a successful render."
     );
     println!(
-        "- <out>.status.json records phase, elapsed time, discovered files, scanned files, cards found, last path, completion, and normal errors."
+        "- <out>.status.json records phase, elapsed time, discovered files, scanned files, cards found, last path, completion, normal errors, and Unix interruption signals."
     );
     println!(
         "- On normal errors, incomplete status is kept; if a rendered partial report exists, it is left at <out>.partial."
     );
     println!(
-        "- If interrupted before rendering, the latest status sidecar is the durable artifact; a dedicated signal handler is deferred."
+        "- On Unix SIGTERM/SIGINT, repo records phase=terminated and the signal in <out>.status.json when --out is set; without --out it prints an interruption diagnostic to stderr."
     );
     println!();
     println!("Trust boundary:");

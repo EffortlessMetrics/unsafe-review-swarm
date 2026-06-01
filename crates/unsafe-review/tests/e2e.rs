@@ -5,7 +5,7 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[test]
 fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Box<dyn Error>> {
@@ -1386,7 +1386,8 @@ fn repo_help_reports_repo_specific_scale_guidance() -> Result<(), Box<dyn Error>
     assert!(text.contains("<out>.partial"));
     assert!(text.contains("<out>.status.json"));
     assert!(text.contains("incomplete status is kept"));
-    assert!(text.contains("dedicated signal handler is deferred"));
+    assert!(text.contains("Unix SIGTERM/SIGINT"));
+    assert!(text.contains("phase=terminated"));
     assert!(text.contains("Trust boundary:"));
     assert!(!text.contains("unsafe-review: cheap unsafe contract review for Rust"));
     assert!(!text.contains("status artifacts are not implemented yet"));
@@ -1787,6 +1788,74 @@ fn repo_output_failure_keeps_partial_and_marks_status_incomplete() -> Result<(),
             .unwrap_or("")
             .ends_with("repo.json.partial")
     );
+
+    Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn repo_sigterm_writes_interrupted_status_sidecar() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-repo-sigterm-e2e")?;
+    let report_path = temp.path().join("repo.json");
+    let partial_path = temp.path().join("repo.json.partial");
+    let status_path = temp.path().join("repo.json.status.json");
+
+    let child = Command::new(env!("CARGO_BIN_EXE_unsafe-review"))
+        .args([
+            os("repo"),
+            os("--root"),
+            fixture.as_os_str().to_os_string(),
+            os("--format"),
+            os("json"),
+            os("--out"),
+            report_path.as_os_str().to_os_string(),
+        ])
+        .env("UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_MS", "5000")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()?;
+
+    std::thread::sleep(Duration::from_millis(500));
+    let kill_status = Command::new("kill")
+        .arg("-TERM")
+        .arg(child.id().to_string())
+        .status()?;
+    assert!(kill_status.success(), "kill -TERM should succeed");
+
+    let output = child.wait_with_output()?;
+    assert_eq!(output.status.code(), Some(143));
+    assert_eq!(stdout_text(&output)?.trim(), "");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("interrupted by SIGTERM"),
+        "stderr should explain SIGTERM interruption: {stderr}"
+    );
+    assert!(
+        stderr.contains("incomplete repo status written to"),
+        "stderr should point to the status sidecar: {stderr}"
+    );
+    assert!(
+        !report_path.exists(),
+        "final report should not look successful"
+    );
+    assert!(
+        !partial_path.exists(),
+        "SIGTERM before rendering should not invent a partial report"
+    );
+
+    let status = parse_json(&fs::read_to_string(&status_path)?)?;
+    assert_eq!(status["schema_version"], "repo-scan-status/v1");
+    assert_eq!(status["phase"], "terminated");
+    assert_eq!(status["completed"], false);
+    assert_eq!(status["signal"], "SIGTERM");
+    assert!(
+        status["error"]
+            .as_str()
+            .unwrap_or("")
+            .contains("interrupted by SIGTERM")
+    );
+    assert!(status["partial_path"].is_null());
 
     Ok(())
 }
