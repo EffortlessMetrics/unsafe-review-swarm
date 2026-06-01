@@ -1,10 +1,13 @@
-use crate::domain::{EvidenceState, ObligationEvidence, RelatedTest, ReviewCard, WitnessRoute};
-use crate::util::path_display;
+use crate::domain::ReviewCard;
 use serde::Serialize;
 
+use model::{
+    AgentCard, AgentContext, AgentMissingEvidence, AgentObligationEvidence, AgentRepairQueue,
+    AgentSafetyContract, AgentSourceContext, AgentWitnessRoute,
+};
+pub(crate) use model::{AgentQueueProjection, AgentReadiness};
+
 const TRUST_BOUNDARY: &str = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.";
-const MAX_CONTEXT_EVIDENCE: usize = 3;
-const MAX_RELATED_TESTS: usize = 3;
 pub(crate) const DO_NOT_DO: &[&str] = &[
     "do not widen unsafe code without reducing the missing evidence",
     "do not suppress this card instead of adding, exposing, or explicitly waiving evidence",
@@ -74,11 +77,7 @@ impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
             context: AgentContext::from(card),
             source_context: AgentSourceContext::from(card),
             safety_contract: AgentSafetyContract::from(card),
-            required_safety_conditions: card
-                .obligations
-                .iter()
-                .map(|obligation| obligation.description.as_str())
-                .collect(),
+            required_safety_conditions: model::required_safety_conditions(card),
             obligation_evidence: card
                 .obligation_evidence
                 .iter()
@@ -92,10 +91,7 @@ impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
             missing_evidence: card
                 .missing
                 .iter()
-                .map(|missing| AgentMissingEvidence {
-                    kind: &missing.kind,
-                    message: &missing.message,
-                })
+                .map(AgentMissingEvidence::from)
                 .collect(),
             allowed_repairs: allowed_repairs.repairs,
             agent_readiness,
@@ -123,31 +119,7 @@ fn allowed_repairs(card: &ReviewCard) -> AllowedRepairs {
 }
 
 fn repair_queue(card: &ReviewCard, readiness: &AgentReadiness) -> AgentRepairQueue {
-    let mut buckets = Vec::new();
-    if has_missing_kind(card, "contract") {
-        push_bucket(&mut buckets, "repairable_by_safety_docs");
-    }
-    if has_missing_kind(card, "guard") {
-        push_bucket(&mut buckets, "repairable_by_guard");
-    }
-    if has_missing_kind(card, "reach") {
-        push_bucket(&mut buckets, "repairable_by_test");
-    }
-    if has_missing_kind(card, "witness") {
-        push_bucket(&mut buckets, "requires_witness_receipt");
-    }
-    if !readiness.ready {
-        push_bucket(&mut buckets, "requires_human_review");
-        push_bucket(&mut buckets, "do_not_auto_repair");
-    }
-    if buckets.is_empty() {
-        push_bucket(&mut buckets, "review_only");
-    }
-
-    AgentRepairQueue {
-        summary: repair_queue_summary(&buckets, readiness.ready),
-        buckets,
-    }
+    queue::build(card, readiness)
 }
 
 pub(crate) fn repair_queue_projection(card: &ReviewCard) -> AgentQueueProjection {
@@ -160,298 +132,15 @@ pub(crate) fn repair_queue_projection(card: &ReviewCard) -> AgentQueueProjection
     }
 }
 
-fn repair_queue_summary(buckets: &[&'static str], ready: bool) -> String {
-    if buckets == ["review_only"] {
-        return "No repair bucket selected; inspect the ReviewCard before delegating work."
-            .to_string();
-    }
-    let mut summary = format!("Queue this card as: {}.", buckets.join(", "));
-    if !ready {
-        summary.push_str(" Keep human review in the loop before delegating edits.");
-    }
-    summary
-}
-
-fn has_missing_kind(card: &ReviewCard, kind: &str) -> bool {
-    card.missing.iter().any(|missing| missing.kind == kind)
-}
-
-fn push_bucket(buckets: &mut Vec<&'static str>, bucket: &'static str) {
-    if !buckets.contains(&bucket) {
-        buckets.push(bucket);
-    }
-}
-
 struct AllowedRepairs {
     repairs: Vec<String>,
     has_card_scoped_repairs: bool,
 }
 
+mod model;
+mod queue;
 mod readiness;
 mod repairs;
-
-#[derive(Serialize)]
-struct AgentCard<'a> {
-    id: &'a str,
-    #[serde(rename = "class")]
-    class_name: &'static str,
-    priority: &'static str,
-    confidence: &'static str,
-}
-
-impl<'a> From<&'a ReviewCard> for AgentCard<'a> {
-    fn from(card: &'a ReviewCard) -> Self {
-        Self {
-            id: &card.id.0,
-            class_name: card.class.as_str(),
-            priority: card.priority.as_str(),
-            confidence: card.confidence.as_str(),
-        }
-    }
-}
-
-#[derive(Serialize)]
-struct AgentContext<'a> {
-    file: String,
-    line: usize,
-    column: usize,
-    owner: &'a str,
-    site_kind: &'static str,
-    operation_family: &'static str,
-    operation: &'a str,
-    snippet: &'a str,
-    hazards: Vec<&'static str>,
-}
-
-impl<'a> From<&'a ReviewCard> for AgentContext<'a> {
-    fn from(card: &'a ReviewCard) -> Self {
-        Self {
-            file: path_display(&card.site.location.file),
-            line: card.site.location.line,
-            column: card.site.location.column,
-            owner: card.site.owner.as_deref().unwrap_or(""),
-            site_kind: card.site.kind.as_str(),
-            operation_family: card.operation.family.as_str(),
-            operation: &card.operation.expression,
-            snippet: &card.site.snippet,
-            hazards: card.hazards.iter().map(|hazard| hazard.as_str()).collect(),
-        }
-    }
-}
-
-#[derive(Serialize)]
-struct AgentSourceContext<'a> {
-    unsafe_site: AgentSourceSite<'a>,
-    nearby_safety_contract: Option<AgentContextEvidence<'a>>,
-    nearby_guard_evidence: Vec<AgentContextEvidence<'a>>,
-    related_tests: Vec<AgentRelatedTest<'a>>,
-    limits: &'static [&'static str],
-}
-
-impl<'a> From<&'a ReviewCard> for AgentSourceContext<'a> {
-    fn from(card: &'a ReviewCard) -> Self {
-        let nearby_safety_contract = card.contract.present.then_some(AgentContextEvidence {
-            kind: "safety_contract",
-            key: None,
-            summary: &card.contract.summary,
-        });
-        let nearby_guard_evidence = card
-            .obligation_evidence
-            .iter()
-            .filter(|evidence| evidence.discharge.present)
-            .take(MAX_CONTEXT_EVIDENCE)
-            .map(|evidence| AgentContextEvidence {
-                kind: "guard_evidence",
-                key: Some(evidence.obligation.key.as_str()),
-                summary: &evidence.discharge.summary,
-            })
-            .collect();
-        let related_tests = card
-            .related_tests
-            .iter()
-            .take(MAX_RELATED_TESTS)
-            .map(AgentRelatedTest::from)
-            .collect();
-
-        Self {
-            unsafe_site: AgentSourceSite::from(card),
-            nearby_safety_contract,
-            nearby_guard_evidence,
-            related_tests,
-            limits: &[
-                "bounded source context only; this packet does not include whole files",
-                "related test mentions do not prove the unsafe site executed",
-                "evidence summaries are ReviewCard projections, not independent analyzer truth",
-            ],
-        }
-    }
-}
-
-#[derive(Serialize)]
-struct AgentSourceSite<'a> {
-    file: String,
-    line: usize,
-    column: usize,
-    owner: &'a str,
-    snippet: &'a str,
-}
-
-impl<'a> From<&'a ReviewCard> for AgentSourceSite<'a> {
-    fn from(card: &'a ReviewCard) -> Self {
-        Self {
-            file: path_display(&card.site.location.file),
-            line: card.site.location.line,
-            column: card.site.location.column,
-            owner: card.site.owner.as_deref().unwrap_or(""),
-            snippet: &card.site.snippet,
-        }
-    }
-}
-
-#[derive(Serialize)]
-struct AgentContextEvidence<'a> {
-    kind: &'static str,
-    key: Option<&'a str>,
-    summary: &'a str,
-}
-
-#[derive(Serialize)]
-struct AgentRelatedTest<'a> {
-    name: &'a str,
-    file: &'a str,
-    line: usize,
-}
-
-impl<'a> From<&'a RelatedTest> for AgentRelatedTest<'a> {
-    fn from(test: &'a RelatedTest) -> Self {
-        Self {
-            name: &test.name,
-            file: &test.file,
-            line: test.line,
-        }
-    }
-}
-
-#[derive(Serialize)]
-struct AgentSafetyContract<'a> {
-    required_conditions: Vec<&'a str>,
-    contract_evidence: &'a str,
-    discharge_evidence: &'a str,
-    reach_evidence: &'a str,
-    witness_evidence: &'a str,
-    reach_limitation: &'static str,
-}
-
-impl<'a> From<&'a ReviewCard> for AgentSafetyContract<'a> {
-    fn from(card: &'a ReviewCard) -> Self {
-        Self {
-            required_conditions: card
-                .obligations
-                .iter()
-                .map(|obligation| obligation.description.as_str())
-                .collect(),
-            contract_evidence: &card.contract.summary,
-            discharge_evidence: &card.discharge.summary,
-            reach_evidence: &card.reach.summary,
-            witness_evidence: &card.witness.summary,
-            reach_limitation: "static reach evidence is not proof that the unsafe site executed",
-        }
-    }
-}
-
-#[derive(Serialize)]
-struct AgentObligationEvidence<'a> {
-    key: &'a str,
-    description: &'a str,
-    contract: AgentEvidenceState<'a>,
-    discharge: AgentEvidenceState<'a>,
-    reach: AgentEvidenceState<'a>,
-    witness: AgentEvidenceState<'a>,
-}
-
-impl<'a> From<&'a ObligationEvidence> for AgentObligationEvidence<'a> {
-    fn from(evidence: &'a ObligationEvidence) -> Self {
-        Self {
-            key: &evidence.obligation.key,
-            description: &evidence.obligation.description,
-            contract: AgentEvidenceState::from(&evidence.contract),
-            discharge: AgentEvidenceState::from(&evidence.discharge),
-            reach: AgentEvidenceState::from(&evidence.reach),
-            witness: AgentEvidenceState::from(&evidence.witness),
-        }
-    }
-}
-
-#[derive(Serialize)]
-struct AgentEvidenceState<'a> {
-    present: bool,
-    state: &'a str,
-    summary: &'a str,
-}
-
-impl<'a> From<&'a EvidenceState> for AgentEvidenceState<'a> {
-    fn from(state: &'a EvidenceState) -> Self {
-        Self {
-            present: state.present,
-            state: &state.state,
-            summary: &state.summary,
-        }
-    }
-}
-
-#[derive(Serialize)]
-struct AgentMissingEvidence<'a> {
-    kind: &'a str,
-    message: &'a str,
-}
-
-#[derive(Clone, Serialize)]
-pub(crate) struct AgentQueueProjection {
-    pub(crate) agent_readiness: AgentReadiness,
-    pub(crate) repair_queue: AgentRepairQueue,
-}
-
-#[derive(Clone, Serialize)]
-pub(crate) struct AgentReadiness {
-    pub(crate) ready: bool,
-    pub(crate) state: &'static str,
-    pub(crate) reasons: Vec<String>,
-}
-
-#[derive(Clone, Serialize)]
-pub(crate) struct AgentRepairQueue {
-    pub(crate) buckets: Vec<&'static str>,
-    pub(crate) summary: String,
-}
-
-impl AgentReadiness {
-    fn not_ready(state: &'static str, reasons: Vec<String>) -> Self {
-        Self {
-            ready: false,
-            state,
-            reasons,
-        }
-    }
-}
-
-#[derive(Serialize)]
-struct AgentWitnessRoute<'a> {
-    kind: &'static str,
-    reason: &'a str,
-    command: Option<&'a str>,
-    required: bool,
-}
-
-impl<'a> From<&'a WitnessRoute> for AgentWitnessRoute<'a> {
-    fn from(route: &'a WitnessRoute) -> Self {
-        Self {
-            kind: route.kind.as_str(),
-            reason: &route.reason,
-            command: route.command.as_deref(),
-            required: route.required,
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -459,6 +148,7 @@ mod tests {
     use crate::api::{
         AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, PolicyMode, Scope, analyze,
     };
+    use crate::domain::EvidenceState;
     use std::path::PathBuf;
 
     #[test]

@@ -1,4 +1,4 @@
-use super::AgentReadiness;
+use super::model::AgentReadiness;
 use crate::domain::{Confidence, OperationFamily, ReviewCard, ReviewClass, WitnessKind};
 
 pub(super) fn build(card: &ReviewCard, has_card_scoped_repairs: bool) -> AgentReadiness {
