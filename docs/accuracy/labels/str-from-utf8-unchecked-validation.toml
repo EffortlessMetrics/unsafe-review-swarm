@@ -169,6 +169,19 @@ label_source = "fixture_golden"
 rationale = "A comment that mentions returning from a UTF-8 validation match arm is not executable evidence and does not discharge the unchecked conversion obligation."
 
 [[samples]]
+id = "utf8-unchecked-match-return-string-not-guard"
+fixture = "str_from_utf8_unchecked_match_return_string_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "utf8"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A string literal that mentions returning from a UTF-8 validation match arm is not executable evidence and does not discharge the unchecked conversion obligation."
+
+[[samples]]
 id = "utf8-unchecked-let-else-ok-validation-present"
 fixture = "str_from_utf8_unchecked_let_else_ok_guard"
 kind = "positive"
