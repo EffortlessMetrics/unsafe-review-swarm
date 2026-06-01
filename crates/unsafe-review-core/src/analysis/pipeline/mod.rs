@@ -3394,6 +3394,7 @@ pub fn zstd_sync(
         for fixture in [
             "str_from_utf8_unchecked_is_ok_guard",
             "str_from_utf8_unchecked_if_let_ok_guard",
+            "str_from_utf8_unchecked_if_let_err_return_guard",
             "str_from_utf8_unchecked_is_err_return_guard",
             "str_from_utf8_unchecked_question_mark_guard",
             "str_from_utf8_unchecked_match_return_guard",
