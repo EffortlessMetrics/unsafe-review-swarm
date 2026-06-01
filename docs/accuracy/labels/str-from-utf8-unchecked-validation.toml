@@ -299,6 +299,19 @@ label_source = "fixture_golden"
 rationale = "Same-buffer match Err early-return UTF-8 evidence becomes stale when the buffer is reassigned before from_utf8_unchecked."
 
 [[samples]]
+id = "utf8-unchecked-match-err-shadowed-not-guard"
+fixture = "str_from_utf8_unchecked_match_err_shadowed_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "utf8"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Same-buffer match Err early-return UTF-8 evidence becomes stale when the validated buffer binding is shadowed before from_utf8_unchecked."
+
+[[samples]]
 id = "utf8-unchecked-let-else-ok-reassigned-not-guard"
 fixture = "str_from_utf8_unchecked_let_else_ok_reassigned_not_guard"
 kind = "false_positive_control"

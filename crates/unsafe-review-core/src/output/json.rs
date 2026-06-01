@@ -445,6 +445,7 @@ mod tests {
         "str_from_utf8_unchecked_question_mark_guard",
         "str_from_utf8_unchecked_match_return_guard",
         "str_from_utf8_unchecked_match_err_reassigned_not_guard",
+        "str_from_utf8_unchecked_match_err_shadowed_not_guard",
         "str_from_utf8_unchecked_post_validation_not_guard",
         "str_from_utf8_unchecked_other_buffer_not_guard",
         "str_from_utf8_unchecked_prefix_validation_not_guard",
