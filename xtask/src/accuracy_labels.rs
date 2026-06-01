@@ -302,20 +302,18 @@ fn validate_label_ledger(
     let mut ids = BTreeSet::new();
     let mut fixtures = BTreeSet::new();
     let mut sample_keys = BTreeSet::new();
+    let context = LabelLedgerContext {
+        path,
+        claim_id,
+        source_kind,
+        claim,
+        fixture_cases,
+    };
     for (idx, sample) in samples.iter().enumerate() {
         let sample = sample
             .as_table()
             .ok_or_else(|| format!("{path} samples[{idx}] must be a TOML table"))?;
-        let sample = validate_sample(
-            path,
-            idx,
-            sample,
-            claim_id,
-            source_kind,
-            claim,
-            fixture_cases,
-            &mut ids,
-        )?;
+        let sample = validate_sample(&context, idx, sample, &mut ids)?;
         fixtures.insert(sample.fixture);
         if !sample_keys.insert(sample.key.clone()) {
             return Err(format!("{path} contains duplicate sample `{}`", sample.key));
@@ -337,16 +335,21 @@ fn require_label_trust_boundary_limits(text: &str, path: &str) -> Result<(), Str
     Ok(())
 }
 
+struct LabelLedgerContext<'a> {
+    path: &'a str,
+    claim_id: &'a str,
+    source_kind: &'a str,
+    claim: &'a PolicyClaim,
+    fixture_cases: &'a BTreeMap<String, CalibrationFixtureCase>,
+}
+
 fn validate_sample(
-    path: &str,
+    context: &LabelLedgerContext<'_>,
     idx: usize,
     sample: &toml::map::Map<String, toml::Value>,
-    claim_id: &str,
-    ledger_source_kind: &str,
-    claim: &PolicyClaim,
-    fixture_cases: &BTreeMap<String, CalibrationFixtureCase>,
     ids: &mut BTreeSet<String>,
 ) -> Result<LabelSampleStats, String> {
+    let path = context.path;
     for field in sample.keys() {
         if !LABEL_SAMPLE_FIELDS.contains(&field.as_str()) {
             return Err(format!(
@@ -360,9 +363,10 @@ fn validate_sample(
     }
     let label_source = required_table_string(sample, "label_source", path, idx)?;
     require_allowed(label_source, LABEL_SOURCE_KINDS, path, "label_source")?;
-    if label_source != ledger_source_kind {
+    if label_source != context.source_kind {
         return Err(format!(
-            "{path} samples[{idx}] label_source `{label_source}` does not match ledger source_kind `{ledger_source_kind}`"
+            "{path} samples[{idx}] label_source `{label_source}` does not match ledger source_kind `{}`",
+            context.source_kind
         ));
     }
     if label_source == "human_adjudicated" {
@@ -375,12 +379,12 @@ fn validate_sample(
         required_table_string(sample, "adjudicator", path, idx)?;
     }
     let fixture = required_table_string(sample, "fixture", path, idx)?;
-    if !claim.fixtures.contains(fixture) {
+    if !context.claim.fixtures.contains(fixture) {
         return Err(format!(
             "{path} samples[{idx}] references fixture `{fixture}` not listed by policy/accuracy-calibration.toml claim"
         ));
     }
-    let fixture_case = fixture_cases.get(fixture).ok_or_else(|| {
+    let fixture_case = context.fixture_cases.get(fixture).ok_or_else(|| {
         format!("{path} samples[{idx}] references fixture `{fixture}` not present in fixtures/calibration.toml")
     })?;
     let kind = required_table_string(sample, "kind", path, idx)?;
@@ -451,9 +455,10 @@ fn validate_sample(
         obligation_key,
     };
     let contract_state = optional_table_string(sample, "expected_contract_state", path, idx)?;
-    if public_contract_claim_requires_contract_state(claim_id) && contract_state.is_none() {
+    if public_contract_claim_requires_contract_state(context.claim_id) && contract_state.is_none() {
         return Err(format!(
-            "{path} samples[{idx}] claim `{claim_id}` must pin `expected_contract_state`"
+            "{path} samples[{idx}] claim `{}` must pin `expected_contract_state`",
+            context.claim_id
         ));
     }
     if let Some(contract_state) = contract_state {
@@ -492,9 +497,10 @@ fn validate_sample(
         },
     )?;
     let route_kinds = optional_table_str_array(sample, "expected_witness_route_kinds", path, idx)?;
-    if witness_route_claim_requires_route_labels(claim_id) && route_kinds.is_empty() {
+    if witness_route_claim_requires_route_labels(context.claim_id) && route_kinds.is_empty() {
         return Err(format!(
-            "{path} samples[{idx}] claim `{claim_id}` must pin `expected_witness_route_kinds`"
+            "{path} samples[{idx}] claim `{}` must pin `expected_witness_route_kinds`",
+            context.claim_id
         ));
     }
     if !route_kinds.is_empty() {

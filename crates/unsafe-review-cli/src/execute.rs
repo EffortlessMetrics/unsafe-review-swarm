@@ -306,12 +306,12 @@ impl RepoStatusReporter {
         *self
             .last_status
             .lock()
-            .map_err(|_| "repo status lock poisoned".to_string())? = Some(status.clone());
+            .map_err(|err| format!("repo status lock poisoned: {err}"))? = Some(status.clone());
         if let Some(output) = &event.partial_output {
             *self
                 .partial_output
                 .lock()
-                .map_err(|_| "repo partial output lock poisoned".to_string())? =
+                .map_err(|err| format!("repo partial output lock poisoned: {err}"))? =
                 Some(output.clone());
         }
         maybe_pause_for_repo_interrupt_after_scan(status);
@@ -338,7 +338,7 @@ impl RepoStatusReporter {
         let last_status = self
             .last_status
             .lock()
-            .map_err(|_| "repo status lock poisoned".to_string())?
+            .map_err(|err| format!("repo status lock poisoned: {err}"))?
             .clone();
         fs::write(
             &path,
@@ -401,7 +401,7 @@ impl RepoSignalState {
         let last_status = self
             .last_status
             .lock()
-            .map_err(|_| "repo status lock poisoned".to_string())?
+            .map_err(|err| format!("repo status lock poisoned: {err}"))?
             .clone();
         let partial_path = self.write_interrupted_partial()?;
         ensure_parent_dir(path)?;
@@ -427,7 +427,7 @@ impl RepoSignalState {
         let partial_output = self
             .partial_output
             .lock()
-            .map_err(|_| "repo partial output lock poisoned".to_string())?
+            .map_err(|err| format!("repo partial output lock poisoned: {err}"))?
             .clone();
         let Some(output) = partial_output else {
             return Ok(None);
