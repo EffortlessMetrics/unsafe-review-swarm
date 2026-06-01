@@ -335,6 +335,7 @@ required_core_fixtures = [
   "str_from_utf8_unchecked_is_err_return_comment_not_guard",
   "str_from_utf8_unchecked_question_mark_guard",
   "str_from_utf8_unchecked_match_return_guard",
+  "str_from_utf8_unchecked_match_err_reassigned_not_guard",
   "str_from_utf8_unchecked_let_else_ok_guard",
   "str_from_utf8_unchecked_match_ok_guard",
   "str_from_utf8_unchecked_post_validation_not_guard",
@@ -3951,6 +3952,16 @@ expected_hazard = "invalid_value"
 fixture = "str_from_utf8_unchecked_if_let_err_reassigned_not_guard"
 kind = "false_positive_control"
 claim = "str::from_utf8_unchecked does not accept if-let Err early-return evidence after buffer reassignment"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "str_from_utf8_unchecked_match_err_reassigned_not_guard"
+kind = "false_positive_control"
+claim = "str::from_utf8_unchecked does not accept match Err early-return evidence after buffer reassignment"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
