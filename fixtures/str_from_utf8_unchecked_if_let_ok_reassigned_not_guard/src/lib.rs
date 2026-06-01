@@ -1,0 +1,20 @@
+pub fn decode_reassigned<'a>(input: &'a [u8], fallback: &'a [u8]) -> &'a str {
+    let mut bytes = input;
+    if let Ok(_valid) = core::str::from_utf8(bytes) {
+        bytes = fallback;
+        // SAFETY: fixture deliberately invalidates the validated slice inside the Ok branch.
+        unsafe { core::str::from_utf8_unchecked(bytes) }
+    } else {
+        ""
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode_reassigned;
+
+    #[test]
+    fn mentions_decode_reassigned() {
+        let _ = stringify!(decode_reassigned);
+    }
+}
