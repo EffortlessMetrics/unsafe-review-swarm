@@ -402,7 +402,7 @@ status = "fixture_pinned"
 kind = "evidence_precision"
 owner = "calibration"
 operation_family = "copy_nonoverlapping"
-hazard = "aliasing_or_provenance"
+hazard = "bounds"
 support_tier = "Core operation smoke slice"
 fixtures = [
   "copy_nonoverlapping",
@@ -588,7 +588,7 @@ status = "fixture_pinned"
 kind = "evidence_precision"
 owner = "calibration"
 operation_family = "ptr_copy"
-hazard = "pointer_validity"
+hazard = "bounds"
 support_tier = "Core operation smoke slice"
 fixtures = [
   "ptr_copy_overlapping",

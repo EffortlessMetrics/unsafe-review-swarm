@@ -439,6 +439,7 @@ fn validate_sample(
     let expected_owner = optional_table_string(sample, "expected_owner", path, idx)?;
     let expected_site_kind = optional_table_string(sample, "expected_site_kind", path, idx)?;
     let obligation_key = required_table_string(sample, "expected_obligation_key", path, idx)?;
+    require_obligation_hazard_alignment(path, idx, obligation_key, expected_hazard)?;
     let fixture_obligation = FixtureObligation {
         fixture,
         operation_family: expected_operation_family,
@@ -508,6 +509,20 @@ fn validate_sample(
             route_kinds.join(",")
         ),
     })
+}
+
+fn require_obligation_hazard_alignment(
+    path: &str,
+    idx: usize,
+    obligation_key: &str,
+    expected_hazard: &str,
+) -> Result<(), String> {
+    if obligation_key == "valid-range" && expected_hazard != "bounds" {
+        return Err(format!(
+            "{path} samples[{idx}] expected_obligation_key `valid-range` must use expected_hazard `bounds`, got `{expected_hazard}`"
+        ));
+    }
+    Ok(())
 }
 
 fn reject_zero_card_fields(
@@ -1139,6 +1154,66 @@ rationale = "The fixture intentionally has alignment evidence, so missing should
                 .unwrap_or_default()
                 .contains("expected_discharge_state")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn label_ledger_rejects_valid_range_sample_with_non_bounds_hazard() -> Result<(), String> {
+        let ledger = r#"
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "ptr-copy-valid-range-evidence"
+operation_family = "ptr_copy"
+hazard = "bounds"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not calibrated precision or recall, not witness adequacy, and not policy readiness."
+
+[[samples]]
+id = "bad-valid-range-hazard"
+fixture = "ptr_copy_slice_range_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "Valid-range labels must stay tied to the bounds hazard, not a broader pointer validity selector."
+"#
+        .parse::<toml::Table>()
+        .map(toml::Value::Table)
+        .map_err(|err| format!("parse test ledger failed: {err}"))?;
+        let mut cases = BTreeMap::new();
+        cases.insert(
+            "ptr_copy_slice_range_guard".to_string(),
+            CalibrationFixtureCase {
+                kind: "positive".to_string(),
+                expected_cards: 1,
+                expected_class: Some("guard_missing".to_string()),
+                expected_operation_family: Some("ptr_copy".to_string()),
+                expected_hazard: Some("pointer_validity".to_string()),
+            },
+        );
+        let claim = PolicyClaim {
+            operation_family: Some("ptr_copy".to_string()),
+            hazard: Some("bounds".to_string()),
+            fixtures: BTreeSet::from(["ptr_copy_slice_range_guard".to_string()]),
+            label_ledgers: BTreeSet::new(),
+        };
+
+        let result = validate_label_ledger(
+            "docs/accuracy/labels/test.toml",
+            &ledger,
+            "ptr-copy-valid-range-evidence",
+            &claim,
+            &cases,
+        );
+
+        let err = result.err().unwrap_or_default();
+        assert!(err.contains("expected_obligation_key `valid-range`"));
+        assert!(err.contains("expected_hazard `bounds`"));
         Ok(())
     }
 
