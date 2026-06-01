@@ -1565,64 +1565,22 @@ fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<()
 
     let main_badge = parse_json(&fs::read_to_string(badge_dir.join("unsafe-review.json"))?)?;
     assert_eq!(main_badge["schemaVersion"], 1);
-    assert_eq!(main_badge["contract_version"], "0.1");
-    assert_eq!(main_badge["kind"], "unsafe_review");
-    assert_eq!(main_badge["basis"], "open_actionable_review_gaps");
     assert_eq!(main_badge["label"], "unsafe-review");
     assert_eq!(main_badge["message"], "1");
-    assert_eq!(main_badge["counts"]["unsuppressed_review_gaps"], 1);
-    assert_eq!(
-        main_badge["counts"]["unsuppressed_evidence_quality_findings"],
-        0
-    );
-    assert_eq!(main_badge["counts"]["evidence_quality_contract_missing"], 0);
-    assert_eq!(main_badge["counts"]["evidence_quality_guard_missing"], 0);
-    assert_eq!(
-        main_badge["counts"]["evidence_quality_guarded_unwitnessed"],
-        0
-    );
+    assert_public_badge_payload(&main_badge)?;
     assert_ne!(main_badge["message"], "safe");
 
     let plus_badge = parse_json(&fs::read_to_string(
         badge_dir.join("unsafe-review-plus.json"),
     )?)?;
     assert_eq!(plus_badge["schemaVersion"], 1);
-    assert_eq!(plus_badge["contract_version"], "0.1");
-    assert_eq!(plus_badge["kind"], "unsafe_review_plus");
-    assert_eq!(
-        plus_badge["basis"],
-        "open_actionable_review_gaps_plus_evidence_quality_findings"
-    );
     assert_eq!(plus_badge["label"], "unsafe-review+");
     assert_eq!(plus_badge["message"], "2");
-    assert_eq!(plus_badge["counts"]["unsuppressed_review_gaps"], 1);
-    assert_eq!(
-        plus_badge["counts"]["unsuppressed_evidence_quality_findings"],
-        1
-    );
-    assert_eq!(plus_badge["counts"]["evidence_quality_contract_missing"], 0);
-    assert_eq!(plus_badge["counts"]["evidence_quality_guard_missing"], 1);
-    assert_eq!(
-        plus_badge["counts"]["evidence_quality_guarded_unwitnessed"],
-        0
-    );
-    let evidence_quality_component_count = json_usize(
-        &plus_badge["counts"]["evidence_quality_contract_missing"],
-        "evidence_quality_contract_missing",
-    )? + json_usize(
-        &plus_badge["counts"]["evidence_quality_guard_missing"],
-        "evidence_quality_guard_missing",
-    )? + json_usize(
-        &plus_badge["counts"]["evidence_quality_guarded_unwitnessed"],
-        "evidence_quality_guarded_unwitnessed",
-    )?;
-    assert_eq!(
-        json_usize(
-            &plus_badge["counts"]["unsuppressed_evidence_quality_findings"],
-            "unsuppressed_evidence_quality_findings",
-        )?,
-        evidence_quality_component_count
-    );
+    assert_public_badge_payload(&plus_badge)?;
+    let evidence_quality_component_count =
+        json_usize(&summary["contract_missing"], "contract_missing")?
+            + json_usize(&summary["guard_missing"], "guard_missing")?
+            + json_usize(&summary["guarded_unwitnessed"], "guarded_unwitnessed")?;
     let main_count = main_badge["message"]
         .as_str()
         .ok_or("main badge message missing")?
@@ -2775,6 +2733,31 @@ fn stdout_text(output: &Output) -> Result<String, Box<dyn Error>> {
 
 fn parse_json(text: &str) -> Result<Value, Box<dyn Error>> {
     Ok(serde_json::from_str(text)?)
+}
+
+fn assert_public_badge_payload(value: &Value) -> Result<(), Box<dyn Error>> {
+    let object = value
+        .as_object()
+        .ok_or("badge endpoint payload should be a JSON object")?;
+    for key in object.keys() {
+        if !["schemaVersion", "label", "message", "color"].contains(&key.as_str()) {
+            return Err(format!("badge endpoint contains non-Shields field `{key}`").into());
+        }
+    }
+    for internal in [
+        "contract_version",
+        "kind",
+        "scope",
+        "basis",
+        "status",
+        "counts",
+    ] {
+        assert!(
+            value.get(internal).is_none(),
+            "public badge JSON must not contain internal field `{internal}`"
+        );
+    }
+    Ok(())
 }
 
 fn json_usize(value: &Value, field: &str) -> Result<usize, Box<dyn Error>> {

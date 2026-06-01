@@ -12,46 +12,8 @@ pub(crate) fn render(output: &AnalyzeOutput) -> (String, String) {
     let weak_evidence_findings = evidence_quality.total();
     let plus_count = base_count + weak_evidence_findings;
     let plus_color = badge_color(plus_count);
-    let main = badge(
-        "unsafe_review",
-        "repo",
-        "open_actionable_review_gaps",
-        "unsafe-review",
-        base_count,
-        base_color,
-        BadgeCounts {
-            unsuppressed_review_gaps: base_count,
-            unsuppressed_evidence_quality_findings: 0,
-            evidence_quality_contract_missing: 0,
-            evidence_quality_guard_missing: 0,
-            evidence_quality_guarded_unwitnessed: 0,
-            suppressed_review_gaps: 0,
-            suppressed_evidence_quality_findings: 0,
-            intentional_findings: 0,
-            unknowns: output.summary.static_unknown,
-            analyzed_unsafe_seams: output.summary.unsafe_sites,
-        },
-    );
-    let plus = badge(
-        "unsafe_review_plus",
-        "repo",
-        "open_actionable_review_gaps_plus_evidence_quality_findings",
-        "unsafe-review+",
-        plus_count,
-        plus_color,
-        BadgeCounts {
-            unsuppressed_review_gaps: base_count,
-            unsuppressed_evidence_quality_findings: weak_evidence_findings,
-            evidence_quality_contract_missing: evidence_quality.contract_missing,
-            evidence_quality_guard_missing: evidence_quality.guard_missing,
-            evidence_quality_guarded_unwitnessed: evidence_quality.guarded_unwitnessed,
-            suppressed_review_gaps: 0,
-            suppressed_evidence_quality_findings: 0,
-            intentional_findings: 0,
-            unknowns: output.summary.static_unknown,
-            analyzed_unsafe_seams: output.summary.unsafe_sites,
-        },
-    );
+    let main = badge("unsafe-review", base_count, base_color);
+    let plus = badge("unsafe-review+", plus_count, plus_color);
     (render_pretty(&main), render_pretty(&plus))
 }
 
@@ -88,56 +50,22 @@ fn render_pretty(value: &impl Serialize) -> String {
     }
 }
 
-fn badge(
-    kind: &'static str,
-    scope: &'static str,
-    basis: &'static str,
-    label: &'static str,
-    count: usize,
-    color: &'static str,
-    counts: BadgeCounts,
-) -> BadgeJson<'static> {
+fn badge(label: &'static str, count: usize, color: &'static str) -> BadgeJson {
     BadgeJson {
         schema_version: 1,
-        contract_version: "0.1",
-        kind,
-        scope,
-        basis,
         label,
         message: count.to_string(),
-        status: if count == 0 { "pass" } else { "fail" },
         color,
-        counts,
     }
 }
 
 #[derive(Serialize)]
-struct BadgeJson<'a> {
+struct BadgeJson {
     #[serde(rename = "schemaVersion")]
     schema_version: u8,
-    contract_version: &'a str,
-    kind: &'a str,
-    scope: &'a str,
-    basis: &'a str,
-    label: &'a str,
+    label: &'static str,
     message: String,
-    status: &'a str,
     color: &'static str,
-    counts: BadgeCounts,
-}
-
-#[derive(Serialize)]
-struct BadgeCounts {
-    unsuppressed_review_gaps: usize,
-    unsuppressed_evidence_quality_findings: usize,
-    evidence_quality_contract_missing: usize,
-    evidence_quality_guard_missing: usize,
-    evidence_quality_guarded_unwitnessed: usize,
-    suppressed_review_gaps: usize,
-    suppressed_evidence_quality_findings: usize,
-    intentional_findings: usize,
-    unknowns: usize,
-    analyzed_unsafe_seams: usize,
 }
 
 #[cfg(test)]
@@ -154,37 +82,17 @@ mod tests {
         let plus = parse_json(&plus)?;
 
         assert_eq!(main["schemaVersion"], 1);
-        assert_eq!(main["contract_version"], "0.1");
-        assert_eq!(main["kind"], "unsafe_review");
-        assert_eq!(main["basis"], "open_actionable_review_gaps");
         assert_eq!(main["label"], "unsafe-review");
         assert_eq!(main["message"], "1");
-        assert_eq!(main["status"], "fail");
         assert_eq!(main["color"], "yellow");
-        assert_eq!(main["counts"]["unsuppressed_review_gaps"], 1);
-        assert_eq!(main["counts"]["unsuppressed_evidence_quality_findings"], 0);
-        assert_eq!(main["counts"]["evidence_quality_contract_missing"], 0);
-        assert_eq!(main["counts"]["evidence_quality_guard_missing"], 0);
-        assert_eq!(main["counts"]["evidence_quality_guarded_unwitnessed"], 0);
+        assert_shields_endpoint_fields_only(&main)?;
         assert_ne!(main["message"], "safe");
 
         assert_eq!(plus["schemaVersion"], 1);
-        assert_eq!(plus["contract_version"], "0.1");
-        assert_eq!(plus["kind"], "unsafe_review_plus");
-        assert_eq!(
-            plus["basis"],
-            "open_actionable_review_gaps_plus_evidence_quality_findings"
-        );
         assert_eq!(plus["label"], "unsafe-review+");
         assert_eq!(plus["message"], "2");
-        assert_eq!(plus["status"], "fail");
         assert_eq!(plus["color"], "yellow");
-        assert_eq!(plus["counts"]["unsuppressed_review_gaps"], 1);
-        assert_eq!(plus["counts"]["unsuppressed_evidence_quality_findings"], 1);
-        assert_eq!(plus["counts"]["evidence_quality_contract_missing"], 0);
-        assert_eq!(plus["counts"]["evidence_quality_guard_missing"], 1);
-        assert_eq!(plus["counts"]["evidence_quality_guarded_unwitnessed"], 0);
-        assert_eq!(plus["message"], badge_count_sum(&plus)?.to_string());
+        assert_shields_endpoint_fields_only(&plus)?;
         assert_ne!(plus["message"], "UB-free");
         Ok(())
     }
@@ -198,14 +106,12 @@ mod tests {
 
         assert_eq!(main["message"], "0");
         assert_eq!(main["schemaVersion"], 1);
-        assert_eq!(main["contract_version"], "0.1");
-        assert_eq!(main["status"], "pass");
         assert_eq!(main["color"], "green");
+        assert_shields_endpoint_fields_only(&main)?;
         assert_ne!(main["message"], "safe");
         assert_eq!(plus["message"], "0");
         assert_eq!(plus["schemaVersion"], 1);
-        assert_eq!(plus["contract_version"], "0.1");
-        assert_eq!(plus["status"], "pass");
+        assert_shields_endpoint_fields_only(&plus)?;
         assert_ne!(plus["message"], "Miri-clean");
         Ok(())
     }
@@ -226,28 +132,51 @@ mod tests {
     #[test]
     fn unsafe_review_plus_count_matches_component_breakdown() -> Result<(), String> {
         let output = fixture_output("raw_pointer_alignment")?;
-        let (_main, plus) = render(&output);
+        let (main, plus) = render(&output);
+        let main = parse_json(&main)?;
         let plus = parse_json(&plus)?;
 
-        assert_eq!(plus["message"], badge_count_sum(&plus)?.to_string());
-        assert_eq!(plus["counts"]["unsuppressed_review_gaps"], 1);
-        assert_eq!(plus["counts"]["evidence_quality_contract_missing"], 0);
-        assert_eq!(plus["counts"]["evidence_quality_guard_missing"], 1);
-        assert_eq!(plus["counts"]["evidence_quality_guarded_unwitnessed"], 0);
+        assert_eq!(main["message"], "1");
+        assert_eq!(plus["message"], "2");
+
+        Ok(())
+    }
+
+    #[test]
+    fn public_badge_payloads_are_shields_endpoint_json() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let (main, plus) = render(&output);
+
+        for text in [main, plus] {
+            let badge = parse_json(&text)?;
+            assert_shields_endpoint_fields_only(&badge)?;
+            for internal in [
+                "contract_version",
+                "kind",
+                "scope",
+                "basis",
+                "status",
+                "counts",
+            ] {
+                assert!(
+                    badge.get(internal).is_none(),
+                    "public badge JSON must not contain internal field `{internal}`"
+                );
+            }
+        }
 
         Ok(())
     }
 
     fn assert_badge_endpoint_contract(
         expected_label: &str,
-        expected_kind: &str,
+        _expected_kind: &str,
         text: &str,
     ) -> Result<(), String> {
         let badge = parse_json(text)?;
         assert_eq!(badge["schemaVersion"], 1);
-        assert_eq!(badge["contract_version"], "0.1");
-        assert_eq!(badge["kind"], expected_kind);
         assert_eq!(badge["label"], expected_label);
+        assert_shields_endpoint_fields_only(&badge)?;
 
         let message = badge["message"]
             .as_str()
@@ -278,6 +207,20 @@ mod tests {
         Ok(())
     }
 
+    fn assert_shields_endpoint_fields_only(badge: &serde_json::Value) -> Result<(), String> {
+        let object = badge
+            .as_object()
+            .ok_or_else(|| "badge endpoint JSON must be an object".to_string())?;
+        for key in object.keys() {
+            if !["schemaVersion", "label", "message", "color"].contains(&key.as_str()) {
+                return Err(format!(
+                    "public badge JSON contains non-Shields field `{key}`"
+                ));
+            }
+        }
+        Ok(())
+    }
+
     fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures")
@@ -291,35 +234,6 @@ mod tests {
             include_unchanged_tests: true,
             max_cards: None,
         })
-    }
-
-    fn badge_count_sum(badge: &serde_json::Value) -> Result<usize, String> {
-        let counts = &badge["counts"];
-        let mut total = json_usize(
-            &counts["unsuppressed_review_gaps"],
-            "unsuppressed_review_gaps",
-        )?;
-        total += json_usize(
-            &counts["evidence_quality_contract_missing"],
-            "evidence_quality_contract_missing",
-        )?;
-        total += json_usize(
-            &counts["evidence_quality_guard_missing"],
-            "evidence_quality_guard_missing",
-        )?;
-        total += json_usize(
-            &counts["evidence_quality_guarded_unwitnessed"],
-            "evidence_quality_guarded_unwitnessed",
-        )?;
-        Ok(total)
-    }
-
-    fn json_usize(value: &serde_json::Value, field: &str) -> Result<usize, String> {
-        value
-            .as_u64()
-            .ok_or_else(|| format!("{field} must be an unsigned count"))?
-            .try_into()
-            .map_err(|_err| format!("{field} does not fit in usize"))
     }
 
     fn parse_json(text: &str) -> Result<serde_json::Value, String> {

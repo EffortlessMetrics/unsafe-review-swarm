@@ -43,10 +43,16 @@ Endpoint badges may appear in README rows only when `badges/unsafe-review.json`
 and `badges/unsafe-review-plus.json` are checked in and covered by the
 validation path above.
 
-The endpoints remain Shields-compatible through `schemaVersion = 1`. Additional
-repo-contract fields describe the source projection: `unsafe-review` uses
-`open_actionable_review_gaps`, while `unsafe-review+` uses
-`open_actionable_review_gaps_plus_evidence_quality_findings`.
+The checked-in public endpoints must be Shields endpoint JSON only. They may
+contain `schemaVersion`, `label`, `message`, `color`, and other
+Shields-supported presentation fields, but they must not contain internal
+repo-contract fields such as `contract_version`, `kind`, `scope`, `basis`,
+`status`, or `counts`.
+
+`unsafe-review` uses the open actionable review gap count as its numeric
+message. `unsafe-review+` uses open review gaps plus missing-or-weak evidence
+findings as its numeric message. The meaning belongs in this policy document
+and the badge link target, not in the endpoint message.
 
 ## Forbidden badge posture
 

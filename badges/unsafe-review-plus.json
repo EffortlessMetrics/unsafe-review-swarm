@@ -1,23 +1,6 @@
 {
   "schemaVersion": 1,
-  "contract_version": "0.1",
-  "kind": "unsafe_review_plus",
-  "scope": "repo",
-  "basis": "open_actionable_review_gaps_plus_evidence_quality_findings",
   "label": "unsafe-review+",
   "message": "1021",
-  "status": "fail",
-  "color": "orange",
-  "counts": {
-    "unsuppressed_review_gaps": 519,
-    "unsuppressed_evidence_quality_findings": 502,
-    "evidence_quality_contract_missing": 27,
-    "evidence_quality_guard_missing": 389,
-    "evidence_quality_guarded_unwitnessed": 86,
-    "suppressed_review_gaps": 0,
-    "suppressed_evidence_quality_findings": 0,
-    "intentional_findings": 0,
-    "unknowns": 0,
-    "analyzed_unsafe_seams": 519
-  }
+  "color": "orange"
 }

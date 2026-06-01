@@ -7,6 +7,18 @@ const ENDPOINTS: &[(&str, &str)] = &[
 
 const ENDPOINT_PREFIX: &str = "https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FEffortlessMetrics%2Funsafe-review%2Fmain%2Fbadges%2F";
 const FORBIDDEN_MESSAGE_TERMS: &[&str] = &["safe", "sound", "ub-free", "miri-clean", "proof"];
+const SHIELDS_ENDPOINT_FIELDS: &[&str] = &[
+    "schemaVersion",
+    "label",
+    "message",
+    "color",
+    "labelColor",
+    "isError",
+    "namedLogo",
+    "logoSvg",
+    "style",
+    "cacheSeconds",
+];
 
 pub(crate) fn endpoint_count() -> usize {
     ENDPOINTS.len()
@@ -83,6 +95,7 @@ fn check_readme_endpoint(readme: &str, path: &str) -> Result<(), String> {
 
 fn check_endpoint_json(path: &str, label: &str) -> Result<(), String> {
     let value = crate::parse_json_file(&crate::workspace_path(path))?;
+    reject_non_shields_endpoint_fields(path, &value)?;
     let schema = crate::json_usize_at(&value, "/schemaVersion", path)?;
     if schema != 1 {
         return Err(format!("{path} schemaVersion is {schema}, expected 1"));
@@ -92,6 +105,20 @@ fn check_endpoint_json(path: &str, label: &str) -> Result<(), String> {
     require_numeric_message(path, message)?;
     reject_forbidden_message_terms(path, message)?;
     crate::require_non_empty_json_str(&value, "color", path)?;
+    Ok(())
+}
+
+fn reject_non_shields_endpoint_fields(path: &str, value: &serde_json::Value) -> Result<(), String> {
+    let object = value
+        .as_object()
+        .ok_or_else(|| format!("{path} badge endpoint payload must be a JSON object"))?;
+    for key in object.keys() {
+        if !SHIELDS_ENDPOINT_FIELDS.contains(&key.as_str()) {
+            return Err(format!(
+                "{path} badge endpoint payload contains non-Shields field `{key}`"
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -176,6 +203,42 @@ mod tests {
         assert!(is_public_endpoint("badges/unsafe-review.json"));
         assert!(is_public_endpoint("badges/unsafe-review-plus.json"));
         assert!(!is_public_endpoint("badges/local-only.json"));
+    }
+
+    #[test]
+    fn endpoint_json_rejects_internal_contract_fields() {
+        let value = serde_json::json!({
+            "schemaVersion": 1,
+            "contract_version": "0.1",
+            "kind": "unsafe_review",
+            "scope": "repo",
+            "basis": "open_actionable_review_gaps",
+            "label": "unsafe-review",
+            "message": "7",
+            "status": "fail",
+            "color": "orange",
+            "counts": {
+                "unsuppressed_review_gaps": 7
+            }
+        });
+
+        let err = reject_non_shields_endpoint_fields("badges/unsafe-review.json", &value)
+            .err()
+            .unwrap_or_default();
+
+        assert!(err.contains("non-Shields field"));
+        assert!(
+            [
+                "contract_version",
+                "kind",
+                "scope",
+                "basis",
+                "status",
+                "counts"
+            ]
+            .iter()
+            .any(|field| err.contains(field))
+        );
     }
 
     #[test]
