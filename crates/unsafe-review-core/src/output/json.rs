@@ -463,6 +463,7 @@ mod tests {
         "str_from_utf8_unchecked_if_let_ok_shadowed_not_guard",
         "str_from_utf8_unchecked_if_let_err_return_guard",
         "str_from_utf8_unchecked_if_let_err_return_comment_not_guard",
+        "str_from_utf8_unchecked_if_let_err_return_string_not_guard",
         "str_from_utf8_unchecked_if_let_err_reassigned_not_guard",
         "str_from_utf8_unchecked_if_let_err_shadowed_not_guard",
         "str_from_utf8_unchecked_guard_then_shadowed_not_guard",

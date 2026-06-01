@@ -935,6 +935,7 @@ fixtures = [
   "str_from_utf8_unchecked_if_let_ok_guard",
   "str_from_utf8_unchecked_if_let_err_return_guard",
   "str_from_utf8_unchecked_if_let_err_return_comment_not_guard",
+  "str_from_utf8_unchecked_if_let_err_return_string_not_guard",
   "str_from_utf8_unchecked_is_err_return_guard",
   "str_from_utf8_unchecked_is_err_return_comment_not_guard",
   "str_from_utf8_unchecked_is_err_return_string_not_guard",
