@@ -203,6 +203,7 @@ required_core_fixtures = [
   "get_unchecked_mut_if_let_get_reassigned_index_not_guard",
   "get_unchecked_mut_if_let_get_shadowed_index_not_guard",
   "get_unchecked_mut_if_let_get_reassigned_receiver_not_guard",
+  "get_unchecked_mut_if_let_get_reassigned_receiver_path_not_guard",
   "get_unchecked_mut_if_let_get_shadowed_receiver_not_guard",
   "get_unchecked_mut_let_else_get_reassigned_index_not_guard",
   "get_unchecked_mut_let_else_get_shadowed_index_not_guard",
@@ -2502,6 +2503,16 @@ expected_hazard = "bounds"
 fixture = "get_unchecked_mut_if_let_get_reassigned_receiver_not_guard"
 kind = "false_positive_control"
 claim = "get_unchecked_mut does not accept if-let get probe evidence after the checked receiver is reassigned before use"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "get_unchecked"
+expected_hazard = "bounds"
+
+[[cases]]
+fixture = "get_unchecked_mut_if_let_get_reassigned_receiver_path_not_guard"
+kind = "false_positive_control"
+claim = "get_unchecked_mut does not accept if-let get probe evidence after the checked receiver path is reassigned before use"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
