@@ -3364,6 +3364,7 @@ pub fn zstd_sync(
             "str_from_utf8_unchecked_let_else_ok_comment_not_guard",
             "str_from_utf8_unchecked_let_else_ok_string_not_guard",
             "str_from_utf8_unchecked_let_else_ok_shadowed_not_guard",
+            "str_from_utf8_unchecked_match_ok_comment_not_guard",
             "str_from_utf8_unchecked_match_ok_shadowed_not_guard",
         ] {
             let output = fixture_output(fixture)?;
