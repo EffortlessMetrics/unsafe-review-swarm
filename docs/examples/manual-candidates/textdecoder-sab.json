@@ -1,0 +1,27 @@
+{
+  "schema_version": "manual-candidate/v1",
+  "id": "R4R2-S001",
+  "source": "manual",
+  "manual_candidate": true,
+  "analyzer_discovered": false,
+  "title": "TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes",
+  "location": {
+    "file": "src/runtime/webcore/TextDecoder.rs",
+    "line": 237
+  },
+  "operation_family": "raw_pointer_read",
+  "unsafe_operation": "core::slice::from_raw_parts",
+  "invariant": "&[u8] memory must not be concurrently mutated",
+  "safe_caller": "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))",
+  "evidence": [
+    {
+      "kind": "runtime_witness",
+      "path": "target/unsafe-scout/textdecoder-shared-race-route.out"
+    },
+    {
+      "kind": "model",
+      "path": "target/unsafe-scout/miri-textdecoder-shared-slice.out"
+    }
+  ],
+  "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
+}

@@ -228,13 +228,16 @@ fixture-backed examples of repair-ready and human-review-only packets.
 Import a manually discovered advisory candidate:
 
 ```bash
-unsafe-review candidate import target/unsafe-scout/textdecoder-candidate.json \
+unsafe-review candidate import docs/examples/manual-candidates/textdecoder-sab.json \
   --out .unsafe-review/candidates/R4R2-S001.json
 ```
 
 The imported artifact is canonicalized with `source = "manual"` and
 `manual_candidate = true`. It remains advisory and must not be described as an
 analyzer-discovered finding.
+
+The example input above is a committed smoke fixture. In a real scout lane,
+replace it with the candidate JSON produced by the external investigation.
 
 After import, `explain` and `context` can load the candidate by ID from
 `.unsafe-review/candidates/` when no analyzer ReviewCard with that ID exists:

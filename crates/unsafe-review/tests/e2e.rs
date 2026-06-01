@@ -606,15 +606,14 @@ fn context_packet_queues_contract_gaps_for_public_safety_docs() -> Result<(), Bo
 fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_marker()
 -> Result<(), Box<dyn Error>> {
     let temp = TempDir::new("unsafe-review-manual-candidate-e2e")?;
-    let input = temp.path().join("candidate.json");
+    let input = manual_candidate_example_path();
     let out = temp.path().join(".unsafe-review/candidates/R4R2-S001.json");
     fs::create_dir_all(out.parent().ok_or("candidate output missing parent")?)?;
-    fs::write(&input, manual_candidate_json())?;
 
     let imported = run_success([
         os("candidate"),
         os("import"),
-        input.as_os_str().to_os_string(),
+        input.into_os_string(),
         os("--out"),
         out.as_os_str().to_os_string(),
     ])?;
@@ -626,6 +625,7 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
     assert_eq!(canonical["schema_version"], "manual-candidate/v1");
     assert_eq!(canonical["source"], "manual");
     assert_eq!(canonical["manual_candidate"], true);
+    assert_eq!(canonical["analyzer_discovered"], false);
     assert_eq!(canonical["id"], "R4R2-S001");
 
     let empty_snapshot = temp.path().join("empty-snapshot.json");
@@ -3069,6 +3069,11 @@ fn fixture_root(name: &str) -> PathBuf {
         .join(name)
 }
 
+fn manual_candidate_example_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../docs/examples/manual-candidates/textdecoder-sab.json")
+}
+
 fn os(value: &str) -> OsString {
     OsString::from(value)
 }
@@ -3126,30 +3131,7 @@ fn write_e2e_file(root: &Path, rel: &str) -> Result<(), Box<dyn Error>> {
 }
 
 fn manual_candidate_json() -> &'static str {
-    r#"{
-  "schema_version": "manual-candidate/v1",
-  "id": "R4R2-S001",
-  "title": "TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes",
-  "location": {
-    "file": "src/runtime/webcore/TextDecoder.rs",
-    "line": 237
-  },
-  "operation_family": "raw_pointer_read",
-  "unsafe_operation": "core::slice::from_raw_parts",
-  "invariant": "&[u8] memory must not be concurrently mutated",
-  "safe_caller": "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))",
-  "evidence": [
-    {
-      "kind": "runtime_witness",
-      "path": "target/unsafe-scout/textdecoder-shared-race-route.out"
-    },
-    {
-      "kind": "model",
-      "path": "target/unsafe-scout/miri-textdecoder-shared-slice.out"
-    }
-  ],
-  "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
-}"#
+    include_str!("../../../docs/examples/manual-candidates/textdecoder-sab.json")
 }
 
 fn empty_review_card_snapshot_json() -> &'static str {

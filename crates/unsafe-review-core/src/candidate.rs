@@ -23,6 +23,8 @@ pub struct ManualCandidate {
     pub source: String,
     #[serde(default)]
     pub manual_candidate: bool,
+    #[serde(default)]
+    pub analyzer_discovered: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -59,6 +61,7 @@ impl ManualCandidate {
     fn normalize(&mut self) {
         self.source = "manual".to_string();
         self.manual_candidate = true;
+        self.analyzer_discovered = false;
         if self.trust_boundary.trim().is_empty() {
             self.trust_boundary = MANUAL_CANDIDATE_TRUST_BOUNDARY.to_string();
         }
@@ -324,12 +327,11 @@ mod tests {
         assert_eq!(candidate.id, "R4R2-S001");
         assert_eq!(candidate.source, "manual");
         assert!(candidate.manual_candidate);
+        assert!(!candidate.analyzer_discovered);
         assert_eq!(candidate.evidence.len(), 2);
-        assert!(
-            candidate
-                .to_pretty_json()?
-                .contains("\"manual_candidate\": true")
-        );
+        let canonical = candidate.to_pretty_json()?;
+        assert!(canonical.contains("\"manual_candidate\": true"));
+        assert!(canonical.contains("\"analyzer_discovered\": false"));
         Ok(())
     }
 
@@ -427,6 +429,9 @@ mod tests {
         r#"{
           "schema_version": "manual-candidate/v1",
           "id": "R4R2-S001",
+          "source": "manual",
+          "manual_candidate": true,
+          "analyzer_discovered": false,
           "title": "TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes",
           "location": {
             "file": "src/runtime/webcore/TextDecoder.rs",
