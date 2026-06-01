@@ -99,6 +99,7 @@ target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
 target/unsafe-review/receipt-audit.md
+target/unsafe-review/manual-candidates.json
 target/unsafe-review/lsp.json
 target/unsafe-review/repair-queue.json
 ```
@@ -114,6 +115,12 @@ The bundle also includes `receipt-audit.md`, and the terminal handoff prints the
 matching `unsafe-review receipt audit` command so reviewers can check whether
 saved witness receipt metadata still matches the current first-pr cards. The
 audit is metadata-only and does not run the witness.
+
+When imported manual candidates are present, the terminal handoff and
+`review-kit.json` also point to `manual-candidates.json` and copy-only
+`explain`, `context --json`, and `candidate witness-plan` commands for the
+first manual candidate. Those candidates remain manual/advisory targets, not
+analyzer ReviewCards, not policy inputs, and not witness execution.
 
 ## Output Formats
 
@@ -271,6 +278,9 @@ the candidate into analyzer-discovered ReviewCard witness evidence.
 `first-pr` writes a separate `manual-candidates.json` index for imported
 `.unsafe-review/candidates/*.json` artifacts. `cards.json`, SARIF, comment-plan,
 saved LSP, repair-queue, and policy-report surfaces remain ReviewCard-only.
+The first-pr terminal handoff and `review-kit.json` may include copy-only
+commands for manual candidate explain/context/witness-plan projection, while
+still labeling them manual/advisory and not analyzer-discovered.
 
 Manual candidate projections do not execute witnesses, post comments, edit
 source, enforce policy, prove UB, prove site execution, or prove repository

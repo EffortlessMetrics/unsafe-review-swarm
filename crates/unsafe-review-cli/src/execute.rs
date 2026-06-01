@@ -862,7 +862,13 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     )?;
     write_artifact(
         &options.out_dir.join(REVIEW_KIT_ARTIFACT),
-        first_pr::render_review_kit_manifest(&output, &root, &check, &FIRST_PR_ARTIFACTS),
+        first_pr::render_review_kit_manifest(
+            &output,
+            &root,
+            &check,
+            &manual_candidates,
+            &FIRST_PR_ARTIFACTS,
+        ),
     )?;
 
     first_pr::print_first_pr_report(
@@ -870,6 +876,7 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         &options.out_dir,
         &root,
         &check,
+        &manual_candidates,
         NO_CHANGED_GAPS_MESSAGE,
         NO_CHANGED_GAPS_LIMITATION,
         &FIRST_PR_ARTIFACTS,

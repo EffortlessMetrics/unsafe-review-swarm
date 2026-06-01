@@ -624,6 +624,7 @@ fn check_review_kit_handoff(
     }
 
     check_review_kit_top_card_handoff(handoff, top_card_id, card_count)?;
+    check_review_kit_manual_candidate_handoff(handoff)?;
 
     let boundary =
         super::require_non_empty_json_str(handoff, "trust_boundary", "review-kit.json handoff")?;
@@ -641,6 +642,125 @@ fn check_review_kit_handoff(
         }
     }
 
+    Ok(())
+}
+
+fn check_review_kit_manual_candidate_handoff(handoff: &serde_json::Value) -> Result<(), String> {
+    let manual = handoff
+        .get("manual_candidates")
+        .ok_or_else(|| "review-kit.json handoff is missing manual_candidates".to_string())?;
+    if !manual.is_object() {
+        return Err("review-kit.json handoff manual_candidates must be an object".to_string());
+    }
+    require_expected_value(
+        super::require_non_empty_json_str(
+            manual,
+            "artifact",
+            "review-kit.json handoff manual_candidates",
+        )?,
+        "manual-candidates.json",
+        "review-kit.json handoff manual_candidates artifact",
+    )?;
+    let count = super::json_usize_at(
+        manual,
+        "/manual_candidates",
+        "review-kit.json handoff manual_candidates",
+    )?;
+    let analyzer_discovered = super::json_usize_at(
+        manual,
+        "/analyzer_discovered",
+        "review-kit.json handoff manual_candidates",
+    )?;
+    if analyzer_discovered != 0 {
+        return Err(
+            "review-kit.json handoff manual_candidates analyzer_discovered must stay 0".to_string(),
+        );
+    }
+    check_review_kit_first_manual_candidate_handoff(manual, count)?;
+    let boundary = super::require_non_empty_json_str(
+        manual,
+        "trust_boundary",
+        "review-kit.json handoff manual_candidates",
+    )?;
+    for expected in [
+        "manual/advisory",
+        "not analyzer-discovered ReviewCards",
+        "not policy inputs",
+        "not witness execution",
+        "do not import ReviewCard witness evidence",
+    ] {
+        if !super::text_contains_ignore_ascii_case(boundary, expected) {
+            return Err(format!(
+                "review-kit.json handoff manual_candidates trust_boundary must include `{expected}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn check_review_kit_first_manual_candidate_handoff(
+    manual: &serde_json::Value,
+    count: usize,
+) -> Result<(), String> {
+    let Some(first_candidate) = manual.get("first_candidate") else {
+        return Err(
+            "review-kit.json handoff manual_candidates is missing first_candidate".to_string(),
+        );
+    };
+    if count == 0 {
+        if first_candidate.is_null() {
+            return Ok(());
+        }
+        return Err(
+            "review-kit.json handoff manual_candidates first_candidate must be null when count is 0"
+                .to_string(),
+        );
+    }
+    if !first_candidate.is_object() {
+        return Err(
+            "review-kit.json handoff manual_candidates first_candidate must be an object when candidates exist"
+                .to_string(),
+        );
+    }
+    let id = super::require_non_empty_json_str(
+        first_candidate,
+        "id",
+        "review-kit.json handoff manual_candidates first_candidate",
+    )?;
+    super::require_json_str(
+        first_candidate,
+        "source",
+        "manual",
+        "review-kit.json handoff manual_candidates first_candidate",
+    )?;
+    if first_candidate.get("manual_candidate") != Some(&serde_json::Value::Bool(true)) {
+        return Err(
+            "review-kit.json handoff manual_candidates first_candidate manual_candidate must be true"
+                .to_string(),
+        );
+    }
+    if first_candidate.get("analyzer_discovered") != Some(&serde_json::Value::Bool(false)) {
+        return Err(
+            "review-kit.json handoff manual_candidates first_candidate analyzer_discovered must be false"
+                .to_string(),
+        );
+    }
+    for (field, command) in [
+        ("explain", "unsafe-review explain "),
+        ("context_json", "unsafe-review context "),
+        ("witness_plan", "unsafe-review candidate witness-plan "),
+    ] {
+        let text = super::require_non_empty_json_str(
+            first_candidate,
+            field,
+            "review-kit.json handoff manual_candidates first_candidate",
+        )?;
+        if !text.starts_with(command) || !text.contains(id) {
+            return Err(format!(
+                "review-kit.json handoff manual_candidates first_candidate {field} must reference `{id}`"
+            ));
+        }
+    }
     Ok(())
 }
 

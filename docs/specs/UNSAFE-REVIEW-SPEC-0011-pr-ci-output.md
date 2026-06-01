@@ -134,6 +134,9 @@ must include card count and open actionable gap count matching cards.json
 must include top_card_id, or null only when no cards exist
 must include copy-only handoff commands for the reviewer summary, receipt audit,
   and top-card explain/context commands when a top card exists
+must include manual candidate handoff metadata pointing to
+  manual-candidates.json, with analyzer_discovered = 0 and copy-only
+  explain/context/witness-plan commands when manual candidates exist
 must list every required first-pr artifact with relative paths
 must include artifact kind, format, and schema_version/null metadata
 must include trust boundary wording

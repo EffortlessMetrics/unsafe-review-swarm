@@ -11,11 +11,13 @@ pub(super) fn print_first_pr_report(
     out_dir: &Path,
     root: &Path,
     check: &CheckOptions,
+    manual_candidates: &[ManualCandidate],
     no_changed_gaps_message: &str,
     no_changed_gaps_limitation: &str,
     artifacts: &[&str],
 ) {
     print_first_pr_overview(output, out_dir);
+    print_manual_candidate_handoff(out_dir, root, manual_candidates);
     print_receipt_audit_handoff(check);
     print_top_card_summary(
         output,
@@ -31,6 +33,31 @@ fn print_receipt_audit_handoff(check: &CheckOptions) {
     println!("Audit saved receipts:");
     println!("  {}", receipt_audit_command(check));
     println!("  saved receipt metadata only; unsafe-review did not run a witness");
+}
+
+fn print_manual_candidate_handoff(
+    out_dir: &Path,
+    root: &Path,
+    manual_candidates: &[ManualCandidate],
+) {
+    println!("Manual candidates:");
+    println!(
+        "  {} (manual/advisory; not analyzer ReviewCards)",
+        out_dir.join("manual-candidates.json").display()
+    );
+    println!("  Count: {}", manual_candidates.len());
+    if let Some(candidate) = manual_candidates.first() {
+        println!("  First manual candidate: {}", candidate.id);
+        println!("  Explain: {}", explain_command(root, &candidate.id));
+        println!("  Agent packet: {}", context_command(root, &candidate.id));
+        println!(
+            "  Witness plan: {}",
+            candidate_witness_plan_command(root, &candidate.id)
+        );
+    }
+    println!(
+        "  manual candidates are advisory manual targets, not analyzer-discovered, not policy inputs, and unsafe-review did not run witnesses"
+    );
 }
 
 fn receipt_audit_command(check: &CheckOptions) -> String {
@@ -144,10 +171,19 @@ fn context_command(root: &Path, card_id: &impl fmt::Display) -> String {
     )
 }
 
+fn candidate_witness_plan_command(root: &Path, candidate_id: &str) -> String {
+    format!(
+        "unsafe-review candidate witness-plan --root {} {}",
+        shell_arg(&root.display().to_string()),
+        shell_arg(candidate_id)
+    )
+}
+
 pub(super) fn render_review_kit_manifest(
     output: &AnalyzeOutput,
     root: &Path,
     check: &CheckOptions,
+    manual_candidates: &[ManualCandidate],
     artifacts: &[&str],
 ) -> String {
     let value = json!({
@@ -165,7 +201,7 @@ pub(super) fn render_review_kit_manifest(
             "open_actionable_gaps": output.summary.open_actionable_gaps,
         },
         "top_card_id": output.cards.first().map(|card| card.id.to_string()),
-        "handoff": review_kit_handoff(output, root, check),
+        "handoff": review_kit_handoff(output, root, check, manual_candidates),
         "artifacts": artifacts
             .iter()
             .map(|path| artifact_entry(path))
@@ -181,6 +217,7 @@ fn review_kit_handoff(
     output: &AnalyzeOutput,
     root: &Path,
     check: &CheckOptions,
+    manual_candidates: &[ManualCandidate],
 ) -> serde_json::Value {
     let top_card = output.cards.first().map(|card| {
         json!({
@@ -194,7 +231,33 @@ fn review_kit_handoff(
         "reviewer_summary": "pr-summary.md",
         "receipt_audit_markdown": receipt_audit_command(check),
         "top_card": top_card,
+        "manual_candidates": review_kit_manual_candidate_handoff(manual_candidates, root),
         "trust_boundary": "Copy-only review-kit handoff commands; unsafe-review did not run witnesses, run agents, post comments, edit source, or enforce blocking policy.",
+    })
+}
+
+fn review_kit_manual_candidate_handoff(
+    manual_candidates: &[ManualCandidate],
+    root: &Path,
+) -> serde_json::Value {
+    let first_candidate = manual_candidates.first().map(|candidate| {
+        json!({
+            "id": candidate.id.as_str(),
+            "source": "manual",
+            "manual_candidate": true,
+            "analyzer_discovered": false,
+            "explain": explain_command(root, &candidate.id),
+            "context_json": context_command(root, &candidate.id),
+            "witness_plan": candidate_witness_plan_command(root, &candidate.id),
+        })
+    });
+
+    json!({
+        "artifact": "manual-candidates.json",
+        "manual_candidates": manual_candidates.len(),
+        "analyzer_discovered": 0,
+        "first_candidate": first_candidate,
+        "trust_boundary": "Manual/advisory candidate handoff only; manual candidates are not analyzer-discovered ReviewCards, not policy inputs, and not witness execution. Receipts against manual candidates attach external evidence to the manual candidate ID only and do not import ReviewCard witness evidence.",
     })
 }
 
@@ -404,6 +467,7 @@ mod tests {
             &output,
             Path::new("fixtures/safe_code_no_cards"),
             &check,
+            &[],
             &["review-kit.json", "cards.json", "pr-summary.md"],
         );
         let value: serde_json::Value = match serde_json::from_str(&rendered) {
@@ -430,6 +494,19 @@ mod tests {
                 .contains("--format markdown")
         );
         assert!(value["handoff"]["top_card"].is_null());
+        assert_eq!(
+            value["handoff"]["manual_candidates"]["artifact"],
+            "manual-candidates.json"
+        );
+        assert_eq!(
+            value["handoff"]["manual_candidates"]["manual_candidates"],
+            0
+        );
+        assert_eq!(
+            value["handoff"]["manual_candidates"]["analyzer_discovered"],
+            0
+        );
+        assert!(value["handoff"]["manual_candidates"]["first_candidate"].is_null());
         assert!(
             value["handoff"]["trust_boundary"]
                 .as_str()

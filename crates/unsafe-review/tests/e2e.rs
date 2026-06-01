@@ -877,6 +877,16 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("Agent repair queue:"));
     assert!(stdout.contains("repair-queue.json"));
     assert!(stdout.contains("copy-only; unsafe-review did not run an agent"));
+    assert!(stdout.contains("Manual candidates:"));
+    assert!(stdout.contains("manual-candidates.json"));
+    assert!(stdout.contains("Count: 1"));
+    assert!(stdout.contains("First manual candidate: R4R2-S001"));
+    assert!(stdout.contains("unsafe-review explain --root"));
+    assert!(stdout.contains("unsafe-review context --root"));
+    assert!(stdout.contains("unsafe-review candidate witness-plan --root"));
+    assert!(stdout.contains("manual candidates are advisory manual targets"));
+    assert!(stdout.contains("not analyzer-discovered"));
+    assert!(stdout.contains("not policy inputs"));
     assert!(stdout.contains("Audit saved receipts:"));
     assert!(stdout.contains("unsafe-review receipt audit --root"));
     assert!(stdout.contains("--diff"));
@@ -982,6 +992,64 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             .as_str()
             .unwrap_or("")
             .contains("--format markdown")
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["artifact"],
+        "manual-candidates.json"
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["manual_candidates"],
+        1
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["analyzer_discovered"],
+        0
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["first_candidate"]["id"],
+        "R4R2-S001"
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["first_candidate"]["source"],
+        "manual"
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["first_candidate"]["manual_candidate"],
+        true
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["first_candidate"]["analyzer_discovered"],
+        false
+    );
+    assert!(
+        review_kit["handoff"]["manual_candidates"]["first_candidate"]["explain"]
+            .as_str()
+            .unwrap_or("")
+            .contains("unsafe-review explain --root")
+    );
+    assert!(
+        review_kit["handoff"]["manual_candidates"]["first_candidate"]["context_json"]
+            .as_str()
+            .unwrap_or("")
+            .contains("unsafe-review context --root")
+    );
+    assert!(
+        review_kit["handoff"]["manual_candidates"]["first_candidate"]["witness_plan"]
+            .as_str()
+            .unwrap_or("")
+            .contains("unsafe-review candidate witness-plan --root")
+    );
+    assert!(
+        review_kit["handoff"]["manual_candidates"]["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not analyzer-discovered ReviewCards")
+    );
+    assert!(
+        review_kit["handoff"]["manual_candidates"]["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("do not import ReviewCard witness evidence")
     );
     assert!(
         review_kit["handoff"]["trust_boundary"]

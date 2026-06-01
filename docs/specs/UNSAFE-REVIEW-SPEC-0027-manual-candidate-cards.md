@@ -182,6 +182,11 @@ into an analyzer ReviewCard.
 - `first-pr` writes `manual-candidates.json` for imported candidates and keeps
   ReviewCard-derived artifacts, including cards JSON, SARIF, comment-plan,
   saved LSP, repair queue, and policy-report surfaces, ReviewCard-only.
+- `first-pr` terminal output and `review-kit.json` include a bounded,
+  copy-only manual candidate handoff with `manual-candidates.json`,
+  `explain`, `context --json`, and `candidate witness-plan` commands while
+  preserving `source = manual`, `manual_candidate = true`, and
+  `analyzer_discovered = false`.
 
 ## CI Proof
 
