@@ -264,9 +264,11 @@ fn render_repo_file_list(root: &Path, files: &[PathBuf]) -> String {
 
 struct RepoStatusReporter {
     status_path: Option<PathBuf>,
+    partial_path: Option<PathBuf>,
     progress: bool,
     last_status: Arc<Mutex<Option<RepoScanStatus>>>,
     partial_output: Arc<Mutex<Option<AnalyzeOutput>>>,
+    format: Format,
     last_phase: Option<String>,
     last_discovery_heartbeat: usize,
     last_scan_heartbeat: usize,
@@ -287,13 +289,15 @@ impl RepoStatusReporter {
             partial_path.clone(),
             last_status.clone(),
             partial_output.clone(),
-            format,
+            format.clone(),
         )?;
         Ok(Self {
             status_path,
+            partial_path,
             progress,
             last_status,
             partial_output,
+            format,
             last_phase: None,
             last_discovery_heartbeat: 0,
             last_scan_heartbeat: 0,
@@ -371,6 +375,24 @@ impl RepoStatusReporter {
             return true;
         }
         false
+    }
+
+    fn write_partial_report(&self) -> Result<Option<PathBuf>, String> {
+        let Some(path) = self.partial_path.as_ref() else {
+            return Ok(None);
+        };
+        let partial_output = self
+            .partial_output
+            .lock()
+            .map_err(|err| format!("repo partial output lock poisoned: {err}"))?
+            .clone();
+        let Some(output) = partial_output else {
+            return Ok(None);
+        };
+        ensure_parent_dir(path)?;
+        fs::write(path, render_with_format(&output, &self.format))
+            .map_err(|err| format!("write partial repo report {} failed: {err}", path.display()))?;
+        Ok(Some(path.clone()))
     }
 }
 
@@ -681,7 +703,20 @@ fn repo_incomplete_error(
     partial_path: Option<&Path>,
 ) -> String {
     let mut message = error.to_string();
-    match reporter.record_incomplete(error, partial_path) {
+    let mut retained_partial = partial_path
+        .filter(|path| path.exists())
+        .map(Path::to_path_buf);
+    if retained_partial.is_none() {
+        match reporter.write_partial_report() {
+            Ok(partial) => retained_partial = partial,
+            Err(partial_err) => {
+                message.push_str(&format!(
+                    "; failed to write partial repo report: {partial_err}"
+                ));
+            }
+        }
+    }
+    match reporter.record_incomplete(error, retained_partial.as_deref()) {
         Ok(Some(status_path)) => {
             message.push_str(&format!(
                 "; incomplete repo status written to {}",
@@ -695,7 +730,7 @@ fn repo_incomplete_error(
             ));
         }
     }
-    if let Some(partial_path) = partial_path.filter(|path| path.exists()) {
+    if let Some(partial_path) = retained_partial {
         message.push_str(&format!(
             "; partial repo report kept at {}",
             partial_path.display()

@@ -290,9 +290,10 @@ renames that file to `<out>` only after a successful render. It also updates
 `<out>.status.json` while analysis runs. The status sidecar records the scan
 phase, elapsed time, discovered files, scanned files, cards found, last path,
 completion, normal errors, and Unix interruption signals. Add `--progress` to
-print a small stderr heartbeat from the same status stream. If a normal write
-or rename error occurs after rendering, the partial report is kept at
-`<out>.partial`. On Unix SIGTERM/SIGINT before rendering, `repo` records
+print a small stderr heartbeat from the same status stream. If a normal
+analysis, write, or rename error occurs after at least one file completed, the
+latest completed-file report snapshot is kept at `<out>.partial`. On Unix
+SIGTERM/SIGINT before rendering, `repo` records
 `phase = terminated` and the signal in `<out>.status.json` when `--out` is set.
 If at least one file finished scanning, `repo` also writes the latest
 completed-file report snapshot to `<out>.partial` and records that path in the

@@ -38,12 +38,14 @@ records `schema_version`, `phase`, `elapsed_ms`, `files_discovered`,
 `files_scanned`, `cards_found`, `last_path`, `completed`, `error`, and
 `signal`, and `partial_path`. `--progress` prints stderr heartbeats from the
 same status stream. On normal analysis, write, or rename errors, the command
-marks status incomplete and keeps any rendered partial report at
-`<out>.partial`. If the process receives Unix SIGTERM/SIGINT before rendering,
-the command writes `phase = terminated`, records the signal, and leaves the
-latest status sidecar as the durable artifact. When completed-file card output
-is available, the command also writes the latest partial report snapshot to
-`<out>.partial` and records that path in the terminated status.
+marks status incomplete. If at least one file completed before the error, it
+keeps the latest completed-file report snapshot at `<out>.partial` and records
+that path in the failed status. If the process receives Unix SIGTERM/SIGINT
+before rendering, the command writes `phase = terminated`, records the signal,
+and leaves the latest status sidecar as the durable artifact. When
+completed-file card output is available, the command also writes the latest
+partial report snapshot to `<out>.partial` and records that path in the
+terminated status.
 
 Repo JSON uses this top-level contract:
 
@@ -163,7 +165,8 @@ the current `unsafe-review badges` repo projection.
   large-repo default skips, and max-file truncation without analyzing files.
 - Repo `--out` writes `<out>.status.json` with complete scan status on
   successful analysis, promotes `<out>.partial` to `<out>` only after successful
-  rendering, marks status incomplete on normal output errors, records
+  rendering, marks status incomplete on normal analysis/output errors, records
+  a retained partial path when a completed-file snapshot exists, records
   `phase = terminated` plus `signal = SIGTERM` on Unix SIGTERM, keeps a
   completed-file partial report snapshot when one exists, and `--progress`
   prints a final completion heartbeat.

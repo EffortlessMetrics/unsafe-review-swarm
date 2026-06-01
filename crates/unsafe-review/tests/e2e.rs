@@ -1855,6 +1855,72 @@ fn repo_output_failure_keeps_partial_and_marks_status_incomplete() -> Result<(),
     Ok(())
 }
 
+#[test]
+fn repo_analysis_failure_keeps_completed_file_partial_snapshot() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-repo-analysis-error-partial-e2e")?;
+    let scan_root = temp.path().join("fixture");
+    copy_dir_all(&fixture, &scan_root)?;
+    fs::write(scan_root.join("src/z_bad.rs"), [0xff])?;
+    let report_path = temp.path().join("repo.json");
+    let partial_path = temp.path().join("repo.json.partial");
+    let status_path = temp.path().join("repo.json.status.json");
+
+    let output = run_failure([
+        os("repo"),
+        os("--root"),
+        scan_root.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+        os("--out"),
+        report_path.as_os_str().to_os_string(),
+    ])?;
+
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("read") && stderr.contains("z_bad.rs"),
+        "stderr should explain the analysis read failure: {stderr}"
+    );
+    assert!(
+        stderr.contains("incomplete repo status written to"),
+        "stderr should point to the incomplete status sidecar: {stderr}"
+    );
+    assert!(
+        stderr.contains("partial repo report kept at"),
+        "stderr should point to the retained partial report: {stderr}"
+    );
+    assert!(
+        !report_path.exists(),
+        "final report should not look successful"
+    );
+    assert!(
+        partial_path.exists(),
+        "analysis error after a completed file should retain a partial report"
+    );
+    let partial = parse_json(&fs::read_to_string(&partial_path)?)?;
+    assert_eq!(partial["scope"], "repo");
+    assert_eq!(partial["summary"]["rust_files"], 2);
+    assert_eq!(partial["summary"]["cards"], 1);
+    assert_eq!(partial["cards"][0]["site"]["file"], "src/lib.rs");
+
+    let status = parse_json(&fs::read_to_string(&status_path)?)?;
+    assert_eq!(status["schema_version"], "repo-scan-status/v1");
+    assert_eq!(status["phase"], "failed");
+    assert_eq!(status["completed"], false);
+    assert_eq!(status["files_discovered"], 2);
+    assert_eq!(status["files_scanned"], 1);
+    assert_eq!(status["cards_found"], 1);
+    assert!(status["error"].as_str().unwrap_or("").contains("z_bad.rs"));
+    assert!(
+        status["partial_path"]
+            .as_str()
+            .unwrap_or("")
+            .ends_with("repo.json.partial")
+    );
+
+    Ok(())
+}
+
 #[cfg(unix)]
 #[test]
 fn repo_sigterm_writes_interrupted_status_sidecar() -> Result<(), Box<dyn Error>> {
