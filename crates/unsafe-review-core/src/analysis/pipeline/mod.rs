@@ -3465,6 +3465,8 @@ pub fn zstd_sync(
 
         for fixture in [
             "transmute_layout_disjunct_branch_not_guard",
+            "transmute_layout_closed_branch_not_guard",
+            "transmute_layout_observed_not_guard",
             "transmute_copy_layout_disjunct_branch_not_guard",
         ] {
             let disjunct = fixture_output(fixture)?;
