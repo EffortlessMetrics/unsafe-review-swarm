@@ -104,6 +104,19 @@ label_source = "fixture_golden"
 rationale = "Comment-only return text inside a same-buffer from_utf8 is_err branch is not executable early-return evidence and must not discharge UTF-8 validation."
 
 [[samples]]
+id = "utf8-unchecked-is-err-return-string-not-guard"
+fixture = "str_from_utf8_unchecked_is_err_return_string_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "utf8"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "String-literal return text inside a same-buffer from_utf8 is_err branch is not executable early-return evidence and must not discharge UTF-8 validation."
+
+[[samples]]
 id = "utf8-unchecked-is-err-return-reassigned-not-guard"
 fixture = "str_from_utf8_unchecked_is_err_return_reassigned_not_guard"
 kind = "false_positive_control"
