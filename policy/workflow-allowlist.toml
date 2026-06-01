@@ -81,3 +81,15 @@ actions = [
 reason = "Advisory cargo-llvm-cov + Codecov telemetry workflow, routed to the EM shared self-hosted 16 GB Rust tier on trusted push(main)/dispatch refs only. It uploads LCOV as execution-surface telemetry without threshold gating, without PR comment posting, without witness execution, without default branch-protection blocking, and without claiming memory safety, UB-free status, Miri-clean status, or site-execution proof."
 created = "2026-05-23"
 review_after = "2026-08-23"
+
+[[workflow]]
+id = "workflow-0007"
+path = ".github/workflows/droid-pr-review.yml"
+permissions = "pull-requests: write"
+actions = [
+  "actions/checkout@v5",
+  "Factory-AI/droid-action@8ea31f351ee6636ebef918ccb64682f477af7184",
+]
+reason = "Owner-requested advisory Droid PR review bot. It configures Factory BYOK with MiniMax M3 via the Anthropic-compatible MiniMax endpoint, runs only on non-draft pull requests, cancels superseded review runs per PR, clears ambient Anthropic globals, posts advisory review/security comments through Factory, and does not run unsafe-review witnesses, edit source, publish artifacts, or make unsafe-correctness claims."
+created = "2026-06-01"
+review_after = "2026-07-01"

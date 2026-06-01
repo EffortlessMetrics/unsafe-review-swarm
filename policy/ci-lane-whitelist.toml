@@ -89,3 +89,13 @@ cost_estimate = "low"
 trigger_policy = "workflow_dispatch only with dry_run default true"
 status = "deferred"
 review_after = "2026-07-23"
+
+[[lane]]
+id = "droid-pr-review"
+owner = "repo-infra / review-bot"
+intent = "Run an owner-requested Factory Droid advisory PR review using the MiniMax M3 BYOK custom model"
+proof_obligation = "workflow configures ~/.factory/settings.json with MiniMax-M3, uses the deterministic custom:MiniMax-M3-0 model for review and security review, clears ambient Anthropic globals, cancels superseded PR review runs, and remains advisory without source edits, witness execution, publishing, or unsafe-review blocking claims"
+cost_estimate = "medium"
+trigger_policy = "pull_request(opened, synchronize, reopened, ready_for_review) for non-draft PRs"
+status = "advisory"
+review_after = "2026-07-01"

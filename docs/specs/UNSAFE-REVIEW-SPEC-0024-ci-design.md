@@ -466,6 +466,31 @@ The future trusted-poster architecture is specified in
 part of the default workflow set and must remain deferred until separately
 implemented and reviewed.
 
+### 4.8 `droid-pr-review.yml` - advisory Droid PR review bot
+
+Purpose:
+
+```text
+run an owner-requested Factory Droid advisory review on non-draft pull requests
+using the MiniMax M3 BYOK custom model
+```
+
+The workflow configures `~/.factory/settings.json` with a `customModels` entry
+for `MiniMax-M3` through MiniMax's Anthropic-compatible endpoint, clears ambient
+Anthropic globals before invoking Droid, and passes `custom:MiniMax-M3-0` for
+both the review and security-review model.
+
+This lane may post advisory Droid review comments, but it must not run
+unsafe-review witnesses, edit source, publish artifacts, or make blocking
+unsafe-correctness claims. It remains separate from the unsafe-review
+ReviewCard-derived first-pr lane and does not change the default rule that
+unsafe-review findings are advisory by default.
+
+The workflow is registered in:
+
+- [policy/workflow-allowlist.toml](../../policy/workflow-allowlist.toml)
+- [policy/ci-lane-whitelist.toml](../../policy/ci-lane-whitelist.toml)
+
 ## 5. CI permissions policy
 
 Default workspace, policy-contracts, first-pr, source-divergence, and coverage
