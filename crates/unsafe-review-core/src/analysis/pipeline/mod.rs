@@ -3424,6 +3424,8 @@ pub fn zstd_sync(
             "transmute_bool_comment_not_guard",
             "transmute_bool_other_value_not_guard",
             "transmute_bool_prior_guarded_call_not_guard",
+            "transmute_bool_disjunct_branch_not_guard",
+            "transmute_bool_conjunct_return_not_guard",
             "transmute_bool_value_observed_not_guard",
             "transmute_bool_closed_if_observed_not_guard",
             "transmute_bool_invalid_return_comment_not_guard",
