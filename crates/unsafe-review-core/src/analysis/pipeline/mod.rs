@@ -1783,6 +1783,32 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn get_unchecked_mut_len_branch_evidence_respects_branch_shape() -> Result<(), String> {
+        let conjunct = fixture_output("get_unchecked_mut_conjunct_len_guard")?;
+        let conjunct_card = single_card("get_unchecked_mut_conjunct_len_guard", &conjunct)?;
+        assert_eq!(conjunct_card.site.kind, UnsafeSiteKind::Operation);
+        assert_eq!(
+            conjunct_card.operation.family,
+            OperationFamily::GetUnchecked
+        );
+        assert_eq!(conjunct_card.class, ReviewClass::GuardedUnwitnessed);
+        assert!(conjunct_card.discharge.present);
+        assert!(obligation_discharge_present(conjunct_card, "bounds"));
+
+        let disjunct = fixture_output("get_unchecked_mut_disjunct_len_not_guard")?;
+        let disjunct_card = single_card("get_unchecked_mut_disjunct_len_not_guard", &disjunct)?;
+        assert_eq!(disjunct_card.site.kind, UnsafeSiteKind::Operation);
+        assert_eq!(
+            disjunct_card.operation.family,
+            OperationFamily::GetUnchecked
+        );
+        assert_eq!(disjunct_card.class, ReviewClass::GuardMissing);
+        assert!(!disjunct_card.discharge.present);
+        assert!(!obligation_discharge_present(disjunct_card, "bounds"));
+        Ok(())
+    }
+
+    #[test]
     fn get_unchecked_mut_bounds_evidence_requires_same_receiver() -> Result<(), String> {
         let guarded = fixture_output("get_unchecked_mut_len_guard")?;
         let guarded_card = single_card("get_unchecked_mut_len_guard", &guarded)?;
