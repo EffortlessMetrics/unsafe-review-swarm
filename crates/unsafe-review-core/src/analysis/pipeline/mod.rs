@@ -1746,6 +1746,24 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn get_unchecked_mut_get_probe_bounds_evidence_is_discharged() -> Result<(), String> {
+        for fixture in [
+            "get_unchecked_mut_get_probe_guard",
+            "get_unchecked_mut_get_probe_early_return_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+            assert_eq!(card.operation.family, OperationFamily::GetUnchecked);
+            assert_eq!(card.class, ReviewClass::GuardedUnwitnessed);
+            assert!(card.discharge.present);
+            assert!(obligation_discharge_present(card, "bounds"));
+        }
+        Ok(())
+    }
+
+    #[test]
     fn get_unchecked_mut_bounds_evidence_requires_same_receiver() -> Result<(), String> {
         let guarded = fixture_output("get_unchecked_mut_len_guard")?;
         let guarded_card = single_card("get_unchecked_mut_len_guard", &guarded)?;
