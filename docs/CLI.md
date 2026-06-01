@@ -246,8 +246,28 @@ unsafe-review candidate witness-plan R4R2-S001
 ```
 
 Manual candidate projections preserve the manual marker and external evidence
-references. They do not execute witnesses, post comments, edit source, enforce
-policy, prove UB, prove site execution, or prove repository safety.
+references. Receipts may reference the same manual candidate ID and audit as a
+manual/advisory target:
+
+```bash
+unsafe-review receipt template R4R2-S001 \
+  --tool human-deep-review \
+  --strength test_targeted \
+  --author unsafe-scout \
+  --recorded-at 2026-05-31T00:00:00Z \
+  --expires-at 2026-08-18 \
+  --out .unsafe-review/receipts/R4R2-S001.json
+
+unsafe-review receipt audit --format json
+```
+
+Manual candidate receipt audit preserves `source = "manual"`,
+`manual_candidate = true`, and `analyzer_discovered = false`. It does not turn
+the candidate into analyzer-discovered ReviewCard witness evidence.
+
+Manual candidate projections do not execute witnesses, post comments, edit
+source, enforce policy, prove UB, prove site execution, or prove repository
+safety.
 
 ## Repo Posture And Badges
 

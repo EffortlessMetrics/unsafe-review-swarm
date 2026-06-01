@@ -21,6 +21,12 @@ pub struct WitnessReceipt {
     pub limitations: Option<Vec<String>>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReceiptCardIdKind {
+    AnalyzerReviewCard,
+    ManualCandidate,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MiriReceiptInput {
     pub card_id: String,
@@ -86,8 +92,11 @@ impl WitnessReceipt {
         validate_required(&self.tool, "tool")?;
         validate_tool(&self.tool)?;
         validate_strength(&self.strength)?;
-        if !looks_like_counted_card_id(&self.card_id) {
-            return Err("card_id must be an exact counted UR-* identity ending in -cN".to_string());
+        if receipt_card_id_kind(&self.card_id).is_none() {
+            return Err(
+                "card_id must be an exact counted UR-* identity ending in -cN or a path-safe manual candidate id"
+                    .to_string(),
+            );
         }
         let author = validate_required_option(&self.author, "author")?;
         validate_required(author, "author")?;
@@ -104,6 +113,10 @@ impl WitnessReceipt {
 
     pub fn command_hash(command: &str) -> String {
         stable_hash_hex(command)
+    }
+
+    pub fn card_id_kind(card_id: &str) -> Option<ReceiptCardIdKind> {
+        receipt_card_id_kind(card_id)
     }
 
     pub fn evidence_summary(&self) -> String {
@@ -579,6 +592,27 @@ fn looks_like_counted_card_id(value: &str) -> bool {
         && count.bytes().all(|byte| byte.is_ascii_digit())
 }
 
+fn receipt_card_id_kind(value: &str) -> Option<ReceiptCardIdKind> {
+    if looks_like_counted_card_id(value) {
+        return Some(ReceiptCardIdKind::AnalyzerReviewCard);
+    }
+    if looks_like_manual_candidate_id(value) {
+        return Some(ReceiptCardIdKind::ManualCandidate);
+    }
+    None
+}
+
+fn looks_like_manual_candidate_id(value: &str) -> bool {
+    !value.trim().is_empty()
+        && value == value.trim()
+        && !value.starts_with("UR-")
+        && !value.contains('/')
+        && !value.contains('\\')
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b':'))
+}
+
 mod timestamp_validation {
     use super::{decimal_at, validate_range};
 
@@ -643,6 +677,27 @@ mod tests {
                 .unwrap_or_default()
                 .contains("command_hash")
         );
+    }
+
+    #[test]
+    fn witness_receipt_validation_accepts_manual_candidate_ids() -> Result<(), String> {
+        let mut receipt = fixture_receipt();
+        receipt.card_id = "R4R2-S001".to_string();
+
+        receipt.validate()?;
+        assert_eq!(
+            WitnessReceipt::card_id_kind(&receipt.card_id),
+            Some(ReceiptCardIdKind::ManualCandidate)
+        );
+        assert_eq!(
+            WitnessReceipt::card_id_kind(
+                "UR-crate-src-lib-rs-owner-operation-read-read-deadbeef1234-alignment-c1"
+            ),
+            Some(ReceiptCardIdKind::AnalyzerReviewCard)
+        );
+        assert!(WitnessReceipt::card_id_kind("UR-not-counted").is_none());
+        assert!(WitnessReceipt::card_id_kind("../R4R2-S001").is_none());
+        Ok(())
     }
 
     #[test]

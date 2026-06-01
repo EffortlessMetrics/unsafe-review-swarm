@@ -21,7 +21,7 @@ pub use obligation::SafetyObligation;
 pub use operation::{OperationFamily, UnsafeOperation, UnsafeSite, UnsafeSiteKind};
 pub use receipt::{
     CargoCarefulReceiptInput, ConcurrencyReceiptInput, MiriReceiptInput, ProofReceiptInput,
-    SanitizerReceiptInput, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt,
+    ReceiptCardIdKind, SanitizerReceiptInput, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt,
 };
 pub use review_card::{NextAction, ReviewCard};
 pub use witness::{WitnessEvidence, WitnessKind, WitnessRoute};

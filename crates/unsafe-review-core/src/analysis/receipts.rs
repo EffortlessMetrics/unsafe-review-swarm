@@ -1,5 +1,8 @@
 use crate::api::AnalyzeOutput;
-use crate::domain::{CardId, ReviewCard, WitnessEvidence, WitnessReceipt, WitnessRoute};
+use crate::candidate::{ManualCandidate, load_manual_candidates};
+use crate::domain::{
+    CardId, ReceiptCardIdKind, ReviewCard, WitnessEvidence, WitnessReceipt, WitnessRoute,
+};
 use crate::util::path_display;
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
@@ -7,7 +10,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const AUDIT_TRUST_BOUNDARY: &str = "Static witness receipt audit only; this checks saved receipt metadata against current ReviewCards, does not execute witnesses, does not prove site reach, and does not make policy decisions.";
+const AUDIT_TRUST_BOUNDARY: &str = "Static witness receipt audit only; this checks saved receipt metadata against current ReviewCards and manual candidates, does not execute witnesses, does not prove site reach, and does not make policy decisions.";
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ReceiptIndex {
@@ -195,6 +198,7 @@ pub struct ReceiptAuditEntry {
     pub statuses: Vec<String>,
     pub issues: Vec<String>,
     pub matched_card: Option<ReceiptAuditCard>,
+    pub matched_manual_candidate: Option<ReceiptAuditManualCandidate>,
     pub route_tools: Vec<String>,
 }
 
@@ -202,11 +206,28 @@ pub struct ReceiptAuditEntry {
 pub struct ReceiptAuditCard {
     pub id: String,
     #[serde(rename = "class")]
-    pub class_name: &'static str,
+    pub class_name: String,
     pub operation: String,
-    pub operation_family: &'static str,
+    pub operation_family: String,
     pub missing_count: usize,
     pub next_action: String,
+    pub source: String,
+    pub manual_candidate: bool,
+    pub analyzer_discovered: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct ReceiptAuditManualCandidate {
+    pub id: String,
+    pub title: String,
+    pub location: String,
+    pub operation: String,
+    pub operation_family: String,
+    pub next_action: String,
+    pub trust_boundary: String,
+    pub source: String,
+    pub manual_candidate: bool,
+    pub analyzer_discovered: bool,
 }
 
 pub(crate) fn audit_receipts(output: &AnalyzeOutput) -> Result<ReceiptAuditReport, String> {
@@ -223,6 +244,15 @@ fn audit_receipts_with_date(
         .iter()
         .map(|card| (card.id.0.clone(), card))
         .collect::<BTreeMap<_, _>>();
+    let manual_candidates = load_manual_candidates(&output.root)?.into_iter().try_fold(
+        BTreeMap::new(),
+        |mut candidates, candidate| {
+            if candidates.insert(candidate.id.clone(), candidate).is_some() {
+                return Err("duplicate manual candidate id".to_string());
+            }
+            Ok(candidates)
+        },
+    )?;
     let records = audit_receipt_records(&output.root)?;
     let mut summary = ReceiptAuditSummary {
         receipts: records.len(),
@@ -232,7 +262,13 @@ fn audit_receipts_with_date(
     let mut receipts = Vec::new();
 
     for record in records {
-        let entry = audit_receipt_record(record, &cards, audit_date, &duplicate_card_ids);
+        let entry = audit_receipt_record(
+            record,
+            &cards,
+            &manual_candidates,
+            audit_date,
+            &duplicate_card_ids,
+        );
         count_statuses(&mut summary, &entry.statuses);
         receipts.push(entry);
     }
@@ -250,6 +286,8 @@ fn audit_receipts_with_date(
                 .to_string(),
             "does not prove site reach, memory safety, UB-free status, or repo safety".to_string(),
             "matched receipts improve witness evidence only and do not erase missing contracts, guards, or reach evidence"
+                .to_string(),
+            "manual candidate receipts attach external evidence to that manual candidate only and do not make it analyzer-discovered"
                 .to_string(),
         ],
         summary,
@@ -354,6 +392,7 @@ fn receipt_files(dir: &Path) -> Result<Vec<PathBuf>, String> {
 fn audit_receipt_record(
     record: AuditReceiptRecord,
     cards: &BTreeMap<String, &ReviewCard>,
+    manual_candidates: &BTreeMap<String, ManualCandidate>,
     audit_date: &str,
     duplicate_card_ids: &BTreeSet<String>,
 ) -> ReceiptAuditEntry {
@@ -378,6 +417,7 @@ fn audit_receipt_record(
             statuses: statuses.into_iter().collect(),
             issues,
             matched_card: None,
+            matched_manual_candidate: None,
             route_tools: Vec::new(),
         };
     }
@@ -399,6 +439,7 @@ fn audit_receipt_record(
             statuses: statuses.into_iter().collect(),
             issues,
             matched_card: None,
+            matched_manual_candidate: None,
             route_tools: Vec::new(),
         };
     };
@@ -411,7 +452,7 @@ fn audit_receipt_record(
     if let Some(err) = record.validation_error {
         statuses.insert("invalid".to_string());
         issues.push(err.clone());
-        if err.contains("exact counted") {
+        if err.contains("card_id") {
             statuses.insert("wrong_identity".to_string());
         }
         if err.contains("unknown receipt tool") {
@@ -422,14 +463,18 @@ fn audit_receipt_record(
         }
     }
 
-    let matched = cards.get(&receipt.card_id).copied();
-    let route_tools = matched
+    let matched_review_card = cards.get(&receipt.card_id).copied();
+    let matched_manual_candidate = matched_review_card
+        .is_none()
+        .then(|| manual_candidates.get(&receipt.card_id))
+        .flatten();
+    let route_tools = matched_review_card
         .map(route_tools)
         .unwrap_or_default()
         .into_iter()
         .collect::<Vec<_>>();
 
-    if let Some(card) = matched {
+    if let Some(card) = matched_review_card {
         statuses.insert("matched".to_string());
         if !route_tools.iter().any(|tool| tool == &receipt.tool) {
             statuses.insert("wrong_tool".to_string());
@@ -446,13 +491,27 @@ fn audit_receipt_record(
                 receipt.strength
             ));
         }
-    } else if looks_counted(&receipt.card_id) {
+    } else if let Some(_candidate) = matched_manual_candidate {
+        statuses.insert("manual_candidate".to_string());
+        statuses.insert("matched".to_string());
+    } else if matches!(
+        WitnessReceipt::card_id_kind(&receipt.card_id),
+        Some(ReceiptCardIdKind::AnalyzerReviewCard)
+    ) {
         statuses.insert("unmatched".to_string());
         statuses.insert("stale".to_string());
         issues.push("receipt card_id is not present in the current ReviewCard set".to_string());
+    } else if matches!(
+        WitnessReceipt::card_id_kind(&receipt.card_id),
+        Some(ReceiptCardIdKind::ManualCandidate)
+    ) {
+        statuses.insert("unmatched".to_string());
+        statuses.insert("stale".to_string());
+        issues
+            .push("receipt card_id is not present in the current manual candidate set".to_string());
     } else {
         statuses.insert("wrong_identity".to_string());
-        issues.push("receipt card_id is not an exact counted ReviewCard identity".to_string());
+        issues.push("receipt card_id is not an exact counted ReviewCard identity or a path-safe manual candidate id".to_string());
     }
 
     if let Some(expires_at) = receipt.expires_at.as_deref()
@@ -481,14 +540,9 @@ fn audit_receipt_record(
         limitations: receipt.limitations.unwrap_or_default(),
         statuses: statuses.into_iter().collect(),
         issues,
-        matched_card: matched.map(|card| ReceiptAuditCard {
-            id: card.id.0.clone(),
-            class_name: card.class.as_str(),
-            operation: card.operation.expression.clone(),
-            operation_family: card.operation.family.as_str(),
-            missing_count: card.missing.len(),
-            next_action: card.next_action.summary.clone(),
-        }),
+        matched_card: matched_review_card.map(receipt_audit_card_from_review_card),
+        matched_manual_candidate: matched_manual_candidate
+            .map(receipt_audit_manual_candidate_from_manual_candidate),
         route_tools,
     }
 }
@@ -499,11 +553,49 @@ fn receipt_imports_current_witness_evidence(
     route_tools: &[String],
 ) -> bool {
     statuses.contains("matched")
+        && !statuses.contains("manual_candidate")
         && !statuses.contains("invalid")
         && !statuses.contains("expired")
         && !statuses.contains("duplicate")
         && route_tools.iter().any(|tool| tool == &receipt.tool)
         && imports_witness_evidence(&receipt.strength)
+}
+
+fn receipt_audit_card_from_review_card(card: &ReviewCard) -> ReceiptAuditCard {
+    ReceiptAuditCard {
+        id: card.id.0.clone(),
+        class_name: card.class.as_str().to_string(),
+        operation: card.operation.expression.clone(),
+        operation_family: card.operation.family.as_str().to_string(),
+        missing_count: card.missing.len(),
+        next_action: card.next_action.summary.clone(),
+        source: "analyzer".to_string(),
+        manual_candidate: false,
+        analyzer_discovered: true,
+    }
+}
+
+fn receipt_audit_manual_candidate_from_manual_candidate(
+    candidate: &ManualCandidate,
+) -> ReceiptAuditManualCandidate {
+    ReceiptAuditManualCandidate {
+        id: candidate.id.clone(),
+        title: candidate.title.clone(),
+        location: format!(
+            "{}:{}",
+            candidate.location.file.display(),
+            candidate.location.line
+        ),
+        operation: candidate.unsafe_operation.clone(),
+        operation_family: candidate.operation_family.clone(),
+        next_action:
+            "Review the manual candidate and preserve receipts as external evidence for this manual ID"
+                .to_string(),
+        trust_boundary: candidate.trust_boundary.clone(),
+        source: "manual".to_string(),
+        manual_candidate: true,
+        analyzer_discovered: false,
+    }
 }
 
 fn route_tools(card: &ReviewCard) -> BTreeSet<String> {
@@ -572,16 +664,6 @@ fn civil_from_days(days_since_epoch: i64) -> (i32, u32, u32) {
     let month = mp + if mp < 10 { 3 } else { -9 };
     let year = y + i64::from(month <= 2);
     (year as i32, month as u32, day as u32)
-}
-
-fn looks_counted(value: &str) -> bool {
-    let Some((prefix, count)) = value.rsplit_once("-c") else {
-        return false;
-    };
-    value.starts_with("UR-")
-        && !prefix.is_empty()
-        && !count.is_empty()
-        && count.bytes().all(|byte| byte.is_ascii_digit())
 }
 
 #[cfg(test)]
@@ -955,7 +1037,7 @@ mod tests {
         write_receipt(
             &receipt_dir,
             "wrong-identity.json",
-            "not-counted",
+            "UR-not-counted",
             "miri",
             "ran",
             "2026-08-18",
@@ -983,7 +1065,7 @@ mod tests {
         assert_eq!(report.summary.command_hash_mismatch, 0);
         assert_eq!(report.summary.duplicate, 5);
         assert_eq!(report.summary.invalid, 1);
-        assert_eq!(report.limitations.len(), 4);
+        assert_eq!(report.limitations.len(), 5);
         assert!(
             report
                 .limitations
@@ -1184,6 +1266,83 @@ mod tests {
     }
 
     #[test]
+    fn receipt_audit_matches_manual_candidate_receipts_preserving_manual_marker()
+    -> Result<(), String> {
+        let root = copy_fixture_to_temp(
+            "raw_pointer_alignment",
+            "unsafe-review-receipt-audit-manual-candidate",
+        )?;
+        let candidate_dir = root.join(".unsafe-review").join("candidates");
+        fs::create_dir_all(&candidate_dir)
+            .map_err(|err| format!("create candidate dir failed: {err}"))?;
+        fs::write(
+            candidate_dir.join("R4R2-S001.json"),
+            manual_candidate_json(),
+        )
+        .map_err(|err| format!("write manual candidate failed: {err}"))?;
+        let receipt_dir = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipt_dir)
+            .map_err(|err| format!("create receipt dir failed: {err}"))?;
+        write_receipt(
+            &receipt_dir,
+            "manual-candidate.json",
+            "R4R2-S001",
+            "human-deep-review",
+            "test_targeted",
+            "2026-08-18",
+        )?;
+        let output = analyze_fixture_root(&root)?;
+
+        let report = audit_receipts_with_date(&output, "2026-05-18")?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+        assert_eq!(report.summary.receipts, 1);
+        assert_eq!(report.summary.matched, 1);
+        assert_eq!(report.summary.unmatched, 0);
+        assert_eq!(report.summary.wrong_identity, 0);
+        assert_eq!(report.summary.invalid, 0);
+        let entry = report
+            .receipts
+            .first()
+            .ok_or_else(|| "manual candidate receipt entry missing".to_string())?;
+        assert!(entry.statuses.iter().any(|status| status == "matched"));
+        assert!(
+            entry
+                .statuses
+                .iter()
+                .any(|status| status == "manual_candidate")
+        );
+        assert!(
+            !entry
+                .statuses
+                .iter()
+                .any(|status| status == "imports_witness_evidence")
+        );
+        assert!(entry.route_tools.is_empty());
+        assert!(entry.matched_card.is_none());
+        let matched = entry.matched_manual_candidate.as_ref().ok_or_else(|| {
+            "manual candidate receipt should include candidate context".to_string()
+        })?;
+        assert_eq!(matched.id, "R4R2-S001");
+        assert_eq!(matched.source, "manual");
+        assert!(matched.manual_candidate);
+        assert!(!matched.analyzer_discovered);
+        assert_eq!(
+            matched.title,
+            "TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes"
+        );
+        assert_eq!(matched.location, "src/runtime/webcore/TextDecoder.rs:237");
+        assert_eq!(matched.operation_family, "raw_pointer_read");
+        assert_eq!(matched.operation, "core::slice::from_raw_parts");
+        assert!(
+            matched
+                .next_action
+                .contains("external evidence for this manual ID")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn receipt_audit_does_not_require_valid_receipts_for_card_scan() -> Result<(), String> {
         let root = copy_fixture_to_temp(
             "raw_pointer_alignment",
@@ -1194,7 +1353,7 @@ mod tests {
             .map_err(|err| format!("create receipt dir failed: {err}"))?;
         fs::write(
             receipt_dir.join("invalid.json"),
-            r#"{"schema_version":"0.1","card_id":"not-counted","tool":"proof-bot","strength":"ran"}"#,
+            r#"{"schema_version":"0.1","card_id":"UR-not-counted","tool":"proof-bot","strength":"ran"}"#,
         )
         .map_err(|err| format!("write invalid receipt failed: {err}"))?;
 
@@ -1361,6 +1520,29 @@ mod tests {
             ),
         )
         .map_err(|err| format!("write receipt {name} failed: {err}"))
+    }
+
+    fn manual_candidate_json() -> &'static str {
+        r#"{
+  "schema_version": "manual-candidate/v1",
+  "id": "R4R2-S001",
+  "title": "TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes",
+  "location": {
+    "file": "src/runtime/webcore/TextDecoder.rs",
+    "line": 237
+  },
+  "operation_family": "raw_pointer_read",
+  "unsafe_operation": "core::slice::from_raw_parts",
+  "invariant": "&[u8] memory must not be concurrently mutated",
+  "safe_caller": "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))",
+  "evidence": [
+    {
+      "kind": "runtime_witness",
+      "path": "target/unsafe-scout/textdecoder-shared-race-route.out"
+    }
+  ],
+  "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
+}"#
     }
 
     fn routes_for(kind: WitnessKind) -> Vec<WitnessRoute> {

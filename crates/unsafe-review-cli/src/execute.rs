@@ -114,7 +114,7 @@ fn print_support() {
         "- first-pr bundle: advisory; projects cards, summaries, SARIF, comment plans, witness plans, and saved LSP JSON from ReviewCards."
     );
     println!(
-        "- receipts: saved-output template/import/audit only; receipts attach external evidence to exact card identities."
+        "- receipts: saved-output template/import/audit only; receipts attach external evidence to exact ReviewCard or manual candidate identities."
     );
     println!("- outcome comparison: saved snapshot comparison only.");
     println!("- policy report: advisory no-new-debt simulation only.");

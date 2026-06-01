@@ -1,4 +1,6 @@
-use crate::analysis::receipts::{ReceiptAuditCard, ReceiptAuditReport};
+use crate::analysis::receipts::{
+    ReceiptAuditCard, ReceiptAuditManualCandidate, ReceiptAuditReport,
+};
 
 pub(crate) fn render_json(report: &ReceiptAuditReport) -> String {
     match serde_json::to_string_pretty(report) {
@@ -10,7 +12,9 @@ pub(crate) fn render_json(report: &ReceiptAuditReport) -> String {
 pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
     let mut out = String::new();
     out.push_str("# unsafe-review receipt audit\n\n");
-    out.push_str("Static audit of saved witness receipt metadata against current ReviewCards.\n\n");
+    out.push_str(
+        "Static audit of saved witness receipt metadata against current ReviewCards and manual candidates.\n\n",
+    );
     out.push_str(&format!("Audit date: `{}`\n\n", report.audit_date));
     out.push_str("## Summary\n\n");
     out.push_str("| Receipts | Matched | Unmatched | Expired | Stale | Wrong identity | Wrong tool | Weaker than route | Command hash mismatch | Duplicate | Invalid |\n");
@@ -67,7 +71,7 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
         out.push_str("No receipt files found.\n\n");
     } else {
         out.push_str(
-            "| Status | Receipt | Card | Matched card | Tool | Strength | Summary | Author | Recorded | Expires | Command hash | Limitations | Routed tools | Issues |\n",
+            "| Status | Receipt | Card | Matched target | Tool | Strength | Summary | Author | Recorded | Expires | Command hash | Limitations | Routed tools | Issues |\n",
         );
         out.push_str("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n");
         for receipt in &report.receipts {
@@ -125,7 +129,10 @@ fn receipt_row(receipt: &crate::analysis::receipts::ReceiptAuditEntry) -> String
         markdown_cell(&receipt.statuses.join(", ")),
         receipt.path,
         optional_code(receipt.card_id.as_deref()),
-        matched_card(receipt.matched_card.as_ref()),
+        matched_target(
+            receipt.matched_card.as_ref(),
+            receipt.matched_manual_candidate.as_ref(),
+        ),
         optional_code(receipt.receipt_tool.as_deref()),
         optional_code(receipt.strength.as_deref()),
         summary_cell(receipt.summary.as_deref()),
@@ -178,18 +185,32 @@ fn optional_code(value: Option<&str>) -> String {
     }
 }
 
-fn matched_card(card: Option<&ReceiptAuditCard>) -> String {
-    let Some(card) = card else {
-        return "-".to_string();
-    };
-    format!(
-        "`{}` / `{}` / `{}` / {} missing; next: {}",
-        card.class_name,
-        card.operation_family,
-        markdown_cell(&card.operation),
-        card.missing_count,
-        markdown_cell(&card.next_action)
-    )
+fn matched_target(
+    card: Option<&ReceiptAuditCard>,
+    candidate: Option<&ReceiptAuditManualCandidate>,
+) -> String {
+    if let Some(candidate) = candidate {
+        return format!(
+            "`manual_candidate` / `{}` / source `manual` / `{}` / {}; next: {}; boundary: {}",
+            candidate.operation_family,
+            markdown_cell(&candidate.operation),
+            markdown_cell(&candidate.location),
+            markdown_cell(&candidate.next_action),
+            markdown_cell(&candidate.trust_boundary)
+        );
+    }
+    if let Some(card) = card {
+        return format!(
+            "`{}` / `{}` / source `{}` / `{}` / {} missing; next: {}",
+            card.class_name,
+            card.operation_family,
+            card.source,
+            markdown_cell(&card.operation),
+            card.missing_count,
+            markdown_cell(&card.next_action)
+        );
+    }
+    "-".to_string()
 }
 
 fn markdown_cell(value: &str) -> String {
@@ -248,6 +269,7 @@ mod tests {
                         "receipt card_id is not present in the current ReviewCard set".to_string(),
                     ],
                     matched_card: None,
+                    matched_manual_candidate: None,
                     route_tools: Vec::new(),
                 },
                 ReceiptAuditEntry {
@@ -272,13 +294,17 @@ mod tests {
                     matched_card: Some(ReceiptAuditCard {
                         id: "UR-live-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
                             .to_string(),
-                        class_name: "guard_missing",
+                        class_name: "guard_missing".to_string(),
                         operation: "unsafe { ptr.cast::<Header>().read() }".to_string(),
-                        operation_family: "raw_pointer_read",
+                        operation_family: "raw_pointer_read".to_string(),
                         missing_count: 2,
                         next_action: "Add or expose guard | witness\nThen attach receipt"
                             .to_string(),
+                        source: "analyzer".to_string(),
+                        manual_candidate: false,
+                        analyzer_discovered: true,
                     }),
+                    matched_manual_candidate: None,
                     route_tools: vec!["miri".to_string(), "cargo-careful".to_string()],
                 },
                 ReceiptAuditEntry {
@@ -308,13 +334,17 @@ mod tests {
                     matched_card: Some(ReceiptAuditCard {
                         id: "UR-live-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
                             .to_string(),
-                        class_name: "guard_missing",
+                        class_name: "guard_missing".to_string(),
                         operation: "unsafe { ptr.cast::<Header>().read() }".to_string(),
-                        operation_family: "raw_pointer_read",
+                        operation_family: "raw_pointer_read".to_string(),
                         missing_count: 2,
                         next_action: "Add or expose guard | witness\nThen attach receipt"
                             .to_string(),
+                        source: "analyzer".to_string(),
+                        manual_candidate: false,
+                        analyzer_discovered: true,
                     }),
+                    matched_manual_candidate: None,
                     route_tools: vec!["miri".to_string(), "cargo-careful".to_string()],
                 },
             ],
@@ -340,7 +370,7 @@ mod tests {
             "matched receipts improve witness evidence only; they do not erase missing contracts"
         ));
         assert!(markdown.contains(
-            "| Status | Receipt | Card | Matched card | Tool | Strength | Summary | Author | Recorded | Expires | Command hash | Limitations | Routed tools | Issues |"
+            "| Status | Receipt | Card | Matched target | Tool | Strength | Summary | Author | Recorded | Expires | Command hash | Limitations | Routed tools | Issues |"
         ));
         assert!(markdown.contains("focused witness"));
         assert!(markdown.contains("focused witness passed"));
@@ -361,7 +391,7 @@ mod tests {
             markdown.contains("receipt tool `loom` is not one of this card's routed witness tools")
         );
         assert!(markdown.contains("receipt strength `configured` is weaker"));
-        assert!(markdown.contains("`guard_missing` / `raw_pointer_read`"));
+        assert!(markdown.contains("`guard_missing` / `raw_pointer_read` / source `analyzer`"));
         assert!(markdown.contains("unsafe { ptr.cast::<Header>().read() }"));
         assert!(markdown.contains("Add or expose guard \\| witness Then attach receipt"));
         assert!(markdown.contains("## Limitations"));
@@ -370,5 +400,68 @@ mod tests {
         assert!(markdown.contains("## Trust boundary"));
         assert!(markdown.contains("does not execute witnesses"));
         assert!(markdown.contains("does not prove site reach"));
+    }
+
+    #[test]
+    fn markdown_projects_manual_candidate_receipt_targets() {
+        let report = ReceiptAuditReport {
+            schema_version: "0.1".to_string(),
+            tool: "unsafe-review".to_string(),
+            mode: "receipt-audit".to_string(),
+            policy: "advisory".to_string(),
+            audit_date: "2026-05-26".to_string(),
+            trust_boundary: "Static witness receipt audit only; does not execute witnesses."
+                .to_string(),
+            limitations: vec![
+                "manual candidate receipts attach external evidence to that manual candidate only"
+                    .to_string(),
+            ],
+            summary: ReceiptAuditSummary {
+                receipts: 1,
+                matched: 1,
+                ..ReceiptAuditSummary::default()
+            },
+            receipts: vec![ReceiptAuditEntry {
+                path: ".unsafe-review/receipts/manual.json".to_string(),
+                card_id: Some("R4R2-S001".to_string()),
+                receipt_tool: Some("human-deep-review".to_string()),
+                strength: Some("test_targeted".to_string()),
+                summary: Some("manual route reviewed".to_string()),
+                author: Some("core/fixtures".to_string()),
+                recorded_at: Some("2026-05-20T00:00:00Z".to_string()),
+                expires_at: Some("2026-08-18".to_string()),
+                command_hash: None,
+                limitations: vec!["manual evidence only".to_string()],
+                statuses: vec!["manual_candidate".to_string(), "matched".to_string()],
+                issues: Vec::new(),
+                matched_card: None,
+                matched_manual_candidate: Some(ReceiptAuditManualCandidate {
+                    id: "R4R2-S001".to_string(),
+                    title: "TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes"
+                        .to_string(),
+                    location: "src/runtime/webcore/TextDecoder.rs:237".to_string(),
+                    operation: "core::slice::from_raw_parts".to_string(),
+                    operation_family: "raw_pointer_read".to_string(),
+                    next_action:
+                        "Review the manual candidate and preserve receipts as external evidence"
+                            .to_string(),
+                    trust_boundary:
+                        "manual candidate; not analyzer-discovered; not proof of repository safety"
+                            .to_string(),
+                    source: "manual".to_string(),
+                    manual_candidate: true,
+                    analyzer_discovered: false,
+                }),
+                route_tools: Vec::new(),
+            }],
+        };
+
+        let markdown = render_markdown(&report);
+
+        assert!(markdown.contains("manual_candidate, matched"));
+        assert!(markdown.contains("`manual_candidate` / `raw_pointer_read` / source `manual`"));
+        assert!(markdown.contains("src/runtime/webcore/TextDecoder.rs:237"));
+        assert!(markdown.contains("manual candidate; not analyzer-discovered"));
+        assert!(!markdown.contains("imports_witness_evidence"));
     }
 }

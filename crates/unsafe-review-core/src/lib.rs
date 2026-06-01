@@ -33,7 +33,7 @@ pub use candidate::{
 pub use domain::{
     CardId, CargoCarefulReceiptInput, ConcurrencyReceiptInput, Confidence, ContractEvidence,
     DischargeEvidence, HazardKind, MiriReceiptInput, MissingEvidence, NextAction, Priority,
-    ProofReceiptInput, ReachEvidence, RelatedTest, ReviewCard, ReviewClass, SafetyObligation,
-    SanitizerReceiptInput, SourceLocation, UnsafeOperation, UnsafeSite,
+    ProofReceiptInput, ReachEvidence, ReceiptCardIdKind, RelatedTest, ReviewCard, ReviewClass,
+    SafetyObligation, SanitizerReceiptInput, SourceLocation, UnsafeOperation, UnsafeSite,
     WITNESS_RECEIPT_SCHEMA_VERSION, WitnessEvidence, WitnessKind, WitnessReceipt, WitnessRoute,
 };

@@ -679,6 +679,104 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
 }
 
 #[test]
+fn manual_candidate_receipts_audit_as_manual_advisory_targets() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-manual-candidate-receipt-e2e")?;
+    copy_dir_all(&fixture, temp.path())?;
+    let input = temp.path().join("candidate.json");
+    let candidate_out = temp.path().join(".unsafe-review/candidates/R4R2-S001.json");
+    fs::create_dir_all(
+        candidate_out
+            .parent()
+            .ok_or("candidate output missing parent")?,
+    )?;
+    fs::write(&input, manual_candidate_json())?;
+
+    run_success([
+        os("candidate"),
+        os("import"),
+        input.as_os_str().to_os_string(),
+        os("--out"),
+        candidate_out.as_os_str().to_os_string(),
+    ])?;
+
+    let receipt_out = temp.path().join(".unsafe-review/receipts/R4R2-S001.json");
+    fs::create_dir_all(
+        receipt_out
+            .parent()
+            .ok_or("receipt output missing parent")?,
+    )?;
+    run_success([
+        os("receipt"),
+        os("template"),
+        os("R4R2-S001"),
+        os("--tool"),
+        os("human-deep-review"),
+        os("--strength"),
+        os("test_targeted"),
+        os("--author"),
+        os("unsafe-scout"),
+        os("--recorded-at"),
+        os("2026-05-31T00:00:00Z"),
+        os("--expires-at"),
+        os("2026-08-18"),
+        os("--summary"),
+        os("manual route reviewed with external witness packet"),
+        os("--command"),
+        os("manual review R4R2-S001"),
+        os("--out"),
+        receipt_out.as_os_str().to_os_string(),
+    ])?;
+
+    let validate = run_success([
+        os("receipt"),
+        os("validate"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+    ])?;
+    assert!(stdout_text(&validate)?.contains("witness receipts: 1 valid"));
+
+    let audit = run_success([
+        os("receipt"),
+        os("audit"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--diff"),
+        temp.path().join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let audit = parse_json(&stdout_text(&audit)?)?;
+    assert_eq!(audit["summary"]["receipts"], 1);
+    assert_eq!(audit["summary"]["matched"], 1);
+    assert_eq!(audit["summary"]["wrong_identity"], 0);
+    let receipt = &audit["receipts"][0];
+    let statuses = serde_json::to_string(&receipt["statuses"])?;
+    assert!(statuses.contains("manual_candidate"));
+    assert!(statuses.contains("matched"));
+    assert!(!statuses.contains("imports_witness_evidence"));
+    assert!(receipt["matched_card"].is_null());
+    assert_eq!(receipt["matched_manual_candidate"]["id"], "R4R2-S001");
+    assert_eq!(receipt["matched_manual_candidate"]["source"], "manual");
+    assert_eq!(
+        receipt["matched_manual_candidate"]["manual_candidate"],
+        true
+    );
+    assert_eq!(
+        receipt["matched_manual_candidate"]["analyzer_discovered"],
+        false
+    );
+    assert!(
+        receipt["matched_manual_candidate"]["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not analyzer-discovered")
+    );
+
+    Ok(())
+}
+
+#[test]
 fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment");
     let temp = TempDir::new("unsafe-review-first-pr-e2e")?;
@@ -2077,7 +2175,7 @@ fn receipt_audit_reports_matching_saved_receipts_without_running_witnesses()
     assert!(markdown.contains("keep matching receipt metadata attached to the review record"));
     assert!(markdown.contains("do not erase missing contracts"));
     assert!(markdown.contains("Duplicate"));
-    assert!(markdown.contains("Matched card"));
+    assert!(markdown.contains("Matched target"));
     assert!(markdown.contains("Summary"));
     assert!(markdown.contains("focused fixture witness passed"));
     assert!(markdown.contains("imports_witness_evidence, matched"));

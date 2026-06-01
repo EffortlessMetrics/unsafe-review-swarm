@@ -70,10 +70,7 @@ impl ManualCandidate {
             &self.schema_version,
             MANUAL_CANDIDATE_SCHEMA_VERSION,
         )?;
-        require_nonempty("id", &self.id)?;
-        if self.id.contains('/') || self.id.contains('\\') {
-            return Err("manual candidate id must not contain path separators".to_string());
-        }
+        validate_candidate_id(&self.id)?;
         require_nonempty("title", &self.title)?;
         if self.location.file.as_os_str().is_empty() {
             return Err("manual candidate location.file must not be empty".to_string());
@@ -111,6 +108,26 @@ pub fn load_manual_candidate(root: &Path, id: &str) -> Result<Option<ManualCandi
         return Ok(None);
     }
     read_manual_candidate(&path).map(Some)
+}
+
+pub(crate) fn load_manual_candidates(root: &Path) -> Result<Vec<ManualCandidate>, String> {
+    let dir = root.join(".unsafe-review").join("candidates");
+    if !dir.is_dir() {
+        return Ok(Vec::new());
+    }
+    let entries =
+        fs::read_dir(&dir).map_err(|err| format!("read {} failed: {err}", dir.display()))?;
+    let mut candidates = Vec::new();
+    for entry in entries {
+        let entry = entry.map_err(|err| format!("read_dir entry failed: {err}"))?;
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+            continue;
+        }
+        candidates.push(read_manual_candidate(&path)?);
+    }
+    candidates.sort_by(|left, right| left.id.cmp(&right.id));
+    Ok(candidates)
 }
 
 pub fn manual_candidate_path(root: &Path, id: &str) -> PathBuf {
@@ -270,8 +287,15 @@ fn require_nonempty(field: &str, value: &str) -> Result<(), String> {
 
 fn validate_candidate_id(id: &str) -> Result<(), String> {
     require_nonempty("id", id)?;
-    if id.contains('/') || id.contains('\\') {
-        return Err("manual candidate id must not contain path separators".to_string());
+    if id != id.trim()
+        || id.starts_with("UR-")
+        || id.contains('/')
+        || id.contains('\\')
+        || !id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.' | b':'))
+    {
+        return Err("manual candidate id must be path-safe, non-UR, and use only ASCII letters, digits, '.', '_', '-', or ':'".to_string());
     }
     Ok(())
 }
@@ -349,6 +373,39 @@ mod tests {
     }
 
     #[test]
+    fn manual_candidates_load_sorted_from_candidate_dir() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-manual-candidates")?;
+        let dir = root.join(".unsafe-review").join("candidates");
+        fs::create_dir_all(&dir).map_err(|err| format!("create candidate dir failed: {err}"))?;
+        fs::write(dir.join("B-002.json"), example_json_with_id("B-002"))
+            .map_err(|err| format!("write B candidate failed: {err}"))?;
+        fs::write(dir.join("A-001.json"), example_json_with_id("A-001"))
+            .map_err(|err| format!("write A candidate failed: {err}"))?;
+        fs::write(dir.join("README.md"), "ignored\n")
+            .map_err(|err| format!("write ignored file failed: {err}"))?;
+
+        let candidates = load_manual_candidates(&root)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let ids = candidates
+            .iter()
+            .map(|candidate| candidate.id.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(ids, vec!["A-001", "B-002"]);
+        Ok(())
+    }
+
+    #[test]
+    fn manual_candidate_rejects_non_path_safe_ids() {
+        for id in ["UR-not-counted", "../R4R2-S001", "R4R2 S001", " R4R2-S001"] {
+            let err = ManualCandidate::from_json_str(&example_json_with_id(id))
+                .err()
+                .unwrap_or_default();
+            assert!(err.contains("path-safe"), "{id} produced {err}");
+        }
+    }
+
+    #[test]
     fn manual_candidate_explain_context_and_witness_plan_preserve_manual_marker()
     -> Result<(), String> {
         let candidate = ManualCandidate::from_json_str(example_json())?;
@@ -391,6 +448,10 @@ mod tests {
           ],
           "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
         }"#
+    }
+
+    fn example_json_with_id(id: &str) -> String {
+        example_json().replace("\"id\": \"R4R2-S001\"", &format!("\"id\": \"{id}\""))
     }
 
     fn unique_temp_dir(prefix: &str) -> Result<PathBuf, String> {
