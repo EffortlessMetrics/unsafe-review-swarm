@@ -1,23 +1,24 @@
 mod card_builder;
+mod discovery;
+mod progress;
+mod scan;
 
 use super::{receipts, scanner};
+#[cfg(test)]
+use crate::api::RepoScanPhase;
 use crate::api::{
-    AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, DiscoveryOptions, RepoScanPhase,
-    RepoScanStatus, Scope, Summary,
+    AnalyzeInput, AnalyzeOutput, DiffSource, DiscoveryOptions, RepoScanStatus, Summary,
 };
 use crate::domain::{CardId, ReviewCard};
-use crate::input::{diff, workspace};
+use crate::input::diff;
 use crate::policy::PolicyState;
 use crate::util::{slug, stable_hash_hex};
 use std::collections::BTreeMap;
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::time::Instant;
-
-type RepoProgressFn<'a> = &'a mut dyn FnMut(&RepoScanStatus) -> Result<(), String>;
+use std::path::Path;
 
 pub(crate) fn analyze(input: AnalyzeInput) -> Result<AnalyzeOutput, String> {
-    let discovery = default_discovery_for(&input);
+    let discovery = discovery::default_discovery_for(&input);
     analyze_with_receipts(input, true, discovery, None)
 }
 
@@ -40,159 +41,54 @@ where
 }
 
 pub(crate) fn analyze_without_receipts(input: AnalyzeInput) -> Result<AnalyzeOutput, String> {
-    let discovery = default_discovery_for(&input);
+    let discovery = discovery::default_discovery_for(&input);
     analyze_with_receipts(input, false, discovery, None)
-}
-
-fn default_discovery_for(input: &AnalyzeInput) -> DiscoveryOptions {
-    if matches!(input.scope, Scope::Repo) || matches!(input.mode, AnalysisMode::Repo) {
-        DiscoveryOptions::repo_defaults()
-    } else {
-        DiscoveryOptions::default()
-    }
 }
 
 fn analyze_with_receipts(
     input: AnalyzeInput,
     import_receipts: bool,
-    discovery: DiscoveryOptions,
-    mut progress: Option<RepoProgressFn<'_>>,
+    discovery_options: DiscoveryOptions,
+    progress: Option<progress::RepoProgressFn<'_>>,
 ) -> Result<AnalyzeOutput, String> {
-    let started = Instant::now();
-    let repo_mode = matches!(input.scope, Scope::Repo) || matches!(input.mode, AnalysisMode::Repo);
+    let repo_mode = discovery::is_repo_mode(&input);
     let diff_index = load_diff_index(&input.diff)?;
-    emit_repo_status(
-        &mut progress,
-        repo_status(RepoScanPhase::Discovering, &started, 0, 0, 0, None, false),
-    )?;
-    let mut discovered_files = 0usize;
-    let all_rust_files = {
-        let mut discovery_progress = |count: usize, path: &Path| {
-            discovered_files = count;
-            emit_repo_status(
-                &mut progress,
-                repo_status(
-                    RepoScanPhase::Discovering,
-                    &started,
-                    discovered_files,
-                    0,
-                    0,
-                    Some(path.to_path_buf()),
-                    false,
-                ),
-            )
-        };
-        workspace::discover_rust_files_with_progress(
-            &input.root,
-            &discovery,
-            Some(&mut discovery_progress),
-        )?
-    };
-    discovered_files = all_rust_files.len();
+    let mut reporter = progress::RepoScanReporter::new(progress);
+    let all_rust_files =
+        discovery::discover_rust_files(&input.root, &discovery_options, &mut reporter)?;
+    let discovered_files = all_rust_files.len();
     let package = package_name(&input.root);
     let policy_state = PolicyState::load(&input.root)?;
-    let receipt_index = if import_receipts {
-        receipts::ReceiptIndex::load(&input.root)?
-    } else {
-        receipts::ReceiptIndex::default()
-    };
-    let candidate_files = if repo_mode || diff_index.is_empty() {
-        all_rust_files.clone()
-    } else {
-        all_rust_files
-            .iter()
-            .filter(|path| diff_index.contains_file(path))
-            .cloned()
-            .collect::<Vec<_>>()
-    };
+    let receipt_index = load_receipts(&input.root, import_receipts)?;
+    let candidate_files = discovery::candidate_files(&all_rust_files, &diff_index, repo_mode);
 
-    let mut cards = Vec::new();
-    let mut identity_counts = BTreeMap::new();
-    let max_cards = input.max_cards.unwrap_or(usize::MAX);
-    let mut files_scanned = 0usize;
-    let mut last_scanned_path = None;
-    emit_repo_status(
-        &mut progress,
-        repo_status(
-            RepoScanPhase::Scanning,
-            &started,
-            discovered_files,
-            files_scanned,
-            cards.len(),
-            None,
-            false,
-        ),
-    )?;
-    'files: for rel in &candidate_files {
-        if cards.len() >= max_cards {
-            break;
-        }
-        emit_repo_status(
-            &mut progress,
-            repo_status(
-                RepoScanPhase::Scanning,
-                &started,
-                discovered_files,
-                files_scanned,
-                cards.len(),
-                Some(rel.clone()),
-                false,
-            ),
-        )?;
-        let scanned = scanner::scan_file(&input.root, rel, Some(&diff_index), repo_mode)?;
-        files_scanned += 1;
-        let mut build_ctx = card_builder::CardBuildContext {
+    let scan_result = scan::scan_candidate_files(
+        &candidate_files,
+        scan::ScanInputs {
             root: &input.root,
             package: &package,
             receipt_index: &receipt_index,
             policy_state: &policy_state,
-            identity_counts: &mut identity_counts,
-        };
-        let mut reached_max_cards = false;
-        for scanned_site in scanned {
-            cards.push(card_builder::build_card(&mut build_ctx, scanned_site));
-            if cards.len() >= max_cards {
-                reached_max_cards = true;
-                break;
-            }
-        }
-        emit_repo_status(
-            &mut progress,
-            repo_status(
-                RepoScanPhase::Scanning,
-                &started,
-                discovered_files,
-                files_scanned,
-                cards.len(),
-                Some(rel.clone()),
-                false,
-            ),
-        )?;
-        last_scanned_path = Some(rel.clone());
-        if reached_max_cards {
-            break 'files;
-        }
-    }
-    cards.sort_by(|left, right| {
-        left.site
-            .location
-            .file
-            .cmp(&right.site.location.file)
-            .then(left.site.location.line.cmp(&right.site.location.line))
-    });
-    let summary = summarize(all_rust_files.len(), candidate_files.len(), &cards);
-    emit_repo_status(
-        &mut progress,
-        repo_status(
-            RepoScanPhase::Complete,
-            &started,
+            diff_index: &diff_index,
+            repo_mode,
             discovered_files,
-            files_scanned,
-            cards.len(),
-            last_scanned_path,
-            true,
-        ),
+            max_cards: input.max_cards.unwrap_or(usize::MAX),
+        },
+        &mut reporter,
     )?;
+
+    let summary = summarize(
+        all_rust_files.len(),
+        candidate_files.len(),
+        &scan_result.cards,
+    );
+    reporter.emit_complete(
+        discovered_files,
+        scan_result.files_scanned,
+        scan_result.cards.len(),
+        scan_result.last_scanned_path,
+    )?;
+
     Ok(AnalyzeOutput {
         schema_version: "0.1".to_string(),
         tool: "unsafe-review".to_string(),
@@ -201,38 +97,15 @@ fn analyze_with_receipts(
         mode: input.mode,
         policy: input.policy,
         summary,
-        cards,
+        cards: scan_result.cards,
     })
 }
 
-fn emit_repo_status(
-    progress: &mut Option<RepoProgressFn<'_>>,
-    status: RepoScanStatus,
-) -> Result<(), String> {
-    if let Some(progress) = progress.as_deref_mut() {
-        progress(&status)?;
-    }
-    Ok(())
-}
-
-fn repo_status(
-    phase: RepoScanPhase,
-    started: &Instant,
-    files_discovered: usize,
-    files_scanned: usize,
-    cards_found: usize,
-    last_path: Option<PathBuf>,
-    completed: bool,
-) -> RepoScanStatus {
-    RepoScanStatus {
-        schema_version: "repo-scan-status/v1".to_string(),
-        phase,
-        elapsed_ms: started.elapsed().as_millis().try_into().unwrap_or(u64::MAX),
-        files_discovered,
-        files_scanned,
-        cards_found,
-        last_path,
-        completed,
+fn load_receipts(root: &Path, import_receipts: bool) -> Result<receipts::ReceiptIndex, String> {
+    if import_receipts {
+        receipts::ReceiptIndex::load(root)
+    } else {
+        Ok(receipts::ReceiptIndex::default())
     }
 }
 
