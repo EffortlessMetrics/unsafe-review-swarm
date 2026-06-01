@@ -11,6 +11,15 @@ struct AdvisoryArtifactSummary {
     high_priority_cards: usize,
 }
 
+struct AdvisoryArtifactManifest {
+    card_ids: BTreeSet<String>,
+    card_projections: BTreeMap<String, CardProjection>,
+    scope: String,
+    card_count: usize,
+    open_actionable_gaps: usize,
+    high_priority_cards: usize,
+}
+
 struct CardProjection {
     id: String,
     class_name: String,
@@ -1142,6 +1151,29 @@ fn require_top_card_primary_route_command(
 }
 
 fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, String> {
+    let manifest = check_cards_json_artifact(dir)?;
+    check_pr_summary_artifact(dir, &manifest)?;
+    check_sarif_artifact(dir, &manifest)?;
+    check_comment_plan_artifact(dir, &manifest)?;
+    let repair_queue_projections = check_repair_queue_artifact(
+        dir,
+        manifest.card_count,
+        &manifest.card_ids,
+        &manifest.card_projections,
+    )?;
+
+    Ok(AdvisoryArtifactSummary {
+        card_ids: manifest.card_ids,
+        card_projections: manifest.card_projections,
+        repair_queue_projections,
+        scope: manifest.scope,
+        card_count: manifest.card_count,
+        open_actionable_gaps: manifest.open_actionable_gaps,
+        high_priority_cards: manifest.high_priority_cards,
+    })
+}
+
+fn check_cards_json_artifact(dir: &Path) -> Result<AdvisoryArtifactManifest, String> {
     if !dir.is_dir() {
         return Err(format!(
             "advisory artifact directory missing: {}",
@@ -1177,6 +1209,23 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         .filter(|card| card.priority == "high")
         .count();
 
+    Ok(AdvisoryArtifactManifest {
+        card_ids,
+        card_projections,
+        scope,
+        card_count,
+        open_actionable_gaps,
+        high_priority_cards,
+    })
+}
+
+fn check_pr_summary_artifact(
+    dir: &Path,
+    manifest: &AdvisoryArtifactManifest,
+) -> Result<(), String> {
+    let scope = &manifest.scope;
+    let card_count = manifest.card_count;
+    let open_actionable_gaps = manifest.open_actionable_gaps;
     let pr_summary_path = dir.join("pr-summary.md");
     let pr_summary = super::read_to_string(&pr_summary_path)?;
     super::require_text_contains(
@@ -1220,7 +1269,14 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         )?;
         super::require_text_contains(&pr_summary, "unsafe site executed", &pr_summary_path)?;
     }
+    Ok(())
+}
 
+fn check_sarif_artifact(dir: &Path, manifest: &AdvisoryArtifactManifest) -> Result<(), String> {
+    let scope = manifest.scope.as_str();
+    let card_ids = &manifest.card_ids;
+    let card_projections = &manifest.card_projections;
+    let card_count = manifest.card_count;
     let sarif = super::parse_json_file(&dir.join("cards.sarif"))?;
     super::require_json_str(&sarif, "version", "2.1.0", "cards.sarif")?;
     super::require_json_array(&sarif, "runs", "cards.sarif")?;
@@ -1252,116 +1308,13 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
     }
     let mut sarif_card_ids = BTreeSet::new();
     for result in sarif_results {
-        let Some(card_id) = result
-            .pointer("/properties/cardId")
-            .and_then(serde_json::Value::as_str)
-        else {
-            return Err("cards.sarif result is missing properties.cardId".to_string());
-        };
-        if !card_ids.contains(card_id) {
-            return Err(format!(
-                "cards.sarif result references unknown card id `{card_id}`"
-            ));
-        }
+        let card_id =
+            check_sarif_result_projection(result, &sarif_rule_ids, card_ids, card_projections)?;
         if !sarif_card_ids.insert(card_id.to_string()) {
             return Err(format!("cards.sarif results repeat card id `{card_id}`"));
         }
-        let Some(card_projection) = card_projections.get(card_id) else {
-            return Err(format!(
-                "cards.sarif result references unknown card id `{card_id}`"
-            ));
-        };
-        let rule_id = super::require_non_empty_json_str(result, "ruleId", "cards.sarif result")?;
-        require_expected_value(
-            rule_id,
-            &card_projection.class_name,
-            "cards.sarif result ruleId",
-        )?;
-        if !sarif_rule_ids.contains(rule_id) {
-            return Err(format!(
-                "cards.sarif result ruleId `{rule_id}` is not declared in tool.driver.rules"
-            ));
-        }
-        require_projected_str(
-            result
-                .pointer("/properties")
-                .ok_or_else(|| "cards.sarif result is missing properties".to_string())?,
-            "class",
-            &card_projection.class_name,
-            "cards.sarif result properties",
-        )?;
-        let properties = result
-            .pointer("/properties")
-            .ok_or_else(|| "cards.sarif result is missing properties".to_string())?;
-        require_sarif_location_projection(result, card_projection)?;
-        require_projected_str(
-            properties,
-            "priority",
-            &card_projection.priority,
-            "cards.sarif result properties",
-        )?;
-        require_projected_str(
-            properties,
-            "confidence",
-            &card_projection.confidence,
-            "cards.sarif result properties",
-        )?;
-        require_projected_str(
-            properties,
-            "operationFamily",
-            &card_projection.operation_family,
-            "cards.sarif result properties",
-        )?;
-        require_projected_str(
-            properties,
-            "operation",
-            &card_projection.operation,
-            "cards.sarif result properties",
-        )?;
-        require_projected_str(
-            properties,
-            "nextAction",
-            &card_projection.next_action,
-            "cards.sarif result properties",
-        )?;
-        require_projected_string_array(
-            properties,
-            "verifyCommands",
-            &card_projection.verify_commands,
-            "cards.sarif result properties",
-        )?;
-        require_projected_witness_routes_field(
-            properties,
-            "witnessRouteDetails",
-            &card_projection.witness_routes,
-            "cards.sarif result properties",
-        )?;
-        require_projected_string_array(
-            properties,
-            "witnessRoutes",
-            &witness_route_summaries(&card_projection.witness_routes),
-            "cards.sarif result properties",
-        )?;
-        require_projected_string_array(
-            properties,
-            "hazards",
-            &card_projection.hazards,
-            "cards.sarif result properties",
-        )?;
-        require_projected_string_array(
-            properties,
-            "missingEvidence",
-            &card_projection.missing,
-            "cards.sarif result properties",
-        )?;
-        let result_boundary = properties
-            .get("trustBoundary")
-            .and_then(serde_json::Value::as_str)
-            .ok_or_else(|| "cards.sarif result properties is missing trustBoundary".to_string())?;
-        super::require_boundary_text(result_boundary, "cards.sarif result properties")?;
-        super::json_array_at(result, "/properties/verifyCommands", "cards.sarif result")?;
     }
-    for card_id in &card_ids {
+    for card_id in card_ids {
         if !sarif_card_ids.contains(card_id) {
             return Err(format!("cards.sarif results missing card id `{card_id}`"));
         }
@@ -1375,8 +1328,131 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         .pointer("/runs/0/properties/scope")
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| "cards.sarif is missing /runs/0/properties/scope".to_string())?;
-    require_expected_value(sarif_scope, &scope, "cards.sarif /runs/0/properties/scope")?;
+    require_expected_value(sarif_scope, scope, "cards.sarif /runs/0/properties/scope")?;
+    Ok(())
+}
 
+fn check_sarif_result_projection<'a>(
+    result: &'a serde_json::Value,
+    sarif_rule_ids: &BTreeSet<&str>,
+    card_ids: &BTreeSet<String>,
+    card_projections: &BTreeMap<String, CardProjection>,
+) -> Result<&'a str, String> {
+    let Some(card_id) = result
+        .pointer("/properties/cardId")
+        .and_then(serde_json::Value::as_str)
+    else {
+        return Err("cards.sarif result is missing properties.cardId".to_string());
+    };
+    if !card_ids.contains(card_id) {
+        return Err(format!(
+            "cards.sarif result references unknown card id `{card_id}`"
+        ));
+    }
+    let Some(card_projection) = card_projections.get(card_id) else {
+        return Err(format!(
+            "cards.sarif result references unknown card id `{card_id}`"
+        ));
+    };
+    let rule_id = super::require_non_empty_json_str(result, "ruleId", "cards.sarif result")?;
+    require_expected_value(
+        rule_id,
+        &card_projection.class_name,
+        "cards.sarif result ruleId",
+    )?;
+    if !sarif_rule_ids.contains(rule_id) {
+        return Err(format!(
+            "cards.sarif result ruleId `{rule_id}` is not declared in tool.driver.rules"
+        ));
+    }
+    require_projected_str(
+        result
+            .pointer("/properties")
+            .ok_or_else(|| "cards.sarif result is missing properties".to_string())?,
+        "class",
+        &card_projection.class_name,
+        "cards.sarif result properties",
+    )?;
+    let properties = result
+        .pointer("/properties")
+        .ok_or_else(|| "cards.sarif result is missing properties".to_string())?;
+    require_sarif_location_projection(result, card_projection)?;
+    require_projected_str(
+        properties,
+        "priority",
+        &card_projection.priority,
+        "cards.sarif result properties",
+    )?;
+    require_projected_str(
+        properties,
+        "confidence",
+        &card_projection.confidence,
+        "cards.sarif result properties",
+    )?;
+    require_projected_str(
+        properties,
+        "operationFamily",
+        &card_projection.operation_family,
+        "cards.sarif result properties",
+    )?;
+    require_projected_str(
+        properties,
+        "operation",
+        &card_projection.operation,
+        "cards.sarif result properties",
+    )?;
+    require_projected_str(
+        properties,
+        "nextAction",
+        &card_projection.next_action,
+        "cards.sarif result properties",
+    )?;
+    require_projected_string_array(
+        properties,
+        "verifyCommands",
+        &card_projection.verify_commands,
+        "cards.sarif result properties",
+    )?;
+    require_projected_witness_routes_field(
+        properties,
+        "witnessRouteDetails",
+        &card_projection.witness_routes,
+        "cards.sarif result properties",
+    )?;
+    require_projected_string_array(
+        properties,
+        "witnessRoutes",
+        &witness_route_summaries(&card_projection.witness_routes),
+        "cards.sarif result properties",
+    )?;
+    require_projected_string_array(
+        properties,
+        "hazards",
+        &card_projection.hazards,
+        "cards.sarif result properties",
+    )?;
+    require_projected_string_array(
+        properties,
+        "missingEvidence",
+        &card_projection.missing,
+        "cards.sarif result properties",
+    )?;
+    let result_boundary = properties
+        .get("trustBoundary")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "cards.sarif result properties is missing trustBoundary".to_string())?;
+    super::require_boundary_text(result_boundary, "cards.sarif result properties")?;
+    super::json_array_at(result, "/properties/verifyCommands", "cards.sarif result")?;
+    Ok(card_id)
+}
+
+fn check_comment_plan_artifact(
+    dir: &Path,
+    manifest: &AdvisoryArtifactManifest,
+) -> Result<(), String> {
+    let card_ids = &manifest.card_ids;
+    let card_projections = &manifest.card_projections;
+    let card_count = manifest.card_count;
     let comment_plan_path = dir.join("comment-plan.json");
     let comment_plan = super::parse_json_file(&comment_plan_path)?;
     super::require_json_str(&comment_plan, "schema_version", "0.1", "comment-plan.json")?;
@@ -1655,7 +1731,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
             )?;
         }
     }
-    for card_id in &card_ids {
+    for card_id in card_ids {
         if !comment_card_ids.contains(card_id) && !not_selected_card_ids.contains(card_id) {
             return Err(format!(
                 "comment-plan.json must account for ReviewCard id `{card_id}` in comments[] or not_selected[]"
@@ -1693,18 +1769,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         }
     }
     require_comment_plan_summary(&comment_plan, comments.len(), not_selected_card_ids.len())?;
-    let repair_queue_projections =
-        check_repair_queue_artifact(dir, card_count, &card_ids, &card_projections)?;
-
-    Ok(AdvisoryArtifactSummary {
-        card_ids,
-        card_projections,
-        repair_queue_projections,
-        scope,
-        card_count,
-        open_actionable_gaps,
-        high_priority_cards,
-    })
+    Ok(())
 }
 
 fn require_comment_plan_summary(
