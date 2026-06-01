@@ -148,6 +148,25 @@ fn markdown_state(state: Option<&OutcomeCardState>) -> String {
                 "`{}` / `{}` / {} missing / witness `{}`",
                 state.class_name, state.priority, state.missing_count, state.witness
             )];
+            if let Some(source) = state.source.as_deref() {
+                parts.push(format!("source `{}`", markdown_cell(source)));
+            }
+            if let Some(manual_candidate) = state.manual_candidate {
+                parts.push(format!("manual_candidate `{manual_candidate}`"));
+            }
+            if let Some(analyzer_discovered) = state.analyzer_discovered {
+                parts.push(format!("analyzer-discovered `{analyzer_discovered}`"));
+            }
+            if let Some(title) = state.title.as_deref() {
+                parts.push(format!("title `{}`", markdown_cell(title)));
+            }
+            if let Some(location) = state.location.as_ref() {
+                parts.push(format!(
+                    "location `{}`:{}",
+                    markdown_cell(&location.file),
+                    location.line
+                ));
+            }
             if let Some(operation_family) = state.operation_family.as_deref() {
                 parts.push(format!(
                     "operation family `{}`",
@@ -157,8 +176,14 @@ fn markdown_state(state: Option<&OutcomeCardState>) -> String {
             if let Some(operation) = state.operation.as_deref() {
                 parts.push(format!("operation `{}`", markdown_cell(operation)));
             }
+            if let Some(evidence_count) = state.evidence_count {
+                parts.push(format!("external evidence {evidence_count}"));
+            }
             if let Some(next_action) = state.next_action.as_deref() {
                 parts.push(format!("next: {}", markdown_cell(next_action)));
+            }
+            if let Some(trust_boundary) = state.trust_boundary.as_deref() {
+                parts.push(format!("boundary: {}", markdown_cell(trust_boundary)));
             }
             parts.join("; ")
         }

@@ -628,6 +628,72 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
     assert_eq!(canonical["manual_candidate"], true);
     assert_eq!(canonical["id"], "R4R2-S001");
 
+    let empty_snapshot = temp.path().join("empty-snapshot.json");
+    fs::write(&empty_snapshot, empty_review_card_snapshot_json())?;
+    let outcome = run_success([
+        os("outcome"),
+        os("--before"),
+        empty_snapshot.as_os_str().to_os_string(),
+        os("--after"),
+        out.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let outcome = parse_json(&stdout_text(&outcome)?)?;
+    assert_eq!(outcome["after"]["schema_version"], "manual-candidate/v1");
+    assert_eq!(outcome["after"]["source"], "manual");
+    assert_eq!(outcome["summary"]["new"], 1);
+    assert_eq!(outcome["cards"]["new"][0]["card_id"], "R4R2-S001");
+    assert_eq!(outcome["cards"]["new"][0]["after"]["source"], "manual");
+    assert_eq!(
+        outcome["cards"]["new"][0]["after"]["manual_candidate"],
+        true
+    );
+    assert_eq!(
+        outcome["cards"]["new"][0]["after"]["analyzer_discovered"],
+        false
+    );
+    assert_eq!(
+        outcome["cards"]["new"][0]["after"]["operation_family"],
+        "raw_pointer_read"
+    );
+    assert_eq!(
+        outcome["cards"]["new"][0]["after"]["operation"],
+        "core::slice::from_raw_parts"
+    );
+    assert_eq!(outcome["cards"]["new"][0]["after"]["evidence_count"], 2);
+    assert!(
+        outcome["cards"]["new"][0]["reason"]
+            .as_str()
+            .unwrap_or("")
+            .contains("new manual candidate")
+    );
+    let limitations = outcome["limitations"]
+        .as_array()
+        .ok_or("outcome limitations missing")?;
+    assert!(limitations.iter().any(|limitation| {
+        limitation
+            .as_str()
+            .unwrap_or("")
+            .contains("manual candidate JSON artifacts")
+    }));
+
+    let outcome_markdown = run_success([
+        os("outcome"),
+        os("--before"),
+        empty_snapshot.as_os_str().to_os_string(),
+        os("--after"),
+        out.as_os_str().to_os_string(),
+        os("--format"),
+        os("markdown"),
+    ])?;
+    let outcome_markdown = stdout_text(&outcome_markdown)?;
+    assert!(outcome_markdown.contains("new manual candidate"));
+    assert!(outcome_markdown.contains("source `manual`"));
+    assert!(outcome_markdown.contains("manual_candidate `true`"));
+    assert!(outcome_markdown.contains("analyzer-discovered `false`"));
+    assert!(outcome_markdown.contains("not analyzer-discovered"));
+
     let explain = run_success([
         os("explain"),
         os("--root"),
@@ -2866,6 +2932,17 @@ fn manual_candidate_json() -> &'static str {
     }
   ],
   "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
+}"#
+}
+
+fn empty_review_card_snapshot_json() -> &'static str {
+    r#"{
+  "schema_version": "0.1",
+  "summary": {
+    "cards": 0,
+    "open_actionable_gaps": 0
+  },
+  "cards": []
 }"#
 }
 

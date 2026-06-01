@@ -1,3 +1,4 @@
+use crate::candidate::{MANUAL_CANDIDATE_SCHEMA_VERSION, ManualCandidate};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -7,7 +8,7 @@ use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
 mod markdown;
 mod witness;
 
-const TRUST_BOUNDARY: &str = "Static unsafe contract review outcome only; this compares existing ReviewCard snapshots, not memory-safety proof, not UB-free status, and not witness execution.";
+const TRUST_BOUNDARY: &str = "Static unsafe contract review outcome only; this compares existing ReviewCard snapshots and manual candidate snapshots, not memory-safety proof, not UB-free status, and not witness execution.";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct OutcomeReport {
@@ -28,6 +29,8 @@ pub struct OutcomeReport {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct OutcomeSnapshotSummary {
     pub schema_version: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
     pub cards: usize,
     pub open_actionable_gaps: usize,
 }
@@ -93,6 +96,16 @@ pub struct OutcomeCardState {
     #[serde(rename = "class")]
     pub class_name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub source: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub manual_candidate: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub analyzer_discovered: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub title: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub location: Option<OutcomeLocation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub operation: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub operation_family: Option<String>,
@@ -100,13 +113,25 @@ pub struct OutcomeCardState {
     pub missing_count: usize,
     pub witness: String,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub evidence_count: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next_action: Option<String>,
     pub missing: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trust_boundary: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct OutcomeLocation {
+    pub file: String,
+    pub line: usize,
 }
 
 #[derive(Deserialize)]
 struct Snapshot {
     schema_version: String,
+    #[serde(default)]
+    source: Option<String>,
     summary: SnapshotSummary,
     cards: Vec<SnapshotCard>,
 }
@@ -123,6 +148,16 @@ struct SnapshotCard {
     #[serde(rename = "class")]
     class_name: String,
     #[serde(default)]
+    source: Option<String>,
+    #[serde(default)]
+    manual_candidate: Option<bool>,
+    #[serde(default)]
+    analyzer_discovered: Option<bool>,
+    #[serde(default)]
+    title: Option<String>,
+    #[serde(default)]
+    location: Option<SnapshotLocation>,
+    #[serde(default)]
     operation: Option<String>,
     #[serde(default)]
     operation_family: Option<String>,
@@ -133,6 +168,21 @@ struct SnapshotCard {
     next_action: Option<String>,
     #[serde(default)]
     missing: Vec<String>,
+    #[serde(default)]
+    trust_boundary: Option<String>,
+    #[serde(default)]
+    evidence_count: Option<usize>,
+}
+
+#[derive(Clone, Deserialize)]
+struct SnapshotLocation {
+    file: String,
+    line: usize,
+}
+
+#[derive(Deserialize)]
+struct SnapshotSchema {
+    schema_version: Option<String>,
 }
 
 pub fn compare_json(before_json: &str, after_json: &str) -> Result<OutcomeReport, String> {
@@ -153,6 +203,13 @@ pub fn render_markdown(report: &OutcomeReport) -> String {
 }
 
 fn parse_snapshot(text: &str, label: &str) -> Result<Snapshot, String> {
+    let schema: SnapshotSchema = serde_json::from_str(text)
+        .map_err(|err| format!("parse {label} unsafe-review JSON snapshot failed: {err}"))?;
+    if schema.schema_version.as_deref() == Some(MANUAL_CANDIDATE_SCHEMA_VERSION) {
+        let candidate = ManualCandidate::from_json_str(text)
+            .map_err(|err| format!("parse {label} manual candidate snapshot failed: {err}"))?;
+        return Ok(snapshot_from_manual_candidate(candidate));
+    }
     let snapshot: Snapshot = serde_json::from_str(text)
         .map_err(|err| format!("parse {label} unsafe-review JSON snapshot failed: {err}"))?;
     if snapshot.schema_version.trim().is_empty() {
@@ -168,13 +225,49 @@ fn parse_snapshot(text: &str, label: &str) -> Result<Snapshot, String> {
     Ok(snapshot)
 }
 
+fn snapshot_from_manual_candidate(candidate: ManualCandidate) -> Snapshot {
+    let evidence_count = candidate.evidence.len();
+    Snapshot {
+        schema_version: candidate.schema_version,
+        source: Some("manual".to_string()),
+        summary: SnapshotSummary {
+            cards: 1,
+            open_actionable_gaps: 1,
+        },
+        cards: vec![SnapshotCard {
+            id: candidate.id,
+            class_name: "manual_candidate".to_string(),
+            source: Some("manual".to_string()),
+            manual_candidate: Some(true),
+            analyzer_discovered: Some(false),
+            title: Some(candidate.title),
+            location: Some(SnapshotLocation {
+                file: candidate.location.file.display().to_string(),
+                line: candidate.location.line,
+            }),
+            operation: Some(candidate.unsafe_operation),
+            operation_family: Some(candidate.operation_family),
+            priority: "advisory".to_string(),
+            witness: "manual candidate external evidence packet; no analyzer witness execution"
+                .to_string(),
+            next_action: Some(
+                "Review the manual candidate, preserve the external evidence packet, and attach receipts only when they match this manual candidate ID."
+                    .to_string(),
+            ),
+            missing: Vec::new(),
+            trust_boundary: Some(candidate.trust_boundary),
+            evidence_count: Some(evidence_count),
+        }],
+    }
+}
+
 fn compare_snapshots(before: Snapshot, after: Snapshot) -> Result<OutcomeReport, String> {
     let before_id = snapshot_id(&before);
     let after_id = snapshot_id(&after);
     let before_summary = OutcomeSnapshotSummary::from(&before);
     let after_summary = OutcomeSnapshotSummary::from(&after);
-    let before_cards = cards_by_id(before.cards, "before")?;
-    let after_cards = cards_by_id(after.cards, "after")?;
+    let before_cards = cards_by_identity(before.cards, "before")?;
+    let after_cards = cards_by_identity(after.cards, "after")?;
     let ids = before_cards
         .keys()
         .chain(after_cards.keys())
@@ -182,13 +275,16 @@ fn compare_snapshots(before: Snapshot, after: Snapshot) -> Result<OutcomeReport,
         .collect::<BTreeSet<_>>();
     let mut summary = OutcomeSummary::default();
     let mut cards = OutcomeCards::default();
-    for id in ids {
-        let before = before_cards.get(&id);
-        let after = after_cards.get(&id);
+    for identity in ids {
+        let before = before_cards.get(&identity);
+        let after = after_cards.get(&identity);
         let status = outcome_status(before, after);
         let reason = outcome_reason(status, before, after);
         let card = OutcomeCard {
-            card_id: id,
+            card_id: before
+                .or(after)
+                .map(|card| card.id.clone())
+                .unwrap_or(identity),
             reason,
             before: before.map(OutcomeCardState::from),
             after: after.map(OutcomeCardState::from),
@@ -225,7 +321,8 @@ fn compare_snapshots(before: Snapshot, after: Snapshot) -> Result<OutcomeReport,
         after_id,
         trust_boundary: TRUST_BOUNDARY.to_string(),
         limitations: vec![
-            "compares existing saved ReviewCard JSON snapshots only".to_string(),
+            "compares existing saved ReviewCard JSON snapshots and manual candidate JSON artifacts only".to_string(),
+            "manual candidates remain source=manual advisory artifacts, not analyzer-discovered findings".to_string(),
             "does not rerun analysis or execute witness tools".to_string(),
             "does not make policy or blocking decisions".to_string(),
         ],
@@ -237,17 +334,24 @@ fn compare_snapshots(before: Snapshot, after: Snapshot) -> Result<OutcomeReport,
     })
 }
 
-fn cards_by_id(
+fn cards_by_identity(
     cards: Vec<SnapshotCard>,
     label: &str,
 ) -> Result<BTreeMap<String, SnapshotCard>, String> {
     let mut by_id = BTreeMap::new();
     for card in cards {
-        if by_id.insert(card.id.clone(), card).is_some() {
-            return Err(format!("{label} snapshot contains duplicate card id"));
+        let key = card_identity_key(&card);
+        if by_id.insert(key, card).is_some() {
+            return Err(format!(
+                "{label} snapshot contains duplicate card id/source identity"
+            ));
         }
     }
     Ok(by_id)
+}
+
+fn card_identity_key(card: &SnapshotCard) -> String {
+    format!("{}:{}", source_marker(card), card.id)
 }
 
 fn outcome_status(before: Option<&SnapshotCard>, after: Option<&SnapshotCard>) -> &'static str {
@@ -265,10 +369,18 @@ fn outcome_reason(
     after: Option<&SnapshotCard>,
 ) -> String {
     match (status, before, after) {
+        ("new", None, Some(after)) if is_manual_card(after) => format!(
+            "new manual candidate: appears in the after snapshot with source `{}` and manual_candidate=true; not analyzer-discovered",
+            source_marker(after)
+        ),
         ("new", None, Some(after)) => format!(
             "new card: appears in the after snapshot as `{}` with {} missing evidence item(s)",
             after.class_name,
             after.missing.len()
+        ),
+        ("resolved", Some(before), None) if is_manual_card(before) => format!(
+            "resolved manual candidate: source `{}` manual_candidate=true was present in the before snapshot and is absent from the after snapshot",
+            source_marker(before)
         ),
         ("resolved", Some(before), None) => format!(
             "resolved card: was present in the before snapshot as `{}` and is absent from the after snapshot",
@@ -290,6 +402,27 @@ fn changed_reason(status: &str, before: &SnapshotCard, after: &SnapshotCard) -> 
             before.class_name, after.class_name
         ));
     }
+    if source_marker(before) != source_marker(after) {
+        reasons.push(format!(
+            "source marker changed from `{}` to `{}`",
+            source_marker(before),
+            source_marker(after)
+        ));
+    }
+    if before.manual_candidate_marker() != after.manual_candidate_marker() {
+        reasons.push(format!(
+            "manual candidate marker changed from `{}` to `{}`",
+            before.manual_candidate_marker(),
+            after.manual_candidate_marker()
+        ));
+    }
+    if before.analyzer_discovered_marker() != after.analyzer_discovered_marker() {
+        reasons.push(format!(
+            "analyzer-discovered marker changed from `{}` to `{}`",
+            before.analyzer_discovered_marker(),
+            after.analyzer_discovered_marker()
+        ));
+    }
     let before_missing = before.missing.len();
     let after_missing = after.missing.len();
     if before_missing != after_missing {
@@ -305,8 +438,21 @@ fn changed_reason(status: &str, before: &SnapshotCard, after: &SnapshotCard) -> 
             before_witness.label, after_witness.label
         ));
     }
+    if before.evidence_count != after.evidence_count {
+        reasons.push(format!(
+            "manual external evidence count changed from {} to {}",
+            before.evidence_count.unwrap_or(0),
+            after.evidence_count.unwrap_or(0)
+        ));
+    }
     if reasons.is_empty() {
-        reasons.push("class and missing evidence count are unchanged".to_string());
+        if is_manual_card(before) || is_manual_card(after) {
+            reasons.push(
+                "manual source marker and advisory candidate state are unchanged".to_string(),
+            );
+        } else {
+            reasons.push("class and missing evidence count are unchanged".to_string());
+        }
     }
     format!("{status}: {}", reasons.join("; "))
 }
@@ -326,12 +472,30 @@ fn changed_status(before: &SnapshotCard, after: &SnapshotCard) -> &'static str {
         "improved"
     } else if after_missing > before_missing {
         "regressed"
+    } else if after.evidence_count.unwrap_or(0) > before.evidence_count.unwrap_or(0) {
+        "improved"
+    } else if after.evidence_count.unwrap_or(0) < before.evidence_count.unwrap_or(0) {
+        "regressed"
     } else if witness::witness_state(after).rank > witness::witness_state(before).rank {
         "improved"
     } else if witness::witness_state(after).rank < witness::witness_state(before).rank {
         "regressed"
     } else {
         "unchanged"
+    }
+}
+
+fn is_manual_card(card: &SnapshotCard) -> bool {
+    card.manual_candidate_marker()
+        || source_marker(card) == "manual"
+        || card.class_name == "manual_candidate"
+}
+
+fn source_marker(card: &SnapshotCard) -> &str {
+    if card.manual_candidate_marker() {
+        "manual"
+    } else {
+        card.source.as_deref().unwrap_or("analyzer")
     }
 }
 
@@ -364,12 +528,28 @@ fn snapshot_id(snapshot: &Snapshot) -> String {
     cards.sort_by(|left, right| left.id.cmp(&right.id));
     for card in cards {
         feed_hash(&mut hash, &card.id);
+        feed_hash(&mut hash, source_marker(card));
+        feed_hash(&mut hash, &card.manual_candidate_marker().to_string());
+        feed_hash(&mut hash, &card.analyzer_discovered_marker().to_string());
         feed_hash(&mut hash, &card.class_name);
+        feed_hash(&mut hash, card.title.as_deref().unwrap_or(""));
+        if let Some(location) = &card.location {
+            feed_hash(&mut hash, &location.file);
+            feed_hash(&mut hash, &location.line.to_string());
+        }
         feed_hash(&mut hash, card.operation.as_deref().unwrap_or(""));
         feed_hash(&mut hash, card.operation_family.as_deref().unwrap_or(""));
         feed_hash(&mut hash, &card.priority);
         feed_hash(&mut hash, &card.witness);
+        feed_hash(
+            &mut hash,
+            &card
+                .evidence_count
+                .map(|count| count.to_string())
+                .unwrap_or_default(),
+        );
         feed_hash(&mut hash, card.next_action.as_deref().unwrap_or(""));
+        feed_hash(&mut hash, card.trust_boundary.as_deref().unwrap_or(""));
         for missing in &card.missing {
             feed_hash(&mut hash, missing);
         }
@@ -489,6 +669,7 @@ impl From<&Snapshot> for OutcomeSnapshotSummary {
     fn from(snapshot: &Snapshot) -> Self {
         Self {
             schema_version: snapshot.schema_version.clone(),
+            source: snapshot.source.clone(),
             cards: snapshot.summary.cards,
             open_actionable_gaps: snapshot.summary.open_actionable_gaps,
         }
@@ -497,16 +678,46 @@ impl From<&Snapshot> for OutcomeSnapshotSummary {
 
 impl From<&SnapshotCard> for OutcomeCardState {
     fn from(card: &SnapshotCard) -> Self {
+        let is_manual = is_manual_card(card);
         Self {
             class_name: card.class_name.clone(),
+            source: (is_manual || card.source.is_some()).then(|| source_marker(card).to_string()),
+            manual_candidate: (is_manual || card.manual_candidate.is_some())
+                .then(|| card.manual_candidate_marker()),
+            analyzer_discovered: (is_manual || card.analyzer_discovered.is_some())
+                .then(|| card.analyzer_discovered_marker()),
+            title: card.title.clone(),
+            location: card.location.as_ref().map(OutcomeLocation::from),
             operation: card.operation.clone(),
             operation_family: card.operation_family.clone(),
             priority: card.priority.clone(),
             missing_count: card.missing.len(),
             witness: witness::witness_state(card).label,
+            evidence_count: card.evidence_count,
             next_action: card.next_action.clone(),
             missing: card.missing.clone(),
+            trust_boundary: card.trust_boundary.clone(),
         }
+    }
+}
+
+impl From<&SnapshotLocation> for OutcomeLocation {
+    fn from(location: &SnapshotLocation) -> Self {
+        Self {
+            file: location.file.clone(),
+            line: location.line,
+        }
+    }
+}
+
+impl SnapshotCard {
+    fn manual_candidate_marker(&self) -> bool {
+        self.manual_candidate.unwrap_or(false)
+    }
+
+    fn analyzer_discovered_marker(&self) -> bool {
+        self.analyzer_discovered
+            .unwrap_or_else(|| !is_manual_card(self))
     }
 }
 
@@ -652,6 +863,113 @@ mod tests {
         assert!(markdown.contains("raw_pointer_read"));
         assert!(markdown.contains("unsafe { ptr.cast::<Header>().read() }"));
         assert!(markdown.contains("Add or expose"));
+        Ok(())
+    }
+
+    #[test]
+    fn outcome_compares_manual_candidate_json_without_analyzer_conflation() -> Result<(), String> {
+        let before = snapshot_json(&[]);
+        let after = manual_candidate_json("R4R2-S001", 2);
+
+        let report = compare_json(&before, &after)?;
+
+        assert_eq!(report.after.schema_version, MANUAL_CANDIDATE_SCHEMA_VERSION);
+        assert_eq!(report.after.source.as_deref(), Some("manual"));
+        assert_eq!(report.summary.new, 1);
+        assert_eq!(report.summary.resolved, 0);
+        assert_eq!(report.cards.new[0].card_id, "R4R2-S001");
+        assert!(report.cards.new[0].reason.contains("new manual candidate"));
+        let after = report.cards.new[0]
+            .after
+            .as_ref()
+            .ok_or("manual candidate outcome should include after state")?;
+        assert_eq!(after.class_name, "manual_candidate");
+        assert_eq!(after.source.as_deref(), Some("manual"));
+        assert_eq!(after.manual_candidate, Some(true));
+        assert_eq!(after.analyzer_discovered, Some(false));
+        assert_eq!(after.operation_family.as_deref(), Some("raw_pointer_read"));
+        assert_eq!(
+            after.operation.as_deref(),
+            Some("core::slice::from_raw_parts")
+        );
+        assert_eq!(after.evidence_count, Some(2));
+        assert!(
+            after
+                .trust_boundary
+                .as_deref()
+                .unwrap_or("")
+                .contains("not analyzer-discovered")
+        );
+        assert!(
+            report
+                .limitations
+                .iter()
+                .any(|limitation| limitation.contains("manual candidate JSON artifacts"))
+        );
+        assert!(report.trust_boundary.contains("manual candidate snapshots"));
+
+        let json = render_json(&report);
+        let value: serde_json::Value =
+            serde_json::from_str(&json).map_err(|err| format!("parse JSON failed: {err}"))?;
+        assert_eq!(value["cards"]["new"][0]["after"]["source"], "manual");
+        assert_eq!(value["cards"]["new"][0]["after"]["manual_candidate"], true);
+        assert_eq!(
+            value["cards"]["new"][0]["after"]["analyzer_discovered"],
+            false
+        );
+        assert_eq!(value["cards"]["new"][0]["after"]["evidence_count"], 2);
+
+        let markdown = render_markdown(&report);
+        assert!(markdown.contains("new manual candidate"));
+        assert!(markdown.contains("source `manual`"));
+        assert!(markdown.contains("manual_candidate `true`"));
+        assert!(markdown.contains("analyzer-discovered `false`"));
+        assert!(markdown.contains("not analyzer-discovered"));
+        Ok(())
+    }
+
+    #[test]
+    fn outcome_keys_manual_and_analyzer_cards_by_source_marker() -> Result<(), String> {
+        let before = manual_candidate_json("R4R2-S001", 1);
+        let after = snapshot_json(&[card("R4R2-S001", "guard_missing", "high", &["guard"])]);
+
+        let report = compare_json(&before, &after)?;
+
+        assert_eq!(report.summary.new, 1);
+        assert_eq!(report.summary.resolved, 1);
+        assert_eq!(report.cards.resolved[0].card_id, "R4R2-S001");
+        assert_eq!(report.cards.new[0].card_id, "R4R2-S001");
+        assert_eq!(
+            report.cards.resolved[0]
+                .before
+                .as_ref()
+                .and_then(|state| state.source.as_deref()),
+            Some("manual")
+        );
+        assert_eq!(
+            report.cards.resolved[0]
+                .before
+                .as_ref()
+                .and_then(|state| state.manual_candidate),
+            Some(true)
+        );
+        assert!(
+            report.cards.new[0]
+                .after
+                .as_ref()
+                .and_then(|state| state.source.as_deref())
+                .is_none()
+        );
+        assert!(
+            report.cards.resolved[0]
+                .reason
+                .contains("resolved manual candidate")
+        );
+        assert!(
+            report.cards.new[0]
+                .reason
+                .contains("new card: appears in the after snapshot")
+        );
         Ok(())
     }
 
@@ -827,6 +1145,39 @@ mod tests {
       "next_action": "Add or expose a safety contract, guard, test, or witness for raw_pointer_read.",
       "missing": [{missing}]
     }}"#
+        )
+    }
+
+    fn manual_candidate_json(id: &str, evidence_count: usize) -> String {
+        let evidence = (0..evidence_count)
+            .map(|idx| {
+                format!(
+                    r#"{{
+      "kind": "other",
+      "path": "target/unsafe-scout/evidence-{idx}.txt"
+    }}"#
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(",\n    ");
+        format!(
+            r#"{{
+  "schema_version": "manual-candidate/v1",
+  "id": "{id}",
+  "title": "TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes",
+  "location": {{
+    "file": "src/runtime/webcore/TextDecoder.rs",
+    "line": 237
+  }},
+  "operation_family": "raw_pointer_read",
+  "unsafe_operation": "core::slice::from_raw_parts",
+  "invariant": "&[u8] memory must not be concurrently mutated",
+  "safe_caller": "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))",
+  "evidence": [
+    {evidence}
+  ],
+  "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
+}}"#
         )
     }
 }
