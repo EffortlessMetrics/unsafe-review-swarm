@@ -200,7 +200,7 @@ cargo test -p unsafe-review-core manual_candidate
 cargo test -p unsafe-review-core outcome
 cargo test -p unsafe-review manual_candidate
 cargo test -p unsafe-review first_pr_writes_standard_advisory_review_bundle
-cargo run --locked -p xtask -- check-first-pr-artifacts
+cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review-manual-candidate-smoke
 cargo run --locked -p xtask -- check-pr
 cargo run --locked -p xtask -- source-divergence
 git diff --check

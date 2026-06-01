@@ -94,6 +94,7 @@ target/install-published-0.3.2/bin/unsafe-review --version
 target/install-published-0.3.2/bin/unsafe-review doctor
 target/install-published-0.3.2/bin/unsafe-review repo --help
 target/install-published-0.3.2/bin/unsafe-review repo --root fixtures --include '**/*.rs' --list-files
+target/install-published-0.3.2/bin/unsafe-review repo --root fixtures/raw_pointer_alignment --format markdown --out target/unsafe-review-published-0.3.2-repo.md --timeout-seconds 300
 target/install-published-0.3.2/bin/unsafe-review candidate import docs/examples/manual-candidates/textdecoder-sab.json --out target/unsafe-review-published-0.3.2-candidates/R4R2-S001.json
 target/install-published-0.3.2/bin/unsafe-review first-pr --root fixtures/raw_pointer_alignment --diff fixtures/raw_pointer_alignment/change.diff --out-dir target/unsafe-review-published-0.3.2-smoke
 rtk cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review-published-0.3.2-smoke
@@ -111,8 +112,9 @@ motivated the patch.
 After publication:
 
 1. Record a source publication receipt with source commit, tag, crates.io
-   versions, docs.rs status, install smoke, first-pr smoke, explain/context
-   smoke, support smoke, known limits, and trust boundary.
+   versions, docs.rs status, install smoke, repo help/list-files/status smoke,
+   first-pr smoke, manual candidate smoke, explain/context smoke, support smoke,
+   known limits, and trust boundary.
 2. Mirror release metadata back to `unsafe-review-swarm`.
 3. Do not import source badge counts into swarm badge endpoints unless a
    separate source-of-truth policy explicitly says to do so.
