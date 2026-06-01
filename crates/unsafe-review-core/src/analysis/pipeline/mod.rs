@@ -3393,9 +3393,12 @@ pub fn zstd_sync(
     fn str_from_utf8_unchecked_validation_guards_are_discharged() -> Result<(), String> {
         for fixture in [
             "str_from_utf8_unchecked_is_ok_guard",
+            "str_from_utf8_unchecked_if_let_ok_guard",
             "str_from_utf8_unchecked_is_err_return_guard",
             "str_from_utf8_unchecked_question_mark_guard",
             "str_from_utf8_unchecked_match_return_guard",
+            "str_from_utf8_unchecked_let_else_ok_guard",
+            "str_from_utf8_unchecked_match_ok_guard",
         ] {
             let output = fixture_output(fixture)?;
             let card = single_card(fixture, &output)?;
