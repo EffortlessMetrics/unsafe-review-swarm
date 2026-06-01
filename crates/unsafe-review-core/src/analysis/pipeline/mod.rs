@@ -2269,6 +2269,25 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "bounds"
         ));
 
+        let stale_match_probe_receiver_path =
+            fixture_output("get_unchecked_mut_match_get_reassigned_receiver_path_not_guard")?;
+        let stale_match_probe_receiver_path_card = single_card(
+            "get_unchecked_mut_match_get_reassigned_receiver_path_not_guard",
+            &stale_match_probe_receiver_path,
+        )?;
+        assert_eq!(
+            stale_match_probe_receiver_path_card.operation.family,
+            OperationFamily::GetUnchecked
+        );
+        assert_eq!(
+            stale_match_probe_receiver_path_card.class,
+            ReviewClass::GuardMissing
+        );
+        assert!(!obligation_discharge_present(
+            stale_match_probe_receiver_path_card,
+            "bounds"
+        ));
+
         let shadowed_match_probe_receiver =
             fixture_output("get_unchecked_mut_match_get_shadowed_receiver_not_guard")?;
         let shadowed_match_probe_receiver_card = single_card(
