@@ -3794,6 +3794,26 @@ pub fn zstd_sync(
     }
 
     #[test]
+    fn undocumented_target_feature_declaration_requires_contract() -> Result<(), String> {
+        let output = fixture_output("target_feature_missing_safety_docs")?;
+        let card = single_card("target_feature_missing_safety_docs", &output)?;
+
+        assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+        assert_eq!(card.operation.family, OperationFamily::TargetFeature);
+        assert_eq!(card.class, ReviewClass::ContractMissing);
+        assert!(!card.contract.present);
+        assert!(!card.discharge.present);
+        assert!(!obligation_discharge_present(card, "target-feature"));
+        assert!(
+            card.routes
+                .iter()
+                .any(|route| route.kind == WitnessKind::HumanDeepReview),
+            "undocumented target_feature sites should route to manual contract review"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn unwrap_unchecked_uses_concrete_operation_family() -> Result<(), String> {
         let output = fixture_output("unwrap_unchecked_result")?;
         let card = single_card("unwrap_unchecked_result", &output)?;
