@@ -1,6 +1,6 @@
 use super::{
     any_compact_if_condition, any_marker_tail, branch_still_open_at_operation, compact_code,
-    condition_has_top_level_conjunct, contains_executable_return, contains_simple_assignment_to,
+    condition_has_top_level_conjunct, contains_assignment_to_target, contains_executable_return,
     match_some_branch_after_marker, matching_call_argument_end, matching_code_block_end,
     receiver_before_marker, strip_block_comments_and_literals,
 };
@@ -83,8 +83,8 @@ impl<'a> GetUncheckedBoundsApplicability<'a> {
     }
 
     fn has_stale_target_assignment(&self, text: &str) -> bool {
-        contains_simple_assignment_to(text, &self.same_slice_target)
-            || contains_simple_assignment_to(text, &self.same_index_target)
+        contains_assignment_to_target(text, &self.same_slice_target)
+            || contains_assignment_to_target(text, &self.same_index_target)
     }
 
     fn target_stays_fresh_after(&self, evidence: &str) -> bool {

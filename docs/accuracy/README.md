@@ -113,7 +113,7 @@ The current fixture-pinned slices are:
   and `get(index)` probe guards, including if-let, let-else, and match Some-arm
   forms, discharge the bounds obligation, while rejecting other-receiver,
   post-check, observed-only, closed-branch, comment-only early-return, and
-  stale or shadowed target controls.
+  stale, receiver-path stale, or shadowed target controls.
 - Pointer arithmetic bounds evidence: checks whether `index < num_ctrl_bytes`
   and same-slice end-pointer patterns discharge pointer-arithmetic bounds
   evidence while preserving witness/provenance limits.

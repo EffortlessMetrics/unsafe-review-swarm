@@ -1873,6 +1873,25 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "bounds"
         ));
 
+        let reassigned_receiver_path =
+            fixture_output("get_unchecked_mut_reassigned_receiver_path_not_guard")?;
+        let reassigned_receiver_path_card = single_card(
+            "get_unchecked_mut_reassigned_receiver_path_not_guard",
+            &reassigned_receiver_path,
+        )?;
+        assert_eq!(
+            reassigned_receiver_path_card.operation.family,
+            OperationFamily::GetUnchecked
+        );
+        assert_eq!(
+            reassigned_receiver_path_card.class,
+            ReviewClass::GuardMissing
+        );
+        assert!(!obligation_discharge_present(
+            reassigned_receiver_path_card,
+            "bounds"
+        ));
+
         let shadowed_receiver = fixture_output("get_unchecked_mut_shadowed_receiver_not_guard")?;
         let shadowed_receiver_card = single_card(
             "get_unchecked_mut_shadowed_receiver_not_guard",

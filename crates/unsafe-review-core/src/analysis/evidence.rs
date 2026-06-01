@@ -50,7 +50,9 @@ mod write_bytes;
 mod zeroed;
 
 use self::alignment_discharge::alignment_discharge_state;
-pub(crate) use self::assignment_syntax::contains_simple_assignment_to;
+pub(crate) use self::assignment_syntax::{
+    contains_assignment_to_target, contains_simple_assignment_to,
+};
 use self::boolean_condition::{
     any_compact_if_condition, condition_has_top_level_conjunct, condition_has_top_level_disjunct,
 };
