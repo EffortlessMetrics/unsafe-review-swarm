@@ -1,5 +1,9 @@
-use super::AllowedRepairs;
 use crate::domain::{OperationFamily, ReviewCard};
+
+pub(super) struct AllowedRepairs {
+    pub(super) repairs: Vec<String>,
+    pub(super) has_card_scoped_repairs: bool,
+}
 
 pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
     let mut repairs = Vec::new();
