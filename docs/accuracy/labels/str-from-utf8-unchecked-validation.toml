@@ -364,6 +364,19 @@ label_source = "fixture_golden"
 rationale = "A bare observed is_ok value is not a dominating guard for the later unchecked conversion."
 
 [[samples]]
+id = "utf8-unchecked-is-ok-comment-not-guard"
+fixture = "str_from_utf8_unchecked_is_ok_comment_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+expected_obligation_key = "utf8"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "An is_ok validation mention inside a comment is not executable same-buffer UTF-8 guard evidence."
+
+[[samples]]
 id = "utf8-unchecked-reassigned-buffer-not-guard"
 fixture = "str_from_utf8_unchecked_guard_then_reassigned_not_guard"
 kind = "false_positive_control"

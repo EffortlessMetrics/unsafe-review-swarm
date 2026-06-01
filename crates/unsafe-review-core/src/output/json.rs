@@ -458,6 +458,7 @@ mod tests {
         "str_from_utf8_unchecked_prefix_validation_not_guard",
         "str_from_utf8_unchecked_suffix_validation_not_guard",
         "str_from_utf8_unchecked_is_ok_observed_not_guard",
+        "str_from_utf8_unchecked_is_ok_comment_not_guard",
         "str_from_utf8_unchecked_guard_then_reassigned_not_guard",
         "str_from_utf8_unchecked_guard_then_mutated_not_guard",
         "str_from_utf8_unchecked_if_let_ok_guard",
