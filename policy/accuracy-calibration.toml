@@ -1444,6 +1444,7 @@ fixtures = [
   "get_unchecked_mut_let_else_get_reassigned_index_not_guard",
   "get_unchecked_mut_let_else_get_shadowed_index_not_guard",
   "get_unchecked_mut_let_else_get_reassigned_receiver_not_guard",
+  "get_unchecked_mut_let_else_get_reassigned_receiver_path_not_guard",
   "get_unchecked_mut_let_else_get_shadowed_receiver_not_guard",
   "get_unchecked_mut_match_get_reassigned_index_not_guard",
   "get_unchecked_mut_match_get_shadowed_index_not_guard",
@@ -1465,7 +1466,8 @@ stale-receiver, stale receiver-path, and open-branch, early-return, if-let,
 let-else, or match stale get-probe index, receiver, or receiver-path controls, including
 compound stale-index mutation, open-branch shadowed index, receiver, or receiver-path targets,
 early-return shadowed receiver targets, if-let shadowed receiver-path targets,
-and if-let, let-else, or match shadowed index targets, in the listed fixtures.
+let-else stale receiver-path targets, and if-let, let-else, or match shadowed
+index targets, in the listed fixtures.
 """
 forbidden_claims = [
   "broad get_unchecked soundness",
