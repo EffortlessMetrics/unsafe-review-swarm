@@ -738,6 +738,7 @@ mod tests {
         "get_unchecked_mut_match_get_shadowed_index_not_guard",
         "get_unchecked_mut_match_get_reassigned_receiver_not_guard",
         "get_unchecked_mut_match_get_reassigned_receiver_path_not_guard",
+        "get_unchecked_mut_match_get_shadowed_receiver_path_not_guard",
         "get_unchecked_mut_match_get_shadowed_receiver_not_guard",
         "static_lifetime_mut_ref_not_static_mut",
         "pin_new_unchecked",
