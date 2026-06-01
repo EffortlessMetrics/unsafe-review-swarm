@@ -29,21 +29,22 @@ publishing.
 Prefer synchronized public crate versions unless an explicit policy permits
 facade-only patch releases.
 
-Synchronized patch:
+Synchronized patch example:
 
 ```text
-unsafe-review-core 0.3.0 -> 0.3.1
-unsafe-review-cli  0.3.0 -> 0.3.1
-unsafe-review      0.3.0 -> 0.3.1
+unsafe-review-core 0.3.1 -> 0.3.2
+unsafe-review-cli  0.3.1 -> 0.3.2
+unsafe-review      0.3.1 -> 0.3.2
 ```
 
 Facade-only patching is allowed only when the release-prep PR documents why the
 facade crate is the only published surface that changed.
 
-For the current package-surface case, `0.3.1` is a crates.io
-README/image hotfix after source history repair. It is not a new analyzer
-release, Bun lane, policy release, calibration release, witness execution
-release, automatic comment release, or source-editing release.
+For the current repo-dogfood case, `0.3.2` is a pre-1.0 repo usability patch
+after a history-preserving swarm import. It is not memory-safety proof, UB-free
+status, Miri-clean status, site-execution proof, calibrated precision/recall,
+policy readiness, witness execution, automatic comment release, or
+source-editing release.
 
 ## Validation
 
@@ -88,14 +89,16 @@ rtk cargo publish -p unsafe-review
 Then smoke the installed crate from crates.io:
 
 ```bash
-rtk cargo install unsafe-review --version 0.3.1 --locked --root target/install-published-0.3.1
-target/install-published-0.3.1/bin/unsafe-review --version
-target/install-published-0.3.1/bin/unsafe-review doctor
-target/install-published-0.3.1/bin/unsafe-review first-pr --root fixtures/raw_pointer_alignment --diff fixtures/raw_pointer_alignment/change.diff --out-dir target/unsafe-review-published-0.3.1-smoke
-rtk cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review-published-0.3.1-smoke
-target/install-published-0.3.1/bin/unsafe-review explain <card-id>
-target/install-published-0.3.1/bin/unsafe-review context <card-id> --json
-target/install-published-0.3.1/bin/unsafe-review support
+rtk cargo install unsafe-review --version 0.3.2 --locked --root target/install-published-0.3.2
+target/install-published-0.3.2/bin/unsafe-review --version
+target/install-published-0.3.2/bin/unsafe-review doctor
+target/install-published-0.3.2/bin/unsafe-review repo --help
+target/install-published-0.3.2/bin/unsafe-review repo --root fixtures --include '**/*.rs' --list-files
+target/install-published-0.3.2/bin/unsafe-review first-pr --root fixtures/raw_pointer_alignment --diff fixtures/raw_pointer_alignment/change.diff --out-dir target/unsafe-review-published-0.3.2-smoke
+rtk cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review-published-0.3.2-smoke
+target/install-published-0.3.2/bin/unsafe-review explain <card-id>
+target/install-published-0.3.2/bin/unsafe-review context <card-id> --json
+target/install-published-0.3.2/bin/unsafe-review support
 ```
 
 Verify crates.io and docs.rs rendering for every published crate. For
