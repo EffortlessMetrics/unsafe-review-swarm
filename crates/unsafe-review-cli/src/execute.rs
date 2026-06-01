@@ -14,8 +14,7 @@ use std::process::Command as ProcessCommand;
 use std::sync::{Arc, Mutex};
 #[cfg(unix)]
 use std::thread;
-#[cfg(debug_assertions)]
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use unsafe_review_core::{
     AnalysisMode, AnalyzeInput, AnalyzeOutput, CardId, CargoCarefulReceiptInput,
     ConcurrencyReceiptInput, DiffSource, DiscoveryOptions, MiriReceiptInput, PolicyMode,
@@ -198,6 +197,7 @@ fn run_repo_check(options: RepoOptions) -> Result<(), String> {
         partial_path.clone(),
         options.progress,
         check.format.clone(),
+        options.timeout_seconds,
     )?;
     maybe_pause_for_repo_interrupt_test();
     let output = match analyze_with_discovery_and_repo_events(
@@ -266,6 +266,9 @@ struct RepoStatusReporter {
     status_path: Option<PathBuf>,
     partial_path: Option<PathBuf>,
     progress: bool,
+    timeout_seconds: Option<u64>,
+    timeout: Option<Duration>,
+    started: Instant,
     last_status: Arc<Mutex<Option<RepoScanStatus>>>,
     partial_output: Arc<Mutex<Option<AnalyzeOutput>>>,
     format: Format,
@@ -281,6 +284,7 @@ impl RepoStatusReporter {
         partial_path: Option<PathBuf>,
         progress: bool,
         format: Format,
+        timeout_seconds: Option<u64>,
     ) -> Result<Self, String> {
         let last_status = Arc::new(Mutex::new(None));
         let partial_output = Arc::new(Mutex::new(None));
@@ -295,6 +299,9 @@ impl RepoStatusReporter {
             status_path,
             partial_path,
             progress,
+            timeout_seconds,
+            timeout: timeout_seconds.map(Duration::from_secs),
+            started: Instant::now(),
             last_status,
             partial_output,
             format,
@@ -306,7 +313,8 @@ impl RepoStatusReporter {
     }
 
     fn record_event(&mut self, event: &RepoScanEvent) -> Result<(), String> {
-        let status = &event.status;
+        let mut status = event.status.clone();
+        self.refresh_elapsed(&mut status);
         *self
             .last_status
             .lock()
@@ -318,14 +326,22 @@ impl RepoStatusReporter {
                 .map_err(|err| format!("repo partial output lock poisoned: {err}"))? =
                 Some(output.clone());
         }
-        maybe_pause_for_repo_interrupt_after_scan(status);
+        maybe_pause_for_repo_interrupt_after_scan(&status);
+        self.refresh_elapsed(&mut status);
+        *self
+            .last_status
+            .lock()
+            .map_err(|err| format!("repo status lock poisoned: {err}"))? = Some(status.clone());
         if let Some(path) = &self.status_path {
             ensure_parent_dir(path)?;
-            fs::write(path, render_repo_scan_status(status)?)
+            fs::write(path, render_repo_scan_status(&status)?)
                 .map_err(|err| format!("write {} failed: {err}", path.display()))?;
         }
-        if self.progress && self.should_print(status) {
-            eprintln!("{}", format_repo_progress(status));
+        if self.progress && self.should_print(&status) {
+            eprintln!("{}", format_repo_progress(&status));
+        }
+        if self.timed_out(&status) {
+            return Err(self.timeout_error());
         }
         Ok(())
     }
@@ -393,6 +409,32 @@ impl RepoStatusReporter {
         fs::write(path, render_with_format(&output, &self.format))
             .map_err(|err| format!("write partial repo report {} failed: {err}", path.display()))?;
         Ok(Some(path.clone()))
+    }
+
+    fn refresh_elapsed(&self, status: &mut RepoScanStatus) {
+        status.elapsed_ms = status.elapsed_ms.max(self.elapsed_ms());
+    }
+
+    fn elapsed_ms(&self) -> u64 {
+        self.started
+            .elapsed()
+            .as_millis()
+            .try_into()
+            .unwrap_or(u64::MAX)
+    }
+
+    fn timed_out(&self, status: &RepoScanStatus) -> bool {
+        !status.completed
+            && self
+                .timeout
+                .is_some_and(|timeout| self.started.elapsed() >= timeout)
+    }
+
+    fn timeout_error(&self) -> String {
+        let seconds = self.timeout_seconds.unwrap_or_default();
+        format!(
+            "repo scan timed out after {seconds}s; use --include/--exclude/--max-files or a scoped --root to reduce scan scope"
+        )
     }
 }
 
@@ -769,7 +811,8 @@ fn maybe_pause_for_repo_interrupt_after_scan(status: &RepoScanStatus) {
     {
         return;
     }
-    let ms = std::env::var("UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_MS")
+    let ms = std::env::var("UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_AFTER_SCAN_MS")
+        .or_else(|_| std::env::var("UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_MS"))
         .ok()
         .and_then(|raw| raw.parse::<u64>().ok())
         .unwrap_or(5_000);
@@ -1430,7 +1473,7 @@ fn print_help() {
         "  check   [--root .] [--base origin/main | --diff file|-] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file]"
     );
     println!(
-        "  repo    [--root .] [--include glob] [--exclude glob] [--list-files] [--progress] [--respect-gitignore|--no-respect-gitignore] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
+        "  repo    [--root .] [--include glob] [--exclude glob] [--list-files] [--progress] [--timeout-seconds N] [--respect-gitignore|--no-respect-gitignore] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
     );
     println!(
         "  first-pr [--root .] [--base origin/main|--diff file|-] [--out-dir target/unsafe-review] [--max-cards N]"
@@ -1487,7 +1530,7 @@ fn print_repo_help() {
     println!();
     println!("Usage:");
     println!(
-        "  unsafe-review repo [--root .] [--include glob] [--exclude glob] [--list-files] [--progress] [--respect-gitignore|--no-respect-gitignore] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
+        "  unsafe-review repo [--root .] [--include glob] [--exclude glob] [--list-files] [--progress] [--timeout-seconds N] [--respect-gitignore|--no-respect-gitignore] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
     );
     println!();
     println!("What repo scans today:");
@@ -1509,6 +1552,9 @@ fn print_repo_help() {
     );
     println!("- --list-files prints selected Rust files and exits without analysis.");
     println!("- --progress prints scan-status heartbeats to stderr during analysis.");
+    println!(
+        "- --timeout-seconds <N> stops analysis after roughly N seconds at repo event boundaries."
+    );
     println!("- --max-files <N> truncates the selected file list before analysis.");
     println!(
         "- --format <name> chooses human, json, markdown, pr-summary, github-summary, sarif, comment-plan, lsp, or witness-plan output."
@@ -1524,6 +1570,9 @@ fn print_repo_help() {
         "- Prefer scoped roots or include/exclude filters such as --include 'src/**/*.rs' and --exclude '**/generated/**'."
     );
     println!("- Use --list-files before a large scan to confirm the selected Rust files.");
+    println!(
+        "- Use --timeout-seconds with --out on long scans to keep an incomplete status sidecar and any completed-file partial report."
+    );
     println!();
     println!("Output and cancellation:");
     println!(

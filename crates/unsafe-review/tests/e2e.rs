@@ -1451,6 +1451,7 @@ fn repo_help_reports_repo_specific_scale_guidance() -> Result<(), Box<dyn Error>
     assert!(text.contains("--exclude <glob>"));
     assert!(text.contains("--list-files prints selected Rust files"));
     assert!(text.contains("--progress prints scan-status heartbeats"));
+    assert!(text.contains("--timeout-seconds <N>"));
     assert!(text.contains("--max-files <N>"));
     assert!(text.contains("<out>.partial"));
     assert!(text.contains("<out>.status.json"));
@@ -1911,6 +1912,99 @@ fn repo_analysis_failure_keeps_completed_file_partial_snapshot() -> Result<(), B
     assert_eq!(status["files_scanned"], 1);
     assert_eq!(status["cards_found"], 1);
     assert!(status["error"].as_str().unwrap_or("").contains("z_bad.rs"));
+    assert!(
+        status["partial_path"]
+            .as_str()
+            .unwrap_or("")
+            .ends_with("repo.json.partial")
+    );
+
+    Ok(())
+}
+
+#[test]
+fn repo_timeout_keeps_completed_file_partial_snapshot() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-repo-timeout-partial-e2e")?;
+    let scan_root = temp.path().join("fixture");
+    copy_dir_all(&fixture, &scan_root)?;
+    fs::write(scan_root.join("src/z_safe.rs"), "pub fn safe() {}\n")?;
+    let report_path = temp.path().join("repo.json");
+    let partial_path = temp.path().join("repo.json.partial");
+    let status_path = temp.path().join("repo.json.status.json");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_unsafe-review"))
+        .args([
+            os("repo"),
+            os("--root"),
+            scan_root.as_os_str().to_os_string(),
+            os("--format"),
+            os("json"),
+            os("--out"),
+            report_path.as_os_str().to_os_string(),
+            os("--timeout-seconds"),
+            os("1"),
+        ])
+        .env(
+            "UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_AFTER_SCANNED",
+            "1",
+        )
+        .env(
+            "UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_AFTER_SCAN_MS",
+            "1100",
+        )
+        .output()?;
+    if output.status.success() {
+        return Err(format!(
+            "expected timeout command to fail\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        )
+        .into());
+    }
+
+    assert_eq!(stdout_text(&output)?.trim(), "");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("repo scan timed out after 1s"),
+        "stderr should explain the timeout: {stderr}"
+    );
+    assert!(
+        stderr.contains("incomplete repo status written to"),
+        "stderr should point to the incomplete status sidecar: {stderr}"
+    );
+    assert!(
+        stderr.contains("partial repo report kept at"),
+        "stderr should point to the retained partial report: {stderr}"
+    );
+    assert!(
+        !report_path.exists(),
+        "timed-out report should not look successful"
+    );
+    assert!(
+        partial_path.exists(),
+        "timeout after a completed file should retain a partial report"
+    );
+    let partial = parse_json(&fs::read_to_string(&partial_path)?)?;
+    assert_eq!(partial["scope"], "repo");
+    assert_eq!(partial["summary"]["rust_files"], 2);
+    assert_eq!(partial["summary"]["cards"], 1);
+    assert_eq!(partial["cards"][0]["site"]["file"], "src/lib.rs");
+
+    let status = parse_json(&fs::read_to_string(&status_path)?)?;
+    assert_eq!(status["schema_version"], "repo-scan-status/v1");
+    assert_eq!(status["phase"], "failed");
+    assert_eq!(status["completed"], false);
+    assert_eq!(status["files_discovered"], 2);
+    assert_eq!(status["files_scanned"], 1);
+    assert_eq!(status["cards_found"], 1);
+    assert_eq!(status["signal"], Value::Null);
+    assert!(
+        status["error"]
+            .as_str()
+            .unwrap_or("")
+            .contains("repo scan timed out after 1s")
+    );
     assert!(
         status["partial_path"]
             .as_str()

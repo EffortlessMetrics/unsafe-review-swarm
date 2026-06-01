@@ -30,6 +30,11 @@ ReviewCards or running witness tools. `--max-files` truncates the selected
 file list after deterministic ordering and applies to both dry-run listing and
 repo analysis input.
 
+`--timeout-seconds` bounds repo analysis wall time cooperatively. The command
+checks the timeout at repo status event boundaries during discovery and
+scanning. It does not interrupt a single file mid-scan, and it does not execute
+witnesses or prove that scanned files are safe.
+
 When repo analysis writes a report through `--out`, it renders to
 `<out>.partial` and renames that file to `<out>` only after a successful render.
 It also updates a `<out>.status.json` sidecar while discovery and scanning run.
@@ -38,14 +43,15 @@ records `schema_version`, `phase`, `elapsed_ms`, `files_discovered`,
 `files_scanned`, `cards_found`, `last_path`, `completed`, `error`, and
 `signal`, and `partial_path`. `--progress` prints stderr heartbeats from the
 same status stream. On normal analysis, write, or rename errors, the command
-marks status incomplete. If at least one file completed before the error, it
-keeps the latest completed-file report snapshot at `<out>.partial` and records
-that path in the failed status. If the process receives Unix SIGTERM/SIGINT
-before rendering, the command writes `phase = terminated`, records the signal,
-and leaves the latest status sidecar as the durable artifact. When
-completed-file card output is available, the command also writes the latest
-partial report snapshot to `<out>.partial` and records that path in the
-terminated status.
+marks status incomplete. A `--timeout-seconds` expiration is a normal incomplete
+scan with `phase = failed`, an explicit timeout `error`, and `signal = null`.
+If at least one file completed before the error or timeout, the command keeps
+the latest completed-file report snapshot at `<out>.partial` and records that
+path in the failed status. If the process receives Unix SIGTERM/SIGINT before
+rendering, the command writes `phase = terminated`, records the signal, and
+leaves the latest status sidecar as the durable artifact. When completed-file
+card output is available, the command also writes the latest partial report
+snapshot to `<out>.partial` and records that path in the terminated status.
 
 Repo JSON uses this top-level contract:
 
@@ -153,7 +159,8 @@ the current `unsafe-review badges` repo projection.
 - JSON output contract coverage
 - CLI e2e coverage for repo JSON and badge JSON
 - CLI e2e coverage for repo file-selection dry runs
-- CLI e2e coverage for repo status sidecars and progress heartbeats
+- CLI e2e coverage for repo status sidecars, progress heartbeats, and timeout
+  snapshots
 - CLI e2e coverage for outcome comparison JSON/Markdown
 - policy documentation when behavior is configurable
 
@@ -167,8 +174,9 @@ the current `unsafe-review badges` repo projection.
   successful analysis, promotes `<out>.partial` to `<out>` only after successful
   rendering, marks status incomplete on normal analysis/output errors, records
   a retained partial path when a completed-file snapshot exists, records
-  `phase = terminated` plus `signal = SIGTERM` on Unix SIGTERM, keeps a
-  completed-file partial report snapshot when one exists, and `--progress`
+  `phase = failed` plus a timeout error on `--timeout-seconds` expiration,
+  records `phase = terminated` plus `signal = SIGTERM` on Unix SIGTERM, keeps
+  a completed-file partial report snapshot when one exists, and `--progress`
   prints a final completion heartbeat.
 - Repo Markdown for a fixture reports repo posture, summary counts, top card
   classes, operation families, witness routes, cards with direct `path:line`

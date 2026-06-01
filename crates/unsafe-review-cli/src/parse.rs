@@ -241,6 +241,20 @@ fn parse_repo(args: Vec<String>) -> Result<RepoOptions, String> {
             "--progress" => {
                 options.progress = true;
             }
+            "--timeout-seconds" => {
+                idx += 1;
+                options.timeout_seconds = Some(parse_timeout_seconds(value(
+                    &args,
+                    idx,
+                    "--timeout-seconds",
+                )?)?);
+            }
+            arg if arg.starts_with("--timeout-seconds=") => {
+                options.timeout_seconds = Some(parse_timeout_seconds(inline_value(
+                    arg,
+                    "--timeout-seconds",
+                )?)?);
+            }
             "--respect-gitignore" => {
                 options.discovery.respect_gitignore = true;
             }
@@ -509,6 +523,16 @@ fn parse_max_files(raw: &str) -> Result<usize, String> {
         .map_err(|err| format!("invalid --max-files `{raw}`: {err}"))
 }
 
+fn parse_timeout_seconds(raw: &str) -> Result<u64, String> {
+    let seconds = raw
+        .parse::<u64>()
+        .map_err(|err| format!("invalid --timeout-seconds `{raw}`: {err}"))?;
+    if seconds == 0 {
+        return Err("invalid --timeout-seconds `0`: value must be greater than 0".to_string());
+    }
+    Ok(seconds)
+}
+
 fn parse_format(raw: &str) -> Result<Format, String> {
     match raw {
         "human" => Ok(Format::Human),
@@ -708,6 +732,8 @@ mod tests {
             "--exclude=**/generated/**",
             "--list-files",
             "--max-files=25",
+            "--timeout-seconds",
+            "30",
             "--no-respect-gitignore",
         ]))?;
 
@@ -724,6 +750,7 @@ mod tests {
             vec!["vendor/**".to_string(), "**/generated/**".to_string()]
         );
         assert_eq!(options.discovery.max_files, Some(25));
+        assert_eq!(options.timeout_seconds, Some(30));
         assert!(!options.discovery.respect_gitignore);
         assert!(options.list_files);
         assert!(!options.progress);
@@ -742,6 +769,16 @@ mod tests {
     }
 
     #[test]
+    fn repo_rejects_zero_timeout() {
+        let command = parse(args(["unsafe-review", "repo", "--timeout-seconds=0"]));
+
+        assert_eq!(
+            command,
+            Err("invalid --timeout-seconds `0`: value must be greater than 0".to_string())
+        );
+    }
+
+    #[test]
     fn check_rejects_repo_only_file_selection_options() {
         let command = parse(args(["unsafe-review", "check", "--include", "src/**/*.rs"]));
 
@@ -753,6 +790,16 @@ mod tests {
         let command = parse(args(["unsafe-review", "check", "--progress"]));
 
         assert_eq!(command, Err("unknown argument `--progress`".to_string()));
+    }
+
+    #[test]
+    fn check_rejects_repo_only_timeout_option() {
+        let command = parse(args(["unsafe-review", "check", "--timeout-seconds=10"]));
+
+        assert_eq!(
+            command,
+            Err("unknown argument `--timeout-seconds=10`".to_string())
+        );
     }
 
     #[test]

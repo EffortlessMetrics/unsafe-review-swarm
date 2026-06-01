@@ -66,6 +66,7 @@ pub(crate) struct RepoOptions {
     pub discovery: DiscoveryOptions,
     pub list_files: bool,
     pub progress: bool,
+    pub timeout_seconds: Option<u64>,
 }
 
 impl Default for RepoOptions {
@@ -75,6 +76,7 @@ impl Default for RepoOptions {
             discovery: DiscoveryOptions::repo_defaults(),
             list_files: false,
             progress: false,
+            timeout_seconds: None,
         }
     }
 }

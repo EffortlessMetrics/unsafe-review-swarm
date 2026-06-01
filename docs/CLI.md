@@ -290,10 +290,12 @@ renames that file to `<out>` only after a successful render. It also updates
 `<out>.status.json` while analysis runs. The status sidecar records the scan
 phase, elapsed time, discovered files, scanned files, cards found, last path,
 completion, normal errors, and Unix interruption signals. Add `--progress` to
-print a small stderr heartbeat from the same status stream. If a normal
-analysis, write, or rename error occurs after at least one file completed, the
-latest completed-file report snapshot is kept at `<out>.partial`. On Unix
-SIGTERM/SIGINT before rendering, `repo` records
+print a small stderr heartbeat from the same status stream. Add
+`--timeout-seconds <n>` to stop analysis cooperatively after roughly `n`
+seconds at repo event boundaries; with `--out`, a timeout is recorded like other
+incomplete scans. If a normal analysis, timeout, write, or rename error occurs
+after at least one file completed, the latest completed-file report snapshot is
+kept at `<out>.partial`. On Unix SIGTERM/SIGINT before rendering, `repo` records
 `phase = terminated` and the signal in `<out>.status.json` when `--out` is set.
 If at least one file finished scanning, `repo` also writes the latest
 completed-file report snapshot to `<out>.partial` and records that path in the
@@ -316,6 +318,7 @@ unsafe-review repo \
   --exclude 'vendor/**' \
   --exclude 'build/**' \
   --exclude '**/generated/**' \
+  --timeout-seconds 300 \
   --format markdown \
   --out target/unsafe-review/repo-posture.md
 ```
@@ -340,6 +343,9 @@ unsafe-review repo \
 `--list-files` prints the selected root-relative Rust files and exits without
 running analysis. `--max-files <n>` truncates the selected file list after
 sorting, so it bounds both `--list-files` output and repo analysis input.
+`--timeout-seconds <n>` bounds repo analysis wall time cooperatively; it does
+not interrupt a single file mid-scan, but it prevents a long scan from looking
+successful after the configured budget expires.
 
 Badge JSON reports open review gaps, not raw unsafe usage and not safety status:
 
