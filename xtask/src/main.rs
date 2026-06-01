@@ -5695,23 +5695,39 @@ fn safety_obligation_labels() -> Result<BTreeSet<String>, String> {
 
 fn safety_obligation_labels_from_text(text: &str) -> Result<BTreeSet<String>, String> {
     let mut labels = BTreeSet::new();
+    collect_safety_obligation_labels(
+        text,
+        "SafetyObligation::new(",
+        "SafetyObligation::new",
+        &mut labels,
+    )?;
+    collect_safety_obligation_labels(text, "obligation!(", "obligation!", &mut labels)?;
+    if labels.is_empty() {
+        Err(format!(
+            "{SAFETY_OBLIGATION_SOURCE} has no SafetyObligation labels"
+        ))
+    } else {
+        Ok(labels)
+    }
+}
+
+fn collect_safety_obligation_labels(
+    text: &str,
+    marker: &str,
+    constructor_name: &str,
+    labels: &mut BTreeSet<String>,
+) -> Result<(), String> {
     let mut rest = text;
-    while let Some((_, suffix)) = rest.split_once("SafetyObligation::new(") {
+    while let Some((_, suffix)) = rest.split_once(marker) {
         let Some(label) = first_quoted_text(suffix) else {
             return Err(format!(
-                "{SAFETY_OBLIGATION_SOURCE} has SafetyObligation::new without a string key"
+                "{SAFETY_OBLIGATION_SOURCE} has {constructor_name} without a string key"
             ));
         };
         labels.insert(label.to_string());
         rest = suffix;
     }
-    if labels.is_empty() {
-        Err(format!(
-            "{SAFETY_OBLIGATION_SOURCE} has no SafetyObligation::new labels"
-        ))
-    } else {
-        Ok(labels)
-    }
+    Ok(())
 }
 
 fn first_quoted_text(text: &str) -> Option<&str> {

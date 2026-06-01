@@ -31,7 +31,8 @@ pub const OPERATION_FAMILY_REGISTRY_REQUIRED_TEXT_COLUMNS: &[(usize, &str)] = &[
 pub const OPERATION_FAMILY_REGISTRY_OBLIGATION_KEYS_COLUMN: (usize, &str) =
     (4, "obligation / evidence keys");
 pub const OPERATION_FAMILY_SOURCE: &str = "crates/unsafe-review-core/src/domain/operation.rs";
-pub const SAFETY_OBLIGATION_SOURCE: &str = "crates/unsafe-review-core/src/analysis/obligations.rs";
+pub const SAFETY_OBLIGATION_SOURCE: &str =
+    "crates/unsafe-review-core/src/analysis/obligations/safety.rs";
 pub const HAZARD_KIND_SOURCE: &str = "crates/unsafe-review-core/src/domain/hazard.rs";
 pub const WITNESS_KIND_SOURCE: &str = "crates/unsafe-review-core/src/domain/witness.rs";
 pub const ZERO_CARD_EXPECTATION_FIELDS: &[&str] = &[
