@@ -3521,7 +3521,9 @@ pub fn zstd_sync(
     fn transmute_bool_value_domain_guards_are_discharged() -> Result<(), String> {
         for fixture in [
             "transmute_bool_valid_value_guard",
+            "transmute_bool_conjunct_branch_guard",
             "transmute_bool_invalid_return_guard",
+            "transmute_bool_disjunct_return_guard",
         ] {
             let output = fixture_output(fixture)?;
             let card = single_card(fixture, &output)?;
