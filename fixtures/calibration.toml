@@ -339,6 +339,7 @@ required_core_fixtures = [
   "str_from_utf8_unchecked_is_err_return_reassigned_not_guard",
   "str_from_utf8_unchecked_is_err_return_shadowed_not_guard",
   "str_from_utf8_unchecked_question_mark_guard",
+  "str_from_utf8_unchecked_question_mark_comment_not_guard",
   "str_from_utf8_unchecked_match_return_guard",
   "str_from_utf8_unchecked_match_return_comment_not_guard",
   "str_from_utf8_unchecked_match_return_string_not_guard",
@@ -3885,6 +3886,16 @@ claim = "str::from_utf8_unchecked recognizes same-buffer from_utf8 question-mark
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "str_from_utf8_unchecked_question_mark_comment_not_guard"
+kind = "false_positive_control"
+claim = "str::from_utf8_unchecked does not treat comment-only question-mark validation text as UTF-8 evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
 expected_operation_family = "str_from_utf8_unchecked"
 expected_hazard = "invalid_value"
 
