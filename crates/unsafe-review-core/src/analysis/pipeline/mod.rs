@@ -3923,6 +3923,24 @@ pub fn zstd_sync(
     }
 
     #[test]
+    fn unwrap_unchecked_direct_state_evidence_rejects_reassignment() -> Result<(), String> {
+        for fixture in [
+            "unwrap_unchecked_is_some_reassigned_not_guard",
+            "unwrap_unchecked_is_ok_reassigned_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+            assert_eq!(card.operation.family, OperationFamily::UnwrapUnchecked);
+            assert_eq!(card.class, ReviewClass::GuardMissing);
+            assert!(!card.discharge.present);
+            assert!(!obligation_discharge_present(card, "valid-value"));
+        }
+        Ok(())
+    }
+
+    #[test]
     fn unwrap_unchecked_state_evidence_rejects_wrong_receiver_or_post_check() -> Result<(), String>
     {
         for fixture in [
