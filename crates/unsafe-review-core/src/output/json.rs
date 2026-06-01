@@ -715,6 +715,7 @@ mod tests {
         "get_unchecked_mut_get_probe_reassigned_index_not_guard",
         "get_unchecked_mut_get_probe_shadowed_index_not_guard",
         "get_unchecked_mut_get_probe_reassigned_receiver_not_guard",
+        "get_unchecked_mut_get_probe_reassigned_receiver_path_not_guard",
         "get_unchecked_mut_get_probe_shadowed_receiver_not_guard",
         "get_unchecked_mut_get_probe_early_return_reassigned_index_not_guard",
         "get_unchecked_mut_get_probe_early_return_shadowed_index_not_guard",
