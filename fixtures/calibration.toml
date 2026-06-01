@@ -331,6 +331,7 @@ required_core_fixtures = [
   "str_from_utf8_unchecked_is_ok_guard",
   "str_from_utf8_unchecked_if_let_ok_guard",
   "str_from_utf8_unchecked_if_let_ok_comment_not_guard",
+  "str_from_utf8_unchecked_if_let_ok_string_not_guard",
   "str_from_utf8_unchecked_if_let_err_return_guard",
   "str_from_utf8_unchecked_if_let_err_return_comment_not_guard",
   "str_from_utf8_unchecked_if_let_err_return_string_not_guard",
@@ -3805,6 +3806,16 @@ expected_hazard = "invalid_value"
 fixture = "str_from_utf8_unchecked_if_let_ok_comment_not_guard"
 kind = "false_positive_control"
 claim = "str::from_utf8_unchecked does not treat comment-only if-let Ok validation text as UTF-8 evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "str_from_utf8_unchecked"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "str_from_utf8_unchecked_if_let_ok_string_not_guard"
+kind = "false_positive_control"
+claim = "str::from_utf8_unchecked does not treat string-literal if-let Ok validation text as UTF-8 evidence"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
