@@ -18,9 +18,9 @@ use super::zeroed_operation::zeroed_operation_family;
 use crate::domain::{OperationFamily, SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind};
 use crate::input::diff::DiffIndex;
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
+mod file_scan;
 mod item_names;
 mod owner_context;
 mod text_detection;
@@ -41,165 +41,7 @@ pub(crate) struct ScannedSite {
     pub(crate) context_after: Vec<String>,
 }
 
-pub(crate) fn scan_file(
-    root: &Path,
-    rel: &PathBuf,
-    diff: Option<&DiffIndex>,
-    repo_mode: bool,
-) -> Result<Vec<ScannedSite>, String> {
-    let abs = root.join(rel);
-    let text =
-        fs::read_to_string(&abs).map_err(|err| format!("read {} failed: {err}", abs.display()))?;
-    let lines: Vec<&str> = text.lines().collect();
-    let parsed = super::syntax::parse_source(text.as_str());
-    let extern_names = extern_fn_names(&lines);
-    let local_modules = local_module_names(&lines);
-    let syntax_sites = detect_syntax_sites(&parsed, &extern_names, &local_modules);
-    let syntax_operation_lines = syntax_sites
-        .iter()
-        .filter(|site| site.kind == UnsafeSiteKind::Operation)
-        .map(|site| site.line)
-        .collect::<BTreeSet<_>>();
-    let syntax_operation_block_lines = operation_block_start_lines(&parsed);
-    let mut out = Vec::new();
-    let mut seen = BTreeSet::new();
-    let mut line_comment_state = LineCommentState::default();
-    for (idx, raw) in lines.iter().enumerate() {
-        let line_no = idx + 1;
-        let trimmed = raw.trim();
-        let detection_line = line_for_text_detection(raw, &mut line_comment_state);
-        let detection_trimmed = detection_line.trim();
-        if detection_trimmed.is_empty() {
-            continue;
-        }
-        let Some((kind, family)) = detect_site(detection_trimmed) else {
-            continue;
-        };
-        if syntax_site_covers_fallback(&syntax_sites, line_no, &kind, &family) {
-            continue;
-        }
-        if kind == UnsafeSiteKind::Operation
-            && family == OperationFamily::Transmute
-            && is_incomplete_multiline_transmute_copy(detection_trimmed)
-            && syntax_operation_covers_fallback(&syntax_sites, line_no, &family)
-        {
-            continue;
-        }
-        if kind == UnsafeSiteKind::UnsafeBlock
-            && family == OperationFamily::Unknown
-            && (syntax_operation_lines.contains(&line_no)
-                || syntax_operation_block_lines.contains(&line_no)
-                || fallback_unsafe_block_contains_specific_operation(&lines, idx))
-        {
-            continue;
-        }
-        seen.insert(site_key(line_no, &kind, &family));
-        let changed = diff.is_none_or(|d| {
-            repo_mode
-                || if syntax_site_uses_exact_range(&kind) {
-                    d.contains_in_range(rel, line_no, line_no)
-                } else {
-                    d.contains_near(rel, line_no)
-                }
-        });
-        if !changed && !repo_mode {
-            continue;
-        }
-        let owner = match (&kind, &family) {
-            (UnsafeSiteKind::ExternBlock, OperationFamily::Ffi) => {
-                find_extern_block_owner(&lines, idx)
-            }
-            (UnsafeSiteKind::Operation, OperationFamily::TargetFeature) => {
-                find_following_fn_owner(&lines, idx)
-            }
-            (UnsafeSiteKind::StaticMut, OperationFamily::StaticMut) => {
-                parse_static_mut_name(detection_trimmed)
-            }
-            _ => None,
-        }
-        .or_else(|| find_owner(&lines, idx));
-        let visibility = visibility_for_snippet(trimmed).to_string();
-        let public_api_surface = is_public_api_surface(&kind, trimmed);
-        let context_before = context_before_site(&lines, idx);
-        let context_after = context_slice(&lines, idx + 1, (idx + 8).min(lines.len()));
-        out.push(ScannedSite {
-            site: UnsafeSite {
-                location: SourceLocation::new(rel.clone(), line_no, first_non_ws_column(raw)),
-                kind,
-                owner,
-                visibility,
-                public_api_surface,
-                changed,
-                snippet: trimmed.to_string(),
-            },
-            operation: UnsafeOperation {
-                family,
-                expression: trimmed.to_string(),
-            },
-            context_before,
-            context_after,
-        });
-    }
-
-    for detected in syntax_sites {
-        if detected.kind == UnsafeSiteKind::UnsafeBlock
-            && detected.family == OperationFamily::Unknown
-            && syntax_operation_lines.contains(&detected.line)
-        {
-            continue;
-        }
-        if !seen.insert(site_key(detected.line, &detected.kind, &detected.family)) {
-            continue;
-        }
-        let changed = diff.is_none_or(|d| {
-            repo_mode
-                || if syntax_site_uses_exact_range(&detected.kind) {
-                    d.contains_in_range(rel, detected.line, detected.end_line)
-                } else {
-                    d.contains_near(rel, detected.line)
-                }
-        });
-        if !changed && !repo_mode {
-            continue;
-        }
-        let idx = detected.line.saturating_sub(1);
-        let owner = syntax_owner(&detected, &lines, idx);
-        let visibility = visibility_for_snippet(&detected.source_snippet).to_string();
-        let public_api_surface = is_public_api_surface(&detected.kind, &detected.source_snippet);
-        let context_before = context_before_site(&lines, idx);
-        let context_after = context_slice(
-            &lines,
-            (idx + 1).min(lines.len()),
-            (idx + 8).min(lines.len()),
-        );
-        out.push(ScannedSite {
-            site: UnsafeSite {
-                location: SourceLocation::new(rel.clone(), detected.line, detected.column),
-                kind: detected.kind,
-                owner,
-                visibility,
-                public_api_surface,
-                changed,
-                snippet: detected.card_snippet.clone(),
-            },
-            operation: UnsafeOperation {
-                family: detected.family,
-                expression: detected.card_snippet,
-            },
-            context_before,
-            context_after,
-        });
-    }
-    out.extend(detect_js_buffer_reentry_sites(rel, diff, repo_mode, &lines));
-    out.sort_by(|left, right| {
-        left.site
-            .location
-            .line
-            .cmp(&right.site.location.line)
-            .then(left.site.location.column.cmp(&right.site.location.column))
-    });
-    Ok(out)
-}
+pub(crate) use self::file_scan::scan_file;
 
 #[derive(Clone, Debug)]
 struct JsBufferLine {
@@ -1300,6 +1142,7 @@ fn is_public_api_surface(kind: &UnsafeSiteKind, snippet: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
