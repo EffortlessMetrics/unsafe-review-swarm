@@ -310,6 +310,7 @@ fn validate_label_ledger(
             path,
             idx,
             sample,
+            claim_id,
             source_kind,
             claim,
             fixture_cases,
@@ -340,6 +341,7 @@ fn validate_sample(
     path: &str,
     idx: usize,
     sample: &toml::map::Map<String, toml::Value>,
+    claim_id: &str,
     ledger_source_kind: &str,
     claim: &PolicyClaim,
     fixture_cases: &BTreeMap<String, CalibrationFixtureCase>,
@@ -485,6 +487,11 @@ fn validate_sample(
         },
     )?;
     let route_kinds = optional_table_str_array(sample, "expected_witness_route_kinds", path, idx)?;
+    if witness_route_claim_requires_route_labels(claim_id) && route_kinds.is_empty() {
+        return Err(format!(
+            "{path} samples[{idx}] claim `{claim_id}` must pin `expected_witness_route_kinds`"
+        ));
+    }
     if !route_kinds.is_empty() {
         for route_kind in &route_kinds {
             require_allowed(
@@ -509,6 +516,10 @@ fn validate_sample(
             route_kinds.join(",")
         ),
     })
+}
+
+fn witness_route_claim_requires_route_labels(claim_id: &str) -> bool {
+    claim_id.ends_with("-witness-routes") || claim_id.ends_with("-human-review-routes")
 }
 
 fn require_obligation_hazard_alignment(
@@ -963,6 +974,66 @@ rationale = "The trust boundary must name the full accuracy-label no-overclaim p
         let err = result.err().unwrap_or_default();
         assert!(err.contains("trust boundary"));
         assert!(err.contains("not Miri-clean status"));
+        Ok(())
+    }
+
+    #[test]
+    fn label_ledger_rejects_witness_route_claim_without_route_labels() -> Result<(), String> {
+        let ledger = r#"
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "unsafe-impl-send-sync-witness-routes"
+operation_family = "unsafe_impl_send_sync"
+hazard = "send_sync_invariant"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not calibrated precision or recall, not witness adequacy, and not policy readiness."
+
+[[samples]]
+id = "missing-route-labels"
+fixture = "unsafe_impl_send"
+kind = "positive"
+expected_cards = 1
+expected_class = "requires_loom"
+expected_operation_family = "unsafe_impl_send_sync"
+expected_hazard = "send_sync_invariant"
+expected_obligation_key = "thread-safety"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "Witness-route calibration claims must pin the route kinds projected by the ReviewCard."
+"#
+        .parse::<toml::Table>()
+        .map(toml::Value::Table)
+        .map_err(|err| format!("parse test ledger failed: {err}"))?;
+        let mut cases = BTreeMap::new();
+        cases.insert(
+            "unsafe_impl_send".to_string(),
+            CalibrationFixtureCase {
+                kind: "positive".to_string(),
+                expected_cards: 1,
+                expected_class: Some("requires_loom".to_string()),
+                expected_operation_family: Some("unsafe_impl_send_sync".to_string()),
+                expected_hazard: Some("send_sync_invariant".to_string()),
+            },
+        );
+        let claim = PolicyClaim {
+            operation_family: Some("unsafe_impl_send_sync".to_string()),
+            hazard: Some("send_sync_invariant".to_string()),
+            fixtures: BTreeSet::from(["unsafe_impl_send".to_string()]),
+            label_ledgers: BTreeSet::new(),
+        };
+
+        let result = validate_label_ledger(
+            "docs/accuracy/labels/test.toml",
+            &ledger,
+            "unsafe-impl-send-sync-witness-routes",
+            &claim,
+            &cases,
+        );
+
+        let err = result.err().unwrap_or_default();
+        assert!(err.contains("must pin"));
+        assert!(err.contains("expected_witness_route_kinds"));
         Ok(())
     }
 

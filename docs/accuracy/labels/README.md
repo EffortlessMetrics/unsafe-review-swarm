@@ -87,8 +87,8 @@ Samples may pin both `expected_contract_state` and
 The states are read from the ReviewCard obligation evidence, not from a
 separate label-specific truth.
 
-Samples may pin `expected_witness_route_kinds` when the claim is about witness
-routing. Route kinds are read from the ReviewCard `witness_routes` projection.
+Samples for witness-routing claims must pin `expected_witness_route_kinds`.
+Route kinds are read from the ReviewCard `witness_routes` projection.
 
 Samples may pin `expected_owner` and `expected_site_kind` when the claim is
 about ReviewCard identity or inventory behavior. These fields are read from the
