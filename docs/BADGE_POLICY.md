@@ -16,7 +16,7 @@
 |---|---|---|
 | CI | Current GitHub CI status. | Analyzer correctness proof. |
 | `unsafe-review` | Numeric open static review gap count. | Safety or unsafety status. |
-| `unsafe-review+` | Numeric repair-plus-quality count: open review gaps plus missing-or-weak evidence findings. | Miri-clean or UB-free status. |
+| `unsafe-review+` | Numeric evidence-quality count: missing-or-weak evidence findings. | Miri-clean or UB-free status. |
 | VS Code planned | Editor surface is planned. | Published VS Marketplace extension. |
 | Open VSX planned | Editor surface is planned. | Published Open VSX extension. |
 | GitHub release | Latest published GitHub release tag. | crates.io availability or release quality proof. |
@@ -50,9 +50,9 @@ repo-contract fields such as `contract_version`, `kind`, `scope`, `basis`,
 `status`, or `counts`.
 
 `unsafe-review` uses the open actionable review gap count as its numeric
-message. `unsafe-review+` uses open review gaps plus missing-or-weak evidence
-findings as its numeric message. The meaning belongs in this policy document
-and the badge link target, not in the endpoint message.
+message. `unsafe-review+` uses missing-or-weak evidence-quality findings as
+its numeric message. The meaning belongs in this policy document and the badge
+link target, not in the endpoint message.
 
 ## Forbidden badge posture
 

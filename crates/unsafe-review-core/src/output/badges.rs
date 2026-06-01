@@ -9,8 +9,7 @@ pub(crate) fn render(output: &AnalyzeOutput) -> (String, String) {
         guard_missing: output.summary.guard_missing,
         guarded_unwitnessed: output.summary.guarded_unwitnessed,
     };
-    let weak_evidence_findings = evidence_quality.total();
-    let plus_count = base_count + weak_evidence_findings;
+    let plus_count = evidence_quality.total();
     let plus_color = badge_color(plus_count);
     let main = badge("unsafe-review", base_count, base_color);
     let plus = badge("unsafe-review+", plus_count, plus_color);
@@ -71,7 +70,9 @@ struct BadgeJson {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::api::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope};
+    use crate::api::{
+        AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, PolicyMode, Scope, Summary,
+    };
     use std::path::PathBuf;
 
     #[test]
@@ -90,7 +91,7 @@ mod tests {
 
         assert_eq!(plus["schemaVersion"], 1);
         assert_eq!(plus["label"], "unsafe-review+");
-        assert_eq!(plus["message"], "2");
+        assert_eq!(plus["message"], "1");
         assert_eq!(plus["color"], "yellow");
         assert_shields_endpoint_fields_only(&plus)?;
         assert_ne!(plus["message"], "UB-free");
@@ -130,14 +131,43 @@ mod tests {
     }
 
     #[test]
-    fn unsafe_review_plus_count_matches_component_breakdown() -> Result<(), String> {
+    fn unsafe_review_plus_count_matches_evidence_quality_breakdown() -> Result<(), String> {
         let output = fixture_output("raw_pointer_alignment")?;
         let (main, plus) = render(&output);
         let main = parse_json(&main)?;
         let plus = parse_json(&plus)?;
 
         assert_eq!(main["message"], "1");
-        assert_eq!(plus["message"], "2");
+        assert_eq!(plus["message"], "1");
+
+        Ok(())
+    }
+
+    #[test]
+    fn unsafe_review_plus_does_not_double_count_open_actionable_gaps() -> Result<(), String> {
+        let output = AnalyzeOutput {
+            schema_version: "0.1".to_string(),
+            tool: "unsafe-review".to_string(),
+            root: PathBuf::from("."),
+            scope: Scope::Repo,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            summary: Summary {
+                open_actionable_gaps: 7,
+                contract_missing: 2,
+                guard_missing: 3,
+                guarded_unwitnessed: 5,
+                ..Summary::default()
+            },
+            cards: Vec::new(),
+        };
+        let (main, plus) = render(&output);
+        let main = parse_json(&main)?;
+        let plus = parse_json(&plus)?;
+
+        assert_eq!(main["message"], "7");
+        assert_eq!(plus["message"], "10");
+        assert_shields_endpoint_fields_only(&plus)?;
 
         Ok(())
     }

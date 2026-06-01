@@ -81,15 +81,16 @@ must not reclassify cards, invent a separate evidence model, or summarize raw
 unsafe usage as safety posture.
 
 Badge JSON is a small serde-backed open-gap summary for Shields-compatible
-consumers. Endpoint JSON must keep `schemaVersion = 1` for Shields while any
-additional repo-contract fields remain advisory projection metadata:
+consumers. Public endpoint JSON must keep `schemaVersion = 1` for Shields and
+must not include internal repo-contract fields:
 
 - `unsafe-review.json` reports the numeric open-gap count as `<n>`
-- `unsafe-review-plus.json` reports the numeric repair-plus-quality count as
-  `<open_actionable_gaps + contract_missing + guard_missing + guarded_unwitnessed>`
-  and exposes the `contract_missing`, `guard_missing`, and
-  `guarded_unwitnessed` components in its `counts` object so the aggregate is
-  auditable without re-running analysis.
+- `unsafe-review-plus.json` reports the numeric evidence-quality count as
+  `<contract_missing + guard_missing + guarded_unwitnessed>`
+
+Internal contract metadata such as `contract_version`, `kind`, `scope`,
+`basis`, `status`, and `counts` may be emitted only to separate contract
+artifacts, never at the public Shields endpoint URLs.
 
 Badges count unresolved review evidence. They never claim the repository is
 safe, UB-free, Miri-clean, or policy-compliant.
@@ -125,9 +126,8 @@ posture and do not certify repository safety.
 Badge meanings are fixed:
 
 - `unsafe-review`: open unsafe-review gap count
-- `unsafe-review+`: open unsafe-review gap count plus missing-or-weak evidence
-  findings, with component counts for contract-missing, guard-missing, and
-  guarded-unwitnessed evidence quality signals
+- `unsafe-review+`: missing-or-weak evidence findings from contract-missing,
+  guard-missing, and guarded-unwitnessed evidence quality signals
 
 Badges must never imply that the repo is sound, memory-safe, UB-free,
 Miri-clean, verified, all clear, policy-ready, or that any unsafe site executed.

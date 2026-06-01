@@ -1711,24 +1711,18 @@ fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<()
     )?)?;
     assert_eq!(plus_badge["schemaVersion"], 1);
     assert_eq!(plus_badge["label"], "unsafe-review+");
-    assert_eq!(plus_badge["message"], "2");
+    assert_eq!(plus_badge["message"], "1");
     assert_public_badge_payload(&plus_badge)?;
     let evidence_quality_component_count =
         json_usize(&summary["contract_missing"], "contract_missing")?
             + json_usize(&summary["guard_missing"], "guard_missing")?
             + json_usize(&summary["guarded_unwitnessed"], "guarded_unwitnessed")?;
-    let main_count = main_badge["message"]
-        .as_str()
-        .ok_or("main badge message missing")?
-        .parse::<usize>()
-        .map_err(|err| format!("main badge message parse failed: {err}"))?;
     let plus_count = plus_badge["message"]
         .as_str()
         .ok_or("plus badge message missing")?
         .parse::<usize>()
         .map_err(|err| format!("plus badge message parse failed: {err}"))?;
-    assert!(plus_count >= main_count);
-    assert_eq!(plus_count, main_count + evidence_quality_component_count);
+    assert_eq!(plus_count, evidence_quality_component_count);
     assert_ne!(plus_badge["message"], "UB-free");
 
     let repo_markdown = run_success([

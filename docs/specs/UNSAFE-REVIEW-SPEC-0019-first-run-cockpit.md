@@ -180,8 +180,7 @@ Every first-run surface is a projection from ReviewCard.
 - Agent packets: card-scoped, readiness-classified, bounded context, allowed
   repairs, do-not-do list, verify commands, and stop conditions.
 - Badges: repo posture only; `unsafe-review` means open gaps and
-  `unsafe-review+` means open gaps plus contract/guard/witness evidence-quality
-  findings.
+  `unsafe-review+` means contract/guard/witness evidence-quality findings.
 
 These surfaces MUST NOT create alternate analyzer truth.
 

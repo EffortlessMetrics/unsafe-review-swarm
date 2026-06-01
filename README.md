@@ -116,8 +116,8 @@ document.
 > Do not copy this repository’s badge URLs. Badge endpoints are repo-scoped
 > static evidence projections and must point at your own `OWNER/REPO/BRANCH`
 > `badges/*.json` paths.
-> `unsafe-review` reports open review gaps; `unsafe-review+` reports open review
-> gaps plus missing-or-weak evidence findings. Both are advisory evidence
+> `unsafe-review` reports open review gaps; `unsafe-review+` reports
+> missing-or-weak evidence-quality findings. Both are advisory evidence
 > indicators only.
 
 Try the bundled smoke fixture:
