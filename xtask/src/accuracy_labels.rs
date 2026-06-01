@@ -451,6 +451,11 @@ fn validate_sample(
         obligation_key,
     };
     let contract_state = optional_table_string(sample, "expected_contract_state", path, idx)?;
+    if public_contract_claim_requires_contract_state(claim_id) && contract_state.is_none() {
+        return Err(format!(
+            "{path} samples[{idx}] claim `{claim_id}` must pin `expected_contract_state`"
+        ));
+    }
     if let Some(contract_state) = contract_state {
         require_allowed(
             contract_state,
@@ -516,6 +521,10 @@ fn validate_sample(
             route_kinds.join(",")
         ),
     })
+}
+
+fn public_contract_claim_requires_contract_state(claim_id: &str) -> bool {
+    claim_id == "public-unsafe-api-safety-docs-contract-evidence"
 }
 
 fn witness_route_claim_requires_route_labels(claim_id: &str) -> bool {
@@ -1098,6 +1107,66 @@ rationale = "The fixture routes Send/Sync invariants to Loom/Shuttle, so ASan sh
                 .unwrap_or_default()
                 .contains("expected_witness_route_kinds")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn label_ledger_rejects_public_contract_claim_without_contract_state() -> Result<(), String> {
+        let ledger = r#"
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "public-unsafe-api-safety-docs-contract-evidence"
+operation_family = "unknown"
+hazard = "unknown"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not calibrated precision or recall, not witness adequacy, and not policy readiness."
+
+[[samples]]
+id = "missing-contract-state"
+fixture = "public_unsafe_fn_missing_safety"
+kind = "positive"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+expected_obligation_key = "unknown"
+expected_discharge_state = "present"
+label_source = "fixture_golden"
+rationale = "Public unsafe API contract evidence claims must pin the ReviewCard contract evidence state."
+"#
+        .parse::<toml::Table>()
+        .map(toml::Value::Table)
+        .map_err(|err| format!("parse test ledger failed: {err}"))?;
+        let mut cases = BTreeMap::new();
+        cases.insert(
+            "public_unsafe_fn_missing_safety".to_string(),
+            CalibrationFixtureCase {
+                kind: "positive".to_string(),
+                expected_cards: 1,
+                expected_class: Some("contract_missing".to_string()),
+                expected_operation_family: Some("unknown".to_string()),
+                expected_hazard: Some("unknown".to_string()),
+            },
+        );
+        let claim = PolicyClaim {
+            operation_family: Some("unknown".to_string()),
+            hazard: Some("unknown".to_string()),
+            fixtures: BTreeSet::from(["public_unsafe_fn_missing_safety".to_string()]),
+            label_ledgers: BTreeSet::new(),
+        };
+
+        let result = validate_label_ledger(
+            "docs/accuracy/labels/test.toml",
+            &ledger,
+            "public-unsafe-api-safety-docs-contract-evidence",
+            &claim,
+            &cases,
+        );
+
+        let err = result.err().unwrap_or_default();
+        assert!(err.contains("must pin"));
+        assert!(err.contains("expected_contract_state"));
         Ok(())
     }
 
