@@ -1690,6 +1690,7 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "nonnull_new_shadowed_ptr_not_guard",
             "nonnull_cast_checked_pointer_not_guard",
             "nonnull_method_receiver_reassigned_not_guard",
+            "nonnull_method_receiver_shadowed_not_guard",
             "nonnull_is_null_reassigned_ptr_not_guard",
             "nonnull_is_null_shadowed_ptr_not_guard",
             "nonnull_is_null_open_branch_shadowed_ptr_not_guard",

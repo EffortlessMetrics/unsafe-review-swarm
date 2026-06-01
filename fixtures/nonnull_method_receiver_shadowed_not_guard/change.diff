@@ -1,0 +1,27 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,22 @@
++use core::ptr::NonNull;
++
++pub fn expose_nonnull_after_bucket_shadow(
++    bucket: Vec<u8>,
++    replacement: Vec<u8>,
++) -> Option<NonNull<u8>> {
++    if bucket.as_ptr().is_null() {
++        return None;
++    }
++    let bucket = replacement;
++    // SAFETY: fixture checks that stale method-receiver nullability evidence is rejected.
++    Some(unsafe { NonNull::new_unchecked(bucket.as_ptr().cast_mut()) })
++}
++
++#[cfg(test)]
++mod tests {
++    use super::expose_nonnull_after_bucket_shadow;
++
++    #[test]
++    fn mentions_expose_nonnull_after_bucket_shadow() {
++        let _ = stringify!(expose_nonnull_after_bucket_shadow);
++    }
++}
