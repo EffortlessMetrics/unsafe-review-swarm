@@ -51,7 +51,8 @@ The key properties:
   verifier.
 - `actions/upload-artifact@v7` — uploads `cards.json`, `pr-summary.md`,
   `github-summary.md`, `cards.sarif`, `comment-plan.json`, `witness-plan.md`,
-  and `lsp.json` for download by reviewers.
+  `receipt-audit.md`, `manual-candidates.json`, `lsp.json`, and
+  `repair-queue.json` for download by reviewers.
 
 The workflow does not:
 

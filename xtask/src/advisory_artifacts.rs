@@ -93,7 +93,7 @@ const REPAIR_QUEUE_BUCKETS: [&str; 6] = [
     "requires_human_review",
     "do_not_auto_repair",
 ];
-const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 10] = [
+const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 11] = [
     "review-kit.json",
     "cards.json",
     "pr-summary.md",
@@ -102,6 +102,7 @@ const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 10] = [
     "comment-plan.json",
     "witness-plan.md",
     "receipt-audit.md",
+    "manual-candidates.json",
     "lsp.json",
     "repair-queue.json",
 ];
@@ -136,6 +137,7 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         &summary.card_projections,
     )?;
     check_receipt_audit_artifact(dir)?;
+    check_manual_candidates_artifact(dir)?;
     check_lsp_artifact(dir, &summary)?;
     check_github_summary_artifact(
         dir,
@@ -200,6 +202,11 @@ fn check_github_summary_artifact(
     )?;
     super::require_text_contains(
         &text,
+        "- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.",
+        &path,
+    )?;
+    super::require_text_contains(
+        &text,
         "- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.",
         &path,
     )?;
@@ -215,7 +222,7 @@ fn check_github_summary_artifact(
     super::require_text_contains(&text, "not site-execution proof", &path)?;
     super::require_text_contains(
         &text,
-        "Full advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, lsp.json, repair-queue.json)",
+        "Full advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, manual-candidates.json, lsp.json, repair-queue.json)",
         &path,
     )?;
 
@@ -278,6 +285,175 @@ fn check_receipt_audit_artifact(dir: &Path) -> Result<(), String> {
         &path,
     )?;
 
+    Ok(())
+}
+
+fn check_manual_candidates_artifact(dir: &Path) -> Result<(), String> {
+    let path = dir.join("manual-candidates.json");
+    let value = super::parse_json_file(&path)?;
+    super::require_json_str(
+        &value,
+        "schema_version",
+        "manual-candidates/v1",
+        "manual-candidates.json",
+    )?;
+    super::require_json_str(&value, "tool", "unsafe-review", "manual-candidates.json")?;
+    super::require_json_str(
+        &value,
+        "mode",
+        "manual_candidate_index",
+        "manual-candidates.json",
+    )?;
+    super::require_json_str(&value, "source", "first_pr", "manual-candidates.json")?;
+    super::require_non_empty_json_str(&value, "tool_version", "manual-candidates.json")?;
+
+    let candidates = super::json_array_at(&value, "/candidates", "manual-candidates.json")?;
+    let summary_count = super::json_usize_at(
+        &value,
+        "/summary/manual_candidates",
+        "manual-candidates.json",
+    )?;
+    if summary_count != candidates.len() {
+        return Err(format!(
+            "manual-candidates.json summary.manual_candidates is {summary_count}, but candidates array has {}",
+            candidates.len()
+        ));
+    }
+    let analyzer_discovered = super::json_usize_at(
+        &value,
+        "/summary/analyzer_discovered",
+        "manual-candidates.json",
+    )?;
+    if analyzer_discovered != 0 {
+        return Err("manual-candidates.json summary.analyzer_discovered must stay 0".to_string());
+    }
+
+    let relationship = value
+        .get("reviewcard_artifact_relationship")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| {
+            "manual-candidates.json is missing reviewcard_artifact_relationship object".to_string()
+        })?;
+    for artifact in [
+        "cards.json",
+        "cards.sarif",
+        "comment-plan.json",
+        "lsp.json",
+        "repair-queue.json",
+        "policy-report",
+    ] {
+        let Some(text) = relationship
+            .get(artifact)
+            .and_then(serde_json::Value::as_str)
+        else {
+            return Err(format!(
+                "manual-candidates.json relationship is missing `{artifact}`"
+            ));
+        };
+        if !super::text_contains_ignore_ascii_case(text, "ReviewCard-only") {
+            return Err(format!(
+                "manual-candidates.json relationship `{artifact}` must say ReviewCard-only"
+            ));
+        }
+    }
+
+    let boundary =
+        super::require_non_empty_json_str(&value, "trust_boundary", "manual-candidates.json")?;
+    super::require_boundary_text(boundary, "manual-candidates.json")?;
+    for expected in [
+        "manual/advisory",
+        "not analyzer-discovered",
+        "not site-execution proof",
+        "not policy gating",
+        "did not run witnesses",
+        "post comments",
+        "edit source",
+        "run an agent",
+        "enforce blocking policy",
+    ] {
+        if !super::text_contains_ignore_ascii_case(boundary, expected) {
+            return Err(format!(
+                "manual-candidates.json trust_boundary must include `{expected}`"
+            ));
+        }
+    }
+
+    for candidate in candidates {
+        check_manual_candidate_artifact_entry(candidate)?;
+    }
+
+    Ok(())
+}
+
+fn check_manual_candidate_artifact_entry(candidate: &serde_json::Value) -> Result<(), String> {
+    super::require_json_str(
+        candidate,
+        "schema_version",
+        "manual-candidate/v1",
+        "manual-candidates.json candidate",
+    )?;
+    super::require_non_empty_json_str(candidate, "id", "manual-candidates.json candidate")?;
+    super::require_json_str(
+        candidate,
+        "source",
+        "manual",
+        "manual-candidates.json candidate",
+    )?;
+    if candidate.get("manual_candidate") != Some(&serde_json::Value::Bool(true)) {
+        return Err("manual-candidates.json candidate manual_candidate must be true".to_string());
+    }
+    if candidate.get("analyzer_discovered") != Some(&serde_json::Value::Bool(false)) {
+        return Err(
+            "manual-candidates.json candidate analyzer_discovered must be false".to_string(),
+        );
+    }
+    super::require_non_empty_json_str(
+        candidate,
+        "operation_family",
+        "manual-candidates.json candidate",
+    )?;
+    super::require_non_empty_json_str(
+        candidate,
+        "unsafe_operation",
+        "manual-candidates.json candidate",
+    )?;
+    super::require_non_empty_json_str(candidate, "invariant", "manual-candidates.json candidate")?;
+    super::require_non_empty_json_str(
+        candidate,
+        "safe_caller",
+        "manual-candidates.json candidate",
+    )?;
+    super::require_non_empty_json_str(
+        candidate,
+        "location_text",
+        "manual-candidates.json candidate",
+    )?;
+    super::require_non_empty_json_str(
+        candidate,
+        "explain_command",
+        "manual-candidates.json candidate",
+    )?;
+    super::require_non_empty_json_str(
+        candidate,
+        "context_command",
+        "manual-candidates.json candidate",
+    )?;
+    super::require_non_empty_json_str(
+        candidate,
+        "witness_plan_command",
+        "manual-candidates.json candidate",
+    )?;
+    let boundary = super::require_non_empty_json_str(
+        candidate,
+        "trust_boundary",
+        "manual-candidates.json candidate",
+    )?;
+    if !super::text_contains_ignore_ascii_case(boundary, "not analyzer-discovered") {
+        return Err(
+            "manual-candidates.json candidate trust_boundary must say not analyzer-discovered"
+                .to_string(),
+        );
+    }
     Ok(())
 }
 
@@ -545,6 +721,7 @@ fn expected_review_kit_artifact_kind(path: &str) -> &'static str {
         "comment-plan.json" => "comment_plan",
         "witness-plan.md" => "witness_plan",
         "receipt-audit.md" => "receipt_audit",
+        "manual-candidates.json" => "manual_candidates",
         "lsp.json" => "saved_lsp",
         "repair-queue.json" => "repair_queue",
         _ => "unknown",
@@ -553,8 +730,12 @@ fn expected_review_kit_artifact_kind(path: &str) -> &'static str {
 
 fn expected_review_kit_artifact_format(path: &str) -> &'static str {
     match path {
-        "review-kit.json" | "cards.json" | "comment-plan.json" | "lsp.json"
-        | "repair-queue.json" => "json",
+        "review-kit.json"
+        | "cards.json"
+        | "comment-plan.json"
+        | "lsp.json"
+        | "repair-queue.json"
+        | "manual-candidates.json" => "json",
         "pr-summary.md" | "github-summary.md" | "witness-plan.md" | "receipt-audit.md" => {
             "markdown"
         }
@@ -575,6 +756,7 @@ fn check_review_kit_artifact_schema_version(
     let expected = match path {
         "review-kit.json" | "cards.json" | "comment-plan.json" | "lsp.json"
         | "repair-queue.json" => Some("0.1"),
+        "manual-candidates.json" => Some("manual-candidates/v1"),
         "cards.sarif" => Some("2.1.0"),
         "pr-summary.md" | "github-summary.md" | "witness-plan.md" | "receipt-audit.md" => None,
         _ => {
@@ -3897,6 +4079,7 @@ fn check_advisory_artifact_overclaims(dir: &Path) -> Result<(), String> {
         "comment-plan.json",
         "witness-plan.md",
         "receipt-audit.md",
+        "manual-candidates.json",
         "lsp.json",
         "repair-queue.json",
     ] {
@@ -3920,6 +4103,7 @@ fn is_machine_json_artifact(name: &str) -> bool {
             | "cards.json"
             | "cards.sarif"
             | "comment-plan.json"
+            | "manual-candidates.json"
             | "lsp.json"
             | "repair-queue.json"
     )

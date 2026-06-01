@@ -135,6 +135,7 @@ target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
 target/unsafe-review/receipt-audit.md
+target/unsafe-review/manual-candidates.json
 target/unsafe-review/lsp.json
 target/unsafe-review/repair-queue.json
 ```

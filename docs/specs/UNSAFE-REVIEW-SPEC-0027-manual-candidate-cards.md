@@ -151,7 +151,8 @@ into an analyzer ReviewCard.
 - schema parser tests for valid and invalid `manual-candidate/v1` JSON
 - CLI import e2e coverage for `candidate import`
 - projection tests proving `source = manual` and `manual_candidate = true` are
-  preserved in explain, context, witness-plan, saved JSON, and outcome surfaces
+  preserved in explain, context, witness-plan, saved JSON, first-pr
+  `manual-candidates.json`, and outcome surfaces
 - receipt tests for manual candidate IDs
 - negative tests proving manual candidates are not labeled analyzer-discovered
 
@@ -169,6 +170,9 @@ into an analyzer ReviewCard.
   evidence for that manual candidate.
 - Outcome comparison preserves manual source markers and compares manual IDs
   deterministically across snapshots.
+- `first-pr` writes `manual-candidates.json` for imported candidates and keeps
+  ReviewCard-derived artifacts, including cards JSON, SARIF, comment-plan,
+  saved LSP, repair queue, and policy-report surfaces, ReviewCard-only.
 
 ## CI Proof
 
@@ -181,6 +185,8 @@ cargo run --locked -p xtask -- check-spec-status
 cargo test -p unsafe-review-core manual_candidate
 cargo test -p unsafe-review-core outcome
 cargo test -p unsafe-review manual_candidate
+cargo test -p unsafe-review first_pr_writes_standard_advisory_review_bundle
+cargo run --locked -p xtask -- check-first-pr-artifacts
 cargo run --locked -p xtask -- check-pr
 cargo run --locked -p xtask -- source-divergence
 git diff --check

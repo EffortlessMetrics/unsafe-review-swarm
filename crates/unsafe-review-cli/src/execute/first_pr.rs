@@ -4,7 +4,7 @@ use std::process::Command as ProcessCommand;
 
 use crate::command::{CheckOptions, DiffInput};
 use serde_json::json;
-use unsafe_review_core::{AnalyzeOutput, Scope};
+use unsafe_review_core::{AnalyzeOutput, ManualCandidate, Scope};
 
 pub(super) fn print_first_pr_report(
     output: &AnalyzeOutput,
@@ -198,6 +198,76 @@ fn review_kit_handoff(
     })
 }
 
+pub(super) fn render_manual_candidates_artifact(candidates: &[ManualCandidate]) -> String {
+    let candidate_values = candidates
+        .iter()
+        .map(manual_candidate_artifact_entry)
+        .collect::<Vec<_>>();
+    let evidence_refs = candidates
+        .iter()
+        .map(|candidate| candidate.evidence.len())
+        .sum::<usize>();
+    let value = json!({
+        "schema_version": "manual-candidates/v1",
+        "tool": "unsafe-review",
+        "tool_version": env!("CARGO_PKG_VERSION"),
+        "mode": "manual_candidate_index",
+        "source": "first_pr",
+        "summary": {
+            "manual_candidates": candidates.len(),
+            "external_evidence_refs": evidence_refs,
+            "analyzer_discovered": 0,
+        },
+        "candidates": candidate_values,
+        "reviewcard_artifact_relationship": {
+            "cards.json": "ReviewCard-only analyzer output; manual candidates are listed only in manual-candidates.json.",
+            "cards.sarif": "ReviewCard-only analyzer output; manual candidates are not emitted as SARIF analyzer results.",
+            "comment-plan.json": "ReviewCard-only comment planning; manual candidates are not selected for automatic comment plans.",
+            "lsp.json": "ReviewCard-only saved editor projection; manual candidates are not emitted as analyzer diagnostics.",
+            "repair-queue.json": "ReviewCard-only repair queue; manual candidates are not automatic repair tasks.",
+            "receipt-audit.md": "Receipts may match manual candidate IDs as manual/advisory targets without importing them as ReviewCard witness evidence.",
+            "policy-report": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs."
+        },
+        "trust_boundary": "Manual/advisory static unsafe contract review candidate index only; candidates are not analyzer-discovered ReviewCards, not a proof of UB, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repository safety, and not policy gating. unsafe-review did not run witnesses, post comments, edit source, run an agent, or enforce blocking policy.",
+    });
+    let mut rendered = serde_json::to_string_pretty(&value).unwrap_or_else(|err| {
+        format!("{{\n  \"error\": \"manual candidate artifact serialization failed: {err}\"\n}}")
+    });
+    rendered.push('\n');
+    rendered
+}
+
+fn manual_candidate_artifact_entry(candidate: &ManualCandidate) -> serde_json::Value {
+    let mut value = serde_json::to_value(candidate).unwrap_or_else(|_| json!({}));
+    if let Some(object) = value.as_object_mut() {
+        object.insert("analyzer_discovered".to_string(), json!(false));
+        object.insert(
+            "location_text".to_string(),
+            json!(format!(
+                "{}:{}",
+                candidate.location.file.display(),
+                candidate.location.line
+            )),
+        );
+        object.insert(
+            "explain_command".to_string(),
+            json!(format!("unsafe-review explain {}", candidate.id)),
+        );
+        object.insert(
+            "context_command".to_string(),
+            json!(format!("unsafe-review context {} --json", candidate.id)),
+        );
+        object.insert(
+            "witness_plan_command".to_string(),
+            json!(format!(
+                "unsafe-review candidate witness-plan {}",
+                candidate.id
+            )),
+        );
+    }
+    value
+}
+
 fn scope_name(scope: &Scope) -> &'static str {
     match scope {
         Scope::Diff => "diff",
@@ -240,6 +310,7 @@ fn artifact_kind(path: &str) -> &'static str {
         "comment-plan.json" => "comment_plan",
         "witness-plan.md" => "witness_plan",
         "receipt-audit.md" => "receipt_audit",
+        "manual-candidates.json" => "manual_candidates",
         "lsp.json" => "saved_lsp",
         "repair-queue.json" => "repair_queue",
         _ => "unknown",
@@ -262,6 +333,7 @@ fn artifact_schema_version(path: &str) -> Option<&'static str> {
     match path {
         "review-kit.json" | "cards.json" | "comment-plan.json" | "lsp.json"
         | "repair-queue.json" => Some("0.1"),
+        "manual-candidates.json" => Some("manual-candidates/v1"),
         "cards.sarif" => Some("2.1.0"),
         _ => None,
     }

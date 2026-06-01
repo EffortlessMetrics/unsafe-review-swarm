@@ -265,6 +265,10 @@ Manual candidate receipt audit preserves `source = "manual"`,
 `manual_candidate = true`, and `analyzer_discovered = false`. It does not turn
 the candidate into analyzer-discovered ReviewCard witness evidence.
 
+`first-pr` writes a separate `manual-candidates.json` index for imported
+`.unsafe-review/candidates/*.json` artifacts. `cards.json`, SARIF, comment-plan,
+saved LSP, repair-queue, and policy-report surfaces remain ReviewCard-only.
+
 Manual candidate projections do not execute witnesses, post comments, edit
 source, enforce policy, prove UB, prove site execution, or prove repository
 safety.

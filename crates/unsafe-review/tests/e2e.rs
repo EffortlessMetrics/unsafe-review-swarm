@@ -844,8 +844,16 @@ fn manual_candidate_receipts_audit_as_manual_advisory_targets() -> Result<(), Bo
 
 #[test]
 fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error>> {
-    let fixture = fixture_root("raw_pointer_alignment");
+    let source_fixture = fixture_root("raw_pointer_alignment");
     let temp = TempDir::new("unsafe-review-first-pr-e2e")?;
+    let fixture = temp.path().join("fixture");
+    copy_dir_all(&source_fixture, &fixture)?;
+    let candidate_dir = fixture.join(".unsafe-review").join("candidates");
+    fs::create_dir_all(&candidate_dir)?;
+    fs::write(
+        candidate_dir.join("R4R2-S001.json"),
+        manual_candidate_json(),
+    )?;
     let out_dir = temp.path().join("unsafe-review");
 
     let output = run_success([
@@ -889,6 +897,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("comment-plan.json"));
     assert!(stdout.contains("witness-plan.md"));
     assert!(stdout.contains("receipt-audit.md"));
+    assert!(stdout.contains("manual-candidates.json"));
     assert!(stdout.contains("lsp.json"));
     assert!(stdout.contains("repair-queue.json"));
     assert!(stdout.contains("Trust boundary:"));
@@ -907,6 +916,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(cards["summary"]["cards"], 1);
     assert_eq!(cards["cards"][0]["class"], "guard_missing");
     assert_eq!(cards["cards"][0]["operation_family"], "raw_pointer_read");
+    assert!(!serde_json::to_string(&cards)?.contains("R4R2-S001"));
     assert!(
         cards["trust_boundary"]
             .as_str()
@@ -989,6 +999,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         "comment-plan.json",
         "witness-plan.md",
         "receipt-audit.md",
+        "manual-candidates.json",
         "lsp.json",
         "repair-queue.json",
     ] {
@@ -1012,6 +1023,9 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         match expected {
             "review-kit.json" | "cards.json" | "comment-plan.json" | "lsp.json"
             | "repair-queue.json" => assert_eq!(entry["schema_version"], "0.1"),
+            "manual-candidates.json" => {
+                assert_eq!(entry["schema_version"], "manual-candidates/v1")
+            }
             "cards.sarif" => assert_eq!(entry["schema_version"], "2.1.0"),
             _ => assert!(entry["schema_version"].is_null()),
         }
@@ -1055,11 +1069,13 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(github_summary.contains("Full reviewer cockpit: `pr-summary.md`"));
     assert!(github_summary.contains("Agent repair queue: `repair-queue.json`"));
     assert!(github_summary.contains("Receipt audit: `receipt-audit.md`"));
+    assert!(github_summary.contains("Manual candidate index: `manual-candidates.json`"));
     assert!(github_summary.contains("`comment-plan.json` is plan-only"));
     assert!(github_summary.contains("Full advisory bundle"));
     assert!(github_summary.contains("review-kit.json"));
     assert!(github_summary.contains("github-summary.md"));
     assert!(github_summary.contains("receipt-audit.md"));
+    assert!(github_summary.contains("manual-candidates.json"));
     assert!(github_summary.contains("not memory-safety proof"));
     assert!(github_summary.contains("not site-execution proof"));
     assert!(github_summary.contains("unsafe-review did not run witnesses"));
@@ -1068,6 +1084,59 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(github_summary.contains("enforce blocking policy"));
     assert!(!github_summary.contains("# unsafe-review PR summary"));
     assert!(!github_summary.contains("## Card table"));
+
+    let manual_candidates =
+        parse_json(&fs::read_to_string(out_dir.join("manual-candidates.json"))?)?;
+    assert_eq!(manual_candidates["schema_version"], "manual-candidates/v1");
+    assert_eq!(manual_candidates["mode"], "manual_candidate_index");
+    assert_eq!(manual_candidates["source"], "first_pr");
+    assert_eq!(manual_candidates["summary"]["manual_candidates"], 1);
+    assert_eq!(manual_candidates["summary"]["analyzer_discovered"], 0);
+    assert_eq!(manual_candidates["candidates"][0]["id"], "R4R2-S001");
+    assert_eq!(manual_candidates["candidates"][0]["source"], "manual");
+    assert_eq!(manual_candidates["candidates"][0]["manual_candidate"], true);
+    assert_eq!(
+        manual_candidates["candidates"][0]["analyzer_discovered"],
+        false
+    );
+    assert_eq!(
+        manual_candidates["candidates"][0]["operation_family"],
+        "raw_pointer_read"
+    );
+    assert_eq!(
+        manual_candidates["candidates"][0]["location_text"],
+        "src/runtime/webcore/TextDecoder.rs:237"
+    );
+    assert!(
+        manual_candidates["candidates"][0]["explain_command"]
+            .as_str()
+            .unwrap_or("")
+            .contains("unsafe-review explain R4R2-S001")
+    );
+    assert!(
+        manual_candidates["reviewcard_artifact_relationship"]["cards.json"]
+            .as_str()
+            .unwrap_or("")
+            .contains("ReviewCard-only")
+    );
+    assert!(
+        manual_candidates["reviewcard_artifact_relationship"]["comment-plan.json"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not selected")
+    );
+    assert!(
+        manual_candidates["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not analyzer-discovered")
+    );
+    assert!(
+        manual_candidates["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not policy gating")
+    );
 
     let receipt_audit = fs::read_to_string(out_dir.join("receipt-audit.md"))?;
     assert!(receipt_audit.contains("# unsafe-review receipt audit"));

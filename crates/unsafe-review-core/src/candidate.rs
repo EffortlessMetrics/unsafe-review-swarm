@@ -110,7 +110,7 @@ pub fn load_manual_candidate(root: &Path, id: &str) -> Result<Option<ManualCandi
     read_manual_candidate(&path).map(Some)
 }
 
-pub(crate) fn load_manual_candidates(root: &Path) -> Result<Vec<ManualCandidate>, String> {
+pub fn load_manual_candidates(root: &Path) -> Result<Vec<ManualCandidate>, String> {
     let dir = root.join(".unsafe-review").join("candidates");
     if !dir.is_dir() {
         return Ok(Vec::new());

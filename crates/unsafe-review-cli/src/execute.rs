@@ -22,9 +22,9 @@ use unsafe_review_core::{
     ProofReceiptInput, RepoScanEvent, RepoScanPhase, RepoScanStatus, SanitizerReceiptInput, Scope,
     WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze, analyze_with_discovery,
     analyze_with_discovery_and_repo_events, audit_witness_receipts, compare_outcome_json,
-    discover_repo_files, evaluate_policy_report, read_manual_candidate, render_badge_jsons,
-    render_comment_plan, render_github_summary, render_human, render_json, render_lsp,
-    render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
+    discover_repo_files, evaluate_policy_report, load_manual_candidates, read_manual_candidate,
+    render_badge_jsons, render_comment_plan, render_github_summary, render_human, render_json,
+    render_lsp, render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
     render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
     render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,
     render_repair_queue, render_sarif, render_witness_plan, validate_witness_receipts,
@@ -40,6 +40,7 @@ type FirstPrRenderer = fn(&AnalyzeOutput) -> String;
 
 const REVIEW_KIT_ARTIFACT: &str = "review-kit.json";
 const RECEIPT_AUDIT_ARTIFACT: &str = "receipt-audit.md";
+const MANUAL_CANDIDATES_ARTIFACT: &str = "manual-candidates.json";
 const FIRST_PR_RENDERED_ARTIFACTS: [(&str, FirstPrRenderer); 8] = [
     ("cards.json", render_json),
     ("pr-summary.md", render_pr_summary),
@@ -50,7 +51,7 @@ const FIRST_PR_RENDERED_ARTIFACTS: [(&str, FirstPrRenderer); 8] = [
     ("lsp.json", render_lsp),
     ("repair-queue.json", render_repair_queue),
 ];
-const FIRST_PR_ARTIFACTS: [&str; 10] = [
+const FIRST_PR_ARTIFACTS: [&str; 11] = [
     REVIEW_KIT_ARTIFACT,
     "cards.json",
     "pr-summary.md",
@@ -59,6 +60,7 @@ const FIRST_PR_ARTIFACTS: [&str; 10] = [
     "comment-plan.json",
     "witness-plan.md",
     RECEIPT_AUDIT_ARTIFACT,
+    MANUAL_CANDIDATES_ARTIFACT,
     "lsp.json",
     "repair-queue.json",
 ];
@@ -120,7 +122,7 @@ fn print_support() {
     println!("Current posture:");
     println!("- ReviewCards: experimental; selected slices are fixture-backed or dogfood-backed.");
     println!(
-        "- first-pr bundle: advisory; projects cards, summaries, SARIF, comment plans, witness plans, and saved LSP JSON from ReviewCards."
+        "- first-pr bundle: advisory; projects cards, summaries, SARIF, comment plans, witness plans, saved LSP JSON, and repair queues from ReviewCards, with manual candidates indexed separately."
     );
     println!(
         "- receipts: saved-output template/import/audit only; receipts attach external evidence to exact ReviewCard or manual candidate identities."
@@ -765,6 +767,7 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         include_unchanged_tests: true,
         max_cards: check.max_cards,
     })?;
+    let manual_candidates = load_manual_candidates(&root)?;
 
     fs::create_dir_all(&options.out_dir)
         .map_err(|err| format!("create {} failed: {err}", options.out_dir.display()))?;
@@ -774,6 +777,10 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     write_artifact(
         &options.out_dir.join(RECEIPT_AUDIT_ARTIFACT),
         render_receipt_audit_markdown(&receipt_audit),
+    )?;
+    write_artifact(
+        &options.out_dir.join(MANUAL_CANDIDATES_ARTIFACT),
+        first_pr::render_manual_candidates_artifact(&manual_candidates),
     )?;
     write_artifact(
         &options.out_dir.join(REVIEW_KIT_ARTIFACT),
