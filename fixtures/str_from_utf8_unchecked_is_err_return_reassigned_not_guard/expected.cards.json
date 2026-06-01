@@ -1,0 +1,79 @@
+[
+    {
+        "id":  "UR-str-from-utf8-unchecked-is-err-return-reassigned-not-guard-fixture-src-lib-rs-decode-reassigned-operation-str_from_utf8_unchecked-from-utf8-unchecked-44aff54b8f45-invalid_value-c1",
+        "class":  "guard_missing",
+        "priority":  "high",
+        "confidence":  "medium",
+        "site":  {
+                     "file":  "src/lib.rs",
+                     "line":  9,
+                     "column":  5,
+                     "kind":  "operation",
+                     "owner":  "decode_reassigned",
+                     "visibility":  "private",
+                     "public_api_surface":  false,
+                     "snippet":  "unsafe { core::str::from_utf8_unchecked(bytes) }"
+                 },
+        "operation":  "unsafe { core::str::from_utf8_unchecked(bytes) }",
+        "operation_family":  "str_from_utf8_unchecked",
+        "hazards":  [
+                        "invalid_value"
+                    ],
+        "obligations":  [
+                            "bytes are valid UTF-8"
+                        ],
+        "obligation_evidence":  [
+                                    {
+                                        "key":  "utf8",
+                                        "description":  "bytes are valid UTF-8",
+                                        "contract":  {
+                                                         "present":  true,
+                                                         "state":  "present",
+                                                         "summary":  "Nearby `SAFETY:` comment was detected"
+                                                     },
+                                        "discharge":  {
+                                                          "present":  false,
+                                                          "state":  "missing",
+                                                          "summary":  "No obligation-specific guard code was detected"
+                                                      },
+                                        "reach":  {
+                                                      "present":  true,
+                                                      "state":  "present",
+                                                      "summary":  "1 related test file(s) mention owner `decode_reassigned`"
+                                                  },
+                                        "witness":  {
+                                                        "present":  false,
+                                                        "state":  "missing",
+                                                        "summary":  "No imported witness receipt was found"
+                                                    }
+                                    }
+                                ],
+        "contract":  "Nearby `SAFETY:` comment was detected",
+        "discharge":  "No visible local guard detected",
+        "reach":  "1 related test file(s) mention owner `decode_reassigned`",
+        "witness":  "No imported witness receipt was found",
+        "witness_routes":  [
+                               {
+                                   "kind":  "miri",
+                                   "reason":  "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+                                   "command":  "cargo +nightly miri test decode_reassigned",
+                                   "required":  false
+                               },
+                               {
+                                   "kind":  "cargo-careful",
+                                   "reason":  "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+                                   "command":  "cargo +nightly careful test decode_reassigned",
+                                   "required":  false
+                               }
+                           ],
+        "missing":  [
+                        "Missing visible local guard for inferred safety obligations",
+                        "No witness receipt imported for this card"
+                    ],
+        "next_action":  "Add or expose the local guard that discharges the `str_from_utf8_unchecked` safety obligation.",
+        "verify_commands":  [
+                                "cargo +nightly miri test decode_reassigned",
+                                "cargo +nightly careful test decode_reassigned"
+                            ]
+    }
+]
