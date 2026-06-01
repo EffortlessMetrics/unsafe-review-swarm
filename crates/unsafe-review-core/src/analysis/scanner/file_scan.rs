@@ -1,8 +1,8 @@
 use super::{
-    ScannedSite, detect_js_buffer_reentry_sites, detect_site, detect_syntax_sites, extern_fn_names,
+    ScannedSite, detect_site, detect_syntax_sites, extern_fn_names,
     fallback_unsafe_block_contains_specific_operation, is_incomplete_multiline_transmute_copy,
-    line_for_text_detection, local_module_names, operation_block_start_lines, scan_site, site_key,
-    syntax_operation_covers_fallback, syntax_site_covers_fallback,
+    js_buffer_reentry, line_for_text_detection, local_module_names, operation_block_start_lines,
+    scan_site, site_key, syntax_operation_covers_fallback, syntax_site_covers_fallback,
 };
 use crate::domain::{OperationFamily, UnsafeSiteKind};
 use crate::input::diff::DiffIndex;
@@ -45,7 +45,9 @@ pub(crate) fn scan_file(
         &syntax_index,
         &mut seen,
     ));
-    out.extend(detect_js_buffer_reentry_sites(rel, diff, repo_mode, &lines));
+    out.extend(js_buffer_reentry::detect_js_buffer_reentry_sites(
+        rel, diff, repo_mode, &lines,
+    ));
     out.sort_by(|left, right| {
         left.site
             .location
