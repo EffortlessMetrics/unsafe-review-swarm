@@ -6,26 +6,28 @@ use crate::command::{CheckOptions, DiffInput};
 use serde_json::json;
 use unsafe_review_core::{AnalyzeOutput, ManualCandidate, Scope};
 
-pub(super) fn print_first_pr_report(
-    output: &AnalyzeOutput,
-    out_dir: &Path,
-    root: &Path,
-    check: &CheckOptions,
-    manual_candidates: &[ManualCandidate],
-    no_changed_gaps_message: &str,
-    no_changed_gaps_limitation: &str,
-    artifacts: &[&str],
-) {
-    print_first_pr_overview(output, out_dir);
-    print_manual_candidate_handoff(out_dir, root, manual_candidates);
-    print_receipt_audit_handoff(check);
+pub(super) struct FirstPrReport<'a> {
+    pub(super) output: &'a AnalyzeOutput,
+    pub(super) out_dir: &'a Path,
+    pub(super) root: &'a Path,
+    pub(super) check: &'a CheckOptions,
+    pub(super) manual_candidates: &'a [ManualCandidate],
+    pub(super) no_changed_gaps_message: &'a str,
+    pub(super) no_changed_gaps_limitation: &'a str,
+    pub(super) artifacts: &'a [&'a str],
+}
+
+pub(super) fn print_first_pr_report(report: FirstPrReport<'_>) {
+    print_first_pr_overview(report.output, report.out_dir);
+    print_manual_candidate_handoff(report.out_dir, report.root, report.manual_candidates);
+    print_receipt_audit_handoff(report.check);
     print_top_card_summary(
-        output,
-        root,
-        no_changed_gaps_message,
-        no_changed_gaps_limitation,
+        report.output,
+        report.root,
+        report.no_changed_gaps_message,
+        report.no_changed_gaps_limitation,
     );
-    print_artifact_paths(out_dir, artifacts);
+    print_artifact_paths(report.out_dir, report.artifacts);
     print_trust_boundary();
 }
 

@@ -1639,7 +1639,7 @@ fn check_comment_plan_artifact(
         let Some(body) = comment.get("body").and_then(serde_json::Value::as_str) else {
             return Err("comment-plan.json comment is missing body".to_string());
         };
-        require_text_mentions_only_known_card_ids(body, &comment_plan_path, &card_ids)?;
+        require_text_mentions_only_known_card_ids(body, &comment_plan_path, card_ids)?;
         require_comment_body_boundary(body)?;
         let body_word_count = body.split_whitespace().count();
         if body_word_count > COMMENT_PLAN_BODY_WORD_LIMIT {
