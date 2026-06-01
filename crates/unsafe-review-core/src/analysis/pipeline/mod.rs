@@ -3613,6 +3613,21 @@ pub fn zstd_sync(
             }),
             "valid-zero obligation should remain missing without target-type evidence"
         );
+
+        let valid_output = fixture_output("zeroed_valid_u32")?;
+        let valid_card = single_card("zeroed_valid_u32", &valid_output)?;
+
+        assert_eq!(valid_card.site.kind, UnsafeSiteKind::Operation);
+        assert_eq!(valid_card.operation.family, OperationFamily::Zeroed);
+        assert_eq!(valid_card.class, ReviewClass::GuardedUnwitnessed);
+        assert!(valid_card.hazards.contains(&HazardKind::InvalidValue));
+        assert!(valid_card.id.0.contains("zeroed"));
+        assert!(
+            valid_card.obligation_evidence.iter().any(|evidence| {
+                evidence.obligation.key == "valid-zero" && evidence.discharge.present
+            }),
+            "valid-zero obligation should be discharged for known valid-zero target types"
+        );
         Ok(())
     }
 
