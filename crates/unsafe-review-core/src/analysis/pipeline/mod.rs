@@ -3345,6 +3345,7 @@ pub fn zstd_sync(
             "str_from_utf8_unchecked_guard_then_shadowed_not_guard",
             "str_from_utf8_unchecked_is_err_return_reassigned_not_guard",
             "str_from_utf8_unchecked_is_err_return_shadowed_not_guard",
+            "str_from_utf8_unchecked_match_return_comment_not_guard",
             "str_from_utf8_unchecked_if_let_ok_reassigned_not_guard",
             "str_from_utf8_unchecked_if_let_ok_shadowed_not_guard",
             "str_from_utf8_unchecked_if_let_err_shadowed_not_guard",
