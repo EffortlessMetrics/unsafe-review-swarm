@@ -871,16 +871,16 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         ),
     )?;
 
-    first_pr::print_first_pr_report(
-        &output,
-        &options.out_dir,
-        &root,
-        &check,
-        &manual_candidates,
-        NO_CHANGED_GAPS_MESSAGE,
-        NO_CHANGED_GAPS_LIMITATION,
-        &FIRST_PR_ARTIFACTS,
-    );
+    first_pr::print_first_pr_report(first_pr::FirstPrReport {
+        output: &output,
+        out_dir: &options.out_dir,
+        root: &root,
+        check: &check,
+        manual_candidates: &manual_candidates,
+        no_changed_gaps_message: NO_CHANGED_GAPS_MESSAGE,
+        no_changed_gaps_limitation: NO_CHANGED_GAPS_LIMITATION,
+        artifacts: &FIRST_PR_ARTIFACTS,
+    });
 
     Ok(())
 }

@@ -106,16 +106,16 @@ fn fallback_sites(
         let Some((kind, family)) = detect_site(detection_trimmed) else {
             continue;
         };
-        if fallback_is_shadowed_by_syntax(
+        if fallback_is_shadowed_by_syntax(FallbackShadowInput {
             lines,
             syntax_sites,
             syntax_index,
             idx,
             line_no,
             detection_trimmed,
-            &kind,
-            &family,
-        ) {
+            kind: &kind,
+            family: &family,
+        }) {
             continue;
         }
         seen.insert(site_key(line_no, &kind, &family));
@@ -137,24 +137,28 @@ fn fallback_sites(
     out
 }
 
-fn fallback_is_shadowed_by_syntax(
-    lines: &[&str],
-    syntax_sites: &[super::DetectedSyntaxSite],
-    syntax_index: &SyntaxSiteIndex,
+struct FallbackShadowInput<'a> {
+    lines: &'a [&'a str],
+    syntax_sites: &'a [super::DetectedSyntaxSite],
+    syntax_index: &'a SyntaxSiteIndex,
     idx: usize,
     line_no: usize,
-    detection_trimmed: &str,
-    kind: &UnsafeSiteKind,
-    family: &OperationFamily,
-) -> bool {
-    syntax_site_covers_fallback(syntax_sites, line_no, kind, family)
-        || (*kind == UnsafeSiteKind::Operation
-            && *family == OperationFamily::Transmute
-            && is_incomplete_multiline_transmute_copy(detection_trimmed)
-            && syntax_operation_covers_fallback(syntax_sites, line_no, family))
-        || (*kind == UnsafeSiteKind::UnsafeBlock
-            && *family == OperationFamily::Unknown
-            && syntax_index.covers_specific_operation(line_no, lines, idx))
+    detection_trimmed: &'a str,
+    kind: &'a UnsafeSiteKind,
+    family: &'a OperationFamily,
+}
+
+fn fallback_is_shadowed_by_syntax(input: FallbackShadowInput<'_>) -> bool {
+    syntax_site_covers_fallback(input.syntax_sites, input.line_no, input.kind, input.family)
+        || (*input.kind == UnsafeSiteKind::Operation
+            && *input.family == OperationFamily::Transmute
+            && is_incomplete_multiline_transmute_copy(input.detection_trimmed)
+            && syntax_operation_covers_fallback(input.syntax_sites, input.line_no, input.family))
+        || (*input.kind == UnsafeSiteKind::UnsafeBlock
+            && *input.family == OperationFamily::Unknown
+            && input
+                .syntax_index
+                .covers_specific_operation(input.line_no, input.lines, input.idx))
 }
 
 fn syntax_backfill_sites(

@@ -15591,6 +15591,13 @@ review_after = "2026-08-01"
             "handoff": {
                 "reviewer_summary": "pr-summary.md",
                 "receipt_audit_markdown": "unsafe-review receipt audit --root fixtures/raw_pointer_alignment --base origin/main --format markdown",
+                "manual_candidates": {
+                    "artifact": "manual-candidates.json",
+                    "manual_candidates": 0,
+                    "analyzer_discovered": 0,
+                    "first_candidate": serde_json::Value::Null,
+                    "trust_boundary": "manual/advisory candidates are not analyzer-discovered ReviewCards, not policy inputs, and not witness execution; receipts against manual candidates do not import ReviewCard witness evidence."
+                },
                 "top_card": top_card_handoff,
                 "trust_boundary": "Copy-only review-kit handoff commands; unsafe-review did not run witnesses, run agents, post comments, edit source, or enforce blocking policy."
             },
