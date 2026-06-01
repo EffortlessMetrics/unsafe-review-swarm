@@ -1429,6 +1429,7 @@ fixtures = [
   "get_unchecked_mut_get_probe_shadowed_index_not_guard",
   "get_unchecked_mut_get_probe_reassigned_receiver_not_guard",
   "get_unchecked_mut_get_probe_reassigned_receiver_path_not_guard",
+  "get_unchecked_mut_get_probe_shadowed_receiver_path_not_guard",
   "get_unchecked_mut_get_probe_shadowed_receiver_not_guard",
   "get_unchecked_mut_get_probe_early_return_reassigned_index_not_guard",
   "get_unchecked_mut_get_probe_early_return_shadowed_index_not_guard",
@@ -1460,7 +1461,7 @@ other-receiver, other-slice get-probe, disjunctive branch, post-check,
 observed-only, closed-branch, comment-only early-return, stale-index,
 stale-receiver, stale receiver-path, and open-branch, early-return, if-let,
 let-else, or match stale get-probe index, receiver, or receiver-path controls, including
-compound stale-index mutation, open-branch shadowed index or receiver targets,
+compound stale-index mutation, open-branch shadowed index, receiver, or receiver-path targets,
 early-return shadowed receiver targets, and if-let, let-else, or match shadowed
 index targets, in the listed fixtures.
 """
