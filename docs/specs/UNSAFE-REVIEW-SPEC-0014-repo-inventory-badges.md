@@ -184,9 +184,9 @@ the current `unsafe-review badges` repo projection.
   trust boundary.
 - Badge JSON for a fixture reports open unsafe-review gaps rather than raw
   unsafe count or safe/unsafe status.
-- The `unsafe-review+` badge message equals `unsuppressed_review_gaps` plus the
-  `evidence_quality_contract_missing`, `evidence_quality_guard_missing`, and
-  `evidence_quality_guarded_unwitnessed` component counts.
+- The `unsafe-review+` badge message equals the evidence-quality component sum:
+  `evidence_quality_contract_missing + evidence_quality_guard_missing +
+  evidence_quality_guarded_unwitnessed`.
 - Outcome comparison between a no-card snapshot and a one-card snapshot reports
   one `new` card and preserves the static-review trust boundary.
 - Outcome JSON includes `schema_version`, deterministic `before_id` and
