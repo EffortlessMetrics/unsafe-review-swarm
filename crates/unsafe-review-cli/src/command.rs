@@ -139,6 +139,7 @@ pub(crate) struct CandidateWitnessPlanOptions {
 pub(crate) enum Command {
     Help,
     RepoHelp,
+    CandidateHelp,
     Version,
     Support,
     Doctor {

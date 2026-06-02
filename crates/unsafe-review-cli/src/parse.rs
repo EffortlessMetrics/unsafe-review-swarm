@@ -23,6 +23,11 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
     if command == "repo" && (has_help_flag(&rest) || is_exact_help_word(&rest)) {
         return Ok(Command::RepoHelp);
     }
+    if command == "candidate"
+        && (rest.is_empty() || has_help_flag(&rest) || is_candidate_help_word(&rest))
+    {
+        return Ok(Command::CandidateHelp);
+    }
     if has_help_flag(&rest) {
         return Ok(Command::Help);
     }
@@ -135,6 +140,10 @@ fn has_help_flag(args: &[String]) -> bool {
 
 fn is_exact_help_word(args: &[String]) -> bool {
     matches!(args, [arg] if arg == "help")
+}
+
+fn is_candidate_help_word(args: &[String]) -> bool {
+    matches!(args, [arg] if arg == "help") || matches!(args, [_subcommand, arg] if arg == "help")
 }
 
 fn parse_support(args: Vec<String>) -> Result<Command, String> {
@@ -643,6 +652,49 @@ mod tests {
         assert_eq!(
             parse(args(["unsafe-review", "repo", "help"]))?,
             Command::RepoHelp
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parses_candidate_help_as_candidate_specific_help() -> Result<(), String> {
+        assert_eq!(
+            parse(args(["unsafe-review", "candidate"]))?,
+            Command::CandidateHelp
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "candidate", "--help"]))?,
+            Command::CandidateHelp
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "candidate", "-h"]))?,
+            Command::CandidateHelp
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "candidate", "help"]))?,
+            Command::CandidateHelp
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "candidate", "import", "--help"]))?,
+            Command::CandidateHelp
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "candidate", "witness-plan", "help"]))?,
+            Command::CandidateHelp
+        );
+        assert_eq!(
+            parse(args([
+                "unsafe-review",
+                "candidate",
+                "import",
+                "candidate.json",
+                "--out",
+                "help"
+            ]))?,
+            Command::Candidate(CandidateCommand::Import(CandidateImportOptions {
+                input: PathBuf::from("candidate.json"),
+                out: Some(PathBuf::from("help")),
+            }))
         );
         Ok(())
     }

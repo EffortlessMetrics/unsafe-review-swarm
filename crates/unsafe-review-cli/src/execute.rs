@@ -74,6 +74,10 @@ pub(crate) fn execute(command: Command) -> Result<(), String> {
             print_repo_help();
             Ok(())
         }
+        Command::CandidateHelp => {
+            print_candidate_help();
+            Ok(())
+        }
         Command::Version => {
             println!("unsafe-review {}", env!("CARGO_PKG_VERSION"));
             Ok(())
@@ -1602,6 +1606,54 @@ fn print_repo_help() {
     );
     println!(
         "- unsafe-review does not execute witnesses, post comments, edit source, or enforce blocking policy by default."
+    );
+}
+
+fn print_candidate_help() {
+    println!("unsafe-review candidate: import and project manual advisory candidates");
+    println!();
+    println!("Usage:");
+    println!(
+        "  unsafe-review candidate import <manual-candidate.json> [--out .unsafe-review/candidates/<id>.json]"
+    );
+    println!("  unsafe-review candidate witness-plan [--root .] <candidate-id> [--out file]");
+    println!();
+    println!("What manual candidates are:");
+    println!(
+        "- Manual candidates are externally discovered advisory unsafe-review artifacts supplied by a reviewer."
+    );
+    println!(
+        "- They use schema_version `manual-candidate/v1` and preserve source `manual`, manual_candidate `true`, and analyzer_discovered `false`."
+    );
+    println!(
+        "- They can carry a title, file:line location, operation family, unsafe operation, invariant, safe caller route, evidence references, and a trust boundary."
+    );
+    println!();
+    println!("Commands:");
+    println!(
+        "- import reads a manual candidate JSON file, validates it, and writes a canonical artifact."
+    );
+    println!(
+        "- witness-plan renders the candidate's advisory witness-plan projection by candidate ID."
+    );
+    println!();
+    println!("After import:");
+    println!(
+        "- explain and context can load the manual candidate by ID when no analyzer ReviewCard has that ID."
+    );
+    println!(
+        "- first-pr writes a separate manual-candidates.json handoff; cards.json, SARIF, comment-plan, LSP, repair-queue, and policy-report stay ReviewCard-only."
+    );
+    println!(
+        "- receipts may audit against manual candidate IDs as external evidence for that manual target, not as imported ReviewCard witness evidence."
+    );
+    println!();
+    println!("Trust boundary:");
+    println!(
+        "- Manual candidates are not analyzer-discovered findings, not proof of memory safety, not UB-free status, not Miri-clean status, not site-execution proof, and not policy gating."
+    );
+    println!(
+        "- unsafe-review does not execute witnesses, post comments, edit source, run an agent, or enforce blocking policy by default."
     );
 }
 

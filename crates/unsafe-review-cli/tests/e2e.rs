@@ -63,6 +63,29 @@ fn cargo_subcommand_alias_writes_pr_summary_artifact() -> Result<(), Box<dyn Err
     Ok(())
 }
 
+#[test]
+fn candidate_help_is_command_specific() -> Result<(), Box<dyn Error>> {
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("candidate")
+            .arg("--help"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+
+    assert!(
+        stdout.contains("unsafe-review candidate: import and project manual advisory candidates")
+    );
+    assert!(stdout.contains("unsafe-review candidate import <manual-candidate.json>"));
+    assert!(stdout.contains("unsafe-review candidate witness-plan"));
+    assert!(stdout.contains("manual_candidate `true`"));
+    assert!(stdout.contains("analyzer_discovered `false`"));
+    assert!(stdout.contains("not analyzer-discovered findings"));
+    assert!(!stdout.contains("Commands:\n  check"));
+
+    Ok(())
+}
+
 fn checked_output(command: &mut Command) -> Result<Output, Box<dyn Error>> {
     let output = command.output()?;
     if output.status.success() {
