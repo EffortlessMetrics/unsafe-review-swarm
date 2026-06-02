@@ -84,6 +84,10 @@ unsafe access.
 same-slot open-branch `write` and `MaybeUninit::new` evidence through
 `maybeuninit_assume_init_open_branch_write_guard` and
 `maybeuninit_assume_init_open_branch_new_guard`, while
+`maybeuninit_assume_init_mut_new_guard` pins a mutable same-slot
+`MaybeUninit::new` binding before `assume_init` and
+`maybeuninit_assume_init_mutslot_new_not_guard` keeps a prefixed `mutslot`
+binding from matching `let mut slot` evidence.
 `maybeuninit_assume_init_closed_branch_write_not_guard`,
 `maybeuninit_assume_init_closed_branch_new_not_guard`,
 `maybeuninit_assume_init_partial_field_not_guard`, and
@@ -109,7 +113,9 @@ initialized-memory evidence through
 keeps writes made stale by reassignment from discharging initialized-memory
 evidence through `maybeuninit_assume_init_read_stale_write_not_guard`, and
 keeps writes made stale by shadowing from discharging initialized-memory
-evidence through `maybeuninit_assume_init_read_shadowed_slot_not_guard`.
+evidence through `maybeuninit_assume_init_read_shadowed_slot_not_guard`, and
+`maybeuninit_assume_init_read_other_slot_write_not_guard` keeps a write to a
+different slot from discharging `assume_init_read` initialized-memory evidence.
 `MaybeUninit::assume_init_ref` pins same-slot `write` evidence through
 `maybeuninit_assume_init_ref_write_guard`, pins same-slot `MaybeUninit::new`
 evidence through `maybeuninit_assume_init_ref_new_guard`, pins open-branch
