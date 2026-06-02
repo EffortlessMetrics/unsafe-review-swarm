@@ -15,29 +15,15 @@ observations and comment-only early-return text are not guards, get-probe
 evidence must target the same slice, and reassigned, compound-reassigned, or
 shadowed checked indexes, receivers, or receiver paths do not discharge bounds
 evidence.
-Recent `NonNull::new_unchecked` nullability additions include
-`nonnull_if_let_new_guard`, `nonnull_let_else_new_guard`,
-`nonnull_match_new_guard`, `nonnull_new_reassigned_ptr_not_guard`,
-`nonnull_new_shadowed_ptr_not_guard`,
-`nonnull_method_receiver_reassigned_not_guard`,
-`nonnull_is_null_return_comment_not_guard`,
-`nonnull_is_null_disjunct_return_guard`,
-`nonnull_is_null_conjunct_return_not_guard`,
-`nonnull_is_null_reassigned_ptr_not_guard`,
-`nonnull_is_null_open_branch_guard`,
-`nonnull_is_null_conjunct_open_branch_guard`,
-`nonnull_is_null_disjunct_open_branch_not_guard`,
-`nonnull_is_null_open_branch_reassigned_ptr_not_guard`,
-`nonnull_if_let_new_reassigned_ptr_not_guard`,
-`nonnull_let_else_new_reassigned_ptr_not_guard`, and
-`nonnull_match_new_reassigned_ptr_not_guard`, which pin same-pointer
-`NonNull::new` if-let, let-else, and match Some-arm guards plus non-null
-open-branch guards and null early-return guards, including the top-level
-conjunctive/disjunctive boolean shapes that dominate the operation, while
-rejecting comment-only return text, inverse, stale, or shadowed checked-pointer
-evidence.
-Method-receiver nullability evidence is also stale when the checked receiver is
-reassigned before `NonNull::new_unchecked`.
+Recent `NonNull::new_unchecked` nullability additions include fixture-backed
+same-pointer `NonNull::new` guards, if-let, let-else, match Some-arm guards,
+non-null open branches, null early-return guards, cast-target uncertainty, and
+stale or shadowed pointer/receiver controls recorded in
+`docs/accuracy/labels/nonnull-new-unchecked-nullability.toml`. These pin the
+top-level conjunctive/disjunctive boolean shapes that dominate the operation,
+while rejecting comment-only return text, inverse evidence, bare observations,
+post-constructor checks, wrong pointers, cast-target/provenance uncertainty,
+and stale or shadowed checked-pointer or method-receiver evidence.
 Recent guard-evidence additions include
 `raw_pointer_alignment_is_aligned_guard`,
 `raw_pointer_alignment_observed_not_guard`,
