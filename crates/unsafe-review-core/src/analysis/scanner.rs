@@ -20,11 +20,13 @@ use crate::input::diff::DiffIndex;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
+mod fallback_scan;
 mod file_scan;
 mod item_names;
 mod js_buffer_reentry;
 mod owner_context;
 mod scan_site;
+mod syntax_scan;
 mod text_detection;
 
 use self::item_names::{parse_fn_name, parse_mod_name, parse_trait_name};
