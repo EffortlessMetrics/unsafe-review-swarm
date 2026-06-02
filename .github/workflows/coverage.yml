@@ -26,12 +26,30 @@ concurrency:
 jobs:
   llvm_cov:
     name: cargo-llvm-cov advisory upload
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
+    # Heavy instrumented Rust build. Routed to the EM shared self-hosted
+    # 16 GB Rust tier; queueing on the shared group is acceptable backpressure.
+    # This lane only runs on push(main)/dispatch (trusted refs), never on
+    # untrusted fork PRs, and is never a required branch-protection gate.
+    runs-on:
+      group: em-ci-small
+      labels: [self-hosted, linux, x64, em-ci, rust-16gb, rust-medium, trusted-pr]
+    timeout-minutes: 45
+    env:
+      CARGO_INCREMENTAL: "0"
+      TMPDIR: /mnt/ci-scratch/tmp/${{ github.run_id }}-${{ github.run_attempt }}
+      CARGO_TARGET_DIR: /mnt/ci-scratch/unsafe-review-coverage/${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
+
+      - name: Prepare scratch and disk preflight
+        run: |
+          set -euo pipefail
+          ci-disk-guard /mnt/ci-scratch 45
+          ci-disk-guard /mnt/ci-cache 10
+          mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
+          df -h /mnt/ci-scratch /mnt/ci-cache || true
 
       - uses: dtolnay/rust-toolchain@1.95.0
         with:
@@ -66,3 +84,10 @@ jobs:
           name: unsafe-review-coverage
           path: target/llvm-cov/lcov.info
           if-no-files-found: warn
+
+      - name: Cleanup scratch and final disk stats
+        if: always()
+        run: |
+          set +e
+          rm -rf "$TMPDIR" "$CARGO_TARGET_DIR"
+          df -h /mnt/ci-scratch /mnt/ci-cache || true

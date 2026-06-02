@@ -18,8 +18,14 @@ concurrency:
 jobs:
   advisory:
     name: unsafe-review advisory packet
+    # Normal Rust build/render lane. Routed to the EM shared self-hosted
+    # rust-small tier; queueing on the shared group is acceptable backpressure.
+    # The full-ci label is a maintainer-applied trust gate, so this lane never
+    # runs unattended on untrusted fork code. It is advisory, not a required gate.
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event.pull_request.draft == false && contains(github.event.pull_request.labels.*.name, 'full-ci')) }}
-    runs-on: ubuntu-latest
+    runs-on:
+      group: em-ci-small
+      labels: [self-hosted, linux, x64, em-ci, rust-small, trusted-pr]
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6

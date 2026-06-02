@@ -26,7 +26,7 @@ actions = [
   "Swatinem/rust-cache@v2",
   "actions/upload-artifact@v7",
 ]
-reason = "Advisory unsafe-review first-pr packet workflow. It uploads cards.json, pr-summary.md, cards.sarif, comment-plan.json, witness-plan.md, and lsp.json without witness execution, comment posting, source edits, or write permissions."
+reason = "Advisory unsafe-review first-pr packet workflow, routed to the EM shared self-hosted rust-small tier behind the maintainer-applied full-ci label gate. It uploads cards.json, pr-summary.md, cards.sarif, comment-plan.json, witness-plan.md, and lsp.json without witness execution, comment posting, source edits, or write permissions."
 created = "2026-05-18"
 review_after = "2026-06-18"
 
@@ -78,6 +78,6 @@ actions = [
   "codecov/codecov-action@v6",
   "actions/upload-artifact@v7",
 ]
-reason = "Advisory cargo-llvm-cov + Codecov telemetry workflow. It uploads LCOV as execution-surface telemetry without threshold gating, without PR comment posting, without witness execution, without default branch-protection blocking, and without claiming memory safety, UB-free status, Miri-clean status, or site-execution proof."
+reason = "Advisory cargo-llvm-cov + Codecov telemetry workflow, routed to the EM shared self-hosted 16 GB Rust tier on trusted push(main)/dispatch refs only. It uploads LCOV as execution-surface telemetry without threshold gating, without PR comment posting, without witness execution, without default branch-protection blocking, and without claiming memory safety, UB-free status, Miri-clean status, or site-execution proof."
 created = "2026-05-23"
 review_after = "2026-08-23"
