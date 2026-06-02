@@ -4308,6 +4308,37 @@ pub fn zstd_sync(
     }
 
     #[test]
+    fn ffi_extern_block_identity_changes_when_signature_changes() -> Result<(), String> {
+        let original = temp_source_output(
+            "unsafe-review-ffi-identity-original",
+            r#"
+unsafe extern "C" {
+    fn strlen(ptr: *const u8) -> usize;
+}
+"#,
+        )?;
+        let changed = temp_source_output(
+            "unsafe-review-ffi-identity-changed",
+            r#"
+unsafe extern "C" {
+    fn strlen(ptr: *const core::ffi::c_char) -> usize;
+}
+"#,
+        )?;
+        let original_card = single_card("ffi original", &original)?;
+        let changed_card = single_card("ffi changed", &changed)?;
+
+        assert_eq!(original_card.operation.family, OperationFamily::Ffi);
+        assert_eq!(changed_card.operation.family, OperationFamily::Ffi);
+        assert_ne!(
+            identity_without_count(&original_card.id),
+            identity_without_count(&changed_card.id),
+            "FFI extern-block identity must include the declaration lines, not only the block opener"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn card_identity_counts_duplicate_sites() -> Result<(), String> {
         let output = fixture_output("duplicate_raw_pointer_reads")?;
         if output.cards.len() != 2 {
@@ -4459,6 +4490,51 @@ pub fn zstd_sync(
             card.obligation_evidence
                 .iter()
                 .all(|evidence| !evidence.witness.present)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn ffi_human_review_receipt_marks_witness_evidence_present_only() -> Result<(), String> {
+        let root =
+            copy_fixture_to_temp("ffi_missing_boundary_contract", "unsafe-review-ffi-receipt")?;
+        let card_id = single_card("ffi_missing_boundary_contract", &fixture_output_at(&root)?)?
+            .id
+            .0
+            .clone();
+        write_receipt_with_tool_and_strength(&root, &card_id, "human-deep-review", "reviewed")?;
+
+        let output = fixture_output_at(&root)?;
+        let card = single_card("ffi_missing_boundary_contract receipt", &output)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp fixture failed: {err}"))?;
+        assert_eq!(card.operation.family, OperationFamily::Ffi);
+        assert!(
+            card.routes
+                .iter()
+                .any(|route| route.kind == crate::domain::WitnessKind::HumanDeepReview)
+        );
+        assert!(card.witness.present);
+        assert!(card.witness.summary.contains("human-deep-review"));
+        assert!(card.witness.summary.contains("reviewed"));
+        assert!(!card.missing.iter().any(|missing| missing.kind == "witness"));
+        assert!(
+            card.missing
+                .iter()
+                .any(|missing| missing.kind == "contract")
+        );
+        assert!(card.missing.iter().any(|missing| missing.kind == "guard"));
+        assert!(card.missing.iter().any(|missing| missing.kind == "reach"));
+        assert!(
+            card.obligation_evidence
+                .iter()
+                .all(|evidence| evidence.witness.present)
+        );
+        assert!(
+            card.obligation_evidence
+                .iter()
+                .any(|evidence| !evidence.discharge.present),
+            "human review receipts must not become static guard/discharge evidence"
         );
         Ok(())
     }
@@ -4648,11 +4724,16 @@ evidence = "test fixture"
         tool: &str,
         strength: &str,
     ) -> Result<(), String> {
+        let command = if tool == "human-deep-review" {
+            "manual review of cited foreign declaration and Rust extern signature"
+        } else {
+            "cargo +nightly miri test read_header"
+        };
         let receipt_dir = root.join(".unsafe-review").join("receipts");
         fs::create_dir_all(&receipt_dir)
             .map_err(|err| format!("create {} failed: {err}", receipt_dir.display()))?;
         fs::write(
-            receipt_dir.join("miri.json"),
+            receipt_dir.join(format!("{}.json", tool.replace('-', "_"))),
             format!(
                 r#"{{
   "schema_version": "0.1",
@@ -4663,7 +4744,7 @@ evidence = "test fixture"
   "recorded_at": "2026-05-18T00:00:00Z",
   "expires_at": "2026-08-18",
   "summary": "focused fixture witness passed",
-  "command": "cargo +nightly miri test read_header",
+  "command": "{command}",
   "limitations": ["fixture only"]
 }}"#
             ),

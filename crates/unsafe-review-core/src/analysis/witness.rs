@@ -47,6 +47,12 @@ pub(crate) fn routes_for(hazards: &[HazardKind], owner: Option<&String>) -> Vec<
                 )),
                 required: false,
             },
+            WitnessRoute {
+                kind: WitnessKind::HumanDeepReview,
+                reason: "Reviewed FFI ABI and ownership seams can be recorded with a human deep-review receipt when executable witnesses cannot cross the foreign boundary".to_string(),
+                command: None,
+                required: false,
+            },
         ];
     }
     if hazards.iter().any(|h| {
@@ -134,6 +140,11 @@ mod tests {
             WitnessKind::CargoCareful,
             "cargo +nightly careful test",
         );
+        assert!(routes.iter().any(|route| {
+            route.kind == WitnessKind::HumanDeepReview
+                && route.command.is_none()
+                && route.reason.contains("Reviewed FFI ABI")
+        }));
         assert_no_route(&routes, WitnessKind::Miri);
     }
 

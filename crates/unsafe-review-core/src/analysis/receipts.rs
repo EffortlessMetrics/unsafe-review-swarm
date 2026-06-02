@@ -64,7 +64,7 @@ impl ReceiptIndex {
             if receipt.expires_at.as_str() < audit_date {
                 continue;
             }
-            if !imports_witness_evidence(&receipt.strength) {
+            if !imports_witness_evidence(&receipt.tool, &receipt.strength) {
                 continue;
             }
             if by_card_id
@@ -124,9 +124,9 @@ impl ReceiptIndex {
                 metadata.tool
             ));
         }
-        if !imports_witness_evidence(&metadata.strength) {
+        if !imports_witness_evidence(&metadata.tool, &metadata.strength) {
             return WitnessEvidence::missing_with(format!(
-                "Saved `{}` receipt for this card has `{}` strength; attach a saved witness run receipt",
+                "Saved `{}` receipt for this card has `{}` strength; attach a matching saved witness or review receipt",
                 metadata.tool, metadata.strength
             ));
         }
@@ -340,8 +340,9 @@ fn parse_receipt_file(path: &Path) -> Result<ParsedReceipt, String> {
     })
 }
 
-fn imports_witness_evidence(strength: &str) -> bool {
+fn imports_witness_evidence(tool: &str, strength: &str) -> bool {
     matches!(strength, "ran" | "test_targeted" | "site_reached")
+        || (tool == "human-deep-review" && strength == "reviewed")
 }
 
 fn audit_receipt_records(root: &Path) -> Result<Vec<AuditReceiptRecord>, String> {
@@ -487,7 +488,7 @@ fn audit_receipt_record(
         if is_weaker_than_required(&receipt, card) {
             statuses.insert("weaker_than_required".to_string());
             issues.push(format!(
-                "receipt strength `{}` is weaker than the minimum `ran` strength for a required witness route",
+                "receipt strength `{}` is weaker than the minimum importable strength for a required witness route",
                 receipt.strength
             ));
         }
@@ -558,7 +559,7 @@ fn receipt_imports_current_witness_evidence(
         && !statuses.contains("expired")
         && !statuses.contains("duplicate")
         && route_tools.iter().any(|tool| tool == &receipt.tool)
-        && imports_witness_evidence(&receipt.strength)
+        && imports_witness_evidence(&receipt.tool, &receipt.strength)
 }
 
 fn receipt_audit_card_from_review_card(card: &ReviewCard) -> ReceiptAuditCard {
@@ -618,6 +619,7 @@ fn strength_rank(value: &str) -> Option<u8> {
     match value {
         "configured" => Some(0),
         "ran" => Some(1),
+        "reviewed" => Some(1),
         "test_targeted" => Some(2),
         "site_reached" => Some(3),
         _ => None,

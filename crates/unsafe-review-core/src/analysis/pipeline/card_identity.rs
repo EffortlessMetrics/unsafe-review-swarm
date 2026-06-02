@@ -1,5 +1,5 @@
 use crate::analysis::scanner;
-use crate::domain::{CardId, HazardKind, OperationFamily};
+use crate::domain::{CardId, HazardKind, OperationFamily, UnsafeSiteKind};
 use crate::util::{slug, stable_hash_hex};
 use std::collections::BTreeMap;
 
@@ -31,7 +31,7 @@ fn card_identity_base(
         .owner
         .clone()
         .unwrap_or_else(|| "unknown".to_string());
-    let normalized = normalize_snippet(&scanned.operation.expression);
+    let normalized = normalize_snippet(&identity_expression(scanned));
     let snippet_hash = stable_hash_hex(&normalized);
     let hazard = hazards.first().map_or("unknown", |hazard| hazard.as_str());
     format!(
@@ -49,6 +49,22 @@ fn card_identity_base(
 
 fn normalize_snippet(value: &str) -> String {
     value.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn identity_expression(scanned: &scanner::ScannedSite) -> String {
+    if scanned.site.kind == UnsafeSiteKind::ExternBlock
+        && scanned.operation.family == OperationFamily::Ffi
+    {
+        let mut lines = vec![scanned.operation.expression.clone()];
+        for line in &scanned.context_after {
+            lines.push(line.clone());
+            if line.contains('}') {
+                break;
+            }
+        }
+        return lines.join(" ");
+    }
+    scanned.operation.expression.clone()
 }
 
 fn operation_path(scanned: &scanner::ScannedSite) -> String {

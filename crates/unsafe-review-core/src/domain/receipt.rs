@@ -92,6 +92,7 @@ impl WitnessReceipt {
         validate_required(&self.tool, "tool")?;
         validate_tool(&self.tool)?;
         validate_strength(&self.strength)?;
+        validate_strength_for_tool(&self.tool, &self.strength)?;
         if receipt_card_id_kind(&self.card_id).is_none() {
             return Err(
                 "card_id must be an exact counted UR-* identity ending in -cN or a path-safe manual candidate id"
@@ -303,7 +304,7 @@ impl WitnessReceipt {
 fn is_supported_receipt_strength(value: &str) -> bool {
     matches!(
         value,
-        "configured" | "ran" | "test_targeted" | "site_reached"
+        "configured" | "ran" | "test_targeted" | "site_reached" | "reviewed"
     )
 }
 
@@ -347,6 +348,16 @@ fn validate_strength(value: &str) -> Result<(), String> {
     } else {
         Err(format!("uses unknown receipt strength `{value}`"))
     }
+}
+
+fn validate_strength_for_tool(tool: &str, strength: &str) -> Result<(), String> {
+    if strength == "reviewed" && tool != "human-deep-review" {
+        return Err(
+            "receipt strength `reviewed` is only supported for `human-deep-review` receipts"
+                .to_string(),
+        );
+    }
+    Ok(())
 }
 
 fn validate_tool(value: &str) -> Result<(), String> {
@@ -727,6 +738,35 @@ mod tests {
                 .err()
                 .unwrap_or_default()
                 .contains("unknown receipt tool")
+        );
+    }
+
+    #[test]
+    fn witness_receipt_validation_accepts_reviewed_human_deep_review() -> Result<(), String> {
+        let mut receipt = fixture_receipt();
+        receipt.tool = "human-deep-review".to_string();
+        receipt.strength = "reviewed".to_string();
+
+        receipt.validate()?;
+        assert!(
+            receipt
+                .evidence_summary()
+                .contains("human-deep-review receipt with `reviewed` strength")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn witness_receipt_validation_rejects_reviewed_executable_tool() {
+        let mut receipt = fixture_receipt();
+        receipt.strength = "reviewed".to_string();
+
+        assert!(
+            receipt
+                .validate()
+                .err()
+                .unwrap_or_default()
+                .contains("only supported for `human-deep-review`")
         );
     }
 

@@ -394,8 +394,9 @@ identities:
 A receipt must include exact counted `card_id`, `tool`, `strength`, `author`,
 `recorded_at`, `expires_at`, and optional command/limitations details. Matching
 receipts whose `tool` matches the card's routed witness tools and whose
-`strength` is `ran`, `test_targeted`, or `site_reached` mark witness evidence
-present, but they do not discharge missing contracts, guards, or reach evidence.
+`strength` is `ran`, `test_targeted`, `site_reached`, or human-review-only
+`reviewed` mark witness evidence present, but they do not discharge missing
+contracts, guards, or reach evidence.
 A `configured` receipt or a receipt whose tool is not routed for the current
 card remains valid audit metadata and does not remove the missing witness gap.
 
@@ -423,6 +424,30 @@ The template command validates the receipt shape and writes JSON. It still does
 not run the witness command. When `--command` is present, the generated JSON also
 includes a stable `command_hash` for drift checks; the hash is not proof that the
 command ran.
+
+For a reviewed C++ or other foreign FFI seam, use the same template command
+with `--tool human-deep-review` after the Rust extern declaration has been
+checked against the cited foreign declaration or ownership contract:
+
+```bash
+unsafe-review receipt template <card-id> \
+  --tool human-deep-review \
+  --strength reviewed \
+  --author reviewer/name \
+  --recorded-at 2026-06-02T00:00:00Z \
+  --expires-at 2026-09-02 \
+  --summary "checked Rust extern signature against C++ symbol Foo__bar" \
+  --command "manual review of Foo__bar C++ declaration and Rust extern signature" \
+  --limitation "manual FFI ABI review only; no witness executed" \
+  --out .unsafe-review/receipts/foo-bar-ffi-review.json
+```
+
+This can import as witness evidence only for a current FFI ReviewCard that
+routes `human-deep-review` and matches the exact counted card identity. It does
+not run code, discharge contract, guard, or reach evidence, prove site
+execution, or prove the foreign side safe. If the extern declaration changes and
+the ReviewCard identity changes, the old receipt remains audit metadata rather
+than current witness evidence.
 
 Import a receipt from saved Miri output after Miri has been run outside
 `unsafe-review`:
@@ -556,8 +581,8 @@ author, command hash, and limitations are saved metadata only, not proof that
 the command ran or covered the unsafe site. It is advisory only: it does not
 execute witness commands, infer site reach, make policy decisions, or claim
 safety. A receipt entry gets `imports_witness_evidence` only when it is a
-current-card match with a routed tool, saved-run strength, no expiry, no
-validation error, and no duplicate for that card. JSON and Markdown output
+current-card match with a routed tool, importable run or review strength, no
+expiry, no validation error, and no duplicate for that card. JSON and Markdown output
 include report-level limitations that keep the saved-metadata boundary explicit.
 When a receipt matches a card, the ReviewCard witness evidence summary also
 keeps the saved command hash visible when present.

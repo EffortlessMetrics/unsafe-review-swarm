@@ -1,6 +1,6 @@
 [
   {
-    "id": "UR-ffi-sanitizer-route-src-lib-rs-strlen-extern_block-ffi-ffi-603b71ab5c00-ffi_abi-c1",
+    "id": "UR-ffi-sanitizer-route-src-lib-rs-strlen-extern_block-ffi-ffi-0d2c36c8a5e3-ffi_abi-c1",
     "class": "miri_unsupported",
     "priority": "medium",
     "confidence": "medium",
@@ -89,6 +89,12 @@
         "kind": "cargo-careful",
         "reason": "cargo-careful can cheaply exercise Rust-side FFI boundary assumptions when a focused test exists",
         "command": "cargo +nightly careful test strlen",
+        "required": false
+      },
+      {
+        "kind": "human-deep-review",
+        "reason": "Reviewed FFI ABI and ownership seams can be recorded with a human deep-review receipt when executable witnesses cannot cross the foreign boundary",
+        "command": null,
         "required": false
       }
     ],

@@ -22,13 +22,14 @@ and limitations. The current implementation imports JSON receipts from:
 Each receipt is matched by exact counted `card_id`. A matching receipt marks the
 card's top-level witness evidence present and marks obligation-level witness
 evidence present only when the receipt tool matches one of the current card's
-routed witness tools and the receipt strength records a saved witness run:
-`ran`, `test_targeted`, or `site_reached`. A `configured`, expired, or
-wrong-tool receipt remains valid receipt metadata for audit, but it does not
-remove the missing witness gap. Card-level witness summaries should surface that
-same-card metadata-only state so reviewers can see why a saved receipt did not
-import as current witness evidence. Receipt import does not discharge contracts,
-guards, or reach evidence.
+routed witness tools and the receipt strength records a saved witness run
+(`ran`, `test_targeted`, or `site_reached`) or human-review-only `reviewed`
+strength. A `configured`, expired, wrong-tool, or non-human `reviewed` receipt
+remains valid receipt metadata for audit or is rejected by validation as
+specified below, but it does not remove the missing witness gap. Card-level
+witness summaries should surface same-card metadata-only state so reviewers can
+see why a saved receipt did not import as current witness evidence. Receipt
+import does not discharge contracts, guards, or reach evidence.
 
 The receipt shape is represented in the core SDK as the serde-backed
 `WitnessReceipt` DTO. Importers and future native adapters must use that same
@@ -43,6 +44,16 @@ matches the exact `command` string in the same receipt.
 The CLI may render a receipt template from explicit user-provided metadata. That
 template output is only a JSON authoring aid; it must not run witness commands or
 claim that a witness succeeded.
+
+For reviewed C++ or other foreign FFI seams, a `human-deep-review` receipt may
+record that a reviewer checked the current Rust extern declaration against the
+cited foreign declaration or ownership contract. It imports as witness evidence
+with `strength = "reviewed"` only when the current ReviewCard routes
+`human-deep-review` and the receipt matches the exact counted card identity. It
+does not execute code, does not discharge contract, guard, or reach evidence,
+and does not prove the foreign side or repository safe. If the extern
+declaration changes enough to change the ReviewCard identity, the old receipt
+becomes stale metadata until reviewed again.
 
 The CLI may import a receipt from saved Miri output. The adapter must read an
 existing log file, reject empty output, reject failure-looking output, require
@@ -89,8 +100,9 @@ receipt metadata without running witnesses, inferring site reach, making policy
 decisions, or claiming safety. Audit must also mark the subset of receipts that
 would import as current ReviewCard witness evidence with
 `imports_witness_evidence`; this requires a current card match, a routed tool,
-saved-run strength (`ran`, `test_targeted`, or `site_reached`), no expiry, no
-validation error, and no duplicate receipt for the same card. Matched receipt
+importable run strength (`ran`, `test_targeted`, or `site_reached`) or
+human-review `reviewed` strength, no expiry, no validation error, and no
+duplicate receipt for the same card. Matched receipt
 entries include current card operation, missing-count, and next-action context.
 Audit entries include the current card's routed witness tools so a reviewer can
 compare the saved receipt tool against the ReviewCard route. Audit entries also
@@ -134,6 +146,7 @@ Receipt JSON fields:
 - `ran`
 - `test_targeted`
 - `site_reached`
+- `reviewed` (only for `tool = "human-deep-review"`)
 
 `tool` must be one of the supported witness lanes:
 
@@ -173,10 +186,16 @@ calendar-valid `YYYY-MM-DD` date on or after the `recorded_at` date.
 
 ## Acceptance examples
 
-- A matching routed-tool `ran`, `test_targeted`, or `site_reached` receipt
-  removes the `witness` missing-evidence item.
-- A matching routed-tool `ran`, `test_targeted`, or `site_reached` receipt
-  marks obligation-level witness evidence present.
+- A matching routed-tool `ran`, `test_targeted`, `site_reached`, or
+  human-review-only `reviewed` receipt removes the `witness` missing-evidence
+  item.
+- A matching routed-tool `ran`, `test_targeted`, `site_reached`, or
+  human-review-only `reviewed` receipt marks obligation-level witness evidence
+  present.
+- A matching `human-deep-review` receipt for an FFI card removes only the
+  witness missing-evidence item and leaves contract, guard, and reach gaps
+  visible when they remain statically unresolved.
+- A `reviewed` receipt whose tool is not `human-deep-review` is rejected.
 - A matching `configured` receipt validates and appears in receipt audit, but
   does not remove the `witness` missing-evidence item.
 - A matching wrong-tool receipt validates and appears in receipt audit, but does

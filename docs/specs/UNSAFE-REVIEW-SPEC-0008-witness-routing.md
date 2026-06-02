@@ -12,7 +12,8 @@ Linked plan: ../../plans/0.1.0/implementation-plan.md
 
 ## Behavior
 
-Route hazards to Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, Crux, or human deep review.
+Route hazards to Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, Crux,
+or human deep review.
 
 ReviewCards carry witness routes as advisory next steps. A route must name the
 route kind and rationale. If a concrete command is available, the same command
@@ -20,6 +21,13 @@ must appear in `verify_commands`; if `verify_commands` names a command, that
 command must come from a witness route. Routes are never required by default:
 they identify the cheapest credible next witness, not proof that the witness
 has run.
+
+FFI ABI and ownership hazards route to sanitizer, cargo-careful, and
+human-deep-review. The human-deep-review route is for seams where a reviewer has
+checked the Rust extern declaration against the cited foreign declaration or
+ownership contract and executable witnesses cannot cross that boundary. It has
+no verify command and is still only receipt metadata until a matching exact-card
+receipt is imported.
 
 ## Non-goals
 
@@ -41,6 +49,8 @@ has run.
 - If evidence is not knowable statically, the card names the limitation instead of overclaiming.
 - A card with a Miri route command exposes that command in `verify_commands`.
 - A human deep review route may have no command and therefore no verify command.
+- An FFI card includes a human deep-review route in addition to executable
+  sanitizer/cargo-careful routes.
 - A fixture cannot mark a witness route as required by default.
 
 ## CI proof
