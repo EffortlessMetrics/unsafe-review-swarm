@@ -12,26 +12,27 @@ jobs:
   droid-review:
     if: github.event.pull_request.draft == false
     runs-on: ubuntu-latest
+    timeout-minutes: 45
 
     permissions:
       contents: read
       pull-requests: write
-      issues: write
       id-token: write
-      actions: read
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
           persist-credentials: false
 
       - name: Configure MiniMax M3 for Droid BYOK
         shell: bash
+        env:
+          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
         run: |
           mkdir -p "$HOME/.factory"
 
-          cat > "$HOME/.factory/settings.json" <<'JSON'
+          cat > "$HOME/.factory/settings.json" <<JSON
           {
             "customModels": [
               {
@@ -47,14 +48,20 @@ jobs:
           JSON
 
       - name: Run Droid Auto Review
+        continue-on-error: true
+        timeout-minutes: 40
         uses: Factory-AI/droid-action@8ea31f351ee6636ebef918ccb64682f477af7184
         env:
-          MINIMAX_API_KEY: ${{ secrets.MINIMAX_API_KEY }}
           ANTHROPIC_AUTH_TOKEN: ""
           ANTHROPIC_BASE_URL: ""
         with:
           factory_api_key: ${{ secrets.FACTORY_API_KEY }}
+          github_token: ${{ github.token }}
           automatic_review: true
           review_model: custom:MiniMax-M3-0
+          review_depth: shallow
+          reasoning_effort: low
           automatic_security_review: true
           security_model: custom:MiniMax-M3-0
+          security_block_on_critical: false
+          security_block_on_high: false

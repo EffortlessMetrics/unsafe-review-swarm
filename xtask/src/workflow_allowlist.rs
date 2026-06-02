@@ -109,10 +109,13 @@ pub(crate) fn check_workflow_text_against_policy(
     text: &str,
     policy: &WorkflowPolicyEntry,
 ) -> Result<(), String> {
-    if !workflow_declares_permission(text, &policy.permissions) {
+    let expected_permissions = policy_permission_set(&policy.permissions)?;
+    let declared_permissions = workflow_declared_permissions(text);
+    if declared_permissions != expected_permissions {
         return Err(format!(
-            "{path} must declare workflow permission `{}`",
-            policy.permissions
+            "{path} must declare workflow permissions `{}` (found `{}`)",
+            policy.permissions,
+            format_permission_set(&declared_permissions)
         ));
     }
 
@@ -134,30 +137,70 @@ pub(crate) fn check_workflow_text_against_policy(
     Ok(())
 }
 
-fn workflow_declares_permission(text: &str, permission: &str) -> bool {
-    let mut in_permissions_block = false;
+fn policy_permission_set(permissions: &str) -> Result<BTreeSet<String>, String> {
+    let out: BTreeSet<String> = permissions
+        .split(',')
+        .map(str::trim)
+        .filter(|permission| !permission.is_empty())
+        .map(str::to_string)
+        .collect();
+    if out.is_empty() {
+        return Err("workflow allowlist permission set must not be empty".to_string());
+    }
+    Ok(out)
+}
+
+fn workflow_declared_permissions(text: &str) -> BTreeSet<String> {
+    let mut permissions = BTreeSet::new();
+    let mut permissions_indent: Option<usize> = None;
 
     for line in text.lines() {
         let trimmed = line.trim();
         if trimmed.is_empty() || trimmed.starts_with('#') {
             continue;
         }
+        let indent = line
+            .chars()
+            .take_while(|ch| matches!(ch, ' ' | '\t'))
+            .count();
 
-        if trimmed == "permissions:" {
-            in_permissions_block = true;
+        if let Some(block_indent) = permissions_indent {
+            if indent <= block_indent {
+                permissions_indent = None;
+            } else {
+                if looks_like_permission_entry(trimmed) {
+                    permissions.insert(trimmed.to_string());
+                }
+                continue;
+            }
+        }
+
+        if let Some(scalar) = trimmed.strip_prefix("permissions:") {
+            let scalar = scalar.trim();
+            if scalar.is_empty() {
+                permissions_indent = Some(indent);
+            } else {
+                permissions.insert(scalar.to_string());
+            }
             continue;
-        }
-
-        if !line.starts_with(' ') && !line.starts_with('\t') {
-            in_permissions_block = false;
-        }
-
-        if in_permissions_block && trimmed == permission {
-            return true;
         }
     }
 
-    false
+    permissions
+}
+
+fn looks_like_permission_entry(line: &str) -> bool {
+    let Some((scope, access)) = line.split_once(':') else {
+        return false;
+    };
+    !scope.trim().is_empty() && !access.trim().is_empty() && !line.starts_with('-')
+}
+
+fn format_permission_set(permissions: &BTreeSet<String>) -> String {
+    if permissions.is_empty() {
+        return "<none>".to_string();
+    }
+    permissions.iter().cloned().collect::<Vec<_>>().join(", ")
 }
 
 pub(crate) fn workflow_used_actions(text: &str) -> BTreeSet<String> {
@@ -224,6 +267,60 @@ jobs:
       - run: echo "note"
 "#;
 
-        assert!(!workflow_declares_permission(text, "contents: read"));
+        let permissions = workflow_declared_permissions(text);
+        assert!(!permissions.contains("contents: read"));
+        assert_eq!(permissions, BTreeSet::from(["id-token: write".to_string()]));
+    }
+
+    #[test]
+    fn workflow_policy_accepts_exact_multiple_permissions() -> Result<(), String> {
+        let text = r#"
+jobs:
+  review:
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+"#;
+
+        check_workflow_text_against_policy(
+            ".github/workflows/droid-pr-review.yml",
+            text,
+            &WorkflowPolicyEntry {
+                path: ".github/workflows/droid-pr-review.yml".to_string(),
+                permissions: "contents: read, pull-requests: write".to_string(),
+                actions: BTreeSet::from(["actions/checkout@v6".to_string()]),
+            },
+        )
+    }
+
+    #[test]
+    fn workflow_policy_rejects_extra_permissions() -> Result<(), String> {
+        let text = r#"
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+jobs:
+  review:
+    steps:
+      - uses: actions/checkout@v6
+"#;
+
+        let Err(err) = check_workflow_text_against_policy(
+            ".github/workflows/droid-pr-review.yml",
+            text,
+            &WorkflowPolicyEntry {
+                path: ".github/workflows/droid-pr-review.yml".to_string(),
+                permissions: "contents: read, pull-requests: write".to_string(),
+                actions: BTreeSet::from(["actions/checkout@v6".to_string()]),
+            },
+        ) else {
+            return Err("extra permissions should fail".to_string());
+        };
+
+        assert!(err.contains("id-token: write"));
+        Ok(())
     }
 }

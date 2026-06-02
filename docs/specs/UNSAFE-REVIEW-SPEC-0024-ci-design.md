@@ -478,7 +478,29 @@ using the MiniMax M3 BYOK custom model
 The workflow configures `~/.factory/settings.json` with a `customModels` entry
 for `MiniMax-M3` through MiniMax's Anthropic-compatible endpoint, clears ambient
 Anthropic globals before invoking Droid, and passes `custom:MiniMax-M3-0` for
-both the review and security-review model.
+both the review and security-review model. The advisory review uses Droid's
+shallow preset with low reasoning effort so routine PR runs stay bounded.
+Droid security review blocking is disabled; this lane may report advisory
+findings, but it must not submit blocking security review outcomes by default.
+
+The workflow passes the scoped workflow GitHub token to Droid explicitly. The
+pinned Factory Droid action's review validator also requests an OIDC token after
+the review pass, so this lane grants `id-token: write` for that validator path
+only; it must not grant `issues: write` or `actions: read`.
+
+The Droid action step uses its own timeout and `continue-on-error` so review-bot
+latency, model failures, or validator failures do not become default merge
+blocking. The job has a slightly longer timeout only to allow the workflow to
+complete cleanup after the bounded Droid step.
+
+This lane is bounded with a job timeout and grants only:
+
+```yaml
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+```
 
 This lane may post advisory Droid review comments, but it must not run
 unsafe-review witnesses, edit source, publish artifacts, or make blocking
