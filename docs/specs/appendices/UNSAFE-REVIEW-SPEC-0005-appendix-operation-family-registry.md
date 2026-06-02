@@ -43,6 +43,16 @@ This appendix provides the canonical operation-family table referenced by Spec 0
 | `target_feature` | `#[target_feature]` declarations and target-feature contract sites | target_feature | local availability proof | target-feature | human-deep-review | `target_feature_safety_docs`, `target_feature_missing_safety_docs` | documented `#[target_feature]` is caller-contract evidence; missing docs ask for caller-contract evidence, but neither form is runtime availability, dispatch, site-execution, or Miri evidence | hardware availability and dispatch correctness require external evidence |
 | `unknown` | changed unsafe block/declaration/fallback shapes without a precise family | unknown | known operation families above | unknown | human-deep-review | `split_unsafe_block`, `public_unsafe_fn_missing_safety`, `public_unsafe_trait_missing_safety`, `public_unsafe_fn_safety_comment_not_docs`, `split_public_unsafe_fn_missing_safety`, `public_unsafe_fn_with_safety_docs`, `public_unsafe_fn_safety_colon_docs`, `documented_private_unsafe_fn`, `private_unsafe_helper_safety_comment`, `unsafe_impl_custom_trait_not_send_sync`, `attributed_unsafe_fn_no_duplicate` | concrete operation cards suppress duplicate wrapper cards when no independent contract-only risk remains; public unsafe API contract evidence requires public `# Safety` docs, local `SAFETY:` comments do not count, and custom unsafe trait impls that are not Send/Sync stay out of Send/Sync concurrency routing | unknown is a review fallback, not proof that no precise unsafe contract exists |
 
+## Zero-card controls
+
+Zero-card controls are not operation-family rows and must not introduce a
+synthetic `ReviewCard` family. Fixture goldens `safe_code_no_cards`,
+`safe_reference_deref_no_cards`, `imports_not_unsafe_operations`,
+`cfg_target_feature_not_operation`, `static_lifetime_mut_ref_not_static_mut`,
+and `adjacent_unchanged_unsafe_fn_no_card` pin safe Rust, safe reference
+derefs, import-only text, cfg predicates, `'static mut` reference type text, and
+unchanged adjacent unsafe declarations as no-card cases.
+
 ## Precedence
 
 1. Syntax-backed detections are authoritative when available.
