@@ -80,12 +80,13 @@ ancestry divergence can remain nonzero after a reseed-style repair; the sync
 checkpoint is the source of truth for whether source has moved since the last
 acknowledged absorption.
 
-## Agent state is not PR state
+## PR disposition policy
 
-Agent runtime state is not a repository disposition reason. A Codex session
-being busy, capped, assigned to another PR, or unable to continue in the
-current branch must not decide whether a PR is closed, merged, parked, marked
-superseded, or otherwise materially mutated.
+Agent runtime state and lane state are not repository disposition reasons. A
+Codex session being busy, capped, assigned to another PR, unable to continue in
+the current branch, or working in a different release lane must not decide
+whether a PR is closed, merged, parked, marked superseded, or otherwise
+materially mutated.
 
 Those conditions may be recorded as a handoff comment only:
 
@@ -101,26 +102,54 @@ Forbidden close or disposition reasons include:
 - Codex has an agent cap,
 - the current session cannot continue,
 - this branch is not the current active task,
-- another PR is being worked first.
+- another PR is being worked first,
+- this PR is outside the current release lane.
+
+Use this rule for lane mismatch:
+
+```text
+out-of-lane = defer / draft / blocked
+not close
+```
+
+`blocked` is not `abandoned`. A blocked PR can preserve useful review context
+while it waits for a concrete fix such as a missing secret, overbroad
+permission, inaccurate allowlist, missing timeout, checkout posture issue,
+failing CI, or required reviewer decision.
 
 Valid PR dispositions must be based on repository facts:
 
 - merged,
 - mergeable and ready,
-- parked for a later lane,
+- deferred, draft, blocked, or parked for a later lane,
+- needs rebase or narrow rework,
 - superseded by a merged PR,
 - duplicate of the chosen canonical PR,
-- stale after useful content was extracted,
-- invalid, unsafe, destructive, or wrong repository,
-- owner-directed close.
+- rejected because it is invalid, unsafe, destructive, or wrong repository,
+- abandoned after owner confirmation or documented non-response,
+- unrecoverable after useful content was extracted or preserved elsewhere.
 
 Parking is not closure. If a PR is useful but belongs to a later lane, leave it
 open unless the owner explicitly requests closure or the useful work has been
 preserved elsewhere.
 
-Every close must name the repository-level reason. When applicable, it must
-also link the replacement PR, issue, branch, commit, or handoff that preserves
-the useful work, and state whether the work can be reopened later.
+Close only for one of these repository-level reasons:
+
+- `duplicate`: another open PR is the canonical review packet for the same
+  work.
+- `superseded`: a merged PR, replacement PR, issue, branch, commit, or handoff
+  preserves the useful work.
+- `rejected`: the work is invalid, unsafe, destructive, in the wrong
+  repository, or owner-rejected.
+- `abandoned`: the owner confirms abandonment or documented follow-up attempts
+  fail and no useful review context remains to preserve.
+- `unrecoverable`: the branch or diff cannot be made reviewable without
+  discarding the useful work, and that useful work has been preserved elsewhere
+  if possible.
+
+Every close must name one of those reasons. When applicable, it must also link
+the replacement PR, issue, branch, commit, or handoff that preserves the useful
+work, and state whether the work can be reopened later.
 
 Suggested disposition labels:
 

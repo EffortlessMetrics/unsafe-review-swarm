@@ -9,6 +9,10 @@ Base snapshot: `main` at `a9274c2` after `docs: define dogfood-calibrated eviden
 The main agent lane remains sequential and merge-ready. Codex web PRs are
 candidate branches, not failures and not active-lane blockers.
 
+Current PR close/defer decisions must follow
+[`SWARM_TO_MAIN.md`](../contributing/SWARM_TO_MAIN.md#pr-disposition-policy).
+This handoff remains the historical candidate queue ledger.
+
 Use this intake rule for every candidate:
 
 - Does it improve the current active lane?
