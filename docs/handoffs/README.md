@@ -5,6 +5,7 @@ what not to do next. Do not put active specs here.
 
 | Handoff | Date | Scope |
 |---|---|---|
+| [Source badge plus spec sync](2026-06-02-source-badge-plus-spec-sync.md) | 2026-06-02 | mirrors source PR #517 `unsafe-review+` acceptance wording and updates the source-sync checkpoint without claiming publication, proof, or policy readiness |
 | [Closed PR recovery audit](2026-06-01-closed-pr-recovery-audit.md) | 2026-06-01 | restores visibility and records recovery disposition requirements for PRs incorrectly closed during release-cleanup queue handling |
 | [Source repo dogfood release sync](2026-06-01-source-repo-dogfood-release-sync.md) | 2026-06-01 | acknowledges source PRs #513/#514, preserves source/swarm history reachability, mirrors source release-gate hygiene, and updates the source-sync checkpoint without claiming publication |
 | [Source evidence-quality badge sync](2026-06-01-source-evidence-quality-badge-sync.md) | 2026-06-01 | mirrors source PR #512 evidence-quality badge count semantics and updates the source-sync checkpoint without claiming publication, proof, or policy readiness |
