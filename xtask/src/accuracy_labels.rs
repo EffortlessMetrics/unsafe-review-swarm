@@ -2,6 +2,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
 
+use super::calibration_constants::OPERATION_FAMILY_REGISTRY;
+use super::support_tiers::SUPPORT_TIERS_DOC;
+
 const LABEL_DIR: &str = "docs/accuracy/labels";
 const LABEL_LEDGER_FIELDS: &[&str] = &[
     "schema_version",
@@ -127,6 +130,7 @@ pub(crate) fn check_accuracy_label_ledgers(
     }
 
     let mut sample_count = 0usize;
+    let mut label_fixture_refs = BTreeMap::new();
     for (claim_id, claim) in &claims {
         let mut claim_sample_fixtures = BTreeSet::new();
         let mut claim_sample_keys = BTreeSet::new();
@@ -139,6 +143,7 @@ pub(crate) fn check_accuracy_label_ledgers(
             let value = super::parse_toml_file(&super::workspace_path(ledger))?;
             let stats = validate_label_ledger(ledger, &value, claim_id, claim, fixture_cases)?;
             sample_count += stats.sample_count;
+            label_fixture_refs.insert(ledger.clone(), stats.fixtures.clone());
             extend_claim_label_samples(
                 claim_id,
                 ledger,
@@ -149,8 +154,34 @@ pub(crate) fn check_accuracy_label_ledgers(
         }
         check_policy_claim_fixture_sample_coverage(claim_id, claim, &claim_sample_fixtures)?;
     }
+    let support_tiers = super::read_to_string(&super::workspace_path(SUPPORT_TIERS_DOC))?;
+    let operation_registry =
+        super::read_to_string(&super::workspace_path(OPERATION_FAMILY_REGISTRY))?;
+    check_label_fixture_doc_coverage(&label_fixture_refs, &support_tiers, &operation_registry)?;
 
     Ok(sample_count)
+}
+
+fn check_label_fixture_doc_coverage(
+    label_fixture_refs: &BTreeMap<String, BTreeSet<String>>,
+    support_tiers: &str,
+    operation_registry: &str,
+) -> Result<(), String> {
+    for (ledger, fixtures) in label_fixture_refs {
+        for fixture in fixtures {
+            if !support_tiers.contains(fixture) {
+                return Err(format!(
+                    "{ledger} fixture `{fixture}` is not referenced by {SUPPORT_TIERS_DOC}"
+                ));
+            }
+            if !operation_registry.contains(fixture) {
+                return Err(format!(
+                    "{ledger} fixture `{fixture}` is not referenced by {OPERATION_FAMILY_REGISTRY}"
+                ));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn extend_claim_label_samples(
@@ -1505,6 +1536,64 @@ rationale = "The fixture is valid calibration data, but this claim did not list 
 
         assert!(err.contains("without label samples"));
         assert!(err.contains("raw_pointer_alignment_is_aligned_guard"));
+        Ok(())
+    }
+
+    #[test]
+    fn label_fixture_doc_coverage_accepts_support_and_registry_mentions() -> Result<(), String> {
+        let refs = BTreeMap::from([(
+            "docs/accuracy/labels/raw-pointer-read-alignment.toml".to_string(),
+            BTreeSet::from(["raw_pointer_alignment".to_string()]),
+        )]);
+
+        check_label_fixture_doc_coverage(
+            &refs,
+            "support row references raw_pointer_alignment",
+            "registry fixture proof references raw_pointer_alignment",
+        )
+    }
+
+    #[test]
+    fn label_fixture_doc_coverage_rejects_missing_support_tier_reference() -> Result<(), String> {
+        let refs = BTreeMap::from([(
+            "docs/accuracy/labels/raw-pointer-read-alignment.toml".to_string(),
+            BTreeSet::from(["raw_pointer_alignment".to_string()]),
+        )]);
+
+        let Err(err) = check_label_fixture_doc_coverage(
+            &refs,
+            "support row omits the fixture",
+            "registry fixture proof references raw_pointer_alignment",
+        ) else {
+            return Err("missing support-tier fixture reference should fail".to_string());
+        };
+
+        assert!(err.contains("docs/accuracy/labels/raw-pointer-read-alignment.toml"));
+        assert!(err.contains("raw_pointer_alignment"));
+        assert!(err.contains(SUPPORT_TIERS_DOC));
+        Ok(())
+    }
+
+    #[test]
+    fn label_fixture_doc_coverage_rejects_missing_registry_reference() -> Result<(), String> {
+        let refs = BTreeMap::from([(
+            "docs/accuracy/labels/raw-pointer-read-alignment.toml".to_string(),
+            BTreeSet::from(["raw_pointer_alignment".to_string()]),
+        )]);
+
+        let Err(err) = check_label_fixture_doc_coverage(
+            &refs,
+            "support row references raw_pointer_alignment",
+            "registry fixture proof omits the fixture",
+        ) else {
+            return Err(
+                "missing operation-family registry fixture reference should fail".to_string(),
+            );
+        };
+
+        assert!(err.contains("docs/accuracy/labels/raw-pointer-read-alignment.toml"));
+        assert!(err.contains("raw_pointer_alignment"));
+        assert!(err.contains(OPERATION_FAMILY_REGISTRY));
         Ok(())
     }
 
