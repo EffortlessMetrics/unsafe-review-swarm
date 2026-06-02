@@ -18,6 +18,9 @@ pub(super) fn build_card(
     let contract = evidence::contract_evidence(&scanned_site);
     let (reach, related_tests) =
         evidence::reach_evidence(ctx.root, scanned_site.site.owner.as_ref());
+    let id =
+        super::card_identity::card_id(ctx.package, &scanned_site, &hazards, ctx.identity_counts);
+    let reach = ctx.receipt_index.reach_evidence_for(&id, reach);
     let mut obligation_evidence =
         evidence::obligation_evidence(&scanned_site, &obligations, &contract, &reach);
     let discharge = evidence::summarize_discharge(&obligation_evidence);
@@ -52,8 +55,6 @@ pub(super) fn build_card(
         .filter_map(|route| route.command.clone())
         .collect::<Vec<_>>();
 
-    let id =
-        super::card_identity::card_id(ctx.package, &scanned_site, &hazards, ctx.identity_counts);
     let witness_evidence = ctx.receipt_index.witness_evidence_for(&id, &routes);
 
     if witness_evidence.present {

@@ -4540,6 +4540,51 @@ unsafe extern "C" {
     }
 
     #[test]
+    fn external_integration_receipt_marks_reach_evidence_present_only() -> Result<(), String> {
+        let root = copy_fixture_to_temp(
+            "ffi_missing_boundary_contract",
+            "unsafe-review-external-reach-receipt",
+        )?;
+        let card_id = single_card("ffi_missing_boundary_contract", &fixture_output_at(&root)?)?
+            .id
+            .0
+            .clone();
+        write_receipt_with_tool_and_strength(
+            &root,
+            &card_id,
+            "external-integration-test",
+            "site_reached",
+        )?;
+
+        let output = fixture_output_at(&root)?;
+        let card = single_card("ffi_missing_boundary_contract reach receipt", &output)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp fixture failed: {err}"))?;
+        assert_eq!(card.reach.state, "external_reached");
+        assert!(card.reach.summary.contains("external-integration-test"));
+        assert!(!card.missing.iter().any(|missing| missing.kind == "reach"));
+        assert!(card.missing.iter().any(|missing| missing.kind == "witness"));
+        assert!(!card.witness.present);
+        assert!(
+            card.missing
+                .iter()
+                .any(|missing| missing.kind == "contract")
+        );
+        assert!(card.missing.iter().any(|missing| missing.kind == "guard"));
+        assert!(
+            card.obligation_evidence
+                .iter()
+                .all(|evidence| evidence.reach.present)
+        );
+        assert!(
+            card.obligation_evidence
+                .iter()
+                .all(|evidence| !evidence.witness.present)
+        );
+        Ok(())
+    }
+
+    #[test]
     fn receipted_fixture_keeps_static_guard_gap_visible() -> Result<(), String> {
         let output = fixture_output("raw_pointer_alignment_receipted")?;
         let card = single_card("raw_pointer_alignment_receipted", &output)?;
@@ -4726,6 +4771,8 @@ evidence = "test fixture"
     ) -> Result<(), String> {
         let command = if tool == "human-deep-review" {
             "manual review of cited foreign declaration and Rust extern signature"
+        } else if tool == "external-integration-test" {
+            "bun test test/js/sab-copy-to-unshared.test.ts"
         } else {
             "cargo +nightly miri test read_header"
         };

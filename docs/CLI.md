@@ -397,6 +397,10 @@ receipts whose `tool` matches the card's routed witness tools and whose
 `strength` is `ran`, `test_targeted`, `site_reached`, or human-review-only
 `reviewed` mark witness evidence present, but they do not discharge missing
 contracts, guards, or reach evidence.
+An `external-integration-test` receipt with `strength = "site_reached"` is a
+reach-only exception: when it matches the exact current card identity, it can
+clear the static reach gap while leaving witness, contract, and guard evidence
+unchanged.
 A `configured` receipt or a receipt whose tool is not routed for the current
 card remains valid audit metadata and does not remove the missing witness gap.
 
@@ -448,6 +452,30 @@ not run code, discharge contract, guard, or reach evidence, prove site
 execution, or prove the foreign side safe. If the extern declaration changes and
 the ReviewCard identity changes, the old receipt remains audit metadata rather
 than current witness evidence.
+
+For unsafe seams reached only through another language's integration suite, use
+the template command with `--tool external-integration-test` and
+`--strength site_reached` after the external command has been run outside
+`unsafe-review`:
+
+```bash
+unsafe-review receipt template <card-id> \
+  --tool external-integration-test \
+  --strength site_reached \
+  --author reviewer/name \
+  --recorded-at 2026-06-02T00:00:00Z \
+  --expires-at 2026-09-02 \
+  --summary "Bun TS SAB-backed Blob/S3 integration tests cover copy_to_unshared" \
+  --command "bun test test/js/blob-sab-copy.test.ts test/js/s3-sab-copy.test.ts" \
+  --limitation "external integration reach only; unsafe-review did not run the command" \
+  --out .unsafe-review/receipts/copy-to-unshared-external-reach.json
+```
+
+This can import as reach evidence only for an exact current ReviewCard identity.
+It does not import witness evidence, does not prove the unsafe site executed,
+does not prove memory safety, and does not discharge contract or guard evidence.
+If the card identity changes, the old receipt remains audit metadata until the
+external reach evidence is reviewed again.
 
 Import a receipt from saved Miri output after Miri has been run outside
 `unsafe-review`:
@@ -582,8 +610,12 @@ the command ran or covered the unsafe site. It is advisory only: it does not
 execute witness commands, infer site reach, make policy decisions, or claim
 safety. A receipt entry gets `imports_witness_evidence` only when it is a
 current-card match with a routed tool, importable run or review strength, no
-expiry, no validation error, and no duplicate for that card. JSON and Markdown output
-include report-level limitations that keep the saved-metadata boundary explicit.
+expiry, no validation error, and no duplicate witness import for that card. A
+receipt entry gets `imports_reach_evidence` only when it is a current-card
+`external-integration-test` receipt with `site_reached` strength, no expiry, no
+validation error, and no duplicate reach import for that card. JSON and Markdown
+output include report-level limitations that keep the saved-metadata boundary
+explicit.
 When a receipt matches a card, the ReviewCard witness evidence summary also
 keeps the saved command hash visible when present.
 

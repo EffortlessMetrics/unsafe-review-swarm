@@ -1,7 +1,8 @@
 use crate::api::AnalyzeOutput;
 use crate::candidate::{ManualCandidate, load_manual_candidates};
 use crate::domain::{
-    CardId, ReceiptCardIdKind, ReviewCard, WitnessEvidence, WitnessReceipt, WitnessRoute,
+    CardId, ReachEvidence, ReceiptCardIdKind, ReviewCard, WitnessEvidence, WitnessReceipt,
+    WitnessRoute,
 };
 use crate::util::path_display;
 use serde::Serialize;
@@ -10,12 +11,13 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const AUDIT_TRUST_BOUNDARY: &str = "Static witness receipt audit only; this checks saved receipt metadata against current ReviewCards and manual candidates, does not execute witnesses, does not prove site reach, and does not make policy decisions.";
+const AUDIT_TRUST_BOUNDARY: &str = "Static receipt audit only; this checks saved receipt metadata against current ReviewCards and manual candidates, does not execute witnesses or external tests, does not independently prove site reach, and does not make policy decisions.";
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ReceiptIndex {
     by_card_id: BTreeMap<String, ImportedReceipt>,
-    metadata_by_card_id: BTreeMap<String, ReceiptMetadata>,
+    reach_by_card_id: BTreeMap<String, ImportedReachReceipt>,
+    metadata_by_card_id: BTreeMap<String, Vec<ReceiptMetadata>>,
     audit_date: Option<String>,
 }
 
@@ -23,6 +25,11 @@ pub(crate) struct ReceiptIndex {
 struct ImportedReceipt {
     tool: String,
     evidence: WitnessEvidence,
+}
+
+#[derive(Clone, Debug)]
+struct ImportedReachReceipt {
+    evidence: ReachEvidence,
 }
 
 #[derive(Clone, Debug)]
@@ -44,6 +51,7 @@ impl ReceiptIndex {
             return Ok(Self::default());
         }
         let mut by_card_id = BTreeMap::new();
+        let mut reach_by_card_id = BTreeMap::new();
         let mut metadata_by_card_id = BTreeMap::new();
         let entries =
             fs::read_dir(&dir).map_err(|err| format!("read {} failed: {err}", dir.display()))?;
@@ -56,7 +64,8 @@ impl ReceiptIndex {
             let receipt = parse_receipt_file(&path)?;
             metadata_by_card_id
                 .entry(receipt.card_id.clone())
-                .or_insert_with(|| ReceiptMetadata {
+                .or_insert_with(Vec::new)
+                .push(ReceiptMetadata {
                     tool: receipt.tool.clone(),
                     strength: receipt.strength.clone(),
                     expires_at: receipt.expires_at.clone(),
@@ -64,31 +73,68 @@ impl ReceiptIndex {
             if receipt.expires_at.as_str() < audit_date {
                 continue;
             }
-            if !imports_witness_evidence(&receipt.tool, &receipt.strength) {
-                continue;
+            if imports_witness_evidence(&receipt.tool, &receipt.strength) {
+                if by_card_id
+                    .insert(
+                        receipt.card_id.clone(),
+                        ImportedReceipt {
+                            tool: receipt.tool.clone(),
+                            evidence: receipt.evidence.clone(),
+                        },
+                    )
+                    .is_some()
+                {
+                    return Err(format!(
+                        "{} imports duplicate witness receipt for card_id `{}`",
+                        path.display(),
+                        receipt.card_id
+                    ));
+                }
             }
-            if by_card_id
-                .insert(
-                    receipt.card_id.clone(),
-                    ImportedReceipt {
-                        tool: receipt.tool,
-                        evidence: receipt.evidence,
-                    },
-                )
-                .is_some()
-            {
-                return Err(format!(
-                    "{} imports duplicate receipt for card_id `{}`",
-                    path.display(),
-                    receipt.card_id
-                ));
+            if imports_reach_evidence(&receipt.tool, &receipt.strength) {
+                if reach_by_card_id
+                    .insert(
+                        receipt.card_id.clone(),
+                        ImportedReachReceipt {
+                            evidence: ReachEvidence {
+                                state: "external_reached".to_string(),
+                                summary: format!(
+                                    "External integration reach receipt imported: {}",
+                                    receipt.evidence.summary
+                                ),
+                            },
+                        },
+                    )
+                    .is_some()
+                {
+                    return Err(format!(
+                        "{} imports duplicate reach receipt for card_id `{}`",
+                        path.display(),
+                        receipt.card_id
+                    ));
+                }
             }
         }
         Ok(Self {
             by_card_id,
+            reach_by_card_id,
             metadata_by_card_id,
             audit_date: Some(audit_date.to_string()),
         })
+    }
+
+    pub(crate) fn reach_evidence_for(
+        &self,
+        id: &CardId,
+        static_reach: ReachEvidence,
+    ) -> ReachEvidence {
+        if static_reach.state != "unreached" {
+            return static_reach;
+        }
+        self.reach_by_card_id
+            .get(&id.0)
+            .map(|receipt| receipt.evidence.clone())
+            .unwrap_or(static_reach)
     }
 
     pub(crate) fn witness_evidence_for(
@@ -111,14 +157,23 @@ impl ReceiptIndex {
             ));
         }
 
-        let Some(metadata) = self.metadata_by_card_id.get(&id.0) else {
+        let Some(metadata_entries) = self.metadata_by_card_id.get(&id.0) else {
             return WitnessEvidence::missing();
         };
-        if self
-            .audit_date
-            .as_deref()
-            .is_some_and(|audit_date| metadata.expires_at.as_str() < audit_date)
-        {
+        let Some(metadata) = metadata_entries
+            .iter()
+            .find(|metadata| !imports_reach_evidence(&metadata.tool, &metadata.strength))
+            .or_else(|| metadata_entries.first())
+        else {
+            return WitnessEvidence::missing();
+        };
+        if self.audit_date.as_deref().is_some_and(|audit_date| {
+            metadata.expires_at.as_str() < audit_date
+                && !metadata_entries.iter().any(|item| {
+                    !imports_reach_evidence(&item.tool, &item.strength)
+                        && item.expires_at.as_str() >= audit_date
+                })
+        }) {
             return WitnessEvidence::missing_with(format!(
                 "Saved `{}` receipt for this card is expired; attach a current matching witness receipt",
                 metadata.tool
@@ -140,13 +195,16 @@ pub(crate) fn validate_receipts(root: &Path) -> Result<usize, String> {
         return Ok(0);
     }
     let mut count = 0;
-    let mut card_ids = BTreeSet::new();
+    let mut import_keys = BTreeSet::new();
     for path in receipt_files(&dir)? {
         let receipt = parse_receipt_file(&path)?;
-        if !card_ids.insert(receipt.card_id.clone()) {
+        if let Some(key) = receipt_import_key(&receipt)
+            && !import_keys.insert(key)
+        {
             return Err(format!(
-                "{} imports duplicate receipt for card_id `{}`",
+                "{} imports duplicate {} receipt for card_id `{}`",
                 path.display(),
+                receipt_import_kind(&receipt).unwrap_or("evidence"),
                 receipt.card_id
             ));
         }
@@ -258,7 +316,7 @@ fn audit_receipts_with_date(
         receipts: records.len(),
         ..ReceiptAuditSummary::default()
     };
-    let duplicate_card_ids = duplicate_receipt_card_ids(&records);
+    let duplicate_import_keys = duplicate_receipt_import_keys(&records);
     let mut receipts = Vec::new();
 
     for record in records {
@@ -267,7 +325,7 @@ fn audit_receipts_with_date(
             &cards,
             &manual_candidates,
             audit_date,
-            &duplicate_card_ids,
+            &duplicate_import_keys,
         );
         count_statuses(&mut summary, &entry.statuses);
         receipts.push(entry);
@@ -281,11 +339,14 @@ fn audit_receipts_with_date(
         audit_date: audit_date.to_string(),
         trust_boundary: AUDIT_TRUST_BOUNDARY.to_string(),
         limitations: vec![
-            "audits saved witness receipt metadata only".to_string(),
-            "does not execute Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux"
+            "audits saved receipt metadata only".to_string(),
+            "does not execute Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, Crux, or external integration tests"
                 .to_string(),
-            "does not prove site reach, memory safety, UB-free status, or repo safety".to_string(),
-            "matched receipts improve witness evidence only and do not erase missing contracts, guards, or reach evidence"
+            "does not independently prove site reach, memory safety, UB-free status, or repo safety"
+                .to_string(),
+            "matched witness receipts improve witness evidence only and do not erase missing contracts, guards, or reach evidence"
+                .to_string(),
+            "matched external integration reach receipts improve reach evidence only and do not erase missing contracts, guards, or witness evidence"
                 .to_string(),
             "manual candidate receipts attach external evidence to that manual candidate only and do not make it analyzer-discovered"
                 .to_string(),
@@ -295,16 +356,18 @@ fn audit_receipts_with_date(
     })
 }
 
-fn duplicate_receipt_card_ids(records: &[AuditReceiptRecord]) -> BTreeSet<String> {
-    let mut counts = BTreeMap::<String, usize>::new();
+fn duplicate_receipt_import_keys(records: &[AuditReceiptRecord]) -> BTreeSet<(String, String)> {
+    let mut counts = BTreeMap::<(String, String), usize>::new();
     for record in records {
         if let Some(receipt) = &record.receipt {
-            *counts.entry(receipt.card_id.clone()).or_insert(0) += 1;
+            if let Some(key) = receipt_import_key_from_witness_receipt(receipt) {
+                *counts.entry(key).or_insert(0) += 1;
+            }
         }
     }
     counts
         .into_iter()
-        .filter_map(|(card_id, count)| (count > 1).then_some(card_id))
+        .filter_map(|(key, count)| (count > 1).then_some(key))
         .collect()
 }
 
@@ -341,8 +404,42 @@ fn parse_receipt_file(path: &Path) -> Result<ParsedReceipt, String> {
 }
 
 fn imports_witness_evidence(tool: &str, strength: &str) -> bool {
-    matches!(strength, "ran" | "test_targeted" | "site_reached")
+    (tool != "external-integration-test"
+        && matches!(strength, "ran" | "test_targeted" | "site_reached"))
         || (tool == "human-deep-review" && strength == "reviewed")
+}
+
+fn imports_reach_evidence(tool: &str, strength: &str) -> bool {
+    tool == "external-integration-test" && strength == "site_reached"
+}
+
+fn receipt_import_key(receipt: &ParsedReceipt) -> Option<(String, String)> {
+    receipt_import_kind(receipt).map(|kind| (receipt.card_id.clone(), kind.to_string()))
+}
+
+fn receipt_import_kind(receipt: &ParsedReceipt) -> Option<&'static str> {
+    if imports_witness_evidence(&receipt.tool, &receipt.strength) {
+        Some("witness")
+    } else if imports_reach_evidence(&receipt.tool, &receipt.strength) {
+        Some("reach")
+    } else {
+        None
+    }
+}
+
+fn receipt_import_key_from_witness_receipt(receipt: &WitnessReceipt) -> Option<(String, String)> {
+    receipt_import_kind_from_witness_receipt(receipt)
+        .map(|kind| (receipt.card_id.clone(), kind.to_string()))
+}
+
+fn receipt_import_kind_from_witness_receipt(receipt: &WitnessReceipt) -> Option<&'static str> {
+    if imports_witness_evidence(&receipt.tool, &receipt.strength) {
+        Some("witness")
+    } else if imports_reach_evidence(&receipt.tool, &receipt.strength) {
+        Some("reach")
+    } else {
+        None
+    }
 }
 
 fn audit_receipt_records(root: &Path) -> Result<Vec<AuditReceiptRecord>, String> {
@@ -395,7 +492,7 @@ fn audit_receipt_record(
     cards: &BTreeMap<String, &ReviewCard>,
     manual_candidates: &BTreeMap<String, ManualCandidate>,
     audit_date: &str,
-    duplicate_card_ids: &BTreeSet<String>,
+    duplicate_import_keys: &BTreeSet<(String, String)>,
 ) -> ReceiptAuditEntry {
     let mut statuses = BTreeSet::new();
     let mut issues = Vec::new();
@@ -445,9 +542,14 @@ fn audit_receipt_record(
         };
     };
 
-    if duplicate_card_ids.contains(&receipt.card_id) {
+    if receipt_import_key_from_witness_receipt(&receipt)
+        .is_some_and(|key| duplicate_import_keys.contains(&key))
+    {
         statuses.insert("duplicate".to_string());
-        issues.push("more than one receipt file references this card_id".to_string());
+        issues.push(format!(
+            "more than one receipt file imports {} evidence for this card_id",
+            receipt_import_kind_from_witness_receipt(&receipt).unwrap_or("the same")
+        ));
     }
 
     if let Some(err) = record.validation_error {
@@ -477,7 +579,9 @@ fn audit_receipt_record(
 
     if let Some(card) = matched_review_card {
         statuses.insert("matched".to_string());
-        if !route_tools.iter().any(|tool| tool == &receipt.tool) {
+        if !imports_reach_evidence(&receipt.tool, &receipt.strength)
+            && !route_tools.iter().any(|tool| tool == &receipt.tool)
+        {
             statuses.insert("wrong_tool".to_string());
             issues.push(format!(
                 "receipt tool `{}` is not one of this card's routed witness tools: {}",
@@ -527,6 +631,9 @@ fn audit_receipt_record(
     if receipt_imports_current_witness_evidence(&receipt, &statuses, &route_tools) {
         statuses.insert("imports_witness_evidence".to_string());
     }
+    if receipt_imports_current_reach_evidence(&receipt, &statuses) {
+        statuses.insert("imports_reach_evidence".to_string());
+    }
 
     ReceiptAuditEntry {
         path,
@@ -560,6 +667,18 @@ fn receipt_imports_current_witness_evidence(
         && !statuses.contains("duplicate")
         && route_tools.iter().any(|tool| tool == &receipt.tool)
         && imports_witness_evidence(&receipt.tool, &receipt.strength)
+}
+
+fn receipt_imports_current_reach_evidence(
+    receipt: &WitnessReceipt,
+    statuses: &BTreeSet<String>,
+) -> bool {
+    statuses.contains("matched")
+        && !statuses.contains("manual_candidate")
+        && !statuses.contains("invalid")
+        && !statuses.contains("expired")
+        && !statuses.contains("duplicate")
+        && imports_reach_evidence(&receipt.tool, &receipt.strength)
 }
 
 fn receipt_audit_card_from_review_card(card: &ReviewCard) -> ReceiptAuditCard {
@@ -797,6 +916,82 @@ mod tests {
                 .contains("does not match routed witness tools")
         );
         assert!(evidence.summary.contains("loom"));
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_index_imports_external_integration_reach_evidence_only() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-external-reach-receipt")?;
+        let receipts = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipts).map_err(|err| format!("create receipt dir failed: {err}"))?;
+        let card_id =
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+        write_receipt(
+            &receipts,
+            "external-reach.json",
+            card_id,
+            "external-integration-test",
+            "site_reached",
+            "2026-08-18",
+        )?;
+
+        let index = ReceiptIndex::load_with_date(&root, "2026-05-18")?;
+        let validated = validate_receipts(&root)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+        assert_eq!(validated, 1);
+        let reach = index.reach_evidence_for(
+            &CardId(card_id.to_string()),
+            ReachEvidence {
+                state: "unreached".to_string(),
+                summary: "No static test mention of owner `read` was found".to_string(),
+            },
+        );
+        assert_eq!(reach.state, "external_reached");
+        assert!(reach.summary.contains("external-integration-test"));
+        assert!(reach.summary.contains("site_reached"));
+
+        let witness = index
+            .witness_evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri));
+        assert!(!witness.present);
+        assert!(witness.summary.contains("external-integration-test"));
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_index_allows_witness_and_reach_receipts_for_same_card() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-witness-and-reach-receipts")?;
+        let receipts = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipts).map_err(|err| format!("create receipt dir failed: {err}"))?;
+        let card_id =
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+        write_receipt(&receipts, "miri.json", card_id, "miri", "ran", "2026-08-18")?;
+        write_receipt(
+            &receipts,
+            "external-reach.json",
+            card_id,
+            "external-integration-test",
+            "site_reached",
+            "2026-08-18",
+        )?;
+
+        let index = ReceiptIndex::load_with_date(&root, "2026-05-18")?;
+        let validated = validate_receipts(&root)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+        assert_eq!(validated, 2);
+        let witness = index
+            .witness_evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri));
+        assert!(witness.present);
+        assert!(witness.summary.contains("miri"));
+        let reach = index.reach_evidence_for(
+            &CardId(card_id.to_string()),
+            ReachEvidence {
+                state: "unreached".to_string(),
+                summary: "No static test mention of owner `read` was found".to_string(),
+            },
+        );
+        assert_eq!(reach.state, "external_reached");
         Ok(())
     }
 
@@ -1065,9 +1260,9 @@ mod tests {
         assert_eq!(report.summary.wrong_tool, 1);
         assert_eq!(report.summary.weaker_than_required, 1);
         assert_eq!(report.summary.command_hash_mismatch, 0);
-        assert_eq!(report.summary.duplicate, 5);
+        assert_eq!(report.summary.duplicate, 4);
         assert_eq!(report.summary.invalid, 1);
-        assert_eq!(report.limitations.len(), 5);
+        assert_eq!(report.limitations.len(), 6);
         assert!(
             report
                 .limitations
@@ -1078,7 +1273,13 @@ mod tests {
             report
                 .limitations
                 .iter()
-                .any(|limitation| limitation.contains("do not erase missing contracts"))
+                .any(|limitation| limitation.contains("improve witness evidence only"))
+        );
+        assert!(
+            report
+                .limitations
+                .iter()
+                .any(|limitation| limitation.contains("improve reach evidence only"))
         );
         assert!(report.trust_boundary.contains("does not execute witnesses"));
         let matched_entry = report
@@ -1120,7 +1321,7 @@ mod tests {
             .iter()
             .filter(|entry| entry.statuses.iter().any(|status| status == "duplicate"))
             .count();
-        assert_eq!(duplicate_entries, 5);
+        assert_eq!(duplicate_entries, 4);
         Ok(())
     }
 
@@ -1264,6 +1465,63 @@ mod tests {
             .map_err(|err| format!("remove configured temp root failed: {err}"))?;
         fs::remove_dir_all(&wrong_tool_root)
             .map_err(|err| format!("remove wrong-tool temp root failed: {err}"))?;
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_audit_marks_external_integration_reach_receipts() -> Result<(), String> {
+        let root = copy_fixture_to_temp(
+            "ffi_missing_boundary_contract",
+            "unsafe-review-receipt-audit-external-reach",
+        )?;
+        let output = analyze_fixture_root(&root)?;
+        let card_id = output
+            .cards
+            .first()
+            .ok_or_else(|| "fixture produced no card".to_string())?
+            .id
+            .0
+            .clone();
+        let receipt_dir = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipt_dir)
+            .map_err(|err| format!("create receipt dir failed: {err}"))?;
+        write_receipt(
+            &receipt_dir,
+            "external-reach.json",
+            &card_id,
+            "external-integration-test",
+            "site_reached",
+            "2026-08-18",
+        )?;
+
+        let report = audit_receipts_with_date(&output, "2026-05-18")?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+        assert_eq!(report.summary.receipts, 1);
+        assert_eq!(report.summary.matched, 1);
+        assert_eq!(report.summary.wrong_tool, 0);
+        let entry = report
+            .receipts
+            .first()
+            .ok_or_else(|| "external reach receipt entry missing".to_string())?;
+        assert!(entry.statuses.iter().any(|status| status == "matched"));
+        assert!(
+            entry
+                .statuses
+                .iter()
+                .any(|status| status == "imports_reach_evidence")
+        );
+        assert!(
+            !entry
+                .statuses
+                .iter()
+                .any(|status| status == "imports_witness_evidence")
+        );
+        assert!(!entry.statuses.iter().any(|status| status == "wrong_tool"));
+        assert_eq!(
+            entry.receipt_tool.as_deref(),
+            Some("external-integration-test")
+        );
         Ok(())
     }
 
@@ -1502,7 +1760,12 @@ mod tests {
         strength: &str,
         expires_at: &str,
     ) -> Result<(), String> {
-        let command_hash = WitnessReceipt::command_hash("cargo test");
+        let command = if tool == "external-integration-test" {
+            "bun test test/js/sab-copy-to-unshared.test.ts"
+        } else {
+            "cargo test"
+        };
+        let command_hash = WitnessReceipt::command_hash(command);
         fs::write(
             dir.join(name),
             format!(
@@ -1515,7 +1778,7 @@ mod tests {
   "recorded_at": "2025-12-18T00:00:00Z",
   "expires_at": "{expires_at}",
   "summary": "focused witness",
-  "command": "cargo test",
+  "command": "{command}",
   "command_hash": "{command_hash}",
   "limitations": ["fixture only"]
 }}"#

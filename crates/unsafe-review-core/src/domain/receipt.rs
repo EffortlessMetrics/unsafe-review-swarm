@@ -108,6 +108,9 @@ impl WitnessReceipt {
         if expires_at < &recorded_at[..10] {
             return Err("`expires_at` must be on or after the `recorded_at` date".to_string());
         }
+        if self.tool == "external-integration-test" {
+            validate_required_option(&self.command, "command")?;
+        }
         self.validate_command_hash()?;
         Ok(())
     }
@@ -322,6 +325,7 @@ fn is_supported_receipt_tool(value: &str) -> bool {
             | "kani"
             | "crux"
             | "human-deep-review"
+            | "external-integration-test"
             | "unsupported"
     )
 }
@@ -355,6 +359,11 @@ fn validate_strength_for_tool(tool: &str, strength: &str) -> Result<(), String> 
         return Err(
             "receipt strength `reviewed` is only supported for `human-deep-review` receipts"
                 .to_string(),
+        );
+    }
+    if tool == "external-integration-test" && strength != "site_reached" {
+        return Err(
+            "external-integration-test receipt strength must be `site_reached`".to_string(),
         );
     }
     Ok(())
@@ -767,6 +776,56 @@ mod tests {
                 .err()
                 .unwrap_or_default()
                 .contains("only supported for `human-deep-review`")
+        );
+    }
+
+    #[test]
+    fn witness_receipt_validation_accepts_external_integration_site_reached() -> Result<(), String>
+    {
+        let mut receipt = fixture_receipt();
+        receipt.tool = "external-integration-test".to_string();
+        receipt.strength = "site_reached".to_string();
+        receipt.command = Some("bun test test/js/sab-copy-to-unshared.test.ts".to_string());
+        receipt.command_hash = receipt.command.as_deref().map(WitnessReceipt::command_hash);
+
+        receipt.validate()?;
+        assert!(
+            receipt
+                .evidence_summary()
+                .contains("external-integration-test receipt with `site_reached` strength")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn witness_receipt_validation_rejects_external_integration_without_site_reached() {
+        let mut receipt = fixture_receipt();
+        receipt.tool = "external-integration-test".to_string();
+        receipt.strength = "ran".to_string();
+
+        assert!(
+            receipt
+                .validate()
+                .err()
+                .unwrap_or_default()
+                .contains("external-integration-test receipt strength must be `site_reached`")
+        );
+    }
+
+    #[test]
+    fn witness_receipt_validation_rejects_external_integration_without_command() {
+        let mut receipt = fixture_receipt();
+        receipt.tool = "external-integration-test".to_string();
+        receipt.strength = "site_reached".to_string();
+        receipt.command = None;
+        receipt.command_hash = None;
+
+        assert!(
+            receipt
+                .validate()
+                .err()
+                .unwrap_or_default()
+                .contains("`command` is required")
         );
     }
 

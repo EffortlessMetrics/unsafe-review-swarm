@@ -1208,12 +1208,12 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
 
     let receipt_audit = fs::read_to_string(out_dir.join("receipt-audit.md"))?;
     assert!(receipt_audit.contains("# unsafe-review receipt audit"));
-    assert!(receipt_audit.contains("Static audit of saved witness receipt metadata"));
+    assert!(receipt_audit.contains("Static audit of saved receipt metadata"));
     assert!(receipt_audit.contains("## Reviewer front panel"));
     assert!(receipt_audit.contains("No receipt files found."));
     assert!(receipt_audit.contains("does not execute witnesses"));
-    assert!(receipt_audit.contains("does not prove site reach"));
-    assert!(receipt_audit.contains("matched receipts improve witness evidence only"));
+    assert!(receipt_audit.contains("does not independently prove site reach"));
+    assert!(receipt_audit.contains("matched witness receipts improve witness evidence only"));
 
     let sarif = parse_json(&fs::read_to_string(out_dir.join("cards.sarif"))?)?;
     assert_eq!(sarif["version"], "2.1.0");
@@ -1390,7 +1390,7 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
     assert!(receipt_audit.contains("# unsafe-review receipt audit"));
     assert!(receipt_audit.contains("No receipt files found."));
     assert!(receipt_audit.contains("does not execute witnesses"));
-    assert!(receipt_audit.contains("does not prove site reach"));
+    assert!(receipt_audit.contains("does not independently prove site reach"));
 
     let witness_plan = fs::read_to_string(out_dir.join("witness-plan.md"))?;
     assert!(witness_plan.contains("No changed unsafe-review gaps were found."));
@@ -2510,6 +2510,63 @@ fn receipt_template_writes_valid_receipt_json_without_running_witnesses()
     assert_eq!(receipt["command"], "cargo +nightly miri test read_header");
     assert_eq!(receipt["command_hash"], "3e163b0bce29ff2e");
     assert_eq!(receipt["limitations"][0], "fixture only");
+
+    Ok(())
+}
+
+#[test]
+fn receipt_template_writes_external_integration_reach_receipt() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-external-reach-template-e2e")?;
+    let receipt_path = temp.path().join("external-reach.json");
+    let card_id =
+        "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+
+    let output = run_success([
+        os("receipt"),
+        os("template"),
+        os(card_id),
+        os("--tool"),
+        os("external-integration-test"),
+        os("--strength"),
+        os("site_reached"),
+        os("--author"),
+        os("core/fixtures"),
+        os("--recorded-at"),
+        os("2026-06-02T00:00:00Z"),
+        os("--expires-at"),
+        os("2026-09-02"),
+        os("--summary"),
+        os("TS integration suite reaches the unsafe seam"),
+        os("--command"),
+        os("bun test test/js/sab-copy-to-unshared.test.ts"),
+        os("--limitation"),
+        os("external integration reach only; unsafe-review did not run the command"),
+        os("--out"),
+        receipt_path.as_os_str().to_os_string(),
+    ])?;
+
+    assert_eq!(stdout_text(&output)?.trim(), "");
+    let receipt = parse_json(&fs::read_to_string(receipt_path)?)?;
+    assert_eq!(receipt["schema_version"], "0.1");
+    assert_eq!(receipt["card_id"], card_id);
+    assert_eq!(receipt["tool"], "external-integration-test");
+    assert_eq!(receipt["strength"], "site_reached");
+    assert_eq!(receipt["author"], "core/fixtures");
+    assert_eq!(receipt["recorded_at"], "2026-06-02T00:00:00Z");
+    assert_eq!(receipt["expires_at"], "2026-09-02");
+    assert_eq!(
+        receipt["summary"],
+        "TS integration suite reaches the unsafe seam"
+    );
+    assert_eq!(
+        receipt["command"],
+        "bun test test/js/sab-copy-to-unshared.test.ts"
+    );
+    assert!(json_str(&receipt["command_hash"], "command_hash")?.len() >= 16);
+    assert_eq!(
+        receipt["limitations"][0],
+        "external integration reach only; unsafe-review did not run the command"
+    );
 
     Ok(())
 }

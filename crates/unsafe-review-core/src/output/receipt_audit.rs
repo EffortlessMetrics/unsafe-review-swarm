@@ -13,7 +13,7 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
     let mut out = String::new();
     out.push_str("# unsafe-review receipt audit\n\n");
     out.push_str(
-        "Static audit of saved witness receipt metadata against current ReviewCards and manual candidates.\n\n",
+        "Static audit of saved receipt metadata against current ReviewCards and manual candidates.\n\n",
     );
     out.push_str(&format!("Audit date: `{}`\n\n", report.audit_date));
     out.push_str("## Summary\n\n");
@@ -43,6 +43,10 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
         witness_importable_count(report)
     ));
     out.push_str(&format!(
+        "- Receipts imported as current reach evidence: {}\n",
+        reach_importable_count(report)
+    ));
+    out.push_str(&format!(
         "- Receipts without a current card match: {} unmatched, {} stale\n",
         report.summary.unmatched, report.summary.stale
     ));
@@ -60,11 +64,11 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
         );
     } else {
         out.push_str(
-            "- Next action: review nonzero problem flags before treating saved receipts as current witness evidence.\n",
+            "- Next action: review nonzero problem flags before treating saved receipts as current evidence.\n",
         );
     }
     out.push_str(
-        "- Boundary: matched receipts improve witness evidence only; they do not erase missing contracts, guards, or reach evidence.\n\n",
+        "- Boundary: matched witness receipts improve witness evidence only; matched external integration reach receipts improve reach evidence only. They do not erase missing contracts, guards, or unrelated evidence gaps.\n\n",
     );
     out.push_str("## Receipts\n\n");
     if report.receipts.is_empty() {
@@ -119,6 +123,19 @@ fn witness_importable_count(report: &ReceiptAuditReport) -> usize {
                 .statuses
                 .iter()
                 .any(|status| status == "imports_witness_evidence")
+        })
+        .count()
+}
+
+fn reach_importable_count(report: &ReceiptAuditReport) -> usize {
+    report
+        .receipts
+        .iter()
+        .filter(|receipt| {
+            receipt
+                .statuses
+                .iter()
+                .any(|status| status == "imports_reach_evidence")
         })
         .count()
 }
@@ -230,11 +247,12 @@ mod tests {
             mode: "receipt-audit".to_string(),
             policy: "advisory".to_string(),
             audit_date: "2026-05-26".to_string(),
-            trust_boundary: "Static witness receipt audit only; does not execute witnesses and does not prove site reach.".to_string(),
+            trust_boundary: "Static receipt audit only; does not execute witnesses or external tests and does not independently prove site reach.".to_string(),
             limitations: vec![
-                "audits saved witness receipt metadata only".to_string(),
-                "does not execute Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux".to_string(),
-                "matched receipts improve witness evidence only and do not erase missing contracts, guards, or reach evidence".to_string(),
+                "audits saved receipt metadata only".to_string(),
+                "does not execute Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, Crux, or external integration tests".to_string(),
+                "matched witness receipts improve witness evidence only and do not erase missing contracts, guards, or reach evidence".to_string(),
+                "matched external integration reach receipts improve reach evidence only and do not erase missing contracts, guards, or witness evidence".to_string(),
             ],
             summary: ReceiptAuditSummary {
                 receipts: 3,
@@ -359,16 +377,20 @@ mod tests {
         assert!(markdown.contains("## Reviewer front panel"));
         assert!(markdown.contains("- Matched receipt metadata: 2"));
         assert!(markdown.contains("- Receipts imported as current witness evidence: 1"));
+        assert!(markdown.contains("- Receipts imported as current reach evidence: 0"));
         assert!(markdown.contains("- Receipts without a current card match: 1 unmatched, 1 stale"));
         assert!(markdown.contains(
             "- Problem flags: unmatched: 1; stale: 1; wrong tool: 1; weaker than route: 1; command hash mismatch: 1"
         ));
         assert!(markdown.contains(
-            "review nonzero problem flags before treating saved receipts as current witness evidence"
+            "review nonzero problem flags before treating saved receipts as current evidence"
         ));
-        assert!(markdown.contains(
-            "matched receipts improve witness evidence only; they do not erase missing contracts"
-        ));
+        assert!(markdown.contains("matched witness receipts improve witness evidence only"));
+        assert!(
+            markdown.contains(
+                "matched external integration reach receipts improve reach evidence only"
+            )
+        );
         assert!(markdown.contains(
             "| Status | Receipt | Card | Matched target | Tool | Strength | Summary | Author | Recorded | Expires | Command hash | Limitations | Routed tools | Issues |"
         ));
@@ -396,10 +418,11 @@ mod tests {
         assert!(markdown.contains("Add or expose guard \\| witness Then attach receipt"));
         assert!(markdown.contains("## Limitations"));
         assert!(markdown.contains("does not execute Miri"));
-        assert!(markdown.contains("do not erase missing contracts"));
+        assert!(markdown.contains("improve witness evidence only"));
+        assert!(markdown.contains("improve reach evidence only"));
         assert!(markdown.contains("## Trust boundary"));
         assert!(markdown.contains("does not execute witnesses"));
-        assert!(markdown.contains("does not prove site reach"));
+        assert!(markdown.contains("does not independently prove site reach"));
     }
 
     #[test]
