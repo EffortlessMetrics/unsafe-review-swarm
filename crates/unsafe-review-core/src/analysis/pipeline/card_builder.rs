@@ -52,7 +52,8 @@ pub(super) fn build_card(
         .filter_map(|route| route.command.clone())
         .collect::<Vec<_>>();
 
-    let id = super::card_id(ctx.package, &scanned_site, &hazards, ctx.identity_counts);
+    let id =
+        super::card_identity::card_id(ctx.package, &scanned_site, &hazards, ctx.identity_counts);
     let witness_evidence = ctx.receipt_index.witness_evidence_for(&id, &routes);
 
     if witness_evidence.present {

@@ -1,16 +1,23 @@
+mod action_summary;
 mod card_builder;
+mod card_identity;
+mod input_loading;
+mod summary;
 
+use self::action_summary::next_action_summary;
+#[cfg(test)]
+use self::card_identity::unsafe_call_path;
+use self::input_loading::{load_diff_index, package_name};
+use self::summary::summarize;
 use super::{receipts, scanner};
 use crate::api::{
-    AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, DiscoveryOptions, RepoScanEvent,
-    RepoScanPhase, RepoScanStatus, Scope, Summary,
+    AnalysisMode, AnalyzeInput, AnalyzeOutput, DiscoveryOptions, RepoScanEvent, RepoScanPhase,
+    RepoScanStatus, Scope,
 };
-use crate::domain::{CardId, ReviewCard};
-use crate::input::{diff, workspace};
+use crate::domain::ReviewCard;
+use crate::input::workspace;
 use crate::policy::PolicyState;
-use crate::util::{slug, stable_hash_hex};
 use std::collections::BTreeMap;
-use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -292,309 +299,12 @@ fn repo_status(
     }
 }
 
-fn package_name(root: &std::path::Path) -> String {
-    let Ok(text) = fs::read_to_string(root.join("Cargo.toml")) else {
-        return root
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("workspace")
-            .to_string();
-    };
-    let mut in_package = false;
-    for line in text.lines() {
-        let trimmed = line.trim();
-        if trimmed.starts_with('[') {
-            in_package = trimmed == "[package]";
-            continue;
-        }
-        if !in_package || !trimmed.starts_with("name") {
-            continue;
-        }
-        let Some((_key, value)) = trimmed.split_once('=') else {
-            continue;
-        };
-        let name = value.trim().trim_matches('"');
-        if !name.is_empty() {
-            return name.to_string();
-        }
-    }
-    root.file_name()
-        .and_then(|name| name.to_str())
-        .unwrap_or("workspace")
-        .to_string()
-}
-
-fn load_diff_index(source: &DiffSource) -> Result<diff::DiffIndex, String> {
-    match source {
-        DiffSource::NoneRepoScan => Ok(diff::DiffIndex::default()),
-        DiffSource::Text(text) => Ok(diff::parse_unified_diff(text)),
-        DiffSource::File(path) => {
-            let text = fs::read_to_string(path)
-                .map_err(|err| format!("read diff {} failed: {err}", path.display()))?;
-            Ok(diff::parse_unified_diff(&text))
-        }
-    }
-}
-
-fn summarize(rust_files: usize, changed_rust_files: usize, cards: &[ReviewCard]) -> Summary {
-    let mut summary = Summary {
-        rust_files,
-        changed_rust_files,
-        unsafe_sites: cards.len(),
-        cards: cards.len(),
-        ..Summary::default()
-    };
-    for card in cards {
-        if card.class.is_actionable() {
-            summary.open_actionable_gaps += 1;
-        }
-        match &card.class {
-            crate::domain::ReviewClass::ContractMissing => summary.contract_missing += 1,
-            crate::domain::ReviewClass::GuardMissing => summary.guard_missing += 1,
-            crate::domain::ReviewClass::GuardedUnwitnessed => summary.guarded_unwitnessed += 1,
-            crate::domain::ReviewClass::UnsafeUnreached => summary.unsafe_unreached += 1,
-            crate::domain::ReviewClass::RequiresLoom => summary.requires_loom += 1,
-            crate::domain::ReviewClass::MiriUnsupported => summary.miri_unsupported += 1,
-            crate::domain::ReviewClass::StaticUnknown => summary.static_unknown += 1,
-            _ => {}
-        }
-    }
-    summary
-}
-
-fn next_action_summary(
-    class: &crate::domain::ReviewClass,
-    operation: &str,
-    public_api_surface: bool,
-    routes: &[crate::domain::WitnessRoute],
-) -> String {
-    match class {
-        crate::domain::ReviewClass::ContractMissing if public_api_surface => {
-            "Add a precise public `# Safety` section that names the required caller obligations."
-                .to_string()
-        }
-        crate::domain::ReviewClass::ContractMissing => "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.".to_string(),
-        crate::domain::ReviewClass::GuardMissing if operation == "unknown" => "Review the unsafe site manually and add the missing obligation-specific guard once the contract is identified.".to_string(),
-        crate::domain::ReviewClass::GuardMissing if operation == "unsafe_fn_call" => "Review the `unsafe_fn_call` callee contract manually and add obligation-specific guard evidence for this call.".to_string(),
-        crate::domain::ReviewClass::GuardMissing if operation == "inline_asm" => "Review the `inline_asm` register, memory, and target invariants manually; add explicit guard evidence, and attach a human deep-review receipt only as witness evidence.".to_string(),
-        crate::domain::ReviewClass::GuardMissing if operation == "pin_unchecked" => "Review the `pin_unchecked` move-prevention and projection invariants manually; add explicit guard evidence, and attach a human deep-review receipt only as witness evidence.".to_string(),
-        crate::domain::ReviewClass::GuardMissing => format!("Add or expose the local guard that discharges the `{operation}` safety obligation."),
-        crate::domain::ReviewClass::GuardedUnwitnessed
-            if has_witness_route(routes, crate::domain::WitnessKind::HumanDeepReview) =>
-        {
-            "Attach a human deep-review witness receipt or mark the static limitation explicitly."
-                .to_string()
-        }
-        crate::domain::ReviewClass::GuardedUnwitnessed
-            if has_witness_route(routes, crate::domain::WitnessKind::Miri)
-                && has_witness_route(routes, crate::domain::WitnessKind::CargoCareful) =>
-        {
-            "Attach a focused Miri or cargo-careful witness receipt or mark the static limitation explicitly.".to_string()
-        }
-        crate::domain::ReviewClass::GuardedUnwitnessed
-            if has_witness_route(routes, crate::domain::WitnessKind::Miri) =>
-        {
-            "Attach a focused Miri witness receipt or mark the static limitation explicitly."
-                .to_string()
-        }
-        crate::domain::ReviewClass::GuardedUnwitnessed
-            if has_witness_route(routes, crate::domain::WitnessKind::CargoCareful) =>
-        {
-            "Attach a focused cargo-careful witness receipt or mark the static limitation explicitly.".to_string()
-        }
-        crate::domain::ReviewClass::ReachableUnwitnessed => "Attach a focused witness receipt for the reached unsafe seam or mark the static limitation explicitly.".to_string(),
-        crate::domain::ReviewClass::WitnessMismatch => "Review the witness identity or tool mismatch and attach a matching receipt for this card.".to_string(),
-        crate::domain::ReviewClass::RequiresLoom => "Add or update a Loom/Shuttle model for the changed concurrency invariant.".to_string(),
-        crate::domain::ReviewClass::RequiresSanitizer => "Run a focused sanitizer or cargo-careful witness and attach the receipt with limitations.".to_string(),
-        crate::domain::ReviewClass::RequiresKaniOrCrux => "Run a bounded Kani/Crux proof harness or attach the receipt with limitations.".to_string(),
-        crate::domain::ReviewClass::MiriUnsupported => "Use sanitizer/cargo-careful or an explicit FFI boundary contract; Miri may not exercise this seam.".to_string(),
-        crate::domain::ReviewClass::StaticUnknown => "Review the unsafe site manually; identify the missing contract, guard, test, or witness route before claiming progress.".to_string(),
-        crate::domain::ReviewClass::UnsafeUnreached => "Add or identify a focused test path that reaches the safe wrapper around this unsafe seam.".to_string(),
-        crate::domain::ReviewClass::BaselineKnown => "Known baseline card; keep the ledger owner and review date current.".to_string(),
-        crate::domain::ReviewClass::Suppressed => "Suppressed card; keep the owner, reason, evidence, and review or expiry date current.".to_string(),
-        _ => "Attach a focused witness receipt or mark the static limitation explicitly.".to_string(),
-    }
-}
-
-fn has_witness_route(
-    routes: &[crate::domain::WitnessRoute],
-    kind: crate::domain::WitnessKind,
-) -> bool {
-    routes.iter().any(|route| route.kind == kind)
-}
-
-fn card_id(
-    package: &str,
-    scanned: &scanner::ScannedSite,
-    hazards: &[crate::domain::HazardKind],
-    identity_counts: &mut BTreeMap<String, usize>,
-) -> CardId {
-    let base = card_identity_base(package, scanned, hazards);
-    let next = identity_counts.entry(base.clone()).or_insert(0);
-    *next += 1;
-    CardId(format!("{base}-c{}", *next))
-}
-
-fn card_identity_base(
-    package: &str,
-    scanned: &scanner::ScannedSite,
-    hazards: &[crate::domain::HazardKind],
-) -> String {
-    let file = scanned
-        .site
-        .location
-        .file
-        .to_string_lossy()
-        .replace(['/', '\\'], "_");
-    let owner = scanned
-        .site
-        .owner
-        .clone()
-        .unwrap_or_else(|| "unknown".to_string());
-    let normalized = normalize_snippet(&scanned.operation.expression);
-    let snippet_hash = stable_hash_hex(&normalized);
-    let hazard = hazards.first().map_or("unknown", |hazard| hazard.as_str());
-    format!(
-        "UR-{}-{}-{}-{}-{}-{}-{}-{}",
-        slug(package),
-        slug(&file),
-        slug(&owner),
-        scanned.site.kind.as_str(),
-        scanned.operation.family.as_str(),
-        slug(&operation_path(scanned)),
-        &snippet_hash[..12],
-        hazard
-    )
-}
-
-fn normalize_snippet(value: &str) -> String {
-    value.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
-fn operation_path(scanned: &scanner::ScannedSite) -> String {
-    if scanned.operation.family == crate::domain::OperationFamily::RawPointerDeref {
-        return "deref".to_string();
-    }
-    if scanned.operation.family == crate::domain::OperationFamily::UnreachableUnchecked {
-        return "unreachable_unchecked".to_string();
-    }
-    if scanned.operation.family == crate::domain::OperationFamily::UnsafeFnCall {
-        return unsafe_call_path(&scanned.operation.expression);
-    }
-    if scanned.operation.family == crate::domain::OperationFamily::Unknown {
-        return scanned
-            .site
-            .owner
-            .clone()
-            .unwrap_or_else(|| scanned.site.kind.as_str().to_string());
-    }
-    let normalized = normalize_snippet(&scanned.operation.expression);
-    let target = normalized
-        .split('(')
-        .next()
-        .unwrap_or(normalized.as_str())
-        .trim();
-    if let Some((_prefix, method)) = target.rsplit_once('.') {
-        return method.trim_matches(':').to_string();
-    }
-    if let Some((_prefix, function)) = target.rsplit_once("::") {
-        return function.trim_matches(':').to_string();
-    }
-    scanned.operation.family.as_str().to_string()
-}
-
-fn unsafe_call_path(expression: &str) -> String {
-    let normalized = normalize_snippet(expression);
-    if contains_call_name(&normalized, "new_unchecked") {
-        return "new_unchecked".to_string();
-    }
-    let call = normalized
-        .split_once("unsafe")
-        .and_then(|(_prefix, after_unsafe)| {
-            after_unsafe.split_once('{').map(|(_open, after)| after)
-        })
-        .unwrap_or(normalized.as_str())
-        .split('(')
-        .next()
-        .unwrap_or("unsafe_fn_call")
-        .trim()
-        .trim_start_matches("match")
-        .trim();
-    let call = strip_trailing_turbofish(call);
-    if call.is_empty() {
-        "unsafe_fn_call".to_string()
-    } else if let Some((_prefix, method)) = call.rsplit_once('.') {
-        method.trim_matches(':').to_string()
-    } else if let Some((_prefix, function)) = call.rsplit_once("::") {
-        function.trim_matches(':').to_string()
-    } else {
-        call.trim_matches(':').to_string()
-    }
-}
-
-fn strip_trailing_turbofish(call: &str) -> &str {
-    let call = call.trim();
-    if !call.ends_with('>') {
-        return call;
-    }
-
-    let mut depth = 0usize;
-    for (idx, ch) in call.char_indices().rev() {
-        match ch {
-            '>' => depth += 1,
-            '<' => {
-                depth = depth.saturating_sub(1);
-                if depth == 0 {
-                    let prefix = &call[..idx];
-                    if let Some(without_colons) = prefix.strip_suffix("::") {
-                        return without_colons;
-                    }
-                    return call;
-                }
-            }
-            _ => {}
-        }
-    }
-
-    call
-}
-
-fn contains_call_name(line: &str, name: &str) -> bool {
-    let mut cursor = line;
-    while let Some(pos) = cursor.find(name) {
-        let before = cursor[..pos].chars().next_back();
-        let after = &cursor[pos + name.len()..];
-        let starts_on_boundary = before.is_none_or(|ch| !is_ident_continue(ch));
-        if starts_on_boundary && call_suffix(after) {
-            return true;
-        }
-        cursor = &after[after
-            .char_indices()
-            .next()
-            .map_or(after.len(), |(idx, ch)| idx + ch.len_utf8())..];
-    }
-    false
-}
-
-fn call_suffix(after_name: &str) -> bool {
-    let rest = after_name.trim_start();
-    if rest.starts_with('(') {
-        return true;
-    }
-    rest.strip_prefix("::")
-        .is_some_and(|after_colons| after_colons.trim_start().starts_with('<'))
-}
-
-fn is_ident_continue(ch: char) -> bool {
-    ch == '_' || ch.is_ascii_alphanumeric()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::api::{AnalysisMode, DiffSource, DiscoveryOptions, PolicyMode, Scope};
     use crate::domain::{
-        HazardKind, OperationFamily, Priority, ReviewCard, ReviewClass, UnsafeSiteKind,
+        CardId, HazardKind, OperationFamily, Priority, ReviewCard, ReviewClass, UnsafeSiteKind,
         WitnessKind, WitnessRoute,
     };
     use std::fs;
