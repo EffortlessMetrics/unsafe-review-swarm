@@ -1,0 +1,20 @@
+schema_version = "1.0"
+target = "crossbeam-pr1226"
+report = "reports/2026-05-26-crossbeam-atomic-pointer-rerun.md"
+reviewer = "manual"
+date = "2026-06-02"
+scope = "atomic pointer-state reviewer usefulness sample"
+artifact_set = "target/dogfood-work/crossbeam-pr1226.after-atomic-pointer-state.json"
+trust_boundary = "Static unsafe contract review measurement input; not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not witness adequacy, and not policy readiness."
+
+[[cards]]
+family = "atomic_pointer_state"
+judgment = "actionable"
+reason = "The rerun changed the review shape from broad unknown contract cards to atomic pointer-state cards that name the fetch operation family and ask for concurrency evidence."
+next_step = "Keep this as a dogfood usefulness sample; add another fixture only when a future target exposes a missing atomic pointer-state shape."
+
+[[cards]]
+family = "atomic_pointer_state"
+judgment = "human-only"
+reason = "The useful next action is Loom/Shuttle modeling or human concurrency review, not a local static proof or automatic source repair."
+next_step = "Preserve the route as advisory concurrency-review work until a saved witness receipt is imported and audited."
