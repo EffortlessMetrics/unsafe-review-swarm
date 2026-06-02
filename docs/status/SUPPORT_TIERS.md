@@ -5,29 +5,16 @@ All tiers describe static review evidence. None means memory-safety proof.
 For a concise front panel, see [`SUPPORT_SUMMARY.md`](SUPPORT_SUMMARY.md). This
 file remains the detailed claim-to-proof ledger.
 
-Recent core smoke proof additions include
-`get_unchecked_mut_get_probe_guard`,
-`get_unchecked_mut_get_probe_early_return_guard`,
-`get_unchecked_mut_get_probe_other_slice_not_guard`,
-`get_unchecked_mut_if_let_get_guard`,
-`get_unchecked_mut_let_else_get_guard`,
-`get_unchecked_mut_get_probe_reassigned_index_not_guard`,
-`get_unchecked_mut_get_probe_shadowed_index_not_guard`,
-`get_unchecked_mut_get_probe_reassigned_receiver_not_guard`,
-`get_unchecked_mut_get_probe_shadowed_receiver_not_guard`,
-`get_unchecked_mut_get_probe_early_return_reassigned_index_not_guard`,
-`get_unchecked_mut_if_let_get_reassigned_index_not_guard`,
-`get_unchecked_mut_let_else_get_reassigned_index_not_guard`,
-`get_unchecked_mut_bounds_observed_not_guard`,
-`get_unchecked_mut_closed_bounds_not_guard`,
-`get_unchecked_mut_return_comment_not_guard`, and
-`get_unchecked_mut_reassigned_index_not_guard`,
-`get_unchecked_mut_reassigned_receiver_not_guard`, which pin that same-receiver
-`get(index)` probes, including if-let, let-else, and match Some-arm forms, and positive bounds
-branches must still dominate `get_unchecked`, bare predicate observations and
-comment-only early-return text are not guards, get-probe evidence must target
-the same slice, and reassigned or shadowed checked indexes or receivers do not
-discharge bounds evidence.
+Recent core smoke proof additions include fixture-backed `get_unchecked_mut`
+bounds controls for same-receiver `get(index)` probes, early-return probes,
+if-let, let-else, and match Some-arm forms, plus stale or shadowed index,
+receiver, and receiver-path targets recorded in
+`docs/accuracy/labels/get-unchecked-mut-bounds.toml`. These pin that positive
+bounds branches must still dominate `get_unchecked`, bare predicate
+observations and comment-only early-return text are not guards, get-probe
+evidence must target the same slice, and reassigned, compound-reassigned, or
+shadowed checked indexes, receivers, or receiver paths do not discharge bounds
+evidence.
 Recent `NonNull::new_unchecked` nullability additions include
 `nonnull_if_let_new_guard`, `nonnull_let_else_new_guard`,
 `nonnull_match_new_guard`, `nonnull_new_reassigned_ptr_not_guard`,

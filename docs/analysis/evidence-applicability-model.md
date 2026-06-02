@@ -135,7 +135,7 @@ The analyzer must not mix evidence kinds:
 |---|---|---|---|
 | `unwrap_unchecked` | Same `Option`/`Result` receiver or infallible result value | Valid state dominates operation and remains fresh. | Wrong receiver, stale guard, post-check, comment-only early-return text. |
 | `str::from_utf8_unchecked` | Same byte buffer | UTF-8 validation dominates unchecked conversion and buffer remains fresh. | Wrong buffer, stale buffer, observed-only validation, post-validation. |
-| `get_unchecked` / `get_unchecked_mut` | Same receiver and same index | Bounds probe or length guard applies to the same index and receiver. | Other receiver, stale receiver, stale index, post-check, closed branch. |
+| `get_unchecked` / `get_unchecked_mut` | Same receiver and same index | Bounds probe or length guard applies to the same index and receiver. | Other receiver, stale or shadowed receiver/index/receiver path, post-check, closed branch. |
 | `NonNull::new_unchecked` | Same pointer | Nullability guard applies to the pointer passed to unchecked constructor. | Wrong pointer, stale pointer, non-returning `is_null`, provenance uncertainty. |
 | `MaybeUninit::assume_init` | Same initialization slot | Write/new evidence reaches the same slot before assume-init. | Other slot, stale write, partial init, closed branch, comment-only init. |
 | `Vec::set_len` | Same receiver and initialized range | Initialization/capacity/shrink evidence applies to the new length. | Capacity-only evidence, unrelated const-CAP buffers, stale receiver, stale with_capacity receiver or length, partial-slice initialization, single-index initialization, unrelated initialization, comment-only init. |
