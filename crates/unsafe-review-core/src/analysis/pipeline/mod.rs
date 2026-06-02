@@ -1929,6 +1929,19 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn get_unchecked_mut_get_probe_evidence_rejects_other_slice() -> Result<(), String> {
+        let output = fixture_output("get_unchecked_mut_get_probe_other_slice_not_guard")?;
+        let card = single_card("get_unchecked_mut_get_probe_other_slice_not_guard", &output)?;
+
+        assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+        assert_eq!(card.operation.family, OperationFamily::GetUnchecked);
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert!(!card.discharge.present);
+        assert!(!obligation_discharge_present(card, "bounds"));
+        Ok(())
+    }
+
+    #[test]
     fn get_unchecked_mut_get_probe_pattern_evidence_rejects_reassigned_index() -> Result<(), String>
     {
         for fixture in [
