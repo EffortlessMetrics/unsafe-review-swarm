@@ -10908,6 +10908,42 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_manual_candidate_queue_drift()
+    -> Result<(), String> {
+        let dir =
+            unique_temp_dir("unsafe-review-first-pr-review-kit-manual-candidate-queue-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit = parse_json_file(&path)?;
+        let queue_entry = &mut review_kit["handoff"]["manual_candidates"]["candidate_queue"][0];
+        queue_entry["id"] = serde_json::json!("R4R2-S999");
+        queue_entry["explain"] = serde_json::json!("unsafe-review explain R4R2-S999");
+        queue_entry["context_json"] = serde_json::json!("unsafe-review context R4R2-S999 --json");
+        queue_entry["witness_plan"] =
+            serde_json::json!("unsafe-review candidate witness-plan R4R2-S999");
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "manual candidate queue drift should fail review-kit verification".to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("review-kit.json handoff manual_candidates candidate_queue[0] id `R4R2-S999` must match manual-candidates.json candidate `R4R2-S001`"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_review_kit_missing_artifact() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-missing-artifact")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -15714,6 +15750,9 @@ review_after = "2026-08-01"
                     "manual_candidates": 0,
                     "analyzer_discovered": 0,
                     "first_candidate": serde_json::Value::Null,
+                    "candidate_queue_limit": 5,
+                    "candidate_queue": [],
+                    "omitted_candidates": 0,
                     "trust_boundary": "manual/advisory candidates are not analyzer-discovered ReviewCards, not policy inputs, and not witness execution; receipts against manual candidates do not import ReviewCard witness evidence."
                 },
                 "top_card": top_card_handoff,
@@ -15776,6 +15815,25 @@ review_after = "2026-08-01"
                 "context_json": "unsafe-review context R4R2-S001 --json",
                 "witness_plan": "unsafe-review candidate witness-plan R4R2-S001"
             },
+            "candidate_queue_limit": 5,
+            "candidate_queue": [{
+                "id": "R4R2-S001",
+                "source": "manual",
+                "manual_candidate": true,
+                "analyzer_discovered": false,
+                "title": "TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes",
+                "location_text": "src/runtime/webcore/TextDecoder.rs:237",
+                "operation_family": "raw_pointer_read",
+                "evidence_refs": 0,
+                "implementer_handoff": {
+                    "invariant_at_risk": "&[u8] memory must not be concurrently mutated",
+                    "stop_condition": "stop before source edits"
+                },
+                "explain": "unsafe-review explain R4R2-S001",
+                "context_json": "unsafe-review context R4R2-S001 --json",
+                "witness_plan": "unsafe-review candidate witness-plan R4R2-S001"
+            }],
+            "omitted_candidates": 0,
             "trust_boundary": "manual/advisory candidates are not analyzer-discovered ReviewCards, not policy inputs, and not witness execution; receipts against manual candidates do not import ReviewCard witness evidence."
         });
         fs::write(&path, review_kit.to_string())

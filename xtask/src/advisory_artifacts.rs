@@ -69,12 +69,21 @@ struct RepairQueueReadinessProjection {
 
 struct ManualCandidateIndexProjection {
     ids: BTreeSet<String>,
+    candidates: Vec<ManualCandidateProjection>,
     count: usize,
     first_id: Option<String>,
 }
 
+struct ManualCandidateProjection {
+    id: String,
+    location_text: String,
+    operation_family: String,
+    evidence_refs: usize,
+}
+
 const COMMENT_PLAN_BODY_WORD_LIMIT: usize = 220;
 const COMMENT_PLAN_REVIEW_BUDGET: usize = 3;
+const MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
 const COMMENT_PLAN_REVIEW_BUDGET_REASON: &str = "bounded reviewer noise";
 const COMMENT_PLAN_REVIEW_BUDGET_REASON_CODE: &str = "bounded_reviewer_noise";
 const COMMENT_PLAN_SELECTION_REASONS: &[&str] = &[
@@ -402,28 +411,32 @@ fn check_manual_candidates_artifact(dir: &Path) -> Result<ManualCandidateIndexPr
     }
 
     let mut candidate_ids = BTreeSet::new();
-    let first_id = candidates
-        .first()
-        .and_then(|candidate| candidate.get("id"))
-        .and_then(serde_json::Value::as_str)
-        .map(str::to_string);
+    let mut candidate_projections = Vec::new();
     for candidate in candidates {
-        let id = check_manual_candidate_artifact_entry(candidate)?;
-        if !candidate_ids.insert(id.clone()) {
+        let projection = check_manual_candidate_artifact_entry(candidate)?;
+        if !candidate_ids.insert(projection.id.clone()) {
             return Err(format!(
-                "manual-candidates.json repeats candidate id `{id}`"
+                "manual-candidates.json repeats candidate id `{}`",
+                projection.id
             ));
         }
+        candidate_projections.push(projection);
     }
+    let first_id = candidate_projections
+        .first()
+        .map(|projection| projection.id.clone());
 
     Ok(ManualCandidateIndexProjection {
         ids: candidate_ids,
-        count: candidates.len(),
+        count: candidate_projections.len(),
         first_id,
+        candidates: candidate_projections,
     })
 }
 
-fn check_manual_candidate_artifact_entry(candidate: &serde_json::Value) -> Result<String, String> {
+fn check_manual_candidate_artifact_entry(
+    candidate: &serde_json::Value,
+) -> Result<ManualCandidateProjection, String> {
     super::require_json_str(
         candidate,
         "schema_version",
@@ -431,7 +444,8 @@ fn check_manual_candidate_artifact_entry(candidate: &serde_json::Value) -> Resul
         "manual-candidates.json candidate",
     )?;
     let id =
-        super::require_non_empty_json_str(candidate, "id", "manual-candidates.json candidate")?;
+        super::require_non_empty_json_str(candidate, "id", "manual-candidates.json candidate")?
+            .to_string();
     super::require_json_str(
         candidate,
         "source",
@@ -446,11 +460,12 @@ fn check_manual_candidate_artifact_entry(candidate: &serde_json::Value) -> Resul
             "manual-candidates.json candidate analyzer_discovered must be false".to_string(),
         );
     }
-    super::require_non_empty_json_str(
+    let operation_family = super::require_non_empty_json_str(
         candidate,
         "operation_family",
         "manual-candidates.json candidate",
-    )?;
+    )?
+    .to_string();
     super::require_non_empty_json_str(
         candidate,
         "unsafe_operation",
@@ -462,11 +477,12 @@ fn check_manual_candidate_artifact_entry(candidate: &serde_json::Value) -> Resul
         "safe_caller",
         "manual-candidates.json candidate",
     )?;
-    super::require_non_empty_json_str(
+    let location_text = super::require_non_empty_json_str(
         candidate,
         "location_text",
         "manual-candidates.json candidate",
-    )?;
+    )?
+    .to_string();
     super::require_non_empty_json_str(
         candidate,
         "explain_command",
@@ -511,7 +527,17 @@ fn check_manual_candidate_artifact_entry(candidate: &serde_json::Value) -> Resul
                 .to_string(),
         );
     }
-    Ok(id.to_string())
+    let evidence_refs = candidate
+        .get("evidence")
+        .and_then(serde_json::Value::as_array)
+        .map(Vec::len)
+        .unwrap_or(0);
+    Ok(ManualCandidateProjection {
+        id,
+        location_text,
+        operation_family,
+        evidence_refs,
+    })
 }
 
 fn check_review_kit_manifest(
@@ -741,6 +767,7 @@ fn check_review_kit_manual_candidate_handoff(
         );
     }
     check_review_kit_first_manual_candidate_handoff(manual, manual_candidates)?;
+    check_review_kit_manual_candidate_queue_handoff(manual, manual_candidates)?;
     let boundary = super::require_non_empty_json_str(
         manual,
         "trust_boundary",
@@ -757,6 +784,109 @@ fn check_review_kit_manual_candidate_handoff(
             return Err(format!(
                 "review-kit.json handoff manual_candidates trust_boundary must include `{expected}`"
             ));
+        }
+    }
+    Ok(())
+}
+
+fn check_review_kit_manual_candidate_queue_handoff(
+    manual: &serde_json::Value,
+    manual_candidates: &ManualCandidateIndexProjection,
+) -> Result<(), String> {
+    let limit = super::json_usize_at(
+        manual,
+        "/candidate_queue_limit",
+        "review-kit.json handoff manual_candidates",
+    )?;
+    if limit != MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT {
+        return Err(format!(
+            "review-kit.json handoff manual_candidates candidate_queue_limit is {limit}, expected {MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT}"
+        ));
+    }
+    let queue = super::json_array_at(
+        manual,
+        "/candidate_queue",
+        "review-kit.json handoff manual_candidates",
+    )?;
+    let expected_queue_len = manual_candidates.count.min(limit);
+    if queue.len() != expected_queue_len {
+        return Err(format!(
+            "review-kit.json handoff manual_candidates candidate_queue has {} entries, expected {expected_queue_len}",
+            queue.len()
+        ));
+    }
+    let omitted = super::json_usize_at(
+        manual,
+        "/omitted_candidates",
+        "review-kit.json handoff manual_candidates",
+    )?;
+    let expected_omitted = manual_candidates.count.saturating_sub(queue.len());
+    if omitted != expected_omitted {
+        return Err(format!(
+            "review-kit.json handoff manual_candidates omitted_candidates is {omitted}, expected {expected_omitted}"
+        ));
+    }
+    for (index, entry) in queue.iter().enumerate() {
+        let expected = &manual_candidates.candidates[index];
+        check_review_kit_manual_candidate_queue_entry(entry, expected, index)?;
+    }
+    Ok(())
+}
+
+fn check_review_kit_manual_candidate_queue_entry(
+    entry: &serde_json::Value,
+    expected: &ManualCandidateProjection,
+    index: usize,
+) -> Result<(), String> {
+    let context = format!("review-kit.json handoff manual_candidates candidate_queue[{index}]");
+    let id = super::require_non_empty_json_str(entry, "id", &context)?;
+    if id != expected.id {
+        return Err(format!(
+            "{context} id `{id}` must match manual-candidates.json candidate `{}`",
+            expected.id
+        ));
+    }
+    super::require_json_str(entry, "source", "manual", &context)?;
+    if entry.get("manual_candidate") != Some(&serde_json::Value::Bool(true)) {
+        return Err(format!("{context} manual_candidate must be true"));
+    }
+    if entry.get("analyzer_discovered") != Some(&serde_json::Value::Bool(false)) {
+        return Err(format!("{context} analyzer_discovered must be false"));
+    }
+    super::require_non_empty_json_str(entry, "title", &context)?;
+    require_expected_value(
+        super::require_non_empty_json_str(entry, "location_text", &context)?,
+        &expected.location_text,
+        &format!("{context} location_text"),
+    )?;
+    require_expected_value(
+        super::require_non_empty_json_str(entry, "operation_family", &context)?,
+        &expected.operation_family,
+        &format!("{context} operation_family"),
+    )?;
+    let evidence_refs = super::json_usize_at(entry, "/evidence_refs", &context)?;
+    if evidence_refs != expected.evidence_refs {
+        return Err(format!(
+            "{context} evidence_refs is {evidence_refs}, expected {}",
+            expected.evidence_refs
+        ));
+    }
+    let handoff = entry
+        .get("implementer_handoff")
+        .ok_or_else(|| format!("{context} is missing implementer_handoff"))?;
+    if !handoff.is_object() {
+        return Err(format!("{context} implementer_handoff must be an object"));
+    }
+    super::require_non_empty_json_str(handoff, "invariant_at_risk", &context)?;
+    super::require_non_empty_json_str(handoff, "stop_condition", &context)?;
+    for (field, command) in [
+        ("explain", "unsafe-review explain "),
+        ("context_json", "unsafe-review context "),
+        ("witness_plan", "unsafe-review candidate witness-plan "),
+    ] {
+        let text = super::require_non_empty_json_str(entry, field, &context)?;
+        if !text.starts_with(command) || !text.contains(id) {
+            return Err(format!("{context} {field} must reference `{id}`"));
         }
     }
     Ok(())

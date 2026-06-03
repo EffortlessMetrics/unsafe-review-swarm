@@ -1123,6 +1123,10 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         candidate_dir.join("R4R2-S001.json"),
         manual_candidate_json(),
     )?;
+    fs::write(
+        candidate_dir.join("R4R2-S002.json"),
+        manual_candidate_json().replace("\"id\": \"R4R2-S001\"", "\"id\": \"R4R2-S002\""),
+    )?;
     let out_dir = temp.path().join("unsafe-review");
 
     let output = run_success([
@@ -1148,11 +1152,12 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("copy-only; unsafe-review did not run an agent"));
     assert!(stdout.contains("Manual candidates:"));
     assert!(stdout.contains("manual-candidates.json"));
-    assert!(stdout.contains("Count: 1"));
+    assert!(stdout.contains("Count: 2"));
     assert!(stdout.contains("First manual candidate: R4R2-S001"));
     assert!(stdout.contains("unsafe-review explain --root"));
     assert!(stdout.contains("unsafe-review context --root"));
     assert!(stdout.contains("unsafe-review candidate witness-plan --root"));
+    assert!(stdout.contains("Review-kit candidate queue: first 2 of 2 manual candidate(s)"));
     assert!(stdout.contains("manual candidates are advisory manual targets"));
     assert!(stdout.contains("not analyzer-discovered"));
     assert!(stdout.contains("not policy inputs"));
@@ -1268,7 +1273,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     );
     assert_eq!(
         review_kit["handoff"]["manual_candidates"]["manual_candidates"],
-        1
+        2
     );
     assert_eq!(
         review_kit["handoff"]["manual_candidates"]["analyzer_discovered"],
@@ -1328,6 +1333,56 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             .as_str()
             .unwrap_or("")
             .contains("unsafe-review candidate witness-plan --root")
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["candidate_queue_limit"],
+        5
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["omitted_candidates"],
+        0
+    );
+    let candidate_queue = json_array(
+        &review_kit["handoff"]["manual_candidates"]["candidate_queue"],
+        "review_kit.handoff.manual_candidates.candidate_queue",
+    )?;
+    assert_eq!(candidate_queue.len(), 2);
+    assert_eq!(candidate_queue[0]["id"], "R4R2-S001");
+    assert_eq!(candidate_queue[1]["id"], "R4R2-S002");
+    assert_eq!(candidate_queue[0]["source"], "manual");
+    assert_eq!(candidate_queue[0]["manual_candidate"], true);
+    assert_eq!(candidate_queue[0]["analyzer_discovered"], false);
+    assert_eq!(
+        candidate_queue[0]["location_text"],
+        "src/runtime/webcore/TextDecoder.rs:237"
+    );
+    assert_eq!(candidate_queue[0]["operation_family"], "raw_pointer_read");
+    assert_eq!(candidate_queue[0]["evidence_refs"], 2);
+    assert_eq!(
+        candidate_queue[0]["implementer_handoff"]["route"]["safe_caller"],
+        "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))"
+    );
+    assert_eq!(
+        candidate_queue[0]["implementer_handoff"]["route"]["unsafe_operation"],
+        "core::slice::from_raw_parts"
+    );
+    assert!(
+        candidate_queue[0]["explain"]
+            .as_str()
+            .unwrap_or("")
+            .contains("R4R2-S001")
+    );
+    assert!(
+        candidate_queue[1]["context_json"]
+            .as_str()
+            .unwrap_or("")
+            .contains("R4R2-S002")
+    );
+    assert!(
+        candidate_queue[1]["witness_plan"]
+            .as_str()
+            .unwrap_or("")
+            .contains("R4R2-S002")
     );
     assert!(
         review_kit["handoff"]["manual_candidates"]["trust_boundary"]
@@ -1448,9 +1503,10 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(manual_candidates["schema_version"], "manual-candidates/v1");
     assert_eq!(manual_candidates["mode"], "manual_candidate_index");
     assert_eq!(manual_candidates["source"], "first_pr");
-    assert_eq!(manual_candidates["summary"]["manual_candidates"], 1);
+    assert_eq!(manual_candidates["summary"]["manual_candidates"], 2);
     assert_eq!(manual_candidates["summary"]["analyzer_discovered"], 0);
     assert_eq!(manual_candidates["candidates"][0]["id"], "R4R2-S001");
+    assert_eq!(manual_candidates["candidates"][1]["id"], "R4R2-S002");
     assert_eq!(manual_candidates["candidates"][0]["source"], "manual");
     assert_eq!(manual_candidates["candidates"][0]["manual_candidate"], true);
     assert_eq!(

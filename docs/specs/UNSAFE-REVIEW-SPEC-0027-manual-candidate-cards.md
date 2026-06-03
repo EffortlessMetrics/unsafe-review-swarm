@@ -165,6 +165,13 @@ and stop line when available, and repeat the ReviewCard-only artifact
 relationship. They must not add manual candidates to `cards.json`, SARIF,
 comment-plan, saved LSP, repair-queue, or policy-report surfaces.
 
+`review-kit.json` may include a bounded `candidate_queue` under the manual
+candidate handoff so reviewers and agents can see more than the first imported
+candidate. That queue must stay copy-only, preserve sorted manual IDs and
+manual/advisory markers, include file:line and implementer handoff cues, expose
+the queue limit and omitted count, and cross-check against
+`manual-candidates.json`. It is not the ReviewCard repair queue.
+
 If a manual candidate cannot be projected faithfully into a surface, that
 surface must reject or omit it with an explicit reason instead of degrading it
 into an analyzer ReviewCard.
@@ -223,9 +230,9 @@ into an analyzer ReviewCard.
   saved LSP, repair queue, and policy-report surfaces, ReviewCard-only.
 - `first-pr` terminal output and `review-kit.json` include a bounded,
   copy-only manual candidate handoff with `manual-candidates.json`,
-  `explain`, `context --json`, and `candidate witness-plan` commands while
-  preserving `source = manual`, `manual_candidate = true`, and
-  `analyzer_discovered = false`.
+  a sorted bounded candidate queue, `explain`, `context --json`, and
+  `candidate witness-plan` commands while preserving `source = manual`,
+  `manual_candidate = true`, and `analyzer_discovered = false`.
 
 ## CI Proof
 

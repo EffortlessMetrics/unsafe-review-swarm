@@ -136,8 +136,8 @@ must include copy-only handoff commands for the reviewer summary, receipt audit,
   and top-card explain/context commands when a top card exists
 must include manual candidate handoff metadata pointing to
   manual-candidates.json, with analyzer_discovered = 0 and copy-only
-  explain/context/witness-plan commands plus implementer handoff cues when
-  manual candidates exist
+  explain/context/witness-plan commands, a bounded candidate_queue, omitted
+  count, and implementer handoff cues when manual candidates exist
 must list every required first-pr artifact with relative paths
 must include artifact kind, format, and schema_version/null metadata
 must include trust boundary wording

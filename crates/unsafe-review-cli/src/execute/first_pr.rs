@@ -8,6 +8,8 @@ use unsafe_review_core::{
     AnalyzeOutput, ManualCandidate, Scope, manual_candidate_implementer_handoff,
 };
 
+const MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
+
 pub(super) struct FirstPrReport<'a> {
     pub(super) output: &'a AnalyzeOutput,
     pub(super) out_dir: &'a Path,
@@ -59,6 +61,13 @@ fn print_manual_candidate_handoff(
             candidate_witness_plan_command(root, &candidate.id)
         );
     }
+    println!(
+        "  Review-kit candidate queue: first {} of {} manual candidate(s)",
+        manual_candidates
+            .len()
+            .min(MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT),
+        manual_candidates.len()
+    );
     println!(
         "  manual candidates are advisory manual targets, not analyzer-discovered, not policy inputs, and unsafe-review did not run witnesses"
     );
@@ -244,25 +253,51 @@ fn review_kit_manual_candidate_handoff(
     manual_candidates: &[ManualCandidate],
     root: &Path,
 ) -> serde_json::Value {
-    let first_candidate = manual_candidates.first().map(|candidate| {
-        json!({
-            "id": candidate.id.as_str(),
-            "source": "manual",
-            "manual_candidate": true,
-            "analyzer_discovered": false,
-            "implementer_handoff": manual_candidate_implementer_handoff(candidate),
-            "explain": explain_command(root, &candidate.id),
-            "context_json": context_command(root, &candidate.id),
-            "witness_plan": candidate_witness_plan_command(root, &candidate.id),
-        })
-    });
+    let first_candidate = manual_candidates
+        .first()
+        .map(|candidate| review_kit_manual_candidate_queue_entry(candidate, root));
+    let candidate_queue = manual_candidates
+        .iter()
+        .take(MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT)
+        .map(|candidate| review_kit_manual_candidate_queue_entry(candidate, root))
+        .collect::<Vec<_>>();
+    let omitted_candidates = manual_candidates
+        .len()
+        .saturating_sub(candidate_queue.len());
 
     json!({
         "artifact": "manual-candidates.json",
         "manual_candidates": manual_candidates.len(),
         "analyzer_discovered": 0,
         "first_candidate": first_candidate,
+        "candidate_queue_limit": MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT,
+        "candidate_queue": candidate_queue,
+        "omitted_candidates": omitted_candidates,
         "trust_boundary": "Manual/advisory candidate handoff only; manual candidates are not analyzer-discovered ReviewCards, not policy inputs, and not witness execution. Receipts against manual candidates attach external evidence to the manual candidate ID only and do not import ReviewCard witness evidence.",
+    })
+}
+
+fn review_kit_manual_candidate_queue_entry(
+    candidate: &ManualCandidate,
+    root: &Path,
+) -> serde_json::Value {
+    json!({
+        "id": candidate.id.as_str(),
+        "source": "manual",
+        "manual_candidate": true,
+        "analyzer_discovered": false,
+        "title": candidate.title.as_str(),
+        "location_text": format!(
+            "{}:{}",
+            candidate.location.file.display(),
+            candidate.location.line
+        ),
+        "operation_family": candidate.operation_family.as_str(),
+        "evidence_refs": candidate.evidence.len(),
+        "implementer_handoff": manual_candidate_implementer_handoff(candidate),
+        "explain": explain_command(root, &candidate.id),
+        "context_json": context_command(root, &candidate.id),
+        "witness_plan": candidate_witness_plan_command(root, &candidate.id),
     })
 }
 
@@ -520,6 +555,19 @@ mod tests {
             0
         );
         assert!(value["handoff"]["manual_candidates"]["first_candidate"].is_null());
+        assert_eq!(
+            value["handoff"]["manual_candidates"]["candidate_queue_limit"],
+            MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT
+        );
+        assert_eq!(
+            value["handoff"]["manual_candidates"]["omitted_candidates"],
+            0
+        );
+        assert!(
+            value["handoff"]["manual_candidates"]["candidate_queue"]
+                .as_array()
+                .is_some_and(|queue| queue.is_empty())
+        );
         assert!(
             value["handoff"]["trust_boundary"]
                 .as_str()

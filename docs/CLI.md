@@ -310,8 +310,10 @@ saved LSP, repair-queue, and policy-report surfaces remain ReviewCard-only.
 The saved index keeps the same copy-only implementer handoff cues as
 `candidate list`.
 The first-pr terminal handoff and `review-kit.json` may include copy-only
-commands for manual candidate explain/context/witness-plan projection, while
-still labeling them manual/advisory and not analyzer-discovered.
+commands for manual candidate explain/context/witness-plan projection. The
+review-kit manifest also includes a bounded, sorted manual candidate queue with
+file:line and implementer handoff cues, while still labeling every entry
+manual/advisory and not analyzer-discovered.
 
 Manual candidate projections do not execute witnesses, post comments, edit
 source, enforce policy, prove UB, prove site execution, or prove repository
