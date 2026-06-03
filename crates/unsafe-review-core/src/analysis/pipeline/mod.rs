@@ -2786,6 +2786,59 @@ pub fn zstd_sync(
     }
 
     #[test]
+    fn js_buffer_reentry_fixture_pins_raw_parts_materialization_card() -> Result<(), String> {
+        let output = fixture_output("js_buffer_reentry_raw_parts_materialization")?;
+        assert_eq!(output.cards.len(), 2);
+        let raw_parts_card = output
+            .cards
+            .iter()
+            .find(|card| card.operation.family == OperationFamily::SliceFromRawParts)
+            .ok_or_else(|| "fixture should retain the raw-parts operation card".to_string())?;
+        let reentry_card = output
+            .cards
+            .iter()
+            .find(|card| card.operation.family == OperationFamily::UnsafeFnCall)
+            .ok_or_else(|| "fixture should emit the JS-backed reentry card".to_string())?;
+
+        assert_eq!(raw_parts_card.site.owner.as_deref(), Some("zstd_raw_parts"));
+        assert_eq!(reentry_card.site.owner.as_deref(), Some("zstd_raw_parts"));
+        assert_eq!(raw_parts_card.site.location.line, 32);
+        assert_eq!(reentry_card.site.location.line, 32);
+        assert!(
+            raw_parts_card
+                .operation
+                .expression
+                .contains("core::slice::from_raw_parts")
+        );
+        assert!(
+            reentry_card
+                .operation
+                .expression
+                .contains("JS-backed buffer descriptor")
+        );
+        assert!(
+            reentry_card
+                .operation
+                .expression
+                .contains("core::slice::from_raw_parts")
+        );
+        assert!(reentry_card.operation.expression.contains("options.get"));
+        assert!(
+            reentry_card
+                .next_action
+                .summary
+                .contains("re-fetch/copy bytes after reentry")
+        );
+        assert!(
+            reentry_card
+                .routes
+                .iter()
+                .any(|route| route.kind == WitnessKind::HumanDeepReview)
+        );
+        Ok(())
+    }
+
+    #[test]
     fn js_buffer_reentry_fixture_keeps_options_before_capture_no_card() -> Result<(), String> {
         let output = fixture_output("js_buffer_reentry_options_before_capture_no_card")?;
 

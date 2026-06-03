@@ -47,6 +47,23 @@ label_source = "fixture_golden"
 rationale = "A same-owner async JS-backed buffer descriptor captured before callback reentry and materialized through a helper should stay an advisory ReviewCard with manual-review routing."
 
 [[samples]]
+id = "js-buffer-reentry-raw-parts-materialization-emits-advisory-card"
+fixture = "js_buffer_reentry_raw_parts_materialization"
+kind = "positive"
+expected_cards = 2
+expected_class = "contract_missing"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+expected_owner = "zstd_raw_parts"
+expected_site_kind = "operation"
+expected_obligation_key = "callee-contract"
+expected_contract_state = "missing"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A same-owner JS-backed buffer descriptor captured before options getter reentry and materialized directly through core::slice::from_raw_parts should stay an advisory JS reentry ReviewCard while preserving the underlying raw-parts ReviewCard."
+
+[[samples]]
 id = "js-buffer-options-before-capture-emits-no-card"
 fixture = "js_buffer_reentry_options_before_capture_no_card"
 kind = "false_positive_control"
