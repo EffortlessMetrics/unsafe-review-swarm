@@ -261,6 +261,7 @@ mod tests {
             format!("unsafe-review context {card_id} --json")
         );
         assert_eq!(guard["agent_readiness"]["ready"], true);
+        assert_eq!(guard["agent_readiness"]["state"], "ready_for_agent");
         assert!(
             serde_json::to_string(&guard["missing_evidence"])
                 .map_err(|err| format!("render missing evidence failed: {err}"))?
@@ -303,6 +304,7 @@ mod tests {
         assert_eq!(human["operation_family"], "ffi");
         assert_eq!(no_auto["bucket_reason"], "not_ready_for_automatic_repair");
         assert_eq!(human["agent_readiness"]["ready"], false);
+        assert_eq!(human["agent_readiness"]["state"], "requires_human_review");
         assert!(
             serde_json::to_string(&human["agent_readiness"]["reasons"])
                 .map_err(|err| format!("render readiness reasons failed: {err}"))?
@@ -320,6 +322,7 @@ mod tests {
             operation_family: &'static str,
             buckets: &'static [&'static str],
             ready: bool,
+            state: &'static str,
         }
 
         for case in [
@@ -328,30 +331,35 @@ mod tests {
                 operation_family: "raw_pointer_read",
                 buckets: &["repairable_by_guard", "requires_witness_receipt"],
                 ready: true,
+                state: "ready_for_agent",
             },
             Case {
                 fixture: "vec_set_len",
                 operation_family: "vec_set_len",
                 buckets: &["repairable_by_guard", "requires_witness_receipt"],
                 ready: true,
+                state: "ready_for_agent",
             },
             Case {
                 fixture: "str_from_utf8_unchecked",
                 operation_family: "str_from_utf8_unchecked",
                 buckets: &["repairable_by_guard", "requires_witness_receipt"],
                 ready: true,
+                state: "ready_for_agent",
             },
             Case {
                 fixture: "maybeuninit_assume_init",
                 operation_family: "maybe_uninit_assume_init",
                 buckets: &["repairable_by_guard", "requires_witness_receipt"],
                 ready: true,
+                state: "ready_for_agent",
             },
             Case {
                 fixture: "nonnull_other_guard_not_evidence",
                 operation_family: "nonnull_unchecked",
                 buckets: &["repairable_by_guard", "requires_witness_receipt"],
                 ready: true,
+                state: "ready_for_agent",
             },
             Case {
                 fixture: "ffi_sanitizer_route",
@@ -364,6 +372,7 @@ mod tests {
                     "do_not_auto_repair",
                 ],
                 ready: false,
+                state: "requires_human_review",
             },
             Case {
                 fixture: "atomic_pointer_state_swap",
@@ -372,10 +381,10 @@ mod tests {
                     "repairable_by_guard",
                     "repairable_by_safety_docs",
                     "requires_witness_receipt",
-                    "requires_human_review",
                     "do_not_auto_repair",
                 ],
                 ready: false,
+                state: "requires_witness_receipt",
             },
             Case {
                 fixture: "unsafe_impl_send",
@@ -383,10 +392,10 @@ mod tests {
                 buckets: &[
                     "repairable_by_guard",
                     "requires_witness_receipt",
-                    "requires_human_review",
                     "do_not_auto_repair",
                 ],
                 ready: false,
+                state: "requires_witness_receipt",
             },
             Case {
                 fixture: "inline_asm_human_review",
@@ -398,6 +407,7 @@ mod tests {
                     "do_not_auto_repair",
                 ],
                 ready: false,
+                state: "requires_human_review",
             },
             Case {
                 fixture: "split_unsafe_block",
@@ -411,6 +421,7 @@ mod tests {
                     "do_not_auto_repair",
                 ],
                 ready: false,
+                state: "requires_human_review",
             },
         ] {
             let output = fixture_output(case.fixture)?;
@@ -446,6 +457,11 @@ mod tests {
                 assert_eq!(
                     entry["agent_readiness"]["ready"], case.ready,
                     "{} bucket `{bucket}` should keep the agent readiness",
+                    case.fixture
+                );
+                assert_eq!(
+                    entry["agent_readiness"]["state"], case.state,
+                    "{} bucket `{bucket}` should keep the agent readiness state",
                     case.fixture
                 );
                 assert_repair_queue_boundaries(entry)?;
@@ -515,17 +531,48 @@ mod tests {
 
         let mut aggregate_buckets = repair_queue_buckets_for_card(&queue, card_id)?;
         aggregate_buckets.sort();
-        assert_eq!(
-            aggregate_buckets,
-            vec!["do_not_auto_repair", "requires_human_review"]
-        );
+        assert_eq!(aggregate_buckets, vec!["do_not_auto_repair"]);
         assert_eq!(
             sorted_string_array(&packet["repair_queue"]["buckets"], "agent packet buckets")?,
-            vec!["do_not_auto_repair", "requires_human_review"]
+            vec!["do_not_auto_repair"]
         );
         let aggregate_readiness = repair_queue_readiness_for_card(&queue, card_id)?;
         assert_eq!(aggregate_readiness["ready"], false);
-        assert_eq!(aggregate_readiness["state"], "not_recommended");
+        assert_eq!(aggregate_readiness["state"], "unsupported");
+        assert_eq!(
+            aggregate_readiness["reasons"],
+            packet["agent_readiness"]["reasons"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn repair_queue_marks_witness_only_cards_requires_witness_receipt() -> Result<(), String> {
+        let mut output = fixture_output("raw_pointer_alignment")?;
+        let Some(card) = output.cards.first_mut() else {
+            return Err("fixture should emit at least one card".to_string());
+        };
+        card.missing.retain(|missing| missing.kind == "witness");
+        if card.missing.is_empty() {
+            return Err("fixture should carry witness missing evidence".to_string());
+        }
+        let card = card.clone();
+
+        let queue = parse_json(&render(&output))?;
+        let packet = parse_json(&agent::render(&card))?;
+        let card_id = card.id.0.as_str();
+
+        assert_eq!(
+            repair_queue_buckets_for_card(&queue, card_id)?,
+            vec!["do_not_auto_repair", "requires_witness_receipt"]
+        );
+        assert_eq!(
+            sorted_string_array(&packet["repair_queue"]["buckets"], "agent packet buckets")?,
+            vec!["do_not_auto_repair", "requires_witness_receipt"]
+        );
+        let aggregate_readiness = repair_queue_readiness_for_card(&queue, card_id)?;
+        assert_eq!(aggregate_readiness["ready"], false);
+        assert_eq!(aggregate_readiness["state"], "requires_witness_receipt");
         assert_eq!(
             aggregate_readiness["reasons"],
             packet["agent_readiness"]["reasons"]

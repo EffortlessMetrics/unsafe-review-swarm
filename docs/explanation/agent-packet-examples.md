@@ -20,7 +20,7 @@ Every packet projects from one `ReviewCard` and keeps the same trust boundary:
   "repair_scope": "this card only",
   "agent_readiness": {
     "ready": true,
-    "state": "ready"
+    "state": "ready_for_agent"
   }
 }
 ```
@@ -42,6 +42,17 @@ The useful fields for an agent handoff are:
   claims, automatic safety-repair claims, unrelated edits, and replacing
   executable guard/discharge evidence with comments or docs.
 - `stop_conditions`: when the agent should stop and hand the result back.
+
+Readiness states are closed vocabulary:
+
+- `ready_for_agent`: an agent may work the bounded card-scoped repair.
+- `requires_human_review`: summarize and hand to a human reviewer before edits.
+- `requires_witness_receipt`: run or attach external witness evidence outside
+  `unsafe-review`; do not treat this as an edit task.
+- `unsupported`: do not delegate as repair work from this packet.
+
+The verifier enforces `ready = true` only for `ready_for_agent`; all other
+states must have `ready = false`.
 
 ## Repair Queue Examples
 
@@ -74,7 +85,7 @@ Packet focus:
 ```text
 operation_family: raw_pointer_read
 missing: alignment / pointer / initialization / allocation evidence as reported by the card
-agent_readiness: ready
+agent_readiness: ready_for_agent
 ```
 
 Useful handoff:
@@ -114,7 +125,7 @@ Packet focus:
 ```text
 operation_family: copy_nonoverlapping
 missing: source range, destination range, non-overlap, or witness evidence
-agent_readiness: ready when the packet has scoped repairs and verify commands
+agent_readiness: ready_for_agent when the packet has scoped repairs and verify commands
 ```
 
 Useful handoff:
@@ -155,7 +166,7 @@ Packet focus:
 ```text
 operation_family: str_from_utf8_unchecked
 missing: same-buffer UTF-8 validation or witness evidence
-agent_readiness: ready when the unsafe site and validation target are specific
+agent_readiness: ready_for_agent when the unsafe site and validation target are specific
 ```
 
 Useful handoff:
@@ -195,7 +206,7 @@ Packet focus:
 ```text
 operation_family: nonnull_unchecked
 missing: same-pointer non-null evidence or witness evidence
-agent_readiness: ready when the card identifies one concrete pointer
+agent_readiness: ready_for_agent when the card identifies one concrete pointer
 ```
 
 Useful handoff:
@@ -236,7 +247,7 @@ Packet focus:
 ```text
 operation_family: get_unchecked
 missing: same-slice / same-index bounds evidence or witness evidence
-agent_readiness: ready only when the packet has card-scoped same-index repairs
+agent_readiness: ready_for_agent only when the packet has card-scoped same-index repairs
 ```
 
 Useful handoff:
@@ -278,7 +289,7 @@ Packet focus:
 ```text
 operation_family: maybe_uninit_assume_init
 missing: same-slot initialization evidence or witness evidence
-agent_readiness: ready only when the initialized slot and unsafe site are specific
+agent_readiness: ready_for_agent only when the initialized slot and unsafe site are specific
 ```
 
 Useful handoff:
@@ -320,7 +331,7 @@ Packet focus:
 ```text
 operation_family: vec_set_len
 missing: same-vector capacity evidence, initialized-range evidence, or witness evidence
-agent_readiness: ready when the packet separates capacity from initialized length
+agent_readiness: ready_for_agent when the packet separates capacity from initialized length
 ```
 
 Useful handoff:
@@ -363,7 +374,7 @@ Packet focus:
 ```text
 operation_family: transmute
 missing: layout evidence, valid-value evidence, or witness evidence
-agent_readiness: ready only for narrow value-domain repairs
+agent_readiness: ready_for_agent only for narrow value-domain repairs
 ```
 
 Useful handoff:
@@ -403,7 +414,7 @@ Packet focus:
 ```text
 operation_family: atomic_pointer_state
 missing: concurrency/state invariant evidence or specialist witness route
-agent_readiness: usually not ready / needs human review
+agent_readiness: usually requires_human_review
 ```
 
 Useful handoff:
@@ -441,7 +452,7 @@ Packet focus:
 
 ```text
 operation_family: ffi
-agent_readiness: not ready / needs human review
+agent_readiness: requires_human_review
 ```
 
 Useful handoff:
@@ -478,7 +489,7 @@ Packet focus:
 
 ```text
 operation_family: inline_asm or target_feature
-agent_readiness: not ready / needs human review
+agent_readiness: requires_human_review
 ```
 
 Useful handoff:
@@ -510,7 +521,7 @@ Packet focus:
 
 ```text
 operation_family: unknown or unsupported
-agent_readiness: not ready / needs human review
+agent_readiness: requires_human_review
 ```
 
 Useful handoff:
@@ -544,8 +555,7 @@ Why this is not a repair-ready packet:
 Before handing a packet to an agent, check:
 
 - The packet is for one `card_id`.
-- `agent_readiness.ready` is true for repair work, or the task is explicitly
-  human-review-only.
+- `agent_readiness.state` is `ready_for_agent` before delegating repair work.
 - `allowed_repairs` matches the missing obligation.
 - `source_context` is enough to orient the task without dumping whole files.
 - `verify_commands` are suggestions only; a receipt is needed before claiming a

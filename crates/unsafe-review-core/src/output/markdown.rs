@@ -868,7 +868,7 @@ mod tests {
             card.id
         )));
         assert!(rendered.contains(
-            "- Agent handoff: `ready`; buckets: `repairable_by_guard`, `requires_witness_receipt`; reasons: specific operation family"
+            "- Agent handoff: `ready_for_agent`; buckets: `repairable_by_guard`, `requires_witness_receipt`; reasons: specific operation family"
         ));
         assert!(rendered.contains("- Receipt audit: `receipt-audit.md`"));
         assert!(rendered.contains("no witness was run"));

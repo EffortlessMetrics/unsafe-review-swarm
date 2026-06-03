@@ -12947,8 +12947,8 @@ Snapshot reports:
         fs::write(
             &path,
             summary.replace(
-                "- Agent handoff: `ready`; buckets: `repairable_by_guard`, `requires_witness_receipt`; reasons: specific operation family",
-                "- Agent handoff: `needs_human_review`; buckets: `requires_human_review`; reasons: unrelated",
+                "- Agent handoff: `ready_for_agent`; buckets: `repairable_by_guard`, `requires_witness_receipt`; reasons: specific operation family",
+                "- Agent handoff: `requires_human_review`; buckets: `requires_human_review`; reasons: unrelated",
             ),
         )
         .map_err(|err| format!("write pr summary failed: {err}"))?;
@@ -12958,7 +12958,7 @@ Snapshot reports:
         fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert!(
             result.err().unwrap_or_default().contains(
-                "top card `card-1` agent handoff must include `- Agent handoff: `ready`; buckets: `repairable_by_guard`, `requires_witness_receipt`; reasons: specific operation family`"
+                "top card `card-1` agent handoff must include `- Agent handoff: `ready_for_agent`; buckets: `repairable_by_guard`, `requires_witness_receipt`; reasons: specific operation family`"
             )
         );
         Ok(())
@@ -15125,7 +15125,7 @@ Snapshot reports:
             result
                 .err()
                 .unwrap_or_default()
-                .contains("repair-queue.json agent_readiness.state must be `ready`, `needs_human_review`, or `not_recommended`; got `maybe_ready`")
+                .contains("repair-queue.json agent_readiness.state must be `ready_for_agent`, `requires_human_review`, `requires_witness_receipt`, or `unsupported`; got `maybe_ready`")
         );
         Ok(())
     }
@@ -15143,7 +15143,7 @@ Snapshot reports:
         )
         .map_err(|err| format!("parse repair queue failed: {err}"))?;
         repair_queue["buckets"]["repairable_by_guard"][0]["agent_readiness"]["state"] =
-            serde_json::json!("needs_human_review");
+            serde_json::json!("requires_human_review");
         fs::write(&path, repair_queue.to_string())
             .map_err(|err| format!("write repair queue failed: {err}"))?;
 
@@ -15151,7 +15151,32 @@ Snapshot reports:
 
         fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert!(result.err().unwrap_or_default().contains(
-            "repair-queue.json agent_readiness.state must be `ready` when ready is true"
+            "repair-queue.json agent_readiness.state must be `ready_for_agent` when ready is true"
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn advisory_artifact_checker_rejects_false_ready_for_agent_state() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-artifacts-repair-queue-false-ready-for-agent")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_artifacts(&dir)?;
+
+        let path = dir.join("repair-queue.json");
+        let mut repair_queue: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(&path).map_err(|err| format!("read repair queue failed: {err}"))?,
+        )
+        .map_err(|err| format!("parse repair queue failed: {err}"))?;
+        repair_queue["buckets"]["repairable_by_guard"][0]["agent_readiness"]["ready"] =
+            serde_json::json!(false);
+        fs::write(&path, repair_queue.to_string())
+            .map_err(|err| format!("write repair queue failed: {err}"))?;
+
+        let result = check_advisory_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(result.err().unwrap_or_default().contains(
+            "repair-queue.json agent_readiness.state `ready_for_agent` requires ready = true"
         ));
         Ok(())
     }
@@ -15171,7 +15196,7 @@ Snapshot reports:
         let readiness =
             &mut repair_queue["buckets"]["requires_witness_receipt"][0]["agent_readiness"];
         readiness["ready"] = serde_json::json!(false);
-        readiness["state"] = serde_json::json!("needs_human_review");
+        readiness["state"] = serde_json::json!("requires_human_review");
         fs::write(&path, repair_queue.to_string())
             .map_err(|err| format!("write repair queue failed: {err}"))?;
 
@@ -15657,7 +15682,7 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write cards failed: {err}"))?;
         fs::write(
             dir.join("pr-summary.md"),
-            "- Scope: `diff`\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Top card\n\n- ID: `card-1`\n- Class: `guard_missing`\n- Location: src/lib.rs:7\n- Operation: `unsafe { ptr.cast::<Header>().read() }`\n- Operation family: `raw_pointer_read`\n- Missing evidence: No missing evidence recorded\n- Primary route: `miri` because route\n\n```bash\ncargo +nightly miri test card\n```\n- Next action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Explain: `unsafe-review explain card-1`\n- Agent context: `unsafe-review context card-1 --json`\n- Agent handoff: `ready`; buckets: `repairable_by_guard`, `requires_witness_receipt`; reasons: specific operation family\n\n## Card table\n\n| ID | Class | Location | Operation family | Operation | Missing evidence | Route | Next action |\n|---|---|---|---|---|---|---|---|\n| `card-1` | `guard_missing` | src/lib.rs:7 | `raw_pointer_read` | `unsafe { ptr.cast::<Header>().read() }` | No missing evidence recorded | `miri` | Add or expose the local guard that discharges the `raw_pointer_read` safety obligation. |\n\n## Witness plan\n\n- `card-1`: `miri` because route\n\n```bash\ncargo +nightly miri test card\n```\n\n## Trust boundary\n\nThis artifact is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
+            "- Scope: `diff`\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Top card\n\n- ID: `card-1`\n- Class: `guard_missing`\n- Location: src/lib.rs:7\n- Operation: `unsafe { ptr.cast::<Header>().read() }`\n- Operation family: `raw_pointer_read`\n- Missing evidence: No missing evidence recorded\n- Primary route: `miri` because route\n\n```bash\ncargo +nightly miri test card\n```\n- Next action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Explain: `unsafe-review explain card-1`\n- Agent context: `unsafe-review context card-1 --json`\n- Agent handoff: `ready_for_agent`; buckets: `repairable_by_guard`, `requires_witness_receipt`; reasons: specific operation family\n\n## Card table\n\n| ID | Class | Location | Operation family | Operation | Missing evidence | Route | Next action |\n|---|---|---|---|---|---|---|---|\n| `card-1` | `guard_missing` | src/lib.rs:7 | `raw_pointer_read` | `unsafe { ptr.cast::<Header>().read() }` | No missing evidence recorded | `miri` | Add or expose the local guard that discharges the `raw_pointer_read` safety obligation. |\n\n## Witness plan\n\n- `card-1`: `miri` because route\n\n```bash\ncargo +nightly miri test card\n```\n\n## Trust boundary\n\nThis artifact is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
         )
         .map_err(|err| format!("write pr summary failed: {err}"))?;
         fs::write(
@@ -15672,7 +15697,7 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write comment plan failed: {err}"))?;
         fs::write(
             dir.join("repair-queue.json"),
-            add_repair_queue_boundaries(r#"{"schema_version":"0.1","tool":"unsafe-review","mode":"aggregate_repair_queue","source":"review_card","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue","summary":{"cards":1,"repairable_by_guard":1,"repairable_by_safety_docs":0,"repairable_by_test":0,"requires_witness_receipt":1,"requires_human_review":0,"do_not_auto_repair":0},"buckets":{"repairable_by_guard":[{"card_id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operation_family":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":true,"state":"ready","reasons":["specific operation family"]},"bucket_reason":"guard_evidence_missing","context_command":"unsafe-review context card-1 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"repairable_by_safety_docs":[],"repairable_by_test":[],"requires_witness_receipt":[{"card_id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operation_family":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":true,"state":"ready","reasons":["specific operation family"]},"bucket_reason":"witness_receipt_missing","context_command":"unsafe-review context card-1 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"requires_human_review":[],"do_not_auto_repair":[]}}"#),
+            add_repair_queue_boundaries(r#"{"schema_version":"0.1","tool":"unsafe-review","mode":"aggregate_repair_queue","source":"review_card","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue","summary":{"cards":1,"repairable_by_guard":1,"repairable_by_safety_docs":0,"repairable_by_test":0,"requires_witness_receipt":1,"requires_human_review":0,"do_not_auto_repair":0},"buckets":{"repairable_by_guard":[{"card_id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operation_family":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":true,"state":"ready_for_agent","reasons":["specific operation family"]},"bucket_reason":"guard_evidence_missing","context_command":"unsafe-review context card-1 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"repairable_by_safety_docs":[],"repairable_by_test":[],"requires_witness_receipt":[{"card_id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operation_family":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":true,"state":"ready_for_agent","reasons":["specific operation family"]},"bucket_reason":"witness_receipt_missing","context_command":"unsafe-review context card-1 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"requires_human_review":[],"do_not_auto_repair":[]}}"#),
         )
         .map_err(|err| format!("write repair queue failed: {err}"))?;
         fs::write(dir.join("receipt-audit.md"), receipt_audit_markdown())
@@ -15704,7 +15729,7 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write comment plan failed: {err}"))?;
         fs::write(
             dir.join("repair-queue.json"),
-            add_repair_queue_boundaries(r#"{"schema_version":"0.1","tool":"unsafe-review","mode":"aggregate_repair_queue","source":"review_card","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue","summary":{"cards":2,"repairable_by_guard":1,"repairable_by_safety_docs":1,"repairable_by_test":0,"requires_witness_receipt":1,"requires_human_review":1,"do_not_auto_repair":1},"buckets":{"repairable_by_guard":[{"card_id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operation_family":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":true,"state":"ready","reasons":["specific operation family"]},"bucket_reason":"guard_evidence_missing","context_command":"unsafe-review context card-1 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"repairable_by_safety_docs":[{"card_id":"card-2","class":"contract_missing","priority":"high","confidence":"high","operation_family":"unknown","operation":"unsafe fn read_header(ptr: *const u8)","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":false,"state":"needs_human_review","reasons":["operation family `unknown` is not safe for automatic repair delegation"]},"bucket_reason":"safety_docs_evidence_missing","context_command":"unsafe-review context card-2 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"repairable_by_test":[],"requires_witness_receipt":[{"card_id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operation_family":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":true,"state":"ready","reasons":["specific operation family"]},"bucket_reason":"witness_receipt_missing","context_command":"unsafe-review context card-1 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"requires_human_review":[{"card_id":"card-2","class":"contract_missing","priority":"high","confidence":"high","operation_family":"unknown","operation":"unsafe fn read_header(ptr: *const u8)","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":false,"state":"needs_human_review","reasons":["operation family `unknown` is not safe for automatic repair delegation"]},"bucket_reason":"human_review_required","context_command":"unsafe-review context card-2 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"do_not_auto_repair":[{"card_id":"card-2","class":"contract_missing","priority":"high","confidence":"high","operation_family":"unknown","operation":"unsafe fn read_header(ptr: *const u8)","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":false,"state":"needs_human_review","reasons":["operation family `unknown` is not safe for automatic repair delegation"]},"bucket_reason":"not_ready_for_automatic_repair","context_command":"unsafe-review context card-2 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}]}}"#),
+            add_repair_queue_boundaries(r#"{"schema_version":"0.1","tool":"unsafe-review","mode":"aggregate_repair_queue","source":"review_card","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue","summary":{"cards":2,"repairable_by_guard":1,"repairable_by_safety_docs":1,"repairable_by_test":0,"requires_witness_receipt":1,"requires_human_review":1,"do_not_auto_repair":1},"buckets":{"repairable_by_guard":[{"card_id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operation_family":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":true,"state":"ready_for_agent","reasons":["specific operation family"]},"bucket_reason":"guard_evidence_missing","context_command":"unsafe-review context card-1 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"repairable_by_safety_docs":[{"card_id":"card-2","class":"contract_missing","priority":"high","confidence":"high","operation_family":"unknown","operation":"unsafe fn read_header(ptr: *const u8)","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":false,"state":"requires_human_review","reasons":["operation family `unknown` is not safe for automatic repair delegation"]},"bucket_reason":"safety_docs_evidence_missing","context_command":"unsafe-review context card-2 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"repairable_by_test":[],"requires_witness_receipt":[{"card_id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","operation_family":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":true,"state":"ready_for_agent","reasons":["specific operation family"]},"bucket_reason":"witness_receipt_missing","context_command":"unsafe-review context card-1 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"requires_human_review":[{"card_id":"card-2","class":"contract_missing","priority":"high","confidence":"high","operation_family":"unknown","operation":"unsafe fn read_header(ptr: *const u8)","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":false,"state":"requires_human_review","reasons":["operation family `unknown` is not safe for automatic repair delegation"]},"bucket_reason":"human_review_required","context_command":"unsafe-review context card-2 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"do_not_auto_repair":[{"card_id":"card-2","class":"contract_missing","priority":"high","confidence":"high","operation_family":"unknown","operation":"unsafe fn read_header(ptr: *const u8)","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":false,"state":"requires_human_review","reasons":["operation family `unknown` is not safe for automatic repair delegation"]},"bucket_reason":"not_ready_for_automatic_repair","context_command":"unsafe-review context card-2 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}]}}"#),
         )
         .map_err(|err| format!("write repair queue failed: {err}"))?;
         fs::write(dir.join("receipt-audit.md"), receipt_audit_markdown())

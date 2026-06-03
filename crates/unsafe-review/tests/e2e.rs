@@ -480,7 +480,7 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     );
     assert!(packet["witness_routes"].is_array());
     assert_eq!(packet["agent_readiness"]["ready"], true);
-    assert_eq!(packet["agent_readiness"]["state"], "ready");
+    assert_eq!(packet["agent_readiness"]["state"], "ready_for_agent");
     let allowed_repairs = serde_json::to_string(&packet["allowed_repairs"])?;
     assert!(allowed_repairs.contains("alignment guard"));
     assert!(allowed_repairs.contains("witness receipt"));
@@ -588,7 +588,7 @@ fn context_packet_queues_contract_gaps_for_public_safety_docs() -> Result<(), Bo
     assert!(repair_queue.contains("requires_human_review"));
     assert!(repair_queue.contains("do_not_auto_repair"));
     assert_eq!(packet["agent_readiness"]["ready"], false);
-    assert_eq!(packet["agent_readiness"]["state"], "needs_human_review");
+    assert_eq!(packet["agent_readiness"]["state"], "requires_human_review");
     let reasons = serde_json::to_string(&packet["agent_readiness"]["reasons"])?;
     assert!(reasons.contains("operation family `unknown`"));
     assert!(reasons.contains("no verify command"));

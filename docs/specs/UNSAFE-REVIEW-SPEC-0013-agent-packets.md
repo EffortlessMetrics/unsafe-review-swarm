@@ -55,13 +55,24 @@ and a few related test mentions. It must not dump whole files by default, and a
 related test mention remains reach evidence only; it is not a claim that the
 unsafe site executed.
 
-`agent_readiness` is additive metadata, not analyzer truth. A packet is marked
-`ready` only when the ReviewCard has an actionable class, a concrete operation
-family, medium-or-high confidence, card-scoped allowed repairs, and a verify
-command. Cards that require human deep review, unsupported witness routes,
-ambiguous operation families, weak confidence, or external specialist routing
-are marked not ready with reasons. This classification does not execute an
-agent, apply edits, run witnesses, or resolve the card.
+`agent_readiness` is additive metadata, not analyzer truth. Its state vocabulary
+is closed:
+
+- `ready_for_agent`: bounded card-scoped repair work is allowed.
+- `requires_human_review`: a reviewer must inspect or narrow the card before
+  edits.
+- `requires_witness_receipt`: the remaining work is external witness evidence,
+  not an automatic source repair.
+- `unsupported`: the packet is not a supported repair task.
+
+A packet is marked `ready_for_agent` only when the ReviewCard has an actionable
+class, a concrete operation family, medium-or-high confidence, card-scoped
+allowed repairs, and a verify command. `ready = true` requires
+`state = ready_for_agent`; `ready = false` requires any other closed state.
+Cards that require human deep review, unsupported witness routes, ambiguous
+operation families, weak confidence, receipt-only work, or external specialist
+routing are marked not ready with reasons. This classification does not execute
+an agent, apply edits, run witnesses, or resolve the card.
 
 Packets constrain LLMs with task, contract, missing evidence, allowed repairs,
 do-not-do list, verify commands, and stop conditions. They are copy-only in
@@ -137,9 +148,11 @@ repair-queue vocabulary, every queue entry references a known ReviewCard, every
 bucket reason is from a closed vocabulary, do-not-do boundaries are present, and
 no queue entry weakens the source card's missing evidence or trust boundary.
 Each queue entry's `agent_readiness.reasons` must explain why the packet is or
-is not ready for bounded agent work. `agent_readiness.state` must be `ready`,
-`needs_human_review`, or `not_recommended`, and must agree with
-`agent_readiness.ready`.
+is not ready for bounded agent work. `agent_readiness.state` must be
+`ready_for_agent`, `requires_human_review`, `requires_witness_receipt`, or
+`unsupported`, and must agree with `agent_readiness.ready`: `ready = true`
+means `state = ready_for_agent`, and `ready = false` means the state is not
+`ready_for_agent`.
 Entries in `requires_human_review` or `do_not_auto_repair` must not be marked
 agent-ready.
 
@@ -186,7 +199,7 @@ agent-ready.
 - If the ReviewCard carries a static reach gap, allowed repairs may name a
   focused test for the owner or seam, but the packet must preserve that a test
   mention is reach evidence only and not site-execution proof.
-- Agent readiness is `ready` for a high-confidence, card-scoped repair packet
+- Agent readiness is `ready_for_agent` for a high-confidence, card-scoped repair packet
   with a verify command, and is not ready for human-review or unsupported
   operation families such as inline assembly and FFI ownership boundaries.
 - Repair queue buckets reflect missing ReviewCard evidence: safety-doc gaps can

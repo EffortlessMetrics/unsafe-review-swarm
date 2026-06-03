@@ -21,6 +21,11 @@ pub(crate) struct AgentReadiness {
     pub(crate) reasons: Vec<String>,
 }
 
+pub(crate) const READY_FOR_AGENT: &str = "ready_for_agent";
+pub(crate) const REQUIRES_HUMAN_REVIEW: &str = "requires_human_review";
+pub(crate) const REQUIRES_WITNESS_RECEIPT: &str = "requires_witness_receipt";
+pub(crate) const UNSUPPORTED: &str = "unsupported";
+
 #[derive(Clone, Serialize)]
 pub(crate) struct AgentRepairQueue {
     pub(crate) buckets: Vec<&'static str>,
@@ -28,6 +33,14 @@ pub(crate) struct AgentRepairQueue {
 }
 
 impl AgentReadiness {
+    pub(super) fn ready_for_agent(reasons: Vec<String>) -> Self {
+        Self {
+            ready: true,
+            state: READY_FOR_AGENT,
+            reasons,
+        }
+    }
+
     pub(super) fn not_ready(state: &'static str, reasons: Vec<String>) -> Self {
         Self {
             ready: false,
@@ -83,8 +96,10 @@ fn repair_queue(card: &ReviewCard, readiness: &AgentReadiness) -> AgentRepairQue
     if has_missing_kind(card, "witness") {
         push_bucket(&mut buckets, "requires_witness_receipt");
     }
-    if !readiness.ready {
+    if readiness.state == REQUIRES_HUMAN_REVIEW {
         push_bucket(&mut buckets, "requires_human_review");
+    }
+    if !readiness.ready {
         push_bucket(&mut buckets, "do_not_auto_repair");
     }
     if buckets.is_empty() {

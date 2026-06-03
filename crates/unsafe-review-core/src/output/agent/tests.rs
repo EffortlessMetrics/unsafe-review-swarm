@@ -115,7 +115,7 @@ fn agent_packet_is_parseable_bounded_and_card_sourced() -> Result<(), String> {
     }
     assert!(value["allowed_repairs"].is_array());
     assert_eq!(value["agent_readiness"]["ready"], true);
-    assert_eq!(value["agent_readiness"]["state"], "ready");
+    assert_eq!(value["agent_readiness"]["state"], "ready_for_agent");
     assert!(
         serde_json::to_string(&value["agent_readiness"]["reasons"])
             .map_err(|err| format!("render readiness reasons failed: {err}"))?
@@ -206,7 +206,7 @@ fn agent_packet_queues_contract_gaps_without_auto_repair_ready() -> Result<(), S
     assert!(repair_queue.contains("requires_human_review"));
     assert!(repair_queue.contains("do_not_auto_repair"));
     assert_eq!(value["agent_readiness"]["ready"], false);
-    assert_eq!(value["agent_readiness"]["state"], "needs_human_review");
+    assert_eq!(value["agent_readiness"]["state"], "requires_human_review");
     assert!(reasons.contains("operation family `unknown`"));
     assert!(reasons.contains("no verify command"));
     Ok(())
@@ -251,7 +251,7 @@ fn agent_packet_scopes_ptr_copy_repairs_to_count_and_source_range() -> Result<()
     assert!(!allowed_repairs.contains("do not overlap"));
     assert!(!allowed_repairs.contains("alignment guard"));
     assert_eq!(value["agent_readiness"]["ready"], true);
-    assert_eq!(value["agent_readiness"]["state"], "ready");
+    assert_eq!(value["agent_readiness"]["state"], "ready_for_agent");
     Ok(())
 }
 
@@ -274,7 +274,7 @@ fn agent_packet_scopes_raw_pointer_repairs_to_pointer_and_range() -> Result<(), 
     assert!(!allowed_repairs.contains("same-slice length/range guard"));
     assert!(!allowed_repairs.contains("all-zero bit pattern"));
     assert_eq!(value["agent_readiness"]["ready"], true);
-    assert_eq!(value["agent_readiness"]["state"], "ready");
+    assert_eq!(value["agent_readiness"]["state"], "ready_for_agent");
     Ok(())
 }
 
@@ -315,7 +315,7 @@ fn agent_packet_scopes_ptr_replace_repairs_to_destination_and_ownership() -> Res
     assert!(!allowed_repairs.contains("all-zero bit pattern"));
     assert!(!allowed_repairs.contains("callee safety contract"));
     assert_eq!(value["agent_readiness"]["ready"], true);
-    assert_eq!(value["agent_readiness"]["state"], "ready");
+    assert_eq!(value["agent_readiness"]["state"], "ready_for_agent");
     Ok(())
 }
 
@@ -337,7 +337,7 @@ fn agent_packet_scopes_vec_set_len_repairs_to_same_vector_and_length() -> Result
     assert!(!allowed_repairs.contains("same-slice"));
     assert!(!allowed_repairs.contains("same raw pointer"));
     assert_eq!(value["agent_readiness"]["ready"], true);
-    assert_eq!(value["agent_readiness"]["state"], "ready");
+    assert_eq!(value["agent_readiness"]["state"], "ready_for_agent");
     Ok(())
 }
 
@@ -357,7 +357,7 @@ fn agent_packet_scopes_get_unchecked_repairs_to_same_slice_and_index() -> Result
     assert!(allowed_repairs.contains("witness receipt"));
     assert!(!allowed_repairs.contains("alignment guard"));
     assert_eq!(value["agent_readiness"]["ready"], true);
-    assert_eq!(value["agent_readiness"]["state"], "ready");
+    assert_eq!(value["agent_readiness"]["state"], "ready_for_agent");
     Ok(())
 }
 
@@ -381,7 +381,7 @@ fn agent_packet_scopes_maybeuninit_repairs_to_same_slot_initialization() -> Resu
     assert!(!allowed_repairs.contains("alignment guard"));
     assert!(!allowed_repairs.contains("same-slice"));
     assert_eq!(value["agent_readiness"]["ready"], true);
-    assert_eq!(value["agent_readiness"]["state"], "ready");
+    assert_eq!(value["agent_readiness"]["state"], "ready_for_agent");
     Ok(())
 }
 
@@ -402,7 +402,7 @@ fn agent_packet_scopes_transmute_repairs_to_layout_and_valid_value() -> Result<(
     assert!(!allowed_repairs.contains("same-slice"));
     assert!(!allowed_repairs.contains("same `MaybeUninit` slot"));
     assert_eq!(value["agent_readiness"]["ready"], true);
-    assert_eq!(value["agent_readiness"]["state"], "ready");
+    assert_eq!(value["agent_readiness"]["state"], "ready_for_agent");
     Ok(())
 }
 
@@ -424,7 +424,7 @@ fn agent_packet_scopes_unwrap_unchecked_repairs_to_same_receiver_state() -> Resu
     assert!(!allowed_repairs.contains("same-slice"));
     assert!(!allowed_repairs.contains("valid-value domain"));
     assert_eq!(value["agent_readiness"]["ready"], true);
-    assert_eq!(value["agent_readiness"]["state"], "ready");
+    assert_eq!(value["agent_readiness"]["state"], "ready_for_agent");
     Ok(())
 }
 
@@ -448,7 +448,7 @@ fn agent_packet_scopes_unreachable_unchecked_repairs_to_same_control_path() -> R
     assert!(!allowed_repairs.contains("same-receiver"));
     assert!(!allowed_repairs.contains("valid-value domain"));
     assert_eq!(value["agent_readiness"]["ready"], true);
-    assert_eq!(value["agent_readiness"]["state"], "ready");
+    assert_eq!(value["agent_readiness"]["state"], "ready_for_agent");
     Ok(())
 }
 
@@ -474,7 +474,7 @@ fn agent_packet_scopes_utf8_repairs_to_same_buffer_validation() -> Result<(), St
     assert!(!allowed_repairs.contains("same-slice"));
     assert!(!allowed_repairs.contains("same raw pointer"));
     assert_eq!(value["agent_readiness"]["ready"], true);
-    assert_eq!(value["agent_readiness"]["state"], "ready");
+    assert_eq!(value["agent_readiness"]["state"], "ready_for_agent");
     Ok(())
 }
 
@@ -496,7 +496,7 @@ fn agent_packet_scopes_nonnull_repairs_to_same_pointer() -> Result<(), String> {
     assert!(!allowed_repairs.contains("same byte buffer"));
     assert!(!allowed_repairs.contains("same-slice"));
     assert_eq!(value["agent_readiness"]["ready"], true);
-    assert_eq!(value["agent_readiness"]["state"], "ready");
+    assert_eq!(value["agent_readiness"]["state"], "ready_for_agent");
     Ok(())
 }
 
@@ -518,7 +518,7 @@ fn agent_packet_scopes_zeroed_repairs_to_valid_zero_target_type() -> Result<(), 
     assert!(!allowed_repairs.contains("same control-flow path"));
     assert!(!allowed_repairs.contains("same-receiver"));
     assert_eq!(value["agent_readiness"]["ready"], true);
-    assert_eq!(value["agent_readiness"]["state"], "ready");
+    assert_eq!(value["agent_readiness"]["state"], "ready_for_agent");
     Ok(())
 }
 
@@ -541,7 +541,7 @@ fn agent_packet_scopes_box_from_raw_repairs_to_same_pointer_ownership() -> Resul
     assert!(!allowed_repairs.contains("same-slice"));
     assert!(!allowed_repairs.contains("all-zero bit pattern"));
     assert_eq!(value["agent_readiness"]["ready"], true);
-    assert_eq!(value["agent_readiness"]["state"], "ready");
+    assert_eq!(value["agent_readiness"]["state"], "ready_for_agent");
     Ok(())
 }
 
@@ -563,7 +563,7 @@ fn agent_packet_scopes_drop_in_place_repairs_to_drop_obligations() -> Result<(),
     assert!(!allowed_repairs.contains("Box::from_raw"));
     assert!(!allowed_repairs.contains("all-zero bit pattern"));
     assert_eq!(value["agent_readiness"]["ready"], true);
-    assert_eq!(value["agent_readiness"]["state"], "ready");
+    assert_eq!(value["agent_readiness"]["state"], "ready_for_agent");
     Ok(())
 }
 
@@ -588,7 +588,7 @@ fn agent_packet_scopes_slice_from_raw_parts_repairs_to_pointer_len_range() -> Re
     assert!(!allowed_repairs.contains("all-zero bit pattern"));
     assert!(!allowed_repairs.contains("callee safety contract"));
     assert_eq!(value["agent_readiness"]["ready"], true);
-    assert_eq!(value["agent_readiness"]["state"], "ready");
+    assert_eq!(value["agent_readiness"]["state"], "ready_for_agent");
     Ok(())
 }
 
@@ -617,7 +617,7 @@ fn agent_packet_scopes_vec_from_raw_parts_repairs_to_raw_parts_ownership() -> Re
     assert!(!allowed_repairs.contains("all-zero bit pattern"));
     assert!(!allowed_repairs.contains("callee safety contract"));
     assert_eq!(value["agent_readiness"]["ready"], true);
-    assert_eq!(value["agent_readiness"]["state"], "ready");
+    assert_eq!(value["agent_readiness"]["state"], "ready_for_agent");
     Ok(())
 }
 
@@ -645,7 +645,7 @@ fn agent_packet_scopes_pin_unchecked_repairs_to_pin_invariant() -> Result<(), St
     assert!(!allowed_repairs.contains("all-zero bit pattern"));
     assert!(!allowed_repairs.contains("same control-flow path"));
     assert_eq!(value["agent_readiness"]["ready"], false);
-    assert_eq!(value["agent_readiness"]["state"], "needs_human_review");
+    assert_eq!(value["agent_readiness"]["state"], "requires_human_review");
     assert!(reasons.contains("human deep review"));
     assert!(reasons.contains("no verify command"));
     assert!(routes.contains("human-deep-review"));
@@ -676,7 +676,7 @@ fn agent_packet_scopes_target_feature_repairs_to_dispatch_invariant() -> Result<
     assert!(!allowed_repairs.contains("all-zero bit pattern"));
     assert!(!allowed_repairs.contains("will not move"));
     assert_eq!(value["agent_readiness"]["ready"], false);
-    assert_eq!(value["agent_readiness"]["state"], "needs_human_review");
+    assert_eq!(value["agent_readiness"]["state"], "requires_human_review");
     assert!(reasons.contains("target_feature"));
     assert!(reasons.contains("human deep review"));
     assert!(reasons.contains("no verify command"));
@@ -710,7 +710,7 @@ fn agent_packet_routes_non_miri_cards_without_overclaiming() -> Result<(), Strin
     assert!(!allowed_repairs.contains("all-zero bit pattern"));
     assert!(!allowed_repairs.contains("target_feature"));
     assert_eq!(value["agent_readiness"]["ready"], false);
-    assert_eq!(value["agent_readiness"]["state"], "needs_human_review");
+    assert_eq!(value["agent_readiness"]["state"], "requires_human_review");
     let reasons = serde_json::to_string(&value["agent_readiness"]["reasons"])
         .map_err(|err| format!("render readiness reasons failed: {err}"))?;
     assert!(reasons.contains("miri_unsupported"));
@@ -748,7 +748,7 @@ fn agent_packet_scopes_unsafe_fn_call_repairs_to_callee_contract() -> Result<(),
     assert!(!allowed_repairs.contains("target_feature"));
     assert!(!allowed_repairs.contains("static mut"));
     assert_eq!(value["agent_readiness"]["ready"], false);
-    assert_eq!(value["agent_readiness"]["state"], "needs_human_review");
+    assert_eq!(value["agent_readiness"]["state"], "requires_human_review");
     assert!(reasons.contains("human deep review"));
     assert!(reasons.contains("no verify command"));
     assert!(routes.contains("human-deep-review"));
@@ -808,11 +808,14 @@ fn agent_packet_marks_loom_routed_cards_as_not_ready_for_repair_delegation() -> 
     assert!(routes.contains("shuttle"));
     assert!(!routes.contains("\"miri\""));
     assert_eq!(value["agent_readiness"]["ready"], false);
-    assert_eq!(value["agent_readiness"]["state"], "needs_human_review");
+    assert_eq!(
+        value["agent_readiness"]["state"],
+        "requires_witness_receipt"
+    );
     let reasons = serde_json::to_string(&value["agent_readiness"]["reasons"])
         .map_err(|err| format!("render readiness reasons failed: {err}"))?;
     assert!(reasons.contains("requires_loom"));
-    assert!(reasons.contains("external witness routing"));
+    assert!(reasons.contains("external witness receipt"));
     Ok(())
 }
 
@@ -842,9 +845,12 @@ fn agent_packet_scopes_static_mut_repairs_to_global_state_invariant() -> Result<
     assert!(!allowed_repairs.contains("all-zero bit pattern"));
     assert!(!allowed_repairs.contains("target_feature"));
     assert_eq!(value["agent_readiness"]["ready"], false);
-    assert_eq!(value["agent_readiness"]["state"], "needs_human_review");
+    assert_eq!(
+        value["agent_readiness"]["state"],
+        "requires_witness_receipt"
+    );
     assert!(reasons.contains("requires_loom"));
-    assert!(reasons.contains("external witness routing"));
+    assert!(reasons.contains("external witness receipt"));
     assert!(routes.contains("loom"));
     assert!(routes.contains("shuttle"));
     Ok(())
@@ -876,7 +882,10 @@ fn agent_packet_scopes_unsafe_impl_repairs_to_same_impl_owner() -> Result<(), St
     assert!(!allowed_repairs.contains("all-zero bit pattern"));
     assert!(!allowed_repairs.contains("target_feature"));
     assert_eq!(value["agent_readiness"]["ready"], false);
-    assert_eq!(value["agent_readiness"]["state"], "needs_human_review");
+    assert_eq!(
+        value["agent_readiness"]["state"],
+        "requires_witness_receipt"
+    );
     assert!(routes.contains("loom"));
     assert!(routes.contains("shuttle"));
     Ok(())
@@ -904,7 +913,7 @@ fn agent_packet_marks_inline_asm_as_not_ready_for_repair_delegation() -> Result<
     assert!(!allowed_repairs.contains("all-zero bit pattern"));
     assert!(!allowed_repairs.contains("static mut"));
     assert_eq!(value["agent_readiness"]["ready"], false);
-    assert_eq!(value["agent_readiness"]["state"], "needs_human_review");
+    assert_eq!(value["agent_readiness"]["state"], "requires_human_review");
     let reasons = serde_json::to_string(&value["agent_readiness"]["reasons"])
         .map_err(|err| format!("render readiness reasons failed: {err}"))?;
     assert!(reasons.contains("inline_asm"));
@@ -995,14 +1004,14 @@ fn agent_packet_marks_no_missing_cards_not_ready_for_repair() -> Result<(), Stri
 
     let value = parse_json(&render(&card))?;
     assert_eq!(value["agent_readiness"]["ready"], false);
-    assert_eq!(value["agent_readiness"]["state"], "not_recommended");
+    assert_eq!(value["agent_readiness"]["state"], "unsupported");
     assert!(
         serde_json::to_string(&value["agent_readiness"]["reasons"])
             .map_err(|err| format!("render readiness reasons failed: {err}"))?
             .contains("no missing evidence to repair")
     );
     let buckets = json_string_array(&value["repair_queue"]["buckets"], "repair queue buckets")?;
-    assert_eq!(buckets, vec!["requires_human_review", "do_not_auto_repair"]);
+    assert_eq!(buckets, vec!["do_not_auto_repair"]);
     assert!(!buckets.iter().any(|bucket| bucket == "review_only"));
     Ok(())
 }

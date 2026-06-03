@@ -145,6 +145,15 @@ do-not-auto-repair buckets, each pointing back to
 `unsafe-review context <card-id> --json`. It is not a standalone `--format`
 yet, and it does not run agents.
 
+Each repair-queue entry carries `agent_readiness` with a closed state:
+`ready_for_agent`, `requires_human_review`, `requires_witness_receipt`, or
+`unsupported`. Only `ready_for_agent` may have `ready = true`. Every other
+state is copy-only context for a reviewer: do not hand it to an agent as an
+edit task unless the reviewer first narrows the work. The entry's
+`allowed_repairs`, `do_not_do`, and `context_command` define what work is
+allowed, what must not be done, and which card packet proves whether the repair
+improved ReviewCard evidence after rerun.
+
 The default human output is for terminal review. It names the card identity,
 operation family, operation expression, obligation evidence, witness route, next
 action, verify commands, and trust boundary without executing witnesses.

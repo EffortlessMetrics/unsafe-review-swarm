@@ -102,6 +102,12 @@ const REPAIR_QUEUE_BUCKETS: [&str; 6] = [
     "requires_human_review",
     "do_not_auto_repair",
 ];
+const REPAIR_QUEUE_READINESS_STATES: [&str; 4] = [
+    "ready_for_agent",
+    "requires_human_review",
+    "requires_witness_receipt",
+    "unsupported",
+];
 const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 11] = [
     "review-kit.json",
     "cards.json",
@@ -2212,23 +2218,21 @@ fn check_repair_queue_readiness(
     };
     let state =
         super::require_non_empty_json_str(readiness, "state", "repair-queue.json agent_readiness")?;
-    match state {
-        "ready" | "needs_human_review" | "not_recommended" => {}
-        _ => {
-            return Err(format!(
-                "repair-queue.json agent_readiness.state must be `ready`, `needs_human_review`, or `not_recommended`; got `{state}`"
-            ));
-        }
+    if !REPAIR_QUEUE_READINESS_STATES.contains(&state) {
+        return Err(format!(
+            "repair-queue.json agent_readiness.state must be `ready_for_agent`, `requires_human_review`, `requires_witness_receipt`, or `unsupported`; got `{state}`"
+        ));
     }
-    if ready && state != "ready" {
+    if ready && state != "ready_for_agent" {
         return Err(
-            "repair-queue.json agent_readiness.state must be `ready` when ready is true"
+            "repair-queue.json agent_readiness.state must be `ready_for_agent` when ready is true"
                 .to_string(),
         );
     }
-    if !ready && state == "ready" {
+    if !ready && state == "ready_for_agent" {
         return Err(
-            "repair-queue.json agent_readiness.state `ready` requires ready = true".to_string(),
+            "repair-queue.json agent_readiness.state `ready_for_agent` requires ready = true"
+                .to_string(),
         );
     }
     let reasons = super::json_array_at(readiness, "/reasons", "repair-queue.json agent_readiness")?;
