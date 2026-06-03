@@ -5,7 +5,7 @@ use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
 fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Box<dyn Error>> {
@@ -2424,7 +2424,7 @@ fn repo_sigterm_writes_interrupted_status_sidecar() -> Result<(), Box<dyn Error>
         .stderr(Stdio::piped())
         .spawn()?;
 
-    std::thread::sleep(Duration::from_millis(500));
+    std::thread::sleep(std::time::Duration::from_millis(500));
     let kill_status = Command::new("kill")
         .arg("-TERM")
         .arg(child.id().to_string())
@@ -2499,7 +2499,7 @@ fn repo_sigterm_keeps_completed_file_partial_report() -> Result<(), Box<dyn Erro
         .stderr(Stdio::piped())
         .spawn()?;
 
-    std::thread::sleep(Duration::from_millis(500));
+    std::thread::sleep(std::time::Duration::from_millis(500));
     let kill_status = Command::new("kill")
         .arg("-TERM")
         .arg(child.id().to_string())

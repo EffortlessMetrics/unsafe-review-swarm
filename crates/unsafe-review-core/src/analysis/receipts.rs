@@ -73,8 +73,8 @@ impl ReceiptIndex {
             if receipt.expires_at.as_str() < audit_date {
                 continue;
             }
-            if imports_witness_evidence(&receipt.tool, &receipt.strength) {
-                if by_card_id
+            if imports_witness_evidence(&receipt.tool, &receipt.strength)
+                && by_card_id
                     .insert(
                         receipt.card_id.clone(),
                         ImportedReceipt {
@@ -83,16 +83,15 @@ impl ReceiptIndex {
                         },
                     )
                     .is_some()
-                {
-                    return Err(format!(
-                        "{} imports duplicate witness receipt for card_id `{}`",
-                        path.display(),
-                        receipt.card_id
-                    ));
-                }
+            {
+                return Err(format!(
+                    "{} imports duplicate witness receipt for card_id `{}`",
+                    path.display(),
+                    receipt.card_id
+                ));
             }
-            if imports_reach_evidence(&receipt.tool, &receipt.strength) {
-                if reach_by_card_id
+            if imports_reach_evidence(&receipt.tool, &receipt.strength)
+                && reach_by_card_id
                     .insert(
                         receipt.card_id.clone(),
                         ImportedReachReceipt {
@@ -106,13 +105,12 @@ impl ReceiptIndex {
                         },
                     )
                     .is_some()
-                {
-                    return Err(format!(
-                        "{} imports duplicate reach receipt for card_id `{}`",
-                        path.display(),
-                        receipt.card_id
-                    ));
-                }
+            {
+                return Err(format!(
+                    "{} imports duplicate reach receipt for card_id `{}`",
+                    path.display(),
+                    receipt.card_id
+                ));
             }
         }
         Ok(Self {
@@ -359,10 +357,10 @@ fn audit_receipts_with_date(
 fn duplicate_receipt_import_keys(records: &[AuditReceiptRecord]) -> BTreeSet<(String, String)> {
     let mut counts = BTreeMap::<(String, String), usize>::new();
     for record in records {
-        if let Some(receipt) = &record.receipt {
-            if let Some(key) = receipt_import_key_from_witness_receipt(receipt) {
-                *counts.entry(key).or_insert(0) += 1;
-            }
+        if let Some(receipt) = &record.receipt
+            && let Some(key) = receipt_import_key_from_witness_receipt(receipt)
+        {
+            *counts.entry(key).or_insert(0) += 1;
         }
     }
     counts

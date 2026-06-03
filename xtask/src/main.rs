@@ -15078,7 +15078,7 @@ Snapshot reports:
         repair_queue["buckets"]["requires_human_review"][0]["agent_readiness"]["ready"] =
             serde_json::json!(true);
         repair_queue["buckets"]["requires_human_review"][0]["agent_readiness"]["state"] =
-            serde_json::json!("ready");
+            serde_json::json!("ready_for_agent");
         fs::write(&path, repair_queue.to_string())
             .map_err(|err| format!("write repair queue failed: {err}"))?;
 
@@ -15852,7 +15852,7 @@ review_after = "2026-08-01"
     }
 
     fn receipt_audit_markdown() -> &'static str {
-        "# unsafe-review receipt audit\n\nStatic audit of saved witness receipt metadata against current ReviewCards.\n\n## Summary\n\n| Receipts | Matched | Unmatched | Expired | Stale | Wrong identity | Wrong tool | Weaker than route | Command hash mismatch | Duplicate | Invalid |\n|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n| 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |\n\n## Reviewer front panel\n\n- Matched receipt metadata: 0\n- Receipts imported as current witness evidence: 0\n- Receipts without a current card match: 0 unmatched, 0 stale\n- Problem flags: none\n- Next action: keep matching receipt metadata attached to the review record.\n- Boundary: matched receipts improve witness evidence only; they do not erase missing contracts, guards, or reach evidence.\n\n## Trust boundary\n\nStatic witness receipt audit only; does not execute witnesses and does not prove site reach.\n"
+        "# unsafe-review receipt audit\n\nStatic audit of saved receipt metadata against current ReviewCards.\n\n## Summary\n\n| Receipts | Matched | Unmatched | Expired | Stale | Wrong identity | Wrong tool | Weaker than route | Command hash mismatch | Duplicate | Invalid |\n|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n| 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |\n\n## Reviewer front panel\n\n- Matched receipt metadata: 0\n- Receipts imported as current witness evidence: 0\n- Receipts without a current card match: 0 unmatched, 0 stale\n- Problem flags: none\n- Next action: keep matching receipt metadata attached to the review record.\n- Boundary: matched witness receipts improve witness evidence only; they do not erase missing contracts, guards, or reach evidence.\n- Manual boundary: manual candidate receipts attach external evidence to that manual candidate only and do not make it analyzer-discovered.\n\n## Trust boundary\n\nStatic witness receipt audit only; does not execute witnesses, does not prove site reach, and does not independently prove site reach.\n"
     }
 
     fn unique_temp_dir(prefix: &str) -> Result<PathBuf, String> {

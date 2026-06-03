@@ -263,10 +263,14 @@ fn render_repo_file_list(root: &Path, files: &[PathBuf]) -> String {
         files.len()
     );
     for file in files {
-        rendered.push_str(&file.display().to_string());
+        rendered.push_str(&repo_path_display(file));
         rendered.push('\n');
     }
     rendered
+}
+
+fn repo_path_display(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
 }
 
 struct RepoStatusReporter {
@@ -663,7 +667,7 @@ fn render_repo_scan_status(
         "files_scanned": status.files_scanned,
         "files_remaining": files_remaining(status),
         "cards_found": status.cards_found,
-        "last_path": status.last_path.as_ref().map(|path| path.display().to_string()),
+        "last_path": status.last_path.as_ref().map(|path| repo_path_display(path)),
         "completed": status.completed,
         "error": null,
         "signal": null,
@@ -694,7 +698,7 @@ fn render_repo_scan_incomplete_status(
         "cards_found": status.map_or(0, |status| status.cards_found),
         "last_path": status
             .and_then(|status| status.last_path.as_ref())
-            .map(|path| path.display().to_string()),
+            .map(|path| repo_path_display(path)),
         "completed": false,
         "error": error,
         "signal": null,
@@ -726,7 +730,7 @@ fn render_repo_scan_interrupted_status(
         "cards_found": status.map_or(0, |status| status.cards_found),
         "last_path": status
             .and_then(|status| status.last_path.as_ref())
-            .map(|path| path.display().to_string()),
+            .map(|path| repo_path_display(path)),
         "completed": false,
         "error": format!("repo scan interrupted by {signal_name}"),
         "signal": signal_name,
@@ -757,7 +761,7 @@ fn format_repo_progress(status: &RepoScanStatus) -> String {
     let last_path = status
         .last_path
         .as_ref()
-        .map(|path| path.display().to_string())
+        .map(|path| repo_path_display(path))
         .unwrap_or_else(|| "-".to_string());
     format!(
         "unsafe-review repo: phase={} elapsed_ms={} files_discovered={} files_scanned={} files_remaining={} cards_found={} last_path={} completed={}",
@@ -1384,7 +1388,7 @@ fn render_candidate_list_markdown(
                 "- Operation family: `{}`\n",
                 candidate.operation_family
             ));
-            out.push_str(&format!("- Source: `manual`\n"));
+            out.push_str("- Source: `manual`\n");
             out.push_str("- Manual candidate: `true`\n");
             out.push_str("- Analyzer-discovered: `false`\n");
             out.push_str(&format!(

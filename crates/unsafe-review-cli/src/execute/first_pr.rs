@@ -137,7 +137,7 @@ fn print_top_card_summary(
     println!("Top card:");
     println!(
         "  {}:{} `{}`",
-        card.site.location.file.display(),
+        card_path_display(&card.site.location.file),
         card.site.location.line,
         card.operation.family.as_str()
     );
@@ -426,6 +426,10 @@ fn print_trust_boundary() {
     println!(
         "  unsafe-review did not run witnesses, post comments, edit source, or enforce blocking policy."
     );
+}
+
+fn card_path_display(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
 }
 
 #[cfg(test)]
