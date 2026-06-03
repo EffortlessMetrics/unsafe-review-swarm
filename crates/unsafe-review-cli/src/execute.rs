@@ -196,12 +196,14 @@ fn run_repo_check(options: RepoOptions) -> Result<(), String> {
     let report_path = check.out.clone();
     let partial_path = report_path.as_deref().map(repo_partial_path);
     let status_path = report_path.as_deref().map(repo_status_path);
+    let scan_scope = RepoScanScopeMetadata::new(&check.root, &options.discovery);
     let mut reporter = RepoStatusReporter::new(
         status_path,
         partial_path.clone(),
         options.progress,
         check.format.clone(),
         options.timeout_seconds,
+        scan_scope,
     )?;
     maybe_pause_for_repo_interrupt_test();
     let output = match analyze_with_discovery_and_repo_events(
@@ -276,10 +278,34 @@ struct RepoStatusReporter {
     last_status: Arc<Mutex<Option<RepoScanStatus>>>,
     partial_output: Arc<Mutex<Option<AnalyzeOutput>>>,
     format: Format,
+    scan_scope: RepoScanScopeMetadata,
     last_phase: Option<String>,
     last_discovery_heartbeat: usize,
     last_scan_heartbeat: usize,
     _signal_guard: Option<RepoSignalGuard>,
+}
+
+#[derive(Clone, Debug)]
+struct RepoScanScopeMetadata {
+    root: PathBuf,
+    include: Vec<String>,
+    exclude: Vec<String>,
+    respect_gitignore: bool,
+    large_repo_ignores: bool,
+    max_files: Option<usize>,
+}
+
+impl RepoScanScopeMetadata {
+    fn new(root: &Path, discovery: &DiscoveryOptions) -> Self {
+        Self {
+            root: root.to_path_buf(),
+            include: discovery.include.clone(),
+            exclude: discovery.exclude.clone(),
+            respect_gitignore: discovery.respect_gitignore,
+            large_repo_ignores: discovery.large_repo_ignores,
+            max_files: discovery.max_files,
+        }
+    }
 }
 
 impl RepoStatusReporter {
@@ -289,6 +315,7 @@ impl RepoStatusReporter {
         progress: bool,
         format: Format,
         timeout_seconds: Option<u64>,
+        scan_scope: RepoScanScopeMetadata,
     ) -> Result<Self, String> {
         let last_status = Arc::new(Mutex::new(None));
         let partial_output = Arc::new(Mutex::new(None));
@@ -298,6 +325,7 @@ impl RepoStatusReporter {
             last_status.clone(),
             partial_output.clone(),
             format.clone(),
+            scan_scope.clone(),
         )?;
         Ok(Self {
             status_path,
@@ -309,6 +337,7 @@ impl RepoStatusReporter {
             last_status,
             partial_output,
             format,
+            scan_scope,
             last_phase: None,
             last_discovery_heartbeat: 0,
             last_scan_heartbeat: 0,
@@ -338,7 +367,7 @@ impl RepoStatusReporter {
             .map_err(|err| format!("repo status lock poisoned: {err}"))? = Some(status.clone());
         if let Some(path) = &self.status_path {
             ensure_parent_dir(path)?;
-            fs::write(path, render_repo_scan_status(&status)?)
+            fs::write(path, render_repo_scan_status(&status, &self.scan_scope)?)
                 .map_err(|err| format!("write {} failed: {err}", path.display()))?;
         }
         if self.progress && self.should_print(&status) {
@@ -370,6 +399,7 @@ impl RepoStatusReporter {
                 last_status.as_ref(),
                 error,
                 partial_path.filter(|path| path.exists()),
+                &self.scan_scope,
             )?,
         )
         .map_err(|err| format!("write {} failed: {err}", path.display()))?;
@@ -449,6 +479,7 @@ struct RepoSignalState {
     last_status: Arc<Mutex<Option<RepoScanStatus>>>,
     partial_output: Arc<Mutex<Option<AnalyzeOutput>>>,
     format: Format,
+    scan_scope: RepoScanScopeMetadata,
 }
 
 #[cfg(unix)]
@@ -479,6 +510,7 @@ impl RepoSignalState {
                 last_status.as_ref(),
                 signal_name,
                 partial_path.as_deref(),
+                &self.scan_scope,
             )?,
         )
         .map_err(|err| format!("write {} failed: {err}", path.display()))?;
@@ -532,6 +564,7 @@ fn install_repo_signal_guard(
     last_status: Arc<Mutex<Option<RepoScanStatus>>>,
     partial_output: Arc<Mutex<Option<AnalyzeOutput>>>,
     format: Format,
+    scan_scope: RepoScanScopeMetadata,
 ) -> Result<Option<RepoSignalGuard>, String> {
     install_repo_signal_guard_impl(
         status_path,
@@ -539,6 +572,7 @@ fn install_repo_signal_guard(
         last_status,
         partial_output,
         format,
+        scan_scope,
     )
 }
 
@@ -549,6 +583,7 @@ fn install_repo_signal_guard_impl(
     last_status: Arc<Mutex<Option<RepoScanStatus>>>,
     partial_output: Arc<Mutex<Option<AnalyzeOutput>>>,
     format: Format,
+    scan_scope: RepoScanScopeMetadata,
 ) -> Result<Option<RepoSignalGuard>, String> {
     let state = RepoSignalState {
         status_path,
@@ -556,6 +591,7 @@ fn install_repo_signal_guard_impl(
         last_status,
         partial_output,
         format,
+        scan_scope,
     };
     let mut signals = Signals::new([SIGTERM, SIGINT])
         .map_err(|err| format!("install repo signal handler failed: {err}"))?;
@@ -599,6 +635,7 @@ fn install_repo_signal_guard_impl(
     _last_status: Arc<Mutex<Option<RepoScanStatus>>>,
     _partial_output: Arc<Mutex<Option<AnalyzeOutput>>>,
     _format: Format,
+    _scan_scope: RepoScanScopeMetadata,
 ) -> Result<Option<RepoSignalGuard>, String> {
     Ok(None)
 }
@@ -612,13 +649,18 @@ fn repo_signal_name(signal: i32) -> &'static str {
     }
 }
 
-fn render_repo_scan_status(status: &RepoScanStatus) -> Result<String, String> {
+fn render_repo_scan_status(
+    status: &RepoScanStatus,
+    scan_scope: &RepoScanScopeMetadata,
+) -> Result<String, String> {
     let value = serde_json::json!({
         "schema_version": status.schema_version.as_str(),
         "phase": status.phase.as_str(),
+        "scan_scope": repo_scan_scope_json(scan_scope),
         "elapsed_ms": status.elapsed_ms,
         "files_discovered": status.files_discovered,
         "files_scanned": status.files_scanned,
+        "files_remaining": files_remaining(status),
         "cards_found": status.cards_found,
         "last_path": status.last_path.as_ref().map(|path| path.display().to_string()),
         "completed": status.completed,
@@ -636,15 +678,18 @@ fn render_repo_scan_incomplete_status(
     status: Option<&RepoScanStatus>,
     error: &str,
     partial_path: Option<&Path>,
+    scan_scope: &RepoScanScopeMetadata,
 ) -> Result<String, String> {
     let value = serde_json::json!({
         "schema_version": status
             .map(|status| status.schema_version.as_str())
             .unwrap_or("repo-scan-status/v1"),
         "phase": "failed",
+        "scan_scope": repo_scan_scope_json(scan_scope),
         "elapsed_ms": status.map_or(0, |status| status.elapsed_ms),
         "files_discovered": status.map_or(0, |status| status.files_discovered),
         "files_scanned": status.map_or(0, |status| status.files_scanned),
+        "files_remaining": status.map_or(0, files_remaining),
         "cards_found": status.map_or(0, |status| status.cards_found),
         "last_path": status
             .and_then(|status| status.last_path.as_ref())
@@ -665,15 +710,18 @@ fn render_repo_scan_interrupted_status(
     status: Option<&RepoScanStatus>,
     signal_name: &str,
     partial_path: Option<&Path>,
+    scan_scope: &RepoScanScopeMetadata,
 ) -> Result<String, String> {
     let value = serde_json::json!({
         "schema_version": status
             .map(|status| status.schema_version.as_str())
             .unwrap_or("repo-scan-status/v1"),
         "phase": "terminated",
+        "scan_scope": repo_scan_scope_json(scan_scope),
         "elapsed_ms": status.map_or(0, |status| status.elapsed_ms),
         "files_discovered": status.map_or(0, |status| status.files_discovered),
         "files_scanned": status.map_or(0, |status| status.files_scanned),
+        "files_remaining": status.map_or(0, files_remaining),
         "cards_found": status.map_or(0, |status| status.cards_found),
         "last_path": status
             .and_then(|status| status.last_path.as_ref())
@@ -689,6 +737,21 @@ fn render_repo_scan_interrupted_status(
     Ok(rendered)
 }
 
+fn repo_scan_scope_json(scan_scope: &RepoScanScopeMetadata) -> serde_json::Value {
+    serde_json::json!({
+        "root": scan_scope.root.display().to_string(),
+        "include": &scan_scope.include,
+        "exclude": &scan_scope.exclude,
+        "respect_gitignore": scan_scope.respect_gitignore,
+        "large_repo_ignores": scan_scope.large_repo_ignores,
+        "max_files": scan_scope.max_files,
+    })
+}
+
+fn files_remaining(status: &RepoScanStatus) -> usize {
+    status.files_discovered.saturating_sub(status.files_scanned)
+}
+
 fn format_repo_progress(status: &RepoScanStatus) -> String {
     let last_path = status
         .last_path
@@ -696,11 +759,12 @@ fn format_repo_progress(status: &RepoScanStatus) -> String {
         .map(|path| path.display().to_string())
         .unwrap_or_else(|| "-".to_string());
     format!(
-        "unsafe-review repo: phase={} elapsed_ms={} files_discovered={} files_scanned={} cards_found={} last_path={} completed={}",
+        "unsafe-review repo: phase={} elapsed_ms={} files_discovered={} files_scanned={} files_remaining={} cards_found={} last_path={} completed={}",
         status.phase.as_str(),
         status.elapsed_ms,
         status.files_discovered,
         status.files_scanned,
+        files_remaining(status),
         status.cards_found,
         last_path,
         status.completed,
@@ -1590,7 +1654,7 @@ fn print_repo_help() {
         "- --out renders to <out>.partial, then renames it to <out> only after a successful render."
     );
     println!(
-        "- <out>.status.json records phase, elapsed time, discovered files, scanned files, cards found, last path, completion, normal errors, and Unix interruption signals."
+        "- <out>.status.json records scan scope, phase, elapsed time, discovered/scanned/remaining files, cards found, last path, completion, normal errors, and Unix interruption signals."
     );
     println!(
         "- On normal errors, incomplete status is kept; if a rendered partial report exists, it is left at <out>.partial."

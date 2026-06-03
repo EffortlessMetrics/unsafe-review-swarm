@@ -39,10 +39,13 @@ When repo analysis writes a report through `--out`, it renders to
 `<out>.partial` and renames that file to `<out>` only after a successful render.
 It also updates a `<out>.status.json` sidecar while discovery and scanning run.
 The sidecar is operational scan status, not a second ReviewCard truth. It
-records `schema_version`, `phase`, `elapsed_ms`, `files_discovered`,
-`files_scanned`, `cards_found`, `last_path`, `completed`, `error`, and
-`signal`, and `partial_path`. `--progress` prints stderr heartbeats from the
-same status stream. On normal analysis, write, or rename errors, the command
+records `schema_version`, `phase`, `scan_scope`, `elapsed_ms`,
+`files_discovered`, `files_scanned`, `files_remaining`, `cards_found`,
+`last_path`, `completed`, `error`, `signal`, and `partial_path`. `scan_scope`
+records the root, include/exclude filters, gitignore/default-ignore posture,
+and `--max-files` value so an interrupted large-repo scan can be replayed from
+the sidecar. `--progress` prints stderr heartbeats from the same status stream,
+including `files_remaining`. On normal analysis, write, or rename errors, the command
 marks status incomplete. A `--timeout-seconds` expiration is a normal incomplete
 scan with `phase = failed`, an explicit timeout `error`, and `signal = null`.
 If at least one file completed before the error or timeout, the command keeps

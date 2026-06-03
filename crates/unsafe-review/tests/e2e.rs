@@ -1903,6 +1903,13 @@ fn repo_progress_writes_status_sidecar_for_out_reports() -> Result<(), Box<dyn E
         os("repo"),
         os("--root"),
         fixture.as_os_str().to_os_string(),
+        os("--include"),
+        os("src/lib.rs"),
+        os("--exclude"),
+        os("src/generated.rs"),
+        os("--max-files"),
+        os("5"),
+        os("--no-respect-gitignore"),
         os("--format"),
         os("json"),
         os("--out"),
@@ -1916,6 +1923,10 @@ fn repo_progress_writes_status_sidecar_for_out_reports() -> Result<(), Box<dyn E
         stderr.contains("unsafe-review repo: phase=complete"),
         "stderr should include a final progress heartbeat: {stderr}"
     );
+    assert!(
+        stderr.contains("files_remaining=0"),
+        "stderr should include remaining file count: {stderr}"
+    );
     let report = parse_json(&fs::read_to_string(&report_path)?)?;
     assert_eq!(report["scope"], "repo");
     assert!(
@@ -1925,9 +1936,16 @@ fn repo_progress_writes_status_sidecar_for_out_reports() -> Result<(), Box<dyn E
     let status = parse_json(&fs::read_to_string(&status_path)?)?;
     assert_eq!(status["schema_version"], "repo-scan-status/v1");
     assert_eq!(status["phase"], "complete");
+    assert_eq!(status["scan_scope"]["root"], fixture.display().to_string());
+    assert_eq!(status["scan_scope"]["include"][0], "src/lib.rs");
+    assert_eq!(status["scan_scope"]["exclude"][0], "src/generated.rs");
+    assert_eq!(status["scan_scope"]["respect_gitignore"], false);
+    assert_eq!(status["scan_scope"]["large_repo_ignores"], true);
+    assert_eq!(status["scan_scope"]["max_files"], 5);
     assert_eq!(status["completed"], true);
     assert_eq!(status["files_discovered"], 1);
     assert_eq!(status["files_scanned"], 1);
+    assert_eq!(status["files_remaining"], 0);
     assert_eq!(status["cards_found"], 1);
     assert_eq!(status["last_path"], "src/lib.rs");
     assert!(status["elapsed_ms"].as_u64().is_some());
@@ -1975,6 +1993,7 @@ fn repo_output_failure_keeps_partial_and_marks_status_incomplete() -> Result<(),
     let status = parse_json(&fs::read_to_string(&status_path)?)?;
     assert_eq!(status["schema_version"], "repo-scan-status/v1");
     assert_eq!(status["phase"], "failed");
+    assert_default_repo_status_scope(&status, &fixture, 0)?;
     assert_eq!(status["completed"], false);
     assert_eq!(status["files_discovered"], 1);
     assert_eq!(status["files_scanned"], 1);
@@ -2046,6 +2065,7 @@ fn repo_analysis_failure_keeps_completed_file_partial_snapshot() -> Result<(), B
     let status = parse_json(&fs::read_to_string(&status_path)?)?;
     assert_eq!(status["schema_version"], "repo-scan-status/v1");
     assert_eq!(status["phase"], "failed");
+    assert_default_repo_status_scope(&status, &scan_root, 1)?;
     assert_eq!(status["completed"], false);
     assert_eq!(status["files_discovered"], 2);
     assert_eq!(status["files_scanned"], 1);
@@ -2133,6 +2153,7 @@ fn repo_timeout_keeps_completed_file_partial_snapshot() -> Result<(), Box<dyn Er
     let status = parse_json(&fs::read_to_string(&status_path)?)?;
     assert_eq!(status["schema_version"], "repo-scan-status/v1");
     assert_eq!(status["phase"], "failed");
+    assert_default_repo_status_scope(&status, &scan_root, 1)?;
     assert_eq!(status["completed"], false);
     assert_eq!(status["files_discovered"], 2);
     assert_eq!(status["files_scanned"], 1);
@@ -2209,6 +2230,7 @@ fn repo_sigterm_writes_interrupted_status_sidecar() -> Result<(), Box<dyn Error>
     let status = parse_json(&fs::read_to_string(&status_path)?)?;
     assert_eq!(status["schema_version"], "repo-scan-status/v1");
     assert_eq!(status["phase"], "terminated");
+    assert_default_repo_status_scope(&status, &fixture, 0)?;
     assert_eq!(status["completed"], false);
     assert_eq!(status["signal"], "SIGTERM");
     assert!(
@@ -2292,6 +2314,7 @@ fn repo_sigterm_keeps_completed_file_partial_report() -> Result<(), Box<dyn Erro
     let status = parse_json(&fs::read_to_string(&status_path)?)?;
     assert_eq!(status["schema_version"], "repo-scan-status/v1");
     assert_eq!(status["phase"], "terminated");
+    assert_default_repo_status_scope(&status, &scan_root, 1)?;
     assert_eq!(status["completed"], false);
     assert_eq!(status["signal"], "SIGTERM");
     assert_eq!(status["files_discovered"], 2);
@@ -3417,6 +3440,27 @@ fn json_array<'a>(value: &'a Value, path: &str) -> Result<&'a Vec<Value>, Box<dy
     value
         .as_array()
         .ok_or_else(|| format!("{path} should be an array").into())
+}
+
+fn assert_default_repo_status_scope(
+    status: &Value,
+    root: &Path,
+    files_remaining: u64,
+) -> Result<(), Box<dyn Error>> {
+    assert_eq!(status["scan_scope"]["root"], root.display().to_string());
+    assert_eq!(
+        json_array(&status["scan_scope"]["include"], "scan_scope.include")?.len(),
+        0
+    );
+    assert_eq!(
+        json_array(&status["scan_scope"]["exclude"], "scan_scope.exclude")?.len(),
+        0
+    );
+    assert_eq!(status["scan_scope"]["respect_gitignore"], true);
+    assert_eq!(status["scan_scope"]["large_repo_ignores"], true);
+    assert!(status["scan_scope"]["max_files"].is_null());
+    assert_eq!(status["files_remaining"], files_remaining);
+    Ok(())
 }
 
 fn fixture_root(name: &str) -> PathBuf {
