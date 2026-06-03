@@ -138,6 +138,7 @@ target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
 target/unsafe-review/receipt-audit.md
 target/unsafe-review/manual-candidates.json
+target/unsafe-review/manual-repair-queue.json
 target/unsafe-review/lsp.json
 target/unsafe-review/repair-queue.json
 ```
@@ -268,7 +269,9 @@ Default behavior of the example workflow:
 - runs `unsafe-review first-pr --base origin/<base>`;
 - verifies with `cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review`;
 - uploads `cards.json`, `pr-summary.md`, `github-summary.md`, `cards.sarif`,
-`comment-plan.json`, `witness-plan.md`, `lsp.json`, and `repair-queue.json`;
+`comment-plan.json`, `witness-plan.md`, `receipt-audit.md`,
+`manual-candidates.json`, `manual-repair-queue.json`, `lsp.json`, and
+`repair-queue.json`;
 - does not post comments;
 - does not run witnesses;
 - does not block on findings, only on artifact/tooling contract failures.

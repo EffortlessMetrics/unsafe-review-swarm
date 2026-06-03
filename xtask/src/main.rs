@@ -14227,7 +14227,7 @@ Snapshot reports:
         fs::write(
             &path,
             summary.replace(
-                "## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Policy report: `policy-report.md` is ReviewCard-only policy simulation; manual candidates are not policy inputs.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n",
+                "## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Policy report: `policy-report.md`; ReviewCard-only; manual candidates are not policy inputs.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n",
                 "",
             ),
         )
@@ -16647,6 +16647,7 @@ review_after = "2026-08-01"
                 },
                 "manual_candidates": {
                     "artifact": "manual-candidates.json",
+                    "manual_repair_queue_artifact": "manual-repair-queue.json",
                     "manual_candidates": 0,
                     "analyzer_discovered": 0,
                     "operation_families": {},
@@ -16673,6 +16674,7 @@ review_after = "2026-08-01"
                 {"path":"policy-report.json","kind":"policy_report_json","format":"json","schema_version":"0.1"},
                 {"path":"policy-report.md","kind":"policy_report_markdown","format":"markdown","schema_version":serde_json::Value::Null},
                 {"path":"manual-candidates.json","kind":"manual_candidates","format":"json","schema_version":"manual-candidates/v1"},
+                {"path":"manual-repair-queue.json","kind":"manual_repair_queue","format":"json","schema_version":"manual-repair-queue/v1"},
                 {"path":"lsp.json","kind":"saved_lsp","format":"json","schema_version":"0.1"},
                 {"path":"repair-queue.json","kind":"repair_queue","format":"json","schema_version":"0.1"}
             ],
@@ -16703,6 +16705,32 @@ review_after = "2026-08-01"
         });
         fs::write(dir.join("manual-candidates.json"), value.to_string())
             .map_err(|err| format!("write manual candidates failed: {err}"))
+    }
+
+    fn write_empty_manual_repair_queue_artifact(dir: &Path) -> Result<(), String> {
+        let value = serde_json::json!({
+            "schema_version": "manual-repair-queue/v1",
+            "tool": "unsafe-review",
+            "tool_version": "0.2.1-test",
+            "mode": "manual_candidate_repair_queue",
+            "source": "manual_candidate",
+            "policy": "advisory",
+            "summary": {
+                "manual_candidates": 0,
+                "queued_candidates": 0,
+                "analyzer_discovered": 0,
+                "external_evidence_refs": 0,
+                "operation_families": {},
+                "evidence_kinds": {},
+                "with_fix_options": 0,
+                "with_test_targets": 0,
+                "with_do_not_touch": 0
+            },
+            "queue": [],
+            "trust_boundary": "Copy-only manual candidate repair queue; entries come from imported manual candidates, not analyzer-discovered ReviewCards. This is not an automatic repair queue, not proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not policy gating, and not repair success. unsafe-review did not run agents, did not run witnesses, did not edit source, did not post comments, and did not enforce blocking policy."
+        });
+        fs::write(dir.join("manual-repair-queue.json"), value.to_string())
+            .map_err(|err| format!("write manual repair queue failed: {err}"))
     }
 
     fn manual_candidate_reviewcard_relationship_fixture() -> serde_json::Value {
@@ -16878,9 +16906,77 @@ review_after = "2026-08-01"
             .map_err(|err| format!("write manual candidates failed: {err}"))
     }
 
+    fn write_one_manual_repair_queue_artifact(dir: &Path) -> Result<(), String> {
+        let handoff = manual_candidate_handoff_fixture();
+        let value = serde_json::json!({
+            "schema_version": "manual-repair-queue/v1",
+            "tool": "unsafe-review",
+            "tool_version": "0.2.1-test",
+            "mode": "manual_candidate_repair_queue",
+            "source": "manual_candidate",
+            "policy": "advisory",
+            "summary": {
+                "manual_candidates": 1,
+                "queued_candidates": 1,
+                "analyzer_discovered": 0,
+                "external_evidence_refs": 1,
+                "operation_families": {
+                    "raw_pointer_read": 1
+                },
+                "evidence_kinds": {
+                    "runtime_witness": 1
+                },
+                "with_fix_options": 1,
+                "with_test_targets": 1,
+                "with_do_not_touch": 1
+            },
+            "queue": [{
+                "id": "R4R2-S001",
+                "source": "manual",
+                "manual_candidate": true,
+                "analyzer_discovered": false,
+                "title": "TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes",
+                "location_text": "src/runtime/webcore/TextDecoder.rs:237",
+                "operation_family": "raw_pointer_read",
+                "unsafe_operation": "core::slice::from_raw_parts",
+                "safe_caller": "TextDecoder.decode SharedArrayBuffer route",
+                "invariant_at_risk": "&[u8] memory must not be concurrently mutated",
+                "external_evidence_refs": 1,
+                "fix_options": [
+                    "copy SharedArrayBuffer-backed bytes before constructing the slice"
+                ],
+                "test_targets": [
+                    "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+                ],
+                "do_not_touch": [
+                    "Do not rewrite TextDecoder unrelated encodings"
+                ],
+                "implementer_handoff": handoff,
+                "explain": "unsafe-review explain R4R2-S001",
+                "context_json": "unsafe-review context R4R2-S001 --json",
+                "witness_plan": "unsafe-review candidate witness-plan R4R2-S001",
+                "bucket": "manual_candidate_handoff",
+                "bucket_reason": "manual_candidate_copy_only",
+                "agent_handoff": {
+                    "state": "copy_ready",
+                    "automatic": false,
+                    "reasons": [
+                        "manual candidate includes file:line, safe caller route, invariant, evidence, fix/test/non-goal guidance, and stop condition",
+                        "candidate must stay manual/advisory and separate from ReviewCard repair-queue.json"
+                    ]
+                },
+                "trust_boundary": "Copy-only manual candidate repair queue entry; not analyzer-discovered, not automatic repair, not witness execution, not source editing, not proof, and not policy gating."
+            }],
+            "trust_boundary": "Copy-only manual candidate repair queue; entries come from imported manual candidates, not analyzer-discovered ReviewCards. This is not an automatic repair queue, not proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not policy gating, and not repair success. unsafe-review did not run agents, did not run witnesses, did not edit source, did not post comments, and did not enforce blocking policy."
+        });
+        fs::write(dir.join("manual-repair-queue.json"), value.to_string())
+            .map_err(|err| format!("write manual repair queue failed: {err}"))
+    }
+
     fn write_one_manual_candidate_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         write_valid_first_pr_artifacts(dir)?;
         write_one_manual_candidates_artifact(dir)?;
+        write_one_manual_repair_queue_artifact(dir)?;
         insert_manual_candidate_front_panel_fixture(dir)?;
         insert_manual_candidate_witness_follow_up_fixture(dir)?;
         let path = dir.join("review-kit.json");
@@ -17114,7 +17210,7 @@ review_after = "2026-08-01"
         top_card: &str,
     ) -> String {
         format!(
-            "## unsafe-review advisory summary\n\n- Scope: `diff`\n- Review cards: {review_cards}\n- Open actionable gaps: {open_actionable_gaps}\n- Policy mode: `advisory`\n\n## Top card\n\n{top_card}\n\n## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Policy report: `policy-report.md` is ReviewCard-only policy simulation; manual candidates are not policy inputs.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n---\n\nFull advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, policy-report.json, policy-report.md, manual-candidates.json, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n"
+            "## unsafe-review advisory summary\n\n- Scope: `diff`\n- Review cards: {review_cards}\n- Open actionable gaps: {open_actionable_gaps}\n- Policy mode: `advisory`\n\n## Top card\n\n{top_card}\n\n## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Policy report: `policy-report.md`; ReviewCard-only; manual candidates are not policy inputs.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n---\n\nFull advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, policy-report.json, policy-report.md, manual-candidates.json, manual-repair-queue.json, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n"
         )
     }
 
@@ -17196,6 +17292,7 @@ review_after = "2026-08-01"
         )
         .map_err(|err| format!("write github summary failed: {err}"))?;
         write_empty_manual_candidates_artifact(dir)?;
+        write_empty_manual_repair_queue_artifact(dir)?;
         write_review_kit_artifact(dir, 1, 1, Some("card-1"))?;
         Ok(())
     }
@@ -17270,6 +17367,7 @@ review_after = "2026-08-01"
             .map_err(|err| format!("write receipt audit failed: {err}"))?;
         write_policy_report_artifacts(dir, Vec::new(), 0)?;
         write_empty_manual_candidates_artifact(dir)?;
+        write_empty_manual_repair_queue_artifact(dir)?;
         write_review_kit_artifact(dir, 0, 0, None)?;
         Ok(())
     }

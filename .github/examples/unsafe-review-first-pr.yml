@@ -73,6 +73,8 @@ jobs:
             cards.sarif \
             comment-plan.json \
             witness-plan.md \
+            manual-candidates.json \
+            manual-repair-queue.json \
             lsp.json \
             repair-queue.json
           do
@@ -100,6 +102,7 @@ jobs:
             target/unsafe-review/witness-plan.md
             target/unsafe-review/receipt-audit.md
             target/unsafe-review/manual-candidates.json
+            target/unsafe-review/manual-repair-queue.json
             target/unsafe-review/lsp.json
             target/unsafe-review/repair-queue.json
           if-no-files-found: error

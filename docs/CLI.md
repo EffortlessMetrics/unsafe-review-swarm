@@ -107,6 +107,7 @@ target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
 target/unsafe-review/receipt-audit.md
 target/unsafe-review/manual-candidates.json
+target/unsafe-review/manual-repair-queue.json
 target/unsafe-review/lsp.json
 target/unsafe-review/repair-queue.json
 ```
@@ -129,10 +130,12 @@ saved witness receipt metadata still matches the current first-pr cards. The
 audit is metadata-only and does not run the witness.
 
 When imported manual candidates are present, the terminal handoff and
-`review-kit.json` also point to `manual-candidates.json` and copy-only
+`review-kit.json` also point to `manual-candidates.json`,
+`manual-repair-queue.json`, and copy-only
 `explain`, `context --json`, and `candidate witness-plan` commands for the
 first manual candidate. Those candidates remain manual/advisory targets, not
-analyzer ReviewCards, not policy inputs, and not witness execution.
+analyzer ReviewCards, not policy inputs, not repair-queue inputs, and not
+witness execution.
 The review-kit manifest summary mirrors the canonical card summary counts,
 including diff-scope file counts, so downstream reviewers and agents can see
 mixed-language PR breadth without treating non-Rust files as ReviewCards.

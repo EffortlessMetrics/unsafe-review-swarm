@@ -263,6 +263,8 @@ target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
 target/unsafe-review/receipt-audit.md
+target/unsafe-review/manual-candidates.json
+target/unsafe-review/manual-repair-queue.json
 target/unsafe-review/lsp.json
 target/unsafe-review/repair-queue.json
 ```
@@ -636,6 +638,16 @@ comment-plan.json schema_version is checked
 witness-plan.md exists
 lsp.json exists and parses
 lsp.json schema_version is checked
+manual-candidates.json exists and parses
+manual-candidates.json schema_version is checked
+manual-repair-queue.json exists and parses
+manual-repair-queue.json schema_version is checked
+manual-repair-queue.json stays source = manual_candidate and policy = advisory
+manual-repair-queue.json queue entries preserve manual-candidate markers and
+copy-only guidance from manual-candidates.json
+manual-repair-queue.json does not claim analyzer discovery, automatic repair,
+agent execution, witness execution, source edits, comments, proof, or policy
+gating
 repair-queue.json exists and parses
 policy-report.json exists and parses
 policy-report.json schema_version is checked
@@ -658,6 +670,8 @@ comment-plan includes trust boundary
 manual-candidate markers are rejected from ReviewCard-only first-pr artifacts:
 cards.json, cards.sarif, comment-plan.json, lsp.json, repair-queue.json,
 policy-report.json, and policy-report.md
+manual-candidate markers are allowed only in manual-candidates.json,
+manual-repair-queue.json, and the review-kit manual-candidate handoff
 manual-candidate reviewcard_artifact_applicability marks ReviewCard-only
 artifacts as not applicable to manual candidates and rejects marker allowance
 policy-report artifacts remain ReviewCard-only policy simulation and
@@ -1071,6 +1085,8 @@ jobs:
             target/unsafe-review/comment-plan.json
             target/unsafe-review/witness-plan.md
             target/unsafe-review/receipt-audit.md
+            target/unsafe-review/manual-candidates.json
+            target/unsafe-review/manual-repair-queue.json
             target/unsafe-review/lsp.json
             target/unsafe-review/repair-queue.json
           if-no-files-found: error

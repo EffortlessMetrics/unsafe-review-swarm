@@ -102,6 +102,10 @@ fn print_manual_candidate_handoff(
         manual_candidates.len()
     );
     println!(
+        "  Manual repair queue: {} (copy-only; unsafe-review did not run an agent)",
+        out_dir.join("manual-repair-queue.json").display()
+    );
+    println!(
         "  manual candidates are advisory manual targets, not analyzer-discovered, not policy inputs, and unsafe-review did not run witnesses"
     );
 }
@@ -490,6 +494,7 @@ fn review_kit_manual_candidate_handoff(
 
     json!({
         "artifact": "manual-candidates.json",
+        "manual_repair_queue_artifact": "manual-repair-queue.json",
         "manual_candidates": manual_candidates.len(),
         "analyzer_discovered": 0,
         "operation_families": manual_candidate_operation_family_counts(manual_candidates),
@@ -854,6 +859,76 @@ pub(super) fn render_manual_candidates_artifact(
     rendered
 }
 
+pub(super) fn render_manual_repair_queue_artifact(
+    root: &Path,
+    candidates: &[ManualCandidate],
+) -> String {
+    let queue = candidates
+        .iter()
+        .map(|candidate| manual_repair_queue_entry(root, candidate))
+        .collect::<Vec<_>>();
+    let value = json!({
+        "schema_version": "manual-repair-queue/v1",
+        "tool": "unsafe-review",
+        "tool_version": env!("CARGO_PKG_VERSION"),
+        "mode": "manual_candidate_repair_queue",
+        "source": "manual_candidate",
+        "policy": "advisory",
+        "summary": {
+            "manual_candidates": candidates.len(),
+            "queued_candidates": queue.len(),
+            "analyzer_discovered": 0,
+            "external_evidence_refs": candidates.iter().map(|candidate| candidate.evidence.len()).sum::<usize>(),
+            "operation_families": manual_candidate_operation_family_counts(candidates),
+            "evidence_kinds": manual_candidate_evidence_kind_counts(candidates),
+            "with_fix_options": candidates.iter().filter(|candidate| !candidate.fix_options.is_empty()).count(),
+            "with_test_targets": candidates.iter().filter(|candidate| !candidate.test_targets.is_empty()).count(),
+            "with_do_not_touch": candidates.iter().filter(|candidate| !candidate.do_not_touch.is_empty()).count(),
+        },
+        "queue": queue,
+        "trust_boundary": "Copy-only manual candidate repair queue; entries come from imported manual candidates, not analyzer-discovered ReviewCards. This is not an automatic repair queue, not proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not policy gating, and not repair success. unsafe-review did not run agents, did not run witnesses, did not edit source, did not post comments, and did not enforce blocking policy.",
+    });
+    let mut rendered = serde_json::to_string_pretty(&value).unwrap_or_else(|err| {
+        format!("{{\n  \"error\": \"manual repair queue serialization failed: {err}\"\n}}")
+    });
+    rendered.push('\n');
+    rendered
+}
+
+fn manual_repair_queue_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::Value {
+    json!({
+        "id": candidate.id.as_str(),
+        "source": "manual",
+        "manual_candidate": true,
+        "analyzer_discovered": false,
+        "title": candidate.title.as_str(),
+        "location_text": manual_candidate_location_text(candidate),
+        "operation_family": candidate.operation_family.as_str(),
+        "unsafe_operation": candidate.unsafe_operation.as_str(),
+        "safe_caller": candidate.safe_caller.as_str(),
+        "invariant_at_risk": candidate.invariant.as_str(),
+        "external_evidence_refs": candidate.evidence.len(),
+        "fix_options": &candidate.fix_options,
+        "test_targets": &candidate.test_targets,
+        "do_not_touch": &candidate.do_not_touch,
+        "implementer_handoff": manual_candidate_implementer_handoff(candidate),
+        "explain": explain_command(root, &candidate.id),
+        "context_json": context_command(root, &candidate.id),
+        "witness_plan": candidate_witness_plan_command(root, &candidate.id),
+        "bucket": "manual_candidate_handoff",
+        "bucket_reason": "manual_candidate_copy_only",
+        "agent_handoff": {
+            "state": "copy_ready",
+            "automatic": false,
+            "reasons": [
+                "manual candidate includes file:line, safe caller route, invariant, evidence, fix/test/non-goal guidance, and stop condition",
+                "candidate must stay manual/advisory and separate from ReviewCard repair-queue.json"
+            ]
+        },
+        "trust_boundary": "Copy-only manual candidate repair queue entry; not analyzer-discovered, not automatic repair, not witness execution, not source editing, not proof, and not policy gating.",
+    })
+}
+
 fn manual_candidate_artifact_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::Value {
     let mut value = serde_json::to_value(candidate).unwrap_or_else(|_| json!({}));
     if let Some(object) = value.as_object_mut() {
@@ -976,6 +1051,7 @@ fn artifact_kind(path: &str) -> &'static str {
         "policy-report.json" => "policy_report_json",
         "policy-report.md" => "policy_report_markdown",
         "manual-candidates.json" => "manual_candidates",
+        "manual-repair-queue.json" => "manual_repair_queue",
         "lsp.json" => "saved_lsp",
         "repair-queue.json" => "repair_queue",
         _ => "unknown",
@@ -999,6 +1075,7 @@ fn artifact_schema_version(path: &str) -> Option<&'static str> {
         "review-kit.json" | "cards.json" | "comment-plan.json" | "lsp.json"
         | "repair-queue.json" | "policy-report.json" => Some("0.1"),
         "manual-candidates.json" => Some("manual-candidates/v1"),
+        "manual-repair-queue.json" => Some("manual-repair-queue/v1"),
         "cards.sarif" => Some("2.1.0"),
         _ => None,
     }

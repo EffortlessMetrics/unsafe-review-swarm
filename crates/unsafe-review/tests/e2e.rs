@@ -1528,6 +1528,8 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("unsafe-review context --root"));
     assert!(stdout.contains("unsafe-review candidate witness-plan --root"));
     assert!(stdout.contains("Review-kit candidate queue: first 2 of 2 manual candidate(s)"));
+    assert!(stdout.contains("Manual repair queue:"));
+    assert!(stdout.contains("manual-repair-queue.json"));
     assert!(stdout.contains("manual candidates are advisory manual targets"));
     assert!(stdout.contains("not analyzer-discovered"));
     assert!(stdout.contains("not policy inputs"));
@@ -1723,6 +1725,10 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(
         review_kit["handoff"]["manual_candidates"]["artifact"],
         "manual-candidates.json"
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["manual_repair_queue_artifact"],
+        "manual-repair-queue.json"
     );
     assert_eq!(
         review_kit["handoff"]["manual_candidates"]["manual_candidates"],
@@ -1943,6 +1949,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         "policy-report.json",
         "policy-report.md",
         "manual-candidates.json",
+        "manual-repair-queue.json",
         "lsp.json",
         "repair-queue.json",
     ] {
@@ -1970,6 +1977,9 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             }
             "manual-candidates.json" => {
                 assert_eq!(entry["schema_version"], "manual-candidates/v1")
+            }
+            "manual-repair-queue.json" => {
+                assert_eq!(entry["schema_version"], "manual-repair-queue/v1")
             }
             "cards.sarif" => assert_eq!(entry["schema_version"], "2.1.0"),
             _ => assert!(entry["schema_version"].is_null()),
@@ -2027,6 +2037,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(github_summary.contains("policy-report.json"));
     assert!(github_summary.contains("policy-report.md"));
     assert!(github_summary.contains("manual-candidates.json"));
+    assert!(github_summary.contains("manual-repair-queue.json"));
     assert!(github_summary.contains("not memory-safety proof"));
     assert!(github_summary.contains("not site-execution proof"));
     assert!(github_summary.contains("unsafe-review did not run witnesses"));
@@ -2194,6 +2205,101 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             .contains("not policy gating")
     );
 
+    let manual_repair_queue = parse_json(&fs::read_to_string(
+        out_dir.join("manual-repair-queue.json"),
+    )?)?;
+    assert_eq!(
+        manual_repair_queue["schema_version"],
+        "manual-repair-queue/v1"
+    );
+    assert_eq!(manual_repair_queue["mode"], "manual_candidate_repair_queue");
+    assert_eq!(manual_repair_queue["source"], "manual_candidate");
+    assert_eq!(manual_repair_queue["policy"], "advisory");
+    assert_eq!(manual_repair_queue["summary"]["manual_candidates"], 2);
+    assert_eq!(manual_repair_queue["summary"]["queued_candidates"], 2);
+    assert_eq!(manual_repair_queue["summary"]["analyzer_discovered"], 0);
+    assert_eq!(manual_repair_queue["summary"]["external_evidence_refs"], 5);
+    assert_eq!(
+        manual_repair_queue["summary"]["operation_families"]["raw_pointer_read"],
+        1
+    );
+    assert_eq!(
+        manual_repair_queue["summary"]["operation_families"]["slice_from_raw_parts"],
+        1
+    );
+    assert_eq!(manual_repair_queue["summary"]["with_fix_options"], 2);
+    assert_eq!(manual_repair_queue["summary"]["with_test_targets"], 2);
+    assert_eq!(manual_repair_queue["summary"]["with_do_not_touch"], 2);
+    assert_eq!(manual_repair_queue["queue"][0]["id"], "R4R2-S001");
+    assert_eq!(manual_repair_queue["queue"][0]["source"], "manual");
+    assert_eq!(manual_repair_queue["queue"][0]["manual_candidate"], true);
+    assert_eq!(
+        manual_repair_queue["queue"][0]["analyzer_discovered"],
+        false
+    );
+    assert_eq!(
+        manual_repair_queue["queue"][0]["location_text"],
+        "src/runtime/webcore/TextDecoder.rs:237"
+    );
+    assert_eq!(
+        manual_repair_queue["queue"][0]["safe_caller"],
+        "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))"
+    );
+    assert_eq!(
+        manual_repair_queue["queue"][0]["invariant_at_risk"],
+        "&[u8] memory must not be concurrently mutated"
+    );
+    assert_eq!(
+        manual_repair_queue["queue"][0]["implementer_handoff"],
+        manual_candidates["candidates"][0]["implementer_handoff"]
+    );
+    assert_eq!(
+        manual_repair_queue["queue"][1]["id"],
+        manual_candidates["candidates"][1]["id"]
+    );
+    assert_eq!(
+        manual_repair_queue["queue"][1]["fix_options"],
+        manual_candidates["candidates"][1]["fix_options"]
+    );
+    assert_eq!(
+        manual_repair_queue["queue"][1]["test_targets"],
+        manual_candidates["candidates"][1]["test_targets"]
+    );
+    assert_eq!(
+        manual_repair_queue["queue"][1]["do_not_touch"],
+        manual_candidates["candidates"][1]["do_not_touch"]
+    );
+    assert_eq!(
+        manual_repair_queue["queue"][0]["bucket"],
+        "manual_candidate_handoff"
+    );
+    assert_eq!(
+        manual_repair_queue["queue"][0]["agent_handoff"]["state"],
+        "copy_ready"
+    );
+    assert_eq!(
+        manual_repair_queue["queue"][0]["agent_handoff"]["automatic"],
+        false
+    );
+    assert!(
+        manual_repair_queue["queue"][0]["agent_handoff"]["reasons"][1]
+            .as_str()
+            .unwrap_or("")
+            .contains("separate from ReviewCard repair-queue.json")
+    );
+    assert!(
+        manual_repair_queue["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not an automatic repair queue")
+    );
+    assert!(
+        manual_repair_queue["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("did not run agents")
+    );
+
     let receipt_audit = fs::read_to_string(out_dir.join("receipt-audit.md"))?;
     assert!(receipt_audit.contains("# unsafe-review receipt audit"));
     assert!(receipt_audit.contains("Static audit of saved receipt metadata"));
@@ -2281,6 +2387,9 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             .unwrap_or("")
             .contains("not an automatic repair queue")
     );
+    let repair_queue_raw = fs::read_to_string(out_dir.join("repair-queue.json"))?;
+    assert!(!repair_queue_raw.contains("R4R2-S001"));
+    assert!(!repair_queue_raw.contains("manual_candidate"));
 
     let policy_report = parse_json(&fs::read_to_string(out_dir.join("policy-report.json"))?)?;
     assert_eq!(policy_report["schema_version"], "0.1");

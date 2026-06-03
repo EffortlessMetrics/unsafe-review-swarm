@@ -156,7 +156,7 @@ const REPAIR_QUEUE_READINESS_STATES: [&str; 4] = [
     "requires_witness_receipt",
     "unsupported",
 ];
-const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 13] = [
+const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 14] = [
     "review-kit.json",
     "cards.json",
     "pr-summary.md",
@@ -168,6 +168,7 @@ const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 13] = [
     "policy-report.json",
     "policy-report.md",
     "manual-candidates.json",
+    "manual-repair-queue.json",
     "lsp.json",
     "repair-queue.json",
 ];
@@ -205,6 +206,7 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
     )?;
     check_receipt_audit_artifact(dir)?;
     check_policy_report_artifacts(dir, &summary)?;
+    check_manual_repair_queue_artifact(dir, &manual_candidates)?;
     check_manual_candidate_front_door_artifacts(dir, &manual_candidates)?;
     check_lsp_artifact(dir, &summary)?;
     check_github_summary_artifact(
@@ -462,7 +464,7 @@ fn check_github_summary_artifact(
     )?;
     super::require_text_contains(
         &text,
-        "- Policy report: `policy-report.md` is ReviewCard-only policy simulation; manual candidates are not policy inputs.",
+        "- Policy report: `policy-report.md`; ReviewCard-only; manual candidates are not policy inputs.",
         &path,
     )?;
     super::require_text_contains(
@@ -487,7 +489,7 @@ fn check_github_summary_artifact(
     super::require_text_contains(&text, "not site-execution proof", &path)?;
     super::require_text_contains(
         &text,
-        "Full advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, policy-report.json, policy-report.md, manual-candidates.json, lsp.json, repair-queue.json)",
+        "Full advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, policy-report.json, policy-report.md, manual-candidates.json, manual-repair-queue.json, lsp.json, repair-queue.json)",
         &path,
     )?;
 
@@ -810,6 +812,315 @@ fn check_manual_candidates_artifact(dir: &Path) -> Result<ManualCandidateIndexPr
         operation_families,
         evidence_kinds,
     })
+}
+
+fn check_manual_repair_queue_artifact(
+    dir: &Path,
+    manual_candidates: &ManualCandidateIndexProjection,
+) -> Result<(), String> {
+    let path = dir.join("manual-repair-queue.json");
+    let value = super::parse_json_file(&path)?;
+    super::require_json_str(
+        &value,
+        "schema_version",
+        "manual-repair-queue/v1",
+        "manual-repair-queue.json",
+    )?;
+    super::require_json_str(&value, "tool", "unsafe-review", "manual-repair-queue.json")?;
+    super::require_json_str(
+        &value,
+        "mode",
+        "manual_candidate_repair_queue",
+        "manual-repair-queue.json",
+    )?;
+    super::require_json_str(
+        &value,
+        "source",
+        "manual_candidate",
+        "manual-repair-queue.json",
+    )?;
+    super::require_json_str(&value, "policy", "advisory", "manual-repair-queue.json")?;
+    let boundary =
+        super::require_non_empty_json_str(&value, "trust_boundary", "manual-repair-queue.json")?;
+    for expected in [
+        "Copy-only manual candidate repair queue",
+        "not analyzer-discovered ReviewCards",
+        "not an automatic repair queue",
+        "not proof of memory safety",
+        "not UB-free status",
+        "not a Miri result",
+        "not Miri-clean status",
+        "not site-execution proof",
+        "not policy gating",
+        "not repair success",
+        "did not run agents",
+        "did not run witnesses",
+        "did not edit source",
+        "did not post comments",
+        "did not enforce blocking policy",
+    ] {
+        if !super::text_contains_ignore_ascii_case(boundary, expected) {
+            return Err(format!(
+                "manual-repair-queue.json trust_boundary must include `{expected}`"
+            ));
+        }
+    }
+
+    let summary_count = super::json_usize_at(
+        &value,
+        "/summary/manual_candidates",
+        "manual-repair-queue.json",
+    )?;
+    if summary_count != manual_candidates.count {
+        return Err(format!(
+            "manual-repair-queue.json summary.manual_candidates is {summary_count}, but manual-candidates.json has {}",
+            manual_candidates.count
+        ));
+    }
+    let queued_count = super::json_usize_at(
+        &value,
+        "/summary/queued_candidates",
+        "manual-repair-queue.json",
+    )?;
+    if queued_count != manual_candidates.count {
+        return Err(format!(
+            "manual-repair-queue.json summary.queued_candidates is {queued_count}, but manual-candidates.json has {}",
+            manual_candidates.count
+        ));
+    }
+    let analyzer_discovered = super::json_usize_at(
+        &value,
+        "/summary/analyzer_discovered",
+        "manual-repair-queue.json",
+    )?;
+    if analyzer_discovered != 0 {
+        return Err("manual-repair-queue.json summary.analyzer_discovered must stay 0".to_string());
+    }
+    let evidence_refs = super::json_usize_at(
+        &value,
+        "/summary/external_evidence_refs",
+        "manual-repair-queue.json",
+    )?;
+    let expected_evidence_refs = manual_candidates
+        .candidates
+        .iter()
+        .map(|candidate| candidate.evidence_refs)
+        .sum::<usize>();
+    if evidence_refs != expected_evidence_refs {
+        return Err(format!(
+            "manual-repair-queue.json summary.external_evidence_refs is {evidence_refs}, but manual-candidates.json has {expected_evidence_refs}"
+        ));
+    }
+    require_summary_count_map(
+        &value,
+        "/summary/operation_families",
+        &manual_candidates.operation_families,
+        "manual-repair-queue.json summary.operation_families",
+    )?;
+    require_summary_count_map(
+        &value,
+        "/summary/evidence_kinds",
+        &manual_candidates.evidence_kinds,
+        "manual-repair-queue.json summary.evidence_kinds",
+    )?;
+    require_manual_repair_guidance_count(
+        &value,
+        "with_fix_options",
+        manual_candidates
+            .candidates
+            .iter()
+            .filter(|candidate| !candidate.fix_options.is_empty())
+            .count(),
+    )?;
+    require_manual_repair_guidance_count(
+        &value,
+        "with_test_targets",
+        manual_candidates
+            .candidates
+            .iter()
+            .filter(|candidate| !candidate.test_targets.is_empty())
+            .count(),
+    )?;
+    require_manual_repair_guidance_count(
+        &value,
+        "with_do_not_touch",
+        manual_candidates
+            .candidates
+            .iter()
+            .filter(|candidate| !candidate.do_not_touch.is_empty())
+            .count(),
+    )?;
+
+    let queue = super::json_array_at(&value, "/queue", "manual-repair-queue.json")?;
+    if queue.len() != manual_candidates.count {
+        return Err(format!(
+            "manual-repair-queue.json queue has {} entrie(s), expected {}",
+            queue.len(),
+            manual_candidates.count
+        ));
+    }
+    for (index, (entry, expected)) in queue.iter().zip(&manual_candidates.candidates).enumerate() {
+        check_manual_repair_queue_entry(entry, expected, index)?;
+    }
+
+    Ok(())
+}
+
+fn require_manual_repair_guidance_count(
+    value: &serde_json::Value,
+    field: &str,
+    expected: usize,
+) -> Result<(), String> {
+    let pointer = format!("/summary/{field}");
+    let actual = super::json_usize_at(value, &pointer, "manual-repair-queue.json")?;
+    if actual != expected {
+        return Err(format!(
+            "manual-repair-queue.json summary.{field} is {actual}, expected {expected}"
+        ));
+    }
+    Ok(())
+}
+
+fn check_manual_repair_queue_entry(
+    entry: &serde_json::Value,
+    expected: &ManualCandidateProjection,
+    index: usize,
+) -> Result<(), String> {
+    let context = format!("manual-repair-queue.json queue[{index}]");
+    require_projected_str(entry, "id", &expected.id, &context)?;
+    require_projected_str(entry, "title", &expected.title, &context)?;
+    require_projected_str(entry, "location_text", &expected.location_text, &context)?;
+    require_projected_str(
+        entry,
+        "operation_family",
+        &expected.operation_family,
+        &context,
+    )?;
+    require_projected_str(
+        entry,
+        "unsafe_operation",
+        &expected.unsafe_operation,
+        &context,
+    )?;
+    require_projected_str(entry, "safe_caller", &expected.safe_caller, &context)?;
+    require_projected_str(entry, "invariant_at_risk", &expected.invariant, &context)?;
+    super::require_json_str(entry, "source", "manual", &context)?;
+    if entry.get("manual_candidate") != Some(&serde_json::Value::Bool(true)) {
+        return Err(format!("{context} manual_candidate must be true"));
+    }
+    if entry.get("analyzer_discovered") != Some(&serde_json::Value::Bool(false)) {
+        return Err(format!("{context} analyzer_discovered must be false"));
+    }
+    let evidence_refs = super::json_usize_at(entry, "/external_evidence_refs", &context)?;
+    if evidence_refs != expected.evidence_refs {
+        return Err(format!(
+            "{context} external_evidence_refs is {evidence_refs}, expected {}",
+            expected.evidence_refs
+        ));
+    }
+    require_projected_optional_string_array(entry, "fix_options", &expected.fix_options, &context)?;
+    require_projected_optional_string_array(
+        entry,
+        "test_targets",
+        &expected.test_targets,
+        &context,
+    )?;
+    require_projected_optional_string_array(
+        entry,
+        "do_not_touch",
+        &expected.do_not_touch,
+        &context,
+    )?;
+    let handoff = entry
+        .get("implementer_handoff")
+        .ok_or_else(|| format!("{context} is missing implementer_handoff"))?;
+    if handoff != &expected.implementer_handoff {
+        return Err(format!(
+            "{context} implementer_handoff must match manual-candidates.json candidate `{}` implementer_handoff",
+            expected.id
+        ));
+    }
+    require_manual_command(
+        entry,
+        "explain",
+        "unsafe-review explain",
+        &expected.id,
+        &context,
+    )?;
+    require_manual_command(
+        entry,
+        "context_json",
+        "unsafe-review context",
+        &expected.id,
+        &context,
+    )?;
+    require_manual_command(
+        entry,
+        "witness_plan",
+        "unsafe-review candidate witness-plan",
+        &expected.id,
+        &context,
+    )?;
+    super::require_json_str(entry, "bucket", "manual_candidate_handoff", &context)?;
+    super::require_json_str(
+        entry,
+        "bucket_reason",
+        "manual_candidate_copy_only",
+        &context,
+    )?;
+    let agent_handoff = entry
+        .get("agent_handoff")
+        .ok_or_else(|| format!("{context} is missing agent_handoff"))?;
+    super::require_json_str(agent_handoff, "state", "copy_ready", &context)?;
+    if agent_handoff.get("automatic") != Some(&serde_json::Value::Bool(false)) {
+        return Err(format!("{context} agent_handoff.automatic must be false"));
+    }
+    let reasons = require_non_empty_string_array(agent_handoff, "reasons", &context)?;
+    for expected_text in [
+        "manual candidate includes file:line",
+        "separate from ReviewCard repair-queue.json",
+    ] {
+        if !reasons.iter().any(|reason| reason.contains(expected_text)) {
+            return Err(format!(
+                "{context} agent_handoff.reasons must include `{expected_text}`"
+            ));
+        }
+    }
+    let boundary = super::require_non_empty_json_str(entry, "trust_boundary", &context)?;
+    for expected_text in [
+        "not analyzer-discovered",
+        "not automatic repair",
+        "not witness execution",
+        "not source editing",
+        "not proof",
+        "not policy gating",
+    ] {
+        if !super::text_contains_ignore_ascii_case(boundary, expected_text) {
+            return Err(format!(
+                "{context} trust_boundary must include `{expected_text}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn require_manual_command(
+    value: &serde_json::Value,
+    field: &str,
+    prefix: &str,
+    expected_id: &str,
+    context: &str,
+) -> Result<(), String> {
+    let command = super::require_non_empty_json_str(value, field, context)?;
+    if !command.starts_with(prefix) || !command.contains(expected_id) {
+        return Err(format!(
+            "{context} {field} must start with `{prefix}` and reference `{expected_id}`"
+        ));
+    }
+    if field == "context_json" && !command.contains("--json") {
+        return Err(format!("{context} context_json must include `--json`"));
+    }
+    Ok(())
 }
 
 fn manual_candidate_operation_family_counts(
@@ -2162,6 +2473,7 @@ fn expected_review_kit_artifact_kind(path: &str) -> &'static str {
         "policy-report.json" => "policy_report_json",
         "policy-report.md" => "policy_report_markdown",
         "manual-candidates.json" => "manual_candidates",
+        "manual-repair-queue.json" => "manual_repair_queue",
         "lsp.json" => "saved_lsp",
         "repair-queue.json" => "repair_queue",
         _ => "unknown",
@@ -2176,6 +2488,7 @@ fn expected_review_kit_artifact_format(path: &str) -> &'static str {
         | "lsp.json"
         | "repair-queue.json"
         | "manual-candidates.json"
+        | "manual-repair-queue.json"
         | "policy-report.json" => "json",
         "pr-summary.md" | "github-summary.md" | "witness-plan.md" | "receipt-audit.md"
         | "policy-report.md" => "markdown",
@@ -2197,6 +2510,7 @@ fn check_review_kit_artifact_schema_version(
         "review-kit.json" | "cards.json" | "comment-plan.json" | "lsp.json"
         | "repair-queue.json" | "policy-report.json" => Some("0.1"),
         "manual-candidates.json" => Some("manual-candidates/v1"),
+        "manual-repair-queue.json" => Some("manual-repair-queue/v1"),
         "cards.sarif" => Some("2.1.0"),
         "pr-summary.md" | "github-summary.md" | "witness-plan.md" | "receipt-audit.md"
         | "policy-report.md" => None,
@@ -5771,6 +6085,7 @@ fn check_advisory_artifact_overclaims(dir: &Path) -> Result<(), String> {
         "policy-report.json",
         "policy-report.md",
         "manual-candidates.json",
+        "manual-repair-queue.json",
         "lsp.json",
         "repair-queue.json",
     ] {
@@ -5796,6 +6111,7 @@ fn is_machine_json_artifact(name: &str) -> bool {
             | "comment-plan.json"
             | "policy-report.json"
             | "manual-candidates.json"
+            | "manual-repair-queue.json"
             | "lsp.json"
             | "repair-queue.json"
     )

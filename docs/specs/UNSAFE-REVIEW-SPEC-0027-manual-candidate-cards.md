@@ -213,6 +213,17 @@ candidate-specific fix options, test targets, non-goals, and stop lines must
 still project from the imported manual candidate. It is not the
 ReviewCard repair queue.
 
+`first-pr` may also write `manual-repair-queue.json` as a dedicated
+manual-candidate repair handoff sidecar. It must use
+`schema_version = manual-repair-queue/v1`, `source = manual_candidate`,
+`mode = manual_candidate_repair_queue`, and `policy = advisory`. It must
+preserve sorted manual IDs, `source = manual`, `manual_candidate = true`, and
+`analyzer_discovered = false`, project the same implementer handoff, guidance,
+and copy-only explain/context/witness-plan commands as `manual-candidates.json`,
+and cross-check summary counts and guidance against `manual-candidates.json`.
+It is not `repair-queue.json`, not analyzer-discovered ReviewCard output, not
+automatic repair, not proof, not witness execution, and not policy gating.
+
 When imported candidates are present in a `first-pr` run, `pr-summary.md` and
 `github-summary.md` must include a compact manual-candidate front-door cue with
 the manual count, advisory operation-family and evidence-kind count summaries,
@@ -266,6 +277,9 @@ into an analyzer ReviewCard.
 - projection tests proving optional fix options, test targets, and do-not-touch
   guidance stay aligned across candidate import, explain/context, witness-plan,
   first-pr `manual-candidates.json`, and `review-kit.json`
+- verifier and first-pr e2e tests proving `manual-repair-queue.json` stays
+  aligned with `manual-candidates.json`, preserves manual markers and
+  implementer guidance, and remains separate from ReviewCard `repair-queue.json`
 - outcome projection tests proving single-candidate and aggregate
   `manual-candidates/v1` comparisons preserve safe caller, invariant, external
   evidence command/limitation, optional fix/test/non-goal guidance, and manual
@@ -310,6 +324,10 @@ into an analyzer ReviewCard.
   ReviewCard-derived artifacts, including cards JSON, SARIF, comment-plan,
   saved LSP, repair queue, and policy-report JSON/Markdown surfaces,
   ReviewCard-only.
+- `first-pr` writes `manual-repair-queue.json` as a separate copy-only manual
+  candidate repair handoff, preserving manual markers, guidance, and commands
+  from `manual-candidates.json` while keeping ReviewCard `repair-queue.json`
+  free of manual-candidate markers.
 - The first-pr verifier rejects manual-candidate markers in ReviewCard-only
   artifacts instead of silently accepting leaked manual candidates as analyzer
   output.
@@ -345,6 +363,7 @@ cargo test -p unsafe-review-core outcome
 cargo test -p unsafe-review manual_candidate
 cargo test -p unsafe-review first_pr_writes_standard_advisory_review_bundle
 cargo test -p xtask manual_candidate
+cargo test -p xtask first_pr_artifact_checker
 cargo run --locked -p xtask -- check-manual-candidate-examples
 cargo run --locked -p xtask -- check-pr
 cargo run --locked -p xtask -- source-divergence
