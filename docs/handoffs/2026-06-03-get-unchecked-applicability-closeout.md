@@ -178,3 +178,14 @@ Stop adding `get_unchecked` micro-rails unless one of these is true:
 
 Otherwise, spend the next work on workflow, recipes, agent repair boundaries,
 CI cookbook, and usefulness judgments.
+
+## Validation
+
+Local validation for this closeout:
+
+```bash
+rtk cargo run --locked -p xtask -- check-docs
+rtk cargo run --locked -p xtask -- check-doc-artifacts
+rtk cargo run --locked -p xtask -- check-docs-automation
+rtk cargo run --locked -p xtask -- check-pr
+```
