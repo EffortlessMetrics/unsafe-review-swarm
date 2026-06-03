@@ -3,6 +3,7 @@ use std::path::{Component, Path};
 
 struct AdvisoryArtifactSummary {
     card_ids: BTreeSet<String>,
+    card_order: Vec<String>,
     card_projections: BTreeMap<String, CardProjection>,
     repair_queue_projections: BTreeMap<String, RepairQueueProjection>,
     scope: String,
@@ -16,6 +17,7 @@ struct AdvisoryArtifactSummary {
 
 struct AdvisoryArtifactManifest {
     card_ids: BTreeSet<String>,
+    card_order: Vec<String>,
     card_projections: BTreeMap<String, CardProjection>,
     scope: String,
     changed_files: usize,
@@ -58,17 +60,20 @@ struct WitnessRouteProjection {
 
 struct RepairQueueProjection {
     buckets: Vec<String>,
+    readiness_ready: bool,
     readiness_state: String,
     readiness_reasons: Vec<String>,
 }
 
 struct RepairQueueEntryProjection {
     card_id: String,
+    readiness_ready: bool,
     readiness_state: String,
     readiness_reasons: Vec<String>,
 }
 
 struct RepairQueueReadinessProjection {
+    ready: bool,
     state: String,
     reasons: Vec<String>,
 }
@@ -109,6 +114,7 @@ struct ManualCandidateEvidenceProjection {
 const COMMENT_PLAN_BODY_WORD_LIMIT: usize = 220;
 const COMMENT_PLAN_REVIEW_BUDGET: usize = 3;
 const MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
+const REVIEW_CARD_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
 const COMMENT_PLAN_REVIEW_BUDGET_REASON: &str = "bounded reviewer noise";
 const COMMENT_PLAN_REVIEW_BUDGET_REASON_CODE: &str = "bounded_reviewer_noise";
 const COMMENT_PLAN_SELECTION_REASONS: &[&str] = &[
@@ -219,6 +225,9 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         summary.card_count,
         summary.open_actionable_gaps,
         &summary.card_ids,
+        &summary.card_order,
+        &summary.card_projections,
+        &summary.repair_queue_projections,
         &manual_candidates,
     )?;
     check_advisory_artifact_overclaims(dir)?;
@@ -1033,6 +1042,9 @@ fn check_review_kit_manifest(
     card_count: usize,
     open_actionable_gaps: usize,
     card_ids: &BTreeSet<String>,
+    card_order: &[String],
+    card_projections: &BTreeMap<String, CardProjection>,
+    repair_queue_projections: &BTreeMap<String, RepairQueueProjection>,
     manual_candidates: &ManualCandidateIndexProjection,
 ) -> Result<(), String> {
     let path = dir.join("review-kit.json");
@@ -1127,6 +1139,9 @@ fn check_review_kit_manifest(
         &review_kit,
         top_card_id.as_deref(),
         card_count,
+        card_order,
+        card_projections,
+        repair_queue_projections,
         manual_candidates,
     )?;
 
@@ -1192,6 +1207,9 @@ fn check_review_kit_handoff(
     review_kit: &serde_json::Value,
     top_card_id: Option<&str>,
     card_count: usize,
+    card_order: &[String],
+    card_projections: &BTreeMap<String, CardProjection>,
+    repair_queue_projections: &BTreeMap<String, RepairQueueProjection>,
     manual_candidates: &ManualCandidateIndexProjection,
 ) -> Result<(), String> {
     let handoff = review_kit
@@ -1226,6 +1244,13 @@ fn check_review_kit_handoff(
     }
 
     check_review_kit_top_card_handoff(handoff, top_card_id, card_count)?;
+    check_review_kit_review_card_handoff(
+        handoff,
+        card_count,
+        card_order,
+        card_projections,
+        repair_queue_projections,
+    )?;
     check_review_kit_manual_candidate_handoff(handoff, manual_candidates)?;
 
     let boundary =
@@ -1245,6 +1270,243 @@ fn check_review_kit_handoff(
     }
 
     Ok(())
+}
+
+fn check_review_kit_review_card_handoff(
+    handoff: &serde_json::Value,
+    card_count: usize,
+    card_order: &[String],
+    card_projections: &BTreeMap<String, CardProjection>,
+    repair_queue_projections: &BTreeMap<String, RepairQueueProjection>,
+) -> Result<(), String> {
+    let review_cards = handoff
+        .get("review_cards")
+        .ok_or_else(|| "review-kit.json handoff is missing review_cards".to_string())?;
+    if !review_cards.is_object() {
+        return Err("review-kit.json handoff review_cards must be an object".to_string());
+    }
+    require_expected_value(
+        super::require_non_empty_json_str(
+            review_cards,
+            "artifact",
+            "review-kit.json handoff review_cards",
+        )?,
+        "cards.json",
+        "review-kit.json handoff review_cards artifact",
+    )?;
+    require_expected_value(
+        super::require_non_empty_json_str(
+            review_cards,
+            "repair_queue_artifact",
+            "review-kit.json handoff review_cards",
+        )?,
+        "repair-queue.json",
+        "review-kit.json handoff review_cards repair_queue_artifact",
+    )?;
+    let count = super::json_usize_at(
+        review_cards,
+        "/review_cards",
+        "review-kit.json handoff review_cards",
+    )?;
+    if count != card_count {
+        return Err(format!(
+            "review-kit.json handoff review_cards.review_cards is {count}, but cards.json has {card_count}"
+        ));
+    }
+    let limit = super::json_usize_at(
+        review_cards,
+        "/card_queue_limit",
+        "review-kit.json handoff review_cards",
+    )?;
+    if limit != REVIEW_CARD_REVIEW_KIT_QUEUE_LIMIT {
+        return Err(format!(
+            "review-kit.json handoff review_cards card_queue_limit is {limit}, expected {REVIEW_CARD_REVIEW_KIT_QUEUE_LIMIT}"
+        ));
+    }
+    let queue = super::json_array_at(
+        review_cards,
+        "/card_queue",
+        "review-kit.json handoff review_cards",
+    )?;
+    let expected_queue_len = card_count.min(limit);
+    if queue.len() != expected_queue_len {
+        return Err(format!(
+            "review-kit.json handoff review_cards card_queue has {} entries, expected {expected_queue_len}",
+            queue.len()
+        ));
+    }
+    let omitted = super::json_usize_at(
+        review_cards,
+        "/omitted_cards",
+        "review-kit.json handoff review_cards",
+    )?;
+    let expected_omitted = card_count.saturating_sub(queue.len());
+    if omitted != expected_omitted {
+        return Err(format!(
+            "review-kit.json handoff review_cards omitted_cards is {omitted}, expected {expected_omitted}"
+        ));
+    }
+    for (index, entry) in queue.iter().enumerate() {
+        let expected_id = card_order
+            .get(index)
+            .ok_or_else(|| format!("cards.json has no card at index {index}"))?;
+        check_review_kit_review_card_queue_entry(
+            entry,
+            expected_id,
+            card_projections,
+            repair_queue_projections,
+            index,
+        )?;
+    }
+    let boundary = super::require_non_empty_json_str(
+        review_cards,
+        "trust_boundary",
+        "review-kit.json handoff review_cards",
+    )?;
+    super::require_boundary_text(boundary, "review-kit.json handoff review_cards")?;
+    for expected in [
+        "cards.json",
+        "repair-queue.json",
+        "does not run agents",
+        "run witnesses",
+        "edit source",
+        "post comments",
+        "suppress cards",
+        "resolve cards",
+        "enforce blocking policy",
+        "not a proof",
+        "repair success",
+        "policy readiness",
+    ] {
+        if !super::text_contains_ignore_ascii_case(boundary, expected) {
+            return Err(format!(
+                "review-kit.json handoff review_cards trust_boundary must include `{expected}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn check_review_kit_review_card_queue_entry(
+    entry: &serde_json::Value,
+    expected_id: &str,
+    card_projections: &BTreeMap<String, CardProjection>,
+    repair_queue_projections: &BTreeMap<String, RepairQueueProjection>,
+    index: usize,
+) -> Result<(), String> {
+    let context = format!("review-kit.json handoff review_cards card_queue[{index}]");
+    let card_id = super::require_non_empty_json_str(entry, "card_id", &context)?;
+    if card_id != expected_id {
+        return Err(format!(
+            "{context} card_id `{card_id}` must match cards.json card `{expected_id}`"
+        ));
+    }
+    let card = card_projections
+        .get(card_id)
+        .ok_or_else(|| format!("{context} references unknown card id `{card_id}`"))?;
+    super::require_json_str(entry, "source", "review_card", &context)?;
+    if entry.get("manual_candidate").is_some() || entry.get("analyzer_discovered").is_some() {
+        return Err(format!(
+            "{context} must not include manual candidate marker fields"
+        ));
+    }
+    require_projected_str(entry, "class", &card.class_name, &context)?;
+    require_projected_str(entry, "priority", &card.priority, &context)?;
+    require_projected_str(entry, "confidence", &card.confidence, &context)?;
+    require_projected_str(entry, "path", &card.path, &context)?;
+    require_projected_u64(entry, "line", card.line, &context)?;
+    require_expected_value(
+        super::require_non_empty_json_str(entry, "location_text", &context)?,
+        &format!("{}:{}", card.path, card.line),
+        &format!("{context} location_text"),
+    )?;
+    require_projected_str(entry, "operation_family", &card.operation_family, &context)?;
+    require_projected_str(entry, "operation", &card.operation, &context)?;
+    require_projected_str(entry, "next_action", &card.next_action, &context)?;
+    require_projected_string_array(entry, "missing_evidence", &card.missing, &context)?;
+
+    let repair = repair_queue_projections
+        .get(card_id)
+        .ok_or_else(|| format!("{context} card `{card_id}` is missing from repair-queue.json"))?;
+    require_projected_string_array(entry, "repair_queue_buckets", &repair.buckets, &context)?;
+    let expected_bucket_reasons = repair
+        .buckets
+        .iter()
+        .map(|bucket| expected_repair_queue_bucket_reason(bucket).to_string())
+        .collect::<Vec<_>>();
+    require_projected_string_array(
+        entry,
+        "repair_queue_bucket_reasons",
+        &expected_bucket_reasons,
+        &context,
+    )?;
+    check_review_kit_review_card_readiness(entry, repair, &context)?;
+    for (field, command) in [
+        ("explain", "unsafe-review explain "),
+        ("context_json", "unsafe-review context "),
+    ] {
+        let text = super::require_non_empty_json_str(entry, field, &context)?;
+        if !text.starts_with(command) || !text.contains(card_id) {
+            return Err(format!("{context} {field} must reference `{card_id}`"));
+        }
+        if field == "context_json" && !text.contains("--json") {
+            return Err(format!("{context} context_json must include `--json`"));
+        }
+    }
+    let boundary =
+        super::require_non_empty_json_str(entry, "trust_boundary", &format!("{context} entry"))?;
+    super::require_boundary_text(boundary, &context)?;
+    for expected in [
+        "cards.json",
+        "repair-queue.json",
+        "did not run agents",
+        "run witnesses",
+        "edit source",
+        "post comments",
+        "suppress cards",
+        "resolve cards",
+        "enforce blocking policy",
+    ] {
+        if !super::text_contains_ignore_ascii_case(boundary, expected) {
+            return Err(format!(
+                "{context} trust_boundary must include `{expected}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn check_review_kit_review_card_readiness(
+    entry: &serde_json::Value,
+    repair: &RepairQueueProjection,
+    context: &str,
+) -> Result<(), String> {
+    let readiness = entry
+        .get("agent_readiness")
+        .ok_or_else(|| format!("{context} is missing agent_readiness"))?;
+    if !readiness.is_object() {
+        return Err(format!("{context} agent_readiness must be an object"));
+    }
+    let Some(ready) = readiness.get("ready").and_then(serde_json::Value::as_bool) else {
+        return Err(format!("{context} agent_readiness.ready must be a boolean"));
+    };
+    if ready != repair.readiness_ready {
+        return Err(format!(
+            "{context} agent_readiness.ready must project repair-queue.json value `{}`; got `{ready}`",
+            repair.readiness_ready
+        ));
+    }
+    require_expected_value(
+        super::require_non_empty_json_str(readiness, "state", context)?,
+        &repair.readiness_state,
+        &format!("{context} agent_readiness.state"),
+    )?;
+    require_projected_string_array(
+        readiness,
+        "reasons",
+        &repair.readiness_reasons,
+        &format!("{context} agent_readiness"),
+    )
 }
 
 fn check_review_kit_manual_candidate_handoff(
@@ -2065,6 +2327,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
 
     Ok(AdvisoryArtifactSummary {
         card_ids: manifest.card_ids,
+        card_order: manifest.card_order,
         card_projections: manifest.card_projections,
         repair_queue_projections,
         scope: manifest.scope,
@@ -2098,6 +2361,7 @@ fn check_cards_json_artifact(dir: &Path) -> Result<AdvisoryArtifactManifest, Str
     let scope = super::require_non_empty_json_str(&cards, "scope", "cards.json")?.to_string();
     require_known_advisory_scope(&scope)?;
     let card_ids = super::advisory_card_ids(&cards)?;
+    let card_order = advisory_card_order(&cards)?;
     let card_projections = advisory_card_projections(&cards)?;
     let card_count = card_ids.len();
     let changed_files = super::json_usize_at(&cards, "/summary/changed_files", "cards.json")?;
@@ -2120,6 +2384,7 @@ fn check_cards_json_artifact(dir: &Path) -> Result<AdvisoryArtifactManifest, Str
 
     Ok(AdvisoryArtifactManifest {
         card_ids,
+        card_order,
         card_projections,
         scope,
         changed_files,
@@ -2934,6 +3199,7 @@ fn check_repair_queue_entry(
     let readiness = check_repair_queue_readiness(readiness, bucket)?;
     Ok(RepairQueueEntryProjection {
         card_id: card_id.to_string(),
+        readiness_ready: readiness.ready,
         readiness_state: readiness.state,
         readiness_reasons: readiness.reasons,
     })
@@ -2995,9 +3261,16 @@ fn push_repair_queue_projection(
             .entry(entry.card_id.clone())
             .or_insert_with(|| RepairQueueProjection {
                 buckets: Vec::new(),
+                readiness_ready: entry.readiness_ready,
                 readiness_state: entry.readiness_state.clone(),
                 readiness_reasons: entry.readiness_reasons.clone(),
             });
+    if projection.readiness_ready != entry.readiness_ready {
+        return Err(format!(
+            "repair-queue.json card `{}` has inconsistent agent_readiness.ready across buckets",
+            entry.card_id
+        ));
+    }
     if projection.readiness_state != entry.readiness_state {
         return Err(format!(
             "repair-queue.json card `{}` has inconsistent agent_readiness.state across buckets",
@@ -3080,6 +3353,7 @@ fn check_repair_queue_readiness(
         .map(str::to_string)
         .collect();
     Ok(RepairQueueReadinessProjection {
+        ready,
         state: state.to_string(),
         reasons: readiness_reasons,
     })
@@ -3358,6 +3632,15 @@ fn advisory_card_projections(
         );
     }
     Ok(projections)
+}
+
+fn advisory_card_order(cards: &serde_json::Value) -> Result<Vec<String>, String> {
+    super::json_array_at(cards, "/cards", "cards.json")?
+        .iter()
+        .map(|card| {
+            super::require_non_empty_json_str(card, "id", "cards.json card").map(str::to_string)
+        })
+        .collect()
 }
 
 fn optional_card_string(card: &serde_json::Value, field: &str) -> Result<Option<String>, String> {

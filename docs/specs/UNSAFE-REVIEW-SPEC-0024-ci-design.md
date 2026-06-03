@@ -670,6 +670,16 @@ state, buckets, and readiness reasons
 repair-queue.json entries carry do-not-do boundaries
 repair-queue.json human-review and do-not-auto-repair entries are not agent-ready
 repair-queue.json does not claim agent execution or repair success
+review-kit.json handoff.review_cards has a bounded card_queue with limit and
+omitted-card counts
+review-kit.json handoff.review_cards entries reference known ReviewCards only
+review-kit.json handoff.review_cards entries project cards.json identity,
+location, operation, missing evidence, and next action
+review-kit.json handoff.review_cards entries project repair-queue.json buckets,
+bucket reasons, and agent-readiness state
+review-kit.json handoff.review_cards stays ReviewCard-only and excludes manual
+candidate marker fields
+review-kit.json handoff.review_cards carries copy-only trust boundary wording
 no WorkspaceEdit appears
 no positive overclaim wording appears
 ```

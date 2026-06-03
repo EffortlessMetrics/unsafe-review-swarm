@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt::{self, Write as _};
 use std::path::Path;
 use std::process::Command as ProcessCommand;
@@ -5,10 +6,20 @@ use std::process::Command as ProcessCommand;
 use crate::command::{CheckOptions, DiffInput};
 use serde_json::json;
 use unsafe_review_core::{
-    AnalyzeOutput, ManualCandidate, Scope, manual_candidate_implementer_handoff,
+    AnalyzeOutput, ManualCandidate, ReviewCard, Scope, manual_candidate_implementer_handoff,
+    render_repair_queue,
 };
 
 const MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
+const REVIEW_CARD_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
+const REVIEW_CARD_REPAIR_QUEUE_BUCKETS: [&str; 6] = [
+    "repairable_by_guard",
+    "repairable_by_safety_docs",
+    "repairable_by_test",
+    "requires_witness_receipt",
+    "requires_human_review",
+    "do_not_auto_repair",
+];
 
 pub(super) struct FirstPrReport<'a> {
     pub(super) output: &'a AnalyzeOutput,
@@ -284,9 +295,150 @@ fn review_kit_handoff(
         "reviewer_summary": "pr-summary.md",
         "receipt_audit_markdown": receipt_audit_command(check),
         "top_card": top_card,
+        "review_cards": review_kit_review_card_handoff(output, root),
         "manual_candidates": review_kit_manual_candidate_handoff(manual_candidates, root),
         "trust_boundary": "Copy-only review-kit handoff commands; unsafe-review did not run witnesses, run agents, post comments, edit source, or enforce blocking policy.",
     })
+}
+
+fn review_kit_review_card_handoff(output: &AnalyzeOutput, root: &Path) -> serde_json::Value {
+    let repair_queue = review_kit_repair_queue_index(output);
+    let card_queue = output
+        .cards
+        .iter()
+        .take(REVIEW_CARD_REVIEW_KIT_QUEUE_LIMIT)
+        .map(|card| review_kit_review_card_queue_entry(card, root, repair_queue.get(&card.id.0)))
+        .collect::<Vec<_>>();
+    let omitted_cards = output.cards.len().saturating_sub(card_queue.len());
+
+    json!({
+        "artifact": "cards.json",
+        "repair_queue_artifact": "repair-queue.json",
+        "review_cards": output.cards.len(),
+        "card_queue_limit": REVIEW_CARD_REVIEW_KIT_QUEUE_LIMIT,
+        "card_queue": card_queue,
+        "omitted_cards": omitted_cards,
+        "trust_boundary": "Static unsafe contract review only; copy-only ReviewCard queue preview projected from cards.json and repair-queue.json. It does not run agents, run witnesses, edit source, post comments, suppress cards, resolve cards, or enforce blocking policy. It is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repair success, and not policy readiness.",
+    })
+}
+
+fn review_kit_review_card_queue_entry(
+    card: &ReviewCard,
+    root: &Path,
+    repair_queue: Option<&ReviewKitRepairQueueProjection>,
+) -> serde_json::Value {
+    let path = card_path_display(&card.site.location.file);
+    let missing_evidence = card
+        .missing
+        .iter()
+        .map(|missing| missing.message.as_str())
+        .collect::<Vec<_>>();
+    let repair_queue_buckets = repair_queue
+        .map(|projection| projection.buckets.clone())
+        .unwrap_or_default();
+    let repair_queue_bucket_reasons = repair_queue
+        .map(|projection| projection.bucket_reasons.clone())
+        .unwrap_or_default();
+    let agent_readiness = repair_queue
+        .map(|projection| projection.agent_readiness.clone())
+        .unwrap_or_else(|| {
+            json!({
+                "ready": false,
+                "state": "requires_human_review",
+                "reasons": ["missing repair-queue projection"],
+            })
+        });
+
+    json!({
+        "card_id": card.id.to_string(),
+        "source": "review_card",
+        "class": card.class.as_str(),
+        "priority": card.priority.as_str(),
+        "confidence": card.confidence.as_str(),
+        "path": path,
+        "line": card.site.location.line,
+        "location_text": format!("{}:{}", card_path_display(&card.site.location.file), card.site.location.line),
+        "operation_family": card.operation.family.as_str(),
+        "operation": card.operation.expression.as_str(),
+        "missing_evidence": missing_evidence,
+        "next_action": card.next_action.summary.as_str(),
+        "repair_queue_buckets": repair_queue_buckets,
+        "repair_queue_bucket_reasons": repair_queue_bucket_reasons,
+        "agent_readiness": agent_readiness,
+        "explain": explain_command(root, &card.id),
+        "context_json": context_command(root, &card.id),
+        "trust_boundary": "Static unsafe contract review only; copy-only ReviewCard queue entry projected from cards.json and repair-queue.json; it is not a proof of memory safety, not UB-free status, not a Miri result, and not site-execution proof. unsafe-review did not run agents, run witnesses, edit source, post comments, suppress cards, resolve cards, or enforce blocking policy.",
+    })
+}
+
+#[derive(Clone)]
+struct ReviewKitRepairQueueProjection {
+    buckets: Vec<String>,
+    bucket_reasons: Vec<String>,
+    agent_readiness: serde_json::Value,
+}
+
+fn review_kit_repair_queue_index(
+    output: &AnalyzeOutput,
+) -> BTreeMap<String, ReviewKitRepairQueueProjection> {
+    let Ok(repair_queue) = serde_json::from_str::<serde_json::Value>(&render_repair_queue(output))
+    else {
+        return BTreeMap::new();
+    };
+    let Some(buckets) = repair_queue
+        .get("buckets")
+        .and_then(serde_json::Value::as_object)
+    else {
+        return BTreeMap::new();
+    };
+
+    let mut index = BTreeMap::<String, ReviewKitRepairQueueProjection>::new();
+    for bucket in REVIEW_CARD_REPAIR_QUEUE_BUCKETS {
+        let Some(entries) = buckets.get(bucket).and_then(serde_json::Value::as_array) else {
+            continue;
+        };
+        for entry in entries {
+            let Some(card_id) = entry.get("card_id").and_then(serde_json::Value::as_str) else {
+                continue;
+            };
+            let projection = index.entry(card_id.to_string()).or_insert_with(|| {
+                ReviewKitRepairQueueProjection {
+                    buckets: Vec::new(),
+                    bucket_reasons: Vec::new(),
+                    agent_readiness: entry
+                        .get("agent_readiness")
+                        .cloned()
+                        .unwrap_or(serde_json::Value::Null),
+                }
+            });
+            if !projection
+                .buckets
+                .iter()
+                .any(|candidate| candidate == bucket)
+            {
+                projection.buckets.push(bucket.to_string());
+            }
+            if let Some(reason) = entry
+                .get("bucket_reason")
+                .and_then(serde_json::Value::as_str)
+            {
+                if !projection
+                    .bucket_reasons
+                    .iter()
+                    .any(|candidate| candidate == reason)
+                {
+                    projection.bucket_reasons.push(reason.to_string());
+                }
+            }
+            if projection.agent_readiness.is_null() {
+                projection.agent_readiness = entry
+                    .get("agent_readiness")
+                    .cloned()
+                    .unwrap_or(serde_json::Value::Null);
+            }
+        }
+    }
+    index
 }
 
 fn review_kit_manual_candidate_handoff(
@@ -817,6 +969,22 @@ mod tests {
                 .contains("--format markdown")
         );
         assert!(value["handoff"]["top_card"].is_null());
+        assert_eq!(value["handoff"]["review_cards"]["artifact"], "cards.json");
+        assert_eq!(
+            value["handoff"]["review_cards"]["repair_queue_artifact"],
+            "repair-queue.json"
+        );
+        assert_eq!(value["handoff"]["review_cards"]["review_cards"], 0);
+        assert_eq!(
+            value["handoff"]["review_cards"]["card_queue_limit"],
+            REVIEW_CARD_REVIEW_KIT_QUEUE_LIMIT
+        );
+        assert_eq!(value["handoff"]["review_cards"]["omitted_cards"], 0);
+        assert!(
+            value["handoff"]["review_cards"]["card_queue"]
+                .as_array()
+                .is_some_and(|queue| queue.is_empty())
+        );
         assert_eq!(
             value["handoff"]["manual_candidates"]["artifact"],
             "manual-candidates.json"

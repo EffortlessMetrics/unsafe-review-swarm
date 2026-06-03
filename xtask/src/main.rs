@@ -11038,6 +11038,108 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_review_card_queue_id_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-review-card-queue-id-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit = parse_json_file(&path)?;
+        let entry = &mut review_kit["handoff"]["review_cards"]["card_queue"][0];
+        entry["card_id"] = serde_json::json!("missing-card");
+        entry["explain"] = serde_json::json!("unsafe-review explain missing-card");
+        entry["context_json"] = serde_json::json!("unsafe-review context missing-card --json");
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err("ReviewCard queue id drift should fail verification".to_string());
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains(
+                "review-kit.json handoff review_cards card_queue[0] card_id `missing-card` must match cards.json card `card-1`"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_review_card_queue_projection_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir(
+            "unsafe-review-first-pr-review-kit-review-card-queue-projection-drift",
+        )?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit = parse_json_file(&path)?;
+        review_kit["handoff"]["review_cards"]["card_queue"][0]["operation_family"] =
+            serde_json::json!("slice_from_raw_parts");
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "ReviewCard queue cards.json projection drift should fail verification"
+                        .to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("review-kit.json handoff review_cards card_queue[0] operation_family"),
+            "{err}"
+        );
+        assert!(err.contains("raw_pointer_read"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_review_card_queue_repair_drift()
+    -> Result<(), String> {
+        let dir =
+            unique_temp_dir("unsafe-review-first-pr-review-kit-review-card-queue-repair-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit = parse_json_file(&path)?;
+        review_kit["handoff"]["review_cards"]["card_queue"][0]["repair_queue_buckets"] =
+            serde_json::json!(["repairable_by_safety_docs"]);
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "ReviewCard queue repair-queue projection drift should fail verification"
+                        .to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("review-kit.json handoff review_cards card_queue[0] repair_queue_buckets"),
+            "{err}"
+        );
+        assert!(err.contains("requires_witness_receipt"), "{err}");
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_review_kit_receipt_handoff_drift() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-receipt-handoff-drift")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -16147,7 +16249,37 @@ review_after = "2026-08-01"
                 })
             })
             .unwrap_or(serde_json::Value::Null);
+        let review_card_queue = top_card_id
+            .map(|card_id| {
+                serde_json::json!({
+                    "card_id": card_id,
+                    "source": "review_card",
+                    "class": "guard_missing",
+                    "priority": "high",
+                    "confidence": "medium",
+                    "path": "src/lib.rs",
+                    "line": 7,
+                    "location_text": "src/lib.rs:7",
+                    "operation_family": "raw_pointer_read",
+                    "operation": "unsafe { ptr.cast::<Header>().read() }",
+                    "missing_evidence": [],
+                    "next_action": "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.",
+                    "repair_queue_buckets": ["repairable_by_guard", "requires_witness_receipt"],
+                    "repair_queue_bucket_reasons": ["guard_evidence_missing", "witness_receipt_missing"],
+                    "agent_readiness": {
+                        "ready": true,
+                        "state": "ready_for_agent",
+                        "reasons": ["specific operation family"]
+                    },
+                    "explain": format!("unsafe-review explain {card_id}"),
+                    "context_json": format!("unsafe-review context {card_id} --json"),
+                    "trust_boundary": "Static unsafe contract review only; copy-only ReviewCard queue entry projected from cards.json and repair-queue.json; it is not a proof of memory safety, not UB-free status, not a Miri result, and not site-execution proof. unsafe-review did not run agents, run witnesses, edit source, post comments, suppress cards, resolve cards, or enforce blocking policy."
+                })
+            })
+            .into_iter()
+            .collect::<Vec<_>>();
         let changed_files = usize::from(card_count > 0);
+        let omitted_cards = card_count.saturating_sub(review_card_queue.len());
         let value = serde_json::json!({
             "schema_version": "0.1",
             "tool": "unsafe-review",
@@ -16169,6 +16301,15 @@ review_after = "2026-08-01"
             "handoff": {
                 "reviewer_summary": "pr-summary.md",
                 "receipt_audit_markdown": "unsafe-review receipt audit --root fixtures/raw_pointer_alignment --base origin/main --format markdown",
+                "review_cards": {
+                    "artifact": "cards.json",
+                    "repair_queue_artifact": "repair-queue.json",
+                    "review_cards": card_count,
+                    "card_queue_limit": 5,
+                    "card_queue": review_card_queue,
+                    "omitted_cards": omitted_cards,
+                    "trust_boundary": "Static unsafe contract review only; copy-only ReviewCard queue preview projected from cards.json and repair-queue.json. It does not run agents, run witnesses, edit source, post comments, suppress cards, resolve cards, or enforce blocking policy. It is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repair success, and not policy readiness."
+                },
                 "manual_candidates": {
                     "artifact": "manual-candidates.json",
                     "manual_candidates": 0,

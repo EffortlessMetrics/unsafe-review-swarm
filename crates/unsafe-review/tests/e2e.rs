@@ -1416,6 +1416,77 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             .unwrap_or("")
             .contains("--json")
     );
+    assert_eq!(
+        review_kit["handoff"]["review_cards"]["artifact"],
+        "cards.json"
+    );
+    assert_eq!(
+        review_kit["handoff"]["review_cards"]["repair_queue_artifact"],
+        "repair-queue.json"
+    );
+    assert_eq!(review_kit["handoff"]["review_cards"]["review_cards"], 1);
+    assert_eq!(review_kit["handoff"]["review_cards"]["card_queue_limit"], 5);
+    assert_eq!(review_kit["handoff"]["review_cards"]["omitted_cards"], 0);
+    let card_queue = json_array(
+        &review_kit["handoff"]["review_cards"]["card_queue"],
+        "review_kit.handoff.review_cards.card_queue",
+    )?;
+    assert_eq!(card_queue.len(), 1);
+    assert_eq!(card_queue[0]["card_id"], card_id);
+    assert_eq!(card_queue[0]["source"], "review_card");
+    assert_eq!(card_queue[0]["class"], cards["cards"][0]["class"]);
+    assert_eq!(card_queue[0]["priority"], cards["cards"][0]["priority"]);
+    assert_eq!(card_queue[0]["confidence"], cards["cards"][0]["confidence"]);
+    assert_eq!(card_queue[0]["path"], cards["cards"][0]["site"]["file"]);
+    assert_eq!(card_queue[0]["line"], cards["cards"][0]["site"]["line"]);
+    assert_eq!(
+        card_queue[0]["operation_family"],
+        cards["cards"][0]["operation_family"]
+    );
+    assert_eq!(card_queue[0]["operation"], cards["cards"][0]["operation"]);
+    assert_eq!(
+        card_queue[0]["missing_evidence"],
+        cards["cards"][0]["missing"]
+    );
+    assert_eq!(
+        card_queue[0]["next_action"],
+        cards["cards"][0]["next_action"]
+    );
+    assert_eq!(
+        card_queue[0]["repair_queue_buckets"][0],
+        "repairable_by_guard"
+    );
+    assert_eq!(
+        card_queue[0]["repair_queue_buckets"][1],
+        "requires_witness_receipt"
+    );
+    assert_eq!(
+        card_queue[0]["repair_queue_bucket_reasons"][0],
+        "guard_evidence_missing"
+    );
+    assert_eq!(
+        card_queue[0]["repair_queue_bucket_reasons"][1],
+        "witness_receipt_missing"
+    );
+    assert_eq!(card_queue[0]["agent_readiness"]["state"], "ready_for_agent");
+    assert!(
+        card_queue[0]["explain"]
+            .as_str()
+            .unwrap_or("")
+            .contains(card_id)
+    );
+    assert!(
+        card_queue[0]["context_json"]
+            .as_str()
+            .unwrap_or("")
+            .contains("--json")
+    );
+    assert!(
+        review_kit["handoff"]["review_cards"]["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("repair-queue.json")
+    );
     assert!(
         review_kit["handoff"]["receipt_audit_markdown"]
             .as_str()
@@ -1956,6 +2027,16 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
     assert!(review_kit["top_card_id"].is_null());
     assert_eq!(review_kit["handoff"]["reviewer_summary"], "pr-summary.md");
     assert!(review_kit["handoff"]["top_card"].is_null());
+    assert_eq!(review_kit["handoff"]["review_cards"]["review_cards"], 0);
+    assert_eq!(review_kit["handoff"]["review_cards"]["card_queue_limit"], 5);
+    assert_eq!(review_kit["handoff"]["review_cards"]["omitted_cards"], 0);
+    assert!(
+        json_array(
+            &review_kit["handoff"]["review_cards"]["card_queue"],
+            "review_kit.handoff.review_cards.card_queue",
+        )?
+        .is_empty()
+    );
     assert!(
         review_kit["handoff"]["receipt_audit_markdown"]
             .as_str()

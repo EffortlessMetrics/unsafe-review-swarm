@@ -135,6 +135,12 @@ must include changed-file, changed-Rust-file, changed-non-Rust-file, card, and
 must include top_card_id, or null only when no cards exist
 must include copy-only handoff commands for the reviewer summary, receipt audit,
   and top-card explain/context commands when a top card exists
+must include a bounded ReviewCard queue preview under handoff.review_cards,
+  with cards.json and repair-queue.json artifact references, queue limit,
+  omitted-card count, and entries projected from known ReviewCards only
+must keep handoff.review_cards entries aligned with cards.json identity,
+  location, operation, missing evidence, next action, and with repair-queue.json
+  bucket, bucket-reason, and agent-readiness state
 must include manual candidate handoff metadata pointing to
   manual-candidates.json, with analyzer_discovered = 0 and copy-only
   explain/context/witness-plan commands, a bounded candidate_queue, omitted
@@ -147,6 +153,11 @@ must include trust boundary wording
 The manifest is a discovery projection. It must not reclassify ReviewCards or
 create a second source of truth for operation family, obligation, evidence,
 witness route, repair bucket, outcome, or policy posture.
+
+The ReviewCard queue preview must not include manual candidates. Manual
+candidates remain under `manual-candidates.json` and
+`handoff.manual_candidates.candidate_queue`. The ReviewCard queue is copy-only
+and advisory; `repair-queue.json` remains the checked aggregate queue truth.
 
 The handoff commands are reviewer and agent discovery aids only. They must not
 imply that unsafe-review ran witnesses, ran an agent, posted comments, edited

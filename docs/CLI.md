@@ -136,6 +136,10 @@ analyzer ReviewCards, not policy inputs, and not witness execution.
 The review-kit manifest summary mirrors the canonical card summary counts,
 including diff-scope file counts, so downstream reviewers and agents can see
 mixed-language PR breadth without treating non-Rust files as ReviewCards.
+Its handoff also includes a bounded ReviewCard queue preview that points to the
+first cards, their `explain`/`context --json` commands, and checked
+`repair-queue.json` bucket/readiness state; this is a discovery index, not a
+second analyzer truth or repair execution claim.
 
 ## Output Formats
 
