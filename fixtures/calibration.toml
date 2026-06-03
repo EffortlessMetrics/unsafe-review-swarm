@@ -525,6 +525,8 @@ required_core_fixtures = [
   "macro_rules_owner_inference",
   "nested_unsafe_operation_call_dedupe",
   "adjacent_unchanged_unsafe_fn_no_card",
+  "js_buffer_reentry_sync_compression",
+  "js_buffer_reentry_options_before_capture_no_card",
   "comment_alignment_not_guard",
 ]
 
@@ -5731,6 +5733,23 @@ fixture = "adjacent_unchanged_unsafe_fn_no_card"
 kind = "false_positive_control"
 claim = "adjacent unchanged unsafe declarations do not emit cards when a neighboring safe function changes"
 support_tier = "Diff unsafe site inventory"
+expected_cards = 0
+
+[[cases]]
+fixture = "js_buffer_reentry_sync_compression"
+kind = "positive"
+claim = "JS-backed buffer descriptor capture before options getter reentry and later byte materialization emits one advisory ReviewCard"
+support_tier = "JS-backed buffer reentry heuristic"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+
+[[cases]]
+fixture = "js_buffer_reentry_options_before_capture_no_card"
+kind = "false_positive_control"
+claim = "JS-backed buffer reentry heuristic does not emit a ReviewCard when options are parsed before descriptor capture"
+support_tier = "JS-backed buffer reentry heuristic"
 expected_cards = 0
 
 [[cases]]

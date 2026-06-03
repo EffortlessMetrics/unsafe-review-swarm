@@ -77,7 +77,7 @@ pub(super) fn build_card(
 
     let next_action_summary = if is_js_buffer_reentry_heuristic(&scanned_site.operation.expression)
     {
-        "JS-backed buffer descriptor is captured before a possible JS reentry point and materialized afterward; parse options before capture or re-fetch/copy bytes after reentry, then attach a focused sanitizer/runtime receipt if available.".to_string()
+        "Review the JS-backed buffer descriptor captured before a possible JS reentry point and materialized afterward; parse options before capture or re-fetch/copy bytes after reentry, then attach a focused sanitizer/runtime receipt if available.".to_string()
     } else {
         super::next_action_summary(
             &class,

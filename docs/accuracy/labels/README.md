@@ -24,6 +24,9 @@ Current ledgers:
   `get_unchecked_mut` bounds evidence.
 - `inline-asm-human-review-routes.toml`: fixture-pinned route-quality labels
   for inline assembly human-deep-review witness routing.
+- `js-buffer-reentry-heuristic.toml`: fixture-pinned operation-family labels
+  for JS-backed buffer descriptor capture before getter reentry and later byte
+  materialization behavior.
 - `local-unsafe-contract-evidence.toml`: fixture-pinned obligation-level
   labels for private/local unsafe contract evidence.
 - `maybeuninit-assume-init-initialized.toml`: fixture-pinned

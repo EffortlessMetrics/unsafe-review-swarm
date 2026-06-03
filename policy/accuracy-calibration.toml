@@ -1615,3 +1615,34 @@ forbidden_claims = [
   "global recall",
   "memory-safety proof",
 ]
+
+[[claim]]
+id = "js-buffer-reentry-heuristic"
+status = "fixture_pinned"
+kind = "operation_family"
+owner = "calibration"
+support_tier = "JS-backed buffer reentry heuristic"
+fixtures = [
+  "js_buffer_reentry_sync_compression",
+  "js_buffer_reentry_options_before_capture_no_card",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/js-buffer-reentry-heuristic.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned JS-backed buffer reentry heuristic behavior emits one advisory
+ReviewCard for the listed sync compression capture, getter reentry, and helper
+materialization fixture, and emits zero ReviewCards for the listed options
+before capture control.
+"""
+forbidden_claims = [
+  "Bun vulnerability",
+  "stale backing storage proof",
+  "site-execution proof",
+  "witness execution proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]

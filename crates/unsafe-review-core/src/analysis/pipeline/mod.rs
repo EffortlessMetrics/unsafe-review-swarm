@@ -2639,6 +2639,44 @@ pub fn zstd_sync(
     }
 
     #[test]
+    fn js_buffer_reentry_fixture_pins_sync_compression_card() -> Result<(), String> {
+        let output = fixture_output("js_buffer_reentry_sync_compression")?;
+        let card = single_card("js_buffer_reentry_sync_compression", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::UnsafeFnCall);
+        assert_eq!(card.class, ReviewClass::ContractMissing);
+        assert_eq!(card.site.owner.as_deref(), Some("zstd_sync"));
+        assert!(card.hazards.contains(&HazardKind::Unknown));
+        assert!(
+            card.operation
+                .expression
+                .contains("JS-backed buffer descriptor")
+        );
+        assert!(
+            card.next_action
+                .summary
+                .contains("parse options before capture")
+        );
+        assert!(
+            card.routes
+                .iter()
+                .any(|route| route.kind == WitnessKind::HumanDeepReview)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn js_buffer_reentry_fixture_keeps_options_before_capture_no_card() -> Result<(), String> {
+        let output = fixture_output("js_buffer_reentry_options_before_capture_no_card")?;
+
+        assert!(
+            output.cards.is_empty(),
+            "parsing options before descriptor capture should stay a no-card control"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn vec_from_raw_parts_uses_vec_operation_family() -> Result<(), String> {
         let output = fixture_output("vec_from_raw_parts")?;
         let card = single_card("vec_from_raw_parts", &output)?;

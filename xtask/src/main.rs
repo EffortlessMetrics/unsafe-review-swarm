@@ -3572,13 +3572,18 @@ fn check_fixture_site_metadata(
     }
 
     let operation = require_non_empty_json_str(card, "operation", &card_context)?;
-    if operation != snippet {
+    if operation != snippet && !is_fixture_operation_snippet_exception(path, operation) {
         return Err(format!(
             "{card_context} operation must match site.snippet so card projections share one operation expression"
         ));
     }
 
     Ok(())
+}
+
+fn is_fixture_operation_snippet_exception(path: &str, operation: &str) -> bool {
+    path.contains("fixtures/js_buffer_reentry_")
+        && operation.starts_with("JS-backed buffer descriptor captured before possible JS reentry")
 }
 
 fn fixture_known_site_kind(kind: &str) -> bool {
@@ -7072,6 +7077,22 @@ jobs:
 
         assert!(err.contains("operation must match site.snippet"));
         Ok(())
+    }
+
+    #[test]
+    fn fixture_card_identity_allows_js_buffer_reentry_operation_context() {
+        assert!(is_fixture_operation_snippet_exception(
+            "fixtures/js_buffer_reentry_sync_compression/expected.cards.json",
+            "JS-backed buffer descriptor captured before possible JS reentry and materialized afterward; capture: let input = StringOrBuffer::from_js(global, arg0)?;; reentry: let level = options.get(global, \"\")?;; materialize: native_compress(&input, level)",
+        ));
+        assert!(!is_fixture_operation_snippet_exception(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            "JS-backed buffer descriptor captured before possible JS reentry and materialized afterward",
+        ));
+        assert!(!is_fixture_operation_snippet_exception(
+            "fixtures/js_buffer_reentry_sync_compression/expected.cards.json",
+            "ptr.read()",
+        ));
     }
 
     #[test]

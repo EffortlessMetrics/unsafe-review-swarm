@@ -1,0 +1,38 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "js-buffer-reentry-heuristic"
+operation_family = "unsafe_fn_call"
+hazard = "unknown"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+JS-backed buffer reentry heuristic behavior; they are not a proof of memory safety,
+not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence,
+not calibrated precision or recall, not witness adequacy, and not policy readiness.
+"""
+
+[[samples]]
+id = "js-buffer-reentry-sync-compression-emits-advisory-card"
+fixture = "js_buffer_reentry_sync_compression"
+kind = "positive"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+expected_owner = "zstd_sync"
+expected_site_kind = "operation"
+expected_obligation_key = "callee-contract"
+expected_contract_state = "missing"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A same-owner JS-backed buffer descriptor captured before options getter reentry and materialized through a helper should stay an advisory ReviewCard with manual-review routing."
+
+[[samples]]
+id = "js-buffer-options-before-capture-emits-no-card"
+fixture = "js_buffer_reentry_options_before_capture_no_card"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "Parsing options before descriptor capture should not trigger the reentry heuristic or create a ReviewCard."
