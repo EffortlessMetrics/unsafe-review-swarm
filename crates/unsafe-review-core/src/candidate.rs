@@ -40,6 +40,10 @@ pub struct ManualCandidateEvidence {
     pub path: Option<PathBuf>,
     #[serde(default)]
     pub summary: Option<String>,
+    #[serde(default)]
+    pub command: Option<String>,
+    #[serde(default)]
+    pub limitation: Option<String>,
 }
 
 impl ManualCandidate {
@@ -93,6 +97,8 @@ impl ManualCandidate {
                     evidence.kind
                 ));
             }
+            require_optional_nonempty("evidence.command", evidence.command.as_deref())?;
+            require_optional_nonempty("evidence.limitation", evidence.limitation.as_deref())?;
         }
         Ok(())
     }
@@ -169,6 +175,7 @@ pub fn render_manual_candidate_explain(candidate: &ManualCandidate) -> String {
     out.push_str("## Safe caller\n\n");
     out.push_str(&candidate.safe_caller);
     out.push_str("\n\n");
+    render_candidate_handoff_markdown(&mut out, candidate);
     render_candidate_evidence_markdown(&mut out, candidate);
     out.push_str("## Next action\n\n");
     out.push_str("Review the manual candidate, preserve the external evidence packet, and import receipts only when they match this manual candidate ID.\n\n");
@@ -194,10 +201,13 @@ pub fn render_manual_candidate_context(candidate: &ManualCandidate) -> Result<St
         "unsafe_operation": candidate.unsafe_operation,
         "invariant": candidate.invariant,
         "safe_caller": candidate.safe_caller,
+        "implementer_handoff": manual_candidate_implementer_handoff(candidate),
         "evidence": candidate.evidence.iter().map(|evidence| serde_json::json!({
             "kind": evidence.kind,
             "path": evidence.path.as_ref().map(|path| path.display().to_string()),
             "summary": evidence.summary,
+            "command": evidence.command,
+            "limitation": evidence.limitation,
         })).collect::<Vec<_>>(),
         "allowed_actions": [
             "review the manual route and invariant",
@@ -238,6 +248,7 @@ pub fn render_manual_candidate_witness_plan(candidate: &ManualCandidate) -> Stri
     ));
     out.push_str(&format!("Invariant: {}\n\n", candidate.invariant));
     out.push_str(&format!("Safe caller: {}\n\n", candidate.safe_caller));
+    render_candidate_handoff_markdown(&mut out, candidate);
     render_candidate_evidence_markdown(&mut out, candidate);
     out.push_str("## Receipt hints\n\n");
     out.push_str(&format!(
@@ -265,9 +276,72 @@ fn render_candidate_evidence_markdown(out: &mut String, candidate: &ManualCandid
         if let Some(summary) = &evidence.summary {
             out.push_str(&format!(" - {summary}"));
         }
+        if let Some(command) = &evidence.command {
+            out.push_str(&format!("; command `{command}`"));
+        }
+        if let Some(limitation) = &evidence.limitation {
+            out.push_str(&format!("; limitation: {limitation}"));
+        }
         out.push('\n');
     }
     out.push('\n');
+}
+
+fn render_candidate_handoff_markdown(out: &mut String, candidate: &ManualCandidate) {
+    out.push_str("## Implementer handoff\n\n");
+    out.push_str(&format!(
+        "- Inspect: `{}`\n",
+        manual_candidate_location_text(candidate)
+    ));
+    out.push_str(&format!(
+        "- Route: `{}` -> `{}`\n",
+        candidate.safe_caller, candidate.unsafe_operation
+    ));
+    out.push_str(&format!("- Invariant at risk: {}\n", candidate.invariant));
+    out.push_str("- Next: confirm the route, preserve or add concrete evidence for the invariant, and attach receipts only when they target this manual candidate ID.\n");
+    out.push_str("- Stop line: stop before source edits if the route no longer matches this manual candidate, or if the repair would broaden into unrelated unsafe sites.\n\n");
+}
+
+fn manual_candidate_implementer_handoff(candidate: &ManualCandidate) -> serde_json::Value {
+    serde_json::json!({
+        "target": {
+            "file": candidate.location.file.display().to_string(),
+            "line": candidate.location.line,
+            "location_text": manual_candidate_location_text(candidate),
+        },
+        "route": {
+            "safe_caller": candidate.safe_caller,
+            "unsafe_operation": candidate.unsafe_operation,
+            "operation_family": candidate.operation_family,
+        },
+        "invariant_at_risk": candidate.invariant,
+        "external_evidence": candidate.evidence.iter().map(|evidence| serde_json::json!({
+            "kind": evidence.kind,
+            "path": evidence.path.as_ref().map(|path| path.display().to_string()),
+            "summary": evidence.summary,
+            "command": evidence.command,
+            "limitation": evidence.limitation,
+        })).collect::<Vec<_>>(),
+        "suggested_next_steps": [
+            "confirm the file:line and safe caller route before editing",
+            "preserve or add concrete contract, guard, test, or witness evidence for the invariant",
+            "attach receipts only when the external run targets this manual candidate ID"
+        ],
+        "non_goals": [
+            "do not treat this as analyzer-discovered",
+            "do not claim proof, UB-free status, Miri-clean status, or site execution",
+            "do not broaden the task to unrelated unsafe sites"
+        ],
+        "stop_condition": "stop before source edits if the route no longer matches this manual candidate, or if the repair would broaden into unrelated unsafe sites",
+    })
+}
+
+fn manual_candidate_location_text(candidate: &ManualCandidate) -> String {
+    format!(
+        "{}:{}",
+        candidate.location.file.display(),
+        candidate.location.line
+    )
 }
 
 fn require_eq(field: &str, actual: &str, expected: &str) -> Result<(), String> {
@@ -282,6 +356,14 @@ fn require_eq(field: &str, actual: &str, expected: &str) -> Result<(), String> {
 
 fn require_nonempty(field: &str, value: &str) -> Result<(), String> {
     if value.trim().is_empty() {
+        Err(format!("manual candidate {field} must not be empty"))
+    } else {
+        Ok(())
+    }
+}
+
+fn require_optional_nonempty(field: &str, value: Option<&str>) -> Result<(), String> {
+    if value.is_some_and(|value| value.trim().is_empty()) {
         Err(format!("manual candidate {field} must not be empty"))
     } else {
         Ok(())
@@ -408,6 +490,18 @@ mod tests {
     }
 
     #[test]
+    fn manual_candidate_rejects_empty_optional_evidence_metadata() {
+        let err = ManualCandidate::from_json_str(&example_json().replace(
+            "\"command\": \"bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts\"",
+            "\"command\": \"   \"",
+        ))
+        .err()
+        .unwrap_or_default();
+
+        assert!(err.contains("evidence.command"));
+    }
+
+    #[test]
     fn manual_candidate_explain_context_and_witness_plan_preserve_manual_marker()
     -> Result<(), String> {
         let candidate = ManualCandidate::from_json_str(example_json())?;
@@ -418,10 +512,21 @@ mod tests {
 
         assert!(explain.contains("Source: `manual`"));
         assert!(explain.contains("Analyzer-discovered: `false`"));
+        assert!(explain.contains("## Implementer handoff"));
+        assert!(explain.contains("Stop line: stop before source edits"));
+        assert!(explain.contains("command `bun test"));
+        assert!(explain.contains("limitation: runtime route evidence only"));
         assert!(context.contains("\"source\": \"manual\""));
         assert!(context.contains("\"manual_candidate\": true"));
+        assert!(context.contains("\"implementer_handoff\""));
+        assert!(context.contains("\"invariant_at_risk\""));
+        assert!(context.contains("\"command\": \"bun test"));
+        assert!(context.contains("\"limitation\": \"runtime route evidence only"));
+        assert!(context.contains("\"stop_condition\""));
         assert!(witness_plan.contains("manual candidate witness plan"));
         assert!(witness_plan.contains("does not run witnesses"));
+        assert!(witness_plan.contains("## Implementer handoff"));
+        assert!(witness_plan.contains("command `bun test"));
         Ok(())
     }
 
@@ -444,11 +549,17 @@ mod tests {
           "evidence": [
             {
               "kind": "runtime_witness",
-              "path": "target/unsafe-scout/textdecoder-shared-race-route.out"
+              "path": "target/unsafe-scout/textdecoder-shared-race-route.out",
+              "summary": "Bun TextDecoder route reaches shared backing bytes through safe JS",
+              "command": "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts",
+              "limitation": "runtime route evidence only; not memory-safety proof and not analyzer-discovered"
             },
             {
               "kind": "model",
-              "path": "target/unsafe-scout/miri-textdecoder-shared-slice.out"
+              "path": "target/unsafe-scout/miri-textdecoder-shared-slice.out",
+              "summary": "Miri model covers shared-slice aliasing shape outside Bun runtime",
+              "command": "cargo +nightly miri test textdecoder_shared_slice_model",
+              "limitation": "model evidence only; does not prove the Bun site executed under Miri"
             }
           ],
           "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"

@@ -284,19 +284,20 @@ fn check_receipt_audit_artifact(dir: &Path) -> Result<(), String> {
     let text = super::read_to_string(&path)?;
 
     super::require_text_contains(&text, "# unsafe-review receipt audit", &path)?;
-    super::require_text_contains(
-        &text,
-        "Static audit of saved witness receipt metadata",
-        &path,
-    )?;
+    super::require_text_contains(&text, "Static audit of saved receipt metadata", &path)?;
     super::require_text_contains(&text, "## Summary", &path)?;
     super::require_text_contains(&text, "## Reviewer front panel", &path)?;
     super::require_text_contains(&text, "## Trust boundary", &path)?;
     super::require_text_contains(&text, "does not execute witnesses", &path)?;
-    super::require_text_contains(&text, "does not prove site reach", &path)?;
+    super::require_text_contains(&text, "does not independently prove site reach", &path)?;
     super::require_text_contains(
         &text,
-        "matched receipts improve witness evidence only",
+        "matched witness receipts improve witness evidence only",
+        &path,
+    )?;
+    super::require_text_contains(
+        &text,
+        "manual candidate receipts attach external evidence",
         &path,
     )?;
 

@@ -627,6 +627,16 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
     assert_eq!(canonical["manual_candidate"], true);
     assert_eq!(canonical["analyzer_discovered"], false);
     assert_eq!(canonical["id"], "R4R2-S001");
+    assert_eq!(
+        canonical["evidence"][0]["command"],
+        "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+    );
+    assert!(
+        canonical["evidence"][0]["limitation"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not analyzer-discovered")
+    );
 
     let empty_snapshot = temp.path().join("empty-snapshot.json");
     fs::write(&empty_snapshot, empty_review_card_snapshot_json())?;
@@ -704,6 +714,9 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
     assert!(explain.contains("unsafe-review manual candidate"));
     assert!(explain.contains("Source: `manual`"));
     assert!(explain.contains("Analyzer-discovered: `false`"));
+    assert!(explain.contains("## Implementer handoff"));
+    assert!(explain.contains("Inspect: `src/runtime/webcore/TextDecoder.rs:237`"));
+    assert!(explain.contains("Stop line: stop before source edits"));
     assert!(explain.contains("not analyzer-discovered"));
 
     let explain_json = run_success([
@@ -717,6 +730,38 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
     assert_eq!(explain_packet["source"], "manual");
     assert_eq!(explain_packet["manual_candidate"], true);
     assert_eq!(explain_packet["analyzer_discovered"], false);
+    assert_eq!(
+        explain_packet["implementer_handoff"]["target"]["location_text"],
+        "src/runtime/webcore/TextDecoder.rs:237"
+    );
+    assert_eq!(
+        explain_packet["implementer_handoff"]["route"]["safe_caller"],
+        "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))"
+    );
+    assert_eq!(
+        explain_packet["implementer_handoff"]["invariant_at_risk"],
+        "&[u8] memory must not be concurrently mutated"
+    );
+    assert_eq!(
+        explain_packet["implementer_handoff"]["external_evidence"][0]["kind"],
+        "runtime_witness"
+    );
+    assert_eq!(
+        explain_packet["implementer_handoff"]["external_evidence"][0]["command"],
+        "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+    );
+    assert!(
+        explain_packet["implementer_handoff"]["external_evidence"][0]["limitation"]
+            .as_str()
+            .unwrap_or("")
+            .contains("runtime route evidence only")
+    );
+    assert!(
+        explain_packet["implementer_handoff"]["stop_condition"]
+            .as_str()
+            .unwrap_or("")
+            .contains("stop before source edits")
+    );
 
     let context = run_success([
         os("context"),
@@ -727,6 +772,18 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
     let context_packet = parse_json(&stdout_text(&context)?)?;
     assert_eq!(context_packet["source"], "manual");
     assert_eq!(context_packet["manual_candidate"], true);
+    assert_eq!(
+        context_packet["implementer_handoff"]["route"]["unsafe_operation"],
+        "core::slice::from_raw_parts"
+    );
+    assert!(
+        serde_json::to_string(&context_packet["implementer_handoff"]["non_goals"])?
+            .contains("do not treat this as analyzer-discovered")
+    );
+    assert_eq!(
+        context_packet["evidence"][0]["command"],
+        "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+    );
 
     let witness_plan = run_success([
         os("candidate"),
@@ -737,6 +794,10 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
     ])?;
     let witness_plan = stdout_text(&witness_plan)?;
     assert!(witness_plan.contains("manual candidate witness plan"));
+    assert!(witness_plan.contains("## Implementer handoff"));
+    assert!(witness_plan.contains("Route: `new TextDecoder().decode"));
+    assert!(witness_plan.contains("command `bun test"));
+    assert!(witness_plan.contains("limitation: runtime route evidence only"));
     assert!(witness_plan.contains("does not run witnesses"));
     assert!(witness_plan.contains("unsafe-review receipt template R4R2-S001"));
     assert!(witness_plan.contains("not analyzer-discovered"));
@@ -1174,6 +1235,16 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(
         manual_candidates["candidates"][0]["location_text"],
         "src/runtime/webcore/TextDecoder.rs:237"
+    );
+    assert_eq!(
+        manual_candidates["candidates"][0]["evidence"][0]["command"],
+        "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+    );
+    assert!(
+        manual_candidates["candidates"][0]["evidence"][0]["limitation"]
+            .as_str()
+            .unwrap_or("")
+            .contains("runtime route evidence only")
     );
     assert!(
         manual_candidates["candidates"][0]["explain_command"]

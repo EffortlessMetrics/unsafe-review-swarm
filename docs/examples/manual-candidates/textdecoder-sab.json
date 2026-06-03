@@ -16,11 +16,17 @@
   "evidence": [
     {
       "kind": "runtime_witness",
-      "path": "target/unsafe-scout/textdecoder-shared-race-route.out"
+      "path": "target/unsafe-scout/textdecoder-shared-race-route.out",
+      "summary": "Bun TextDecoder route reaches shared backing bytes through safe JS",
+      "command": "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts",
+      "limitation": "runtime route evidence only; not memory-safety proof and not analyzer-discovered"
     },
     {
       "kind": "model",
-      "path": "target/unsafe-scout/miri-textdecoder-shared-slice.out"
+      "path": "target/unsafe-scout/miri-textdecoder-shared-slice.out",
+      "summary": "Miri model covers shared-slice aliasing shape outside Bun runtime",
+      "command": "cargo +nightly miri test textdecoder_shared_slice_model",
+      "limitation": "model evidence only; does not prove the Bun site executed under Miri"
     }
   ],
   "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
