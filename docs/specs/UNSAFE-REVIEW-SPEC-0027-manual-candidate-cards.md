@@ -253,6 +253,9 @@ into an analyzer ReviewCard.
 - `first-pr` `pr-summary.md` and `github-summary.md` show a compact manual
   candidate front-door cue so reviewers can notice and open the copy-only
   handoff without treating candidates as analyzer ReviewCards.
+- `first-pr` `witness-plan.md` shows a compact manual candidate follow-up cue
+  before the ReviewCard trust boundary, points to `candidate witness-plan`, and
+  keeps manual candidates out of ReviewCard witness route groups.
 
 ## CI Proof
 
@@ -266,6 +269,7 @@ cargo test -p unsafe-review-core manual_candidate
 cargo test -p unsafe-review-core outcome
 cargo test -p unsafe-review manual_candidate
 cargo test -p unsafe-review first_pr_writes_standard_advisory_review_bundle
+cargo test -p xtask manual_candidate
 cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review-manual-candidate-smoke
 cargo run --locked -p xtask -- check-pr
 cargo run --locked -p xtask -- source-divergence
