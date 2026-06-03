@@ -4,7 +4,9 @@ use std::process::Command as ProcessCommand;
 
 use crate::command::{CheckOptions, DiffInput};
 use serde_json::json;
-use unsafe_review_core::{AnalyzeOutput, ManualCandidate, Scope};
+use unsafe_review_core::{
+    AnalyzeOutput, ManualCandidate, Scope, manual_candidate_implementer_handoff,
+};
 
 pub(super) struct FirstPrReport<'a> {
     pub(super) output: &'a AnalyzeOutput,
@@ -248,6 +250,7 @@ fn review_kit_manual_candidate_handoff(
             "source": "manual",
             "manual_candidate": true,
             "analyzer_discovered": false,
+            "implementer_handoff": manual_candidate_implementer_handoff(candidate),
             "explain": explain_command(root, &candidate.id),
             "context_json": context_command(root, &candidate.id),
             "witness_plan": candidate_witness_plan_command(root, &candidate.id),
@@ -263,10 +266,13 @@ fn review_kit_manual_candidate_handoff(
     })
 }
 
-pub(super) fn render_manual_candidates_artifact(candidates: &[ManualCandidate]) -> String {
+pub(super) fn render_manual_candidates_artifact(
+    root: &Path,
+    candidates: &[ManualCandidate],
+) -> String {
     let candidate_values = candidates
         .iter()
-        .map(manual_candidate_artifact_entry)
+        .map(|candidate| manual_candidate_artifact_entry(root, candidate))
         .collect::<Vec<_>>();
     let evidence_refs = candidates
         .iter()
@@ -302,7 +308,7 @@ pub(super) fn render_manual_candidates_artifact(candidates: &[ManualCandidate]) 
     rendered
 }
 
-fn manual_candidate_artifact_entry(candidate: &ManualCandidate) -> serde_json::Value {
+fn manual_candidate_artifact_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::Value {
     let mut value = serde_json::to_value(candidate).unwrap_or_else(|_| json!({}));
     if let Some(object) = value.as_object_mut() {
         object.insert("analyzer_discovered".to_string(), json!(false));
@@ -316,18 +322,19 @@ fn manual_candidate_artifact_entry(candidate: &ManualCandidate) -> serde_json::V
         );
         object.insert(
             "explain_command".to_string(),
-            json!(format!("unsafe-review explain {}", candidate.id)),
+            json!(explain_command(root, &candidate.id)),
         );
         object.insert(
             "context_command".to_string(),
-            json!(format!("unsafe-review context {} --json", candidate.id)),
+            json!(context_command(root, &candidate.id)),
         );
         object.insert(
             "witness_plan_command".to_string(),
-            json!(format!(
-                "unsafe-review candidate witness-plan {}",
-                candidate.id
-            )),
+            json!(candidate_witness_plan_command(root, &candidate.id)),
+        );
+        object.insert(
+            "implementer_handoff".to_string(),
+            manual_candidate_implementer_handoff(candidate),
         );
     }
     value

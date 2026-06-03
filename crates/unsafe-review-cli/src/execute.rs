@@ -21,9 +21,10 @@ use unsafe_review_core::{
     ProofReceiptInput, RepoScanEvent, RepoScanPhase, RepoScanStatus, SanitizerReceiptInput, Scope,
     WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze, analyze_with_discovery,
     analyze_with_discovery_and_repo_events, audit_witness_receipts, compare_outcome_json,
-    discover_repo_files, evaluate_policy_report, load_manual_candidates, read_manual_candidate,
-    render_badge_jsons, render_comment_plan, render_github_summary, render_human, render_json,
-    render_lsp, render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
+    discover_repo_files, evaluate_policy_report, load_manual_candidates,
+    manual_candidate_implementer_handoff, read_manual_candidate, render_badge_jsons,
+    render_comment_plan, render_github_summary, render_human, render_json, render_lsp,
+    render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
     render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
     render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,
     render_repair_queue, render_sarif, render_witness_plan, validate_witness_receipts,
@@ -926,7 +927,7 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     )?;
     write_artifact(
         &options.out_dir.join(MANUAL_CANDIDATES_ARTIFACT),
-        first_pr::render_manual_candidates_artifact(&manual_candidates),
+        first_pr::render_manual_candidates_artifact(&root, &manual_candidates),
     )?;
     write_artifact(
         &options.out_dir.join(REVIEW_KIT_ARTIFACT),
@@ -1344,6 +1345,10 @@ fn manual_candidate_list_entry(
             "witness_plan_command".to_string(),
             serde_json::json!(candidate_witness_plan_command(root, &candidate.id)),
         );
+        object.insert(
+            "implementer_handoff".to_string(),
+            manual_candidate_implementer_handoff(candidate),
+        );
     }
     value
 }
@@ -1386,6 +1391,17 @@ fn render_candidate_list_markdown(
                 "- Evidence refs: `{}`\n",
                 candidate.evidence.len()
             ));
+            out.push_str("#### Implementer Handoff\n\n");
+            out.push_str(&format!(
+                "- Inspect: `{}`\n",
+                manual_candidate_location_text(candidate)
+            ));
+            out.push_str(&format!(
+                "- Route: `{}` -> `{}`\n",
+                candidate.safe_caller, candidate.unsafe_operation
+            ));
+            out.push_str(&format!("- Invariant at risk: {}\n", candidate.invariant));
+            out.push_str("- Stop line: stop before source edits if the route no longer matches this manual candidate, or if the repair would broaden into unrelated unsafe sites.\n");
             out.push_str(&format!(
                 "- Explain: `{}`\n",
                 candidate_explain_command(root, &candidate.id)

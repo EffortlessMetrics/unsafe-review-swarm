@@ -302,7 +302,7 @@ fn render_candidate_handoff_markdown(out: &mut String, candidate: &ManualCandida
     out.push_str("- Stop line: stop before source edits if the route no longer matches this manual candidate, or if the repair would broaden into unrelated unsafe sites.\n\n");
 }
 
-fn manual_candidate_implementer_handoff(candidate: &ManualCandidate) -> serde_json::Value {
+pub fn manual_candidate_implementer_handoff(candidate: &ManualCandidate) -> serde_json::Value {
     serde_json::json!({
         "target": {
             "file": candidate.location.file.display().to_string(),

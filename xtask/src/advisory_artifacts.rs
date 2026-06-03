@@ -459,6 +459,24 @@ fn check_manual_candidate_artifact_entry(candidate: &serde_json::Value) -> Resul
         "witness_plan_command",
         "manual-candidates.json candidate",
     )?;
+    let handoff = candidate.get("implementer_handoff").ok_or_else(|| {
+        "manual-candidates.json candidate is missing implementer_handoff".to_string()
+    })?;
+    if !handoff.is_object() {
+        return Err(
+            "manual-candidates.json candidate implementer_handoff must be an object".to_string(),
+        );
+    }
+    super::require_non_empty_json_str(
+        handoff,
+        "invariant_at_risk",
+        "manual-candidates.json candidate implementer_handoff",
+    )?;
+    super::require_non_empty_json_str(
+        handoff,
+        "stop_condition",
+        "manual-candidates.json candidate implementer_handoff",
+    )?;
     let boundary = super::require_non_empty_json_str(
         candidate,
         "trust_boundary",
@@ -752,6 +770,26 @@ fn check_review_kit_first_manual_candidate_handoff(
                 .to_string(),
         );
     }
+    let handoff = first_candidate.get("implementer_handoff").ok_or_else(|| {
+        "review-kit.json handoff manual_candidates first_candidate is missing implementer_handoff"
+            .to_string()
+    })?;
+    if !handoff.is_object() {
+        return Err(
+            "review-kit.json handoff manual_candidates first_candidate implementer_handoff must be an object"
+                .to_string(),
+        );
+    }
+    super::require_non_empty_json_str(
+        handoff,
+        "invariant_at_risk",
+        "review-kit.json handoff manual_candidates first_candidate implementer_handoff",
+    )?;
+    super::require_non_empty_json_str(
+        handoff,
+        "stop_condition",
+        "review-kit.json handoff manual_candidates first_candidate implementer_handoff",
+    )?;
     for (field, command) in [
         ("explain", "unsafe-review explain "),
         ("context_json", "unsafe-review context "),
