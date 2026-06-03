@@ -972,8 +972,42 @@ fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dy
     ])?;
     assert_eq!(stdout_text(&wrote)?.trim(), "");
     assert_eq!(
-        parse_json(&fs::read_to_string(out)?)?["summary"]["manual_candidates"],
+        parse_json(&fs::read_to_string(&out)?)?["summary"]["manual_candidates"],
         2
+    );
+
+    let empty_snapshot = temp.path().join("empty-snapshot.json");
+    fs::write(&empty_snapshot, empty_review_card_snapshot_json())?;
+    let outcome = run_success([
+        os("outcome"),
+        os("--before"),
+        empty_snapshot.as_os_str().to_os_string(),
+        os("--after"),
+        out.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let outcome = parse_json(&stdout_text(&outcome)?)?;
+    assert_eq!(outcome["after"]["schema_version"], "manual-candidates/v1");
+    assert_eq!(outcome["after"]["source"], "candidate_list");
+    assert_eq!(outcome["after"]["cards"], 2);
+    assert_eq!(outcome["summary"]["new"], 2);
+    assert_eq!(outcome["cards"]["new"][0]["card_id"], "R4R2-S001");
+    assert_eq!(outcome["cards"]["new"][1]["card_id"], "R4R2-S002");
+    assert_eq!(outcome["cards"]["new"][0]["after"]["source"], "manual");
+    assert_eq!(
+        outcome["cards"]["new"][0]["after"]["manual_candidate"],
+        true
+    );
+    assert_eq!(
+        outcome["cards"]["new"][0]["after"]["analyzer_discovered"],
+        false
+    );
+    assert!(
+        outcome["cards"]["new"][0]["reason"]
+            .as_str()
+            .unwrap_or("")
+            .contains("new manual candidate")
     );
 
     Ok(())

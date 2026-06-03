@@ -97,8 +97,9 @@ candidate records external evidence for that manual candidate only. It does not
 prove the repository safe, prove UB, prove site execution outside the receipt,
 or convert the candidate into an analyzer finding.
 
-Outcome comparison must compare manual candidates with manual candidates by
-stable manual ID and source marker. It must not report a manual candidate as an
+Outcome comparison must compare both single `manual-candidate/v1` artifacts and
+aggregate `manual-candidates/v1` indexes with manual candidates by stable manual
+ID and source marker. It must not report a manual candidate as an
 analyzer-resolved card unless a later analyzer-discovered ReviewCard explicitly
 links to the same manual ID through a reviewed linkage field.
 
@@ -214,8 +215,9 @@ into an analyzer ReviewCard.
   executing witnesses.
 - A receipt against a manual candidate ID can be imported or audited only as
   evidence for that manual candidate.
-- Outcome comparison preserves manual source markers and compares manual IDs
-  deterministically across snapshots.
+- Outcome comparison accepts both single manual candidate artifacts and
+  aggregate manual candidate indexes, preserves manual source markers, and
+  compares manual IDs deterministically across snapshots.
 - `first-pr` writes `manual-candidates.json` for imported candidates and keeps
   ReviewCard-derived artifacts, including cards JSON, SARIF, comment-plan,
   saved LSP, repair queue, and policy-report surfaces, ReviewCard-only.

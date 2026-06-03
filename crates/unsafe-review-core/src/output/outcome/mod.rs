@@ -1,4 +1,6 @@
-use crate::candidate::{MANUAL_CANDIDATE_SCHEMA_VERSION, ManualCandidate};
+use crate::candidate::{
+    MANUAL_CANDIDATE_INDEX_SCHEMA_VERSION, MANUAL_CANDIDATE_SCHEMA_VERSION, ManualCandidate,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -194,6 +196,22 @@ struct SnapshotSchema {
     schema_version: Option<String>,
 }
 
+#[derive(Deserialize)]
+struct ManualCandidateIndexSnapshot {
+    schema_version: String,
+    #[serde(default)]
+    source: Option<String>,
+    summary: ManualCandidateIndexSummary,
+    candidates: Vec<serde_json::Value>,
+}
+
+#[derive(Deserialize)]
+struct ManualCandidateIndexSummary {
+    manual_candidates: usize,
+    #[serde(default)]
+    analyzer_discovered: usize,
+}
+
 pub fn compare_json(before_json: &str, after_json: &str) -> Result<OutcomeReport, String> {
     let before = parse_snapshot(before_json, "before")?;
     let after = parse_snapshot(after_json, "after")?;
@@ -219,6 +237,12 @@ fn parse_snapshot(text: &str, label: &str) -> Result<Snapshot, String> {
             .map_err(|err| format!("parse {label} manual candidate snapshot failed: {err}"))?;
         return Ok(snapshot_from_manual_candidate(candidate));
     }
+    if schema.schema_version.as_deref() == Some(MANUAL_CANDIDATE_INDEX_SCHEMA_VERSION) {
+        let index: ManualCandidateIndexSnapshot = serde_json::from_str(text).map_err(|err| {
+            format!("parse {label} manual candidate index snapshot failed: {err}")
+        })?;
+        return snapshot_from_manual_candidate_index(index, label);
+    }
     let snapshot: Snapshot = serde_json::from_str(text)
         .map_err(|err| format!("parse {label} unsafe-review JSON snapshot failed: {err}"))?;
     if snapshot.schema_version.trim().is_empty() {
@@ -235,38 +259,92 @@ fn parse_snapshot(text: &str, label: &str) -> Result<Snapshot, String> {
 }
 
 fn snapshot_from_manual_candidate(candidate: ManualCandidate) -> Snapshot {
-    let evidence_count = candidate.evidence.len();
     Snapshot {
-        schema_version: candidate.schema_version,
+        schema_version: candidate.schema_version.clone(),
         source: Some("manual".to_string()),
         summary: SnapshotSummary {
             cards: 1,
             open_actionable_gaps: 1,
         },
-        cards: vec![SnapshotCard {
-            id: candidate.id,
-            class_name: "manual_candidate".to_string(),
-            source: Some("manual".to_string()),
-            manual_candidate: Some(true),
-            analyzer_discovered: Some(false),
-            title: Some(candidate.title),
-            location: Some(SnapshotLocation {
-                file: candidate.location.file.display().to_string(),
-                line: candidate.location.line,
-            }),
-            operation: Some(candidate.unsafe_operation),
-            operation_family: Some(candidate.operation_family),
-            priority: "advisory".to_string(),
-            witness: "manual candidate external evidence packet; no analyzer witness execution"
+        cards: vec![snapshot_card_from_manual_candidate(candidate)],
+    }
+}
+
+fn snapshot_from_manual_candidate_index(
+    index: ManualCandidateIndexSnapshot,
+    label: &str,
+) -> Result<Snapshot, String> {
+    if index.schema_version != MANUAL_CANDIDATE_INDEX_SCHEMA_VERSION {
+        return Err(format!(
+            "{label} manual candidate index schema_version must be `{MANUAL_CANDIDATE_INDEX_SCHEMA_VERSION}`"
+        ));
+    }
+    if index.summary.manual_candidates != index.candidates.len() {
+        return Err(format!(
+            "{label} manual candidate index summary.manual_candidates {} does not match {} candidate object(s)",
+            index.summary.manual_candidates,
+            index.candidates.len()
+        ));
+    }
+    if index.summary.analyzer_discovered != 0 {
+        return Err(format!(
+            "{label} manual candidate index summary.analyzer_discovered must stay 0"
+        ));
+    }
+
+    let mut cards = Vec::with_capacity(index.candidates.len());
+    for (idx, candidate) in index.candidates.into_iter().enumerate() {
+        let candidate_text = serde_json::to_string(&candidate).map_err(|err| {
+            format!("serialize {label} manual candidate index candidate {idx} failed: {err}")
+        })?;
+        let candidate = ManualCandidate::from_json_str(&candidate_text).map_err(|err| {
+            format!("parse {label} manual candidate index candidate {idx} failed: {err}")
+        })?;
+        cards.push(snapshot_card_from_manual_candidate(candidate));
+    }
+
+    let count = cards.len();
+    Ok(Snapshot {
+        schema_version: index.schema_version,
+        source: Some(
+            index
+                .source
+                .filter(|source| !source.trim().is_empty())
+                .unwrap_or_else(|| "manual_candidate_index".to_string()),
+        ),
+        summary: SnapshotSummary {
+            cards: count,
+            open_actionable_gaps: count,
+        },
+        cards,
+    })
+}
+
+fn snapshot_card_from_manual_candidate(candidate: ManualCandidate) -> SnapshotCard {
+    let evidence_count = candidate.evidence.len();
+    SnapshotCard {
+        id: candidate.id,
+        class_name: "manual_candidate".to_string(),
+        source: Some("manual".to_string()),
+        manual_candidate: Some(true),
+        analyzer_discovered: Some(false),
+        title: Some(candidate.title),
+        location: Some(SnapshotLocation {
+            file: candidate.location.file.display().to_string(),
+            line: candidate.location.line,
+        }),
+        operation: Some(candidate.unsafe_operation),
+        operation_family: Some(candidate.operation_family),
+        priority: "advisory".to_string(),
+        witness: "manual candidate external evidence packet; no analyzer witness execution"
+            .to_string(),
+        next_action: Some(
+            "Review the manual candidate, preserve the external evidence packet, and attach receipts only when they match this manual candidate ID."
                 .to_string(),
-            next_action: Some(
-                "Review the manual candidate, preserve the external evidence packet, and attach receipts only when they match this manual candidate ID."
-                    .to_string(),
-            ),
-            missing: Vec::new(),
-            trust_boundary: Some(candidate.trust_boundary),
-            evidence_count: Some(evidence_count),
-        }],
+        ),
+        missing: Vec::new(),
+        trust_boundary: Some(candidate.trust_boundary),
+        evidence_count: Some(evidence_count),
     }
 }
 
@@ -1044,6 +1122,75 @@ mod tests {
     }
 
     #[test]
+    fn outcome_compares_manual_candidate_index_json_without_analyzer_conflation()
+    -> Result<(), String> {
+        let before = snapshot_json(&[]);
+        let after = manual_candidate_index_json(&[
+            manual_candidate_json("R4R2-S001", 2),
+            manual_candidate_json("R4R2-S002", 1),
+        ]);
+
+        let report = compare_json(&before, &after)?;
+
+        assert_eq!(
+            report.after.schema_version,
+            MANUAL_CANDIDATE_INDEX_SCHEMA_VERSION
+        );
+        assert_eq!(report.after.source.as_deref(), Some("candidate_list"));
+        assert_eq!(report.after.cards, 2);
+        assert_eq!(report.after.open_actionable_gaps, 2);
+        assert_eq!(report.summary.new, 2);
+        assert_eq!(report.cards.new.len(), 2);
+        for card in &report.cards.new {
+            let after = card
+                .after
+                .as_ref()
+                .ok_or("manual candidate index card should include after state")?;
+            assert!(card.reason.contains("new manual candidate"));
+            assert_eq!(after.class_name, "manual_candidate");
+            assert_eq!(after.source.as_deref(), Some("manual"));
+            assert_eq!(after.manual_candidate, Some(true));
+            assert_eq!(after.analyzer_discovered, Some(false));
+            assert_eq!(after.operation_family.as_deref(), Some("raw_pointer_read"));
+            assert_eq!(
+                after.operation.as_deref(),
+                Some("core::slice::from_raw_parts")
+            );
+        }
+        assert_eq!(report.cards.new[0].card_id, "R4R2-S001");
+        assert_eq!(
+            report.cards.new[0]
+                .after
+                .as_ref()
+                .and_then(|state| state.evidence_count),
+            Some(2)
+        );
+        assert_eq!(report.cards.new[1].card_id, "R4R2-S002");
+        assert_eq!(
+            report.cards.new[1]
+                .after
+                .as_ref()
+                .and_then(|state| state.evidence_count),
+            Some(1)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn outcome_rejects_manual_candidate_index_count_drift() {
+        let before = snapshot_json(&[]);
+        let after =
+            manual_candidate_index_json_with_count(&[manual_candidate_json("R4R2-S001", 1)], 2, 0);
+
+        assert!(
+            compare_json(&before, &after)
+                .err()
+                .unwrap_or_default()
+                .contains("summary.manual_candidates 2 does not match 1 candidate object")
+        );
+    }
+
+    #[test]
     fn outcome_empty_markdown_uses_standard_advisory_wording() -> Result<(), String> {
         let before = snapshot_json(&[]);
         let after = snapshot_json(&[]);
@@ -1248,6 +1395,46 @@ mod tests {
   ],
   "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
 }}"#
+        )
+    }
+
+    fn manual_candidate_index_json(candidates: &[String]) -> String {
+        manual_candidate_index_json_with_count(candidates, candidates.len(), 0)
+    }
+
+    fn manual_candidate_index_json_with_count(
+        candidates: &[String],
+        manual_candidates: usize,
+        analyzer_discovered: usize,
+    ) -> String {
+        let evidence_count = candidates
+            .iter()
+            .filter_map(|candidate| serde_json::from_str::<serde_json::Value>(candidate).ok())
+            .map(|candidate| {
+                candidate
+                    .get("evidence")
+                    .and_then(serde_json::Value::as_array)
+                    .map_or(0, Vec::len)
+            })
+            .sum::<usize>();
+        format!(
+            r#"{{
+  "schema_version": "manual-candidates/v1",
+  "tool": "unsafe-review",
+  "tool_version": "0.2.1-test",
+  "mode": "manual_candidate_index",
+  "source": "candidate_list",
+  "summary": {{
+    "manual_candidates": {manual_candidates},
+    "external_evidence_refs": {evidence_count},
+    "analyzer_discovered": {analyzer_discovered}
+  }},
+  "candidates": [
+    {}
+  ],
+  "trust_boundary": "manual/advisory candidates are not analyzer-discovered ReviewCards"
+}}"#,
+            candidates.join(",\n    ")
         )
     }
 }

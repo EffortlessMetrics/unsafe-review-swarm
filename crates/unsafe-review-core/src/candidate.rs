@@ -3,6 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 pub const MANUAL_CANDIDATE_SCHEMA_VERSION: &str = "manual-candidate/v1";
+pub const MANUAL_CANDIDATE_INDEX_SCHEMA_VERSION: &str = "manual-candidates/v1";
 const MANUAL_CANDIDATE_TRUST_BOUNDARY: &str =
     "manual candidate; not analyzer-discovered; not proof of repository safety";
 
