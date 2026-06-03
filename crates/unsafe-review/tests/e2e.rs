@@ -1453,6 +1453,15 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         cards["cards"][0]["next_action"]
     );
     assert_eq!(
+        card_queue[0]["verify_commands"],
+        cards["cards"][0]["verify_commands"]
+    );
+    assert_eq!(
+        card_queue[0]["witness_routes"],
+        cards["cards"][0]["witness_routes"]
+    );
+    assert_eq!(card_queue[0]["witness_routes"][0]["kind"], "miri");
+    assert_eq!(
         card_queue[0]["repair_queue_buckets"][0],
         "repairable_by_guard"
     );

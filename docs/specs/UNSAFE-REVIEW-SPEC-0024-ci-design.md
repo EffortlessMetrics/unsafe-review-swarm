@@ -675,6 +675,8 @@ omitted-card counts
 review-kit.json handoff.review_cards entries reference known ReviewCards only
 review-kit.json handoff.review_cards entries project cards.json identity,
 location, operation, missing evidence, and next action
+review-kit.json handoff.review_cards entries project cards.json verify commands
+and witness routes
 review-kit.json handoff.review_cards entries project repair-queue.json buckets,
 bucket reasons, and agent-readiness state
 review-kit.json handoff.review_cards stays ReviewCard-only and excludes manual

@@ -139,8 +139,9 @@ must include a bounded ReviewCard queue preview under handoff.review_cards,
   with cards.json and repair-queue.json artifact references, queue limit,
   omitted-card count, and entries projected from known ReviewCards only
 must keep handoff.review_cards entries aligned with cards.json identity,
-  location, operation, missing evidence, next action, and with repair-queue.json
-  bucket, bucket-reason, and agent-readiness state
+  location, operation, missing evidence, next action, verify commands, witness
+  routes, and with repair-queue.json bucket, bucket-reason, and agent-readiness
+  state
 must include manual candidate handoff metadata pointing to
   manual-candidates.json, with analyzer_discovered = 0 and copy-only
   explain/context/witness-plan commands, a bounded candidate_queue, omitted
@@ -158,6 +159,9 @@ The ReviewCard queue preview must not include manual candidates. Manual
 candidates remain under `manual-candidates.json` and
 `handoff.manual_candidates.candidate_queue`. The ReviewCard queue is copy-only
 and advisory; `repair-queue.json` remains the checked aggregate queue truth.
+ReviewCard queue entries project `verify_commands` and full `witness_routes`
+route objects from `cards.json`; they are reviewer handoff cues only and do not
+claim witness execution.
 
 The handoff commands are reviewer and agent discovery aids only. They must not
 imply that unsafe-review ran witnesses, ran an agent, posted comments, edited

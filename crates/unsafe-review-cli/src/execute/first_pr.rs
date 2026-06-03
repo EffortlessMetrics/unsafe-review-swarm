@@ -362,6 +362,8 @@ fn review_kit_review_card_queue_entry(
         "operation": card.operation.expression.as_str(),
         "missing_evidence": missing_evidence,
         "next_action": card.next_action.summary.as_str(),
+        "verify_commands": &card.next_action.verify_commands,
+        "witness_routes": review_kit_witness_routes(card),
         "repair_queue_buckets": repair_queue_buckets,
         "repair_queue_bucket_reasons": repair_queue_bucket_reasons,
         "agent_readiness": agent_readiness,
@@ -369,6 +371,20 @@ fn review_kit_review_card_queue_entry(
         "context_json": context_command(root, &card.id),
         "trust_boundary": "Static unsafe contract review only; copy-only ReviewCard queue entry projected from cards.json and repair-queue.json; it is not a proof of memory safety, not UB-free status, not a Miri result, and not site-execution proof. unsafe-review did not run agents, run witnesses, edit source, post comments, suppress cards, resolve cards, or enforce blocking policy.",
     })
+}
+
+fn review_kit_witness_routes(card: &ReviewCard) -> Vec<serde_json::Value> {
+    card.routes
+        .iter()
+        .map(|route| {
+            json!({
+                "kind": route.kind.as_str(),
+                "reason": route.reason.as_str(),
+                "command": route.command.as_deref(),
+                "required": route.required,
+            })
+        })
+        .collect()
 }
 
 #[derive(Clone)]

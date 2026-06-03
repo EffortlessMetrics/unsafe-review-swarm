@@ -11254,6 +11254,76 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_review_card_queue_verify_command_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir(
+            "unsafe-review-first-pr-review-kit-review-card-queue-verify-command-drift",
+        )?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit = parse_json_file(&path)?;
+        review_kit["handoff"]["review_cards"]["card_queue"][0]["verify_commands"][0] =
+            serde_json::json!("cargo test unrelated");
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "ReviewCard queue verify command drift should fail verification".to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("review-kit.json handoff review_cards card_queue[0] verify_commands"),
+            "{err}"
+        );
+        assert!(err.contains("cargo +nightly miri test card"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_review_card_queue_witness_route_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir(
+            "unsafe-review-first-pr-review-kit-review-card-queue-witness-route-drift",
+        )?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit = parse_json_file(&path)?;
+        review_kit["handoff"]["review_cards"]["card_queue"][0]["witness_routes"][0]["kind"] =
+            serde_json::json!("asan");
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "ReviewCard queue witness route drift should fail verification".to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains(
+                "review-kit.json handoff review_cards card_queue[0] witness_routes[0] kind"
+            ),
+            "{err}"
+        );
+        assert!(err.contains("miri"), "{err}");
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_review_kit_review_card_queue_repair_drift()
     -> Result<(), String> {
         let dir =
@@ -16412,6 +16482,13 @@ review_after = "2026-08-01"
                     "operation": "unsafe { ptr.cast::<Header>().read() }",
                     "missing_evidence": [],
                     "next_action": "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.",
+                    "verify_commands": ["cargo +nightly miri test card"],
+                    "witness_routes": [{
+                        "kind": "miri",
+                        "reason": "route",
+                        "command": "cargo +nightly miri test card",
+                        "required": false
+                    }],
                     "repair_queue_buckets": ["repairable_by_guard", "requires_witness_receipt"],
                     "repair_queue_bucket_reasons": ["guard_evidence_missing", "witness_receipt_missing"],
                     "agent_readiness": {

@@ -1424,6 +1424,8 @@ fn check_review_kit_review_card_queue_entry(
     require_projected_str(entry, "operation", &card.operation, &context)?;
     require_projected_str(entry, "next_action", &card.next_action, &context)?;
     require_projected_string_array(entry, "missing_evidence", &card.missing, &context)?;
+    require_projected_string_array(entry, "verify_commands", &card.verify_commands, &context)?;
+    require_projected_witness_routes(entry, &card.witness_routes, &context)?;
 
     let repair = repair_queue_projections
         .get(card_id)
