@@ -97,12 +97,23 @@ struct ManualCandidateProjection {
     unsafe_operation: String,
     invariant: String,
     safe_caller: String,
+    proof_mode: Option<ManualCandidateProofModeProjection>,
+    fix_boundary: Option<String>,
+    pr_aperture: Option<String>,
     evidence: Vec<ManualCandidateEvidenceProjection>,
     fix_options: Vec<String>,
     test_targets: Vec<String>,
     do_not_touch: Vec<String>,
     evidence_refs: usize,
     implementer_handoff: serde_json::Value,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct ManualCandidateProofModeProjection {
+    kind: String,
+    system_bun_expected: String,
+    mutation_required: bool,
+    miri_required: bool,
 }
 
 struct ManualCandidateEvidenceProjection {
@@ -116,6 +127,7 @@ struct ManualCandidateEvidenceProjection {
 const COMMENT_PLAN_BODY_WORD_LIMIT: usize = 220;
 const COMMENT_PLAN_REVIEW_BUDGET: usize = 3;
 const MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
+const MANUAL_CANDIDATE_GITHUB_QUEUE_LIMIT: usize = 2;
 const REVIEW_CARD_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
 const COMMENT_PLAN_REVIEW_BUDGET_REASON: &str = "bounded reviewer noise";
 const COMMENT_PLAN_REVIEW_BUDGET_REASON_CODE: &str = "bounded_reviewer_noise";
@@ -256,7 +268,12 @@ fn check_manual_candidate_front_door_artifacts(
     for artifact in ["pr-summary.md", "github-summary.md"] {
         let path = dir.join(artifact);
         let text = super::read_to_string(&path)?;
-        check_manual_candidate_front_door_text(&text, &path, manual_candidates)?;
+        let queue_limit = if artifact == "github-summary.md" {
+            MANUAL_CANDIDATE_GITHUB_QUEUE_LIMIT
+        } else {
+            MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT
+        };
+        check_manual_candidate_front_door_text(&text, &path, manual_candidates, queue_limit)?;
     }
     Ok(())
 }
@@ -265,6 +282,7 @@ fn check_manual_candidate_front_door_text(
     text: &str,
     path: &Path,
     manual_candidates: &ManualCandidateIndexProjection,
+    queue_limit: usize,
 ) -> Result<(), String> {
     super::require_text_contains(text, "## Manual candidates", path)?;
     super::require_text_contains(
@@ -321,7 +339,7 @@ fn check_manual_candidate_front_door_text(
         path,
     )?;
     check_manual_candidate_front_door_guidance_text(text, path, first)?;
-    check_manual_candidate_queue_preview_text(text, path, manual_candidates)?;
+    check_manual_candidate_queue_preview_text(text, path, manual_candidates, queue_limit)?;
     for expected in [
         "unsafe-review explain",
         "unsafe-review context",
@@ -344,10 +362,9 @@ fn check_manual_candidate_queue_preview_text(
     text: &str,
     path: &Path,
     manual_candidates: &ManualCandidateIndexProjection,
+    queue_limit: usize,
 ) -> Result<(), String> {
-    let queue_len = manual_candidates
-        .count
-        .min(MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT);
+    let queue_len = manual_candidates.count.min(queue_limit);
     super::require_text_contains(
         text,
         &format!(
@@ -385,6 +402,9 @@ fn check_manual_candidate_queue_preview_text(
 fn manual_candidate_first_guidance_cue(
     candidate: &ManualCandidateProjection,
 ) -> Option<(&'static str, &str)> {
+    if let Some(proof_mode) = &candidate.proof_mode {
+        return Some(("proof mode", proof_mode.kind.as_str()));
+    }
     if let Some(value) = candidate.test_targets.first() {
         return Some(("first test target", value.as_str()));
     }
@@ -405,9 +425,13 @@ fn check_manual_candidate_front_door_guidance_text(
     let guidance_count =
         candidate.fix_options.len() + candidate.test_targets.len() + candidate.do_not_touch.len();
     if guidance_count == 0 {
+        check_manual_candidate_front_door_proof_mode_text(text, path, candidate)?;
+        check_manual_candidate_front_door_boundary_text(text, path, candidate)?;
         return Ok(());
     }
 
+    check_manual_candidate_front_door_proof_mode_text(text, path, candidate)?;
+    check_manual_candidate_front_door_boundary_text(text, path, candidate)?;
     super::require_text_contains(
         text,
         &format!(
@@ -426,6 +450,46 @@ fn check_manual_candidate_front_door_guidance_text(
     }
     if let Some(note) = candidate.do_not_touch.first() {
         super::require_text_contains(text, &format!("- First do-not-touch note: {note}"), path)?;
+    }
+    Ok(())
+}
+
+fn check_manual_candidate_front_door_proof_mode_text(
+    text: &str,
+    path: &Path,
+    candidate: &ManualCandidateProjection,
+) -> Result<(), String> {
+    if let Some(proof_mode) = &candidate.proof_mode {
+        super::require_text_contains(
+            text,
+            &format!(
+                "- Proof mode: `{}` (system Bun expected: `{}`; mutation required: `{}`; Miri/model required: `{}`)",
+                proof_mode.kind,
+                proof_mode.system_bun_expected,
+                proof_mode.mutation_required,
+                proof_mode.miri_required
+            ),
+            path,
+        )?;
+    }
+    Ok(())
+}
+
+fn check_manual_candidate_front_door_boundary_text(
+    text: &str,
+    path: &Path,
+    candidate: &ManualCandidateProjection,
+) -> Result<(), String> {
+    if let Some(fix_boundary) = &candidate.fix_boundary {
+        super::require_text_contains(text, &format!("- Fix boundary: {fix_boundary}"), path)?;
+    }
+    if let Some(pr_aperture) = &candidate.pr_aperture {
+        super::require_text_contains(text, &format!("- PR aperture: {pr_aperture}"), path)?;
+        super::require_text_contains(
+            text,
+            "- Stop line: keep the PR inside this aperture; stop before source edits if the route no longer matches or the work would broaden into unrelated unsafe sites.",
+            path,
+        )?;
     }
     Ok(())
 }
@@ -950,6 +1014,33 @@ fn check_manual_repair_queue_artifact(
             .filter(|candidate| !candidate.do_not_touch.is_empty())
             .count(),
     )?;
+    require_manual_repair_guidance_count(
+        &value,
+        "with_proof_mode",
+        manual_candidates
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.proof_mode.is_some())
+            .count(),
+    )?;
+    require_manual_repair_guidance_count(
+        &value,
+        "with_fix_boundary",
+        manual_candidates
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.fix_boundary.is_some())
+            .count(),
+    )?;
+    require_manual_repair_guidance_count(
+        &value,
+        "with_pr_aperture",
+        manual_candidates
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.pr_aperture.is_some())
+            .count(),
+    )?;
 
     let queue = super::json_array_at(&value, "/queue", "manual-repair-queue.json")?;
     if queue.len() != manual_candidates.count {
@@ -1031,6 +1122,9 @@ fn check_manual_repair_queue_entry(
         &expected.do_not_touch,
         &context,
     )?;
+    require_projected_optional_proof_mode(entry, "proof_mode", &expected.proof_mode, &context)?;
+    require_projected_optional_str(entry, "fix_boundary", &expected.fix_boundary, &context)?;
+    require_projected_optional_str(entry, "pr_aperture", &expected.pr_aperture, &context)?;
     let handoff = entry
         .get("implementer_handoff")
         .ok_or_else(|| format!("{context} is missing implementer_handoff"))?;
@@ -1234,6 +1328,21 @@ fn check_manual_candidate_artifact_entry(
         "manual-candidates.json candidate",
     )?
     .to_string();
+    let proof_mode = optional_manual_candidate_proof_mode(
+        candidate,
+        "proof_mode",
+        "manual-candidates.json candidate",
+    )?;
+    let fix_boundary = optional_non_empty_json_string(
+        candidate,
+        "fix_boundary",
+        "manual-candidates.json candidate",
+    )?;
+    let pr_aperture = optional_non_empty_json_string(
+        candidate,
+        "pr_aperture",
+        "manual-candidates.json candidate",
+    )?;
     let location = candidate
         .get("location")
         .ok_or_else(|| "manual-candidates.json candidate is missing location".to_string())?;
@@ -1312,6 +1421,9 @@ fn check_manual_candidate_artifact_entry(
         unsafe_operation,
         invariant,
         safe_caller,
+        proof_mode,
+        fix_boundary,
+        pr_aperture,
         evidence_refs: evidence.len(),
         evidence,
         fix_options,
@@ -1433,6 +1545,9 @@ fn check_manual_candidate_implementer_handoff(
         &expected.do_not_touch,
         context,
     )?;
+    require_projected_optional_proof_mode(handoff, "proof_mode", &expected.proof_mode, context)?;
+    require_projected_optional_str(handoff, "fix_boundary", &expected.fix_boundary, context)?;
+    require_projected_optional_str(handoff, "pr_aperture", &expected.pr_aperture, context)?;
     require_non_empty_string_array(handoff, "suggested_next_steps", context)?;
     let non_goals = require_non_empty_string_array(handoff, "non_goals", context)?;
     for expected_text in [
@@ -1479,6 +1594,56 @@ fn optional_non_empty_json_string(
         Some(serde_json::Value::String(_)) => Err(format!("{context} {field} must not be empty")),
         Some(_) => Err(format!("{context} {field} must be a string")),
     }
+}
+
+fn optional_manual_candidate_proof_mode(
+    value: &serde_json::Value,
+    field: &str,
+    context: &str,
+) -> Result<Option<ManualCandidateProofModeProjection>, String> {
+    let Some(value) = value.get(field) else {
+        return Ok(None);
+    };
+    if value.is_null() {
+        return Ok(None);
+    }
+    if !value.is_object() {
+        return Err(format!("{context} {field} must be an object when present"));
+    }
+    let context = format!("{context} {field}");
+    Ok(Some(ManualCandidateProofModeProjection {
+        kind: super::require_non_empty_json_str(value, "kind", &context)?.to_string(),
+        system_bun_expected: super::require_non_empty_json_str(
+            value,
+            "system_bun_expected",
+            &context,
+        )?
+        .to_string(),
+        mutation_required: json_bool_at(value, "/mutation_required", &context)?,
+        miri_required: json_bool_at(value, "/miri_required", &context)?,
+    }))
+}
+
+fn json_bool_at(value: &serde_json::Value, pointer: &str, context: &str) -> Result<bool, String> {
+    value
+        .pointer(pointer)
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| format!("{context} {pointer} must be a boolean"))
+}
+
+fn require_projected_optional_proof_mode(
+    value: &serde_json::Value,
+    field: &str,
+    expected: &Option<ManualCandidateProofModeProjection>,
+    context: &str,
+) -> Result<(), String> {
+    let actual = optional_manual_candidate_proof_mode(value, field, context)?;
+    if &actual != expected {
+        return Err(format!(
+            "{context} {field} must match manual-candidates.json candidate {field}"
+        ));
+    }
+    Ok(())
 }
 
 fn require_projected_optional_str(
@@ -4890,7 +5055,12 @@ fn check_manual_candidate_witness_plan_text(
         path,
     )?;
     check_manual_candidate_front_door_guidance_text(text, path, first)?;
-    check_manual_candidate_queue_preview_text(text, path, manual_candidates)?;
+    check_manual_candidate_queue_preview_text(
+        text,
+        path,
+        manual_candidates,
+        MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT,
+    )?;
     for expected in [
         "unsafe-review candidate witness-plan",
         "unsafe-review context",

@@ -4705,6 +4705,16 @@ fn assert_manual_candidate_front_panel(text: &str, later_heading: &str) {
     ));
     assert!(text.contains("- Invariant at risk: &[u8] memory must not be concurrently mutated"));
     assert!(text.contains("- External evidence refs: 2"));
+    assert!(text.contains(
+        "- Proof mode: `mutation-plus-miri` (system Bun expected: `nondiscriminating`; mutation required: `true`; Miri/model required: `true`)"
+    ));
+    assert!(text.contains(
+        "- Fix boundary: Snapshot shared/growable/resizable bytes before Rust receives &[u8]"
+    ));
+    assert!(text.contains(
+        "- PR aperture: TextDecoder shared-byte snapshot only; do not patch S3, fs, writev, or unrelated encodings"
+    ));
+    assert!(text.contains("- Stop line: keep the PR inside this aperture"));
     assert!(text.contains("- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)"));
     assert!(text.contains(
         "- First fix option: Copy SharedArrayBuffer-backed bytes into stable owned storage before creating a Rust slice"
@@ -4718,6 +4728,9 @@ fn assert_manual_candidate_front_panel(text: &str, later_heading: &str) {
         "- First do-not-touch note: Do not rewrite unrelated TextDecoder encoding paths"
     ));
     assert!(text.contains("- Manual candidate queue preview: first 2 of 2 manual candidate(s)"));
+    assert!(text.contains(
+        "`R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 2; proof mode: `mutation-plus-miri`"
+    ));
     assert!(text.contains(
         "`R4R2-S002` at `src/sql_jsc/mysql/MySQLValue.rs:411` (`slice_from_raw_parts`); evidence refs: 3; first test target: `test/js/sql/sql-mysql-bind-blob-borrow.test.ts`"
     ));
@@ -4755,6 +4768,16 @@ fn assert_manual_candidate_witness_follow_up(text: &str) {
     ));
     assert!(text.contains("- Invariant at risk: &[u8] memory must not be concurrently mutated"));
     assert!(text.contains("- External evidence refs: 2"));
+    assert!(text.contains(
+        "- Proof mode: `mutation-plus-miri` (system Bun expected: `nondiscriminating`; mutation required: `true`; Miri/model required: `true`)"
+    ));
+    assert!(text.contains(
+        "- Fix boundary: Snapshot shared/growable/resizable bytes before Rust receives &[u8]"
+    ));
+    assert!(text.contains(
+        "- PR aperture: TextDecoder shared-byte snapshot only; do not patch S3, fs, writev, or unrelated encodings"
+    ));
+    assert!(text.contains("- Stop line: keep the PR inside this aperture"));
     assert!(text.contains("- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)"));
     assert!(text.contains(
         "- First fix option: Copy SharedArrayBuffer-backed bytes into stable owned storage before creating a Rust slice"
@@ -4768,6 +4791,9 @@ fn assert_manual_candidate_witness_follow_up(text: &str) {
         "- First do-not-touch note: Do not rewrite unrelated TextDecoder encoding paths"
     ));
     assert!(text.contains("- Manual candidate queue preview: first 2 of 2 manual candidate(s)"));
+    assert!(text.contains(
+        "`R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 2; proof mode: `mutation-plus-miri`"
+    ));
     assert!(text.contains(
         "`R4R2-S002` at `src/sql_jsc/mysql/MySQLValue.rs:411` (`slice_from_raw_parts`); evidence refs: 3; first test target: `test/js/sql/sql-mysql-bind-blob-borrow.test.ts`"
     ));
