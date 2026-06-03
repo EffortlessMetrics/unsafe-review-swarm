@@ -1,7 +1,5 @@
-use super::{OutcomeCard, OutcomeCardState, OutcomeReport};
+use super::{OutcomeCardState, OutcomeReport};
 use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
-
-const MAX_MOVEMENT_REASONS: usize = 5;
 
 pub(super) fn render_markdown(report: &OutcomeReport) -> String {
     let mut out = String::new();
@@ -60,20 +58,21 @@ pub(super) fn render_markdown(report: &OutcomeReport) -> String {
         out.push('\n');
     }
     out.push_str("## Movement reasons\n\n");
-    let movement_reasons = movement_reasons(report);
-    if movement_reasons.is_empty() {
+    if report.reviewer_delta.movement_reasons.is_empty() {
         out.push_str(
             "- No new, resolved, improved, or regressed ReviewCards in these saved snapshots.\n\n",
         );
     } else {
-        for (status, card) in &movement_reasons {
+        for reason in &report.reviewer_delta.movement_reasons {
             out.push_str(&format!(
                 "- `{status}` `{}`: {}\n",
-                card.card_id,
-                markdown_cell(&card.reason)
+                reason.card_id,
+                markdown_cell(&reason.reason),
+                status = reason.status
             ));
         }
-        let remaining = movement_count(report).saturating_sub(movement_reasons.len());
+        let remaining =
+            movement_count(report).saturating_sub(report.reviewer_delta.movement_reasons.len());
         if remaining > 0 {
             out.push_str(&format!(
                 "- Additional movement reasons: {remaining} more in the Card outcomes table.\n"
@@ -114,24 +113,6 @@ pub(super) fn render_markdown(report: &OutcomeReport) -> String {
     out.push_str(&report.trust_boundary);
     out.push('\n');
     out
-}
-
-fn movement_reasons(report: &OutcomeReport) -> Vec<(&'static str, &OutcomeCard)> {
-    let mut reasons = Vec::new();
-    for (status, cards) in [
-        ("new", report.cards.new.as_slice()),
-        ("regressed", report.cards.regressed.as_slice()),
-        ("improved", report.cards.improved.as_slice()),
-        ("resolved", report.cards.resolved.as_slice()),
-    ] {
-        for card in cards {
-            if reasons.len() == MAX_MOVEMENT_REASONS {
-                return reasons;
-            }
-            reasons.push((status, card));
-        }
-    }
-    reasons
 }
 
 fn movement_count(report: &OutcomeReport) -> usize {

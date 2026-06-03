@@ -9,6 +9,7 @@ mod markdown;
 mod witness;
 
 const TRUST_BOUNDARY: &str = "Static unsafe contract review outcome only; this compares existing ReviewCard snapshots and manual candidate snapshots, not memory-safety proof, not UB-free status, and not witness execution.";
+const MAX_REVIEWER_MOVEMENT_REASONS: usize = 5;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct OutcomeReport {
@@ -52,6 +53,7 @@ pub struct OutcomeReviewerDelta {
     pub regressed_cards: usize,
     pub unchanged_cards: usize,
     pub receipt_movement: OutcomeReceiptMovement,
+    pub movement_reasons: Vec<OutcomeMovementReason>,
     pub top_remaining_gaps: Vec<OutcomeRemainingGap>,
 }
 
@@ -59,6 +61,13 @@ pub struct OutcomeReviewerDelta {
 pub struct OutcomeReceiptMovement {
     pub improved: usize,
     pub regressed: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct OutcomeMovementReason {
+    pub status: String,
+    pub card_id: String,
+    pub reason: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -593,11 +602,34 @@ impl OutcomeReviewerDelta {
             regressed_cards: summary.regressed,
             unchanged_cards: summary.unchanged,
             receipt_movement: receipt_movement(cards),
+            movement_reasons: movement_reasons(cards),
             top_remaining_gaps: top_remaining_gaps(cards),
         };
         delta.top_remaining_gaps.truncate(5);
         delta
     }
+}
+
+fn movement_reasons(cards: &OutcomeCards) -> Vec<OutcomeMovementReason> {
+    let mut reasons = Vec::new();
+    for (status, cards) in [
+        ("new", cards.new.as_slice()),
+        ("regressed", cards.regressed.as_slice()),
+        ("improved", cards.improved.as_slice()),
+        ("resolved", cards.resolved.as_slice()),
+    ] {
+        for card in cards {
+            if reasons.len() == MAX_REVIEWER_MOVEMENT_REASONS {
+                return reasons;
+            }
+            reasons.push(OutcomeMovementReason {
+                status: status.to_string(),
+                card_id: card.card_id.clone(),
+                reason: card.reason.clone(),
+            });
+        }
+    }
+    reasons
 }
 
 fn receipt_movement(cards: &OutcomeCards) -> OutcomeReceiptMovement {
@@ -754,6 +786,20 @@ mod tests {
         assert_eq!(report.reviewer_delta.improved_cards, 1);
         assert_eq!(report.reviewer_delta.regressed_cards, 1);
         assert_eq!(report.reviewer_delta.unchanged_cards, 1);
+        assert_eq!(report.reviewer_delta.movement_reasons.len(), 4);
+        assert_eq!(report.reviewer_delta.movement_reasons[0].status, "new");
+        assert_eq!(report.reviewer_delta.movement_reasons[0].card_id, "UR-e-c1");
+        assert!(
+            report.reviewer_delta.movement_reasons[0]
+                .reason
+                .contains("new card: appears in the after snapshot")
+        );
+        assert_eq!(
+            report.reviewer_delta.movement_reasons[1].status,
+            "regressed"
+        );
+        assert_eq!(report.reviewer_delta.movement_reasons[2].status, "improved");
+        assert_eq!(report.reviewer_delta.movement_reasons[3].status, "resolved");
         assert_eq!(report.reviewer_delta.top_remaining_gaps.len(), 4);
         assert_eq!(report.reviewer_delta.top_remaining_gaps[0].priority, "high");
         assert!(report.before_id.starts_with("snapshot-"));
@@ -799,6 +845,20 @@ mod tests {
         assert_eq!(value["summary"]["new"], 1);
         assert_eq!(value["reviewer_delta"]["new_cards"], 1);
         assert_eq!(value["reviewer_delta"]["resolved_cards"], 0);
+        assert_eq!(
+            value["reviewer_delta"]["movement_reasons"][0]["status"],
+            "new"
+        );
+        assert_eq!(
+            value["reviewer_delta"]["movement_reasons"][0]["card_id"],
+            "UR-new-c1"
+        );
+        assert!(
+            value["reviewer_delta"]["movement_reasons"][0]["reason"]
+                .as_str()
+                .unwrap_or("")
+                .contains("new card: appears in the after snapshot")
+        );
         assert_eq!(
             value["reviewer_delta"]["top_remaining_gaps"][0]["card_id"],
             "UR-new-c1"
@@ -912,6 +972,16 @@ mod tests {
         let value: serde_json::Value =
             serde_json::from_str(&json).map_err(|err| format!("parse JSON failed: {err}"))?;
         assert_eq!(value["cards"]["new"][0]["after"]["source"], "manual");
+        assert_eq!(
+            value["reviewer_delta"]["movement_reasons"][0]["card_id"],
+            "R4R2-S001"
+        );
+        assert!(
+            value["reviewer_delta"]["movement_reasons"][0]["reason"]
+                .as_str()
+                .unwrap_or("")
+                .contains("new manual candidate")
+        );
         assert_eq!(value["cards"]["new"][0]["after"]["manual_candidate"], true);
         assert_eq!(
             value["cards"]["new"][0]["after"]["analyzer_discovered"],
