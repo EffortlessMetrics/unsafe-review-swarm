@@ -244,8 +244,9 @@ fn run_repo_check(options: RepoOptions) -> Result<(), String> {
 
 fn repo_list_files(options: RepoOptions) -> Result<(), String> {
     let root = options.check.root.clone();
+    let scan_scope = RepoScanScopeMetadata::new(&root, &options.discovery);
     let files = discover_repo_files(root.clone(), options.discovery)?;
-    let rendered = render_repo_file_list(&root, &files);
+    let rendered = render_repo_file_list(&root, &files, &options.check.format, &scan_scope)?;
     if let Some(path) = options.check.out {
         ensure_parent_dir(&path)?;
         fs::write(&path, rendered)
@@ -256,7 +257,21 @@ fn repo_list_files(options: RepoOptions) -> Result<(), String> {
     Ok(())
 }
 
-fn render_repo_file_list(root: &Path, files: &[PathBuf]) -> String {
+fn render_repo_file_list(
+    root: &Path,
+    files: &[PathBuf],
+    format: &Format,
+    scan_scope: &RepoScanScopeMetadata,
+) -> Result<String, String> {
+    match format {
+        Format::Human => Ok(render_repo_file_list_human(root, files)),
+        Format::Json => render_repo_file_list_json(root, files, scan_scope),
+        Format::Markdown => Ok(render_repo_file_list_markdown(root, files, scan_scope)),
+        _ => Err("repo --list-files only supports human, json, or markdown output".to_string()),
+    }
+}
+
+fn render_repo_file_list_human(root: &Path, files: &[PathBuf]) -> String {
     let mut rendered = format!(
         "unsafe-review repo file list\nroot: {}\nfiles: {}\n",
         root.display(),
@@ -267,6 +282,102 @@ fn render_repo_file_list(root: &Path, files: &[PathBuf]) -> String {
         rendered.push('\n');
     }
     rendered
+}
+
+fn render_repo_file_list_json(
+    root: &Path,
+    files: &[PathBuf],
+    scan_scope: &RepoScanScopeMetadata,
+) -> Result<String, String> {
+    let file_paths = files
+        .iter()
+        .map(|file| repo_path_display(file))
+        .collect::<Vec<_>>();
+    let value = serde_json::json!({
+        "schema_version": "repo-file-list/v1",
+        "tool": "unsafe-review",
+        "tool_version": env!("CARGO_PKG_VERSION"),
+        "mode": "repo_list_files",
+        "root": root.display().to_string(),
+        "scan_scope": repo_scan_scope_json(scan_scope),
+        "summary": {
+            "selected_rust_files": file_paths.len(),
+            "analysis_run": false,
+            "reviewcards_created": 0,
+            "witnesses_run": false,
+        },
+        "files": file_paths,
+        "trust_boundary": repo_file_list_trust_boundary(),
+    });
+    let mut rendered = serde_json::to_string_pretty(&value)
+        .map_err(|err| format!("render repo file list JSON failed: {err}"))?;
+    rendered.push('\n');
+    Ok(rendered)
+}
+
+fn render_repo_file_list_markdown(
+    root: &Path,
+    files: &[PathBuf],
+    scan_scope: &RepoScanScopeMetadata,
+) -> String {
+    let mut out = String::new();
+    out.push_str("# unsafe-review repo file list\n\n");
+    out.push_str("Selected Rust files from the repo discovery pipeline.\n\n");
+    out.push_str("## Summary\n\n");
+    out.push_str(&format!("- Root: `{}`\n", root.display()));
+    out.push_str(&format!("- Selected Rust files: `{}`\n", files.len()));
+    out.push_str("- Analysis run: `false`\n");
+    out.push_str("- ReviewCards created: `0`\n");
+    out.push_str("- Witnesses run: `false`\n\n");
+    out.push_str("## Scan Scope\n\n");
+    out.push_str(&format!(
+        "- Include: `{}`\n",
+        repo_scope_patterns_display(&scan_scope.include)
+    ));
+    out.push_str(&format!(
+        "- Exclude: `{}`\n",
+        repo_scope_patterns_display(&scan_scope.exclude)
+    ));
+    out.push_str(&format!(
+        "- Respect gitignore: `{}`\n",
+        scan_scope.respect_gitignore
+    ));
+    out.push_str(&format!(
+        "- Large-repo ignores: `{}`\n",
+        scan_scope.large_repo_ignores
+    ));
+    out.push_str(&format!(
+        "- Max files: `{}`\n\n",
+        scan_scope
+            .max_files
+            .map(|max_files| max_files.to_string())
+            .unwrap_or_else(|| "none".to_string())
+    ));
+    out.push_str("## Files\n\n");
+    if files.is_empty() {
+        out.push_str("No Rust files selected.\n\n");
+    } else {
+        for file in files {
+            out.push_str(&format!("- `{}`\n", repo_path_display(file)));
+        }
+        out.push('\n');
+    }
+    out.push_str("## Trust Boundary\n\n");
+    out.push_str(repo_file_list_trust_boundary());
+    out.push('\n');
+    out
+}
+
+fn repo_scope_patterns_display(patterns: &[String]) -> String {
+    if patterns.is_empty() {
+        "all".to_string()
+    } else {
+        patterns.join(", ")
+    }
+}
+
+fn repo_file_list_trust_boundary() -> &'static str {
+    "File selection dry run only; this does not analyze files, create ReviewCards, execute witnesses, prove site reach, prove repository safety, or make UB-free/Miri-clean claims."
 }
 
 fn repo_path_display(path: &Path) -> String {
@@ -1923,6 +2034,7 @@ fn print_repo_help() {
         "- --respect-gitignore is the default; --no-respect-gitignore includes ignored Rust files."
     );
     println!("- --list-files prints selected Rust files and exits without analysis.");
+    println!("- With --list-files, --format supports human, json, or markdown output.");
     println!("- --progress prints scan-status heartbeats to stderr during analysis.");
     println!(
         "- --timeout-seconds <N> stops analysis after roughly N seconds at repo event boundaries."

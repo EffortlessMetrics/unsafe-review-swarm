@@ -30,6 +30,13 @@ ReviewCards or running witness tools. `--max-files` truncates the selected
 file list after deterministic ordering and applies to both dry-run listing and
 repo analysis input.
 
+`--list-files` supports human, JSON, and Markdown output. Its machine-readable
+artifact uses `schema_version = repo-file-list/v1`, records the selected files,
+the replayable scan scope, and summary booleans showing that analysis,
+ReviewCard creation, and witness execution did not run. ReviewCard-derived
+formats such as SARIF, comment-plan, LSP, and witness-plan are not valid
+`--list-files` outputs.
+
 `--timeout-seconds` bounds repo analysis wall time cooperatively. The command
 checks the timeout at repo status event boundaries during discovery and
 scanning. It does not interrupt a single file mid-scan, and it does not execute

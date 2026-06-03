@@ -403,7 +403,11 @@ unsafe-review repo \
 ```
 
 `--list-files` prints the selected root-relative Rust files and exits without
-running analysis. `--max-files <n>` truncates the selected file list after
+running analysis. Add `--format json` or `--format markdown` when a handoff or
+automation needs the selected files, replayable scan scope, and explicit
+no-analysis/no-witness boundary as a saved artifact. ReviewCard-derived formats
+such as SARIF, comment-plan, LSP, and witness-plan are not valid for
+`--list-files`. `--max-files <n>` truncates the selected file list after
 sorting, so it bounds both `--list-files` output and repo analysis input.
 `--timeout-seconds <n>` bounds repo analysis wall time cooperatively; it does
 not interrupt a single file mid-scan, but it prevents a long scan from looking

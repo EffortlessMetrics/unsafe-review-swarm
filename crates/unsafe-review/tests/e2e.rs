@@ -1977,6 +1977,7 @@ fn repo_help_reports_repo_specific_scale_guidance() -> Result<(), Box<dyn Error>
     assert!(text.contains("--include <glob>"));
     assert!(text.contains("--exclude <glob>"));
     assert!(text.contains("--list-files prints selected Rust files"));
+    assert!(text.contains("With --list-files, --format supports human, json, or markdown output"));
     assert!(text.contains("--progress prints scan-status heartbeats"));
     assert!(text.contains("--timeout-seconds <N>"));
     assert!(text.contains("--max-files <N>"));
@@ -2070,6 +2071,97 @@ fn repo_list_files_honors_selection_controls() -> Result<(), Box<dyn Error>> {
         os("--no-respect-gitignore"),
     ])?;
     assert!(stdout_text(&ignored)?.contains("ignored/lib.rs"));
+
+    Ok(())
+}
+
+#[test]
+fn repo_list_files_renders_json_and_markdown_scope_artifacts() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-repo-list-files-formats")?;
+    write_e2e_file(temp.path(), "src/lib.rs")?;
+    write_e2e_file(temp.path(), "packages/pkg/src/lib.rs")?;
+    write_e2e_file(temp.path(), "packages/pkg/src/skip.rs")?;
+    write_e2e_file(temp.path(), "ignored/lib.rs")?;
+    fs::write(temp.path().join(".gitignore"), "ignored/\n")?;
+    let json_out = temp.path().join("repo-files.json");
+
+    let json_output = run_success([
+        os("repo"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--include"),
+        os("src/**/*.rs"),
+        os("--include"),
+        os("packages/**/*.rs"),
+        os("--exclude"),
+        os("packages/**/skip.rs"),
+        os("--max-files"),
+        os("2"),
+        os("--format"),
+        os("json"),
+        os("--out"),
+        json_out.as_os_str().to_os_string(),
+        os("--list-files"),
+    ])?;
+
+    assert_eq!(stdout_text(&json_output)?.trim(), "");
+    let list = parse_json(&fs::read_to_string(&json_out)?)?;
+    assert_eq!(list["schema_version"], "repo-file-list/v1");
+    assert_eq!(list["mode"], "repo_list_files");
+    assert_eq!(list["root"], temp.path().display().to_string());
+    assert_eq!(list["scan_scope"]["include"][0], "src/**/*.rs");
+    assert_eq!(list["scan_scope"]["include"][1], "packages/**/*.rs");
+    assert_eq!(list["scan_scope"]["exclude"][0], "packages/**/skip.rs");
+    assert_eq!(list["scan_scope"]["respect_gitignore"], true);
+    assert_eq!(list["scan_scope"]["large_repo_ignores"], true);
+    assert_eq!(list["scan_scope"]["max_files"], 2);
+    assert_eq!(list["summary"]["selected_rust_files"], 2);
+    assert_eq!(list["summary"]["analysis_run"], false);
+    assert_eq!(list["summary"]["reviewcards_created"], 0);
+    assert_eq!(list["summary"]["witnesses_run"], false);
+    assert_eq!(list["files"][0], "src/lib.rs");
+    assert_eq!(list["files"][1], "packages/pkg/src/lib.rs");
+    assert!(
+        list["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("does not analyze files")
+    );
+
+    let markdown_output = run_success([
+        os("repo"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--include"),
+        os("ignored/**/*.rs"),
+        os("--no-respect-gitignore"),
+        os("--format"),
+        os("markdown"),
+        os("--list-files"),
+    ])?;
+    let markdown = stdout_text(&markdown_output)?;
+    assert!(markdown.contains("# unsafe-review repo file list"));
+    assert!(markdown.contains("- Analysis run: `false`"));
+    assert!(markdown.contains("- ReviewCards created: `0`"));
+    assert!(markdown.contains("- Respect gitignore: `false`"));
+    assert!(markdown.contains("- `ignored/lib.rs`"));
+    assert!(markdown.contains("not analyze files"));
+    assert!(markdown.contains("UB-free/Miri-clean claims"));
+
+    let unsupported = run_failure([
+        os("repo"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--format"),
+        os("sarif"),
+        os("--list-files"),
+    ])?;
+    assert_eq!(unsupported.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&unsupported.stderr);
+    assert!(
+        stderr.contains("repo --list-files only supports human, json, or markdown output"),
+        "stderr should explain list-files format limits: {stderr}"
+    );
 
     Ok(())
 }
