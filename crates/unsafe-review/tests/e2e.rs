@@ -845,6 +845,28 @@ fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dy
         ledger["candidates"][0]["location_text"],
         "src/runtime/webcore/TextDecoder.rs:237"
     );
+    assert_eq!(
+        ledger["candidates"][0]["implementer_handoff"]["target"]["location_text"],
+        "src/runtime/webcore/TextDecoder.rs:237"
+    );
+    assert_eq!(
+        ledger["candidates"][0]["implementer_handoff"]["route"]["safe_caller"],
+        "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))"
+    );
+    assert_eq!(
+        ledger["candidates"][0]["implementer_handoff"]["route"]["unsafe_operation"],
+        "core::slice::from_raw_parts"
+    );
+    assert_eq!(
+        ledger["candidates"][0]["implementer_handoff"]["invariant_at_risk"],
+        "&[u8] memory must not be concurrently mutated"
+    );
+    assert!(
+        ledger["candidates"][0]["implementer_handoff"]["stop_condition"]
+            .as_str()
+            .unwrap_or("")
+            .contains("stop before source edits")
+    );
     assert!(
         ledger["candidates"][0]["explain_command"]
             .as_str()
@@ -900,6 +922,10 @@ fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dy
     assert!(markdown.contains("Analyzer-discovered: `0`"));
     assert!(markdown.contains("### `R4R2-S001`"));
     assert!(markdown.contains("Location: `src/runtime/webcore/TextDecoder.rs:237`"));
+    assert!(markdown.contains("#### Implementer Handoff"));
+    assert!(markdown.contains("Route: `new TextDecoder().decode"));
+    assert!(markdown.contains("Invariant at risk: &[u8] memory must not be concurrently mutated"));
+    assert!(markdown.contains("Stop line: stop before source edits"));
     assert!(markdown.contains("Context: `unsafe-review context --root"));
     assert!(markdown.contains("ReviewCard-only repair queue"));
     assert!(markdown.contains("not analyzer-discovered ReviewCards"));
@@ -1202,6 +1228,27 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         review_kit["handoff"]["manual_candidates"]["first_candidate"]["analyzer_discovered"],
         false
     );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["first_candidate"]["implementer_handoff"]["target"]
+            ["location_text"],
+        "src/runtime/webcore/TextDecoder.rs:237"
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["first_candidate"]["implementer_handoff"]["route"]
+            ["safe_caller"],
+        "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))"
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["first_candidate"]["implementer_handoff"]["invariant_at_risk"],
+        "&[u8] memory must not be concurrently mutated"
+    );
+    assert!(
+        review_kit["handoff"]["manual_candidates"]["first_candidate"]["implementer_handoff"]
+            ["stop_condition"]
+            .as_str()
+            .unwrap_or("")
+            .contains("stop before source edits")
+    );
     assert!(
         review_kit["handoff"]["manual_candidates"]["first_candidate"]["explain"]
             .as_str()
@@ -1370,7 +1417,37 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         manual_candidates["candidates"][0]["explain_command"]
             .as_str()
             .unwrap_or("")
-            .contains("unsafe-review explain R4R2-S001")
+            .contains("unsafe-review explain --root")
+    );
+    assert!(
+        manual_candidates["candidates"][0]["context_command"]
+            .as_str()
+            .unwrap_or("")
+            .contains("unsafe-review context --root")
+    );
+    assert!(
+        manual_candidates["candidates"][0]["witness_plan_command"]
+            .as_str()
+            .unwrap_or("")
+            .contains("unsafe-review candidate witness-plan --root")
+    );
+    assert_eq!(
+        manual_candidates["candidates"][0]["implementer_handoff"]["target"]["location_text"],
+        "src/runtime/webcore/TextDecoder.rs:237"
+    );
+    assert_eq!(
+        manual_candidates["candidates"][0]["implementer_handoff"]["route"]["unsafe_operation"],
+        "core::slice::from_raw_parts"
+    );
+    assert_eq!(
+        manual_candidates["candidates"][0]["implementer_handoff"]["invariant_at_risk"],
+        "&[u8] memory must not be concurrently mutated"
+    );
+    assert!(
+        manual_candidates["candidates"][0]["implementer_handoff"]["stop_condition"]
+            .as_str()
+            .unwrap_or("")
+            .contains("stop before source edits")
     );
     assert!(
         manual_candidates["reviewcard_artifact_relationship"]["cards.json"]

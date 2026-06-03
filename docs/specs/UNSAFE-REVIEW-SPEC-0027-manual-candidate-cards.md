@@ -158,7 +158,9 @@ witnesses, edit source, or broaden the task to unrelated unsafe sites.
 Manual candidate list/reporting projections must load only
 `.unsafe-review/candidates/*.json` artifacts, preserve sorted manual IDs,
 include `source = manual`, `manual_candidate = true`, and
-`analyzer_discovered = false`, and repeat the ReviewCard-only artifact
+`analyzer_discovered = false`, include copy-only implementer handoff cues for
+the file:line target, safe caller route, invariant, evidence packet, non-goals,
+and stop line when available, and repeat the ReviewCard-only artifact
 relationship. They must not add manual candidates to `cards.json`, SARIF,
 comment-plan, saved LSP, repair-queue, or policy-report surfaces.
 
@@ -205,8 +207,9 @@ into an analyzer ReviewCard.
   evidence commands and limitations, non-goals, and stop line from the same
   manual candidate.
 - `candidate list` reports imported candidates as a manual/advisory ledger with
-  sorted IDs, file:line locations, evidence counts, copy-only projection
-  commands, and ReviewCard-only artifact boundaries.
+  sorted IDs, file:line locations, compact implementer handoff cues, evidence
+  counts, copy-only projection commands, and ReviewCard-only artifact
+  boundaries.
 - `witness-plan` routes manual evidence as suggested follow-up work without
   executing witnesses.
 - A receipt against a manual candidate ID can be imported or audited only as

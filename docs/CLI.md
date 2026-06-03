@@ -275,10 +275,10 @@ unsafe-review candidate witness-plan R4R2-S001
 
 `candidate list` reports the imported manual candidate ledger from
 `.unsafe-review/candidates/`. It preserves sorted manual candidate IDs,
-file:line locations, ReviewCard-only artifact boundaries, and copy-only
-explain/context/witness-plan commands without adding those candidates to
-`cards.json`, SARIF, comment plans, saved LSP diagnostics, repair queues, or
-policy reports.
+file:line locations, compact implementer handoff cues, ReviewCard-only artifact
+boundaries, and copy-only explain/context/witness-plan commands without adding
+those candidates to `cards.json`, SARIF, comment plans, saved LSP diagnostics,
+repair queues, or policy reports.
 
 Manual candidate projections preserve the manual marker and external evidence
 references, including optional exact evidence commands and limitations. The
@@ -307,6 +307,8 @@ the candidate into analyzer-discovered ReviewCard witness evidence.
 `first-pr` writes a separate `manual-candidates.json` index for imported
 `.unsafe-review/candidates/*.json` artifacts. `cards.json`, SARIF, comment-plan,
 saved LSP, repair-queue, and policy-report surfaces remain ReviewCard-only.
+The saved index keeps the same copy-only implementer handoff cues as
+`candidate list`.
 The first-pr terminal handoff and `review-kit.json` may include copy-only
 commands for manual candidate explain/context/witness-plan projection, while
 still labeling them manual/advisory and not analyzer-discovered.
