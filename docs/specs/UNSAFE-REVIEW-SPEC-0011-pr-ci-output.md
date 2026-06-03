@@ -163,6 +163,16 @@ ReviewCard queue entries project `verify_commands` and full `witness_routes`
 route objects from `cards.json`; they are reviewer handoff cues only and do not
 claim witness execution.
 
+Manual candidate markers (`source = manual`, `manual_candidate`, or
+`analyzer_discovered`) must not appear in ReviewCard-only first-pr artifacts:
+`cards.json`, `cards.sarif`, `comment-plan.json`, `lsp.json`, or
+`repair-queue.json`. The artifact verifier rejects marker leakage instead of
+silently converting manual candidates into analyzer output.
+`manual-candidates.json` and `handoff.manual_candidates` must carry structured
+`reviewcard_artifact_applicability` metadata that records these surfaces as
+`reviewcard_only`, records policy-report as `reviewcard_only_follow_up`, and
+sets manual-candidate applicability and marker allowance to false.
+
 The handoff commands are reviewer and agent discovery aids only. They must not
 imply that unsafe-review ran witnesses, ran an agent, posted comments, edited
 source, or enforced blocking policy.

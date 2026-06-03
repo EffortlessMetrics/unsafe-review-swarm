@@ -596,6 +596,7 @@ fn check_manual_candidates_artifact(dir: &Path) -> Result<ManualCandidateIndexPr
             ));
         }
     }
+    check_manual_candidate_reviewcard_applicability(&value, "manual-candidates.json")?;
 
     let boundary =
         super::require_non_empty_json_str(&value, "trust_boundary", "manual-candidates.json")?;
@@ -1551,6 +1552,10 @@ fn check_review_kit_manual_candidate_handoff(
             "review-kit.json handoff manual_candidates analyzer_discovered must stay 0".to_string(),
         );
     }
+    check_manual_candidate_reviewcard_applicability(
+        manual,
+        "review-kit.json handoff manual_candidates",
+    )?;
     check_review_kit_first_manual_candidate_handoff(manual, manual_candidates)?;
     check_review_kit_manual_candidate_queue_handoff(manual, manual_candidates)?;
     let boundary = super::require_non_empty_json_str(
@@ -1568,6 +1573,60 @@ fn check_review_kit_manual_candidate_handoff(
         if !super::text_contains_ignore_ascii_case(boundary, expected) {
             return Err(format!(
                 "review-kit.json handoff manual_candidates trust_boundary must include `{expected}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn check_manual_candidate_reviewcard_applicability(
+    value: &serde_json::Value,
+    context: &str,
+) -> Result<(), String> {
+    let applicability = value
+        .get("reviewcard_artifact_applicability")
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| format!("{context} is missing reviewcard_artifact_applicability object"))?;
+    for (artifact, decision) in [
+        ("cards.json", "reviewcard_only"),
+        ("cards.sarif", "reviewcard_only"),
+        ("comment-plan.json", "reviewcard_only"),
+        ("lsp.json", "reviewcard_only"),
+        ("repair-queue.json", "reviewcard_only"),
+        ("policy-report", "reviewcard_only_follow_up"),
+    ] {
+        let entry = applicability.get(artifact).ok_or_else(|| {
+            format!("{context} reviewcard_artifact_applicability is missing `{artifact}`")
+        })?;
+        if !entry.is_object() {
+            return Err(format!(
+                "{context} reviewcard_artifact_applicability `{artifact}` must be an object"
+            ));
+        }
+        let entry_context = format!("{context} reviewcard_artifact_applicability.{artifact}");
+        super::require_json_str(entry, "decision", decision, &entry_context)?;
+        if entry
+            .get("applies_to_manual_candidates")
+            .and_then(serde_json::Value::as_bool)
+            != Some(false)
+        {
+            return Err(format!(
+                "{entry_context} applies_to_manual_candidates must be false"
+            ));
+        }
+        if entry
+            .get("manual_candidate_markers_allowed")
+            .and_then(serde_json::Value::as_bool)
+            != Some(false)
+        {
+            return Err(format!(
+                "{entry_context} manual_candidate_markers_allowed must be false"
+            ));
+        }
+        let reason = super::require_non_empty_json_str(entry, "reason", &entry_context)?;
+        if !super::text_contains_ignore_ascii_case(reason, "manual candidates") {
+            return Err(format!(
+                "{entry_context} reason must explain manual candidate applicability"
             ));
         }
     }
@@ -2312,6 +2371,43 @@ fn require_top_card_primary_route_command(
     }
 }
 
+fn reject_manual_candidate_markers(value: &serde_json::Value, context: &str) -> Result<(), String> {
+    reject_manual_candidate_markers_at(value, context)
+}
+
+fn reject_manual_candidate_markers_at(
+    value: &serde_json::Value,
+    context: &str,
+) -> Result<(), String> {
+    match value {
+        serde_json::Value::Object(object) => {
+            for field in ["manual_candidate", "analyzer_discovered"] {
+                if object.contains_key(field) {
+                    return Err(format!(
+                        "{context} must not include `{field}`; manual candidates belong only in manual-candidates.json or the review-kit manual handoff"
+                    ));
+                }
+            }
+            if object.get("source").and_then(serde_json::Value::as_str) == Some("manual") {
+                return Err(format!(
+                    "{context} must not set source = manual; manual candidates belong only in manual-candidates.json or the review-kit manual handoff"
+                ));
+            }
+            for (key, value) in object {
+                reject_manual_candidate_markers_at(value, &format!("{context}/{key}"))?;
+            }
+            Ok(())
+        }
+        serde_json::Value::Array(items) => {
+            for (idx, item) in items.iter().enumerate() {
+                reject_manual_candidate_markers_at(item, &format!("{context}/{idx}"))?;
+            }
+            Ok(())
+        }
+        _ => Ok(()),
+    }
+}
+
 fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, String> {
     let manifest = check_cards_json_artifact(dir)?;
     check_pr_summary_artifact(dir, &manifest)?;
@@ -2351,6 +2447,7 @@ fn check_cards_json_artifact(dir: &Path) -> Result<AdvisoryArtifactManifest, Str
     }
 
     let cards = super::parse_json_file(&dir.join("cards.json"))?;
+    reject_manual_candidate_markers(&cards, "cards.json")?;
     super::require_json_str(&cards, "schema_version", "0.1", "cards.json")?;
     super::require_json_str(&cards, "tool", "unsafe-review", "cards.json")?;
     super::require_json_str(&cards, "policy", "advisory", "cards.json")?;
@@ -2457,6 +2554,7 @@ fn check_sarif_artifact(dir: &Path, manifest: &AdvisoryArtifactManifest) -> Resu
     let card_projections = &manifest.card_projections;
     let card_count = manifest.card_count;
     let sarif = super::parse_json_file(&dir.join("cards.sarif"))?;
+    reject_manual_candidate_markers(&sarif, "cards.sarif")?;
     super::require_json_str(&sarif, "version", "2.1.0", "cards.sarif")?;
     super::require_json_array(&sarif, "runs", "cards.sarif")?;
     let sarif_rule_ids = sarif_rule_ids(&sarif)?;
@@ -2634,6 +2732,7 @@ fn check_comment_plan_artifact(
     let card_count = manifest.card_count;
     let comment_plan_path = dir.join("comment-plan.json");
     let comment_plan = super::parse_json_file(&comment_plan_path)?;
+    reject_manual_candidate_markers(&comment_plan, "comment-plan.json")?;
     super::require_json_str(&comment_plan, "schema_version", "0.1", "comment-plan.json")?;
     super::require_json_str(&comment_plan, "mode", "plan_only", "comment-plan.json")?;
     super::require_json_str(&comment_plan, "policy", "advisory", "comment-plan.json")?;
@@ -3012,6 +3111,7 @@ fn check_repair_queue_artifact(
 ) -> Result<BTreeMap<String, RepairQueueProjection>, String> {
     let path = dir.join("repair-queue.json");
     let repair_queue = super::parse_json_file(&path)?;
+    reject_manual_candidate_markers(&repair_queue, "repair-queue.json")?;
     super::require_json_str(&repair_queue, "schema_version", "0.1", "repair-queue.json")?;
     super::require_json_str(
         &repair_queue,
@@ -4638,6 +4738,7 @@ fn require_pr_summary_witness_line(
 fn check_lsp_artifact(dir: &Path, summary: &AdvisoryArtifactSummary) -> Result<(), String> {
     let path = dir.join("lsp.json");
     let lsp = super::parse_json_file(&path)?;
+    reject_manual_candidate_markers(&lsp, "lsp.json")?;
     let card_projections = &summary.card_projections;
     let card_ids = card_projections.keys().cloned().collect::<BTreeSet<_>>();
     super::require_json_str(&lsp, "schema_version", "0.1", "lsp.json")?;

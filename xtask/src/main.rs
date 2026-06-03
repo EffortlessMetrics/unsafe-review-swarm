@@ -11655,6 +11655,49 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_manual_candidate_markers_in_reviewcard_only_artifacts()
+    -> Result<(), String> {
+        for (artifact, object_pointer) in [
+            ("cards.json", "/cards/0"),
+            ("cards.sarif", "/runs/0/results/0/properties"),
+            ("comment-plan.json", "/comments/0"),
+            ("lsp.json", "/diagnostics/0"),
+            ("repair-queue.json", "/buckets/repairable_by_guard/0"),
+        ] {
+            let dir = unique_temp_dir(&format!(
+                "unsafe-review-first-pr-reviewcard-only-manual-marker-{artifact}"
+            ))?;
+            fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+            write_one_manual_candidate_first_pr_artifacts(&dir)?;
+            let path = dir.join(artifact);
+            let mut value = parse_json_file(&path)?;
+            value
+                .pointer_mut(object_pointer)
+                .and_then(serde_json::Value::as_object_mut)
+                .ok_or_else(|| format!("{artifact} fixture is missing object `{object_pointer}`"))?
+                .insert("manual_candidate".to_string(), serde_json::json!(true));
+            fs::write(&path, value.to_string())
+                .map_err(|err| format!("write {artifact} failed: {err}"))?;
+
+            let result = check_first_pr_artifacts(&dir);
+
+            fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+            let err = match result {
+                Ok(()) => {
+                    return Err(format!(
+                        "{artifact} manual candidate marker should fail verification"
+                    ));
+                }
+                Err(err) => err,
+            };
+            assert!(err.contains(artifact), "{artifact}: {err}");
+            assert!(err.contains("manual_candidate"), "{artifact}: {err}");
+            assert!(err.contains("manual-candidates.json"), "{artifact}: {err}");
+        }
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_manual_candidate_front_door_drift() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-manual-front-door-drift")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -16539,6 +16582,7 @@ review_after = "2026-08-01"
                     "artifact": "manual-candidates.json",
                     "manual_candidates": 0,
                     "analyzer_discovered": 0,
+                    "reviewcard_artifact_applicability": manual_candidate_reviewcard_applicability_fixture(),
                     "first_candidate": serde_json::Value::Null,
                     "candidate_queue_limit": 5,
                     "candidate_queue": [],
@@ -16568,11 +16612,77 @@ review_after = "2026-08-01"
     }
 
     fn write_empty_manual_candidates_artifact(dir: &Path) -> Result<(), String> {
-        fs::write(
-            dir.join("manual-candidates.json"),
-            r#"{"schema_version":"manual-candidates/v1","tool":"unsafe-review","tool_version":"0.2.1-test","mode":"manual_candidate_index","source":"first_pr","summary":{"manual_candidates":0,"external_evidence_refs":0,"analyzer_discovered":0},"candidates":[],"reviewcard_artifact_relationship":{"cards.json":"ReviewCard-only analyzer output; manual candidates are listed only in manual-candidates.json.","cards.sarif":"ReviewCard-only analyzer output; manual candidates are not emitted as SARIF analyzer results.","comment-plan.json":"ReviewCard-only comment planning; manual candidates are not selected for automatic comment plans.","lsp.json":"ReviewCard-only saved editor projection; manual candidates are not emitted as analyzer diagnostics.","repair-queue.json":"ReviewCard-only repair queue; manual candidates are not automatic repair tasks.","receipt-audit.md":"Receipts may match manual candidate IDs as manual/advisory targets without importing them as ReviewCard witness evidence.","policy-report":"ReviewCard-only policy simulation; manual candidates are not policy gating inputs."},"trust_boundary":"Manual/advisory static unsafe contract review candidate index only; candidates are not analyzer-discovered ReviewCards, not a proof of UB, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repository safety, and not policy gating. unsafe-review did not run witnesses, post comments, edit source, run an agent, or enforce blocking policy."}"#,
-        )
-        .map_err(|err| format!("write manual candidates failed: {err}"))
+        let value = serde_json::json!({
+            "schema_version": "manual-candidates/v1",
+            "tool": "unsafe-review",
+            "tool_version": "0.2.1-test",
+            "mode": "manual_candidate_index",
+            "source": "first_pr",
+            "summary": {
+                "manual_candidates": 0,
+                "external_evidence_refs": 0,
+                "analyzer_discovered": 0
+            },
+            "candidates": [],
+            "reviewcard_artifact_relationship": manual_candidate_reviewcard_relationship_fixture(),
+            "reviewcard_artifact_applicability": manual_candidate_reviewcard_applicability_fixture(),
+            "trust_boundary": "Manual/advisory static unsafe contract review candidate index only; candidates are not analyzer-discovered ReviewCards, not a proof of UB, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repository safety, and not policy gating. unsafe-review did not run witnesses, post comments, edit source, run an agent, or enforce blocking policy."
+        });
+        fs::write(dir.join("manual-candidates.json"), value.to_string())
+            .map_err(|err| format!("write manual candidates failed: {err}"))
+    }
+
+    fn manual_candidate_reviewcard_relationship_fixture() -> serde_json::Value {
+        serde_json::json!({
+            "cards.json": "ReviewCard-only analyzer output; manual candidates are listed only in manual-candidates.json.",
+            "cards.sarif": "ReviewCard-only analyzer output; manual candidates are not emitted as SARIF analyzer results.",
+            "comment-plan.json": "ReviewCard-only comment planning; manual candidates are not selected for automatic comment plans.",
+            "lsp.json": "ReviewCard-only saved editor projection; manual candidates are not emitted as analyzer diagnostics.",
+            "repair-queue.json": "ReviewCard-only repair queue; manual candidates are not automatic repair tasks.",
+            "receipt-audit.md": "Receipts may match manual candidate IDs as manual/advisory targets without importing them as ReviewCard witness evidence.",
+            "policy-report": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs."
+        })
+    }
+
+    fn manual_candidate_reviewcard_applicability_fixture() -> serde_json::Value {
+        serde_json::json!({
+            "cards.json": manual_candidate_reviewcard_applicability_entry_fixture(
+                "reviewcard_only",
+                "Manual candidates stay in manual-candidate ledger surfaces and are not emitted as analyzer ReviewCards."
+            ),
+            "cards.sarif": manual_candidate_reviewcard_applicability_entry_fixture(
+                "reviewcard_only",
+                "Manual candidates are not emitted as SARIF analyzer results."
+            ),
+            "comment-plan.json": manual_candidate_reviewcard_applicability_entry_fixture(
+                "reviewcard_only",
+                "Manual candidates are not selected for automatic comment plans."
+            ),
+            "lsp.json": manual_candidate_reviewcard_applicability_entry_fixture(
+                "reviewcard_only",
+                "Manual candidates are not emitted as saved editor diagnostics."
+            ),
+            "repair-queue.json": manual_candidate_reviewcard_applicability_entry_fixture(
+                "reviewcard_only",
+                "Manual candidates are not automatic repair tasks."
+            ),
+            "policy-report": manual_candidate_reviewcard_applicability_entry_fixture(
+                "reviewcard_only_follow_up",
+                "Manual candidates are not policy gating inputs; policy-report applicability remains follow-up."
+            )
+        })
+    }
+
+    fn manual_candidate_reviewcard_applicability_entry_fixture(
+        decision: &str,
+        reason: &str,
+    ) -> serde_json::Value {
+        serde_json::json!({
+            "decision": decision,
+            "applies_to_manual_candidates": false,
+            "manual_candidate_markers_allowed": false,
+            "reason": reason,
+        })
     }
 
     fn manual_candidate_handoff_fixture() -> serde_json::Value {
@@ -16676,15 +16786,8 @@ review_after = "2026-08-01"
                 "analyzer_discovered": 0
             },
             "candidates": [manual_candidate_fixture()],
-            "reviewcard_artifact_relationship": {
-                "cards.json": "ReviewCard-only analyzer output; manual candidates are listed only in manual-candidates.json.",
-                "cards.sarif": "ReviewCard-only analyzer output; manual candidates are not emitted as SARIF analyzer results.",
-                "comment-plan.json": "ReviewCard-only comment planning; manual candidates are not selected for automatic comment plans.",
-                "lsp.json": "ReviewCard-only saved editor projection; manual candidates are not emitted as analyzer diagnostics.",
-                "repair-queue.json": "ReviewCard-only repair queue; manual candidates are not automatic repair tasks.",
-                "receipt-audit.md": "Receipts may match manual candidate IDs as manual/advisory targets without importing them as ReviewCard witness evidence.",
-                "policy-report": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs."
-            },
+            "reviewcard_artifact_relationship": manual_candidate_reviewcard_relationship_fixture(),
+            "reviewcard_artifact_applicability": manual_candidate_reviewcard_applicability_fixture(),
             "trust_boundary": "Manual/advisory static unsafe contract review candidate index only; candidates are not analyzer-discovered ReviewCards, not a proof of UB, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repository safety, and not policy gating. unsafe-review did not run witnesses, post comments, edit source, run an agent, or enforce blocking policy."
         });
         fs::write(dir.join("manual-candidates.json"), value.to_string())
@@ -16703,6 +16806,7 @@ review_after = "2026-08-01"
             "artifact": "manual-candidates.json",
             "manual_candidates": 1,
             "analyzer_discovered": 0,
+            "reviewcard_artifact_applicability": manual_candidate_reviewcard_applicability_fixture(),
             "first_candidate": {
                 "id": "R4R2-S001",
                 "source": "manual",

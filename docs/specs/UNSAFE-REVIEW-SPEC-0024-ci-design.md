@@ -652,6 +652,10 @@ comment-plan has renderable line/path fields and keeps selected comments changed
 comment-plan carries structured next action, actionability, relevance, and witness route fields
 comment-plan comment bodies stay within the hard 220-word limit
 comment-plan includes trust boundary
+manual-candidate markers are rejected from ReviewCard-only first-pr artifacts:
+cards.json, cards.sarif, comment-plan.json, lsp.json, and repair-queue.json
+manual-candidate reviewcard_artifact_applicability marks ReviewCard-only
+artifacts as not applicable to manual candidates and rejects marker allowance
 witness-plan includes route limits
 receipt-audit.md exists
 receipt-audit includes saved-receipt metadata summary and trust boundary

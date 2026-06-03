@@ -477,6 +477,7 @@ fn review_kit_manual_candidate_handoff(
         "artifact": "manual-candidates.json",
         "manual_candidates": manual_candidates.len(),
         "analyzer_discovered": 0,
+        "reviewcard_artifact_applicability": manual_candidate_reviewcard_applicability(),
         "first_candidate": first_candidate,
         "candidate_queue_limit": MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT,
         "candidate_queue": candidate_queue,
@@ -771,6 +772,7 @@ pub(super) fn render_manual_candidates_artifact(
             "receipt-audit.md": "Receipts may match manual candidate IDs as manual/advisory targets without importing them as ReviewCard witness evidence.",
             "policy-report": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs."
         },
+        "reviewcard_artifact_applicability": manual_candidate_reviewcard_applicability(),
         "trust_boundary": "Manual/advisory static unsafe contract review candidate index only; candidates are not analyzer-discovered ReviewCards, not a proof of UB, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repository safety, and not policy gating. unsafe-review did not run witnesses, post comments, edit source, run an agent, or enforce blocking policy.",
     });
     let mut rendered = serde_json::to_string_pretty(&value).unwrap_or_else(|err| {
@@ -810,6 +812,47 @@ fn manual_candidate_artifact_entry(root: &Path, candidate: &ManualCandidate) -> 
         );
     }
     value
+}
+
+fn manual_candidate_reviewcard_applicability() -> serde_json::Value {
+    json!({
+        "cards.json": manual_candidate_reviewcard_applicability_entry(
+            "reviewcard_only",
+            "Manual candidates stay in manual-candidate ledger surfaces and are not emitted as analyzer ReviewCards."
+        ),
+        "cards.sarif": manual_candidate_reviewcard_applicability_entry(
+            "reviewcard_only",
+            "Manual candidates are not emitted as SARIF analyzer results."
+        ),
+        "comment-plan.json": manual_candidate_reviewcard_applicability_entry(
+            "reviewcard_only",
+            "Manual candidates are not selected for automatic comment plans."
+        ),
+        "lsp.json": manual_candidate_reviewcard_applicability_entry(
+            "reviewcard_only",
+            "Manual candidates are not emitted as saved editor diagnostics."
+        ),
+        "repair-queue.json": manual_candidate_reviewcard_applicability_entry(
+            "reviewcard_only",
+            "Manual candidates are not automatic repair tasks."
+        ),
+        "policy-report": manual_candidate_reviewcard_applicability_entry(
+            "reviewcard_only_follow_up",
+            "Manual candidates are not policy gating inputs; policy-report applicability remains follow-up."
+        )
+    })
+}
+
+fn manual_candidate_reviewcard_applicability_entry(
+    decision: &str,
+    reason: &str,
+) -> serde_json::Value {
+    json!({
+        "decision": decision,
+        "applies_to_manual_candidates": false,
+        "manual_candidate_markers_allowed": false,
+        "reason": reason,
+    })
 }
 
 fn scope_name(scope: &Scope) -> &'static str {
@@ -1012,6 +1055,11 @@ mod tests {
         assert_eq!(
             value["handoff"]["manual_candidates"]["analyzer_discovered"],
             0
+        );
+        assert_eq!(
+            value["handoff"]["manual_candidates"]["reviewcard_artifact_applicability"]["policy-report"]
+                ["decision"],
+            "reviewcard_only_follow_up"
         );
         assert!(value["handoff"]["manual_candidates"]["first_candidate"].is_null());
         assert_eq!(

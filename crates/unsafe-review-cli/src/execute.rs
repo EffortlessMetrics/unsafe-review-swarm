@@ -1433,6 +1433,7 @@ fn render_candidate_list_json(
             .map(|candidate| manual_candidate_list_entry(root, candidate))
             .collect::<Vec<_>>(),
         "reviewcard_artifact_relationship": manual_candidate_reviewcard_relationship(),
+        "reviewcard_artifact_applicability": manual_candidate_reviewcard_applicability(),
         "trust_boundary": manual_candidate_list_trust_boundary(),
     });
     let mut rendered = serde_json::to_string_pretty(&value)
@@ -1630,6 +1631,47 @@ fn manual_candidate_reviewcard_relationship() -> serde_json::Value {
         "repair-queue.json": "ReviewCard-only repair queue; manual candidates are not automatic repair tasks.",
         "receipt-audit.md": "Receipts may match manual candidate IDs as manual/advisory targets without importing them as ReviewCard witness evidence.",
         "policy-report": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs."
+    })
+}
+
+fn manual_candidate_reviewcard_applicability() -> serde_json::Value {
+    serde_json::json!({
+        "cards.json": manual_candidate_reviewcard_applicability_entry(
+            "reviewcard_only",
+            "Manual candidates stay in manual-candidate ledger surfaces and are not emitted as analyzer ReviewCards."
+        ),
+        "cards.sarif": manual_candidate_reviewcard_applicability_entry(
+            "reviewcard_only",
+            "Manual candidates are not emitted as SARIF analyzer results."
+        ),
+        "comment-plan.json": manual_candidate_reviewcard_applicability_entry(
+            "reviewcard_only",
+            "Manual candidates are not selected for automatic comment plans."
+        ),
+        "lsp.json": manual_candidate_reviewcard_applicability_entry(
+            "reviewcard_only",
+            "Manual candidates are not emitted as saved editor diagnostics."
+        ),
+        "repair-queue.json": manual_candidate_reviewcard_applicability_entry(
+            "reviewcard_only",
+            "Manual candidates are not automatic repair tasks."
+        ),
+        "policy-report": manual_candidate_reviewcard_applicability_entry(
+            "reviewcard_only_follow_up",
+            "Manual candidates are not policy gating inputs; policy-report applicability remains follow-up."
+        )
+    })
+}
+
+fn manual_candidate_reviewcard_applicability_entry(
+    decision: &str,
+    reason: &str,
+) -> serde_json::Value {
+    serde_json::json!({
+        "decision": decision,
+        "applies_to_manual_candidates": false,
+        "manual_candidate_markers_allowed": false,
+        "reason": reason,
     })
 }
 

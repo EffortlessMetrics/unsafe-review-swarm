@@ -1025,6 +1025,22 @@ fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dy
             .unwrap_or("")
             .contains("not automatic repair tasks")
     );
+    assert_eq!(
+        ledger["reviewcard_artifact_applicability"]["cards.sarif"]["decision"],
+        "reviewcard_only"
+    );
+    assert_eq!(
+        ledger["reviewcard_artifact_applicability"]["comment-plan.json"]["applies_to_manual_candidates"],
+        false
+    );
+    assert_eq!(
+        ledger["reviewcard_artifact_applicability"]["policy-report"]["manual_candidate_markers_allowed"],
+        false
+    );
+    assert_eq!(
+        ledger["reviewcard_artifact_applicability"]["policy-report"]["decision"],
+        "reviewcard_only_follow_up"
+    );
     assert!(
         ledger["trust_boundary"]
             .as_str()
@@ -1521,6 +1537,26 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         0
     );
     assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["reviewcard_artifact_applicability"]["cards.sarif"]
+            ["decision"],
+        "reviewcard_only"
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["reviewcard_artifact_applicability"]["comment-plan.json"]
+            ["applies_to_manual_candidates"],
+        false
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["reviewcard_artifact_applicability"]["policy-report"]
+            ["manual_candidate_markers_allowed"],
+        false
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["reviewcard_artifact_applicability"]["policy-report"]
+            ["decision"],
+        "reviewcard_only_follow_up"
+    );
+    assert_eq!(
         review_kit["handoff"]["manual_candidates"]["first_candidate"]["id"],
         "R4R2-S001"
     );
@@ -1870,6 +1906,22 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             .as_str()
             .unwrap_or("")
             .contains("not selected")
+    );
+    assert_eq!(
+        manual_candidates["reviewcard_artifact_applicability"]["cards.sarif"]["decision"],
+        "reviewcard_only"
+    );
+    assert_eq!(
+        manual_candidates["reviewcard_artifact_applicability"]["comment-plan.json"]["applies_to_manual_candidates"],
+        false
+    );
+    assert_eq!(
+        manual_candidates["reviewcard_artifact_applicability"]["policy-report"]["manual_candidate_markers_allowed"],
+        false
+    );
+    assert_eq!(
+        manual_candidates["reviewcard_artifact_applicability"]["policy-report"]["decision"],
+        "reviewcard_only_follow_up"
     );
     assert!(
         manual_candidates["trust_boundary"]
