@@ -7,7 +7,7 @@ Linked proposal: UNSAFE-REVIEW-PROP-0002-source-of-truth-stack
 Linked ADRs:
 - none
 Linked plan:
-- TBD
+- plans/0.2.0/implementation-plan.md
 Linked issues:
 - #1145
 Linked PRs:
@@ -74,9 +74,9 @@ unsafe-review candidate import target/unsafe-scout/textdecoder-candidate.json \
 unsafe-review candidate list --format json
 ```
 
-The repository keeps the example below at
-`docs/examples/manual-candidates/textdecoder-sab.json` so release and dogfood
-smokes can exercise import without depending on an external scout artifact.
+The repository keeps committed examples under `docs/examples/manual-candidates/`
+so release and dogfood smokes can exercise import without depending on an
+external scout artifact.
 
 The importer must preserve the supplied manual candidate identity. Projected
 cards or card-like records must carry:
@@ -216,6 +216,8 @@ into an analyzer ReviewCard.
   preserved with `analyzer_discovered = false` in explain, context,
   witness-plan, saved JSON, first-pr `manual-candidates.json`, and outcome
   surfaces
+- a checked smoke that imports committed manual-candidate examples into a
+  disposable first-pr root and verifies the resulting advisory bundle
 - receipt tests for manual candidate IDs
 - negative tests proving manual candidates are not labeled analyzer-discovered
 
@@ -270,7 +272,7 @@ cargo test -p unsafe-review-core outcome
 cargo test -p unsafe-review manual_candidate
 cargo test -p unsafe-review first_pr_writes_standard_advisory_review_bundle
 cargo test -p xtask manual_candidate
-cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review-manual-candidate-smoke
+cargo run --locked -p xtask -- check-manual-candidate-examples
 cargo run --locked -p xtask -- check-pr
 cargo run --locked -p xtask -- source-divergence
 git diff --check

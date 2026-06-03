@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 use std::collections::{BTreeMap, BTreeSet};
+use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -118,6 +119,10 @@ const FIXTURE_EXPECTED_CARDS_EXCEPTIONS: &[&str] = &[
 
 const FIXTURE_PACKAGE_PREFIX_EXCEPTIONS: &[(&str, &str)] =
     &[("raw_pointer_alignment_line_drift", "raw-pointer-alignment")];
+const MANUAL_CANDIDATE_EXAMPLE_DIR: &str = "docs/examples/manual-candidates";
+const MANUAL_CANDIDATE_SMOKE_FIXTURE_DIR: &str =
+    "target/unsafe-review-manual-candidate-smoke-fixture";
+const MANUAL_CANDIDATE_SMOKE_OUT_DIR: &str = "target/unsafe-review-manual-candidate-smoke";
 
 const DOGFOOD_MANIFEST: &str = "docs/dogfood/corpus.toml";
 const DOGFOOD_INDEX: &str = "docs/dogfood/index.json";
@@ -245,7 +250,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
     match commands::XtaskCommand::parse(&args)? {
         commands::XtaskCommand::Help => {
             println!(
-                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-first-hour, source-divergence, check-source-sync"
+                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, source-divergence, check-source-sync"
             );
             Ok(())
         }
@@ -278,6 +283,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckFuzz => check_manual_fuzz_harness(),
         commands::XtaskCommand::CheckAdvisoryArtifacts(dir) => check_advisory_artifacts(&dir),
         commands::XtaskCommand::CheckFirstPrArtifacts(dir) => check_first_pr_artifacts(&dir),
+        commands::XtaskCommand::CheckManualCandidateExamples => check_manual_candidate_examples(),
         commands::XtaskCommand::CheckFirstHour => check_first_hour(),
         commands::XtaskCommand::SourceDivergence => source_sync::report_source_divergence(),
     }
@@ -404,6 +410,228 @@ fn check_ci_routing_contract() -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+struct ManualCandidateExample {
+    path: PathBuf,
+    id: String,
+}
+
+fn check_manual_candidate_examples() -> Result<(), String> {
+    let examples = manual_candidate_examples()?;
+    let fixture_dir = Path::new(MANUAL_CANDIDATE_SMOKE_FIXTURE_DIR);
+    let out_dir = Path::new(MANUAL_CANDIDATE_SMOKE_OUT_DIR);
+
+    reset_target_dir(fixture_dir)?;
+    reset_target_dir(out_dir)?;
+    copy_dir_all(Path::new("fixtures/raw_pointer_alignment"), fixture_dir)?;
+
+    let candidate_dir = fixture_dir.join(".unsafe-review").join("candidates");
+    fs::create_dir_all(&candidate_dir)
+        .map_err(|err| format!("create {} failed: {err}", candidate_dir.display()))?;
+    for example in &examples {
+        let out = candidate_dir.join(format!("{}.json", example.id));
+        run_unsafe_review([
+            os("candidate"),
+            os("import"),
+            example.path.as_os_str().to_os_string(),
+            os("--out"),
+            out.as_os_str().to_os_string(),
+        ])?;
+    }
+
+    run_unsafe_review([
+        os("first-pr"),
+        os("--root"),
+        fixture_dir.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture_dir.join("change.diff").as_os_str().to_os_string(),
+        os("--out-dir"),
+        out_dir.as_os_str().to_os_string(),
+    ])?;
+
+    check_first_pr_artifacts(out_dir)?;
+    check_manual_candidate_smoke_matches_examples(out_dir, &examples)?;
+    println!(
+        "check-manual-candidate-examples: ok ({} candidates -> {})",
+        examples.len(),
+        out_dir.display()
+    );
+    Ok(())
+}
+
+fn manual_candidate_examples() -> Result<Vec<ManualCandidateExample>, String> {
+    let dir = Path::new(MANUAL_CANDIDATE_EXAMPLE_DIR);
+    let mut examples = Vec::new();
+    let entries =
+        fs::read_dir(dir).map_err(|err| format!("read {} failed: {err}", dir.display()))?;
+    for entry in entries {
+        let entry = entry.map_err(|err| format!("read_dir entry failed: {err}"))?;
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let path_display = path.display().to_string();
+        let value = parse_json_file(&path)?;
+        require_json_str(
+            &value,
+            "schema_version",
+            "manual-candidate/v1",
+            &path_display,
+        )?;
+        require_json_str(&value, "source", "manual", &path_display)?;
+        if value.get("manual_candidate") != Some(&serde_json::Value::Bool(true)) {
+            return Err(format!("{path_display} manual_candidate must be true"));
+        }
+        if value.get("analyzer_discovered") != Some(&serde_json::Value::Bool(false)) {
+            return Err(format!("{path_display} analyzer_discovered must be false"));
+        }
+        let id = require_non_empty_json_str(&value, "id", &path_display)?.to_string();
+        if !is_path_safe_manual_candidate_id(&id) {
+            return Err(format!(
+                "{path_display} id `{id}` is not safe for a candidate artifact filename"
+            ));
+        }
+        examples.push(ManualCandidateExample { path, id });
+    }
+    if examples.is_empty() {
+        return Err(format!(
+            "{MANUAL_CANDIDATE_EXAMPLE_DIR} has no JSON examples"
+        ));
+    }
+    examples.sort_by(|left, right| left.id.cmp(&right.id).then(left.path.cmp(&right.path)));
+    let mut ids = BTreeSet::new();
+    for example in &examples {
+        if !ids.insert(example.id.clone()) {
+            return Err(format!(
+                "{MANUAL_CANDIDATE_EXAMPLE_DIR} contains duplicate manual candidate id `{}`",
+                example.id
+            ));
+        }
+    }
+    Ok(examples)
+}
+
+fn check_manual_candidate_smoke_matches_examples(
+    out_dir: &Path,
+    examples: &[ManualCandidateExample],
+) -> Result<(), String> {
+    let path = out_dir.join("manual-candidates.json");
+    let value = parse_json_file(&path)?;
+    let path_display = path.display().to_string();
+    let actual_count = json_usize_at(&value, "/summary/manual_candidates", &path_display)?;
+    if actual_count != examples.len() {
+        return Err(format!(
+            "{} summary.manual_candidates is {actual_count}, expected {} committed examples",
+            path.display(),
+            examples.len()
+        ));
+    }
+    let actual_ids = json_array_at(&value, "/candidates", &path_display)?
+        .iter()
+        .map(|candidate| {
+            require_non_empty_json_str(candidate, "id", &path_display).map(str::to_string)
+        })
+        .collect::<Result<BTreeSet<_>, _>>()?;
+    let expected_ids = examples
+        .iter()
+        .map(|example| example.id.clone())
+        .collect::<BTreeSet<_>>();
+    if actual_ids != expected_ids {
+        return Err(format!(
+            "{} candidate IDs {:?} do not match committed example IDs {:?}",
+            path.display(),
+            actual_ids,
+            expected_ids
+        ));
+    }
+    Ok(())
+}
+
+fn reset_target_dir(path: &Path) -> Result<(), String> {
+    require_target_subpath(path)?;
+    if path.exists() {
+        fs::remove_dir_all(path)
+            .map_err(|err| format!("remove {} failed: {err}", path.display()))?;
+    }
+    Ok(())
+}
+
+fn require_target_subpath(path: &Path) -> Result<(), String> {
+    if path.is_absolute()
+        || !matches!(
+            path.components().next(),
+            Some(std::path::Component::Normal(component)) if component == "target"
+        )
+        || path
+            .components()
+            .any(|component| matches!(component, std::path::Component::ParentDir))
+    {
+        return Err(format!(
+            "{} must be a relative generated path under target/",
+            path.display()
+        ));
+    }
+    Ok(())
+}
+
+fn copy_dir_all(source: &Path, target: &Path) -> Result<(), String> {
+    fs::create_dir_all(target)
+        .map_err(|err| format!("create {} failed: {err}", target.display()))?;
+    for entry in
+        fs::read_dir(source).map_err(|err| format!("read {} failed: {err}", source.display()))?
+    {
+        let entry = entry.map_err(|err| format!("read_dir entry failed: {err}"))?;
+        let source_path = entry.path();
+        let target_path = target.join(entry.file_name());
+        if source_path.is_dir() {
+            copy_dir_all(&source_path, &target_path)?;
+        } else {
+            fs::copy(&source_path, &target_path).map_err(|err| {
+                format!(
+                    "copy {} to {} failed: {err}",
+                    source_path.display(),
+                    target_path.display()
+                )
+            })?;
+        }
+    }
+    Ok(())
+}
+
+fn run_unsafe_review(args: impl IntoIterator<Item = OsString>) -> Result<(), String> {
+    let args = args.into_iter().collect::<Vec<_>>();
+    let display_args = args
+        .iter()
+        .map(|arg| arg.to_string_lossy())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let output = Command::new("cargo")
+        .args(["run", "--locked", "-p", "unsafe-review", "--"])
+        .args(&args)
+        .output()
+        .map_err(|err| format!("failed to run unsafe-review {display_args}: {err}"))?;
+    if output.status.success() {
+        return Ok(());
+    }
+    Err(format!(
+        "unsafe-review {display_args} failed with status {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout).trim(),
+        String::from_utf8_lossy(&output.stderr).trim()
+    ))
+}
+
+fn os(value: &str) -> OsString {
+    OsString::from(value)
+}
+
+fn is_path_safe_manual_candidate_id(id: &str) -> bool {
+    !id.is_empty()
+        && id
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == '.')
+        && !id.contains("..")
 }
 
 fn check_doc_artifacts() -> Result<(), String> {

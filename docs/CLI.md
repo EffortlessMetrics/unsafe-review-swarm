@@ -272,6 +272,12 @@ analyzer-discovered finding.
 
 The example input above is a committed smoke fixture. In a real scout lane,
 replace it with the candidate JSON produced by the external investigation.
+The repository-level smoke imports every committed example into a disposable
+first-pr fixture and verifies the advisory bundle:
+
+```bash
+cargo run --locked -p xtask -- check-manual-candidate-examples
+```
 
 After import, `explain` and `context` can load the candidate by ID from
 `.unsafe-review/candidates/` when no analyzer ReviewCard with that ID exists:
