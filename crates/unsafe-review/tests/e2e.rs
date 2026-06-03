@@ -1720,6 +1720,9 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(repair_queue["mode"], "aggregate_repair_queue");
     assert_eq!(repair_queue["source"], "review_card");
     assert_eq!(repair_queue["policy"], "advisory");
+    assert_eq!(repair_queue["summary"]["changed_files"], 1);
+    assert_eq!(repair_queue["summary"]["changed_rust_files"], 1);
+    assert_eq!(repair_queue["summary"]["changed_non_rust_files"], 0);
     assert_eq!(repair_queue["summary"]["cards"], 1);
     assert_eq!(
         repair_queue["buckets"]["repairable_by_guard"][0]["card_id"],

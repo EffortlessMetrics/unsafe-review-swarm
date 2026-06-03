@@ -158,7 +158,8 @@ findings independently.
 into copy-only guard, contract, test, witness, human-review, and
 do-not-auto-repair buckets, each pointing back to
 `unsafe-review context <card-id> --json`. It is not a standalone `--format`
-yet, and it does not run agents.
+yet, and it does not run agents. Its summary mirrors the canonical diff-scope
+file counts from `cards.json`; the bucket entries remain ReviewCard-only.
 
 Each repair-queue entry carries `agent_readiness` with a closed state:
 `ready_for_agent`, `requires_human_review`, `requires_witness_receipt`, or

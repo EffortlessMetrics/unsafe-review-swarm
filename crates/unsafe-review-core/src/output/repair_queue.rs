@@ -38,7 +38,7 @@ impl From<&AnalyzeOutput> for RepairQueueArtifact {
                 buckets.push(bucket, RepairQueueEntry::new(card, bucket, &projection));
             }
         }
-        let summary = RepairQueueSummary::from(&buckets);
+        let summary = RepairQueueSummary::new(output, &buckets);
         Self {
             schema_version: "0.1",
             tool: "unsafe-review",
@@ -78,6 +78,9 @@ impl RepairQueueBuckets {
 
 #[derive(Serialize)]
 struct RepairQueueSummary {
+    changed_files: usize,
+    changed_rust_files: usize,
+    changed_non_rust_files: usize,
     cards: usize,
     repairable_by_guard: usize,
     repairable_by_safety_docs: usize,
@@ -87,9 +90,12 @@ struct RepairQueueSummary {
     do_not_auto_repair: usize,
 }
 
-impl From<&RepairQueueBuckets> for RepairQueueSummary {
-    fn from(buckets: &RepairQueueBuckets) -> Self {
+impl RepairQueueSummary {
+    fn new(output: &AnalyzeOutput, buckets: &RepairQueueBuckets) -> Self {
         Self {
+            changed_files: output.summary.changed_files,
+            changed_rust_files: output.summary.changed_rust_files,
+            changed_non_rust_files: output.summary.changed_non_rust_files,
             cards: unique_card_count(buckets),
             repairable_by_guard: buckets.repairable_by_guard.len(),
             repairable_by_safety_docs: buckets.repairable_by_safety_docs.len(),
@@ -245,6 +251,9 @@ mod tests {
         assert_eq!(value["mode"], "aggregate_repair_queue");
         assert_eq!(value["source"], "review_card");
         assert_eq!(value["policy"], "advisory");
+        assert_eq!(value["summary"]["changed_files"], 1);
+        assert_eq!(value["summary"]["changed_rust_files"], 1);
+        assert_eq!(value["summary"]["changed_non_rust_files"], 0);
         assert_eq!(value["summary"]["cards"], 1);
         assert_eq!(value["summary"]["repairable_by_guard"], 1);
         assert_eq!(value["summary"]["requires_witness_receipt"], 1);

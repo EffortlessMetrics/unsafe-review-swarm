@@ -1553,6 +1553,9 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
     check_comment_plan_artifact(dir, &manifest)?;
     let repair_queue_projections = check_repair_queue_artifact(
         dir,
+        manifest.changed_files,
+        manifest.changed_rust_files,
+        manifest.changed_non_rust_files,
         manifest.card_count,
         &manifest.card_ids,
         &manifest.card_projections,
@@ -2231,6 +2234,9 @@ fn require_comment_plan_summary(
 
 fn check_repair_queue_artifact(
     dir: &Path,
+    changed_files: usize,
+    changed_rust_files: usize,
+    changed_non_rust_files: usize,
     card_count: usize,
     card_ids: &BTreeSet<String>,
     card_projections: &BTreeMap<String, CardProjection>,
@@ -2253,6 +2259,24 @@ fn check_repair_queue_artifact(
         .ok_or_else(|| "repair-queue.json is missing trust_boundary".to_string())?;
     check_repair_queue_trust_boundary(boundary, "repair-queue.json")?;
 
+    require_repair_queue_summary_count(
+        &repair_queue,
+        "changed_files",
+        changed_files,
+        "cards.json summary.changed_files",
+    )?;
+    require_repair_queue_summary_count(
+        &repair_queue,
+        "changed_rust_files",
+        changed_rust_files,
+        "cards.json summary.changed_rust_files",
+    )?;
+    require_repair_queue_summary_count(
+        &repair_queue,
+        "changed_non_rust_files",
+        changed_non_rust_files,
+        "cards.json summary.changed_non_rust_files",
+    )?;
     let summary_cards = super::json_usize_at(&repair_queue, "/summary/cards", "repair-queue.json")?;
     if summary_cards != card_count {
         return Err(format!(
@@ -2319,6 +2343,22 @@ fn check_repair_queue_artifact(
         }
     }
     Ok(repair_queue_projections)
+}
+
+fn require_repair_queue_summary_count(
+    repair_queue: &serde_json::Value,
+    field: &str,
+    expected: usize,
+    source: &str,
+) -> Result<(), String> {
+    let pointer = format!("/summary/{field}");
+    let actual = super::json_usize_at(repair_queue, &pointer, "repair-queue.json")?;
+    if actual != expected {
+        return Err(format!(
+            "repair-queue.json summary.{field} is {actual}, but {source} is {expected}"
+        ));
+    }
+    Ok(())
 }
 
 fn check_repair_queue_entry(
