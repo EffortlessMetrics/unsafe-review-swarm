@@ -8,6 +8,9 @@ These examples show how to read the packet for common card families. They are
 fixture-backed examples of packet intent, not proof that the example code is
 safe.
 
+For the operational handoff path, see
+[Bounded agent repair workflow](agent-repair-workflow.md).
+
 ## Packet Shape
 
 Every packet projects from one `ReviewCard` and keeps the same trust boundary:

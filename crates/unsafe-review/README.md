@@ -154,6 +154,7 @@ artifacts.
 | Support tiers | [docs/status/SUPPORT_TIERS.md](https://github.com/EffortlessMetrics/unsafe-review/blob/main/docs/status/SUPPORT_TIERS.md) |
 | ReviewCard trust boundary | [docs/explanation/review-cards-and-trust-boundary.md](https://github.com/EffortlessMetrics/unsafe-review/blob/main/docs/explanation/review-cards-and-trust-boundary.md) |
 | Explain examples | [docs/explanation/explain-examples.md](https://github.com/EffortlessMetrics/unsafe-review/blob/main/docs/explanation/explain-examples.md) |
+| Agent repair workflow | [docs/explanation/agent-repair-workflow.md](https://github.com/EffortlessMetrics/unsafe-review/blob/main/docs/explanation/agent-repair-workflow.md) |
 | Dogfood evidence | [docs/dogfood/index.md](https://github.com/EffortlessMetrics/unsafe-review/blob/main/docs/dogfood/index.md) |
 
 ## License

@@ -157,7 +157,9 @@ state is copy-only context for a reviewer: do not hand it to an agent as an
 edit task unless the reviewer first narrows the work. The entry's
 `allowed_repairs`, `do_not_do`, and `context_command` define what work is
 allowed, what must not be done, and which card packet proves whether the repair
-improved ReviewCard evidence after rerun.
+improved ReviewCard evidence after rerun. See
+[Bounded agent repair workflow](explanation/agent-repair-workflow.md) for the
+human handoff path.
 
 The default human output is for terminal review. It names the card identity,
 operation family, operation expression, obligation evidence, witness route, next

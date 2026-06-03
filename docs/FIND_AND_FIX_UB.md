@@ -188,6 +188,8 @@ unsafe-review context <card-id> --json
 ```
 
 Use this only when the packet says the card is ready for bounded repair work.
+For the full handoff path, see
+[Bounded agent repair workflow](explanation/agent-repair-workflow.md).
 The JSON includes:
 
 - `agent_readiness`

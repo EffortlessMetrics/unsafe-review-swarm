@@ -188,6 +188,7 @@ posture live in the status docs.
 | First-hour guide | [First-hour guide](docs/FIRST_HOUR.md) |
 | ReviewCard trust boundary | [ReviewCard explanation](docs/explanation/review-cards-and-trust-boundary.md) |
 | Explain examples | [Reviewer examples](docs/explanation/explain-examples.md) |
+| Agent repair workflow | [Bounded agent repair workflow](docs/explanation/agent-repair-workflow.md) |
 | Dogfood evidence | [Dogfood index](docs/dogfood/index.md) |
 | CLI reference | [CLI guide](docs/CLI.md) |
 
@@ -225,6 +226,7 @@ cargo run --locked -p xtask -- check-dogfood
 - [CLI guide](docs/CLI.md)
 - [ReviewCard trust boundary](docs/explanation/review-cards-and-trust-boundary.md)
 - [Explain examples](docs/explanation/explain-examples.md)
+- [Bounded agent repair workflow](docs/explanation/agent-repair-workflow.md)
 - [Specifications](docs/specs/README.md)
 - [ADRs](docs/adr/README.md)
 - [Implementation plan](plans/0.2.0/implementation-plan.md)
