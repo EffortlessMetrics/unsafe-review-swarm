@@ -66,6 +66,91 @@ Field rules:
 - `do_not_touch[]`: optional copy-only non-goals that must stay out of the
   candidate-local change.
 
+## Stable-Byte-Source Vocabulary
+
+Large mixed-language repositories such as Bun may use manual candidates to
+classify a stable-byte-source risk before the analyzer can discover the route.
+This is advisory classification vocabulary for manual packets and cockpit
+handoffs. It is not analyzer discovery, witness execution, proof of UB, proof of
+site execution, or a policy signal.
+
+The stable-byte invariant is:
+
+```text
+Rust/native code must not retain or later materialize a &[u8] or pointer+len
+from JS-owned storage after JS can mutate, resize, detach, replace, race, or
+reenter that backing storage.
+```
+
+Manual stable-byte candidates should use one of these classes when the route
+matches:
+
+| Class | Source shape | Sink shape | Hazard |
+|---|---|---|---|
+| `stable-byte-source-rab-async` | JS `TypedArray`, `DataView`, or buffer view over resizable or detachable storage | async worker, deferred native write/read, or scheduled Rust/native use | cached pointer/len can outlive backing storage validity after resize, detach, replacement, or mutation |
+| `stable-byte-source-sab-race` | SharedArrayBuffer, growable shared backing storage, or shared view | Rust slice, decoder, parser, native read, or FFI call that treats bytes as stable | shared bytes can mutate concurrently while Rust/native code observes them as immutable or stable |
+| `stable-byte-source-getter-reentry` | JS descriptor/options/path capture followed by getter, callback, or other JS reentry | later Rust/native byte read, compression/decompression, decode, path use, or FFI read | JS reentry can mutate, resize, detach, or replace the backing storage between capture and use |
+| `stable-byte-source-helper-dependent` | route stability depends on a helper such as clone, pin, snapshot, byte-copy, or coercion | later sink is safe only if the helper actually stabilizes bytes before use | proof and fix boundary are blocked on exact helper semantics |
+| `stable-byte-source-pathlike-live-view` | pathlike or stringlike bytes supplied through a JS-owned live view | filesystem, module loading, URL/path conversion, or native path API | path bytes may be read after JS can mutate or replace the view that supplied them |
+| `stable-byte-source-native-ffi-read` | JS-backed or otherwise movable bytes passed as pointer+len toward native code | native library, syscall wrapper, C/C++ function, or Zig/C FFI read | native code can read through a pointer/len whose lifetime or backing storage stability is not established |
+
+Stable-byte manual packets should project these fields when known. Runtime JSON
+must avoid colliding with the top-level `source = manual` marker; implementations
+should namespace the byte-source fields, for example under `stable_byte`, while
+human cockpit views may render the labels below.
+
+| Field | Meaning |
+|---|---|
+| `class` | one stable-byte-source class from the table above |
+| `source` | concrete caller-visible byte source, for example JS `TypedArray` over a resizable ArrayBuffer |
+| `sink` | Rust/native seam that reads or retains the bytes |
+| `hazard` | candidate-specific stable-byte invariant at risk |
+| `observable` | whether the candidate has expected system-visible wrong behavior (`yes`), is nondiscriminating/non-observable (`no`), is route-only (`source-route-only`), or is blocked on helper semantics (`helper-gated`) |
+| `proof_required` | one of `observable-red-green`, `mutation-plus-miri`, `source-route-only`, or `helper-gated` |
+| `suggested_fix_boundary` | smallest byte-stability boundary to try first, such as snapshot before scheduling, parse options before capture, or re-fetch/copy after getter reentry |
+| `pr_aperture` | intended upstream PR scope plus explicit stop line, such as scalar write only and not writev/pathlike |
+| `ledger_state` | workflow state from the stable-byte ledger vocabulary below |
+
+Proof mode selection must stay explicit:
+
+- `observable-red-green`: use when wrong behavior is expected through a safe
+  system route; require system-Bun red and patched-green evidence before
+  claiming the candidate is fixed.
+- `mutation-plus-miri`: use when system behavior is nondiscriminating or UB is
+  not directly observable; require a mutation witness plus a Miri/model proof of
+  the aliasing or lifetime shape before upgrading confidence.
+- `source-route-only`: use when the packet currently proves only the safe caller
+  route and sink seam; do not label the candidate as sure UB from source
+  inspection alone.
+- `helper-gated`: use when a helper's exact copy/pin/snapshot semantics decide
+  the candidate; park as a verified follow-up with the exact unblock command or
+  source check.
+
+Stable-byte ledger states are workflow primitives, not proof claims:
+
+| State | Meaning |
+|---|---|
+| `handoff-ready` | source-routed manual packet exists and the next implementer action is clear |
+| `fork-draft` | fix is implemented in a fork or worktree and still under local/fork validation |
+| `upstream-open` | smallest upstreamable PR is open and maintainer-review gated |
+| `parked-followup` | work is done and verified but not upstreamable until a named dependency or helper decision lands |
+| `merged-upstream` | upstream PR landed and ledger can retain receipt/provenance |
+| `needs-refresh` | upstream/main or the fork delta moved and the route/proof/patch needs recheck |
+
+Stable-byte packets must continue to use the normal manual-candidate trust
+boundary:
+
+```text
+source = manual
+manual_candidate = true
+analyzer_discovered = false
+```
+
+They must also state what unsafe-review is not claiming. In particular,
+source-route-only evidence is not proof of UB, an observable witness is not
+Miri-clean status, a model is not site execution, and ledger state is not
+policy readiness.
+
 Each `evidence[]` item must include:
 
 - `kind`: closed vocabulary such as `runtime_witness`, `model`,
