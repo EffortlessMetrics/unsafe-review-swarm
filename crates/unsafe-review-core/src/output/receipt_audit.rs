@@ -207,14 +207,7 @@ fn matched_target(
     candidate: Option<&ReceiptAuditManualCandidate>,
 ) -> String {
     if let Some(candidate) = candidate {
-        return format!(
-            "`manual_candidate` / `{}` / source `manual` / `{}` / {}; next: {}; boundary: {}",
-            candidate.operation_family,
-            markdown_cell(&candidate.operation),
-            markdown_cell(&candidate.location),
-            markdown_cell(&candidate.next_action),
-            markdown_cell(&candidate.trust_boundary)
-        );
+        return manual_candidate_target(candidate);
     }
     if let Some(card) = card {
         return format!(
@@ -228,6 +221,47 @@ fn matched_target(
         );
     }
     "-".to_string()
+}
+
+fn manual_candidate_target(candidate: &ReceiptAuditManualCandidate) -> String {
+    let mut parts = vec![
+        format!(
+            "`manual_candidate` / `{}` / source `manual` / `{}` / {}",
+            candidate.operation_family,
+            markdown_cell(&candidate.operation),
+            markdown_cell(&candidate.location)
+        ),
+        format!("route: {}", markdown_cell(&candidate.safe_caller)),
+        format!("invariant: {}", markdown_cell(&candidate.invariant)),
+    ];
+    if let Some(fix) = candidate.fix_options.first() {
+        parts.push(format!("first fix: {}", markdown_cell(fix)));
+    }
+    if let Some(target) = candidate.test_targets.first() {
+        parts.push(format!("first test: `{}`", markdown_cell(target)));
+    }
+    if let Some(note) = candidate.do_not_touch.first() {
+        parts.push(format!("first do-not-touch: {}", markdown_cell(note)));
+    }
+    if let Some(evidence) = candidate.evidence.first() {
+        let mut evidence_parts = vec![format!("first evidence: `{}`", evidence.kind)];
+        if let Some(path) = &evidence.path {
+            evidence_parts.push(format!("path `{}`", markdown_cell(path)));
+        }
+        if let Some(command) = &evidence.command {
+            evidence_parts.push(format!("command `{}`", markdown_cell(command)));
+        }
+        if let Some(limitation) = &evidence.limitation {
+            evidence_parts.push(format!("limitation {}", markdown_cell(limitation)));
+        }
+        parts.push(evidence_parts.join(", "));
+    }
+    parts.push(format!("next: {}", markdown_cell(&candidate.next_action)));
+    parts.push(format!(
+        "boundary: {}",
+        markdown_cell(&candidate.trust_boundary)
+    ));
+    parts.join("; ")
 }
 
 fn markdown_cell(value: &str) -> String {
@@ -427,24 +461,25 @@ mod tests {
 
     #[test]
     fn markdown_projects_manual_candidate_receipt_targets() {
-        let report = ReceiptAuditReport {
-            schema_version: "0.1".to_string(),
-            tool: "unsafe-review".to_string(),
-            mode: "receipt-audit".to_string(),
-            policy: "advisory".to_string(),
-            audit_date: "2026-05-26".to_string(),
-            trust_boundary: "Static witness receipt audit only; does not execute witnesses."
-                .to_string(),
-            limitations: vec![
+        let report =
+            ReceiptAuditReport {
+                schema_version: "0.1".to_string(),
+                tool: "unsafe-review".to_string(),
+                mode: "receipt-audit".to_string(),
+                policy: "advisory".to_string(),
+                audit_date: "2026-05-26".to_string(),
+                trust_boundary: "Static witness receipt audit only; does not execute witnesses."
+                    .to_string(),
+                limitations: vec![
                 "manual candidate receipts attach external evidence to that manual candidate only"
                     .to_string(),
             ],
-            summary: ReceiptAuditSummary {
-                receipts: 1,
-                matched: 1,
-                ..ReceiptAuditSummary::default()
-            },
-            receipts: vec![ReceiptAuditEntry {
+                summary: ReceiptAuditSummary {
+                    receipts: 1,
+                    matched: 1,
+                    ..ReceiptAuditSummary::default()
+                },
+                receipts: vec![ReceiptAuditEntry {
                 path: ".unsafe-review/receipts/manual.json".to_string(),
                 card_id: Some("R4R2-S001".to_string()),
                 receipt_tool: Some("human-deep-review".to_string()),
@@ -465,6 +500,31 @@ mod tests {
                     location: "src/runtime/webcore/TextDecoder.rs:237".to_string(),
                     operation: "core::slice::from_raw_parts".to_string(),
                     operation_family: "raw_pointer_read".to_string(),
+                    safe_caller: "TextDecoder.decode SharedArrayBuffer route".to_string(),
+                    invariant: "&[u8] memory must not be concurrently mutated".to_string(),
+                    evidence: vec![crate::analysis::receipts::ReceiptAuditManualCandidateEvidence {
+                        kind: "runtime_witness".to_string(),
+                        path: Some(
+                            "target/unsafe-scout/textdecoder-shared-race-route.out".to_string(),
+                        ),
+                        summary: Some("Bun route reaches shared backing bytes".to_string()),
+                        command: Some(
+                            "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+                                .to_string(),
+                        ),
+                        limitation: Some(
+                            "runtime route evidence only; not memory-safety proof".to_string(),
+                        ),
+                    }],
+                    fix_options: vec![
+                        "Copy SharedArrayBuffer-backed bytes into stable owned storage".to_string(),
+                    ],
+                    test_targets: vec![
+                        "test/js/webcore/textdecoder-sharedarraybuffer.test.ts".to_string(),
+                    ],
+                    do_not_touch: vec![
+                        "Do not rewrite unrelated TextDecoder encoding paths".to_string(),
+                    ],
                     next_action:
                         "Review the manual candidate and preserve receipts as external evidence"
                             .to_string(),
@@ -477,13 +537,27 @@ mod tests {
                 }),
                 route_tools: Vec::new(),
             }],
-        };
+            };
 
         let markdown = render_markdown(&report);
 
         assert!(markdown.contains("manual_candidate, matched"));
         assert!(markdown.contains("`manual_candidate` / `raw_pointer_read` / source `manual`"));
         assert!(markdown.contains("src/runtime/webcore/TextDecoder.rs:237"));
+        assert!(markdown.contains("route: TextDecoder.decode SharedArrayBuffer route"));
+        assert!(markdown.contains("invariant: &[u8] memory must not be concurrently mutated"));
+        assert!(markdown.contains("first fix: Copy SharedArrayBuffer-backed bytes"));
+        assert!(
+            markdown
+                .contains("first test: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`")
+        );
+        assert!(
+            markdown.contains(
+                "first do-not-touch: Do not rewrite unrelated TextDecoder encoding paths"
+            )
+        );
+        assert!(markdown.contains("first evidence: `runtime_witness`"));
+        assert!(markdown.contains("runtime route evidence only; not memory-safety proof"));
         assert!(markdown.contains("manual candidate; not analyzer-discovered"));
         assert!(!markdown.contains("imports_witness_evidence"));
     }

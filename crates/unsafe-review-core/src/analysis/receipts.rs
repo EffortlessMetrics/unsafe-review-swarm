@@ -279,11 +279,26 @@ pub struct ReceiptAuditManualCandidate {
     pub location: String,
     pub operation: String,
     pub operation_family: String,
+    pub safe_caller: String,
+    pub invariant: String,
+    pub evidence: Vec<ReceiptAuditManualCandidateEvidence>,
+    pub fix_options: Vec<String>,
+    pub test_targets: Vec<String>,
+    pub do_not_touch: Vec<String>,
     pub next_action: String,
     pub trust_boundary: String,
     pub source: String,
     pub manual_candidate: bool,
     pub analyzer_discovered: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct ReceiptAuditManualCandidateEvidence {
+    pub kind: String,
+    pub path: Option<String>,
+    pub summary: Option<String>,
+    pub command: Option<String>,
+    pub limitation: Option<String>,
 }
 
 pub(crate) fn audit_receipts(output: &AnalyzeOutput) -> Result<ReceiptAuditReport, String> {
@@ -706,6 +721,25 @@ fn receipt_audit_manual_candidate_from_manual_candidate(
         ),
         operation: candidate.unsafe_operation.clone(),
         operation_family: candidate.operation_family.clone(),
+        safe_caller: candidate.safe_caller.clone(),
+        invariant: candidate.invariant.clone(),
+        evidence: candidate
+            .evidence
+            .iter()
+            .map(|evidence| ReceiptAuditManualCandidateEvidence {
+                kind: evidence.kind.clone(),
+                path: evidence
+                    .path
+                    .as_ref()
+                    .map(|path| path.display().to_string()),
+                summary: evidence.summary.clone(),
+                command: evidence.command.clone(),
+                limitation: evidence.limitation.clone(),
+            })
+            .collect(),
+        fix_options: candidate.fix_options.clone(),
+        test_targets: candidate.test_targets.clone(),
+        do_not_touch: candidate.do_not_touch.clone(),
         next_action:
             "Review the manual candidate and preserve receipts as external evidence for this manual ID"
                 .to_string(),
@@ -1592,6 +1626,40 @@ mod tests {
         assert_eq!(matched.location, "src/runtime/webcore/TextDecoder.rs:237");
         assert_eq!(matched.operation_family, "raw_pointer_read");
         assert_eq!(matched.operation, "core::slice::from_raw_parts");
+        assert_eq!(
+            matched.safe_caller,
+            "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))"
+        );
+        assert_eq!(
+            matched.invariant,
+            "&[u8] memory must not be concurrently mutated"
+        );
+        assert_eq!(matched.evidence.len(), 1);
+        assert_eq!(
+            matched.evidence[0].command.as_deref(),
+            Some("bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts")
+        );
+        assert!(
+            matched.evidence[0]
+                .limitation
+                .as_deref()
+                .unwrap_or("")
+                .contains("not memory-safety proof")
+        );
+        assert!(
+            matched.fix_options[0].contains("Copy SharedArrayBuffer-backed bytes"),
+            "{:?}",
+            matched.fix_options
+        );
+        assert_eq!(
+            matched.test_targets[0],
+            "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+        );
+        assert!(
+            matched.do_not_touch[0].contains("unrelated TextDecoder"),
+            "{:?}",
+            matched.do_not_touch
+        );
         assert!(
             matched
                 .next_action
@@ -1801,8 +1869,19 @@ mod tests {
   "evidence": [
     {
       "kind": "runtime_witness",
-      "path": "target/unsafe-scout/textdecoder-shared-race-route.out"
+      "path": "target/unsafe-scout/textdecoder-shared-race-route.out",
+      "command": "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts",
+      "limitation": "runtime route evidence only; not memory-safety proof and not analyzer-discovered"
     }
+  ],
+  "fix_options": [
+    "Copy SharedArrayBuffer-backed bytes into stable owned storage before creating a Rust slice"
+  ],
+  "test_targets": [
+    "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+  ],
+  "do_not_touch": [
+    "Do not rewrite unrelated TextDecoder encoding paths"
   ],
   "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
 }"#

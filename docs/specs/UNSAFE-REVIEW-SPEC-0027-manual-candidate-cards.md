@@ -105,6 +105,11 @@ Receipts may reference manual candidate IDs, but a receipt against a manual
 candidate records external evidence for that manual candidate only. It does not
 prove the repository safe, prove UB, prove site execution outside the receipt,
 or convert the candidate into an analyzer finding.
+Receipt audit output for a matched manual candidate must preserve the manual
+marker and include copy-only route, invariant, external evidence command/
+limitation, fix option, test target, do-not-touch, next-action, and trust-boundary
+cues so a reviewer can continue the manual candidate handoff after attaching a
+receipt.
 
 Outcome comparison must compare both single `manual-candidate/v1` artifacts and
 aggregate `manual-candidates/v1` indexes with manual candidates by stable manual
@@ -286,6 +291,10 @@ into an analyzer ReviewCard.
   executing witnesses.
 - A receipt against a manual candidate ID can be imported or audited only as
   evidence for that manual candidate.
+- Receipt audit output for a matched manual candidate preserves safe-caller
+  route, invariant, evidence command/limitation, optional fix/test/non-goal
+  guidance, and manual trust-boundary cues without importing ReviewCard witness
+  evidence.
 - Outcome comparison accepts both single manual candidate artifacts and
   aggregate manual candidate indexes, preserves manual source markers, and
   compares manual IDs deterministically across snapshots.

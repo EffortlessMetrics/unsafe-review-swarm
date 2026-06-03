@@ -1287,6 +1287,66 @@ fn manual_candidate_receipts_audit_as_manual_advisory_targets() -> Result<(), Bo
             .unwrap_or("")
             .contains("not analyzer-discovered")
     );
+    assert_eq!(
+        receipt["matched_manual_candidate"]["safe_caller"],
+        "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))"
+    );
+    assert_eq!(
+        receipt["matched_manual_candidate"]["invariant"],
+        "&[u8] memory must not be concurrently mutated"
+    );
+    assert_eq!(
+        receipt["matched_manual_candidate"]["evidence"][0]["command"],
+        "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+    );
+    assert!(
+        receipt["matched_manual_candidate"]["evidence"][0]["limitation"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not memory-safety proof")
+    );
+    assert!(
+        receipt["matched_manual_candidate"]["fix_options"][0]
+            .as_str()
+            .unwrap_or("")
+            .contains("Copy SharedArrayBuffer-backed bytes")
+    );
+    assert_eq!(
+        receipt["matched_manual_candidate"]["test_targets"][0],
+        "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+    );
+    assert!(
+        receipt["matched_manual_candidate"]["do_not_touch"][0]
+            .as_str()
+            .unwrap_or("")
+            .contains("unrelated TextDecoder")
+    );
+
+    let audit_markdown = run_success([
+        os("receipt"),
+        os("audit"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--diff"),
+        temp.path().join("change.diff").into_os_string(),
+        os("--format"),
+        os("markdown"),
+    ])?;
+    let audit_markdown = stdout_text(&audit_markdown)?;
+    assert!(audit_markdown.contains("manual_candidate, matched"));
+    assert!(audit_markdown.contains("route: new TextDecoder().decode"));
+    assert!(audit_markdown.contains("invariant: &[u8] memory must not be concurrently mutated"));
+    assert!(audit_markdown.contains("first fix: Copy SharedArrayBuffer-backed bytes"));
+    assert!(
+        audit_markdown
+            .contains("first test: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`")
+    );
+    assert!(
+        audit_markdown
+            .contains("first do-not-touch: Do not rewrite unrelated TextDecoder encoding paths")
+    );
+    assert!(audit_markdown.contains("runtime route evidence only; not memory-safety proof"));
+    assert!(!audit_markdown.contains("imports_witness_evidence"));
 
     Ok(())
 }
