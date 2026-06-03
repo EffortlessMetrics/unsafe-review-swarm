@@ -16046,6 +16046,7 @@ review_after = "2026-08-01"
         write_valid_first_pr_artifacts(dir)?;
         write_one_manual_candidates_artifact(dir)?;
         insert_manual_candidate_front_panel_fixture(dir)?;
+        insert_manual_candidate_witness_follow_up_fixture(dir)?;
         let path = dir.join("review-kit.json");
         let mut review_kit = parse_json_file(&path)?;
         let handoff = manual_candidate_handoff_fixture();
@@ -16112,8 +16113,31 @@ review_after = "2026-08-01"
         Ok(())
     }
 
+    fn insert_manual_candidate_witness_follow_up_fixture(dir: &Path) -> Result<(), String> {
+        let artifact = "witness-plan.md";
+        let marker = "## Trust boundary";
+        let path = dir.join(artifact);
+        let text =
+            fs::read_to_string(&path).map_err(|err| format!("read {artifact} failed: {err}"))?;
+        if !text.contains(marker) {
+            return Err(format!("{artifact} fixture is missing `{marker}`"));
+        }
+        fs::write(
+            &path,
+            text.replace(
+                marker,
+                &format!("{}{}", manual_candidate_witness_follow_up_fixture(), marker),
+            ),
+        )
+        .map_err(|err| format!("write {artifact} failed: {err}"))
+    }
+
     fn manual_candidate_front_panel_fixture() -> &'static str {
         "## Manual candidates\n\n- Imported manual candidates: 1 (manual/advisory; not analyzer-discovered ReviewCards)\n- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)\n- Safe caller route: TextDecoder.decode SharedArrayBuffer route\n- Invariant at risk: &[u8] memory must not be concurrently mutated\n- External evidence refs: 1\n- Explain: `unsafe-review explain R4R2-S001`\n- Agent context: `unsafe-review context R4R2-S001 --json`\n- Witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only outputs.\n- Boundary: copy-only manual handoff; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n"
+    }
+
+    fn manual_candidate_witness_follow_up_fixture() -> &'static str {
+        "## Manual candidate witness follow-up\n\n- Imported manual candidates: 1 (manual/advisory; not analyzer-discovered ReviewCards)\n- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)\n- Safe caller route: TextDecoder.decode SharedArrayBuffer route\n- Invariant at risk: &[u8] memory must not be concurrently mutated\n- External evidence refs: 1\n- Full manual witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Agent context: `unsafe-review context R4R2-S001 --json`\n- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only witness route groups.\n- Receipt boundary: manual candidate receipts attach external evidence to the manual candidate ID only; they do not import ReviewCard witness evidence.\n- Boundary: copy-only manual follow-up; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n"
     }
 
     fn add_repair_queue_boundaries(text: &str) -> String {
