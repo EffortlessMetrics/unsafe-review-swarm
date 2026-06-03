@@ -37,6 +37,9 @@ The default CI job should not:
 Malformed or missing artifacts may fail CI. Advisory findings should not fail
 CI by default.
 
+If you make this workflow required in branch protection, require successful
+review-kit generation and upload. Do not require zero ReviewCards.
+
 ## Copy-Ready Workflow
 
 For most repositories, start from this artifact-only workflow. Pin
