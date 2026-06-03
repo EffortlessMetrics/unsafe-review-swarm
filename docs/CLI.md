@@ -43,6 +43,8 @@ JSON summaries include `changed_files`, `changed_rust_files`, and
 `changed_non_rust_files`. In diff-backed runs these counters describe the input
 diff breadth, so mixed Rust/JavaScript/C++ PRs can show non-Rust scale without
 creating non-Rust ReviewCards or changing advisory policy.
+`pr-summary` and `github-summary` render the same diff scope as a reviewer-facing
+header bullet when a diff is supplied.
 
 Use `--root` when reviewing a fixture or another workspace:
 

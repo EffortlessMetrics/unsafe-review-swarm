@@ -405,6 +405,7 @@ fn render_pr_summary_header_bullets(out: &mut String, output: &AnalyzeOutput) {
             crate::api::Scope::Repo => "repo",
         }
     ));
+    render_diff_scope_bullet(out, output);
     out.push_str(&format!("- Review cards: {}\n", output.summary.cards));
     out.push_str(&format!(
         "- Open actionable gaps: {}\n",
@@ -413,21 +414,27 @@ fn render_pr_summary_header_bullets(out: &mut String, output: &AnalyzeOutput) {
     out.push_str(&format!("- Policy mode: `{}`\n\n", output.policy.as_str()));
 }
 
+fn render_diff_scope_bullet(out: &mut String, output: &AnalyzeOutput) {
+    if output.summary.changed_files == 0 {
+        return;
+    }
+
+    out.push_str(&format!(
+        "- Diff scope: {} {} changed ({} Rust, {} non-Rust)\n",
+        output.summary.changed_files,
+        file_word(output.summary.changed_files),
+        output.summary.changed_rust_files,
+        output.summary.changed_non_rust_files,
+    ));
+}
+
+fn file_word(count: usize) -> &'static str {
+    if count == 1 { "file" } else { "files" }
+}
+
 fn render_pr_summary_header(out: &mut String, output: &AnalyzeOutput) {
     out.push_str("# unsafe-review PR summary\n\n");
-    out.push_str(&format!(
-        "- Scope: `{}`\n",
-        match output.scope {
-            crate::api::Scope::Diff => "diff",
-            crate::api::Scope::Repo => "repo",
-        }
-    ));
-    out.push_str(&format!("- Review cards: {}\n", output.summary.cards));
-    out.push_str(&format!(
-        "- Open actionable gaps: {}\n",
-        output.summary.open_actionable_gaps
-    ));
-    out.push_str(&format!("- Policy mode: `{}`\n\n", output.policy.as_str()));
+    render_pr_summary_header_bullets(out, output);
 }
 
 fn render_pr_summary_reviewer_cockpit(out: &mut String, output: &AnalyzeOutput) {
@@ -845,6 +852,7 @@ mod tests {
 
         assert!(rendered.contains("# unsafe-review PR summary"));
         assert!(rendered.contains("## Reviewer cockpit"));
+        assert!(rendered.contains("- Diff scope: 1 file changed (1 Rust, 0 non-Rust)"));
         assert!(rendered.contains(&format!("- Top card: `{}`", card.id)));
         assert!(rendered.contains("## Card table"));
         assert!(rendered.contains("- Operation: `unsafe { ptr.cast::<Header>().read() }`"));
@@ -906,6 +914,7 @@ mod tests {
             .ok_or_else(|| "raw pointer fixture should emit a card".to_string())?;
 
         assert!(rendered.contains("## unsafe-review advisory summary"));
+        assert!(rendered.contains("- Diff scope: 1 file changed (1 Rust, 0 non-Rust)"));
         assert!(rendered.contains("## Top card"));
         assert!(rendered.contains(&format!("- ID: `{}`", card.id)));
         assert!(rendered.contains(&format!("- Explain: `unsafe-review explain {}`", card.id)));

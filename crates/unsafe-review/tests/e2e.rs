@@ -127,6 +127,7 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     assert_eq!(stdout_text(&summary)?.trim(), "");
     let summary_text = fs::read_to_string(&summary_path)?;
     assert!(summary_text.contains("# unsafe-review PR summary"));
+    assert!(summary_text.contains("- Diff scope: 1 file changed (1 Rust, 0 non-Rust)"));
     assert!(summary_text.contains("## Card table"));
     assert!(summary_text.contains("- Operation: `unsafe { ptr.cast::<Header>().read() }`"));
     assert!(summary_text.contains("- Operation family: `raw_pointer_read`"));
@@ -150,6 +151,7 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     assert_eq!(stdout_text(&github_summary)?.trim(), "");
     let github_summary_text = fs::read_to_string(&github_summary_path)?;
     assert!(github_summary_text.contains("## unsafe-review advisory summary"));
+    assert!(github_summary_text.contains("- Diff scope: 1 file changed (1 Rust, 0 non-Rust)"));
     assert!(github_summary_text.contains("## Top card"));
     assert!(github_summary_text.contains(&format!("- ID: `{card_id}`")));
     assert!(github_summary_text.contains(&format!("- Explain: `unsafe-review explain {card_id}`")));
@@ -576,7 +578,7 @@ diff --git a/src/binding.cpp b/src/binding.cpp
         os("--root"),
         fixture.as_os_str().to_os_string(),
         os("--diff"),
-        mixed_diff_path.into_os_string(),
+        mixed_diff_path.as_os_str().to_os_string(),
         os("--format"),
         os("json"),
     ])?;
@@ -588,6 +590,19 @@ diff --git a/src/binding.cpp b/src/binding.cpp
     assert_eq!(summary["changed_non_rust_files"], 2);
     assert_eq!(summary["cards"], 1);
     assert_eq!(value["cards"][0]["site"]["file"], "src/lib.rs");
+
+    let github_summary = run_success([
+        os("check"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        mixed_diff_path.as_os_str().to_os_string(),
+        os("--format"),
+        os("github-summary"),
+    ])?;
+    let github_summary = stdout_text(&github_summary)?;
+    assert!(github_summary.contains("- Diff scope: 3 files changed (1 Rust, 2 non-Rust)"));
+    assert!(github_summary.contains("## unsafe-review advisory summary"));
 
     Ok(())
 }
@@ -1503,6 +1518,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     let summary = fs::read_to_string(out_dir.join("pr-summary.md"))?;
     assert!(summary.contains("# unsafe-review PR summary"));
     assert!(summary.contains("## Reviewer cockpit"));
+    assert!(summary.contains("- Diff scope: 1 file changed (1 Rust, 0 non-Rust)"));
     assert!(summary.contains(&format!("- Top card: `{card_id}`")));
     assert!(summary.contains("- Missing/weak evidence:"));
     assert!(summary.contains("- Next reviewer action:"));
@@ -1516,6 +1532,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
 
     let github_summary = fs::read_to_string(out_dir.join("github-summary.md"))?;
     assert!(github_summary.contains("## unsafe-review advisory summary"));
+    assert!(github_summary.contains("- Diff scope: 1 file changed (1 Rust, 0 non-Rust)"));
     assert!(github_summary.contains(&format!("- ID: `{card_id}`")));
     assert!(github_summary.contains(&format!("- Explain: `unsafe-review explain {card_id}`")));
     assert!(github_summary.contains(&format!(
