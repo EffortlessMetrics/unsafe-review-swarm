@@ -3582,7 +3582,8 @@ fn check_fixture_site_metadata(
 }
 
 fn is_fixture_operation_snippet_exception(path: &str, operation: &str) -> bool {
-    path.contains("fixtures/js_buffer_reentry_")
+    path.replace('\\', "/")
+        .contains("fixtures/js_buffer_reentry_")
         && operation.starts_with("JS-backed buffer descriptor captured before possible JS reentry")
 }
 
@@ -7083,6 +7084,10 @@ jobs:
     fn fixture_card_identity_allows_js_buffer_reentry_operation_context() {
         assert!(is_fixture_operation_snippet_exception(
             "fixtures/js_buffer_reentry_sync_compression/expected.cards.json",
+            "JS-backed buffer descriptor captured before possible JS reentry and materialized afterward; capture: let input = StringOrBuffer::from_js(global, arg0)?;; reentry: let level = options.get(global, \"\")?;; materialize: native_compress(&input, level)",
+        ));
+        assert!(is_fixture_operation_snippet_exception(
+            "fixtures\\js_buffer_reentry_sync_compression\\expected.cards.json",
             "JS-backed buffer descriptor captured before possible JS reentry and materialized afterward; capture: let input = StringOrBuffer::from_js(global, arg0)?;; reentry: let level = options.get(global, \"\")?;; materialize: native_compress(&input, level)",
         ));
         assert!(!is_fixture_operation_snippet_exception(
