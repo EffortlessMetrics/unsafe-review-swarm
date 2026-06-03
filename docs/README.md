@@ -12,7 +12,7 @@
 | GitHub Actions user guide | copy-paste drop-in workflow for downstream Rust repositories | `docs/ci/github-actions.md`, `.github/examples/unsafe-review-first-pr.yml` |
 | Coverage telemetry | advisory cargo-llvm-cov + Codecov execution-surface signal, not unsafe correctness | `docs/ci/coverage.md`, `.github/workflows/coverage.yml` |
 | Analysis design | analyzer evidence applicability and refactor rails | `docs/analysis/` |
-| Explanations | concept notes, trust boundaries, reviewer examples, and agent packet examples | `docs/explanation/` |
+| Explanations | concept notes, trust boundaries, reviewer examples, fix recipes, and agent packet examples | `docs/explanation/` |
 | Editor workflow | saved read-only editor projection walkthrough | `docs/editor/saved-lsp-json.md` |
 | Editor extension MVP | publishable saved-lsp viewer extension scope and non-goals | `docs/editor/extension-mvp.md` |
 | Editor marketplace publication | owner pre-publication checklist and manual publish workflow | `docs/editor/marketplace-publication.md`, `.github/workflows/editor-publish.yml` |

@@ -149,7 +149,8 @@ reaches the unsafe operation and the invariant it fails to establish.
 ## 5. Choose The Fix Shape
 
 Use the card family to choose the repair type. Keep the fix minimal and tied to
-the missing evidence.
+the missing evidence. For operation-family details, use
+[ReviewCard fix recipes](explanation/fix-recipes.md).
 
 Good repair shapes:
 
