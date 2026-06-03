@@ -1,0 +1,40 @@
+{
+  "schema_version": "manual-candidate/v1",
+  "id": "R4R2-S002",
+  "source": "manual",
+  "manual_candidate": true,
+  "analyzer_discovered": false,
+  "title": "MySQL BLOB SharedArrayBuffer bind becomes a temporary raw slice",
+  "location": {
+    "file": "src/sql_jsc/mysql/MySQLValue.rs",
+    "line": 411
+  },
+  "operation_family": "slice_from_raw_parts",
+  "unsafe_operation": "JSC__JSValue__borrowBytesForOffThread -> core::slice::from_raw_parts -> Data::Temporary(RawSlice)",
+  "invariant": "MySQL packet construction must not borrow mutable or shared JS backing storage through a temporary raw slice",
+  "safe_caller": "Bun.SQL MySQL prepared statement binding a SharedArrayBuffer-backed Uint8Array as a BLOB parameter",
+  "evidence": [
+    {
+      "kind": "source_trace",
+      "path": "src/sql_jsc/mysql/MySQLValue.rs",
+      "summary": "Manual route shows JS value bytes borrowed off-thread at line 403, converted with core::slice::from_raw_parts at line 411, and stored as Data::Temporary(RawSlice)",
+      "command": "rg -n \"JSC__JSValue__borrowBytesForOffThread|from_raw_parts|Data::Temporary\" src/sql_jsc/mysql/MySQLValue.rs",
+      "limitation": "source trace only; does not prove the safe JS route reaches this site or that backing storage is shared"
+    },
+    {
+      "kind": "runtime_witness",
+      "path": "target/unsafe-scout-mysql/mysql-blob-sab-matrix.rerun.out",
+      "summary": "Bun.SQL MySQL BLOB matrix covers SharedArrayBuffer-backed typed-array parameters through the public JS route",
+      "command": "bun target/unsafe-scout-mysql/mysql-blob-sab-matrix.js",
+      "limitation": "runtime route evidence only; not memory-safety proof, not UB proof, and not analyzer-discovered"
+    },
+    {
+      "kind": "model",
+      "path": "target/unsafe-scout-mysql/miri-rawslice-sab.out",
+      "summary": "Miri model covers the temporary raw-slice aliasing shape outside the Bun runtime",
+      "command": "cargo +nightly miri test mysql_rawslice_shared_bytes_model",
+      "limitation": "model evidence only; does not prove the Bun site executed under Miri"
+    }
+  ],
+  "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
+}

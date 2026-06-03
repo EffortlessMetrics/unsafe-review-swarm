@@ -871,7 +871,7 @@ fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dy
     fs::create_dir_all(&candidate_dir)?;
     fs::write(
         candidate_dir.join("R4R2-S002.json"),
-        manual_candidate_json().replace("\"id\": \"R4R2-S001\"", "\"id\": \"R4R2-S002\""),
+        mysql_manual_candidate_json(),
     )?;
     fs::write(
         candidate_dir.join("R4R2-S001.json"),
@@ -893,13 +893,16 @@ fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dy
     assert_eq!(ledger["source"], "candidate_list");
     assert_eq!(ledger["root"], temp.path().display().to_string());
     assert_eq!(ledger["summary"]["manual_candidates"], 2);
-    assert_eq!(ledger["summary"]["external_evidence_refs"], 4);
+    assert_eq!(ledger["summary"]["external_evidence_refs"], 5);
     assert_eq!(ledger["summary"]["analyzer_discovered"], 0);
     assert_eq!(ledger["candidates"][0]["id"], "R4R2-S001");
     assert_eq!(ledger["candidates"][1]["id"], "R4R2-S002");
     assert_eq!(ledger["candidates"][0]["source"], "manual");
     assert_eq!(ledger["candidates"][0]["manual_candidate"], true);
     assert_eq!(ledger["candidates"][0]["analyzer_discovered"], false);
+    assert_eq!(ledger["candidates"][1]["source"], "manual");
+    assert_eq!(ledger["candidates"][1]["manual_candidate"], true);
+    assert_eq!(ledger["candidates"][1]["analyzer_discovered"], false);
     assert_eq!(
         ledger["candidates"][0]["location_text"],
         "src/runtime/webcore/TextDecoder.rs:237"
@@ -925,6 +928,40 @@ fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dy
             .as_str()
             .unwrap_or("")
             .contains("stop before source edits")
+    );
+    assert_eq!(
+        ledger["candidates"][1]["location_text"],
+        "src/sql_jsc/mysql/MySQLValue.rs:411"
+    );
+    assert_eq!(
+        ledger["candidates"][1]["implementer_handoff"]["target"]["location_text"],
+        "src/sql_jsc/mysql/MySQLValue.rs:411"
+    );
+    assert_eq!(
+        ledger["candidates"][1]["implementer_handoff"]["route"]["safe_caller"],
+        "Bun.SQL MySQL prepared statement binding a SharedArrayBuffer-backed Uint8Array as a BLOB parameter"
+    );
+    assert_eq!(
+        ledger["candidates"][1]["implementer_handoff"]["route"]["unsafe_operation"],
+        "JSC__JSValue__borrowBytesForOffThread -> core::slice::from_raw_parts -> Data::Temporary(RawSlice)"
+    );
+    assert_eq!(
+        ledger["candidates"][1]["implementer_handoff"]["invariant_at_risk"],
+        "MySQL packet construction must not borrow mutable or shared JS backing storage through a temporary raw slice"
+    );
+    assert_eq!(
+        ledger["candidates"][1]["evidence"][0]["kind"],
+        "source_trace"
+    );
+    assert_eq!(
+        ledger["candidates"][1]["evidence"][1]["command"],
+        "bun target/unsafe-scout-mysql/mysql-blob-sab-matrix.js"
+    );
+    assert!(
+        ledger["candidates"][1]["evidence"][2]["limitation"]
+            .as_str()
+            .unwrap_or("")
+            .contains("does not prove the Bun site executed under Miri")
     );
     assert!(
         ledger["candidates"][0]["explain_command"]
@@ -1017,6 +1054,21 @@ fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dy
     assert!(markdown.contains("ReviewCard-only repair queue"));
     assert!(markdown.contains("not analyzer-discovered ReviewCards"));
     assert!(markdown.contains("did not run witnesses"));
+    assert!(markdown.contains("### `R4R2-S002`"));
+    assert!(markdown.contains("Location: `src/sql_jsc/mysql/MySQLValue.rs:411`"));
+    assert!(markdown.contains("Route: `Bun.SQL MySQL prepared statement"));
+    assert!(
+        markdown.contains(
+            "JSC__JSValue__borrowBytesForOffThread -> core::slice::from_raw_parts -> Data::Temporary(RawSlice)"
+        )
+    );
+    assert!(markdown.contains("Evidence packet: `3` external reference(s)"));
+    assert!(markdown.contains("`source_trace` at `src/sql_jsc/mysql/MySQLValue.rs`"));
+    assert!(markdown.contains(
+        "Bun.SQL MySQL BLOB matrix covers SharedArrayBuffer-backed typed-array parameters"
+    ));
+    assert!(markdown.contains("Command: `bun target/unsafe-scout-mysql/mysql-blob-sab-matrix.js`"));
+    assert!(markdown.contains("does not prove the Bun site executed under Miri"));
 
     let out = temp.path().join("manual-candidates-list.json");
     let wrote = run_success([
@@ -1184,7 +1236,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     )?;
     fs::write(
         candidate_dir.join("R4R2-S002.json"),
-        manual_candidate_json().replace("\"id\": \"R4R2-S001\"", "\"id\": \"R4R2-S002\""),
+        mysql_manual_candidate_json(),
     )?;
     let out_dir = temp.path().join("unsafe-review");
 
@@ -4078,6 +4130,10 @@ fn write_e2e_file(root: &Path, rel: &str) -> Result<(), Box<dyn Error>> {
 
 fn manual_candidate_json() -> &'static str {
     include_str!("../../../docs/examples/manual-candidates/textdecoder-sab.json")
+}
+
+fn mysql_manual_candidate_json() -> &'static str {
+    include_str!("../../../docs/examples/manual-candidates/mysql-blob-sab.json")
 }
 
 fn empty_review_card_snapshot_json() -> &'static str {
