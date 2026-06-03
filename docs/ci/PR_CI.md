@@ -3,7 +3,9 @@
 This guide is the operator-facing companion to
 [UNSAFE-REVIEW-SPEC-0024: CI design](../specs/UNSAFE-REVIEW-SPEC-0024-ci-design.md).
 `UNSAFE-REVIEW-SPEC-0011` remains the artifact contract for PR output. This
-guide explains how CI lanes use that contract.
+guide explains how CI lanes use that contract. For a shorter downstream
+copybook focused on advisory UB-risk review, see
+[UB-risk review CI cookbook](UB_RISK_REVIEW_CI.md).
 
 The core line:
 
@@ -258,7 +260,8 @@ open a swarm sync or acknowledgement PR before continuing.
 For a drop-in advisory PR lane, copy
 `.github/examples/unsafe-review-first-pr.yml`. It runs one `first-pr` command,
 verifies the full artifact bundle contract, uploads all first-run artifacts, and
-writes a GitHub job summary.
+writes a GitHub job summary. The downstream maintainer cookbook is
+[UB-risk review CI cookbook](UB_RISK_REVIEW_CI.md).
 
 Default behavior of the example workflow:
 

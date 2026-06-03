@@ -176,6 +176,7 @@ The CLI walkthrough is the maintainer surface. After the first hour, common
 next steps are:
 
 - Wire `unsafe-review` into CI as an advisory PR job: see
+  [docs/ci/UB_RISK_REVIEW_CI.md](ci/UB_RISK_REVIEW_CI.md) for the cookbook,
   [docs/ci/PR_CI.md](ci/PR_CI.md) for the lane model and
   `.github/examples/unsafe-review-first-pr.yml` for a copy-paste workflow.
 - Read [CLI reference](CLI.md) for receipt import, policy report, and outcome

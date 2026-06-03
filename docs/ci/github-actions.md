@@ -3,7 +3,8 @@
 This guide is for a Rust maintainer who wants to wire `unsafe-review` into
 their repository's PR checks. It is the user-facing companion to
 [docs/ci/PR_CI.md](PR_CI.md), which documents how this repository runs its own
-CI lanes.
+CI lanes. For the shorter review posture recipe, see
+[UB-risk review CI cookbook](UB_RISK_REVIEW_CI.md).
 
 The design rule:
 
@@ -137,6 +138,9 @@ runtime saver.
   are separate manual lanes that this workflow does not touch.
 
 ## Next steps
+
+- [docs/ci/UB_RISK_REVIEW_CI.md](UB_RISK_REVIEW_CI.md) - short advisory
+  UB-risk review CI cookbook.
 
 - [docs/ci/PR_CI.md](PR_CI.md) — how this repository runs its own CI lanes.
 - [docs/FIRST_HOUR.md](../FIRST_HOUR.md) — the maintainer first-hour

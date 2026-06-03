@@ -184,6 +184,7 @@ posture live in the status docs.
 | Support posture | [Support summary](docs/status/SUPPORT_SUMMARY.md) |
 | Claim-to-proof ledger | [Support tiers](docs/status/SUPPORT_TIERS.md) |
 | Find/fix workflow | [Find and fix UB-risk review seams](docs/FIND_AND_FIX_UB.md) |
+| Advisory CI cookbook | [UB-risk review CI cookbook](docs/ci/UB_RISK_REVIEW_CI.md) |
 | First-use guide | [First-use guide](docs/FIRST_USE.md) |
 | First-hour guide | [First-hour guide](docs/FIRST_HOUR.md) |
 | ReviewCard trust boundary | [ReviewCard explanation](docs/explanation/review-cards-and-trust-boundary.md) |
@@ -224,6 +225,7 @@ cargo run --locked -p xtask -- check-dogfood
 - [Roadmap](docs/ROADMAP.md)
 - [Architecture](docs/ARCHITECTURE.md)
 - [CLI guide](docs/CLI.md)
+- [UB-risk review CI cookbook](docs/ci/UB_RISK_REVIEW_CI.md)
 - [ReviewCard trust boundary](docs/explanation/review-cards-and-trust-boundary.md)
 - [Explain examples](docs/explanation/explain-examples.md)
 - [Bounded agent repair workflow](docs/explanation/agent-repair-workflow.md)
