@@ -2758,6 +2758,34 @@ pub fn zstd_sync(
     }
 
     #[test]
+    fn js_buffer_reentry_fixture_pins_async_helper_capture_card() -> Result<(), String> {
+        let output = fixture_output("js_buffer_reentry_async_helper_capture")?;
+        let card = single_card("js_buffer_reentry_async_helper_capture", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::UnsafeFnCall);
+        assert_eq!(card.class, ReviewClass::ContractMissing);
+        assert_eq!(card.site.owner.as_deref(), Some("async_rab_input"));
+        assert!(
+            card.operation
+                .expression
+                .contains("from_js_maybe_async_into")
+        );
+        assert!(card.operation.expression.contains("callback.call"));
+        assert!(card.operation.expression.contains("finish_async_input"));
+        assert!(
+            card.next_action
+                .summary
+                .contains("parse options before capture")
+        );
+        assert!(
+            card.routes
+                .iter()
+                .any(|route| route.kind == WitnessKind::HumanDeepReview)
+        );
+        Ok(())
+    }
+
+    #[test]
     fn js_buffer_reentry_fixture_keeps_options_before_capture_no_card() -> Result<(), String> {
         let output = fixture_output("js_buffer_reentry_options_before_capture_no_card")?;
 
@@ -2769,12 +2797,36 @@ pub fn zstd_sync(
     }
 
     #[test]
+    fn js_buffer_reentry_fixture_keeps_async_options_before_capture_no_card() -> Result<(), String>
+    {
+        let output = fixture_output("js_buffer_reentry_async_options_before_capture_no_card")?;
+
+        assert!(
+            output.cards.is_empty(),
+            "callback reentry before async descriptor capture should stay a no-card control"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn js_buffer_reentry_fixture_keeps_recapture_after_reentry_no_card() -> Result<(), String> {
         let output = fixture_output("js_buffer_reentry_recapture_after_reentry_no_card")?;
 
         assert!(
             output.cards.is_empty(),
             "materialization of a descriptor recaptured after reentry should stay a no-card control"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn js_buffer_reentry_fixture_keeps_async_recapture_after_reentry_no_card() -> Result<(), String>
+    {
+        let output = fixture_output("js_buffer_reentry_async_recapture_after_reentry_no_card")?;
+
+        assert!(
+            output.cards.is_empty(),
+            "materialization of an async descriptor recaptured after reentry should stay a no-card control"
         );
         Ok(())
     }

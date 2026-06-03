@@ -526,8 +526,11 @@ required_core_fixtures = [
   "nested_unsafe_operation_call_dedupe",
   "adjacent_unchanged_unsafe_fn_no_card",
   "js_buffer_reentry_sync_compression",
+  "js_buffer_reentry_async_helper_capture",
   "js_buffer_reentry_options_before_capture_no_card",
   "js_buffer_reentry_recapture_after_reentry_no_card",
+  "js_buffer_reentry_async_options_before_capture_no_card",
+  "js_buffer_reentry_async_recapture_after_reentry_no_card",
   "comment_alignment_not_guard",
 ]
 
@@ -5747,6 +5750,16 @@ expected_operation_family = "unsafe_fn_call"
 expected_hazard = "unknown"
 
 [[cases]]
+fixture = "js_buffer_reentry_async_helper_capture"
+kind = "positive"
+claim = "JS-backed buffer descriptor capture through an async helper before callback reentry and later byte materialization emits one advisory ReviewCard"
+support_tier = "JS-backed buffer reentry heuristic"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+
+[[cases]]
 fixture = "js_buffer_reentry_options_before_capture_no_card"
 kind = "false_positive_control"
 claim = "JS-backed buffer reentry heuristic does not emit a ReviewCard when options are parsed before descriptor capture"
@@ -5757,6 +5770,20 @@ expected_cards = 0
 fixture = "js_buffer_reentry_recapture_after_reentry_no_card"
 kind = "false_positive_control"
 claim = "JS-backed buffer reentry heuristic does not emit a ReviewCard when a descriptor is recaptured and materialized after reentry"
+support_tier = "JS-backed buffer reentry heuristic"
+expected_cards = 0
+
+[[cases]]
+fixture = "js_buffer_reentry_async_options_before_capture_no_card"
+kind = "false_positive_control"
+claim = "JS-backed buffer reentry heuristic does not emit a ReviewCard when callback reentry occurs before async descriptor capture"
+support_tier = "JS-backed buffer reentry heuristic"
+expected_cards = 0
+
+[[cases]]
+fixture = "js_buffer_reentry_async_recapture_after_reentry_no_card"
+kind = "false_positive_control"
+claim = "JS-backed buffer reentry heuristic does not emit a ReviewCard when an async descriptor is recaptured and materialized after reentry"
 support_tier = "JS-backed buffer reentry heuristic"
 expected_cards = 0
 

@@ -1624,8 +1624,11 @@ owner = "calibration"
 support_tier = "JS-backed buffer reentry heuristic"
 fixtures = [
   "js_buffer_reentry_sync_compression",
+  "js_buffer_reentry_async_helper_capture",
   "js_buffer_reentry_options_before_capture_no_card",
   "js_buffer_reentry_recapture_after_reentry_no_card",
+  "js_buffer_reentry_async_options_before_capture_no_card",
+  "js_buffer_reentry_async_recapture_after_reentry_no_card",
 ]
 dogfood_targets = []
 label_ledgers = [
@@ -1634,9 +1637,10 @@ label_ledgers = [
 labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned JS-backed buffer reentry heuristic behavior emits one advisory
-ReviewCard for the listed sync compression capture, getter reentry, and helper
-materialization fixture, and emits zero ReviewCards for the listed options
-before capture and post-reentry recapture controls.
+ReviewCard for the listed sync compression or async helper capture, getter or
+callback reentry, and helper materialization fixtures, and emits zero
+ReviewCards for the listed options-before-capture and post-reentry recapture
+controls.
 """
 forbidden_claims = [
   "Bun vulnerability",

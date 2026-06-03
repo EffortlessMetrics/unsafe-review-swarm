@@ -179,6 +179,8 @@ fn js_buffer_reentry_changed(
 
 fn is_js_buffer_descriptor_capture(line: &str) -> bool {
     line.contains("StringOrBuffer::from_js")
+        || (is_js_buffer_async_descriptor_helper(line)
+            && contains_any(line, &["ArrayBuffer", "ArrayBufferView", "StringOrBuffer"]))
         || (contains_call_name(line, "from_js")
             && contains_any(
                 line,
@@ -191,6 +193,10 @@ fn is_js_buffer_descriptor_capture(line: &str) -> bool {
                     "StringOrBuffer",
                 ],
             ))
+}
+
+fn is_js_buffer_async_descriptor_helper(line: &str) -> bool {
+    contains_call_name(line, "from_js_maybe_async_into")
 }
 
 fn js_buffer_capture_binding(line: &str) -> Option<String> {
