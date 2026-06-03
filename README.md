@@ -104,6 +104,7 @@ comments, edit source, or enforce blocking policy.
 
 For the end-to-end maintainer path from first card to fix, witness receipt, and
 outcome comparison, see [Find and fix UB-risk review seams](docs/FIND_AND_FIX_UB.md).
+For release-note history, see [CHANGELOG.md](CHANGELOG.md).
 
 ## Add badges to your repo
 
