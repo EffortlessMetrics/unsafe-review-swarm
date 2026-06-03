@@ -102,6 +102,9 @@ unsafe-review support
 `target/unsafe-review/`. It is advisory-only: it does not run witnesses, post
 comments, edit source, or enforce blocking policy.
 
+For the end-to-end maintainer path from first card to fix, witness receipt, and
+outcome comparison, see [Find and fix UB-risk review seams](docs/FIND_AND_FIX_UB.md).
+
 ## Add badges to your repo
 
 ```bash
@@ -180,6 +183,7 @@ posture live in the status docs.
 |---|---|
 | Support posture | [Support summary](docs/status/SUPPORT_SUMMARY.md) |
 | Claim-to-proof ledger | [Support tiers](docs/status/SUPPORT_TIERS.md) |
+| Find/fix workflow | [Find and fix UB-risk review seams](docs/FIND_AND_FIX_UB.md) |
 | First-use guide | [First-use guide](docs/FIRST_USE.md) |
 | First-hour guide | [First-hour guide](docs/FIRST_HOUR.md) |
 | ReviewCard trust boundary | [ReviewCard explanation](docs/explanation/review-cards-and-trust-boundary.md) |

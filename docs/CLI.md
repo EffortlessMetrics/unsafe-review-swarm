@@ -111,6 +111,11 @@ The command analyzes once and renders every artifact from the same
 `ReviewCard`s. It stays advisory-only: it does not execute witness tools, post
 comments, edit source, or enforce blocking policy.
 
+For the full maintainer workflow that starts with `first-pr` and continues
+through `pr-summary.md`, `explain`, `context --json`, `witness-plan.md`,
+receipt audit, and `outcome`, see
+[Find and fix UB-risk review seams](FIND_AND_FIX_UB.md).
+
 The bundle also includes `receipt-audit.md`, and the terminal handoff prints the
 matching `unsafe-review receipt audit` command so reviewers can check whether
 saved witness receipt metadata still matches the current first-pr cards. The

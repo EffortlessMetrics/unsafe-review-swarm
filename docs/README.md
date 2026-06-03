@@ -4,6 +4,7 @@
 |---|---|---|
 | Mission / vision | product purpose and end state | `docs/MISSION.md`, `docs/VISION.md` |
 | Roadmap | release direction | `docs/ROADMAP.md` |
+| Find/fix workflow | end-to-end UB-risk review seam workflow from first-pr through explain, agent packet, witness receipt, and outcome comparison | `docs/FIND_AND_FIX_UB.md` |
 | First-use guide | install and first useful local run from crates.io | `docs/FIRST_USE.md` |
 | First-hour guide | maintainer first-hour walkthrough from install to one credible review action | `docs/FIRST_HOUR.md` |
 | CLI guide | current user-facing commands and artifact surfaces | `docs/CLI.md` |

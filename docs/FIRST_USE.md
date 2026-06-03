@@ -222,6 +222,10 @@ witnesses, or make a policy decision.
 
 ## Next Step
 
+For the end-to-end maintainer loop from the first card to a bounded fix,
+external witness receipt, receipt audit, and outcome comparison, see
+[Find and fix UB-risk review seams](FIND_AND_FIX_UB.md).
+
 For command details, receipt import examples, policy report examples, and output
 format reference, see the [CLI guide](CLI.md).
 

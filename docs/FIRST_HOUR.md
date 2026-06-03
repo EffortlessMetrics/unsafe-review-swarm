@@ -10,6 +10,10 @@ If you only want install and one card, [docs/FIRST_USE.md](FIRST_USE.md) is
 the shorter walkthrough. This guide goes one step further: it shows what to do
 after the first card lands.
 
+For the repeatable loop from a changed unsafe seam to fix, external witness
+receipt, receipt audit, and before/after comparison, see
+[Find and fix UB-risk review seams](FIND_AND_FIX_UB.md).
+
 ## Trust boundary first
 
 `unsafe-review` is static unsafe-contract review. It finds unsafe Rust changes
@@ -176,6 +180,8 @@ next steps are:
   `.github/examples/unsafe-review-first-pr.yml` for a copy-paste workflow.
 - Read [CLI reference](CLI.md) for receipt import, policy report, and outcome
   comparison commands.
+- Use [Find and fix UB-risk review seams](FIND_AND_FIX_UB.md) when a card needs
+  a bounded repair, external witness receipt, and outcome comparison.
 - Read [ReviewCard explanation](explanation/review-cards-and-trust-boundary.md)
   for the canonical analyzer unit.
 - Check [Support summary](status/SUPPORT_SUMMARY.md) for which surfaces are
