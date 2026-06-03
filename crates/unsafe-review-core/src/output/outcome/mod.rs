@@ -1,5 +1,6 @@
 use crate::candidate::{
     MANUAL_CANDIDATE_INDEX_SCHEMA_VERSION, MANUAL_CANDIDATE_SCHEMA_VERSION, ManualCandidate,
+    ManualCandidateEvidence,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -126,10 +127,35 @@ pub struct OutcomeCardState {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub evidence_count: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub safe_caller: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub invariant: Option<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub evidence: Vec<OutcomeManualCandidateEvidence>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub fix_options: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub test_targets: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub do_not_touch: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub next_action: Option<String>,
     pub missing: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub trust_boundary: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct OutcomeManualCandidateEvidence {
+    pub kind: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub limitation: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -183,6 +209,18 @@ struct SnapshotCard {
     trust_boundary: Option<String>,
     #[serde(default)]
     evidence_count: Option<usize>,
+    #[serde(skip)]
+    safe_caller: Option<String>,
+    #[serde(skip)]
+    invariant: Option<String>,
+    #[serde(skip)]
+    evidence: Vec<OutcomeManualCandidateEvidence>,
+    #[serde(skip)]
+    fix_options: Vec<String>,
+    #[serde(skip)]
+    test_targets: Vec<String>,
+    #[serde(skip)]
+    do_not_touch: Vec<String>,
 }
 
 #[derive(Clone, Deserialize)]
@@ -322,6 +360,11 @@ fn snapshot_from_manual_candidate_index(
 
 fn snapshot_card_from_manual_candidate(candidate: ManualCandidate) -> SnapshotCard {
     let evidence_count = candidate.evidence.len();
+    let evidence = candidate
+        .evidence
+        .iter()
+        .map(OutcomeManualCandidateEvidence::from)
+        .collect();
     SnapshotCard {
         id: candidate.id,
         class_name: "manual_candidate".to_string(),
@@ -345,6 +388,12 @@ fn snapshot_card_from_manual_candidate(candidate: ManualCandidate) -> SnapshotCa
         missing: Vec::new(),
         trust_boundary: Some(candidate.trust_boundary),
         evidence_count: Some(evidence_count),
+        safe_caller: Some(candidate.safe_caller),
+        invariant: Some(candidate.invariant),
+        evidence,
+        fix_options: candidate.fix_options,
+        test_targets: candidate.test_targets,
+        do_not_touch: candidate.do_not_touch,
     }
 }
 
@@ -532,6 +581,9 @@ fn changed_reason(status: &str, before: &SnapshotCard, after: &SnapshotCard) -> 
             after.evidence_count.unwrap_or(0)
         ));
     }
+    if manual_handoff_changed(before, after) {
+        reasons.push("manual handoff guidance changed".to_string());
+    }
     if reasons.is_empty() {
         if is_manual_card(before) || is_manual_card(after) {
             reasons.push(
@@ -637,6 +689,24 @@ fn snapshot_id(snapshot: &Snapshot) -> String {
         );
         feed_hash(&mut hash, card.next_action.as_deref().unwrap_or(""));
         feed_hash(&mut hash, card.trust_boundary.as_deref().unwrap_or(""));
+        feed_hash(&mut hash, card.safe_caller.as_deref().unwrap_or(""));
+        feed_hash(&mut hash, card.invariant.as_deref().unwrap_or(""));
+        for evidence in &card.evidence {
+            feed_hash(&mut hash, &evidence.kind);
+            feed_hash(&mut hash, evidence.path.as_deref().unwrap_or(""));
+            feed_hash(&mut hash, evidence.summary.as_deref().unwrap_or(""));
+            feed_hash(&mut hash, evidence.command.as_deref().unwrap_or(""));
+            feed_hash(&mut hash, evidence.limitation.as_deref().unwrap_or(""));
+        }
+        for fix_option in &card.fix_options {
+            feed_hash(&mut hash, fix_option);
+        }
+        for test_target in &card.test_targets {
+            feed_hash(&mut hash, test_target);
+        }
+        for do_not_touch in &card.do_not_touch {
+            feed_hash(&mut hash, do_not_touch);
+        }
         for missing in &card.missing {
             feed_hash(&mut hash, missing);
         }
@@ -804,9 +874,30 @@ impl From<&SnapshotCard> for OutcomeCardState {
             missing_count: card.missing.len(),
             witness: witness::witness_state(card).label,
             evidence_count: card.evidence_count,
+            safe_caller: card.safe_caller.clone(),
+            invariant: card.invariant.clone(),
+            evidence: card.evidence.clone(),
+            fix_options: card.fix_options.clone(),
+            test_targets: card.test_targets.clone(),
+            do_not_touch: card.do_not_touch.clone(),
             next_action: card.next_action.clone(),
             missing: card.missing.clone(),
             trust_boundary: card.trust_boundary.clone(),
+        }
+    }
+}
+
+impl From<&ManualCandidateEvidence> for OutcomeManualCandidateEvidence {
+    fn from(evidence: &ManualCandidateEvidence) -> Self {
+        Self {
+            kind: evidence.kind.clone(),
+            path: evidence
+                .path
+                .as_ref()
+                .map(|path| path.display().to_string()),
+            summary: evidence.summary.clone(),
+            command: evidence.command.clone(),
+            limitation: evidence.limitation.clone(),
         }
     }
 }
@@ -829,6 +920,18 @@ impl SnapshotCard {
         self.analyzer_discovered
             .unwrap_or_else(|| !is_manual_card(self))
     }
+}
+
+fn manual_handoff_changed(before: &SnapshotCard, after: &SnapshotCard) -> bool {
+    if !is_manual_card(before) && !is_manual_card(after) {
+        return false;
+    }
+    before.safe_caller != after.safe_caller
+        || before.invariant != after.invariant
+        || before.evidence != after.evidence
+        || before.fix_options != after.fix_options
+        || before.test_targets != after.test_targets
+        || before.do_not_touch != after.do_not_touch
 }
 
 #[cfg(test)]
@@ -1031,6 +1134,39 @@ mod tests {
             Some("core::slice::from_raw_parts")
         );
         assert_eq!(after.evidence_count, Some(2));
+        assert_eq!(
+            after.safe_caller.as_deref(),
+            Some("new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))")
+        );
+        assert_eq!(
+            after.invariant.as_deref(),
+            Some("&[u8] memory must not be concurrently mutated")
+        );
+        assert_eq!(
+            after.evidence[0].command.as_deref(),
+            Some("bun test target/unsafe-scout/evidence-0.js")
+        );
+        assert!(
+            after.evidence[0]
+                .limitation
+                .as_deref()
+                .unwrap_or("")
+                .contains("not memory-safety proof")
+        );
+        assert!(
+            after.fix_options[0].contains("Copy SharedArrayBuffer-backed bytes"),
+            "{:?}",
+            after.fix_options
+        );
+        assert_eq!(
+            after.test_targets[0],
+            "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+        );
+        assert!(
+            after.do_not_touch[0].contains("Do not rewrite unrelated TextDecoder"),
+            "{:?}",
+            after.do_not_touch
+        );
         assert!(
             after
                 .trust_boundary
@@ -1066,12 +1202,45 @@ mod tests {
             false
         );
         assert_eq!(value["cards"]["new"][0]["after"]["evidence_count"], 2);
+        assert_eq!(
+            value["cards"]["new"][0]["after"]["safe_caller"],
+            "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))"
+        );
+        assert_eq!(
+            value["cards"]["new"][0]["after"]["invariant"],
+            "&[u8] memory must not be concurrently mutated"
+        );
+        assert_eq!(
+            value["cards"]["new"][0]["after"]["evidence"][0]["command"],
+            "bun test target/unsafe-scout/evidence-0.js"
+        );
+        assert_eq!(
+            value["cards"]["new"][0]["after"]["fix_options"][0],
+            "Copy SharedArrayBuffer-backed bytes into stable owned storage before creating a Rust slice"
+        );
+        assert_eq!(
+            value["cards"]["new"][0]["after"]["test_targets"][0],
+            "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+        );
+        assert_eq!(
+            value["cards"]["new"][0]["after"]["do_not_touch"][0],
+            "Do not rewrite unrelated TextDecoder encoding paths"
+        );
 
         let markdown = render_markdown(&report);
         assert!(markdown.contains("new manual candidate"));
         assert!(markdown.contains("source `manual`"));
         assert!(markdown.contains("manual_candidate `true`"));
         assert!(markdown.contains("analyzer-discovered `false`"));
+        assert!(markdown.contains("route `new TextDecoder().decode"));
+        assert!(markdown.contains("invariant &[u8] memory must not be concurrently mutated"));
+        assert!(markdown.contains("command `bun test target/unsafe-scout/evidence-0.js`"));
+        assert!(markdown.contains("limitation runtime route evidence only"));
+        assert!(markdown.contains("first fix: Copy SharedArrayBuffer-backed bytes"));
+        assert!(
+            markdown.contains("first test: test/js/webcore/textdecoder-sharedarraybuffer.test.ts")
+        );
+        assert!(markdown.contains("first non-goal: Do not rewrite unrelated TextDecoder"));
         assert!(markdown.contains("not analyzer-discovered"));
         Ok(())
     }
@@ -1165,6 +1334,21 @@ mod tests {
                 .and_then(|state| state.evidence_count),
             Some(2)
         );
+        assert_eq!(
+            report.cards.new[0]
+                .after
+                .as_ref()
+                .and_then(|state| state.evidence.first())
+                .and_then(|evidence| evidence.command.as_deref()),
+            Some("bun test target/unsafe-scout/evidence-0.js")
+        );
+        assert!(
+            report.cards.new[0]
+                .after
+                .as_ref()
+                .map(|state| state.fix_options[0].contains("Copy SharedArrayBuffer-backed bytes"))
+                .unwrap_or(false)
+        );
         assert_eq!(report.cards.new[1].card_id, "R4R2-S002");
         assert_eq!(
             report.cards.new[1]
@@ -1172,6 +1356,14 @@ mod tests {
                 .as_ref()
                 .and_then(|state| state.evidence_count),
             Some(1)
+        );
+        assert_eq!(
+            report.cards.new[1]
+                .after
+                .as_ref()
+                .and_then(|state| state.test_targets.first())
+                .map(String::as_str),
+            Some("test/js/webcore/textdecoder-sharedarraybuffer.test.ts")
         );
         Ok(())
     }
@@ -1371,7 +1563,10 @@ mod tests {
                 format!(
                     r#"{{
       "kind": "other",
-      "path": "target/unsafe-scout/evidence-{idx}.txt"
+      "path": "target/unsafe-scout/evidence-{idx}.txt",
+      "summary": "runtime route evidence {idx}",
+      "command": "bun test target/unsafe-scout/evidence-{idx}.js",
+      "limitation": "runtime route evidence only; not memory-safety proof"
     }}"#
                 )
             })
@@ -1390,6 +1585,15 @@ mod tests {
   "unsafe_operation": "core::slice::from_raw_parts",
   "invariant": "&[u8] memory must not be concurrently mutated",
   "safe_caller": "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))",
+  "fix_options": [
+    "Copy SharedArrayBuffer-backed bytes into stable owned storage before creating a Rust slice"
+  ],
+  "test_targets": [
+    "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+  ],
+  "do_not_touch": [
+    "Do not rewrite unrelated TextDecoder encoding paths"
+  ],
   "evidence": [
     {evidence}
   ],

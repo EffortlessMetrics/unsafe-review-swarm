@@ -731,6 +731,40 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
         "core::slice::from_raw_parts"
     );
     assert_eq!(outcome["cards"]["new"][0]["after"]["evidence_count"], 2);
+    assert_eq!(
+        outcome["cards"]["new"][0]["after"]["safe_caller"],
+        "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))"
+    );
+    assert_eq!(
+        outcome["cards"]["new"][0]["after"]["invariant"],
+        "&[u8] memory must not be concurrently mutated"
+    );
+    assert_eq!(
+        outcome["cards"]["new"][0]["after"]["evidence"][0]["command"],
+        "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+    );
+    assert!(
+        outcome["cards"]["new"][0]["after"]["evidence"][0]["limitation"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not memory-safety proof")
+    );
+    assert!(
+        outcome["cards"]["new"][0]["after"]["fix_options"][0]
+            .as_str()
+            .unwrap_or("")
+            .contains("Copy SharedArrayBuffer-backed bytes")
+    );
+    assert_eq!(
+        outcome["cards"]["new"][0]["after"]["test_targets"][0],
+        "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+    );
+    assert!(
+        outcome["cards"]["new"][0]["after"]["do_not_touch"][0]
+            .as_str()
+            .unwrap_or("")
+            .contains("Do not rewrite unrelated TextDecoder")
+    );
     assert!(
         outcome["cards"]["new"][0]["reason"]
             .as_str()
@@ -761,6 +795,19 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
     assert!(outcome_markdown.contains("source `manual`"));
     assert!(outcome_markdown.contains("manual_candidate `true`"));
     assert!(outcome_markdown.contains("analyzer-discovered `false`"));
+    assert!(outcome_markdown.contains("route `new TextDecoder().decode"));
+    assert!(outcome_markdown.contains("invariant &[u8] memory must not be concurrently mutated"));
+    assert!(
+        outcome_markdown
+            .contains("command `bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts`")
+    );
+    assert!(outcome_markdown.contains("limitation runtime route evidence only"));
+    assert!(outcome_markdown.contains("first fix: Copy SharedArrayBuffer-backed bytes"));
+    assert!(
+        outcome_markdown
+            .contains("first test: test/js/webcore/textdecoder-sharedarraybuffer.test.ts")
+    );
+    assert!(outcome_markdown.contains("first non-goal: Do not rewrite unrelated TextDecoder"));
     assert!(outcome_markdown.contains("not analyzer-discovered"));
 
     let explain = run_success([
@@ -1182,6 +1229,70 @@ fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dy
     assert_eq!(
         outcome["cards"]["new"][0]["after"]["analyzer_discovered"],
         false
+    );
+    assert_eq!(
+        outcome["cards"]["new"][0]["after"]["safe_caller"],
+        "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))"
+    );
+    assert_eq!(
+        outcome["cards"]["new"][0]["after"]["invariant"],
+        "&[u8] memory must not be concurrently mutated"
+    );
+    assert_eq!(
+        outcome["cards"]["new"][0]["after"]["evidence"][0]["command"],
+        "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+    );
+    assert!(
+        outcome["cards"]["new"][0]["after"]["fix_options"][0]
+            .as_str()
+            .unwrap_or("")
+            .contains("Copy SharedArrayBuffer-backed bytes")
+    );
+    assert_eq!(
+        outcome["cards"]["new"][0]["after"]["test_targets"][0],
+        "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+    );
+    assert!(
+        outcome["cards"]["new"][0]["after"]["do_not_touch"][0]
+            .as_str()
+            .unwrap_or("")
+            .contains("Do not rewrite unrelated TextDecoder")
+    );
+    assert_eq!(
+        outcome["cards"]["new"][1]["after"]["safe_caller"],
+        "Bun.SQL MySQL prepared statement binding a SharedArrayBuffer-backed Uint8Array as a BLOB parameter"
+    );
+    assert!(
+        outcome["cards"]["new"][1]["after"]["invariant"]
+            .as_str()
+            .unwrap_or("")
+            .contains("MySQL packet construction")
+    );
+    assert_eq!(
+        outcome["cards"]["new"][1]["after"]["evidence"][1]["command"],
+        "bun target/unsafe-scout-mysql/mysql-blob-sab-matrix.js"
+    );
+    assert!(
+        outcome["cards"]["new"][1]["after"]["evidence"][2]["limitation"]
+            .as_str()
+            .unwrap_or("")
+            .contains("does not prove the Bun site executed under Miri")
+    );
+    assert!(
+        outcome["cards"]["new"][1]["after"]["fix_options"][0]
+            .as_str()
+            .unwrap_or("")
+            .contains("stable BufferSource copy helper")
+    );
+    assert_eq!(
+        outcome["cards"]["new"][1]["after"]["test_targets"][1],
+        "bun target/unsafe-scout-mysql/mysql-blob-sab-matrix.js"
+    );
+    assert!(
+        outcome["cards"]["new"][1]["after"]["do_not_touch"][1]
+            .as_str()
+            .unwrap_or("")
+            .contains("Postgres bytea parity")
     );
     assert!(
         outcome["cards"]["new"][0]["reason"]

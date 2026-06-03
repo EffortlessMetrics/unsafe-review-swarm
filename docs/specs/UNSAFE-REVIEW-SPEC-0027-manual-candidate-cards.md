@@ -264,6 +264,10 @@ into an analyzer ReviewCard.
 - projection tests proving optional fix options, test targets, and do-not-touch
   guidance stay aligned across candidate import, explain/context, witness-plan,
   first-pr `manual-candidates.json`, and `review-kit.json`
+- outcome projection tests proving single-candidate and aggregate
+  `manual-candidates/v1` comparisons preserve safe caller, invariant, external
+  evidence command/limitation, optional fix/test/non-goal guidance, and manual
+  advisory markers without importing ReviewCard witness evidence
 - a checked smoke that imports committed manual-candidate examples into a
   disposable first-pr root and verifies the resulting advisory bundle
 - receipt tests for manual candidate IDs
@@ -297,7 +301,9 @@ into an analyzer ReviewCard.
   evidence.
 - Outcome comparison accepts both single manual candidate artifacts and
   aggregate manual candidate indexes, preserves manual source markers, and
-  compares manual IDs deterministically across snapshots.
+  compares manual IDs deterministically across snapshots while keeping the
+  safe-caller route, invariant, evidence command/limitation, and optional
+  fix/test/non-goal guidance visible as manual advisory handoff context.
 - `first-pr` writes `manual-candidates.json` for imported candidates and keeps
   ReviewCard-derived artifacts, including cards JSON, SARIF, comment-plan,
   saved LSP, repair queue, and policy-report surfaces, ReviewCard-only.

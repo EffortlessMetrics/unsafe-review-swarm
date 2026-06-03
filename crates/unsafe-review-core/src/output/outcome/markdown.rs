@@ -160,6 +160,37 @@ fn markdown_state(state: Option<&OutcomeCardState>) -> String {
             if let Some(evidence_count) = state.evidence_count {
                 parts.push(format!("external evidence {evidence_count}"));
             }
+            if let Some(safe_caller) = state.safe_caller.as_deref() {
+                parts.push(format!("route `{}`", markdown_cell(safe_caller)));
+            }
+            if let Some(invariant) = state.invariant.as_deref() {
+                parts.push(format!("invariant {}", markdown_cell(invariant)));
+            }
+            if let Some(evidence) = state.evidence.first() {
+                let mut evidence_parts = vec![format!(
+                    "first evidence `{}`",
+                    markdown_cell(&evidence.kind)
+                )];
+                if let Some(path) = evidence.path.as_deref() {
+                    evidence_parts.push(format!("path `{}`", markdown_cell(path)));
+                }
+                if let Some(command) = evidence.command.as_deref() {
+                    evidence_parts.push(format!("command `{}`", markdown_cell(command)));
+                }
+                if let Some(limitation) = evidence.limitation.as_deref() {
+                    evidence_parts.push(format!("limitation {}", markdown_cell(limitation)));
+                }
+                parts.push(evidence_parts.join(", "));
+            }
+            if let Some(first_fix) = state.fix_options.first() {
+                parts.push(format!("first fix: {}", markdown_cell(first_fix)));
+            }
+            if let Some(first_test) = state.test_targets.first() {
+                parts.push(format!("first test: {}", markdown_cell(first_test)));
+            }
+            if let Some(first_non_goal) = state.do_not_touch.first() {
+                parts.push(format!("first non-goal: {}", markdown_cell(first_non_goal)));
+            }
             if let Some(next_action) = state.next_action.as_deref() {
                 parts.push(format!("next: {}", markdown_cell(next_action)));
             }
