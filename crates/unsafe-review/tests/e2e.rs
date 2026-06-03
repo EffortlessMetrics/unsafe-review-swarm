@@ -1702,6 +1702,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         witness_plan
             .contains("does not run Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux")
     );
+    assert_manual_candidate_witness_follow_up(&witness_plan);
     assert!(!witness_plan.contains("Miri passed"));
     assert!(!witness_plan.contains("site reached"));
 
@@ -3860,6 +3861,38 @@ fn assert_manual_candidate_front_panel(text: &str, later_heading: &str) {
             < text
                 .find(later_heading)
                 .expect("later front-door heading should exist")
+    );
+}
+
+fn assert_manual_candidate_witness_follow_up(text: &str) {
+    assert!(text.contains("## Manual candidate witness follow-up"));
+    assert!(text.contains(
+        "- Imported manual candidates: 2 (manual/advisory; not analyzer-discovered ReviewCards)"
+    ));
+    assert!(text.contains(
+        "- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)"
+    ));
+    assert!(text.contains(
+        "- Safe caller route: new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))"
+    ));
+    assert!(text.contains("- Invariant at risk: &[u8] memory must not be concurrently mutated"));
+    assert!(text.contains("- External evidence refs: 2"));
+    assert!(text.contains("unsafe-review candidate witness-plan --root"));
+    assert!(text.contains("unsafe-review context --root"));
+    assert!(text.contains("manual-candidates.json"));
+    assert!(text.contains("ReviewCard-only witness route groups"));
+    assert!(text.contains("do not import ReviewCard witness evidence"));
+    assert!(text.contains("copy-only manual follow-up"));
+    assert!(text.contains("did not discover these candidates"));
+    assert!(text.contains("did not run witnesses"));
+    assert!(text.contains("did not edit source"));
+    assert!(text.contains("policy inputs"));
+    assert!(
+        text.find("## Manual candidate witness follow-up")
+            .expect("manual candidate witness section should exist")
+            < text
+                .find("## Trust boundary")
+                .expect("trust boundary section should exist")
     );
 }
 

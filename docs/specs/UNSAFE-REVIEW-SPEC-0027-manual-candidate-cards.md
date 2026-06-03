@@ -183,6 +183,12 @@ commands, and advisory boundary. The full candidate payload remains in
 `manual-candidates.json` and `review-kit.json`; the cue must not add manual
 candidates to ReviewCard-only artifacts.
 
+The bundled `first-pr` `witness-plan.md` may include a compact manual-candidate
+follow-up cue that points to `candidate witness-plan` for the full copy-only
+manual packet. That cue must preserve the manual/advisory markers and must not
+add manual candidates to ReviewCard witness route groups or import ReviewCard
+witness evidence.
+
 If a manual candidate cannot be projected faithfully into a surface, that
 surface must reject or omit it with an explicit reason instead of degrading it
 into an analyzer ReviewCard.

@@ -1,4 +1,4 @@
-use std::fmt;
+use std::fmt::{self, Write as _};
 use std::path::Path;
 use std::process::Command as ProcessCommand;
 
@@ -325,6 +325,11 @@ pub(super) fn render_first_pr_front_door_artifact(
             "## Open next",
             &render_manual_candidate_front_panel(root, manual_candidates),
         ),
+        "witness-plan.md" => insert_before_section(
+            rendered,
+            "## Trust boundary",
+            &render_manual_candidate_witness_follow_up(root, manual_candidates),
+        ),
         _ => rendered,
     }
 }
@@ -387,6 +392,49 @@ fn render_manual_candidate_front_panel(
     }
     out.push_str("- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only outputs.\n");
     out.push_str("- Boundary: copy-only manual handoff; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n");
+    out
+}
+
+fn render_manual_candidate_witness_follow_up(
+    root: &Path,
+    manual_candidates: &[ManualCandidate],
+) -> String {
+    let mut out = String::new();
+    out.push_str("## Manual candidate witness follow-up\n\n");
+    let _ = writeln!(
+        &mut out,
+        "- Imported manual candidates: {} (manual/advisory; not analyzer-discovered ReviewCards)",
+        manual_candidates.len()
+    );
+    if let Some(candidate) = manual_candidates.first() {
+        let _ = writeln!(
+            &mut out,
+            "- First manual candidate: `{}` at `{}` (`{}`)",
+            candidate.id,
+            manual_candidate_location_text(candidate),
+            candidate.operation_family
+        );
+        let _ = writeln!(&mut out, "- Safe caller route: {}", candidate.safe_caller);
+        let _ = writeln!(&mut out, "- Invariant at risk: {}", candidate.invariant);
+        let _ = writeln!(
+            &mut out,
+            "- External evidence refs: {}",
+            candidate.evidence.len()
+        );
+        let _ = writeln!(
+            &mut out,
+            "- Full manual witness plan: `{}`",
+            candidate_witness_plan_command(root, &candidate.id)
+        );
+        let _ = writeln!(
+            &mut out,
+            "- Agent context: `{}`",
+            context_command(root, &candidate.id)
+        );
+    }
+    out.push_str("- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only witness route groups.\n");
+    out.push_str("- Receipt boundary: manual candidate receipts attach external evidence to the manual candidate ID only; they do not import ReviewCard witness evidence.\n");
+    out.push_str("- Boundary: copy-only manual follow-up; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n");
     out
 }
 

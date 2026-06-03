@@ -182,14 +182,15 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         "diff",
         "cards.json scope for first-pr artifacts",
     )?;
+    let manual_candidates = check_manual_candidates_artifact(dir)?;
     check_witness_plan_artifact(
         dir,
         summary.card_count,
         summary.open_actionable_gaps,
         &summary.card_projections,
+        &manual_candidates,
     )?;
     check_receipt_audit_artifact(dir)?;
-    let manual_candidates = check_manual_candidates_artifact(dir)?;
     check_manual_candidate_front_door_artifacts(dir, &manual_candidates)?;
     check_lsp_artifact(dir, &summary)?;
     check_github_summary_artifact(
@@ -1824,13 +1825,16 @@ fn require_markdown_top_card_projection(
 }
 
 fn markdown_top_card_section(text: &str) -> &str {
-    let Some(start) = text.find("## Top card") else {
+    let Some((start, heading)) = ["## Top card", "## Reviewer cockpit"]
+        .into_iter()
+        .find_map(|heading| text.find(heading).map(|start| (start, heading)))
+    else {
         return text;
     };
     let section = &text[start..];
     let Some(next_section) = section
-        .get("## Top card".len()..)
-        .and_then(|rest| rest.find("\n## ").map(|index| "## Top card".len() + index))
+        .get(heading.len()..)
+        .and_then(|rest| rest.find("\n## ").map(|index| heading.len() + index))
     else {
         return section;
     };
@@ -3692,6 +3696,7 @@ fn check_witness_plan_artifact(
     card_count: usize,
     open_actionable_gaps: usize,
     card_projections: &BTreeMap<String, CardProjection>,
+    manual_candidates: &ManualCandidateIndexProjection,
 ) -> Result<(), String> {
     let path = dir.join("witness-plan.md");
     let text = super::read_to_string(&path)?;
@@ -3736,6 +3741,72 @@ fn check_witness_plan_artifact(
                 "unsafe site executed",
             ],
         )?;
+    }
+    check_manual_candidate_witness_plan_text(&text, &path, manual_candidates)?;
+    Ok(())
+}
+
+fn check_manual_candidate_witness_plan_text(
+    text: &str,
+    path: &Path,
+    manual_candidates: &ManualCandidateIndexProjection,
+) -> Result<(), String> {
+    if manual_candidates.count == 0 {
+        return Ok(());
+    }
+
+    super::require_text_contains(text, "## Manual candidate witness follow-up", path)?;
+    super::require_text_contains(
+        text,
+        &format!(
+            "- Imported manual candidates: {} (manual/advisory; not analyzer-discovered ReviewCards)",
+            manual_candidates.count
+        ),
+        path,
+    )?;
+    let Some(first) = manual_candidates.candidates.first() else {
+        return Err(format!(
+            "{} has manual candidate count but no first candidate projection",
+            path.display()
+        ));
+    };
+    super::require_text_contains(
+        text,
+        &format!(
+            "- First manual candidate: `{}` at `{}` (`{}`)",
+            first.id, first.location_text, first.operation_family
+        ),
+        path,
+    )?;
+    super::require_text_contains(
+        text,
+        &format!("- Safe caller route: {}", first.safe_caller),
+        path,
+    )?;
+    super::require_text_contains(
+        text,
+        &format!("- Invariant at risk: {}", first.invariant),
+        path,
+    )?;
+    super::require_text_contains(
+        text,
+        &format!("- External evidence refs: {}", first.evidence_refs),
+        path,
+    )?;
+    for expected in [
+        "unsafe-review candidate witness-plan",
+        "unsafe-review context",
+        &first.id,
+        "manual-candidates.json",
+        "ReviewCard-only witness route groups",
+        "not analyzer-discovered",
+        "did not discover",
+        "did not run witnesses",
+        "edit source",
+        "policy inputs",
+        "do not import ReviewCard witness evidence",
+    ] {
+        super::require_text_contains(text, expected, path)?;
     }
     Ok(())
 }
