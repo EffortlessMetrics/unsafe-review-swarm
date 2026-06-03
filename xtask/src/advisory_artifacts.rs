@@ -2372,13 +2372,6 @@ fn require_top_card_primary_route_command(
 }
 
 fn reject_manual_candidate_markers(value: &serde_json::Value, context: &str) -> Result<(), String> {
-    reject_manual_candidate_markers_at(value, context)
-}
-
-fn reject_manual_candidate_markers_at(
-    value: &serde_json::Value,
-    context: &str,
-) -> Result<(), String> {
     match value {
         serde_json::Value::Object(object) => {
             for field in ["manual_candidate", "analyzer_discovered"] {
@@ -2394,13 +2387,13 @@ fn reject_manual_candidate_markers_at(
                 ));
             }
             for (key, value) in object {
-                reject_manual_candidate_markers_at(value, &format!("{context}/{key}"))?;
+                reject_manual_candidate_markers(value, &format!("{context}/{key}"))?;
             }
             Ok(())
         }
         serde_json::Value::Array(items) => {
             for (idx, item) in items.iter().enumerate() {
-                reject_manual_candidate_markers_at(item, &format!("{context}/{idx}"))?;
+                reject_manual_candidate_markers(item, &format!("{context}/{idx}"))?;
             }
             Ok(())
         }
