@@ -175,6 +175,14 @@ drift: target, route, invariant, external evidence commands, limitations, and
 stop lines must still project from the imported manual candidate. It is not the
 ReviewCard repair queue.
 
+When imported candidates are present in a `first-pr` run, `pr-summary.md` and
+`github-summary.md` must include a compact manual-candidate front-door cue with
+the manual count, first candidate ID, file:line, operation family, safe caller
+route, invariant, evidence count, copy-only explain/context/witness-plan
+commands, and advisory boundary. The full candidate payload remains in
+`manual-candidates.json` and `review-kit.json`; the cue must not add manual
+candidates to ReviewCard-only artifacts.
+
 If a manual candidate cannot be projected faithfully into a surface, that
 surface must reject or omit it with an explicit reason instead of degrading it
 into an analyzer ReviewCard.
@@ -236,6 +244,9 @@ into an analyzer ReviewCard.
   a sorted bounded candidate queue, `explain`, `context --json`, and
   `candidate witness-plan` commands while preserving `source = manual`,
   `manual_candidate = true`, and `analyzer_discovered = false`.
+- `first-pr` `pr-summary.md` and `github-summary.md` show a compact manual
+  candidate front-door cue so reviewers can notice and open the copy-only
+  handoff without treating candidates as analyzer ReviewCards.
 
 ## CI Proof
 

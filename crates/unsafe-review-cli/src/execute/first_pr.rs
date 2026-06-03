@@ -304,6 +304,100 @@ fn review_kit_manual_candidate_queue_entry(
     })
 }
 
+pub(super) fn render_first_pr_front_door_artifact(
+    artifact_name: &str,
+    rendered: String,
+    root: &Path,
+    manual_candidates: &[ManualCandidate],
+) -> String {
+    if manual_candidates.is_empty() {
+        return rendered;
+    }
+
+    match artifact_name {
+        "pr-summary.md" => insert_before_section(
+            rendered,
+            "## Card table",
+            &render_manual_candidate_front_panel(root, manual_candidates),
+        ),
+        "github-summary.md" => insert_before_section(
+            rendered,
+            "## Open next",
+            &render_manual_candidate_front_panel(root, manual_candidates),
+        ),
+        _ => rendered,
+    }
+}
+
+fn insert_before_section(rendered: String, heading: &str, section: &str) -> String {
+    if let Some(index) = rendered.find(heading) {
+        let mut out = String::with_capacity(rendered.len() + section.len());
+        out.push_str(&rendered[..index]);
+        if !out.ends_with("\n\n") {
+            out.push('\n');
+        }
+        out.push_str(section);
+        out.push_str(&rendered[index..]);
+        out
+    } else {
+        let mut out = rendered;
+        if !out.ends_with("\n\n") {
+            out.push_str("\n\n");
+        }
+        out.push_str(section);
+        out
+    }
+}
+
+fn render_manual_candidate_front_panel(
+    root: &Path,
+    manual_candidates: &[ManualCandidate],
+) -> String {
+    let mut out = String::new();
+    out.push_str("## Manual candidates\n\n");
+    out.push_str(&format!(
+        "- Imported manual candidates: {} (manual/advisory; not analyzer-discovered ReviewCards)\n",
+        manual_candidates.len()
+    ));
+    if let Some(candidate) = manual_candidates.first() {
+        out.push_str(&format!(
+            "- First manual candidate: `{}` at `{}` (`{}`)\n",
+            candidate.id,
+            manual_candidate_location_text(candidate),
+            candidate.operation_family
+        ));
+        out.push_str(&format!("- Safe caller route: {}\n", candidate.safe_caller));
+        out.push_str(&format!("- Invariant at risk: {}\n", candidate.invariant));
+        out.push_str(&format!(
+            "- External evidence refs: {}\n",
+            candidate.evidence.len()
+        ));
+        out.push_str(&format!(
+            "- Explain: `{}`\n",
+            explain_command(root, &candidate.id)
+        ));
+        out.push_str(&format!(
+            "- Agent context: `{}`\n",
+            context_command(root, &candidate.id)
+        ));
+        out.push_str(&format!(
+            "- Witness plan: `{}`\n",
+            candidate_witness_plan_command(root, &candidate.id)
+        ));
+    }
+    out.push_str("- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only outputs.\n");
+    out.push_str("- Boundary: copy-only manual handoff; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n");
+    out
+}
+
+fn manual_candidate_location_text(candidate: &ManualCandidate) -> String {
+    format!(
+        "{}:{}",
+        candidate.location.file.display(),
+        candidate.location.line
+    )
+}
+
 pub(super) fn render_manual_candidates_artifact(
     root: &Path,
     candidates: &[ManualCandidate],
@@ -593,5 +687,108 @@ mod tests {
                 .contains("did not run witnesses")
         );
         Ok(())
+    }
+
+    #[test]
+    fn first_pr_front_doors_surface_manual_candidate_handoff() -> Result<(), String> {
+        let candidate = manual_candidate_fixture()?;
+        let root = Path::new("fixtures/bun fork");
+
+        let github_summary = render_first_pr_front_door_artifact(
+            "github-summary.md",
+            "## unsafe-review advisory summary\n\n## Top card\n\n## Open next\n\n".to_string(),
+            root,
+            std::slice::from_ref(&candidate),
+        );
+        assert!(github_summary.contains("## Manual candidates"));
+        assert!(github_summary.contains(
+            "- Imported manual candidates: 1 (manual/advisory; not analyzer-discovered ReviewCards)"
+        ));
+        assert!(github_summary.contains(
+            "- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)"
+        ));
+        assert!(
+            github_summary
+                .contains("- Safe caller route: TextDecoder.decode SharedArrayBuffer route")
+        );
+        assert!(
+            github_summary
+                .contains("- Invariant at risk: &[u8] memory must not be concurrently mutated")
+        );
+        assert!(github_summary.contains("- External evidence refs: 1"));
+        assert!(
+            github_summary.contains("unsafe-review explain --root \"fixtures/bun fork\" R4R2-S001")
+        );
+        assert!(
+            github_summary
+                .contains("unsafe-review context --root \"fixtures/bun fork\" R4R2-S001 --json")
+        );
+        assert!(github_summary.contains(
+            "unsafe-review candidate witness-plan --root \"fixtures/bun fork\" R4R2-S001"
+        ));
+        assert!(github_summary.contains("candidates stay out of ReviewCard-only outputs"));
+        assert!(
+            github_summary
+                .find("## Manual candidates")
+                .ok_or_else(|| "manual candidate section should exist".to_string())?
+                < github_summary
+                    .find("## Open next")
+                    .ok_or_else(|| "open next section should exist".to_string())?
+        );
+
+        let pr_summary = render_first_pr_front_door_artifact(
+            "pr-summary.md",
+            "## Top card\n\n## Card table\n\n".to_string(),
+            root,
+            std::slice::from_ref(&candidate),
+        );
+        assert!(pr_summary.contains("## Manual candidates"));
+        assert!(
+            pr_summary
+                .find("## Manual candidates")
+                .ok_or_else(|| "manual candidate section should exist".to_string())?
+                < pr_summary
+                    .find("## Card table")
+                    .ok_or_else(|| "card table section should exist".to_string())?
+        );
+
+        let cards_json = "{}".to_string();
+        assert_eq!(
+            render_first_pr_front_door_artifact(
+                "cards.json",
+                cards_json.clone(),
+                root,
+                &[candidate]
+            ),
+            cards_json
+        );
+
+        Ok(())
+    }
+
+    fn manual_candidate_fixture() -> Result<ManualCandidate, String> {
+        ManualCandidate::from_json_str(
+            r#"{
+              "schema_version": "manual-candidate/v1",
+              "id": "R4R2-S001",
+              "title": "TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes",
+              "location": {
+                "file": "src/runtime/webcore/TextDecoder.rs",
+                "line": 237
+              },
+              "operation_family": "raw_pointer_read",
+              "unsafe_operation": "core::slice::from_raw_parts",
+              "invariant": "&[u8] memory must not be concurrently mutated",
+              "safe_caller": "TextDecoder.decode SharedArrayBuffer route",
+              "evidence": [{
+                "kind": "runtime_witness",
+                "path": "target/unsafe-scout/textdecoder-shared-race-route.out",
+                "summary": "Bun TextDecoder route reaches shared backing bytes through safe JS",
+                "command": "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts",
+                "limitation": "runtime route evidence only; not memory-safety proof and not analyzer-discovered"
+              }],
+              "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
+            }"#,
+        )
     }
 }

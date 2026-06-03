@@ -1532,6 +1532,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(summary.contains(&format!("unsafe-review context {card_id} --json")));
     assert!(summary.contains("## Trust boundary"));
     assert!(summary.contains("not a Miri result unless a witness receipt is attached"));
+    assert_manual_candidate_front_panel(&summary, "## Card table");
 
     let github_summary = fs::read_to_string(out_dir.join("github-summary.md"))?;
     assert!(github_summary.contains("## unsafe-review advisory summary"));
@@ -1561,6 +1562,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(github_summary.contains("enforce blocking policy"));
     assert!(!github_summary.contains("# unsafe-review PR summary"));
     assert!(!github_summary.contains("## Card table"));
+    assert_manual_candidate_front_panel(&github_summary, "## Open next");
 
     let manual_candidates =
         parse_json(&fs::read_to_string(out_dir.join("manual-candidates.json"))?)?;
@@ -3827,6 +3829,38 @@ fn json_array<'a>(value: &'a Value, path: &str) -> Result<&'a Vec<Value>, Box<dy
     value
         .as_array()
         .ok_or_else(|| format!("{path} should be an array").into())
+}
+
+fn assert_manual_candidate_front_panel(text: &str, later_heading: &str) {
+    assert!(text.contains("## Manual candidates"));
+    assert!(text.contains(
+        "- Imported manual candidates: 2 (manual/advisory; not analyzer-discovered ReviewCards)"
+    ));
+    assert!(text.contains(
+        "- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)"
+    ));
+    assert!(text.contains(
+        "- Safe caller route: new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))"
+    ));
+    assert!(text.contains("- Invariant at risk: &[u8] memory must not be concurrently mutated"));
+    assert!(text.contains("- External evidence refs: 2"));
+    assert!(text.contains("unsafe-review explain --root"));
+    assert!(text.contains("unsafe-review context --root"));
+    assert!(text.contains("unsafe-review candidate witness-plan --root"));
+    assert!(text.contains("manual-candidates.json"));
+    assert!(text.contains("candidates stay out of ReviewCard-only outputs"));
+    assert!(text.contains("copy-only manual handoff"));
+    assert!(text.contains("did not discover these candidates"));
+    assert!(text.contains("did not run witnesses"));
+    assert!(text.contains("did not edit source"));
+    assert!(text.contains("policy inputs"));
+    assert!(
+        text.find("## Manual candidates")
+            .expect("manual candidate section should exist")
+            < text
+                .find(later_heading)
+                .expect("later front-door heading should exist")
+    );
 }
 
 fn assert_default_repo_status_scope(

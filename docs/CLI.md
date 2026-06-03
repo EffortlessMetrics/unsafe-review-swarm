@@ -325,6 +325,11 @@ commands for manual candidate explain/context/witness-plan projection. The
 review-kit manifest also includes a bounded, sorted manual candidate queue with
 file:line and implementer handoff cues, while still labeling every entry
 manual/advisory and not analyzer-discovered.
+When imported candidates are present, `pr-summary.md` and `github-summary.md`
+also include a compact manual-candidate front-door cue with the count, first
+file:line handoff, route, invariant, evidence count, and copy-only commands.
+The full manual candidate payload remains in `manual-candidates.json` and
+`review-kit.json`.
 
 Manual candidate projections do not execute witnesses, post comments, edit
 source, enforce policy, prove UB, prove site execution, or prove repository

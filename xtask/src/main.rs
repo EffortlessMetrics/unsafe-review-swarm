@@ -11077,6 +11077,32 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_manual_candidate_front_door_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-manual-front-door-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("pr-summary.md");
+        let text =
+            fs::read_to_string(&path).map_err(|err| format!("read pr summary failed: {err}"))?;
+        let text = text.replace(manual_candidate_front_panel_fixture(), "");
+        fs::write(&path, text).map_err(|err| format!("write pr summary failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => return Err("missing manual candidate summary cue should fail".to_string()),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("pr-summary.md"),
+            "expected pr-summary front-door drift, got {err}"
+        );
+        assert!(err.contains("## Manual candidates"), "{err}");
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_review_kit_missing_artifact() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-missing-artifact")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -16019,6 +16045,7 @@ review_after = "2026-08-01"
     fn write_one_manual_candidate_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         write_valid_first_pr_artifacts(dir)?;
         write_one_manual_candidates_artifact(dir)?;
+        insert_manual_candidate_front_panel_fixture(dir)?;
         let path = dir.join("review-kit.json");
         let mut review_kit = parse_json_file(&path)?;
         let handoff = manual_candidate_handoff_fixture();
@@ -16060,6 +16087,33 @@ review_after = "2026-08-01"
         });
         fs::write(&path, review_kit.to_string())
             .map_err(|err| format!("write review kit failed: {err}"))
+    }
+
+    fn insert_manual_candidate_front_panel_fixture(dir: &Path) -> Result<(), String> {
+        for (artifact, marker) in [
+            ("pr-summary.md", "## Card table"),
+            ("github-summary.md", "## Open next"),
+        ] {
+            let path = dir.join(artifact);
+            let text = fs::read_to_string(&path)
+                .map_err(|err| format!("read {artifact} failed: {err}"))?;
+            if !text.contains(marker) {
+                return Err(format!("{artifact} fixture is missing `{marker}`"));
+            }
+            fs::write(
+                &path,
+                text.replace(
+                    marker,
+                    &format!("{}{}", manual_candidate_front_panel_fixture(), marker),
+                ),
+            )
+            .map_err(|err| format!("write {artifact} failed: {err}"))?;
+        }
+        Ok(())
+    }
+
+    fn manual_candidate_front_panel_fixture() -> &'static str {
+        "## Manual candidates\n\n- Imported manual candidates: 1 (manual/advisory; not analyzer-discovered ReviewCards)\n- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)\n- Safe caller route: TextDecoder.decode SharedArrayBuffer route\n- Invariant at risk: &[u8] memory must not be concurrently mutated\n- External evidence refs: 1\n- Explain: `unsafe-review explain R4R2-S001`\n- Agent context: `unsafe-review context R4R2-S001 --json`\n- Witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only outputs.\n- Boundary: copy-only manual handoff; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n"
     }
 
     fn add_repair_queue_boundaries(text: &str) -> String {

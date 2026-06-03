@@ -923,7 +923,13 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     fs::create_dir_all(&options.out_dir)
         .map_err(|err| format!("create {} failed: {err}", options.out_dir.display()))?;
     for (name, renderer) in FIRST_PR_RENDERED_ARTIFACTS {
-        write_artifact(&options.out_dir.join(name), renderer(&output))?;
+        let rendered = first_pr::render_first_pr_front_door_artifact(
+            name,
+            renderer(&output),
+            &root,
+            &manual_candidates,
+        );
+        write_artifact(&options.out_dir.join(name), rendered)?;
     }
     write_artifact(
         &options.out_dir.join(RECEIPT_AUDIT_ARTIFACT),

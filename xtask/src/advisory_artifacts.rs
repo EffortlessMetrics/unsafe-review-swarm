@@ -190,6 +190,7 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
     )?;
     check_receipt_audit_artifact(dir)?;
     let manual_candidates = check_manual_candidates_artifact(dir)?;
+    check_manual_candidate_front_door_artifacts(dir, &manual_candidates)?;
     check_lsp_artifact(dir, &summary)?;
     check_github_summary_artifact(
         dir,
@@ -223,6 +224,83 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
 }
 
 const GITHUB_SUMMARY_WORD_LIMIT: usize = 600;
+
+fn check_manual_candidate_front_door_artifacts(
+    dir: &Path,
+    manual_candidates: &ManualCandidateIndexProjection,
+) -> Result<(), String> {
+    if manual_candidates.count == 0 {
+        return Ok(());
+    }
+
+    for artifact in ["pr-summary.md", "github-summary.md"] {
+        let path = dir.join(artifact);
+        let text = super::read_to_string(&path)?;
+        check_manual_candidate_front_door_text(&text, &path, manual_candidates)?;
+    }
+    Ok(())
+}
+
+fn check_manual_candidate_front_door_text(
+    text: &str,
+    path: &Path,
+    manual_candidates: &ManualCandidateIndexProjection,
+) -> Result<(), String> {
+    super::require_text_contains(text, "## Manual candidates", path)?;
+    super::require_text_contains(
+        text,
+        &format!(
+            "- Imported manual candidates: {} (manual/advisory; not analyzer-discovered ReviewCards)",
+            manual_candidates.count
+        ),
+        path,
+    )?;
+    let Some(first) = manual_candidates.candidates.first() else {
+        return Err(format!(
+            "{} has manual candidate count but no first candidate projection",
+            path.display()
+        ));
+    };
+    super::require_text_contains(
+        text,
+        &format!(
+            "- First manual candidate: `{}` at `{}` (`{}`)",
+            first.id, first.location_text, first.operation_family
+        ),
+        path,
+    )?;
+    super::require_text_contains(
+        text,
+        &format!("- Safe caller route: {}", first.safe_caller),
+        path,
+    )?;
+    super::require_text_contains(
+        text,
+        &format!("- Invariant at risk: {}", first.invariant),
+        path,
+    )?;
+    super::require_text_contains(
+        text,
+        &format!("- External evidence refs: {}", first.evidence_refs),
+        path,
+    )?;
+    for expected in [
+        "unsafe-review explain",
+        "unsafe-review context",
+        "unsafe-review candidate witness-plan",
+        &first.id,
+        "manual-candidates.json",
+        "ReviewCard-only outputs",
+        "not analyzer-discovered",
+        "did not discover",
+        "did not run witnesses",
+        "edit source",
+        "policy inputs",
+    ] {
+        super::require_text_contains(text, expected, path)?;
+    }
+    Ok(())
+}
 
 fn check_github_summary_artifact(
     dir: &Path,
@@ -1531,7 +1609,8 @@ fn require_markdown_top_card_projection(
     let mut top_card_explain_command = None;
     let mut top_card_agent_context_command = None;
 
-    for line in text.lines() {
+    let top_card_text = markdown_top_card_section(text);
+    for line in top_card_text.lines() {
         let trimmed = line.trim();
         if let Some(rest) = trimmed
             .strip_prefix("- ID: `")
@@ -1694,7 +1773,7 @@ fn require_markdown_top_card_projection(
         )?;
         if let Some(command) = &expected_route.command {
             require_top_card_primary_route_command(
-                text,
+                top_card_text,
                 path,
                 &card_id,
                 &expected_route.kind,
@@ -1742,6 +1821,20 @@ fn require_markdown_top_card_projection(
             path.display()
         ),
     )
+}
+
+fn markdown_top_card_section(text: &str) -> &str {
+    let Some(start) = text.find("## Top card") else {
+        return text;
+    };
+    let section = &text[start..];
+    let Some(next_section) = section
+        .get("## Top card".len()..)
+        .and_then(|rest| rest.find("\n## ").map(|index| "## Top card".len() + index))
+    else {
+        return section;
+    };
+    &section[..next_section]
 }
 
 fn expected_missing_summary(card: &CardProjection) -> String {
