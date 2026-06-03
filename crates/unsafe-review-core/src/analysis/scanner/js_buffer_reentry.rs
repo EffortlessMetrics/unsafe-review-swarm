@@ -211,10 +211,7 @@ fn line_mentions_identifier(line: &str, identifier: &str) -> bool {
         if starts_on_boundary && ends_on_boundary {
             return true;
         }
-        cursor = &after[after
-            .char_indices()
-            .next()
-            .map_or(after.len(), |(idx, ch)| idx + ch.len_utf8())..];
+        cursor = &after[after.chars().next().map_or(after.len(), char::len_utf8)..];
     }
     false
 }
