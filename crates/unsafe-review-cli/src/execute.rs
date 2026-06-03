@@ -7,7 +7,6 @@ use crate::command::{
 use signal_hook::consts::signal::{SIGINT, SIGTERM};
 #[cfg(unix)]
 use signal_hook::iterator::{Handle as SignalHandle, Signals};
-use std::collections::BTreeMap;
 use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
@@ -1417,8 +1416,8 @@ fn render_candidate_list_json(
         .iter()
         .map(|candidate| candidate.evidence.len())
         .sum::<usize>();
-    let operation_families = manual_candidate_operation_family_counts(candidates);
-    let evidence_kinds = manual_candidate_evidence_kind_counts(candidates);
+    let operation_families = first_pr::manual_candidate_operation_family_counts(candidates);
+    let evidence_kinds = first_pr::manual_candidate_evidence_kind_counts(candidates);
     let value = serde_json::json!({
         "schema_version": "manual-candidates/v1",
         "tool": "unsafe-review",
@@ -1480,41 +1479,6 @@ fn manual_candidate_list_entry(
     value
 }
 
-fn manual_candidate_operation_family_counts(
-    candidates: &[unsafe_review_core::ManualCandidate],
-) -> BTreeMap<String, usize> {
-    let mut counts = BTreeMap::new();
-    for candidate in candidates {
-        *counts
-            .entry(candidate.operation_family.clone())
-            .or_insert(0) += 1;
-    }
-    counts
-}
-
-fn manual_candidate_evidence_kind_counts(
-    candidates: &[unsafe_review_core::ManualCandidate],
-) -> BTreeMap<String, usize> {
-    let mut counts = BTreeMap::new();
-    for candidate in candidates {
-        for evidence in &candidate.evidence {
-            *counts.entry(evidence.kind.clone()).or_insert(0) += 1;
-        }
-    }
-    counts
-}
-
-fn render_count_map(counts: &BTreeMap<String, usize>) -> String {
-    if counts.is_empty() {
-        return "none".to_string();
-    }
-    counts
-        .iter()
-        .map(|(key, count)| format!("{key}: {count}"))
-        .collect::<Vec<_>>()
-        .join(", ")
-}
-
 fn render_candidate_list_markdown(
     root: &Path,
     candidates: &[unsafe_review_core::ManualCandidate],
@@ -1523,8 +1487,8 @@ fn render_candidate_list_markdown(
         .iter()
         .map(|candidate| candidate.evidence.len())
         .sum::<usize>();
-    let operation_families = manual_candidate_operation_family_counts(candidates);
-    let evidence_kinds = manual_candidate_evidence_kind_counts(candidates);
+    let operation_families = first_pr::manual_candidate_operation_family_counts(candidates);
+    let evidence_kinds = first_pr::manual_candidate_evidence_kind_counts(candidates);
     let mut out = String::new();
     out.push_str("# unsafe-review manual candidate list\n\n");
     out.push_str("This is a manual/advisory candidate ledger. It lists imported `.unsafe-review/candidates/*.json` artifacts and does not make them analyzer-discovered ReviewCards.\n\n");
@@ -1534,11 +1498,11 @@ fn render_candidate_list_markdown(
     out.push_str(&format!("- External evidence refs: `{evidence_refs}`\n"));
     out.push_str(&format!(
         "- Operation families: `{}`\n",
-        render_count_map(&operation_families)
+        first_pr::render_count_map(&operation_families)
     ));
     out.push_str(&format!(
         "- Evidence kinds: `{}`\n",
-        render_count_map(&evidence_kinds)
+        first_pr::render_count_map(&evidence_kinds)
     ));
     out.push_str("- Analyzer-discovered: `0`\n\n");
     if candidates.is_empty() {

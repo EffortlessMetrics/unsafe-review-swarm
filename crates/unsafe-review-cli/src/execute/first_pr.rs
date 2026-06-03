@@ -756,7 +756,7 @@ fn append_manual_candidate_summary_mix(out: &mut String, candidates: &[ManualCan
     );
 }
 
-fn manual_candidate_operation_family_counts(
+pub(super) fn manual_candidate_operation_family_counts(
     candidates: &[ManualCandidate],
 ) -> BTreeMap<String, usize> {
     let mut counts = BTreeMap::new();
@@ -768,7 +768,7 @@ fn manual_candidate_operation_family_counts(
     counts
 }
 
-fn manual_candidate_evidence_kind_counts(
+pub(super) fn manual_candidate_evidence_kind_counts(
     candidates: &[ManualCandidate],
 ) -> BTreeMap<String, usize> {
     let mut counts = BTreeMap::new();
@@ -780,7 +780,7 @@ fn manual_candidate_evidence_kind_counts(
     counts
 }
 
-fn render_count_map(counts: &BTreeMap<String, usize>) -> String {
+pub(super) fn render_count_map(counts: &BTreeMap<String, usize>) -> String {
     if counts.is_empty() {
         return "none".to_string();
     }
