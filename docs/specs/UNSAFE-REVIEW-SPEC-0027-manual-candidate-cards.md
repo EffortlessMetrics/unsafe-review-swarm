@@ -48,14 +48,23 @@ invariant
 safe_caller
 evidence
 trust_boundary
+fix_options[]
+test_targets[]
+do_not_touch[]
 ```
 
-Required object fields:
+Field rules:
 
 - `location.file`: root-relative path to the candidate source location.
 - `location.line`: 1-based source line when known.
 - `evidence[]`: zero or more external evidence references.
 - `trust_boundary`: explicit manual/advisory boundary text.
+- `fix_options[]`: optional copy-only implementer guidance for candidate-local
+  repair approaches.
+- `test_targets[]`: optional copy-only test or witness targets that should
+  validate the candidate-local change.
+- `do_not_touch[]`: optional copy-only non-goals that must stay out of the
+  candidate-local change.
 
 Each `evidence[]` item must include:
 
@@ -121,6 +130,15 @@ links to the same manual ID through a reviewed linkage field.
   "unsafe_operation": "core::slice::from_raw_parts",
   "invariant": "&[u8] memory must not be concurrently mutated",
   "safe_caller": "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))",
+  "fix_options": [
+    "Copy SharedArrayBuffer-backed bytes into stable owned storage before creating a Rust slice"
+  ],
+  "test_targets": [
+    "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+  ],
+  "do_not_touch": [
+    "Do not rewrite unrelated TextDecoder encoding paths"
+  ],
   "evidence": [
     {
       "kind": "runtime_witness",
@@ -152,7 +170,7 @@ Manual candidate context and witness-plan projections may include a derived
 implementer handoff. That handoff must come from the imported candidate fields,
 including file:line, safe caller route, unsafe operation, operation family,
 invariant, external evidence references, evidence commands and limitations,
-non-goals, and stop condition. It must
+candidate-specific fix options, test targets, non-goals, and stop condition. It must
 remain copy-only and must not mark the candidate analyzer-discovered, run
 witnesses, edit source, or broaden the task to unrelated unsafe sites.
 
@@ -161,7 +179,7 @@ Manual candidate list/reporting projections must load only
 include `source = manual`, `manual_candidate = true`, and
 `analyzer_discovered = false`, include copy-only implementer handoff cues for
 the file:line target, safe caller route, invariant, evidence packet, non-goals,
-and stop line when available, and repeat the ReviewCard-only artifact
+candidate-specific fix options, test targets, and stop line when available, and repeat the ReviewCard-only artifact
 relationship. They must not add manual candidates to `cards.json`, SARIF,
 comment-plan, saved LSP, repair-queue, or policy-report surfaces.
 
@@ -172,7 +190,8 @@ manual/advisory markers, include file:line and implementer handoff cues, expose
 the queue limit and omitted count, and cross-check against
 `manual-candidates.json`. The verifier must also reject implementer handoff
 drift: target, route, invariant, external evidence commands, limitations, and
-stop lines must still project from the imported manual candidate. It is not the
+candidate-specific fix options, test targets, non-goals, and stop lines must
+still project from the imported manual candidate. It is not the
 ReviewCard repair queue.
 
 When imported candidates are present in a `first-pr` run, `pr-summary.md` and
@@ -211,11 +230,15 @@ into an analyzer ReviewCard.
 - CLI import e2e coverage for `candidate import`
 - CLI list e2e coverage for `candidate list --format json`, Markdown output,
   sorted imported candidates, copy-only explain/context/witness-plan commands,
-  and ReviewCard-only artifact relationship wording
+  optional fix options, test targets, do-not-touch guidance, and
+  ReviewCard-only artifact relationship wording
 - projection tests proving `source = manual` and `manual_candidate = true` are
   preserved with `analyzer_discovered = false` in explain, context,
   witness-plan, saved JSON, first-pr `manual-candidates.json`, and outcome
   surfaces
+- projection tests proving optional fix options, test targets, and do-not-touch
+  guidance stay aligned across candidate import, explain/context, witness-plan,
+  first-pr `manual-candidates.json`, and `review-kit.json`
 - a checked smoke that imports committed manual-candidate examples into a
   disposable first-pr root and verifies the resulting advisory bundle
 - receipt tests for manual candidate IDs
@@ -225,18 +248,19 @@ into an analyzer ReviewCard.
 
 - Importing a valid manual candidate JSON writes a canonical candidate artifact
   with the same ID, source marker, location, operation family, unsafe operation,
-  invariant, safe caller, evidence references, and trust boundary.
+  invariant, safe caller, evidence references, optional fix/test/non-goal
+  guidance, and trust boundary.
 - `explain` and `context` for a manual candidate state that it is manual and
   advisory, and they include the external evidence packet without claiming that
   unsafe-review found the issue.
 - `context` and `witness-plan` carry an implementer handoff that names the
   file:line, safe caller route, invariant at risk, external evidence references,
-  evidence commands and limitations, non-goals, and stop line from the same
-  manual candidate.
+  evidence commands and limitations, candidate-specific fix options, test
+  targets, non-goals, and stop line from the same manual candidate.
 - `candidate list` reports imported candidates as a manual/advisory ledger with
   sorted IDs, file:line locations, compact implementer handoff cues, evidence
-  counts, copy-only projection commands, and ReviewCard-only artifact
-  boundaries.
+  counts, optional fix options, test targets, do-not-touch guidance, copy-only
+  projection commands, and ReviewCard-only artifact boundaries.
 - `witness-plan` routes manual evidence as suggested follow-up work without
   executing witnesses.
 - A receipt against a manual candidate ID can be imported or audited only as

@@ -11271,6 +11271,36 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_manual_candidate_guidance_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-manual-candidate-guidance-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("manual-candidates.json");
+        let mut manual_candidates = parse_json_file(&path)?;
+        manual_candidates["candidates"][0]["implementer_handoff"]["fix_options"][0] =
+            serde_json::json!("unrelated repair");
+        fs::write(&path, manual_candidates.to_string())
+            .map_err(|err| format!("write manual candidates failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err("manual candidate guidance drift should fail verification".to_string());
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains(
+                "manual-candidates.json candidate implementer_handoff fix_options must match manual-candidates.json candidate fix_options"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_review_kit_manual_candidate_handoff_drift()
     -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-manual-handoff-drift")?;
@@ -16196,15 +16226,28 @@ review_after = "2026-08-01"
                 "command": "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts",
                 "limitation": "runtime route evidence only; not memory-safety proof and not analyzer-discovered"
             }],
+            "fix_options": [
+                "copy SharedArrayBuffer-backed bytes before constructing the slice"
+            ],
+            "test_targets": [
+                "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+            ],
+            "do_not_touch": [
+                "Do not rewrite TextDecoder unrelated encodings"
+            ],
             "suggested_next_steps": [
                 "confirm the file:line and safe caller route before editing",
                 "preserve or add concrete contract, guard, test, or witness evidence for the invariant",
-                "attach receipts only when the external run targets this manual candidate ID"
+                "attach receipts only when the external run targets this manual candidate ID",
+                "evaluate the candidate-specific fix options before editing",
+                "run or preserve the candidate-specific test targets listed in this handoff",
+                "respect the candidate-specific do-not-touch notes before editing"
             ],
             "non_goals": [
                 "do not treat this as analyzer-discovered",
                 "do not claim proof, UB-free status, Miri-clean status, or site execution",
-                "do not broaden the task to unrelated unsafe sites"
+                "do not broaden the task to unrelated unsafe sites",
+                "Do not rewrite TextDecoder unrelated encodings"
             ],
             "stop_condition": "stop before source edits if the route no longer matches this manual candidate, or if the repair would broaden into unrelated unsafe sites"
         })
@@ -16226,6 +16269,15 @@ review_after = "2026-08-01"
             "unsafe_operation": "core::slice::from_raw_parts",
             "invariant": "&[u8] memory must not be concurrently mutated",
             "safe_caller": "TextDecoder.decode SharedArrayBuffer route",
+            "fix_options": [
+                "copy SharedArrayBuffer-backed bytes before constructing the slice"
+            ],
+            "test_targets": [
+                "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+            ],
+            "do_not_touch": [
+                "Do not rewrite TextDecoder unrelated encodings"
+            ],
             "evidence": [{
                 "kind": "runtime_witness",
                 "path": "target/unsafe-scout/textdecoder-shared-race-route.out",

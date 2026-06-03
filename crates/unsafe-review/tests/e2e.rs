@@ -949,6 +949,38 @@ fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dy
         ledger["candidates"][1]["implementer_handoff"]["invariant_at_risk"],
         "MySQL packet construction must not borrow mutable or shared JS backing storage through a temporary raw slice"
     );
+    assert!(
+        ledger["candidates"][1]["fix_options"][0]
+            .as_str()
+            .unwrap_or("")
+            .contains("stable BufferSource copy helper")
+    );
+    assert_eq!(
+        ledger["candidates"][1]["test_targets"][0],
+        "test/js/sql/sql-mysql-bind-blob-borrow.test.ts"
+    );
+    assert!(
+        ledger["candidates"][1]["do_not_touch"][1]
+            .as_str()
+            .unwrap_or("")
+            .contains("Postgres bytea parity")
+    );
+    assert!(
+        ledger["candidates"][1]["implementer_handoff"]["fix_options"][1]
+            .as_str()
+            .unwrap_or("")
+            .contains("owned or stable bytes")
+    );
+    assert_eq!(
+        ledger["candidates"][1]["implementer_handoff"]["test_targets"][1],
+        "bun target/unsafe-scout-mysql/mysql-blob-sab-matrix.js"
+    );
+    assert!(
+        ledger["candidates"][1]["implementer_handoff"]["do_not_touch"][0]
+            .as_str()
+            .unwrap_or("")
+            .contains("unrelated MySQL protocol packet")
+    );
     assert_eq!(
         ledger["candidates"][1]["evidence"][0]["kind"],
         "source_trace"
@@ -1063,6 +1095,12 @@ fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dy
         )
     );
     assert!(markdown.contains("Evidence packet: `3` external reference(s)"));
+    assert!(markdown.contains("Fix options:"));
+    assert!(markdown.contains("owned or stable bytes before storing Data::Temporary"));
+    assert!(markdown.contains("Test targets:"));
+    assert!(markdown.contains("test/js/sql/sql-mysql-bind-blob-borrow.test.ts"));
+    assert!(markdown.contains("Do not touch:"));
+    assert!(markdown.contains("Postgres bytea parity"));
     assert!(markdown.contains("`source_trace` at `src/sql_jsc/mysql/MySQLValue.rs`"));
     assert!(markdown.contains(
         "Bun.SQL MySQL BLOB matrix covers SharedArrayBuffer-backed typed-array parameters"
@@ -1480,6 +1518,31 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         candidate_queue[0]["implementer_handoff"]["route"]["unsafe_operation"],
         "core::slice::from_raw_parts"
     );
+    assert_eq!(
+        candidate_queue[1]["location_text"],
+        "src/sql_jsc/mysql/MySQLValue.rs:411"
+    );
+    assert_eq!(
+        candidate_queue[1]["operation_family"],
+        "slice_from_raw_parts"
+    );
+    assert_eq!(candidate_queue[1]["evidence_refs"], 3);
+    assert!(
+        candidate_queue[1]["implementer_handoff"]["fix_options"][0]
+            .as_str()
+            .unwrap_or("")
+            .contains("stable BufferSource copy helper")
+    );
+    assert_eq!(
+        candidate_queue[1]["implementer_handoff"]["test_targets"][2],
+        "cargo +nightly miri test mysql_rawslice_shared_bytes_model"
+    );
+    assert!(
+        candidate_queue[1]["implementer_handoff"]["do_not_touch"][2]
+            .as_str()
+            .unwrap_or("")
+            .contains("manual/advisory marker")
+    );
     assert!(
         candidate_queue[0]["explain"]
             .as_str()
@@ -1684,6 +1747,28 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             .as_str()
             .unwrap_or("")
             .contains("stop before source edits")
+    );
+    assert!(
+        manual_candidates["candidates"][1]["fix_options"][2]
+            .as_str()
+            .unwrap_or("")
+            .contains("local to MySQL bind-value conversion")
+    );
+    assert_eq!(
+        manual_candidates["candidates"][1]["test_targets"][0],
+        "test/js/sql/sql-mysql-bind-blob-borrow.test.ts"
+    );
+    assert!(
+        manual_candidates["candidates"][1]["do_not_touch"][0]
+            .as_str()
+            .unwrap_or("")
+            .contains("unrelated MySQL protocol packet")
+    );
+    assert!(
+        manual_candidates["candidates"][1]["implementer_handoff"]["fix_options"][1]
+            .as_str()
+            .unwrap_or("")
+            .contains("owned or stable bytes")
     );
     assert!(
         manual_candidates["reviewcard_artifact_relationship"]["cards.json"]

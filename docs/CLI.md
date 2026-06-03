@@ -301,7 +301,8 @@ Manual candidate projections preserve the manual marker and external evidence
 references, including optional exact evidence commands and limitations. The
 context JSON and witness plan also include a derived, copy-only implementer
 handoff with the file:line target, safe caller route, invariant at risk,
-external evidence references, non-goals, and stop line.
+external evidence references, optional fix options, test targets,
+do-not-touch guidance, non-goals, and stop line.
 Receipts may reference the same manual candidate ID and audit as a
 manual/advisory target:
 

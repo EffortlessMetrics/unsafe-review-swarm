@@ -1572,6 +1572,9 @@ fn append_manual_candidate_list_handoff_markdown(
             }
         }
     }
+    append_json_string_list_markdown(&handoff, "fix_options", "Fix options", out);
+    append_json_string_list_markdown(&handoff, "test_targets", "Test targets", out);
+    append_json_string_list_markdown(&handoff, "do_not_touch", "Do not touch", out);
     append_json_string_list_markdown(&handoff, "suggested_next_steps", "Next steps", out);
     append_json_string_list_markdown(&handoff, "non_goals", "Non-goals", out);
     let stop_condition = json_string_field(&handoff, "stop_condition")
@@ -2100,7 +2103,7 @@ fn print_candidate_help() {
         "- They use schema_version `manual-candidate/v1` and preserve source `manual`, manual_candidate `true`, and analyzer_discovered `false`."
     );
     println!(
-        "- They can carry a title, file:line location, operation family, unsafe operation, invariant, safe caller route, evidence references, and a trust boundary."
+        "- They can carry a title, file:line location, operation family, unsafe operation, invariant, safe caller route, evidence references, optional fix/test/do-not-touch guidance, and a trust boundary."
     );
     println!();
     println!("Commands:");
@@ -2119,7 +2122,7 @@ fn print_candidate_help() {
         "- explain and context can load the manual candidate by ID when no analyzer ReviewCard has that ID."
     );
     println!(
-        "- first-pr writes a separate manual-candidates.json handoff; cards.json, SARIF, comment-plan, LSP, repair-queue, and policy-report stay ReviewCard-only."
+        "- first-pr writes a separate manual-candidates.json handoff with optional guidance fields; cards.json, SARIF, comment-plan, LSP, repair-queue, and policy-report stay ReviewCard-only."
     );
     println!(
         "- receipts may audit against manual candidate IDs as external evidence for that manual target, not as imported ReviewCard witness evidence."

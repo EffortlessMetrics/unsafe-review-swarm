@@ -19,6 +19,12 @@ pub struct ManualCandidate {
     pub safe_caller: String,
     #[serde(default)]
     pub evidence: Vec<ManualCandidateEvidence>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub fix_options: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub test_targets: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub do_not_touch: Vec<String>,
     pub trust_boundary: String,
     #[serde(default = "manual_source")]
     pub source: String,
@@ -91,6 +97,9 @@ impl ManualCandidate {
         require_nonempty("invariant", &self.invariant)?;
         require_nonempty("safe_caller", &self.safe_caller)?;
         require_nonempty("trust_boundary", &self.trust_boundary)?;
+        require_nonempty_items("fix_options", &self.fix_options)?;
+        require_nonempty_items("test_targets", &self.test_targets)?;
+        require_nonempty_items("do_not_touch", &self.do_not_touch)?;
         for evidence in &self.evidence {
             if !is_known_evidence_kind(&evidence.kind) {
                 return Err(format!(
@@ -187,7 +196,7 @@ pub fn render_manual_candidate_explain(candidate: &ManualCandidate) -> String {
 }
 
 pub fn render_manual_candidate_context(candidate: &ManualCandidate) -> Result<String, String> {
-    let value = serde_json::json!({
+    let mut value = serde_json::json!({
         "schema_version": "manual-candidate-context/v1",
         "id": candidate.id,
         "source": "manual",
@@ -222,6 +231,11 @@ pub fn render_manual_candidate_context(candidate: &ManualCandidate) -> Result<St
         ],
         "trust_boundary": candidate.trust_boundary,
     });
+    if let Some(object) = value.as_object_mut() {
+        insert_non_empty_json_array(object, "fix_options", &candidate.fix_options);
+        insert_non_empty_json_array(object, "test_targets", &candidate.test_targets);
+        insert_non_empty_json_array(object, "do_not_touch", &candidate.do_not_touch);
+    }
     let mut rendered = serde_json::to_string_pretty(&value)
         .map_err(|err| format!("render manual candidate context failed: {err}"))?;
     rendered.push('\n');
@@ -299,12 +313,15 @@ fn render_candidate_handoff_markdown(out: &mut String, candidate: &ManualCandida
         candidate.safe_caller, candidate.unsafe_operation
     ));
     out.push_str(&format!("- Invariant at risk: {}\n", candidate.invariant));
+    render_string_list(out, "Fix options", &candidate.fix_options);
+    render_string_list(out, "Test targets", &candidate.test_targets);
+    render_string_list(out, "Do not touch", &candidate.do_not_touch);
     out.push_str("- Next: confirm the route, preserve or add concrete evidence for the invariant, and attach receipts only when they target this manual candidate ID.\n");
     out.push_str("- Stop line: stop before source edits if the route no longer matches this manual candidate, or if the repair would broaden into unrelated unsafe sites.\n\n");
 }
 
 pub fn manual_candidate_implementer_handoff(candidate: &ManualCandidate) -> serde_json::Value {
-    serde_json::json!({
+    let mut value = serde_json::json!({
         "target": {
             "file": candidate.location.file.display().to_string(),
             "line": candidate.location.line,
@@ -323,18 +340,69 @@ pub fn manual_candidate_implementer_handoff(candidate: &ManualCandidate) -> serd
             "command": evidence.command,
             "limitation": evidence.limitation,
         })).collect::<Vec<_>>(),
-        "suggested_next_steps": [
-            "confirm the file:line and safe caller route before editing",
-            "preserve or add concrete contract, guard, test, or witness evidence for the invariant",
-            "attach receipts only when the external run targets this manual candidate ID"
-        ],
-        "non_goals": [
-            "do not treat this as analyzer-discovered",
-            "do not claim proof, UB-free status, Miri-clean status, or site execution",
-            "do not broaden the task to unrelated unsafe sites"
-        ],
+        "suggested_next_steps": manual_candidate_suggested_next_steps(candidate),
+        "non_goals": manual_candidate_non_goals(candidate),
         "stop_condition": "stop before source edits if the route no longer matches this manual candidate, or if the repair would broaden into unrelated unsafe sites",
-    })
+    });
+    if let Some(object) = value.as_object_mut() {
+        insert_non_empty_json_array(object, "fix_options", &candidate.fix_options);
+        insert_non_empty_json_array(object, "test_targets", &candidate.test_targets);
+        insert_non_empty_json_array(object, "do_not_touch", &candidate.do_not_touch);
+    }
+    value
+}
+
+fn manual_candidate_suggested_next_steps(candidate: &ManualCandidate) -> Vec<String> {
+    let mut steps = vec![
+        "confirm the file:line and safe caller route before editing".to_string(),
+        "preserve or add concrete contract, guard, test, or witness evidence for the invariant"
+            .to_string(),
+        "attach receipts only when the external run targets this manual candidate ID".to_string(),
+    ];
+    if !candidate.fix_options.is_empty() {
+        steps.push("evaluate the candidate-specific fix options before editing".to_string());
+    }
+    if !candidate.test_targets.is_empty() {
+        steps.push(
+            "run or preserve the candidate-specific test targets listed in this handoff"
+                .to_string(),
+        );
+    }
+    if !candidate.do_not_touch.is_empty() {
+        steps.push("respect the candidate-specific do-not-touch notes before editing".to_string());
+    }
+    steps
+}
+
+fn manual_candidate_non_goals(candidate: &ManualCandidate) -> Vec<String> {
+    let mut non_goals = vec![
+        "do not treat this as analyzer-discovered".to_string(),
+        "do not claim proof, UB-free status, Miri-clean status, or site execution".to_string(),
+        "do not broaden the task to unrelated unsafe sites".to_string(),
+    ];
+    non_goals.extend(candidate.do_not_touch.iter().cloned());
+    non_goals
+}
+
+fn render_string_list(out: &mut String, label: &str, items: &[String]) {
+    if items.is_empty() {
+        return;
+    }
+    out.push_str(&format!("- {label}:\n"));
+    for item in items {
+        out.push_str(&format!("  - {item}\n"));
+    }
+}
+
+fn insert_non_empty_json_array(
+    object: &mut serde_json::Map<String, serde_json::Value>,
+    field: &str,
+    values: &[String],
+) {
+    if values.is_empty() {
+        return;
+    }
+    object.insert(field.to_string(), serde_json::json!(values));
 }
 
 fn manual_candidate_location_text(candidate: &ManualCandidate) -> String {
@@ -361,6 +429,17 @@ fn require_nonempty(field: &str, value: &str) -> Result<(), String> {
     } else {
         Ok(())
     }
+}
+
+fn require_nonempty_items(field: &str, values: &[String]) -> Result<(), String> {
+    for value in values {
+        if value.trim().is_empty() {
+            return Err(format!(
+                "manual candidate {field} entries must not be empty"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn require_optional_nonempty(field: &str, value: Option<&str>) -> Result<(), String> {
@@ -412,9 +491,15 @@ mod tests {
         assert!(candidate.manual_candidate);
         assert!(!candidate.analyzer_discovered);
         assert_eq!(candidate.evidence.len(), 2);
+        assert_eq!(candidate.fix_options.len(), 1);
+        assert_eq!(candidate.test_targets.len(), 1);
+        assert_eq!(candidate.do_not_touch.len(), 1);
         let canonical = candidate.to_pretty_json()?;
         assert!(canonical.contains("\"manual_candidate\": true"));
         assert!(canonical.contains("\"analyzer_discovered\": false"));
+        assert!(canonical.contains("\"fix_options\""));
+        assert!(canonical.contains("\"test_targets\""));
+        assert!(canonical.contains("\"do_not_touch\""));
         Ok(())
     }
 
@@ -503,6 +588,18 @@ mod tests {
     }
 
     #[test]
+    fn manual_candidate_rejects_empty_guidance_entries() {
+        let err = ManualCandidate::from_json_str(&example_json().replace(
+            "\"copy SharedArrayBuffer-backed bytes before constructing the slice\"",
+            "\"   \"",
+        ))
+        .err()
+        .unwrap_or_default();
+
+        assert!(err.contains("fix_options"));
+    }
+
+    #[test]
     fn manual_candidate_explain_context_and_witness_plan_preserve_manual_marker()
     -> Result<(), String> {
         let candidate = ManualCandidate::from_json_str(example_json())?;
@@ -515,6 +612,12 @@ mod tests {
         assert!(explain.contains("Analyzer-discovered: `false`"));
         assert!(explain.contains("## Implementer handoff"));
         assert!(explain.contains("Stop line: stop before source edits"));
+        assert!(explain.contains("Fix options"));
+        assert!(explain.contains("copy SharedArrayBuffer-backed bytes"));
+        assert!(explain.contains("Test targets"));
+        assert!(explain.contains("textdecoder-sharedarraybuffer.test.ts"));
+        assert!(explain.contains("Do not touch"));
+        assert!(explain.contains("TextDecoder unrelated encodings"));
         assert!(explain.contains("command `bun test"));
         assert!(explain.contains("limitation: runtime route evidence only"));
         assert!(context.contains("\"source\": \"manual\""));
@@ -523,10 +626,16 @@ mod tests {
         assert!(context.contains("\"invariant_at_risk\""));
         assert!(context.contains("\"command\": \"bun test"));
         assert!(context.contains("\"limitation\": \"runtime route evidence only"));
+        assert!(context.contains("\"fix_options\""));
+        assert!(context.contains("\"test_targets\""));
+        assert!(context.contains("\"do_not_touch\""));
         assert!(context.contains("\"stop_condition\""));
         assert!(witness_plan.contains("manual candidate witness plan"));
         assert!(witness_plan.contains("does not run witnesses"));
         assert!(witness_plan.contains("## Implementer handoff"));
+        assert!(witness_plan.contains("Fix options"));
+        assert!(witness_plan.contains("Test targets"));
+        assert!(witness_plan.contains("Do not touch"));
         assert!(witness_plan.contains("command `bun test"));
         Ok(())
     }
@@ -547,6 +656,15 @@ mod tests {
           "unsafe_operation": "core::slice::from_raw_parts",
           "invariant": "&[u8] memory must not be concurrently mutated",
           "safe_caller": "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))",
+          "fix_options": [
+            "copy SharedArrayBuffer-backed bytes before constructing the slice"
+          ],
+          "test_targets": [
+            "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+          ],
+          "do_not_touch": [
+            "Do not rewrite TextDecoder unrelated encodings"
+          ],
           "evidence": [
             {
               "kind": "runtime_witness",

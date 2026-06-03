@@ -91,6 +91,9 @@ struct ManualCandidateProjection {
     invariant: String,
     safe_caller: String,
     evidence: Vec<ManualCandidateEvidenceProjection>,
+    fix_options: Vec<String>,
+    test_targets: Vec<String>,
+    do_not_touch: Vec<String>,
     evidence_refs: usize,
     implementer_handoff: serde_json::Value,
 }
@@ -649,6 +652,21 @@ fn check_manual_candidate_artifact_entry(
         "witness_plan_command",
         "manual-candidates.json candidate",
     )?;
+    let fix_options = require_optional_string_array(
+        candidate,
+        "fix_options",
+        "manual-candidates.json candidate",
+    )?;
+    let test_targets = require_optional_string_array(
+        candidate,
+        "test_targets",
+        "manual-candidates.json candidate",
+    )?;
+    let do_not_touch = require_optional_string_array(
+        candidate,
+        "do_not_touch",
+        "manual-candidates.json candidate",
+    )?;
     let handoff = candidate.get("implementer_handoff").ok_or_else(|| {
         "manual-candidates.json candidate is missing implementer_handoff".to_string()
     })?;
@@ -670,6 +688,9 @@ fn check_manual_candidate_artifact_entry(
         safe_caller,
         evidence_refs: evidence.len(),
         evidence,
+        fix_options,
+        test_targets,
+        do_not_touch,
         implementer_handoff: handoff.clone(),
     };
     check_manual_candidate_implementer_handoff(
@@ -768,6 +789,24 @@ fn check_manual_candidate_implementer_handoff(
         )?;
     }
 
+    require_projected_optional_string_array(
+        handoff,
+        "fix_options",
+        &expected.fix_options,
+        context,
+    )?;
+    require_projected_optional_string_array(
+        handoff,
+        "test_targets",
+        &expected.test_targets,
+        context,
+    )?;
+    require_projected_optional_string_array(
+        handoff,
+        "do_not_touch",
+        &expected.do_not_touch,
+        context,
+    )?;
     require_non_empty_string_array(handoff, "suggested_next_steps", context)?;
     let non_goals = require_non_empty_string_array(handoff, "non_goals", context)?;
     for expected_text in [
@@ -778,6 +817,13 @@ fn check_manual_candidate_implementer_handoff(
         if !non_goals.iter().any(|item| item.contains(expected_text)) {
             return Err(format!(
                 "{context} non_goals must include `{expected_text}`"
+            ));
+        }
+    }
+    for expected_text in &expected.do_not_touch {
+        if !non_goals.iter().any(|item| item == expected_text) {
+            return Err(format!(
+                "{context} non_goals must include candidate do_not_touch entry `{expected_text}`"
             ));
         }
     }
@@ -847,6 +893,43 @@ fn require_non_empty_string_array(
                 .ok_or_else(|| format!("{context} {field} entries must be non-empty strings"))
         })
         .collect()
+}
+
+fn require_optional_string_array(
+    value: &serde_json::Value,
+    field: &str,
+    context: &str,
+) -> Result<Vec<String>, String> {
+    let Some(items) = value.get(field) else {
+        return Ok(Vec::new());
+    };
+    let Some(items) = items.as_array() else {
+        return Err(format!("{context} {field} must be an array when present"));
+    };
+    items
+        .iter()
+        .map(|item| {
+            item.as_str()
+                .filter(|text| !text.trim().is_empty())
+                .map(str::to_string)
+                .ok_or_else(|| format!("{context} {field} entries must be non-empty strings"))
+        })
+        .collect()
+}
+
+fn require_projected_optional_string_array(
+    value: &serde_json::Value,
+    field: &str,
+    expected: &[String],
+    context: &str,
+) -> Result<(), String> {
+    let actual = require_optional_string_array(value, field, context)?;
+    if actual != expected {
+        return Err(format!(
+            "{context} {field} must match manual-candidates.json candidate {field}"
+        ));
+    }
+    Ok(())
 }
 
 fn check_review_kit_manifest(
