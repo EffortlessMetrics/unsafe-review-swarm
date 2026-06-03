@@ -1303,6 +1303,15 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("manual-candidates.json"));
     assert!(stdout.contains("Count: 2"));
     assert!(stdout.contains("First manual candidate: R4R2-S001"));
+    assert!(stdout.contains("Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)"));
+    assert!(
+        stdout.contains("First test target: test/js/webcore/textdecoder-sharedarraybuffer.test.ts")
+    );
+    assert!(stdout.contains("Manual candidate queue preview: first 2 of 2 manual candidate(s)"));
+    assert!(stdout.contains(
+        "R4R2-S002 at src/sql_jsc/mysql/MySQLValue.rs:411 (slice_from_raw_parts) evidence refs: 3"
+    ));
+    assert!(stdout.contains("first test target: test/js/sql/sql-mysql-bind-blob-borrow.test.ts"));
     assert!(stdout.contains("unsafe-review explain --root"));
     assert!(stdout.contains("unsafe-review context --root"));
     assert!(stdout.contains("unsafe-review candidate witness-plan --root"));
@@ -4074,6 +4083,22 @@ fn assert_manual_candidate_front_panel(text: &str, later_heading: &str) {
     ));
     assert!(text.contains("- Invariant at risk: &[u8] memory must not be concurrently mutated"));
     assert!(text.contains("- External evidence refs: 2"));
+    assert!(text.contains("- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)"));
+    assert!(text.contains(
+        "- First fix option: Copy SharedArrayBuffer-backed bytes into stable owned storage before creating a Rust slice"
+    ));
+    assert!(
+        text.contains(
+            "- First test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`"
+        )
+    );
+    assert!(text.contains(
+        "- First do-not-touch note: Do not rewrite unrelated TextDecoder encoding paths"
+    ));
+    assert!(text.contains("- Manual candidate queue preview: first 2 of 2 manual candidate(s)"));
+    assert!(text.contains(
+        "`R4R2-S002` at `src/sql_jsc/mysql/MySQLValue.rs:411` (`slice_from_raw_parts`); evidence refs: 3; first test target: `test/js/sql/sql-mysql-bind-blob-borrow.test.ts`"
+    ));
     assert!(text.contains("unsafe-review explain --root"));
     assert!(text.contains("unsafe-review context --root"));
     assert!(text.contains("unsafe-review candidate witness-plan --root"));
@@ -4106,6 +4131,22 @@ fn assert_manual_candidate_witness_follow_up(text: &str) {
     ));
     assert!(text.contains("- Invariant at risk: &[u8] memory must not be concurrently mutated"));
     assert!(text.contains("- External evidence refs: 2"));
+    assert!(text.contains("- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)"));
+    assert!(text.contains(
+        "- First fix option: Copy SharedArrayBuffer-backed bytes into stable owned storage before creating a Rust slice"
+    ));
+    assert!(
+        text.contains(
+            "- First test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`"
+        )
+    );
+    assert!(text.contains(
+        "- First do-not-touch note: Do not rewrite unrelated TextDecoder encoding paths"
+    ));
+    assert!(text.contains("- Manual candidate queue preview: first 2 of 2 manual candidate(s)"));
+    assert!(text.contains(
+        "`R4R2-S002` at `src/sql_jsc/mysql/MySQLValue.rs:411` (`slice_from_raw_parts`); evidence refs: 3; first test target: `test/js/sql/sql-mysql-bind-blob-borrow.test.ts`"
+    ));
     assert!(text.contains("unsafe-review candidate witness-plan --root"));
     assert!(text.contains("unsafe-review context --root"));
     assert!(text.contains("manual-candidates.json"));

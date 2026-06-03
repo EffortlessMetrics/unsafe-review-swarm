@@ -13,6 +13,15 @@
   "unsafe_operation": "core::slice::from_raw_parts",
   "invariant": "&[u8] memory must not be concurrently mutated",
   "safe_caller": "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))",
+  "fix_options": [
+    "Copy SharedArrayBuffer-backed bytes into stable owned storage before creating a Rust slice"
+  ],
+  "test_targets": [
+    "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+  ],
+  "do_not_touch": [
+    "Do not rewrite unrelated TextDecoder encoding paths"
+  ],
   "evidence": [
     {
       "kind": "runtime_witness",

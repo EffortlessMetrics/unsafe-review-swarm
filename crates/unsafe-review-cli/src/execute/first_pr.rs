@@ -54,6 +54,12 @@ fn print_manual_candidate_handoff(
     println!("  Count: {}", manual_candidates.len());
     if let Some(candidate) = manual_candidates.first() {
         println!("  First manual candidate: {}", candidate.id);
+        if let Some(summary) = manual_candidate_guidance_summary(candidate) {
+            println!("  Guidance: {summary}");
+        }
+        if let Some(target) = candidate.test_targets.first() {
+            println!("  First test target: {target}");
+        }
         println!("  Explain: {}", explain_command(root, &candidate.id));
         println!("  Agent packet: {}", context_command(root, &candidate.id));
         println!(
@@ -61,6 +67,7 @@ fn print_manual_candidate_handoff(
             candidate_witness_plan_command(root, &candidate.id)
         );
     }
+    print_manual_candidate_queue_preview(root, manual_candidates);
     println!(
         "  Review-kit candidate queue: first {} of {} manual candidate(s)",
         manual_candidates
@@ -71,6 +78,36 @@ fn print_manual_candidate_handoff(
     println!(
         "  manual candidates are advisory manual targets, not analyzer-discovered, not policy inputs, and unsafe-review did not run witnesses"
     );
+}
+
+fn print_manual_candidate_queue_preview(root: &Path, manual_candidates: &[ManualCandidate]) {
+    let queue_len = manual_candidates
+        .len()
+        .min(MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT);
+    println!(
+        "  Manual candidate queue preview: first {queue_len} of {} manual candidate(s)",
+        manual_candidates.len()
+    );
+    for candidate in manual_candidates.iter().take(queue_len) {
+        println!(
+            "    - {} at {} ({}) evidence refs: {}",
+            candidate.id,
+            manual_candidate_location_text(candidate),
+            candidate.operation_family,
+            candidate.evidence.len()
+        );
+        if let Some((label, value)) = manual_candidate_first_guidance_cue(candidate) {
+            println!("      {label}: {value}");
+        }
+        println!(
+            "      Agent packet: {}",
+            context_command(root, &candidate.id)
+        );
+        println!(
+            "      Witness plan: {}",
+            candidate_witness_plan_command(root, &candidate.id)
+        );
+    }
 }
 
 fn receipt_audit_command(check: &CheckOptions) -> String {
@@ -377,6 +414,7 @@ fn render_manual_candidate_front_panel(
             "- External evidence refs: {}\n",
             candidate.evidence.len()
         ));
+        append_manual_candidate_guidance_lines(&mut out, candidate);
         out.push_str(&format!(
             "- Explain: `{}`\n",
             explain_command(root, &candidate.id)
@@ -390,6 +428,7 @@ fn render_manual_candidate_front_panel(
             candidate_witness_plan_command(root, &candidate.id)
         ));
     }
+    append_manual_candidate_queue_preview(&mut out, root, manual_candidates);
     out.push_str("- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only outputs.\n");
     out.push_str("- Boundary: copy-only manual handoff; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n");
     out
@@ -421,6 +460,7 @@ fn render_manual_candidate_witness_follow_up(
             "- External evidence refs: {}",
             candidate.evidence.len()
         );
+        append_manual_candidate_guidance_lines(&mut out, candidate);
         let _ = writeln!(
             &mut out,
             "- Full manual witness plan: `{}`",
@@ -432,10 +472,94 @@ fn render_manual_candidate_witness_follow_up(
             context_command(root, &candidate.id)
         );
     }
+    append_manual_candidate_queue_preview(&mut out, root, manual_candidates);
     out.push_str("- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only witness route groups.\n");
     out.push_str("- Receipt boundary: manual candidate receipts attach external evidence to the manual candidate ID only; they do not import ReviewCard witness evidence.\n");
     out.push_str("- Boundary: copy-only manual follow-up; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n");
     out
+}
+
+fn append_manual_candidate_guidance_lines(out: &mut String, candidate: &ManualCandidate) {
+    if let Some(summary) = manual_candidate_guidance_summary(candidate) {
+        let _ = writeln!(out, "- Guidance: {summary}");
+    }
+    if let Some(option) = candidate.fix_options.first() {
+        let _ = writeln!(out, "- First fix option: {option}");
+    }
+    if let Some(target) = candidate.test_targets.first() {
+        let _ = writeln!(out, "- First test target: `{target}`");
+    }
+    if let Some(note) = candidate.do_not_touch.first() {
+        let _ = writeln!(out, "- First do-not-touch note: {note}");
+    }
+}
+
+fn append_manual_candidate_queue_preview(
+    out: &mut String,
+    root: &Path,
+    manual_candidates: &[ManualCandidate],
+) {
+    let queue_len = manual_candidates
+        .len()
+        .min(MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT);
+    let _ = writeln!(
+        out,
+        "- Manual candidate queue preview: first {queue_len} of {} manual candidate(s)",
+        manual_candidates.len()
+    );
+    for candidate in manual_candidates.iter().take(queue_len) {
+        let _ = write!(
+            out,
+            "  - `{}` at `{}` (`{}`); evidence refs: {}",
+            candidate.id,
+            manual_candidate_location_text(candidate),
+            candidate.operation_family,
+            candidate.evidence.len()
+        );
+        if let Some((label, value)) = manual_candidate_first_guidance_cue(candidate) {
+            let _ = write!(out, "; {label}: `{value}`");
+        }
+        out.push('\n');
+        let _ = writeln!(
+            out,
+            "    - Agent context: `{}`",
+            context_command(root, &candidate.id)
+        );
+        let _ = writeln!(
+            out,
+            "    - Witness plan: `{}`",
+            candidate_witness_plan_command(root, &candidate.id)
+        );
+    }
+}
+
+fn manual_candidate_first_guidance_cue(
+    candidate: &ManualCandidate,
+) -> Option<(&'static str, &str)> {
+    if let Some(value) = candidate.test_targets.first() {
+        return Some(("first test target", value.as_str()));
+    }
+    if let Some(value) = candidate.fix_options.first() {
+        return Some(("first fix option", value.as_str()));
+    }
+    if let Some(value) = candidate.do_not_touch.first() {
+        return Some(("first do-not-touch note", value.as_str()));
+    }
+    None
+}
+
+fn manual_candidate_guidance_summary(candidate: &ManualCandidate) -> Option<String> {
+    let total =
+        candidate.fix_options.len() + candidate.test_targets.len() + candidate.do_not_touch.len();
+    if total == 0 {
+        return None;
+    }
+    Some(format!(
+        "{} fix option(s), {} test target(s), {} do-not-touch note(s)",
+        candidate.fix_options.len(),
+        candidate.test_targets.len(),
+        candidate.do_not_touch.len()
+    ))
 }
 
 fn manual_candidate_location_text(candidate: &ManualCandidate) -> String {
@@ -765,6 +889,27 @@ mod tests {
         );
         assert!(github_summary.contains("- External evidence refs: 1"));
         assert!(
+            github_summary
+                .contains("- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)")
+        );
+        assert!(github_summary.contains(
+            "- First fix option: Copy SharedArrayBuffer-backed bytes before constructing the slice"
+        ));
+        assert!(github_summary.contains(
+            "- First test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`"
+        ));
+        assert!(
+            github_summary
+                .contains("- First do-not-touch note: Do not rewrite unrelated TextDecoder paths")
+        );
+        assert!(
+            github_summary
+                .contains("- Manual candidate queue preview: first 1 of 1 manual candidate(s)")
+        );
+        assert!(github_summary.contains(
+            "`R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 1; first test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`"
+        ));
+        assert!(
             github_summary.contains("unsafe-review explain --root \"fixtures/bun fork\" R4R2-S001")
         );
         assert!(
@@ -828,6 +973,15 @@ mod tests {
               "unsafe_operation": "core::slice::from_raw_parts",
               "invariant": "&[u8] memory must not be concurrently mutated",
               "safe_caller": "TextDecoder.decode SharedArrayBuffer route",
+              "fix_options": [
+                "Copy SharedArrayBuffer-backed bytes before constructing the slice"
+              ],
+              "test_targets": [
+                "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+              ],
+              "do_not_touch": [
+                "Do not rewrite unrelated TextDecoder paths"
+              ],
               "evidence": [{
                 "kind": "runtime_witness",
                 "path": "target/unsafe-scout/textdecoder-shared-race-route.out",

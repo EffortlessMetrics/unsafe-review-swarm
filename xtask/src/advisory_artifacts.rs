@@ -288,6 +288,8 @@ fn check_manual_candidate_front_door_text(
         &format!("- External evidence refs: {}", first.evidence_refs),
         path,
     )?;
+    check_manual_candidate_front_door_guidance_text(text, path, first)?;
+    check_manual_candidate_queue_preview_text(text, path, manual_candidates)?;
     for expected in [
         "unsafe-review explain",
         "unsafe-review context",
@@ -302,6 +304,96 @@ fn check_manual_candidate_front_door_text(
         "policy inputs",
     ] {
         super::require_text_contains(text, expected, path)?;
+    }
+    Ok(())
+}
+
+fn check_manual_candidate_queue_preview_text(
+    text: &str,
+    path: &Path,
+    manual_candidates: &ManualCandidateIndexProjection,
+) -> Result<(), String> {
+    let queue_len = manual_candidates
+        .count
+        .min(MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT);
+    super::require_text_contains(
+        text,
+        &format!(
+            "- Manual candidate queue preview: first {queue_len} of {} manual candidate(s)",
+            manual_candidates.count
+        ),
+        path,
+    )?;
+    for candidate in manual_candidates.candidates.iter().take(queue_len) {
+        super::require_text_contains(
+            text,
+            &format!(
+                "`{}` at `{}` (`{}`); evidence refs: {}",
+                candidate.id,
+                candidate.location_text,
+                candidate.operation_family,
+                candidate.evidence_refs
+            ),
+            path,
+        )?;
+        if let Some((label, value)) = manual_candidate_first_guidance_cue(candidate) {
+            super::require_text_contains(text, &format!("{label}: `{value}`"), path)?;
+        }
+        for expected in [
+            "unsafe-review context",
+            "unsafe-review candidate witness-plan",
+            &candidate.id,
+        ] {
+            super::require_text_contains(text, expected, path)?;
+        }
+    }
+    Ok(())
+}
+
+fn manual_candidate_first_guidance_cue(
+    candidate: &ManualCandidateProjection,
+) -> Option<(&'static str, &str)> {
+    if let Some(value) = candidate.test_targets.first() {
+        return Some(("first test target", value.as_str()));
+    }
+    if let Some(value) = candidate.fix_options.first() {
+        return Some(("first fix option", value.as_str()));
+    }
+    if let Some(value) = candidate.do_not_touch.first() {
+        return Some(("first do-not-touch note", value.as_str()));
+    }
+    None
+}
+
+fn check_manual_candidate_front_door_guidance_text(
+    text: &str,
+    path: &Path,
+    candidate: &ManualCandidateProjection,
+) -> Result<(), String> {
+    let guidance_count =
+        candidate.fix_options.len() + candidate.test_targets.len() + candidate.do_not_touch.len();
+    if guidance_count == 0 {
+        return Ok(());
+    }
+
+    super::require_text_contains(
+        text,
+        &format!(
+            "- Guidance: {} fix option(s), {} test target(s), {} do-not-touch note(s)",
+            candidate.fix_options.len(),
+            candidate.test_targets.len(),
+            candidate.do_not_touch.len()
+        ),
+        path,
+    )?;
+    if let Some(option) = candidate.fix_options.first() {
+        super::require_text_contains(text, &format!("- First fix option: {option}"), path)?;
+    }
+    if let Some(target) = candidate.test_targets.first() {
+        super::require_text_contains(text, &format!("- First test target: `{target}`"), path)?;
+    }
+    if let Some(note) = candidate.do_not_touch.first() {
+        super::require_text_contains(text, &format!("- First do-not-touch note: {note}"), path)?;
     }
     Ok(())
 }
@@ -3876,6 +3968,8 @@ fn check_manual_candidate_witness_plan_text(
         &format!("- External evidence refs: {}", first.evidence_refs),
         path,
     )?;
+    check_manual_candidate_front_door_guidance_text(text, path, first)?;
+    check_manual_candidate_queue_preview_text(text, path, manual_candidates)?;
     for expected in [
         "unsafe-review candidate witness-plan",
         "unsafe-review context",

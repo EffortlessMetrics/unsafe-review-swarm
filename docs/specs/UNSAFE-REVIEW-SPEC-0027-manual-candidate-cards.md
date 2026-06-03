@@ -197,16 +197,19 @@ ReviewCard repair queue.
 When imported candidates are present in a `first-pr` run, `pr-summary.md` and
 `github-summary.md` must include a compact manual-candidate front-door cue with
 the manual count, first candidate ID, file:line, operation family, safe caller
-route, invariant, evidence count, copy-only explain/context/witness-plan
+route, invariant, evidence count, optional first-candidate fix/test/do-not-touch
+guidance, a bounded manual-candidate queue preview with file:line, operation
+family, evidence count, first guidance cue, copy-only context/witness-plan
 commands, and advisory boundary. The full candidate payload remains in
 `manual-candidates.json` and `review-kit.json`; the cue must not add manual
 candidates to ReviewCard-only artifacts.
 
 The bundled `first-pr` `witness-plan.md` may include a compact manual-candidate
 follow-up cue that points to `candidate witness-plan` for the full copy-only
-manual packet. That cue must preserve the manual/advisory markers and must not
-add manual candidates to ReviewCard witness route groups or import ReviewCard
-witness evidence.
+manual packet. That cue may include optional first-candidate fix/test/do-not-touch
+guidance plus the bounded manual-candidate queue preview, must preserve the
+manual/advisory markers, and must not add manual candidates to ReviewCard
+witness route groups or import ReviewCard witness evidence.
 
 If a manual candidate cannot be projected faithfully into a surface, that
 surface must reject or omit it with an explicit reason instead of degrading it
@@ -277,10 +280,12 @@ into an analyzer ReviewCard.
   `candidate witness-plan` commands while preserving `source = manual`,
   `manual_candidate = true`, and `analyzer_discovered = false`.
 - `first-pr` `pr-summary.md` and `github-summary.md` show a compact manual
-  candidate front-door cue so reviewers can notice and open the copy-only
-  handoff without treating candidates as analyzer ReviewCards.
+  candidate front-door cue, including a bounded queue preview and optional
+  guidance when present, so reviewers can notice and open the copy-only handoff
+  without treating candidates as analyzer ReviewCards.
 - `first-pr` `witness-plan.md` shows a compact manual candidate follow-up cue
-  before the ReviewCard trust boundary, points to `candidate witness-plan`, and
+  before the ReviewCard trust boundary, points to `candidate witness-plan`,
+  includes a bounded queue preview plus optional guidance when present, and
   keeps manual candidates out of ReviewCard witness route groups.
 
 ## CI Proof
