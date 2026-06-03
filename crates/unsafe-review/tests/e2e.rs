@@ -24,6 +24,8 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     let value = parse_json(&stdout_text(&json)?)?;
     assert_eq!(value["schema_version"], "0.1");
     assert_eq!(value["scope"], "diff");
+    assert_eq!(value["summary"]["changed_files"], 1);
+    assert_eq!(value["summary"]["changed_non_rust_files"], 0);
     assert_eq!(value["summary"]["cards"], 1);
     assert_eq!(value["cards"][0]["class"], "guard_missing");
     assert_eq!(
@@ -544,6 +546,48 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     assert!(explain.contains("## Witness route"));
     assert!(explain.contains("## Trust boundary"));
     assert!(explain.contains("not UB-free status"));
+
+    Ok(())
+}
+
+#[test]
+fn check_json_summary_reports_mixed_language_diff_scope() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-mixed-diff-e2e")?;
+    let mixed_diff_path = temp.path().join("mixed.diff");
+    let mut mixed_diff = fs::read_to_string(fixture.join("change.diff"))?;
+    mixed_diff.push_str(
+        r#"diff --git a/src/js/buffer.ts b/src/js/buffer.ts
+--- a/src/js/buffer.ts
++++ b/src/js/buffer.ts
+@@ -1,0 +1,1 @@
++export const changed = true;
+diff --git a/src/binding.cpp b/src/binding.cpp
+--- a/src/binding.cpp
++++ b/src/binding.cpp
+@@ -1,0 +1,1 @@
++void changed() {}
+"#,
+    );
+    fs::write(&mixed_diff_path, mixed_diff)?;
+
+    let output = run_success([
+        os("check"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        mixed_diff_path.into_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let value = parse_json(&stdout_text(&output)?)?;
+    let summary = &value["summary"];
+
+    assert_eq!(summary["changed_files"], 3);
+    assert_eq!(summary["changed_rust_files"], 1);
+    assert_eq!(summary["changed_non_rust_files"], 2);
+    assert_eq!(summary["cards"], 1);
+    assert_eq!(value["cards"][0]["site"]["file"], "src/lib.rs");
 
     Ok(())
 }
@@ -2094,7 +2138,9 @@ fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<()
     let summary = &repo["summary"];
     for key in [
         "rust_files",
+        "changed_files",
         "changed_rust_files",
+        "changed_non_rust_files",
         "unsafe_sites",
         "cards",
         "open_actionable_gaps",

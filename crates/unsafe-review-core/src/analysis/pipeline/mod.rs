@@ -80,6 +80,8 @@ fn analyze_with_receipts(
     let started = Instant::now();
     let repo_mode = matches!(input.scope, Scope::Repo) || matches!(input.mode, AnalysisMode::Repo);
     let diff_index = load_diff_index(&input.diff)?;
+    let changed_files = diff_index.changed_file_count();
+    let changed_non_rust_files = diff_index.changed_non_rust_file_count();
     emit_repo_status(
         &mut events,
         repo_status(RepoScanPhase::Discovering, &started, 0, 0, 0, None, false),
@@ -123,6 +125,11 @@ fn analyze_with_receipts(
             .filter(|path| diff_index.contains_file(path))
             .cloned()
             .collect::<Vec<_>>()
+    };
+    let changed_rust_files = if repo_mode || diff_index.is_empty() {
+        candidate_files.len()
+    } else {
+        diff_index.changed_rust_file_count()
     };
 
     let mut cards = Vec::new();
@@ -189,7 +196,9 @@ fn analyze_with_receipts(
             Some(partial_analyze_output(
                 &input,
                 all_rust_files.len(),
-                candidate_files.len(),
+                changed_files,
+                changed_rust_files,
+                changed_non_rust_files,
                 &cards,
             )),
         )?;
@@ -199,7 +208,13 @@ fn analyze_with_receipts(
         }
     }
     sort_cards(&mut cards);
-    let summary = summarize(all_rust_files.len(), candidate_files.len(), &cards);
+    let summary = summarize(
+        all_rust_files.len(),
+        changed_files,
+        changed_rust_files,
+        changed_non_rust_files,
+        &cards,
+    );
     let output = AnalyzeOutput {
         schema_version: "0.1".to_string(),
         tool: "unsafe-review".to_string(),
@@ -239,12 +254,20 @@ fn sort_cards(cards: &mut [ReviewCard]) {
 fn partial_analyze_output(
     input: &AnalyzeInput,
     rust_files: usize,
+    changed_files: usize,
     changed_rust_files: usize,
+    changed_non_rust_files: usize,
     cards: &[ReviewCard],
 ) -> AnalyzeOutput {
     let mut cards = cards.to_vec();
     sort_cards(&mut cards);
-    let summary = summarize(rust_files, changed_rust_files, &cards);
+    let summary = summarize(
+        rust_files,
+        changed_files,
+        changed_rust_files,
+        changed_non_rust_files,
+        &cards,
+    );
     AnalyzeOutput {
         schema_version: "0.1".to_string(),
         tool: "unsafe-review".to_string(),
@@ -1023,6 +1046,75 @@ mod tests {
             PathBuf::from("src/lib.rs")
         );
         assert_eq!(output.cards.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn diff_summary_reports_mixed_language_scope_without_scanning_non_rust_files()
+    -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-mixed-diff-summary")?;
+        fs::create_dir_all(root.join("src")).map_err(|err| format!("create src failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"mixed-diff-summary-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
+        fs::write(root.join("src/lib.rs"), "pub unsafe fn source_root() {}\n")
+            .map_err(|err| format!("write src file failed: {err}"))?;
+        let diff = r#"diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,1 @@
++pub unsafe fn source_root() {}
+diff --git a/src/js/buffer.ts b/src/js/buffer.ts
+--- a/src/js/buffer.ts
++++ b/src/js/buffer.ts
+@@ -1,0 +1,1 @@
++export const changed = true;
+diff --git a/src/binding.cpp b/src/binding.cpp
+--- a/src/binding.cpp
++++ b/src/binding.cpp
+@@ -1,0 +1,1 @@
++void changed() {}
+"#;
+
+        let mut partials = Vec::new();
+        let output = analyze_with_discovery_and_repo_events(
+            AnalyzeInput {
+                root: root.clone(),
+                scope: Scope::Diff,
+                diff: DiffSource::Text(diff.to_string()),
+                mode: AnalysisMode::Draft,
+                policy: PolicyMode::Advisory,
+                include_unchanged_tests: true,
+                max_cards: None,
+            },
+            DiscoveryOptions::default(),
+            |event| {
+                if let Some(partial) = &event.partial_output
+                    && event.status.phase == RepoScanPhase::Scanning
+                    && event.status.files_scanned == 1
+                {
+                    partials.push(partial.clone());
+                }
+                Ok(())
+            },
+        )?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert_eq!(output.summary.rust_files, 1);
+        assert_eq!(output.summary.changed_files, 3);
+        assert_eq!(output.summary.changed_rust_files, 1);
+        assert_eq!(output.summary.changed_non_rust_files, 2);
+        assert_eq!(output.cards.len(), 1);
+
+        let first_partial = partials
+            .first()
+            .ok_or_else(|| "expected a partial snapshot after the first file".to_string())?;
+        assert_eq!(first_partial.summary.changed_files, 3);
+        assert_eq!(first_partial.summary.changed_rust_files, 1);
+        assert_eq!(first_partial.summary.changed_non_rust_files, 2);
+        assert_eq!(first_partial.cards.len(), 1);
         Ok(())
     }
 

@@ -74,7 +74,9 @@ The `summary` object must include:
 
 ```text
 rust_files
+changed_files
 changed_rust_files
+changed_non_rust_files
 unsafe_sites
 cards
 open_actionable_gaps
@@ -86,6 +88,10 @@ requires_loom
 miri_unsupported
 static_unknown
 ```
+
+For diff-backed runs, `changed_files` and `changed_non_rust_files` summarize
+the input diff breadth so mixed-language PRs can show non-Rust scale without
+creating non-Rust ReviewCards or changing the Rust scan candidates.
 
 The `cards` array must reuse the canonical `ReviewCard` JSON shape. Repo JSON
 must not reclassify cards, invent a separate evidence model, or summarize raw

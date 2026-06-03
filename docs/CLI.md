@@ -39,6 +39,11 @@ unsafe-review check --diff change.diff --format json
 git diff origin/main...HEAD | unsafe-review check --diff - --format json
 ```
 
+JSON summaries include `changed_files`, `changed_rust_files`, and
+`changed_non_rust_files`. In diff-backed runs these counters describe the input
+diff breadth, so mixed Rust/JavaScript/C++ PRs can show non-Rust scale without
+creating non-Rust ReviewCards or changing advisory policy.
+
 Use `--root` when reviewing a fixture or another workspace:
 
 ```bash

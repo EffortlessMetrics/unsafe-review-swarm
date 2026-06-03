@@ -3,12 +3,16 @@ use crate::domain::{ReviewCard, ReviewClass};
 
 pub(super) fn summarize(
     rust_files: usize,
+    changed_files: usize,
     changed_rust_files: usize,
+    changed_non_rust_files: usize,
     cards: &[ReviewCard],
 ) -> Summary {
     let mut summary = Summary {
         rust_files,
+        changed_files,
         changed_rust_files,
+        changed_non_rust_files,
         unsafe_sites: cards.len(),
         cards: cards.len(),
         ..Summary::default()

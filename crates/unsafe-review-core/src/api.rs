@@ -132,7 +132,9 @@ impl Default for AnalyzeInput {
 #[derive(Clone, Debug, Default)]
 pub struct Summary {
     pub rust_files: usize,
+    pub changed_files: usize,
     pub changed_rust_files: usize,
+    pub changed_non_rust_files: usize,
     pub unsafe_sites: usize,
     pub cards: usize,
     pub open_actionable_gaps: usize,
