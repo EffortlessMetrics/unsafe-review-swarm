@@ -133,6 +133,7 @@ pub(super) fn comment_body(card: &ReviewCard) -> String {
         card.operation.family.as_str()
     ));
     body.push_str(&format!("Missing evidence: {}\n\n", missing_summary(card)));
+    body.push_str(&format!("Proof path: `{}`.\n\n", card.proof_path.as_str()));
     body.push_str(&format!("Next action: {}\n\n", card.next_action.summary));
     if let Some(route) = card.routes.first() {
         body.push_str(&format!(

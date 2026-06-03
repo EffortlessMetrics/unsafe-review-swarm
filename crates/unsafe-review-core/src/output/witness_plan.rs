@@ -111,9 +111,10 @@ fn routes_for_group<'a>(card: &'a ReviewCard, group: &RouteGroup) -> Vec<&'a Wit
 
 fn render_group_card(out: &mut String, card: &ReviewCard, routes: &[&WitnessRoute]) {
     out.push_str(&format!(
-        "#### `{}`\n\n- Class: `{}`\n- Location: {}:{}\n- Operation: `{}`\n- Missing evidence: {}\n- Witness evidence: {}\n",
+        "#### `{}`\n\n- Class: `{}`\n- Proof path: `{}`\n- Location: {}:{}\n- Operation: `{}`\n- Missing evidence: {}\n- Witness evidence: {}\n",
         card.id,
         card.class.as_str(),
+        card.proof_path.as_str(),
         path_display(&card.site.location.file),
         card.site.location.line,
         one_line(&card.operation.expression),

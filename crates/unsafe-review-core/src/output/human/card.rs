@@ -14,6 +14,7 @@ pub(super) fn render_card(out: &mut String, card: &ReviewCard) {
         "  operation_family: {}\n",
         card.operation.family.as_str()
     ));
+    out.push_str(&format!("  proof_path: {}\n", card.proof_path.as_str()));
     push_list(
         out,
         "  hazards:\n",

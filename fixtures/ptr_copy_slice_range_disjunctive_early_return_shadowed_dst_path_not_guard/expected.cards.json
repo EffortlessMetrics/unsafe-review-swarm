@@ -1,106 +1,107 @@
 [
-    {
-        "id": "UR-ptr-copy-slice-range-disjunctive-early-return-shadowed-dst-path-not-guard-src-lib-rs-copy-overlapping-checked-operation-ptr_copy-copy-70114ac07520-pointer_validity-c1",
-        "class": "guard_missing",
-        "priority": "high",
-        "confidence": "medium",
-        "site": {
-            "file": "src/lib.rs",
-            "line": 16,
-            "column": 5,
-            "kind": "operation",
-            "owner": "copy_overlapping_checked",
-            "visibility": "private",
-            "public_api_surface": false,
-            "snippet": "unsafe { core::ptr::copy(buffers.src.as_ptr(), buffers.dst.as_mut_ptr(), count) }"
+  {
+    "id": "UR-ptr-copy-slice-range-disjunctive-early-return-shadowed-dst-path-not-guard-src-lib-rs-copy-overlapping-checked-operation-ptr_copy-copy-70114ac07520-pointer_validity-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "proof_path": "source_route_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 16,
+      "column": 5,
+      "kind": "operation",
+      "owner": "copy_overlapping_checked",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { core::ptr::copy(buffers.src.as_ptr(), buffers.dst.as_mut_ptr(), count) }"
+    },
+    "operation": "unsafe { core::ptr::copy(buffers.src.as_ptr(), buffers.dst.as_mut_ptr(), count) }",
+    "operation_family": "ptr_copy",
+    "hazards": [
+      "pointer_validity",
+      "bounds",
+      "initialized_memory"
+    ],
+    "obligations": [
+      "both ranges are valid for count elements",
+      "source range is initialized for count elements"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "valid-range",
+        "description": "both ranges are valid for count elements",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
         },
-        "operation": "unsafe { core::ptr::copy(buffers.src.as_ptr(), buffers.dst.as_mut_ptr(), count) }",
-        "operation_family": "ptr_copy",
-        "hazards": [
-            "pointer_validity",
-            "bounds",
-            "initialized_memory"
-        ],
-        "obligations": [
-            "both ranges are valid for count elements",
-            "source range is initialized for count elements"
-        ],
-        "obligation_evidence": [
-            {
-                "key": "valid-range",
-                "description": "both ranges are valid for count elements",
-                "contract": {
-                    "present": true,
-                    "state": "present",
-                    "summary": "Nearby `SAFETY:` comment was detected"
-                },
-                "discharge": {
-                    "present": false,
-                    "state": "missing",
-                    "summary": "No length or bounds guard code was detected"
-                },
-                "reach": {
-                    "present": true,
-                    "state": "present",
-                    "summary": "1 related test file(s) mention owner `copy_overlapping_checked`"
-                },
-                "witness": {
-                    "present": false,
-                    "state": "missing",
-                    "summary": "No imported witness receipt was found"
-                }
-            },
-            {
-                "key": "initialized",
-                "description": "source range is initialized for count elements",
-                "contract": {
-                    "present": true,
-                    "state": "present",
-                    "summary": "Nearby `SAFETY:` comment was detected"
-                },
-                "discharge": {
-                    "present": false,
-                    "state": "missing",
-                    "summary": "No obligation-specific guard code was detected"
-                },
-                "reach": {
-                    "present": true,
-                    "state": "present",
-                    "summary": "1 related test file(s) mention owner `copy_overlapping_checked`"
-                },
-                "witness": {
-                    "present": false,
-                    "state": "missing",
-                    "summary": "No imported witness receipt was found"
-                }
-            }
-        ],
-        "contract": "Nearby `SAFETY:` comment was detected",
-        "discharge": "No visible local guard detected",
-        "reach": "1 related test file(s) mention owner `copy_overlapping_checked`",
-        "witness": "No imported witness receipt was found",
-        "witness_routes": [
-            {
-                "kind": "miri",
-                "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
-                "command": "cargo +nightly miri test copy_overlapping_checked",
-                "required": false
-            },
-            {
-                "kind": "cargo-careful",
-                "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
-                "command": "cargo +nightly careful test copy_overlapping_checked",
-                "required": false
-            }
-        ],
-        "missing": [
-            "Missing visible local guard for inferred safety obligations",
-            "No witness receipt imported for this card"
-        ],
-        "next_action": "Add or expose the local guard that discharges the `ptr_copy` safety obligation.",
-        "verify_commands": [
-            "cargo +nightly miri test copy_overlapping_checked",
-            "cargo +nightly careful test copy_overlapping_checked"
-        ]
-    }
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No length or bounds guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `copy_overlapping_checked`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "initialized",
+        "description": "source range is initialized for count elements",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `copy_overlapping_checked`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "No visible local guard detected",
+    "reach": "1 related test file(s) mention owner `copy_overlapping_checked`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test copy_overlapping_checked",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test copy_overlapping_checked",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose the local guard that discharges the `ptr_copy` safety obligation.",
+    "verify_commands": [
+      "cargo +nightly miri test copy_overlapping_checked",
+      "cargo +nightly careful test copy_overlapping_checked"
+    ]
+  }
 ]

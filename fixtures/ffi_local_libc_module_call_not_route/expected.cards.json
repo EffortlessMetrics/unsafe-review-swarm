@@ -1,72 +1,71 @@
 [
-{
-    "id":  "UR-ffi-local-libc-module-call-not-route-src-lib-rs-len-operation-unsafe_fn_call-strlen-b8e01df867a9-unknown-c1",
-    "class":  "guard_missing",
-    "priority":  "high",
-    "confidence":  "medium",
-    "site":  {
-                 "file":  "src/lib.rs",
-                 "line":  12,
-                 "column":  5,
-                 "kind":  "operation",
-                 "owner":  "len",
-                 "visibility":  "private",
-                 "public_api_surface":  false,
-                 "snippet":  "unsafe { libc::strlen(ptr) }"
-             },
-    "operation":  "unsafe { libc::strlen(ptr) }",
-    "operation_family":  "unsafe_fn_call",
-    "hazards":  [
-                    "unknown"
-                ],
-    "obligations":  [
-                        "callee safety preconditions are satisfied"
-                    ],
-    "obligation_evidence":  [
-                                {
-                                    "key":  "callee-contract",
-                                    "description":  "callee safety preconditions are satisfied",
-                                    "contract":  {
-                                                     "present":  true,
-                                                     "state":  "present",
-                                                     "summary":  "Nearby `SAFETY:` comment was detected"
-                                                 },
-                                    "discharge":  {
-                                                      "present":  false,
-                                                      "state":  "missing",
-                                                      "summary":  "No obligation-specific guard code was detected"
-                                                  },
-                                    "reach":  {
-                                                  "present":  true,
-                                                  "state":  "present",
-                                                  "summary":  "1 related test file(s) mention owner `len`"
-                                              },
-                                    "witness":  {
-                                                    "present":  false,
-                                                    "state":  "missing",
-                                                    "summary":  "No imported witness receipt was found"
-                                                }
-                                }
-                            ],
-    "contract":  "Nearby `SAFETY:` comment was detected",
-    "discharge":  "No visible local guard detected",
-    "reach":  "1 related test file(s) mention owner `len`",
-    "witness":  "No imported witness receipt was found",
-    "witness_routes":  [
-                           {
-                               "kind":  "human-deep-review",
-                               "reason":  "The analyzer could not infer a precise witness route; use manual unsafe contract review",
-                               "command":  null,
-                               "required":  false
-                           }
-                       ],
-    "missing":  [
-                    "Missing visible local guard for inferred safety obligations",
-                    "No witness receipt imported for this card"
-                ],
-    "next_action":  "Review the `unsafe_fn_call` callee contract manually and add obligation-specific guard evidence for this call.",
-    "verify_commands":  [
-
-                        ]
-}
+  {
+    "id": "UR-ffi-local-libc-module-call-not-route-src-lib-rs-len-operation-unsafe_fn_call-strlen-b8e01df867a9-unknown-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "proof_path": "human_review_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 12,
+      "column": 5,
+      "kind": "operation",
+      "owner": "len",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { libc::strlen(ptr) }"
+    },
+    "operation": "unsafe { libc::strlen(ptr) }",
+    "operation_family": "unsafe_fn_call",
+    "hazards": [
+      "unknown"
+    ],
+    "obligations": [
+      "callee safety preconditions are satisfied"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "callee-contract",
+        "description": "callee safety preconditions are satisfied",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `len`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "No visible local guard detected",
+    "reach": "1 related test file(s) mention owner `len`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Review the `unsafe_fn_call` callee contract manually and add obligation-specific guard evidence for this call.",
+    "verify_commands": []
+  }
 ]

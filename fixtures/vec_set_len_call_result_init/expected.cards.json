@@ -4,6 +4,7 @@
     "class": "unsafe_unreached",
     "priority": "medium",
     "confidence": "medium",
+    "proof_path": "helper_gated",
     "site": {
       "file": "src/lib.rs",
       "line": 7,

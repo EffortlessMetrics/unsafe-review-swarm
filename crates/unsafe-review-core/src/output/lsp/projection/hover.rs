@@ -39,6 +39,7 @@ fn append_context(text: &mut String, card: &ReviewCard) {
         card.class.as_str()
     ));
     text.push_str(&format!("- Operation: `{}`\n\n", card.operation.expression));
+    text.push_str(&format!("Proof path: `{}`\n\n", card.proof_path.as_str()));
     if !card.hazards.is_empty() {
         text.push_str("Relevant hazard families:\n");
         for hazard in &card.hazards {

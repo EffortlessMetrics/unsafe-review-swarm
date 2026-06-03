@@ -9,7 +9,7 @@ mod receipt;
 mod review_card;
 mod witness;
 
-pub use classification::{Confidence, Priority, ReviewClass};
+pub use classification::{Confidence, Priority, ProofPath, ReviewClass};
 pub use evidence::{
     ContractEvidence, DischargeEvidence, EvidenceState, MissingEvidence, ObligationEvidence,
     ReachEvidence, RelatedTest,

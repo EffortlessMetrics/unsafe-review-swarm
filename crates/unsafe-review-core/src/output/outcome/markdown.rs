@@ -42,14 +42,17 @@ pub(super) fn render_markdown(report: &OutcomeReport) -> String {
         out.push_str("- Top remaining gaps: none in the after snapshot\n\n");
     } else {
         out.push_str("\nTop remaining gaps:\n\n");
-        out.push_str("| Card | Class | Priority | Operation family | Missing | Next action |\n");
-        out.push_str("|---|---|---|---|---:|---|\n");
+        out.push_str(
+            "| Card | Class | Priority | Proof path | Operation family | Missing | Next action |\n",
+        );
+        out.push_str("|---|---|---|---|---|---:|---|\n");
         for gap in &report.reviewer_delta.top_remaining_gaps {
             out.push_str(&format!(
-                "| `{}` | `{}` | `{}` | `{}` | {} | {} |\n",
+                "| `{}` | `{}` | `{}` | `{}` | `{}` | {} | {} |\n",
                 gap.card_id,
                 gap.class_name,
                 gap.priority,
+                markdown_cell(gap.proof_path.as_deref().unwrap_or("unknown")),
                 markdown_cell(gap.operation_family.as_deref().unwrap_or("unknown")),
                 gap.missing_count,
                 markdown_cell(gap.next_action.as_deref().unwrap_or(""))
@@ -153,6 +156,9 @@ fn markdown_state(state: Option<&OutcomeCardState>) -> String {
                     "operation family `{}`",
                     markdown_cell(operation_family)
                 ));
+            }
+            if let Some(proof_path) = state.proof_path.as_deref() {
+                parts.push(format!("proof path `{}`", markdown_cell(proof_path)));
             }
             if let Some(operation) = state.operation.as_deref() {
                 parts.push(format!("operation `{}`", markdown_cell(operation)));

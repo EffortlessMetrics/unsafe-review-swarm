@@ -1,72 +1,71 @@
 [
-    {
-        "id":  "UR-unsafe-impl-custom-trait-not-send-sync-src-lib-rs-token-unsafe_impl-unknown-token-081d26ae97ba-unknown-c1",
-        "class":  "guard_missing",
-        "priority":  "high",
-        "confidence":  "medium",
-        "site":  {
-                     "file":  "src/lib.rs",
-                     "line":  9,
-                     "column":  1,
-                     "kind":  "unsafe_impl",
-                     "owner":  "Token",
-                     "visibility":  "private",
-                     "public_api_surface":  false,
-                     "snippet":  "unsafe impl LocalContract for Token {}"
-                 },
-        "operation":  "unsafe impl LocalContract for Token {}",
-        "operation_family":  "unknown",
-        "hazards":  [
-                        "unknown"
-                    ],
-        "obligations":  [
-                            "unsafe contract could not be inferred from this syntax shape"
-                        ],
-        "obligation_evidence":  [
-                                    {
-                                        "key":  "unknown",
-                                        "description":  "unsafe contract could not be inferred from this syntax shape",
-                                        "contract":  {
-                                                         "present":  true,
-                                                         "state":  "present",
-                                                         "summary":  "Nearby `# Safety` documentation was detected"
-                                                     },
-                                        "discharge":  {
-                                                          "present":  false,
-                                                          "state":  "missing",
-                                                          "summary":  "No obligation-specific guard code was detected"
-                                                      },
-                                        "reach":  {
-                                                      "present":  true,
-                                                      "state":  "present",
-                                                      "summary":  "1 related test file(s) mention owner `Token`"
-                                                  },
-                                        "witness":  {
-                                                        "present":  false,
-                                                        "state":  "missing",
-                                                        "summary":  "No imported witness receipt was found"
-                                                    }
-                                    }
-                                ],
-        "contract":  "Nearby `# Safety` documentation was detected",
-        "discharge":  "No visible local guard detected",
-        "reach":  "1 related test file(s) mention owner `Token`",
-        "witness":  "No imported witness receipt was found",
-        "witness_routes":  [
-                               {
-                                   "kind":  "human-deep-review",
-                                   "reason":  "The analyzer could not infer a precise witness route; use manual unsafe contract review",
-                                   "command":  null,
-                                   "required":  false
-                               }
-                           ],
-        "missing":  [
-                        "Missing visible local guard for inferred safety obligations",
-                        "No witness receipt imported for this card"
-                    ],
-        "next_action":  "Review the unsafe site manually and add the missing obligation-specific guard once the contract is identified.",
-        "verify_commands":  [
-
-                            ]
-    }
+  {
+    "id": "UR-unsafe-impl-custom-trait-not-send-sync-src-lib-rs-token-unsafe_impl-unknown-token-081d26ae97ba-unknown-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "proof_path": "human_review_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 9,
+      "column": 1,
+      "kind": "unsafe_impl",
+      "owner": "Token",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe impl LocalContract for Token {}"
+    },
+    "operation": "unsafe impl LocalContract for Token {}",
+    "operation_family": "unknown",
+    "hazards": [
+      "unknown"
+    ],
+    "obligations": [
+      "unsafe contract could not be inferred from this syntax shape"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "unknown",
+        "description": "unsafe contract could not be inferred from this syntax shape",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `# Safety` documentation was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `Token`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `# Safety` documentation was detected",
+    "discharge": "No visible local guard detected",
+    "reach": "1 related test file(s) mention owner `Token`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Review the unsafe site manually and add the missing obligation-specific guard once the contract is identified.",
+    "verify_commands": []
+  }
 ]

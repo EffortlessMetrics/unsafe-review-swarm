@@ -4,6 +4,7 @@
     "class": "guarded_unwitnessed",
     "priority": "medium",
     "confidence": "medium",
+    "proof_path": "observable_red_green",
     "site": {
       "file": "src/lib.rs",
       "line": 12,

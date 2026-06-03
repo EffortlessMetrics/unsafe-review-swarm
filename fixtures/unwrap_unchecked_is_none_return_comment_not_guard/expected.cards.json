@@ -2,6 +2,7 @@
   {
     "class": "guard_missing",
     "confidence": "medium",
+    "proof_path": "source_route_only",
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "No visible local guard detected",
     "hazards": [

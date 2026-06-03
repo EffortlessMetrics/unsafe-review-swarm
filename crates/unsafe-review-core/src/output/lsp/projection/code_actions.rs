@@ -41,6 +41,7 @@ fn agent_packet_action<'a>(
         payload: LspCodeActionPayload {
             kind: "unsafe-review.agent_packet",
             card_id: &card.id.0,
+            proof_path: card.proof_path.as_str(),
             file: None,
             line: None,
             name: None,
@@ -66,6 +67,7 @@ fn witness_route_action<'a>(
         payload: LspCodeActionPayload {
             kind: "unsafe-review.witness_route",
             card_id: &card.id.0,
+            proof_path: card.proof_path.as_str(),
             file: None,
             line: None,
             name: None,
@@ -90,6 +92,7 @@ fn related_test_action<'a>(
         payload: LspCodeActionPayload {
             kind: "unsafe-review.related_test",
             card_id: &card.id.0,
+            proof_path: card.proof_path.as_str(),
             file: Some(&test.file),
             line: Some(test.line),
             name: Some(&test.name),
@@ -121,6 +124,7 @@ fn witness_command_action<'a>(
         payload: LspCodeActionPayload {
             kind: "unsafe-review.witness_command",
             card_id: &card.id.0,
+            proof_path: card.proof_path.as_str(),
             file: None,
             line: None,
             name: None,

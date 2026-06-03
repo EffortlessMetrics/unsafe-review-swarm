@@ -4,6 +4,7 @@
     "class": "requires_loom",
     "priority": "high",
     "confidence": "medium",
+    "proof_path": "mutation_miri_model",
     "site": {
       "file": "src/lib.rs",
       "line": 2,

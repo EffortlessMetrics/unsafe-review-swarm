@@ -53,6 +53,27 @@ impl ReviewClass {
     }
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ProofPath {
+    ObservableRedGreen,
+    MutationMiriModel,
+    SourceRouteOnly,
+    HelperGated,
+    HumanReviewOnly,
+}
+
+impl ProofPath {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::ObservableRedGreen => "observable_red_green",
+            Self::MutationMiriModel => "mutation_miri_model",
+            Self::SourceRouteOnly => "source_route_only",
+            Self::HelperGated => "helper_gated",
+            Self::HumanReviewOnly => "human_review_only",
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Priority {
     High,
@@ -164,5 +185,20 @@ mod tests {
         assert_eq!(Confidence::Medium.as_str(), "medium");
         assert_eq!(Confidence::Low.as_str(), "low");
         assert_eq!(Confidence::Unknown.as_str(), "unknown");
+    }
+
+    #[test]
+    fn proof_path_strings_cover_every_variant() {
+        let cases = [
+            (ProofPath::ObservableRedGreen, "observable_red_green"),
+            (ProofPath::MutationMiriModel, "mutation_miri_model"),
+            (ProofPath::SourceRouteOnly, "source_route_only"),
+            (ProofPath::HelperGated, "helper_gated"),
+            (ProofPath::HumanReviewOnly, "human_review_only"),
+        ];
+
+        for (path, expected) in cases {
+            assert_eq!(path.as_str(), expected);
+        }
     }
 }

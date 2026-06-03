@@ -17,6 +17,7 @@ pub(super) struct AgentPacket<'a> {
     trust_boundary: &'static str,
     card_id: &'a str,
     card: AgentCard<'a>,
+    proof_path: &'static str,
     task: &'a str,
     context: AgentContext<'a>,
     source_context: AgentSourceContext<'a>,
@@ -47,6 +48,7 @@ impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
             trust_boundary: TRUST_BOUNDARY,
             card_id: &card.id.0,
             card: AgentCard::from(card),
+            proof_path: card.proof_path.as_str(),
             task: &card.next_action.summary,
             context: AgentContext::from(card),
             source_context: AgentSourceContext::from(card),
@@ -98,6 +100,7 @@ struct AgentCard<'a> {
     class_name: &'static str,
     priority: &'static str,
     confidence: &'static str,
+    proof_path: &'static str,
 }
 
 impl<'a> From<&'a ReviewCard> for AgentCard<'a> {
@@ -107,6 +110,7 @@ impl<'a> From<&'a ReviewCard> for AgentCard<'a> {
             class_name: card.class.as_str(),
             priority: card.priority.as_str(),
             confidence: card.confidence.as_str(),
+            proof_path: card.proof_path.as_str(),
         }
     }
 }

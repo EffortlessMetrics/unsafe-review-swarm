@@ -4,6 +4,7 @@
     "class": "contract_missing",
     "priority": "high",
     "confidence": "high",
+    "proof_path": "source_route_only",
     "site": {
       "file": "src/lib.rs",
       "line": 3,

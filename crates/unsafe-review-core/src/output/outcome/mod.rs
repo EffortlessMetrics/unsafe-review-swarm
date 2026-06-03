@@ -78,6 +78,8 @@ pub struct OutcomeRemainingGap {
     pub priority: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub operation_family: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proof_path: Option<String>,
     pub missing_count: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub next_action: Option<String>,
@@ -118,6 +120,8 @@ pub struct OutcomeCardState {
     pub operation: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub operation_family: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proof_path: Option<String>,
     pub priority: String,
     pub missing_count: usize,
     pub witness: String,
@@ -170,6 +174,8 @@ struct SnapshotCard {
     operation: Option<String>,
     #[serde(default)]
     operation_family: Option<String>,
+    #[serde(default)]
+    proof_path: Option<String>,
     priority: String,
     #[serde(default)]
     witness: String,
@@ -256,6 +262,7 @@ fn snapshot_from_manual_candidate(candidate: ManualCandidate) -> Snapshot {
             }),
             operation: Some(candidate.unsafe_operation),
             operation_family: Some(candidate.operation_family),
+            proof_path: Some("human_review_only".to_string()),
             priority: "advisory".to_string(),
             witness: "manual candidate external evidence packet; no analyzer witness execution"
                 .to_string(),
@@ -674,6 +681,7 @@ fn top_remaining_gaps(cards: &OutcomeCards) -> Vec<OutcomeRemainingGap> {
                 class_name: after.class_name.clone(),
                 priority: after.priority.clone(),
                 operation_family: after.operation_family.clone(),
+                proof_path: after.proof_path.clone(),
                 missing_count: after.missing_count,
                 next_action: after.next_action.clone(),
             })
@@ -722,6 +730,7 @@ impl From<&SnapshotCard> for OutcomeCardState {
             location: card.location.as_ref().map(OutcomeLocation::from),
             operation: card.operation.clone(),
             operation_family: card.operation_family.clone(),
+            proof_path: card.proof_path.clone(),
             priority: card.priority.clone(),
             missing_count: card.missing.len(),
             witness: witness::witness_state(card).label,

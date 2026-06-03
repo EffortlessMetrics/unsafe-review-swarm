@@ -56,6 +56,7 @@ pub struct PolicyReportCard {
     pub class_name: String,
     pub operation: String,
     pub operation_family: String,
+    pub proof_path: String,
     pub policy_status: String,
     pub policy_reason: String,
     pub missing_count: usize,
@@ -126,6 +127,7 @@ fn evaluate_with_date(output: &AnalyzeOutput, audit_date: &str) -> Result<Policy
                 class_name: card.class.as_str().to_string(),
                 operation: card.operation.expression.clone(),
                 operation_family: card.operation.family.as_str().to_string(),
+                proof_path: card.proof_path.as_str().to_string(),
                 policy_status: status.as_str().to_string(),
                 policy_reason: policy_reason(status).to_string(),
                 missing_count: card.missing.len(),
@@ -310,15 +312,16 @@ mod markdown_sections {
             return;
         }
 
-        out.push_str("| Status | Reason | Card | Class | Operation family | Operation | Missing evidence | Next action |\n");
-        out.push_str("|---|---|---|---|---|---|---:|---|\n");
+        out.push_str("| Status | Reason | Card | Class | Proof path | Operation family | Operation | Missing evidence | Next action |\n");
+        out.push_str("|---|---|---|---|---|---|---|---:|---|\n");
         for card in &report.cards {
             out.push_str(&format!(
-                "| `{}` | {} | `{}` | `{}` | `{}` | `{}` | {} | {} |\n",
+                "| `{}` | {} | `{}` | `{}` | `{}` | `{}` | `{}` | {} | {} |\n",
                 card.policy_status,
                 markdown_cell(&card.policy_reason),
                 card.card_id,
                 card.class_name,
+                card.proof_path,
                 card.operation_family,
                 markdown_cell(&card.operation),
                 card.missing_count,

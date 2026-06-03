@@ -1,78 +1,79 @@
 [
-{
-    "id":  "UR-str-from-utf8-unchecked-if-let-err-return-guard-fixture-src-lib-rs-decode-operation-str_from_utf8_unchecked-from-utf8-unchecked-44aff54b8f45-invalid_value-c1",
-    "class":  "guarded_unwitnessed",
-    "priority":  "medium",
-    "confidence":  "medium",
-    "site":  {
-                 "file":  "src/lib.rs",
-                 "line":  7,
-                 "column":  5,
-                 "kind":  "operation",
-                 "owner":  "decode",
-                 "visibility":  "private",
-                 "public_api_surface":  false,
-                 "snippet":  "unsafe { core::str::from_utf8_unchecked(bytes) }"
-             },
-    "operation":  "unsafe { core::str::from_utf8_unchecked(bytes) }",
-    "operation_family":  "str_from_utf8_unchecked",
-    "hazards":  [
-                    "invalid_value"
-                ],
-    "obligations":  [
-                        "bytes are valid UTF-8"
-                    ],
-    "obligation_evidence":  [
-                                {
-                                    "key":  "utf8",
-                                    "description":  "bytes are valid UTF-8",
-                                    "contract":  {
-                                                     "present":  true,
-                                                     "state":  "present",
-                                                     "summary":  "Nearby `SAFETY:` comment was detected"
-                                                 },
-                                    "discharge":  {
-                                                      "present":  true,
-                                                      "state":  "present",
-                                                      "summary":  "Same-buffer UTF-8 validation evidence was detected before from_utf8_unchecked"
-                                                  },
-                                    "reach":  {
-                                                  "present":  true,
-                                                  "state":  "present",
-                                                  "summary":  "1 related test file(s) mention owner `decode`"
-                                              },
-                                    "witness":  {
-                                                    "present":  false,
-                                                    "state":  "missing",
-                                                    "summary":  "No imported witness receipt was found"
-                                                }
-                                }
-                            ],
-    "contract":  "Nearby `SAFETY:` comment was detected",
-    "discharge":  "All inferred safety obligations have visible local discharge evidence",
-    "reach":  "1 related test file(s) mention owner `decode`",
-    "witness":  "No imported witness receipt was found",
-    "witness_routes":  [
-                           {
-                               "kind":  "miri",
-                               "reason":  "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
-                               "command":  "cargo +nightly miri test decode",
-                               "required":  false
-                           },
-                           {
-                               "kind":  "cargo-careful",
-                               "reason":  "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
-                               "command":  "cargo +nightly careful test decode",
-                               "required":  false
-                           }
-                       ],
-    "missing":  [
-                    "No witness receipt imported for this card"
-                ],
-    "next_action":  "Attach a focused Miri or cargo-careful witness receipt or mark the static limitation explicitly.",
-    "verify_commands":  [
-                            "cargo +nightly miri test decode",
-                            "cargo +nightly careful test decode"
-                        ]
-}
+  {
+    "id": "UR-str-from-utf8-unchecked-if-let-err-return-guard-fixture-src-lib-rs-decode-operation-str_from_utf8_unchecked-from-utf8-unchecked-44aff54b8f45-invalid_value-c1",
+    "class": "guarded_unwitnessed",
+    "priority": "medium",
+    "confidence": "medium",
+    "proof_path": "observable_red_green",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 7,
+      "column": 5,
+      "kind": "operation",
+      "owner": "decode",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { core::str::from_utf8_unchecked(bytes) }"
+    },
+    "operation": "unsafe { core::str::from_utf8_unchecked(bytes) }",
+    "operation_family": "str_from_utf8_unchecked",
+    "hazards": [
+      "invalid_value"
+    ],
+    "obligations": [
+      "bytes are valid UTF-8"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "utf8",
+        "description": "bytes are valid UTF-8",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Same-buffer UTF-8 validation evidence was detected before from_utf8_unchecked"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `decode`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "All inferred safety obligations have visible local discharge evidence",
+    "reach": "1 related test file(s) mention owner `decode`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test decode",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test decode",
+        "required": false
+      }
+    ],
+    "missing": [
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Attach a focused Miri or cargo-careful witness receipt or mark the static limitation explicitly.",
+    "verify_commands": [
+      "cargo +nightly miri test decode",
+      "cargo +nightly careful test decode"
+    ]
+  }
 ]

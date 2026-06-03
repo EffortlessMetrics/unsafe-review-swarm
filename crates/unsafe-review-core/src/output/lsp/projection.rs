@@ -117,6 +117,7 @@ struct LspDiagnostic<'a> {
     message: String,
     operation: &'a str,
     operation_family: &'static str,
+    proof_path: &'static str,
     hazards: Vec<&'static str>,
     required_safety_conditions: Vec<LspSafetyCondition<'a>>,
     evidence_summary: LspEvidenceSummary<'a>,
@@ -144,6 +145,7 @@ impl<'a> From<&'a ReviewCard> for LspDiagnostic<'a> {
             ),
             operation: &card.operation.expression,
             operation_family: card.operation.family.as_str(),
+            proof_path: card.proof_path.as_str(),
             hazards: card.hazards.iter().map(|hazard| hazard.as_str()).collect(),
             required_safety_conditions: card
                 .obligations
@@ -323,6 +325,7 @@ struct LspCodeAction<'a> {
 struct LspCodeActionPayload<'a> {
     kind: &'static str,
     card_id: &'a str,
+    proof_path: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     file: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]

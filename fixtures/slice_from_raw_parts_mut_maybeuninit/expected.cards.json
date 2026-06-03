@@ -4,6 +4,7 @@
     "class": "guard_missing",
     "priority": "high",
     "confidence": "medium",
+    "proof_path": "source_route_only",
     "site": {
       "file": "src/lib.rs",
       "line": 12,

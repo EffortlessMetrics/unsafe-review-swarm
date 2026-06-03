@@ -38,16 +38,19 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
         render_no_changed_gaps(&mut out);
     }
     out.push_str("## Cards\n\n");
-    out.push_str("| ID | Class | Operation | Hazard | Missing | Route | Next action |\n");
-    out.push_str("|---|---|---|---|---|---|---|\n");
+    out.push_str(
+        "| ID | Class | Proof path | Operation | Hazard | Missing | Route | Next action |\n",
+    );
+    out.push_str("|---|---|---|---|---|---|---|---|\n");
     for card in &output.cards {
         let hazard = card.hazards.first().map_or("unknown", |h| h.as_str());
         let missing = card.missing.first().map_or("", |m| m.kind.as_str());
         let route = diff_primary_route(card);
         out.push_str(&format!(
-            "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |\n",
+            "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |\n",
             md_cell(&card.id.to_string()),
             card.class.as_str(),
+            card.proof_path.as_str(),
             md_cell(&one_line(&card.operation.expression)),
             hazard,
             missing,
@@ -98,15 +101,16 @@ fn render_repo_posture(output: &AnalyzeOutput) -> String {
         out.push_str("No repo-scope unsafe-review cards found.\n\n");
     } else {
         out.push_str(
-            "| ID | Class | Location | Operation family | Operation | Missing evidence | Route | Next action |\n",
+            "| ID | Class | Proof path | Location | Operation family | Operation | Missing evidence | Route | Next action |\n",
         );
-        out.push_str("|---|---|---|---|---|---|---|---|\n");
+        out.push_str("|---|---|---|---|---|---|---|---|---|\n");
         for card in &output.cards {
             let route = repo_primary_route(card);
             out.push_str(&format!(
-                "| `{}` | `{}` | {} | `{}` | `{}` | {} | `{}` | {} |\n",
+                "| `{}` | `{}` | `{}` | {} | `{}` | `{}` | {} | `{}` | {} |\n",
                 md_cell(&card.id.to_string()),
                 card.class.as_str(),
+                card.proof_path.as_str(),
                 md_cell(&card_location(card)),
                 card.operation.family.as_str(),
                 md_cell(&one_line(&card.operation.expression)),
@@ -452,6 +456,7 @@ fn render_pr_summary_reviewer_cockpit(out: &mut String, output: &AnalyzeOutput) 
             "- Obligation: {}\n",
             primary_obligation_summary(card)
         ));
+        out.push_str(&format!("- Proof path: `{}`\n", card.proof_path.as_str()));
         out.push_str("- Evidence found:\n");
         out.push_str(&format!("  - Contract: {}\n", card.contract.summary));
         out.push_str(&format!(
@@ -517,6 +522,7 @@ fn render_pr_summary_top_card(out: &mut String, output: &AnalyzeOutput) {
             "- Operation family: `{}`\n",
             card.operation.family.as_str()
         ));
+        out.push_str(&format!("- Proof path: `{}`\n", card.proof_path.as_str()));
         out.push_str(&format!("- Missing evidence: {}\n", missing_summary(card)));
         if let Some(route) = card.routes.first() {
             out.push_str(&format!(
@@ -543,15 +549,16 @@ fn render_pr_summary_top_card(out: &mut String, output: &AnalyzeOutput) {
 fn render_pr_summary_card_table(out: &mut String, output: &AnalyzeOutput) {
     out.push_str("## Card table\n\n");
     out.push_str(
-        "| ID | Class | Location | Operation family | Operation | Missing evidence | Route | Next action |\n",
+        "| ID | Class | Proof path | Location | Operation family | Operation | Missing evidence | Route | Next action |\n",
     );
-    out.push_str("|---|---|---|---|---|---|---|---|\n");
+    out.push_str("|---|---|---|---|---|---|---|---|---|\n");
     for card in &output.cards {
         let route = repo_primary_route(card);
         out.push_str(&format!(
-            "| `{}` | `{}` | {} | `{}` | `{}` | {} | `{}` | {} |\n",
+            "| `{}` | `{}` | `{}` | {} | `{}` | `{}` | {} | `{}` | {} |\n",
             md_cell(&card.id.to_string()),
             card.class.as_str(),
+            card.proof_path.as_str(),
             md_cell(&format!(
                 "{}:{}",
                 path_display(&card.site.location.file),
@@ -627,6 +634,10 @@ pub(crate) fn render_card_detail(card: &ReviewCard) -> String {
     out.push_str(&format!(
         "**Operation family:** `{}`\n\n",
         card.operation.family.as_str()
+    ));
+    out.push_str(&format!(
+        "**Proof path:** `{}`\n\n",
+        card.proof_path.as_str()
     ));
 
     out.push_str("## Why this card exists\n\n");
@@ -772,10 +783,10 @@ mod tests {
         let rendered = render(&output);
 
         assert!(rendered.contains("# unsafe-review"));
-        assert!(
-            rendered
-                .contains("| ID | Class | Operation | Hazard | Missing | Route | Next action |")
-        );
+        assert!(rendered.contains(
+            "| ID | Class | Proof path | Operation | Hazard | Missing | Route | Next action |"
+        ));
+        assert!(rendered.contains("`source_route_only`"));
         assert!(rendered.contains("unsafe { ptr.cast::<Header>().read() }"));
         assert!(rendered.contains("Add or expose the local guard"));
         assert!(rendered.contains("not a proof of memory safety"));
@@ -804,6 +815,7 @@ mod tests {
         assert!(rendered.contains("## Why this card exists"));
         assert!(rendered.contains("## Required safety conditions"));
         assert!(rendered.contains("**Operation:** `unsafe { ptr.cast::<Header>().read() }`"));
+        assert!(rendered.contains("**Proof path:** `source_route_only`"));
         assert!(rendered.contains("pointer is aligned for the accessed type"));
         assert!(rendered.contains("## Evidence found"));
         assert!(rendered.contains("Guard/discharge:"));
@@ -849,13 +861,18 @@ mod tests {
         assert!(rendered.contains("## Card table"));
         assert!(rendered.contains("- Operation: `unsafe { ptr.cast::<Header>().read() }`"));
         assert!(rendered.contains("- Operation family: `raw_pointer_read`"));
+        assert!(rendered.contains("- Proof path: `source_route_only`"));
         assert!(rendered.contains("- Obligation:"));
         assert!(rendered.contains("- Evidence found:"));
         assert!(rendered.contains("  - Guard/discharge:"));
         assert!(rendered.contains("- Missing/weak evidence: Missing visible local guard"));
         assert!(rendered.contains("- Next reviewer action: Add or expose the local guard"));
         assert!(rendered.contains("- Witness route: `miri` because Pure-Rust UB-adjacent hazard"));
-        assert!(rendered.contains("| ID | Class | Location | Operation family | Operation |"));
+        assert!(
+            rendered
+                .contains("| ID | Class | Proof path | Location | Operation family | Operation |")
+        );
+        assert!(rendered.contains("| `source_route_only` |"));
         assert!(rendered.contains("unsafe { ptr.cast::<Header>().read() }"));
         assert!(rendered.contains("| `raw_pointer_read` |"));
         assert!(rendered.contains("## Witness plan"));
@@ -908,6 +925,7 @@ mod tests {
         assert!(rendered.contains("## unsafe-review advisory summary"));
         assert!(rendered.contains("## Top card"));
         assert!(rendered.contains(&format!("- ID: `{}`", card.id)));
+        assert!(rendered.contains("- Proof path: `source_route_only`"));
         assert!(rendered.contains(&format!("- Explain: `unsafe-review explain {}`", card.id)));
         assert!(rendered.contains(&format!(
             "- Agent context: `unsafe-review context {} --json`",
@@ -949,8 +967,9 @@ mod tests {
         assert!(rendered.contains("## Related sink clusters"));
         assert!(rendered.contains("No multi-card file/owner clusters found."));
         assert!(rendered.contains(
-            "| ID | Class | Location | Operation family | Operation | Missing evidence | Route | Next action |"
+            "| ID | Class | Proof path | Location | Operation family | Operation | Missing evidence | Route | Next action |"
         ));
+        assert!(rendered.contains("| `source_route_only` |"));
         assert!(rendered.contains("src/lib.rs:8"));
         assert!(rendered.contains("unsafe { ptr.cast::<Header>().read() }"));
         assert!(rendered.contains("Add or expose the local guard"));

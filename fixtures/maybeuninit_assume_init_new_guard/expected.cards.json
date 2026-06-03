@@ -1,79 +1,80 @@
 [
-{
-    "id":  "UR-maybeuninit-assume-init-new-guard-src-lib-rs-assume-new-operation-maybe_uninit_assume_init-assume-init-7d779e9e1d27-initialized_memory-c1",
-    "class":  "guarded_unwitnessed",
-    "priority":  "medium",
-    "confidence":  "medium",
-    "site":  {
-                 "file":  "src/lib.rs",
-                 "line":  6,
-                 "column":  5,
-                 "kind":  "operation",
-                 "owner":  "assume_new",
-                 "visibility":  "private",
-                 "public_api_surface":  false,
-                 "snippet":  "unsafe { slot.assume_init() }"
-             },
-    "operation":  "unsafe { slot.assume_init() }",
-    "operation_family":  "maybe_uninit_assume_init",
-    "hazards":  [
-                    "initialized_memory",
-                    "invalid_value"
-                ],
-    "obligations":  [
-                        "all fields/elements are initialized and valid before `assume_init`"
-                    ],
-    "obligation_evidence":  [
-                                {
-                                    "key":  "initialized",
-                                    "description":  "all fields/elements are initialized and valid before `assume_init`",
-                                    "contract":  {
-                                                     "present":  true,
-                                                     "state":  "present",
-                                                     "summary":  "Nearby `SAFETY:` comment was detected"
-                                                 },
-                                    "discharge":  {
-                                                      "present":  true,
-                                                      "state":  "present",
-                                                      "summary":  "MaybeUninit initialization evidence was detected before assume_init"
-                                                  },
-                                    "reach":  {
-                                                  "present":  true,
-                                                  "state":  "present",
-                                                  "summary":  "1 related test file(s) mention owner `assume_new`"
-                                              },
-                                    "witness":  {
-                                                    "present":  false,
-                                                    "state":  "missing",
-                                                    "summary":  "No imported witness receipt was found"
-                                                }
-                                }
-                            ],
-    "contract":  "Nearby `SAFETY:` comment was detected",
-    "discharge":  "All inferred safety obligations have visible local discharge evidence",
-    "reach":  "1 related test file(s) mention owner `assume_new`",
-    "witness":  "No imported witness receipt was found",
-    "witness_routes":  [
-                           {
-                               "kind":  "miri",
-                               "reason":  "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
-                               "command":  "cargo +nightly miri test assume_new",
-                               "required":  false
-                           },
-                           {
-                               "kind":  "cargo-careful",
-                               "reason":  "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
-                               "command":  "cargo +nightly careful test assume_new",
-                               "required":  false
-                           }
-                       ],
-    "missing":  [
-                    "No witness receipt imported for this card"
-                ],
-    "next_action":  "Attach a focused Miri or cargo-careful witness receipt or mark the static limitation explicitly.",
-    "verify_commands":  [
-                            "cargo +nightly miri test assume_new",
-                            "cargo +nightly careful test assume_new"
-                        ]
-}
+  {
+    "id": "UR-maybeuninit-assume-init-new-guard-src-lib-rs-assume-new-operation-maybe_uninit_assume_init-assume-init-7d779e9e1d27-initialized_memory-c1",
+    "class": "guarded_unwitnessed",
+    "priority": "medium",
+    "confidence": "medium",
+    "proof_path": "observable_red_green",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 6,
+      "column": 5,
+      "kind": "operation",
+      "owner": "assume_new",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { slot.assume_init() }"
+    },
+    "operation": "unsafe { slot.assume_init() }",
+    "operation_family": "maybe_uninit_assume_init",
+    "hazards": [
+      "initialized_memory",
+      "invalid_value"
+    ],
+    "obligations": [
+      "all fields/elements are initialized and valid before `assume_init`"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "initialized",
+        "description": "all fields/elements are initialized and valid before `assume_init`",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "MaybeUninit initialization evidence was detected before assume_init"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `assume_new`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "All inferred safety obligations have visible local discharge evidence",
+    "reach": "1 related test file(s) mention owner `assume_new`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test assume_new",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test assume_new",
+        "required": false
+      }
+    ],
+    "missing": [
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Attach a focused Miri or cargo-careful witness receipt or mark the static limitation explicitly.",
+    "verify_commands": [
+      "cargo +nightly miri test assume_new",
+      "cargo +nightly careful test assume_new"
+    ]
+  }
 ]

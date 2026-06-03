@@ -37,10 +37,12 @@ instruction, not a verdict: it must be non-empty, concrete, operation-aware
 when it names a safety obligation, and free of "all clear", safety-proof,
 UB-free, Miri-clean, or site-execution claims.
 
-Card `class`, `priority`, and `confidence` values must use the canonical
-ReviewCard vocabulary. Fixture goldens pin the expected signal for supported
-classification states so a card cannot silently drift from a high-confidence
-contract gap to a weaker or unknown PR-review signal.
+Card `class`, `priority`, `confidence`, and `proof_path` values must use the
+canonical ReviewCard vocabulary. `proof_path` is a reviewer routing hint for the
+kind of evidence that could make a card reviewable, not a proof claim and not a
+verdict that a witness has run. Fixture goldens pin the expected signal for
+supported classification states so a card cannot silently drift from a
+high-confidence contract gap to a weaker or unknown PR-review signal.
 
 ## Non-goals
 
@@ -65,8 +67,8 @@ contract gap to a weaker or unknown PR-review signal.
   hazards, obligation evidence keys, and witness route kinds belong to the
   operation family registry row, command-bearing witness routes name their
   matching tool, and hazards are not duplicated.
-- The card's class, priority, and confidence are known ReviewCard values and
-  match the fixture-pinned classification signal.
+- The card's class, priority, confidence, and proof path are known ReviewCard
+  values and match the fixture-pinned classification signal.
 - The card includes missing evidence and a next action.
 - The card's next action names a concrete review step without implying safety,
   UB-free status, Miri-clean status, or site execution.

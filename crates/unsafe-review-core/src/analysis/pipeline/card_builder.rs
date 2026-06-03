@@ -1,5 +1,8 @@
 use crate::analysis::{classify, evidence, obligations, receipts, witness};
-use crate::domain::{MissingEvidence, NextAction, Priority, ReviewCard, ReviewClass};
+use crate::domain::{
+    MissingEvidence, NextAction, Priority, ProofPath, ReviewCard, ReviewClass, WitnessKind,
+    WitnessRoute,
+};
 
 pub(super) struct CardBuildContext<'a> {
     pub root: &'a std::path::Path,
@@ -90,6 +93,7 @@ pub(super) fn build_card(
         summary: next_action_summary,
         verify_commands,
     };
+    let proof_path = proof_path_for(&class, &routes);
 
     if !witness_evidence.present {
         missing.push(MissingEvidence::new(
@@ -103,6 +107,7 @@ pub(super) fn build_card(
         class,
         priority,
         confidence,
+        proof_path,
         site: scanned_site.site,
         operation: scanned_site.operation,
         hazards,
@@ -116,6 +121,35 @@ pub(super) fn build_card(
         routes,
         next_action,
         related_tests,
+    }
+}
+
+fn proof_path_for(class: &ReviewClass, routes: &[WitnessRoute]) -> ProofPath {
+    if routes.is_empty()
+        || routes.iter().all(|route| {
+            matches!(
+                route.kind,
+                WitnessKind::HumanDeepReview | WitnessKind::Unsupported
+            )
+        })
+    {
+        return ProofPath::HumanReviewOnly;
+    }
+
+    match class {
+        ReviewClass::UnsafeUnreached => ProofPath::HelperGated,
+        ReviewClass::RequiresLoom | ReviewClass::RequiresKaniOrCrux => ProofPath::MutationMiriModel,
+        ReviewClass::GuardedAndWitnessed
+        | ReviewClass::GuardedUnwitnessed
+        | ReviewClass::ReachableUnwitnessed
+        | ReviewClass::WitnessMismatch
+        | ReviewClass::RequiresSanitizer
+        | ReviewClass::MiriUnsupported => ProofPath::ObservableRedGreen,
+        ReviewClass::ContractMissing
+        | ReviewClass::GuardMissing
+        | ReviewClass::StaticUnknown
+        | ReviewClass::BaselineKnown
+        | ReviewClass::Suppressed => ProofPath::SourceRouteOnly,
     }
 }
 
