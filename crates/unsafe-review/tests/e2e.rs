@@ -1279,6 +1279,9 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(review_kit["source"], "first_pr");
     assert_eq!(review_kit["policy"], "advisory");
     assert_eq!(review_kit["scope"], "diff");
+    assert_eq!(review_kit["summary"]["changed_files"], 1);
+    assert_eq!(review_kit["summary"]["changed_rust_files"], 1);
+    assert_eq!(review_kit["summary"]["changed_non_rust_files"], 0);
     assert_eq!(review_kit["summary"]["cards"], 1);
     assert_eq!(review_kit["summary"]["open_actionable_gaps"], 1);
     assert_eq!(review_kit["top_card_id"], card_id);
@@ -1793,6 +1796,9 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
     let review_kit = parse_json(&fs::read_to_string(out_dir.join("review-kit.json"))?)?;
     assert_eq!(review_kit["schema_version"], "0.1");
     assert_eq!(review_kit["mode"], "review_kit_manifest");
+    assert_eq!(review_kit["summary"]["changed_files"], 1);
+    assert_eq!(review_kit["summary"]["changed_rust_files"], 1);
+    assert_eq!(review_kit["summary"]["changed_non_rust_files"], 0);
     assert_eq!(review_kit["summary"]["cards"], 0);
     assert_eq!(review_kit["summary"]["open_actionable_gaps"], 0);
     assert!(review_kit["top_card_id"].is_null());

@@ -133,6 +133,9 @@ When imported manual candidates are present, the terminal handoff and
 `explain`, `context --json`, and `candidate witness-plan` commands for the
 first manual candidate. Those candidates remain manual/advisory targets, not
 analyzer ReviewCards, not policy inputs, and not witness execution.
+The review-kit manifest summary mirrors the canonical card summary counts,
+including diff-scope file counts, so downstream reviewers and agents can see
+mixed-language PR breadth without treating non-Rust files as ReviewCards.
 
 ## Output Formats
 

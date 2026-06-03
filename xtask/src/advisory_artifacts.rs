@@ -6,6 +6,9 @@ struct AdvisoryArtifactSummary {
     card_projections: BTreeMap<String, CardProjection>,
     repair_queue_projections: BTreeMap<String, RepairQueueProjection>,
     scope: String,
+    changed_files: usize,
+    changed_rust_files: usize,
+    changed_non_rust_files: usize,
     card_count: usize,
     open_actionable_gaps: usize,
     high_priority_cards: usize,
@@ -15,6 +18,9 @@ struct AdvisoryArtifactManifest {
     card_ids: BTreeSet<String>,
     card_projections: BTreeMap<String, CardProjection>,
     scope: String,
+    changed_files: usize,
+    changed_rust_files: usize,
+    changed_non_rust_files: usize,
     card_count: usize,
     open_actionable_gaps: usize,
     high_priority_cards: usize,
@@ -186,6 +192,9 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
     check_review_kit_manifest(
         dir,
         &summary.scope,
+        summary.changed_files,
+        summary.changed_rust_files,
+        summary.changed_non_rust_files,
         summary.card_count,
         summary.open_actionable_gaps,
         &summary.card_ids,
@@ -543,6 +552,9 @@ fn check_manual_candidate_artifact_entry(
 fn check_review_kit_manifest(
     dir: &Path,
     scope: &str,
+    changed_files: usize,
+    changed_rust_files: usize,
+    changed_non_rust_files: usize,
     card_count: usize,
     open_actionable_gaps: usize,
     card_ids: &BTreeSet<String>,
@@ -562,6 +574,24 @@ fn check_review_kit_manifest(
     super::require_json_str(&review_kit, "policy", "advisory", "review-kit.json")?;
     super::require_json_str(&review_kit, "scope", scope, "review-kit.json")?;
     super::require_non_empty_json_str(&review_kit, "tool_version", "review-kit.json")?;
+    require_review_kit_summary_count(
+        &review_kit,
+        "changed_files",
+        changed_files,
+        "cards.json summary.changed_files",
+    )?;
+    require_review_kit_summary_count(
+        &review_kit,
+        "changed_rust_files",
+        changed_rust_files,
+        "cards.json summary.changed_rust_files",
+    )?;
+    require_review_kit_summary_count(
+        &review_kit,
+        "changed_non_rust_files",
+        changed_non_rust_files,
+        "cards.json summary.changed_non_rust_files",
+    )?;
     let summary_cards = super::json_usize_at(&review_kit, "/summary/cards", "review-kit.json")?;
     if summary_cards != card_count {
         return Err(format!(
@@ -662,6 +692,22 @@ fn check_review_kit_manifest(
         return Err(format!(
             "review-kit.json artifact set must be {:?}; got {:?}",
             expected, seen
+        ));
+    }
+    Ok(())
+}
+
+fn require_review_kit_summary_count(
+    review_kit: &serde_json::Value,
+    field: &str,
+    expected: usize,
+    source: &str,
+) -> Result<(), String> {
+    let pointer = format!("/summary/{field}");
+    let actual = super::json_usize_at(review_kit, &pointer, "review-kit.json")?;
+    if actual != expected {
+        return Err(format!(
+            "review-kit.json summary.{field} is {actual}, but {source} is {expected}"
         ));
     }
     Ok(())
@@ -1517,6 +1563,9 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         card_projections: manifest.card_projections,
         repair_queue_projections,
         scope: manifest.scope,
+        changed_files: manifest.changed_files,
+        changed_rust_files: manifest.changed_rust_files,
+        changed_non_rust_files: manifest.changed_non_rust_files,
         card_count: manifest.card_count,
         open_actionable_gaps: manifest.open_actionable_gaps,
         high_priority_cards: manifest.high_priority_cards,
@@ -1546,6 +1595,11 @@ fn check_cards_json_artifact(dir: &Path) -> Result<AdvisoryArtifactManifest, Str
     let card_ids = super::advisory_card_ids(&cards)?;
     let card_projections = advisory_card_projections(&cards)?;
     let card_count = card_ids.len();
+    let changed_files = super::json_usize_at(&cards, "/summary/changed_files", "cards.json")?;
+    let changed_rust_files =
+        super::json_usize_at(&cards, "/summary/changed_rust_files", "cards.json")?;
+    let changed_non_rust_files =
+        super::json_usize_at(&cards, "/summary/changed_non_rust_files", "cards.json")?;
     let summary_cards = super::json_usize_at(&cards, "/summary/cards", "cards.json")?;
     let open_actionable_gaps =
         super::json_usize_at(&cards, "/summary/open_actionable_gaps", "cards.json")?;
@@ -1563,6 +1617,9 @@ fn check_cards_json_artifact(dir: &Path) -> Result<AdvisoryArtifactManifest, Str
         card_ids,
         card_projections,
         scope,
+        changed_files,
+        changed_rust_files,
+        changed_non_rust_files,
         card_count,
         open_actionable_gaps,
         high_priority_cards,

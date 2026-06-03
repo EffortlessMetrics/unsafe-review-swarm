@@ -210,6 +210,9 @@ pub(super) fn render_review_kit_manifest(
         "base_ref": check.base.as_deref(),
         "head_commit": git_head_commit(root),
         "summary": {
+            "changed_files": output.summary.changed_files,
+            "changed_rust_files": output.summary.changed_rust_files,
+            "changed_non_rust_files": output.summary.changed_non_rust_files,
             "cards": output.summary.cards,
             "open_actionable_gaps": output.summary.open_actionable_gaps,
         },
@@ -496,6 +499,9 @@ mod tests {
             mode: unsafe_review_core::AnalysisMode::Draft,
             policy: unsafe_review_core::PolicyMode::Advisory,
             summary: unsafe_review_core::api::Summary {
+                changed_files: 3,
+                changed_rust_files: 1,
+                changed_non_rust_files: 2,
                 cards: 0,
                 open_actionable_gaps: 0,
                 ..Default::default()
@@ -527,6 +533,9 @@ mod tests {
         assert_eq!(value["mode"], "review_kit_manifest");
         assert_eq!(value["scope"], "diff");
         assert_eq!(value["base_ref"], "origin/main");
+        assert_eq!(value["summary"]["changed_files"], 3);
+        assert_eq!(value["summary"]["changed_rust_files"], 1);
+        assert_eq!(value["summary"]["changed_non_rust_files"], 2);
         assert!(value["top_card_id"].is_null());
         assert_eq!(value["handoff"]["reviewer_summary"], "pr-summary.md");
         assert!(

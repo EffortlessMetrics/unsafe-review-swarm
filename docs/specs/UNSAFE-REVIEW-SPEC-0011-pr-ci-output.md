@@ -130,7 +130,8 @@ must include source = first_pr
 must include policy = advisory
 must include scope matching cards.json
 must include base/head metadata when known
-must include card count and open actionable gap count matching cards.json
+must include changed-file, changed-Rust-file, changed-non-Rust-file, card, and
+  open-actionable-gap counts matching cards.json
 must include top_card_id, or null only when no cards exist
 must include copy-only handoff commands for the reviewer summary, receipt audit,
   and top-card explain/context commands when a top card exists
