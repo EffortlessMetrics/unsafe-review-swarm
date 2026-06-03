@@ -170,7 +170,10 @@ candidate handoff so reviewers and agents can see more than the first imported
 candidate. That queue must stay copy-only, preserve sorted manual IDs and
 manual/advisory markers, include file:line and implementer handoff cues, expose
 the queue limit and omitted count, and cross-check against
-`manual-candidates.json`. It is not the ReviewCard repair queue.
+`manual-candidates.json`. The verifier must also reject implementer handoff
+drift: target, route, invariant, external evidence commands, limitations, and
+stop lines must still project from the imported manual candidate. It is not the
+ReviewCard repair queue.
 
 If a manual candidate cannot be projected faithfully into a surface, that
 surface must reject or omit it with an explicit reason instead of degrading it
