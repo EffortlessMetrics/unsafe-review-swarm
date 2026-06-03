@@ -884,6 +884,9 @@ pub(super) fn render_manual_repair_queue_artifact(
             "with_fix_options": candidates.iter().filter(|candidate| !candidate.fix_options.is_empty()).count(),
             "with_test_targets": candidates.iter().filter(|candidate| !candidate.test_targets.is_empty()).count(),
             "with_do_not_touch": candidates.iter().filter(|candidate| !candidate.do_not_touch.is_empty()).count(),
+            "with_proof_mode": candidates.iter().filter(|candidate| candidate.proof_mode.is_some()).count(),
+            "with_fix_boundary": candidates.iter().filter(|candidate| candidate.fix_boundary.is_some()).count(),
+            "with_pr_aperture": candidates.iter().filter(|candidate| candidate.pr_aperture.is_some()).count(),
         },
         "queue": queue,
         "trust_boundary": "Copy-only manual candidate repair queue; entries come from imported manual candidates, not analyzer-discovered ReviewCards. This is not an automatic repair queue, not proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not policy gating, and not repair success. unsafe-review did not run agents, did not run witnesses, did not edit source, did not post comments, and did not enforce blocking policy.",
@@ -896,7 +899,7 @@ pub(super) fn render_manual_repair_queue_artifact(
 }
 
 fn manual_repair_queue_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::Value {
-    json!({
+    let mut value = json!({
         "id": candidate.id.as_str(),
         "source": "manual",
         "manual_candidate": true,
@@ -926,7 +929,19 @@ fn manual_repair_queue_entry(root: &Path, candidate: &ManualCandidate) -> serde_
             ]
         },
         "trust_boundary": "Copy-only manual candidate repair queue entry; not analyzer-discovered, not automatic repair, not witness execution, not source editing, not proof, and not policy gating.",
-    })
+    });
+    if let Some(object) = value.as_object_mut() {
+        if let Some(proof_mode) = &candidate.proof_mode {
+            object.insert("proof_mode".to_string(), json!(proof_mode));
+        }
+        if let Some(fix_boundary) = &candidate.fix_boundary {
+            object.insert("fix_boundary".to_string(), json!(fix_boundary));
+        }
+        if let Some(pr_aperture) = &candidate.pr_aperture {
+            object.insert("pr_aperture".to_string(), json!(pr_aperture));
+        }
+    }
+    value
 }
 
 fn manual_candidate_artifact_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::Value {

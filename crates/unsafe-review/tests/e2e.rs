@@ -981,6 +981,36 @@ fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dy
         ledger["candidates"][0]["implementer_handoff"]["invariant_at_risk"],
         "&[u8] memory must not be concurrently mutated"
     );
+    assert_eq!(
+        ledger["candidates"][0]["proof_mode"]["kind"],
+        "mutation-plus-miri"
+    );
+    assert_eq!(
+        ledger["candidates"][0]["proof_mode"]["system_bun_expected"],
+        "nondiscriminating"
+    );
+    assert_eq!(
+        ledger["candidates"][0]["fix_boundary"],
+        "Snapshot shared/growable/resizable bytes before Rust receives &[u8]"
+    );
+    assert!(
+        ledger["candidates"][0]["pr_aperture"]
+            .as_str()
+            .unwrap_or("")
+            .contains("do not patch S3")
+    );
+    assert_eq!(
+        ledger["candidates"][0]["implementer_handoff"]["proof_mode"]["kind"],
+        "mutation-plus-miri"
+    );
+    assert_eq!(
+        ledger["candidates"][0]["implementer_handoff"]["fix_boundary"],
+        ledger["candidates"][0]["fix_boundary"]
+    );
+    assert_eq!(
+        ledger["candidates"][0]["implementer_handoff"]["pr_aperture"],
+        ledger["candidates"][0]["pr_aperture"]
+    );
     assert!(
         ledger["candidates"][0]["implementer_handoff"]["stop_condition"]
             .as_str()
@@ -2128,6 +2158,36 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         manual_candidates["candidates"][0]["implementer_handoff"]["invariant_at_risk"],
         "&[u8] memory must not be concurrently mutated"
     );
+    assert_eq!(
+        manual_candidates["candidates"][0]["proof_mode"]["kind"],
+        "mutation-plus-miri"
+    );
+    assert_eq!(
+        manual_candidates["candidates"][0]["proof_mode"]["system_bun_expected"],
+        "nondiscriminating"
+    );
+    assert_eq!(
+        manual_candidates["candidates"][0]["fix_boundary"],
+        "Snapshot shared/growable/resizable bytes before Rust receives &[u8]"
+    );
+    assert!(
+        manual_candidates["candidates"][0]["pr_aperture"]
+            .as_str()
+            .unwrap_or("")
+            .contains("do not patch S3")
+    );
+    assert_eq!(
+        manual_candidates["candidates"][0]["implementer_handoff"]["proof_mode"]["kind"],
+        "mutation-plus-miri"
+    );
+    assert_eq!(
+        manual_candidates["candidates"][0]["implementer_handoff"]["fix_boundary"],
+        manual_candidates["candidates"][0]["fix_boundary"]
+    );
+    assert_eq!(
+        manual_candidates["candidates"][0]["implementer_handoff"]["pr_aperture"],
+        manual_candidates["candidates"][0]["pr_aperture"]
+    );
     assert!(
         manual_candidates["candidates"][0]["implementer_handoff"]["stop_condition"]
             .as_str()
@@ -2230,6 +2290,9 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(manual_repair_queue["summary"]["with_fix_options"], 2);
     assert_eq!(manual_repair_queue["summary"]["with_test_targets"], 2);
     assert_eq!(manual_repair_queue["summary"]["with_do_not_touch"], 2);
+    assert_eq!(manual_repair_queue["summary"]["with_proof_mode"], 1);
+    assert_eq!(manual_repair_queue["summary"]["with_fix_boundary"], 1);
+    assert_eq!(manual_repair_queue["summary"]["with_pr_aperture"], 1);
     assert_eq!(manual_repair_queue["queue"][0]["id"], "R4R2-S001");
     assert_eq!(manual_repair_queue["queue"][0]["source"], "manual");
     assert_eq!(manual_repair_queue["queue"][0]["manual_candidate"], true);
@@ -2248,6 +2311,18 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(
         manual_repair_queue["queue"][0]["invariant_at_risk"],
         "&[u8] memory must not be concurrently mutated"
+    );
+    assert_eq!(
+        manual_repair_queue["queue"][0]["proof_mode"],
+        manual_candidates["candidates"][0]["proof_mode"]
+    );
+    assert_eq!(
+        manual_repair_queue["queue"][0]["fix_boundary"],
+        manual_candidates["candidates"][0]["fix_boundary"]
+    );
+    assert_eq!(
+        manual_repair_queue["queue"][0]["pr_aperture"],
+        manual_candidates["candidates"][0]["pr_aperture"]
     );
     assert_eq!(
         manual_repair_queue["queue"][0]["implementer_handoff"],

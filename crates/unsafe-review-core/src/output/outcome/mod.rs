@@ -1,6 +1,6 @@
 use crate::candidate::{
     MANUAL_CANDIDATE_INDEX_SCHEMA_VERSION, MANUAL_CANDIDATE_SCHEMA_VERSION, ManualCandidate,
-    ManualCandidateEvidence,
+    ManualCandidateEvidence, ManualCandidateProofMode,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -130,6 +130,12 @@ pub struct OutcomeCardState {
     pub safe_caller: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub invariant: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proof_mode: Option<ManualCandidateProofMode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fix_boundary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pr_aperture: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub evidence: Vec<OutcomeManualCandidateEvidence>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -213,6 +219,12 @@ struct SnapshotCard {
     safe_caller: Option<String>,
     #[serde(skip)]
     invariant: Option<String>,
+    #[serde(skip)]
+    proof_mode: Option<ManualCandidateProofMode>,
+    #[serde(skip)]
+    fix_boundary: Option<String>,
+    #[serde(skip)]
+    pr_aperture: Option<String>,
     #[serde(skip)]
     evidence: Vec<OutcomeManualCandidateEvidence>,
     #[serde(skip)]
@@ -390,6 +402,9 @@ fn snapshot_card_from_manual_candidate(candidate: ManualCandidate) -> SnapshotCa
         evidence_count: Some(evidence_count),
         safe_caller: Some(candidate.safe_caller),
         invariant: Some(candidate.invariant),
+        proof_mode: candidate.proof_mode,
+        fix_boundary: candidate.fix_boundary,
+        pr_aperture: candidate.pr_aperture,
         evidence,
         fix_options: candidate.fix_options,
         test_targets: candidate.test_targets,
@@ -691,6 +706,14 @@ fn snapshot_id(snapshot: &Snapshot) -> String {
         feed_hash(&mut hash, card.trust_boundary.as_deref().unwrap_or(""));
         feed_hash(&mut hash, card.safe_caller.as_deref().unwrap_or(""));
         feed_hash(&mut hash, card.invariant.as_deref().unwrap_or(""));
+        if let Some(proof_mode) = &card.proof_mode {
+            feed_hash(&mut hash, &proof_mode.kind);
+            feed_hash(&mut hash, &proof_mode.system_bun_expected);
+            feed_hash(&mut hash, &proof_mode.mutation_required.to_string());
+            feed_hash(&mut hash, &proof_mode.miri_required.to_string());
+        }
+        feed_hash(&mut hash, card.fix_boundary.as_deref().unwrap_or(""));
+        feed_hash(&mut hash, card.pr_aperture.as_deref().unwrap_or(""));
         for evidence in &card.evidence {
             feed_hash(&mut hash, &evidence.kind);
             feed_hash(&mut hash, evidence.path.as_deref().unwrap_or(""));
@@ -876,6 +899,9 @@ impl From<&SnapshotCard> for OutcomeCardState {
             evidence_count: card.evidence_count,
             safe_caller: card.safe_caller.clone(),
             invariant: card.invariant.clone(),
+            proof_mode: card.proof_mode.clone(),
+            fix_boundary: card.fix_boundary.clone(),
+            pr_aperture: card.pr_aperture.clone(),
             evidence: card.evidence.clone(),
             fix_options: card.fix_options.clone(),
             test_targets: card.test_targets.clone(),
@@ -928,6 +954,9 @@ fn manual_handoff_changed(before: &SnapshotCard, after: &SnapshotCard) -> bool {
     }
     before.safe_caller != after.safe_caller
         || before.invariant != after.invariant
+        || before.proof_mode != after.proof_mode
+        || before.fix_boundary != after.fix_boundary
+        || before.pr_aperture != after.pr_aperture
         || before.evidence != after.evidence
         || before.fix_options != after.fix_options
         || before.test_targets != after.test_targets
@@ -1143,6 +1172,21 @@ mod tests {
             Some("&[u8] memory must not be concurrently mutated")
         );
         assert_eq!(
+            after.proof_mode.as_ref().map(|mode| mode.kind.as_str()),
+            Some("mutation-plus-miri")
+        );
+        assert_eq!(
+            after.fix_boundary.as_deref(),
+            Some("Snapshot shared/growable/resizable bytes before Rust receives &[u8]")
+        );
+        assert!(
+            after
+                .pr_aperture
+                .as_deref()
+                .unwrap_or("")
+                .contains("do not patch S3")
+        );
+        assert_eq!(
             after.evidence[0].command.as_deref(),
             Some("bun test target/unsafe-scout/evidence-0.js")
         );
@@ -1209,6 +1253,20 @@ mod tests {
         assert_eq!(
             value["cards"]["new"][0]["after"]["invariant"],
             "&[u8] memory must not be concurrently mutated"
+        );
+        assert_eq!(
+            value["cards"]["new"][0]["after"]["proof_mode"]["kind"],
+            "mutation-plus-miri"
+        );
+        assert_eq!(
+            value["cards"]["new"][0]["after"]["fix_boundary"],
+            "Snapshot shared/growable/resizable bytes before Rust receives &[u8]"
+        );
+        assert!(
+            value["cards"]["new"][0]["after"]["pr_aperture"]
+                .as_str()
+                .unwrap_or("")
+                .contains("do not patch S3")
         );
         assert_eq!(
             value["cards"]["new"][0]["after"]["evidence"][0]["command"],
@@ -1585,6 +1643,14 @@ mod tests {
   "unsafe_operation": "core::slice::from_raw_parts",
   "invariant": "&[u8] memory must not be concurrently mutated",
   "safe_caller": "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))",
+  "proof_mode": {{
+    "kind": "mutation-plus-miri",
+    "system_bun_expected": "nondiscriminating",
+    "mutation_required": true,
+    "miri_required": true
+  }},
+  "fix_boundary": "Snapshot shared/growable/resizable bytes before Rust receives &[u8]",
+  "pr_aperture": "TextDecoder shared-byte snapshot only; do not patch S3, fs, writev, or unrelated encodings",
   "fix_options": [
     "Copy SharedArrayBuffer-backed bytes into stable owned storage before creating a Rust slice"
   ],

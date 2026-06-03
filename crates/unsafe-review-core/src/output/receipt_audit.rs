@@ -234,6 +234,19 @@ fn manual_candidate_target(candidate: &ReceiptAuditManualCandidate) -> String {
         format!("route: {}", markdown_cell(&candidate.safe_caller)),
         format!("invariant: {}", markdown_cell(&candidate.invariant)),
     ];
+    if let Some(proof_mode) = &candidate.proof_mode {
+        parts.push(format!(
+            "proof mode: `{}` / system Bun `{}`",
+            markdown_cell(&proof_mode.kind),
+            markdown_cell(&proof_mode.system_bun_expected)
+        ));
+    }
+    if let Some(fix_boundary) = &candidate.fix_boundary {
+        parts.push(format!("fix boundary: {}", markdown_cell(fix_boundary)));
+    }
+    if let Some(pr_aperture) = &candidate.pr_aperture {
+        parts.push(format!("PR aperture: {}", markdown_cell(pr_aperture)));
+    }
     if let Some(fix) = candidate.fix_options.first() {
         parts.push(format!("first fix: {}", markdown_cell(fix)));
     }
@@ -502,6 +515,9 @@ mod tests {
                     operation_family: "raw_pointer_read".to_string(),
                     safe_caller: "TextDecoder.decode SharedArrayBuffer route".to_string(),
                     invariant: "&[u8] memory must not be concurrently mutated".to_string(),
+                    proof_mode: None,
+                    fix_boundary: None,
+                    pr_aperture: None,
                     evidence: vec![crate::analysis::receipts::ReceiptAuditManualCandidateEvidence {
                         kind: "runtime_witness".to_string(),
                         path: Some(

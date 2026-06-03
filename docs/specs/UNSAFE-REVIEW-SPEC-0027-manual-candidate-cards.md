@@ -46,6 +46,9 @@ operation_family
 unsafe_operation
 invariant
 safe_caller
+proof_mode
+fix_boundary
+pr_aperture
 evidence
 trust_boundary
 fix_options[]
@@ -58,6 +61,12 @@ Field rules:
 - `location.file`: root-relative path to the candidate source location.
 - `location.line`: 1-based source line when known.
 - `evidence[]`: zero or more external evidence references.
+- `proof_mode`: optional advisory proof-mode object for candidate packets that
+  need an explicit proof bar before implementation or ledger movement.
+- `fix_boundary`: optional copy-only statement of the smallest repair boundary
+  to try first.
+- `pr_aperture`: optional copy-only statement of the intended upstream PR scope
+  and stop line.
 - `trust_boundary`: explicit manual/advisory boundary text.
 - `fix_options[]`: optional copy-only implementer guidance for candidate-local
   repair approaches.
@@ -160,6 +169,21 @@ Each `evidence[]` item must include:
 - `command`: optional exact external command that produced the evidence.
 - `limitation`: optional concise statement of what the evidence does not prove.
 
+When present, `proof_mode` must include:
+
+- `kind`: one of `observable-red-green`, `mutation-plus-miri`,
+  `source-route-only`, or `helper-gated`.
+- `system_bun_expected`: one of `fail`, `nondiscriminating`, or `unavailable`.
+- `mutation_required`: boolean.
+- `miri_required`: boolean.
+
+The importer must preserve `proof_mode`, `fix_boundary`, and `pr_aperture` in
+canonical manual candidate JSON, candidate list JSON, manual candidate
+`context --json`, outcome comparison, receipt audit, and first-pr manual
+candidate ledger surfaces. These fields remain copy-only advisory handoff
+fields. They must not convert a candidate into proof, policy readiness, witness
+execution, or analyzer discovery.
+
 Import command shape:
 
 ```bash
@@ -220,6 +244,14 @@ links to the same manual ID through a reviewed linkage field.
   "unsafe_operation": "core::slice::from_raw_parts",
   "invariant": "&[u8] memory must not be concurrently mutated",
   "safe_caller": "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))",
+  "proof_mode": {
+    "kind": "mutation-plus-miri",
+    "system_bun_expected": "nondiscriminating",
+    "mutation_required": true,
+    "miri_required": true
+  },
+  "fix_boundary": "Snapshot shared/growable/resizable bytes before Rust receives &[u8]",
+  "pr_aperture": "TextDecoder shared-byte snapshot only; do not patch S3, fs, writev, or unrelated encodings",
   "fix_options": [
     "Copy SharedArrayBuffer-backed bytes into stable owned storage before creating a Rust slice"
   ],
@@ -362,6 +394,10 @@ into an analyzer ReviewCard.
 - projection tests proving optional fix options, test targets, and do-not-touch
   guidance stay aligned across candidate import, explain/context, witness-plan,
   first-pr `manual-candidates.json`, and `review-kit.json`
+- schema and projection tests proving optional `proof_mode`, `fix_boundary`,
+  and `pr_aperture` fields are validated, preserved in canonical candidate
+  JSON, and visible in candidate context, outcome, receipt audit, and first-pr
+  manual-candidate sidecar surfaces without becoming ReviewCard evidence
 - verifier and first-pr e2e tests proving `manual-repair-queue.json` stays
   aligned with `manual-candidates.json`, preserves manual markers and
   implementer guidance, and remains separate from ReviewCard `repair-queue.json`
@@ -387,6 +423,9 @@ into an analyzer ReviewCard.
   file:line, safe caller route, invariant at risk, external evidence references,
   evidence commands and limitations, candidate-specific fix options, test
   targets, non-goals, and stop line from the same manual candidate.
+- `context`, outcome comparison, receipt audit, and manual candidate first-pr
+  sidecars preserve optional proof mode, fix boundary, and PR aperture fields as
+  advisory handoff metadata.
 - `candidate list` reports imported candidates as a manual/advisory ledger with
   sorted IDs, advisory operation-family and evidence-kind summaries, file:line
   locations, compact implementer handoff cues, evidence counts, optional fix

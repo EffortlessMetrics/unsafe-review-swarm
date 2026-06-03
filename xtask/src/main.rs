@@ -620,6 +620,15 @@ fn check_manual_candidate_smoke_entry_matches_example(
             &example_path,
         )?;
     }
+    for field in ["proof_mode", "fix_boundary", "pr_aperture"] {
+        require_generated_example_optional_field_match(
+            actual,
+            &example.expected,
+            field,
+            &context,
+            &example_path,
+        )?;
+    }
     Ok(())
 }
 
@@ -649,6 +658,25 @@ fn require_generated_example_optional_array_match(
 ) -> Result<(), String> {
     let actual = optional_json_array(actual, field);
     let expected = optional_json_array(expected, field);
+    if actual == expected {
+        return Ok(());
+    }
+    Err(format!(
+        "{context} field `{field}` must match committed example {example_path}; expected {}, got {}",
+        json_field_display(expected),
+        json_field_display(actual)
+    ))
+}
+
+fn require_generated_example_optional_field_match(
+    actual: &serde_json::Value,
+    expected: &serde_json::Value,
+    field: &str,
+    context: &str,
+    example_path: &str,
+) -> Result<(), String> {
+    let actual = actual.get(field);
+    let expected = expected.get(field);
     if actual == expected {
         return Ok(());
     }
@@ -16780,7 +16808,10 @@ review_after = "2026-08-01"
                 "evidence_kinds": {},
                 "with_fix_options": 0,
                 "with_test_targets": 0,
-                "with_do_not_touch": 0
+                "with_do_not_touch": 0,
+                "with_proof_mode": 0,
+                "with_fix_boundary": 0,
+                "with_pr_aperture": 0
             },
             "queue": [],
             "trust_boundary": "Copy-only manual candidate repair queue; entries come from imported manual candidates, not analyzer-discovered ReviewCards. This is not an automatic repair queue, not proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not policy gating, and not repair success. unsafe-review did not run agents, did not run witnesses, did not edit source, did not post comments, and did not enforce blocking policy."
@@ -16860,6 +16891,14 @@ review_after = "2026-08-01"
                 "operation_family": "raw_pointer_read"
             },
             "invariant_at_risk": "&[u8] memory must not be concurrently mutated",
+            "proof_mode": {
+                "kind": "mutation-plus-miri",
+                "system_bun_expected": "nondiscriminating",
+                "mutation_required": true,
+                "miri_required": true
+            },
+            "fix_boundary": "copy shared bytes before constructing the Rust slice",
+            "pr_aperture": "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings",
             "external_evidence": [{
                 "kind": "runtime_witness",
                 "path": "target/unsafe-scout/textdecoder-shared-race-route.out",
@@ -16910,6 +16949,14 @@ review_after = "2026-08-01"
             "unsafe_operation": "core::slice::from_raw_parts",
             "invariant": "&[u8] memory must not be concurrently mutated",
             "safe_caller": "TextDecoder.decode SharedArrayBuffer route",
+            "proof_mode": {
+                "kind": "mutation-plus-miri",
+                "system_bun_expected": "nondiscriminating",
+                "mutation_required": true,
+                "miri_required": true
+            },
+            "fix_boundary": "copy shared bytes before constructing the Rust slice",
+            "pr_aperture": "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings",
             "fix_options": [
                 "copy SharedArrayBuffer-backed bytes before constructing the slice"
             ],
@@ -16984,7 +17031,10 @@ review_after = "2026-08-01"
                 },
                 "with_fix_options": 1,
                 "with_test_targets": 1,
-                "with_do_not_touch": 1
+                "with_do_not_touch": 1,
+                "with_proof_mode": 1,
+                "with_fix_boundary": 1,
+                "with_pr_aperture": 1
             },
             "queue": [{
                 "id": "R4R2-S001",
@@ -16998,6 +17048,14 @@ review_after = "2026-08-01"
                 "safe_caller": "TextDecoder.decode SharedArrayBuffer route",
                 "invariant_at_risk": "&[u8] memory must not be concurrently mutated",
                 "external_evidence_refs": 1,
+                "proof_mode": {
+                    "kind": "mutation-plus-miri",
+                    "system_bun_expected": "nondiscriminating",
+                    "mutation_required": true,
+                    "miri_required": true
+                },
+                "fix_boundary": "copy shared bytes before constructing the Rust slice",
+                "pr_aperture": "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings",
                 "fix_options": [
                     "copy SharedArrayBuffer-backed bytes before constructing the slice"
                 ],

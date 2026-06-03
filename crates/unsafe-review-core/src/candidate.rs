@@ -17,6 +17,12 @@ pub struct ManualCandidate {
     pub unsafe_operation: String,
     pub invariant: String,
     pub safe_caller: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proof_mode: Option<ManualCandidateProofMode>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fix_boundary: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pr_aperture: Option<String>,
     #[serde(default)]
     pub evidence: Vec<ManualCandidateEvidence>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -38,6 +44,14 @@ pub struct ManualCandidate {
 pub struct ManualCandidateLocation {
     pub file: PathBuf,
     pub line: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ManualCandidateProofMode {
+    pub kind: String,
+    pub system_bun_expected: String,
+    pub mutation_required: bool,
+    pub miri_required: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -96,6 +110,11 @@ impl ManualCandidate {
         require_nonempty("unsafe_operation", &self.unsafe_operation)?;
         require_nonempty("invariant", &self.invariant)?;
         require_nonempty("safe_caller", &self.safe_caller)?;
+        if let Some(proof_mode) = &self.proof_mode {
+            proof_mode.validate()?;
+        }
+        require_optional_nonempty("fix_boundary", self.fix_boundary.as_deref())?;
+        require_optional_nonempty("pr_aperture", self.pr_aperture.as_deref())?;
         require_nonempty("trust_boundary", &self.trust_boundary)?;
         require_nonempty_items("fix_options", &self.fix_options)?;
         require_nonempty_items("test_targets", &self.test_targets)?;
@@ -109,6 +128,24 @@ impl ManualCandidate {
             }
             require_optional_nonempty("evidence.command", evidence.command.as_deref())?;
             require_optional_nonempty("evidence.limitation", evidence.limitation.as_deref())?;
+        }
+        Ok(())
+    }
+}
+
+impl ManualCandidateProofMode {
+    fn validate(&self) -> Result<(), String> {
+        if !is_known_proof_mode_kind(&self.kind) {
+            return Err(format!(
+                "manual candidate proof_mode.kind `{}` is not supported",
+                self.kind
+            ));
+        }
+        if !is_known_system_bun_expected(&self.system_bun_expected) {
+            return Err(format!(
+                "manual candidate proof_mode.system_bun_expected `{}` is not supported",
+                self.system_bun_expected
+            ));
         }
         Ok(())
     }
@@ -232,6 +269,15 @@ pub fn render_manual_candidate_context(candidate: &ManualCandidate) -> Result<St
         "trust_boundary": candidate.trust_boundary,
     });
     if let Some(object) = value.as_object_mut() {
+        if let Some(proof_mode) = &candidate.proof_mode {
+            object.insert("proof_mode".to_string(), serde_json::json!(proof_mode));
+        }
+        if let Some(fix_boundary) = &candidate.fix_boundary {
+            object.insert("fix_boundary".to_string(), serde_json::json!(fix_boundary));
+        }
+        if let Some(pr_aperture) = &candidate.pr_aperture {
+            object.insert("pr_aperture".to_string(), serde_json::json!(pr_aperture));
+        }
         insert_non_empty_json_array(object, "fix_options", &candidate.fix_options);
         insert_non_empty_json_array(object, "test_targets", &candidate.test_targets);
         insert_non_empty_json_array(object, "do_not_touch", &candidate.do_not_touch);
@@ -313,6 +359,21 @@ fn render_candidate_handoff_markdown(out: &mut String, candidate: &ManualCandida
         candidate.safe_caller, candidate.unsafe_operation
     ));
     out.push_str(&format!("- Invariant at risk: {}\n", candidate.invariant));
+    if let Some(proof_mode) = &candidate.proof_mode {
+        out.push_str(&format!(
+            "- Proof mode: `{}` (system Bun expected: `{}`; mutation required: `{}`; Miri/model required: `{}`)\n",
+            proof_mode.kind,
+            proof_mode.system_bun_expected,
+            proof_mode.mutation_required,
+            proof_mode.miri_required
+        ));
+    }
+    if let Some(fix_boundary) = &candidate.fix_boundary {
+        out.push_str(&format!("- Fix boundary: {fix_boundary}\n"));
+    }
+    if let Some(pr_aperture) = &candidate.pr_aperture {
+        out.push_str(&format!("- PR aperture: {pr_aperture}\n"));
+    }
     render_string_list(out, "Fix options", &candidate.fix_options);
     render_string_list(out, "Test targets", &candidate.test_targets);
     render_string_list(out, "Do not touch", &candidate.do_not_touch);
@@ -345,6 +406,15 @@ pub fn manual_candidate_implementer_handoff(candidate: &ManualCandidate) -> serd
         "stop_condition": "stop before source edits if the route no longer matches this manual candidate, or if the repair would broaden into unrelated unsafe sites",
     });
     if let Some(object) = value.as_object_mut() {
+        if let Some(proof_mode) = &candidate.proof_mode {
+            object.insert("proof_mode".to_string(), serde_json::json!(proof_mode));
+        }
+        if let Some(fix_boundary) = &candidate.fix_boundary {
+            object.insert("fix_boundary".to_string(), serde_json::json!(fix_boundary));
+        }
+        if let Some(pr_aperture) = &candidate.pr_aperture {
+            object.insert("pr_aperture".to_string(), serde_json::json!(pr_aperture));
+        }
         insert_non_empty_json_array(object, "fix_options", &candidate.fix_options);
         insert_non_empty_json_array(object, "test_targets", &candidate.test_targets);
         insert_non_empty_json_array(object, "do_not_touch", &candidate.do_not_touch);
@@ -361,6 +431,18 @@ fn manual_candidate_suggested_next_steps(candidate: &ManualCandidate) -> Vec<Str
     ];
     if !candidate.fix_options.is_empty() {
         steps.push("evaluate the candidate-specific fix options before editing".to_string());
+    }
+    if candidate.proof_mode.is_some() {
+        steps.push(
+            "preserve the candidate proof mode and evidence bar before claiming the lane outcome"
+                .to_string(),
+        );
+    }
+    if candidate.fix_boundary.is_some() {
+        steps.push("keep the first patch at the candidate-specific fix boundary".to_string());
+    }
+    if candidate.pr_aperture.is_some() {
+        steps.push("keep the PR inside the candidate-specific aperture and stop line".to_string());
     }
     if !candidate.test_targets.is_empty() {
         steps.push(
@@ -472,6 +554,17 @@ fn is_known_evidence_kind(kind: &str) -> bool {
     )
 }
 
+fn is_known_proof_mode_kind(kind: &str) -> bool {
+    matches!(
+        kind,
+        "observable-red-green" | "mutation-plus-miri" | "source-route-only" | "helper-gated"
+    )
+}
+
+fn is_known_system_bun_expected(value: &str) -> bool {
+    matches!(value, "fail" | "nondiscriminating" | "unavailable")
+}
+
 fn manual_source() -> String {
     "manual".to_string()
 }
@@ -491,12 +584,27 @@ mod tests {
         assert!(candidate.manual_candidate);
         assert!(!candidate.analyzer_discovered);
         assert_eq!(candidate.evidence.len(), 2);
+        assert_eq!(
+            candidate.proof_mode.as_ref().map(|mode| mode.kind.as_str()),
+            Some("mutation-plus-miri")
+        );
+        assert_eq!(
+            candidate.fix_boundary.as_deref(),
+            Some("copy shared bytes before constructing the Rust slice")
+        );
+        assert_eq!(
+            candidate.pr_aperture.as_deref(),
+            Some("TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings")
+        );
         assert_eq!(candidate.fix_options.len(), 1);
         assert_eq!(candidate.test_targets.len(), 1);
         assert_eq!(candidate.do_not_touch.len(), 1);
         let canonical = candidate.to_pretty_json()?;
         assert!(canonical.contains("\"manual_candidate\": true"));
         assert!(canonical.contains("\"analyzer_discovered\": false"));
+        assert!(canonical.contains("\"proof_mode\""));
+        assert!(canonical.contains("\"fix_boundary\""));
+        assert!(canonical.contains("\"pr_aperture\""));
         assert!(canonical.contains("\"fix_options\""));
         assert!(canonical.contains("\"test_targets\""));
         assert!(canonical.contains("\"do_not_touch\""));
@@ -600,6 +708,30 @@ mod tests {
     }
 
     #[test]
+    fn manual_candidate_rejects_unknown_proof_mode() {
+        let err = ManualCandidate::from_json_str(&example_json().replace(
+            "\"kind\": \"mutation-plus-miri\"",
+            "\"kind\": \"sure-from-source\"",
+        ))
+        .err()
+        .unwrap_or_default();
+
+        assert!(err.contains("proof_mode.kind"), "{err}");
+    }
+
+    #[test]
+    fn manual_candidate_rejects_empty_fix_boundary() {
+        let err = ManualCandidate::from_json_str(&example_json().replace(
+            "\"fix_boundary\": \"copy shared bytes before constructing the Rust slice\"",
+            "\"fix_boundary\": \"   \"",
+        ))
+        .err()
+        .unwrap_or_default();
+
+        assert!(err.contains("fix_boundary"), "{err}");
+    }
+
+    #[test]
     fn manual_candidate_explain_context_and_witness_plan_preserve_manual_marker()
     -> Result<(), String> {
         let candidate = ManualCandidate::from_json_str(example_json())?;
@@ -612,6 +744,9 @@ mod tests {
         assert!(explain.contains("Analyzer-discovered: `false`"));
         assert!(explain.contains("## Implementer handoff"));
         assert!(explain.contains("Stop line: stop before source edits"));
+        assert!(explain.contains("Proof mode: `mutation-plus-miri`"));
+        assert!(explain.contains("Fix boundary: copy shared bytes"));
+        assert!(explain.contains("PR aperture: TextDecoder shared-byte snapshot"));
         assert!(explain.contains("Fix options"));
         assert!(explain.contains("copy SharedArrayBuffer-backed bytes"));
         assert!(explain.contains("Test targets"));
@@ -624,6 +759,9 @@ mod tests {
         assert!(context.contains("\"manual_candidate\": true"));
         assert!(context.contains("\"implementer_handoff\""));
         assert!(context.contains("\"invariant_at_risk\""));
+        assert!(context.contains("\"proof_mode\""));
+        assert!(context.contains("\"fix_boundary\""));
+        assert!(context.contains("\"pr_aperture\""));
         assert!(context.contains("\"command\": \"bun test"));
         assert!(context.contains("\"limitation\": \"runtime route evidence only"));
         assert!(context.contains("\"fix_options\""));
@@ -633,6 +771,7 @@ mod tests {
         assert!(witness_plan.contains("manual candidate witness plan"));
         assert!(witness_plan.contains("does not run witnesses"));
         assert!(witness_plan.contains("## Implementer handoff"));
+        assert!(witness_plan.contains("Proof mode: `mutation-plus-miri`"));
         assert!(witness_plan.contains("Fix options"));
         assert!(witness_plan.contains("Test targets"));
         assert!(witness_plan.contains("Do not touch"));
@@ -656,6 +795,14 @@ mod tests {
           "unsafe_operation": "core::slice::from_raw_parts",
           "invariant": "&[u8] memory must not be concurrently mutated",
           "safe_caller": "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))",
+          "proof_mode": {
+            "kind": "mutation-plus-miri",
+            "system_bun_expected": "nondiscriminating",
+            "mutation_required": true,
+            "miri_required": true
+          },
+          "fix_boundary": "copy shared bytes before constructing the Rust slice",
+          "pr_aperture": "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings",
           "fix_options": [
             "copy SharedArrayBuffer-backed bytes before constructing the slice"
           ],

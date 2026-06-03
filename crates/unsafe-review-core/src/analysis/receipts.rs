@@ -1,5 +1,5 @@
 use crate::api::AnalyzeOutput;
-use crate::candidate::{ManualCandidate, load_manual_candidates};
+use crate::candidate::{ManualCandidate, ManualCandidateProofMode, load_manual_candidates};
 use crate::domain::{
     CardId, ReachEvidence, ReceiptCardIdKind, ReviewCard, WitnessEvidence, WitnessReceipt,
     WitnessRoute,
@@ -281,6 +281,12 @@ pub struct ReceiptAuditManualCandidate {
     pub operation_family: String,
     pub safe_caller: String,
     pub invariant: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proof_mode: Option<ManualCandidateProofMode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fix_boundary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pr_aperture: Option<String>,
     pub evidence: Vec<ReceiptAuditManualCandidateEvidence>,
     pub fix_options: Vec<String>,
     pub test_targets: Vec<String>,
@@ -723,6 +729,9 @@ fn receipt_audit_manual_candidate_from_manual_candidate(
         operation_family: candidate.operation_family.clone(),
         safe_caller: candidate.safe_caller.clone(),
         invariant: candidate.invariant.clone(),
+        proof_mode: candidate.proof_mode.clone(),
+        fix_boundary: candidate.fix_boundary.clone(),
+        pr_aperture: candidate.pr_aperture.clone(),
         evidence: candidate
             .evidence
             .iter()
@@ -1634,6 +1643,21 @@ mod tests {
             matched.invariant,
             "&[u8] memory must not be concurrently mutated"
         );
+        assert_eq!(
+            matched.proof_mode.as_ref().map(|mode| mode.kind.as_str()),
+            Some("mutation-plus-miri")
+        );
+        assert_eq!(
+            matched.fix_boundary.as_deref(),
+            Some("Snapshot shared/growable/resizable bytes before Rust receives &[u8]")
+        );
+        assert!(
+            matched
+                .pr_aperture
+                .as_deref()
+                .unwrap_or("")
+                .contains("do not patch S3")
+        );
         assert_eq!(matched.evidence.len(), 1);
         assert_eq!(
             matched.evidence[0].command.as_deref(),
@@ -1866,6 +1890,14 @@ mod tests {
   "unsafe_operation": "core::slice::from_raw_parts",
   "invariant": "&[u8] memory must not be concurrently mutated",
   "safe_caller": "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))",
+  "proof_mode": {
+    "kind": "mutation-plus-miri",
+    "system_bun_expected": "nondiscriminating",
+    "mutation_required": true,
+    "miri_required": true
+  },
+  "fix_boundary": "Snapshot shared/growable/resizable bytes before Rust receives &[u8]",
+  "pr_aperture": "TextDecoder shared-byte snapshot only; do not patch S3, fs, writev, or unrelated encodings",
   "evidence": [
     {
       "kind": "runtime_witness",
