@@ -67,6 +67,12 @@ struct RepairQueueReadinessProjection {
     reasons: Vec<String>,
 }
 
+struct ManualCandidateIndexProjection {
+    ids: BTreeSet<String>,
+    count: usize,
+    first_id: Option<String>,
+}
+
 const COMMENT_PLAN_BODY_WORD_LIMIT: usize = 220;
 const COMMENT_PLAN_REVIEW_BUDGET: usize = 3;
 const COMMENT_PLAN_REVIEW_BUDGET_REASON: &str = "bounded reviewer noise";
@@ -152,7 +158,7 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         &summary.card_projections,
     )?;
     check_receipt_audit_artifact(dir)?;
-    check_manual_candidates_artifact(dir)?;
+    let manual_candidates = check_manual_candidates_artifact(dir)?;
     check_lsp_artifact(dir, &summary)?;
     check_github_summary_artifact(
         dir,
@@ -174,6 +180,7 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         summary.card_count,
         summary.open_actionable_gaps,
         &summary.card_ids,
+        &manual_candidates,
     )?;
     check_advisory_artifact_overclaims(dir)?;
 
@@ -304,7 +311,7 @@ fn check_receipt_audit_artifact(dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn check_manual_candidates_artifact(dir: &Path) -> Result<(), String> {
+fn check_manual_candidates_artifact(dir: &Path) -> Result<ManualCandidateIndexProjection, String> {
     let path = dir.join("manual-candidates.json");
     let value = super::parse_json_file(&path)?;
     super::require_json_str(
@@ -394,21 +401,37 @@ fn check_manual_candidates_artifact(dir: &Path) -> Result<(), String> {
         }
     }
 
+    let mut candidate_ids = BTreeSet::new();
+    let first_id = candidates
+        .first()
+        .and_then(|candidate| candidate.get("id"))
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string);
     for candidate in candidates {
-        check_manual_candidate_artifact_entry(candidate)?;
+        let id = check_manual_candidate_artifact_entry(candidate)?;
+        if !candidate_ids.insert(id.clone()) {
+            return Err(format!(
+                "manual-candidates.json repeats candidate id `{id}`"
+            ));
+        }
     }
 
-    Ok(())
+    Ok(ManualCandidateIndexProjection {
+        ids: candidate_ids,
+        count: candidates.len(),
+        first_id,
+    })
 }
 
-fn check_manual_candidate_artifact_entry(candidate: &serde_json::Value) -> Result<(), String> {
+fn check_manual_candidate_artifact_entry(candidate: &serde_json::Value) -> Result<String, String> {
     super::require_json_str(
         candidate,
         "schema_version",
         "manual-candidate/v1",
         "manual-candidates.json candidate",
     )?;
-    super::require_non_empty_json_str(candidate, "id", "manual-candidates.json candidate")?;
+    let id =
+        super::require_non_empty_json_str(candidate, "id", "manual-candidates.json candidate")?;
     super::require_json_str(
         candidate,
         "source",
@@ -488,7 +511,7 @@ fn check_manual_candidate_artifact_entry(candidate: &serde_json::Value) -> Resul
                 .to_string(),
         );
     }
-    Ok(())
+    Ok(id.to_string())
 }
 
 fn check_review_kit_manifest(
@@ -497,6 +520,7 @@ fn check_review_kit_manifest(
     card_count: usize,
     open_actionable_gaps: usize,
     card_ids: &BTreeSet<String>,
+    manual_candidates: &ManualCandidateIndexProjection,
 ) -> Result<(), String> {
     let path = dir.join("review-kit.json");
     let review_kit = super::parse_json_file(&path)?;
@@ -568,7 +592,12 @@ fn check_review_kit_manifest(
         }
     }
 
-    check_review_kit_handoff(&review_kit, top_card_id.as_deref(), card_count)?;
+    check_review_kit_handoff(
+        &review_kit,
+        top_card_id.as_deref(),
+        card_count,
+        manual_candidates,
+    )?;
 
     let artifacts = super::json_array_at(&review_kit, "/artifacts", "review-kit.json")?;
     let mut seen = BTreeSet::new();
@@ -616,6 +645,7 @@ fn check_review_kit_handoff(
     review_kit: &serde_json::Value,
     top_card_id: Option<&str>,
     card_count: usize,
+    manual_candidates: &ManualCandidateIndexProjection,
 ) -> Result<(), String> {
     let handoff = review_kit
         .get("handoff")
@@ -649,7 +679,7 @@ fn check_review_kit_handoff(
     }
 
     check_review_kit_top_card_handoff(handoff, top_card_id, card_count)?;
-    check_review_kit_manual_candidate_handoff(handoff)?;
+    check_review_kit_manual_candidate_handoff(handoff, manual_candidates)?;
 
     let boundary =
         super::require_non_empty_json_str(handoff, "trust_boundary", "review-kit.json handoff")?;
@@ -670,7 +700,10 @@ fn check_review_kit_handoff(
     Ok(())
 }
 
-fn check_review_kit_manual_candidate_handoff(handoff: &serde_json::Value) -> Result<(), String> {
+fn check_review_kit_manual_candidate_handoff(
+    handoff: &serde_json::Value,
+    manual_candidates: &ManualCandidateIndexProjection,
+) -> Result<(), String> {
     let manual = handoff
         .get("manual_candidates")
         .ok_or_else(|| "review-kit.json handoff is missing manual_candidates".to_string())?;
@@ -691,6 +724,12 @@ fn check_review_kit_manual_candidate_handoff(handoff: &serde_json::Value) -> Res
         "/manual_candidates",
         "review-kit.json handoff manual_candidates",
     )?;
+    if count != manual_candidates.count {
+        return Err(format!(
+            "review-kit.json handoff manual_candidates.manual_candidates is {count}, but manual-candidates.json has {}",
+            manual_candidates.count
+        ));
+    }
     let analyzer_discovered = super::json_usize_at(
         manual,
         "/analyzer_discovered",
@@ -701,7 +740,7 @@ fn check_review_kit_manual_candidate_handoff(handoff: &serde_json::Value) -> Res
             "review-kit.json handoff manual_candidates analyzer_discovered must stay 0".to_string(),
         );
     }
-    check_review_kit_first_manual_candidate_handoff(manual, count)?;
+    check_review_kit_first_manual_candidate_handoff(manual, manual_candidates)?;
     let boundary = super::require_non_empty_json_str(
         manual,
         "trust_boundary",
@@ -725,14 +764,14 @@ fn check_review_kit_manual_candidate_handoff(handoff: &serde_json::Value) -> Res
 
 fn check_review_kit_first_manual_candidate_handoff(
     manual: &serde_json::Value,
-    count: usize,
+    manual_candidates: &ManualCandidateIndexProjection,
 ) -> Result<(), String> {
     let Some(first_candidate) = manual.get("first_candidate") else {
         return Err(
             "review-kit.json handoff manual_candidates is missing first_candidate".to_string(),
         );
     };
-    if count == 0 {
+    if manual_candidates.count == 0 {
         if first_candidate.is_null() {
             return Ok(());
         }
@@ -752,6 +791,22 @@ fn check_review_kit_first_manual_candidate_handoff(
         "id",
         "review-kit.json handoff manual_candidates first_candidate",
     )?;
+    if !manual_candidates.ids.contains(id) {
+        return Err(format!(
+            "review-kit.json handoff manual_candidates first_candidate id `{id}` is not present in manual-candidates.json"
+        ));
+    }
+    let Some(expected_first_id) = manual_candidates.first_id.as_deref() else {
+        return Err(
+            "review-kit.json handoff manual_candidates has a first_candidate but manual-candidates.json has no first candidate"
+                .to_string(),
+        );
+    };
+    if id != expected_first_id {
+        return Err(format!(
+            "review-kit.json handoff manual_candidates first_candidate id `{id}` must match first manual-candidates.json candidate `{expected_first_id}`"
+        ));
+    }
     super::require_json_str(
         first_candidate,
         "source",
