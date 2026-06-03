@@ -36,3 +36,11 @@ kind = "false_positive_control"
 expected_cards = 0
 label_source = "fixture_golden"
 rationale = "Parsing options before descriptor capture should not trigger the reentry heuristic or create a ReviewCard."
+
+[[samples]]
+id = "js-buffer-recapture-after-reentry-emits-no-card"
+fixture = "js_buffer_reentry_recapture_after_reentry_no_card"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "Re-fetching a JS-backed descriptor after options reentry and materializing that refreshed descriptor should not trigger the reentry heuristic for the stale pre-reentry capture."

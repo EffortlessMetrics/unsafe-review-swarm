@@ -318,6 +318,7 @@ mod tests {
         "adjacent_unchanged_unsafe_fn_no_card",
         "js_buffer_reentry_sync_compression",
         "js_buffer_reentry_options_before_capture_no_card",
+        "js_buffer_reentry_recapture_after_reentry_no_card",
         "split_unsafe_block",
         "raw_pointer_deref",
         "raw_pointer_read_unaligned",

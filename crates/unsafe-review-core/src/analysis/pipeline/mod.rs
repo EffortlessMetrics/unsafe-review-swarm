@@ -2769,6 +2769,17 @@ pub fn zstd_sync(
     }
 
     #[test]
+    fn js_buffer_reentry_fixture_keeps_recapture_after_reentry_no_card() -> Result<(), String> {
+        let output = fixture_output("js_buffer_reentry_recapture_after_reentry_no_card")?;
+
+        assert!(
+            output.cards.is_empty(),
+            "materialization of a descriptor recaptured after reentry should stay a no-card control"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn vec_from_raw_parts_uses_vec_operation_family() -> Result<(), String> {
         let output = fixture_output("vec_from_raw_parts")?;
         let card = single_card("vec_from_raw_parts", &output)?;

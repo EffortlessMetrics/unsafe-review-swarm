@@ -527,6 +527,7 @@ required_core_fixtures = [
   "adjacent_unchanged_unsafe_fn_no_card",
   "js_buffer_reentry_sync_compression",
   "js_buffer_reentry_options_before_capture_no_card",
+  "js_buffer_reentry_recapture_after_reentry_no_card",
   "comment_alignment_not_guard",
 ]
 
@@ -5749,6 +5750,13 @@ expected_hazard = "unknown"
 fixture = "js_buffer_reentry_options_before_capture_no_card"
 kind = "false_positive_control"
 claim = "JS-backed buffer reentry heuristic does not emit a ReviewCard when options are parsed before descriptor capture"
+support_tier = "JS-backed buffer reentry heuristic"
+expected_cards = 0
+
+[[cases]]
+fixture = "js_buffer_reentry_recapture_after_reentry_no_card"
+kind = "false_positive_control"
+claim = "JS-backed buffer reentry heuristic does not emit a ReviewCard when a descriptor is recaptured and materialized after reentry"
 support_tier = "JS-backed buffer reentry heuristic"
 expected_cards = 0
 

@@ -50,11 +50,13 @@ pub(super) fn detect_js_buffer_reentry_sites(
         else {
             continue;
         };
+        let capture_binding = js_buffer_capture_binding(&owner_lines[capture_idx].text);
         let Some(materialize_idx) = js_buffer_materialization_after_reentry(
             &owner,
             &owner_lines,
             reentry_idx,
             &helper_materializers,
+            capture_binding.as_deref(),
         ) else {
             continue;
         };
@@ -132,14 +134,18 @@ fn js_buffer_materialization_after_reentry(
     lines: &[JsBufferLine],
     reentry_idx: usize,
     helper_materializers: &BTreeSet<String>,
+    capture_binding: Option<&str>,
 ) -> Option<usize> {
     lines
         .iter()
         .enumerate()
         .skip(reentry_idx + 1)
         .find_map(|(idx, line)| {
-            (is_js_buffer_materialization(&line.text)
-                || calls_js_buffer_materializer_helper(owner, &line.text, helper_materializers))
+            let materializes = is_js_buffer_materialization(&line.text)
+                || calls_js_buffer_materializer_helper(owner, &line.text, helper_materializers);
+            (materializes
+                && capture_binding
+                    .is_none_or(|binding| line_mentions_identifier(&line.text, binding)))
             .then_some(idx)
         })
 }
@@ -185,6 +191,45 @@ fn is_js_buffer_descriptor_capture(line: &str) -> bool {
                     "StringOrBuffer",
                 ],
             ))
+}
+
+fn js_buffer_capture_binding(line: &str) -> Option<String> {
+    let (before_assignment, _) = line.split_once('=')?;
+    let mut binding = before_assignment.trim().strip_prefix("let ")?.trim();
+    binding = binding.strip_prefix("mut ").unwrap_or(binding).trim();
+    let binding = binding.split(':').next().unwrap_or(binding).trim();
+    is_simple_identifier(binding).then(|| binding.to_string())
+}
+
+fn line_mentions_identifier(line: &str, identifier: &str) -> bool {
+    let mut cursor = line;
+    while let Some(pos) = cursor.find(identifier) {
+        let before = cursor[..pos].chars().next_back();
+        let after = &cursor[pos + identifier.len()..];
+        let starts_on_boundary = before.is_none_or(|ch| !is_ident_continue(ch));
+        let ends_on_boundary = after.chars().next().is_none_or(|ch| !is_ident_continue(ch));
+        if starts_on_boundary && ends_on_boundary {
+            return true;
+        }
+        cursor = &after[after
+            .char_indices()
+            .next()
+            .map_or(after.len(), |(idx, ch)| idx + ch.len_utf8())..];
+    }
+    false
+}
+
+fn is_simple_identifier(value: &str) -> bool {
+    let mut chars = value.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    (first == '_' || first.is_ascii_alphabetic())
+        && chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
+}
+
+fn is_ident_continue(ch: char) -> bool {
+    ch == '_' || ch.is_ascii_alphanumeric()
 }
 
 fn is_possible_js_reentry(line: &str) -> bool {
