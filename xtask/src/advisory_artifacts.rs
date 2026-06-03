@@ -156,7 +156,7 @@ const REPAIR_QUEUE_READINESS_STATES: [&str; 4] = [
     "requires_witness_receipt",
     "unsupported",
 ];
-const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 11] = [
+const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 13] = [
     "review-kit.json",
     "cards.json",
     "pr-summary.md",
@@ -165,6 +165,8 @@ const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 11] = [
     "comment-plan.json",
     "witness-plan.md",
     "receipt-audit.md",
+    "policy-report.json",
+    "policy-report.md",
     "manual-candidates.json",
     "lsp.json",
     "repair-queue.json",
@@ -202,6 +204,7 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         &manual_candidates,
     )?;
     check_receipt_audit_artifact(dir)?;
+    check_policy_report_artifacts(dir, &summary)?;
     check_manual_candidate_front_door_artifacts(dir, &manual_candidates)?;
     check_lsp_artifact(dir, &summary)?;
     check_github_summary_artifact(
@@ -459,6 +462,11 @@ fn check_github_summary_artifact(
     )?;
     super::require_text_contains(
         &text,
+        "- Policy report: `policy-report.md` is ReviewCard-only policy simulation; manual candidates are not policy inputs.",
+        &path,
+    )?;
+    super::require_text_contains(
+        &text,
         "- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.",
         &path,
     )?;
@@ -479,7 +487,7 @@ fn check_github_summary_artifact(
     super::require_text_contains(&text, "not site-execution proof", &path)?;
     super::require_text_contains(
         &text,
-        "Full advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, manual-candidates.json, lsp.json, repair-queue.json)",
+        "Full advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, policy-report.json, policy-report.md, manual-candidates.json, lsp.json, repair-queue.json)",
         &path,
     )?;
 
@@ -546,6 +554,118 @@ fn check_receipt_audit_artifact(dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn check_policy_report_artifacts(
+    dir: &Path,
+    summary: &AdvisoryArtifactSummary,
+) -> Result<(), String> {
+    let json_path = dir.join("policy-report.json");
+    let report = super::parse_json_file(&json_path)?;
+    reject_manual_candidate_markers(&report, "policy-report.json")?;
+    super::require_json_str(&report, "schema_version", "0.1", "policy-report.json")?;
+    super::require_json_str(&report, "tool", "unsafe-review", "policy-report.json")?;
+    super::require_json_str(&report, "mode", "policy-report", "policy-report.json")?;
+    super::require_json_str(&report, "policy", "advisory", "policy-report.json")?;
+    let boundary = report
+        .get("trust_boundary")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "policy-report.json is missing trust_boundary".to_string())?;
+    super::require_boundary_text(boundary, "policy-report.json")?;
+    super::require_text_contains(boundary, "does not enforce blocking policy", &json_path)?;
+    let cards = super::json_array_at(&report, "/cards", "policy-report.json")?;
+    let summary_cards = super::json_usize_at(&report, "/summary/cards", "policy-report.json")?;
+    if summary_cards != summary.card_count || cards.len() != summary.card_count {
+        return Err(format!(
+            "policy-report.json cards count must match cards.json summary.cards {}; got summary {summary_cards} and {} card entrie(s)",
+            summary.card_count,
+            cards.len()
+        ));
+    }
+    let new_gaps = super::json_usize_at(&report, "/summary/new_gaps", "policy-report.json")?;
+    if new_gaps != summary.open_actionable_gaps {
+        return Err(format!(
+            "policy-report.json summary.new_gaps is {new_gaps}, but cards.json open_actionable_gaps is {}",
+            summary.open_actionable_gaps
+        ));
+    }
+    let limitations = super::json_array_at(&report, "/limitations", "policy-report.json")?;
+    if !limitations.iter().any(|limitation| {
+        limitation.as_str().is_some_and(|text| {
+            super::text_contains_ignore_ascii_case(
+                text,
+                "manual candidates are not policy-report inputs",
+            )
+        })
+    }) {
+        return Err(
+            "policy-report.json limitations must say manual candidates are not policy-report inputs"
+                .to_string(),
+        );
+    }
+    for card in cards {
+        let card_id = require_known_card_id(card, "policy-report.json card", &summary.card_ids)?;
+        let projection = summary
+            .card_projections
+            .get(card_id)
+            .ok_or_else(|| format!("policy-report.json card `{card_id}` missing projection"))?;
+        require_projected_str(
+            card,
+            "class",
+            &projection.class_name,
+            "policy-report.json card",
+        )?;
+        require_projected_str(
+            card,
+            "operation_family",
+            &projection.operation_family,
+            "policy-report.json card",
+        )?;
+        require_projected_str(
+            card,
+            "operation",
+            &projection.operation,
+            "policy-report.json card",
+        )?;
+        let missing_count =
+            super::json_usize_at(card, "/missing_count", "policy-report.json card")?;
+        if missing_count != projection.missing.len() {
+            return Err(format!(
+                "policy-report.json card `{card_id}` missing_count is {missing_count}, but cards.json has {} missing evidence entrie(s)",
+                projection.missing.len()
+            ));
+        }
+        require_projected_str(
+            card,
+            "next_action",
+            &projection.next_action,
+            "policy-report.json card",
+        )?;
+    }
+
+    let markdown_path = dir.join("policy-report.md");
+    let markdown = super::read_to_string(&markdown_path)?;
+    super::require_text_contains(&markdown, "# unsafe-review policy report", &markdown_path)?;
+    super::require_text_contains(&markdown, "## Reviewer front panel", &markdown_path)?;
+    super::require_text_contains(&markdown, "## Current cards", &markdown_path)?;
+    super::require_text_contains(&markdown, "## Limitations", &markdown_path)?;
+    super::require_text_contains(&markdown, "## Trust boundary", &markdown_path)?;
+    super::require_text_contains(
+        &markdown,
+        "Manual candidates are not policy-report inputs",
+        &markdown_path,
+    )?;
+    super::require_text_contains(&markdown, "static unsafe contract review", &markdown_path)?;
+    super::require_text_contains(&markdown, "not a proof of memory safety", &markdown_path)?;
+    super::require_text_contains(&markdown, "not UB-free status", &markdown_path)?;
+    super::require_text_contains(&markdown, "not a Miri result", &markdown_path)?;
+    super::require_text_contains(
+        &markdown,
+        "does not enforce blocking policy",
+        &markdown_path,
+    )?;
+
+    Ok(())
+}
+
 fn check_manual_candidates_artifact(dir: &Path) -> Result<ManualCandidateIndexProjection, String> {
     let path = dir.join("manual-candidates.json");
     let value = super::parse_json_file(&path)?;
@@ -598,7 +718,8 @@ fn check_manual_candidates_artifact(dir: &Path) -> Result<ManualCandidateIndexPr
         "comment-plan.json",
         "lsp.json",
         "repair-queue.json",
-        "policy-report",
+        "policy-report.json",
+        "policy-report.md",
     ] {
         let Some(text) = relationship
             .get(artifact)
@@ -1697,7 +1818,8 @@ fn check_manual_candidate_reviewcard_applicability(
         ("comment-plan.json", "reviewcard_only"),
         ("lsp.json", "reviewcard_only"),
         ("repair-queue.json", "reviewcard_only"),
-        ("policy-report", "reviewcard_only_follow_up"),
+        ("policy-report.json", "reviewcard_only"),
+        ("policy-report.md", "reviewcard_only"),
     ] {
         let entry = applicability.get(artifact).ok_or_else(|| {
             format!("{context} reviewcard_artifact_applicability is missing `{artifact}`")
@@ -2037,6 +2159,8 @@ fn expected_review_kit_artifact_kind(path: &str) -> &'static str {
         "comment-plan.json" => "comment_plan",
         "witness-plan.md" => "witness_plan",
         "receipt-audit.md" => "receipt_audit",
+        "policy-report.json" => "policy_report_json",
+        "policy-report.md" => "policy_report_markdown",
         "manual-candidates.json" => "manual_candidates",
         "lsp.json" => "saved_lsp",
         "repair-queue.json" => "repair_queue",
@@ -2051,10 +2175,10 @@ fn expected_review_kit_artifact_format(path: &str) -> &'static str {
         | "comment-plan.json"
         | "lsp.json"
         | "repair-queue.json"
-        | "manual-candidates.json" => "json",
-        "pr-summary.md" | "github-summary.md" | "witness-plan.md" | "receipt-audit.md" => {
-            "markdown"
-        }
+        | "manual-candidates.json"
+        | "policy-report.json" => "json",
+        "pr-summary.md" | "github-summary.md" | "witness-plan.md" | "receipt-audit.md"
+        | "policy-report.md" => "markdown",
         "cards.sarif" => "sarif",
         _ => "unknown",
     }
@@ -2071,10 +2195,11 @@ fn check_review_kit_artifact_schema_version(
     };
     let expected = match path {
         "review-kit.json" | "cards.json" | "comment-plan.json" | "lsp.json"
-        | "repair-queue.json" => Some("0.1"),
+        | "repair-queue.json" | "policy-report.json" => Some("0.1"),
         "manual-candidates.json" => Some("manual-candidates/v1"),
         "cards.sarif" => Some("2.1.0"),
-        "pr-summary.md" | "github-summary.md" | "witness-plan.md" | "receipt-audit.md" => None,
+        "pr-summary.md" | "github-summary.md" | "witness-plan.md" | "receipt-audit.md"
+        | "policy-report.md" => None,
         _ => {
             return Err(format!("review-kit.json artifact `{path}` is unknown"));
         }
@@ -5643,6 +5768,8 @@ fn check_advisory_artifact_overclaims(dir: &Path) -> Result<(), String> {
         "comment-plan.json",
         "witness-plan.md",
         "receipt-audit.md",
+        "policy-report.json",
+        "policy-report.md",
         "manual-candidates.json",
         "lsp.json",
         "repair-queue.json",
@@ -5667,6 +5794,7 @@ fn is_machine_json_artifact(name: &str) -> bool {
             | "cards.json"
             | "cards.sarif"
             | "comment-plan.json"
+            | "policy-report.json"
             | "manual-candidates.json"
             | "lsp.json"
             | "repair-queue.json"

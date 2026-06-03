@@ -21,10 +21,10 @@ use unsafe_review_core::{
     ProofReceiptInput, RepoScanEvent, RepoScanPhase, RepoScanStatus, SanitizerReceiptInput, Scope,
     WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze, analyze_with_discovery,
     analyze_with_discovery_and_repo_events, audit_witness_receipts, compare_outcome_json,
-    discover_repo_files, evaluate_policy_report, load_manual_candidates,
-    manual_candidate_implementer_handoff, read_manual_candidate, render_badge_jsons,
-    render_comment_plan, render_github_summary, render_human, render_json, render_lsp,
-    render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
+    discover_repo_files, evaluate_policy_report, evaluate_policy_report_from_output,
+    load_manual_candidates, manual_candidate_implementer_handoff, read_manual_candidate,
+    render_badge_jsons, render_comment_plan, render_github_summary, render_human, render_json,
+    render_lsp, render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
     render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
     render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,
     render_repair_queue, render_sarif, render_witness_plan, validate_witness_receipts,
@@ -40,6 +40,8 @@ type FirstPrRenderer = fn(&AnalyzeOutput) -> String;
 
 const REVIEW_KIT_ARTIFACT: &str = "review-kit.json";
 const RECEIPT_AUDIT_ARTIFACT: &str = "receipt-audit.md";
+const POLICY_REPORT_JSON_ARTIFACT: &str = "policy-report.json";
+const POLICY_REPORT_MARKDOWN_ARTIFACT: &str = "policy-report.md";
 const MANUAL_CANDIDATES_ARTIFACT: &str = "manual-candidates.json";
 const FIRST_PR_RENDERED_ARTIFACTS: [(&str, FirstPrRenderer); 8] = [
     ("cards.json", render_json),
@@ -51,7 +53,7 @@ const FIRST_PR_RENDERED_ARTIFACTS: [(&str, FirstPrRenderer); 8] = [
     ("lsp.json", render_lsp),
     ("repair-queue.json", render_repair_queue),
 ];
-const FIRST_PR_ARTIFACTS: [&str; 11] = [
+const FIRST_PR_ARTIFACTS: [&str; 13] = [
     REVIEW_KIT_ARTIFACT,
     "cards.json",
     "pr-summary.md",
@@ -60,6 +62,8 @@ const FIRST_PR_ARTIFACTS: [&str; 11] = [
     "comment-plan.json",
     "witness-plan.md",
     RECEIPT_AUDIT_ARTIFACT,
+    POLICY_REPORT_JSON_ARTIFACT,
+    POLICY_REPORT_MARKDOWN_ARTIFACT,
     MANUAL_CANDIDATES_ARTIFACT,
     "lsp.json",
     "repair-queue.json",
@@ -1029,6 +1033,7 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         include_unchanged_tests: true,
         max_cards: check.max_cards,
     })?;
+    let policy_report = evaluate_policy_report_from_output(&output)?;
     let manual_candidates = load_manual_candidates(&root)?;
 
     fs::create_dir_all(&options.out_dir)
@@ -1045,6 +1050,14 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     write_artifact(
         &options.out_dir.join(RECEIPT_AUDIT_ARTIFACT),
         render_receipt_audit_markdown(&receipt_audit),
+    )?;
+    write_artifact(
+        &options.out_dir.join(POLICY_REPORT_JSON_ARTIFACT),
+        render_policy_report_json(&policy_report),
+    )?;
+    write_artifact(
+        &options.out_dir.join(POLICY_REPORT_MARKDOWN_ARTIFACT),
+        render_policy_report_markdown(&policy_report),
     )?;
     write_artifact(
         &options.out_dir.join(MANUAL_CANDIDATES_ARTIFACT),
@@ -1644,7 +1657,8 @@ fn manual_candidate_reviewcard_relationship() -> serde_json::Value {
         "lsp.json": "ReviewCard-only saved editor projection; manual candidates are not emitted as analyzer diagnostics.",
         "repair-queue.json": "ReviewCard-only repair queue; manual candidates are not automatic repair tasks.",
         "receipt-audit.md": "Receipts may match manual candidate IDs as manual/advisory targets without importing them as ReviewCard witness evidence.",
-        "policy-report": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs."
+        "policy-report.json": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs.",
+        "policy-report.md": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs."
     })
 }
 
@@ -1670,9 +1684,13 @@ fn manual_candidate_reviewcard_applicability() -> serde_json::Value {
             "reviewcard_only",
             "Manual candidates are not automatic repair tasks."
         ),
-        "policy-report": manual_candidate_reviewcard_applicability_entry(
-            "reviewcard_only_follow_up",
-            "Manual candidates are not policy gating inputs; policy-report applicability remains follow-up."
+        "policy-report.json": manual_candidate_reviewcard_applicability_entry(
+            "reviewcard_only",
+            "Manual candidates are not policy gating inputs for the JSON policy report."
+        ),
+        "policy-report.md": manual_candidate_reviewcard_applicability_entry(
+            "reviewcard_only",
+            "Manual candidates are not policy gating inputs for the Markdown policy report."
         )
     })
 }
@@ -2178,7 +2196,7 @@ fn print_candidate_help() {
         "- explain and context can load the manual candidate by ID when no analyzer ReviewCard has that ID."
     );
     println!(
-        "- first-pr writes a separate manual-candidates.json handoff with optional guidance fields; cards.json, SARIF, comment-plan, LSP, repair-queue, and policy-report stay ReviewCard-only."
+        "- first-pr writes a separate manual-candidates.json handoff with optional guidance fields; cards.json, SARIF, comment-plan, LSP, repair-queue, and policy-report artifacts stay ReviewCard-only."
     );
     println!(
         "- receipts may audit against manual candidate IDs as external evidence for that manual target, not as imported ReviewCard witness evidence."

@@ -220,6 +220,10 @@ pub fn evaluate_policy_report(mut input: AnalyzeInput) -> Result<PolicyReport, S
     policy_report::evaluate(&output)
 }
 
+pub fn evaluate_policy_report_from_output(output: &AnalyzeOutput) -> Result<PolicyReport, String> {
+    policy_report::evaluate(output)
+}
+
 pub fn render_json(output: &AnalyzeOutput) -> String {
     json::render(output)
 }

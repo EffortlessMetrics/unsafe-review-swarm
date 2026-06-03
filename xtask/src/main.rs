@@ -14031,11 +14031,11 @@ Snapshot reports:
         let dir = unique_temp_dir("unsafe-review-first-pr-github-card-id")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
         write_valid_first_pr_artifacts(&dir)?;
-        fs::write(
-            dir.join("github-summary.md"),
-            "## unsafe-review advisory summary\n\n- Scope: `diff`\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Top card\n\n- ID: `missing`\n- Class: `guard_missing`\n- Next action: add an alignment guard\n\nKnown ReviewCard: `card-1`\n\n## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n---\n\nFull advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, manual-candidates.json, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",
-        )
-        .map_err(|err| format!("write github summary failed: {err}"))?;
+        let path = dir.join("github-summary.md");
+        let summary = fs::read_to_string(&path)
+            .map_err(|err| format!("read github summary failed: {err}"))?;
+        fs::write(&path, summary.replace("- ID: `card-1`", "- ID: `missing`"))
+            .map_err(|err| format!("write github summary failed: {err}"))?;
 
         let result = check_first_pr_artifacts(&dir);
 
@@ -14055,9 +14055,12 @@ Snapshot reports:
         let dir = unique_temp_dir("unsafe-review-first-pr-github-card-class")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
         write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("github-summary.md");
+        let summary = fs::read_to_string(&path)
+            .map_err(|err| format!("read github summary failed: {err}"))?;
         fs::write(
-            dir.join("github-summary.md"),
-            "## unsafe-review advisory summary\n\n- Scope: `diff`\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Top card\n\n- ID: `card-1`\n- Class: `contract_missing`\n- Next action: add an alignment guard\n\n## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n---\n\nFull advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, manual-candidates.json, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",
+            &path,
+            summary.replace("- Class: `guard_missing`", "- Class: `contract_missing`"),
         )
         .map_err(|err| format!("write github summary failed: {err}"))?;
 
@@ -14224,7 +14227,7 @@ Snapshot reports:
         fs::write(
             &path,
             summary.replace(
-                "## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n",
+                "## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Policy report: `policy-report.md` is ReviewCard-only policy simulation; manual candidates are not policy inputs.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n",
                 "",
             ),
         )
@@ -16667,6 +16670,8 @@ review_after = "2026-08-01"
                 {"path":"comment-plan.json","kind":"comment_plan","format":"json","schema_version":"0.1"},
                 {"path":"witness-plan.md","kind":"witness_plan","format":"markdown","schema_version":serde_json::Value::Null},
                 {"path":"receipt-audit.md","kind":"receipt_audit","format":"markdown","schema_version":serde_json::Value::Null},
+                {"path":"policy-report.json","kind":"policy_report_json","format":"json","schema_version":"0.1"},
+                {"path":"policy-report.md","kind":"policy_report_markdown","format":"markdown","schema_version":serde_json::Value::Null},
                 {"path":"manual-candidates.json","kind":"manual_candidates","format":"json","schema_version":"manual-candidates/v1"},
                 {"path":"lsp.json","kind":"saved_lsp","format":"json","schema_version":"0.1"},
                 {"path":"repair-queue.json","kind":"repair_queue","format":"json","schema_version":"0.1"}
@@ -16708,7 +16713,8 @@ review_after = "2026-08-01"
             "lsp.json": "ReviewCard-only saved editor projection; manual candidates are not emitted as analyzer diagnostics.",
             "repair-queue.json": "ReviewCard-only repair queue; manual candidates are not automatic repair tasks.",
             "receipt-audit.md": "Receipts may match manual candidate IDs as manual/advisory targets without importing them as ReviewCard witness evidence.",
-            "policy-report": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs."
+            "policy-report.json": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs.",
+            "policy-report.md": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs."
         })
     }
 
@@ -16734,9 +16740,13 @@ review_after = "2026-08-01"
                 "reviewcard_only",
                 "Manual candidates are not automatic repair tasks."
             ),
-            "policy-report": manual_candidate_reviewcard_applicability_entry_fixture(
-                "reviewcard_only_follow_up",
-                "Manual candidates are not policy gating inputs; policy-report applicability remains follow-up."
+            "policy-report.json": manual_candidate_reviewcard_applicability_entry_fixture(
+                "reviewcard_only",
+                "Manual candidates are not policy gating inputs for the JSON policy report."
+            ),
+            "policy-report.md": manual_candidate_reviewcard_applicability_entry_fixture(
+                "reviewcard_only",
+                "Manual candidates are not policy gating inputs for the Markdown policy report."
             )
         })
     }
@@ -17022,7 +17032,90 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write repair queue failed: {err}"))?;
         fs::write(dir.join("receipt-audit.md"), receipt_audit_markdown())
             .map_err(|err| format!("write receipt audit failed: {err}"))?;
+        write_policy_report_artifacts(
+            dir,
+            vec![policy_report_card_fixture(
+                "card-1",
+                "guard_missing",
+                "raw_pointer_read",
+                "unsafe { ptr.cast::<Header>().read() }",
+                0,
+                "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.",
+            )],
+            1,
+        )?;
         Ok(())
+    }
+
+    fn policy_report_card_fixture(
+        card_id: &str,
+        class_name: &str,
+        operation_family: &str,
+        operation: &str,
+        missing_count: usize,
+        next_action: &str,
+    ) -> serde_json::Value {
+        serde_json::json!({
+            "card_id": card_id,
+            "class": class_name,
+            "operation_family": operation_family,
+            "operation": operation,
+            "policy_status": "new_gap",
+            "policy_reason": "Exact ReviewCard identity was not found in the baseline ledger or active suppression ledger.",
+            "missing_count": missing_count,
+            "next_action": next_action
+        })
+    }
+
+    fn write_policy_report_artifacts(
+        dir: &Path,
+        cards: Vec<serde_json::Value>,
+        new_gaps: usize,
+    ) -> Result<(), String> {
+        let card_count = cards.len();
+        let report = serde_json::json!({
+            "schema_version": "0.1",
+            "tool": "unsafe-review",
+            "mode": "policy-report",
+            "policy": "advisory",
+            "generated_at": "2026-05-18",
+            "trust_boundary": "Advisory no-new-debt policy report only; this is static unsafe contract review over existing ReviewCards and policy ledgers. It does not execute witnesses, is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, and does not enforce blocking policy.",
+            "summary": {
+                "cards": card_count,
+                "new_gaps": new_gaps,
+                "baseline_known": 0,
+                "suppressed": 0,
+                "expired_suppressions": 0,
+                "unmatched_baseline": 0,
+                "invalid_ledger_entries": 0
+            },
+            "cards": cards,
+            "unmatched_baseline": [],
+            "invalid_ledger_entries": [],
+            "limitations": [
+                "Advisory report only; review ledgers and source context before making policy decisions.",
+                "Manual candidates are not policy-report inputs and remain separate advisory artifacts.",
+                "The report does not execute witnesses, post comments, edit source, or prove memory safety."
+            ]
+        });
+        fs::write(dir.join("policy-report.json"), report.to_string())
+            .map_err(|err| format!("write policy report json failed: {err}"))?;
+        fs::write(
+            dir.join("policy-report.md"),
+            "# unsafe-review policy report\n\n## Reviewer front panel\n\n- Policy mode: `advisory`\n\n## Current cards\n\nReviewCard-only advisory policy simulation.\n\n## Limitations\n\n- Manual candidates are not policy-report inputs and remain separate advisory artifacts.\n\n## Trust boundary\n\nAdvisory no-new-debt policy report only; this is static unsafe contract review over existing ReviewCards and policy ledgers. It does not execute witnesses, is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, and does not enforce blocking policy.\n",
+        )
+        .map_err(|err| format!("write policy report markdown failed: {err}"))?;
+        Ok(())
+    }
+
+    fn github_summary_fixture(
+        review_cards: usize,
+        open_actionable_gaps: usize,
+        top_card: &str,
+    ) -> String {
+        format!(
+            "## unsafe-review advisory summary\n\n- Scope: `diff`\n- Review cards: {review_cards}\n- Open actionable gaps: {open_actionable_gaps}\n- Policy mode: `advisory`\n\n## Top card\n\n{top_card}\n\n## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Policy report: `policy-report.md` is ReviewCard-only policy simulation; manual candidates are not policy inputs.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n---\n\nFull advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, policy-report.json, policy-report.md, manual-candidates.json, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n"
+        )
     }
 
     fn write_two_card_artifacts(dir: &Path) -> Result<(), String> {
@@ -17054,6 +17147,28 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write repair queue failed: {err}"))?;
         fs::write(dir.join("receipt-audit.md"), receipt_audit_markdown())
             .map_err(|err| format!("write receipt audit failed: {err}"))?;
+        write_policy_report_artifacts(
+            dir,
+            vec![
+                policy_report_card_fixture(
+                    "card-1",
+                    "guard_missing",
+                    "raw_pointer_read",
+                    "unsafe { ptr.cast::<Header>().read() }",
+                    0,
+                    "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.",
+                ),
+                policy_report_card_fixture(
+                    "card-2",
+                    "contract_missing",
+                    "unknown",
+                    "unsafe fn read_header(ptr: *const u8)",
+                    0,
+                    "Add a precise public `# Safety` section that names the required caller obligations.",
+                ),
+            ],
+            2,
+        )?;
         Ok(())
     }
 
@@ -17073,7 +17188,11 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write lsp failed: {err}"))?;
         fs::write(
             dir.join("github-summary.md"),
-            "## unsafe-review advisory summary\n\n- Scope: `diff`\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Top card\n\n- ID: `card-1`\n- Class: `guard_missing`\n- Location: src/lib.rs:7\n- Operation: `unsafe { ptr.cast::<Header>().read() }`\n- Operation family: `raw_pointer_read`\n- Missing evidence: No missing evidence recorded\n- Primary route: `miri` because route\n\n```bash\ncargo +nightly miri test card\n```\n- Next action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n- Explain: `unsafe-review explain card-1`\n- Agent context: `unsafe-review context card-1 --json`\n\n## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n---\n\nFull advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, manual-candidates.json, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",
+            github_summary_fixture(
+                1,
+                1,
+                "- ID: `card-1`\n- Class: `guard_missing`\n- Location: src/lib.rs:7\n- Operation: `unsafe { ptr.cast::<Header>().read() }`\n- Operation family: `raw_pointer_read`\n- Missing evidence: No missing evidence recorded\n- Primary route: `miri` because route\n\n```bash\ncargo +nightly miri test card\n```\n- Next action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n- Explain: `unsafe-review explain card-1`\n- Agent context: `unsafe-review context card-1 --json`",
+            ),
         )
         .map_err(|err| format!("write github summary failed: {err}"))?;
         write_empty_manual_candidates_artifact(dir)?;
@@ -17135,7 +17254,11 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write lsp failed: {err}"))?;
         fs::write(
             dir.join("github-summary.md"),
-            "## unsafe-review advisory summary\n\n- Scope: `diff`\n- Review cards: 0\n- Open actionable gaps: 0\n- Policy mode: `advisory`\n\n## Top card\n\nNo changed unsafe-review gaps were found.\nThis does not prove the repo safe, UB-free, Miri-clean, or that any unsafe site executed.\n\n## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n---\n\nFull advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, manual-candidates.json, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",
+            github_summary_fixture(
+                0,
+                0,
+                "No changed unsafe-review gaps were found.\nThis does not prove the repo safe, UB-free, Miri-clean, or that any unsafe site executed.",
+            ),
         )
         .map_err(|err| format!("write github summary failed: {err}"))?;
         fs::write(
@@ -17145,6 +17268,7 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write repair queue failed: {err}"))?;
         fs::write(dir.join("receipt-audit.md"), receipt_audit_markdown())
             .map_err(|err| format!("write receipt audit failed: {err}"))?;
+        write_policy_report_artifacts(dir, Vec::new(), 0)?;
         write_empty_manual_candidates_artifact(dir)?;
         write_review_kit_artifact(dir, 0, 0, None)?;
         Ok(())

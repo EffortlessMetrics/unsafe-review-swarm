@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const TRUST_BOUNDARY: &str = "Advisory no-new-debt policy report only; this evaluates existing ReviewCards and policy ledgers, does not execute witnesses, does not prove safety, and does not enforce blocking policy.";
+const TRUST_BOUNDARY: &str = "Advisory no-new-debt policy report only; this is static unsafe contract review over existing ReviewCards and policy ledgers. It does not execute witnesses, is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, and does not enforce blocking policy.";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct PolicyReport {
@@ -432,6 +432,7 @@ fn policy_report_limitations() -> Vec<String> {
     vec![
         "Advisory report only; it does not change command exit status or enforce blocking policy.".to_string(),
         "Matching is exact counted ReviewCard identity only; broad path, owner, or operation-family suppression is not supported.".to_string(),
+        "Manual candidates are not policy-report inputs and remain separate advisory artifacts.".to_string(),
         "The report does not execute witnesses, post comments, edit source, or prove memory safety.".to_string(),
         "Malformed ledger entries fail the report instead of being recovered into invalid_ledger_entries.".to_string(),
     ]
@@ -497,8 +498,11 @@ mod tests {
 
         assert_eq!(report.mode, "policy-report");
         assert_eq!(report.policy, "advisory");
-        assert_eq!(report.limitations.len(), 4);
+        assert_eq!(report.limitations.len(), 5);
         assert!(report.limitations[0].contains("Advisory report only"));
+        assert!(report.limitations.iter().any(|limitation| {
+            limitation.contains("Manual candidates are not policy-report inputs")
+        }));
         assert!(
             report
                 .classification_explanations
@@ -533,6 +537,7 @@ mod tests {
             "review new gaps and stale ledger entries before treating this as no-new-debt evidence"
         ));
         assert!(markdown.contains("advisory policy simulation only"));
+        assert!(markdown.contains("Manual candidates are not policy-report inputs"));
         assert!(markdown.contains("## Classification explanations"));
         assert!(markdown.contains("Exact ReviewCard identity was not found"));
         assert!(markdown.contains("Operation family | Operation"));
@@ -542,6 +547,8 @@ mod tests {
         assert!(markdown.contains("Add or expose"));
         assert!(markdown.contains("## Limitations"));
         assert!(report.trust_boundary.contains("does not enforce blocking"));
+        assert!(report.trust_boundary.contains("not a Miri result"));
+        assert!(report.trust_boundary.contains("not Miri-clean status"));
         Ok(())
     }
 

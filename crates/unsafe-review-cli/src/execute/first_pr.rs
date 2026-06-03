@@ -36,6 +36,7 @@ pub(super) fn print_first_pr_report(report: FirstPrReport<'_>) {
     print_first_pr_overview(report.output, report.out_dir);
     print_manual_candidate_handoff(report.out_dir, report.root, report.manual_candidates);
     print_receipt_audit_handoff(report.check);
+    print_policy_report_handoff(report.out_dir);
     print_top_card_summary(
         report.output,
         report.root,
@@ -50,6 +51,12 @@ fn print_receipt_audit_handoff(check: &CheckOptions) {
     println!("Audit saved receipts:");
     println!("  {}", receipt_audit_command(check));
     println!("  saved receipt metadata only; unsafe-review did not run a witness");
+}
+
+fn print_policy_report_handoff(out_dir: &Path) {
+    println!("Policy report:");
+    println!("  {}", out_dir.join("policy-report.md").display());
+    println!("  ReviewCard-only policy simulation; manual candidates are not policy inputs");
 }
 
 fn print_manual_candidate_handoff(
@@ -834,7 +841,8 @@ pub(super) fn render_manual_candidates_artifact(
             "lsp.json": "ReviewCard-only saved editor projection; manual candidates are not emitted as analyzer diagnostics.",
             "repair-queue.json": "ReviewCard-only repair queue; manual candidates are not automatic repair tasks.",
             "receipt-audit.md": "Receipts may match manual candidate IDs as manual/advisory targets without importing them as ReviewCard witness evidence.",
-            "policy-report": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs."
+            "policy-report.json": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs.",
+            "policy-report.md": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs."
         },
         "reviewcard_artifact_applicability": manual_candidate_reviewcard_applicability(),
         "trust_boundary": "Manual/advisory static unsafe contract review candidate index only; candidates are not analyzer-discovered ReviewCards, not a proof of UB, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repository safety, and not policy gating. unsafe-review did not run witnesses, post comments, edit source, run an agent, or enforce blocking policy.",
@@ -900,9 +908,13 @@ fn manual_candidate_reviewcard_applicability() -> serde_json::Value {
             "reviewcard_only",
             "Manual candidates are not automatic repair tasks."
         ),
-        "policy-report": manual_candidate_reviewcard_applicability_entry(
-            "reviewcard_only_follow_up",
-            "Manual candidates are not policy gating inputs; policy-report applicability remains follow-up."
+        "policy-report.json": manual_candidate_reviewcard_applicability_entry(
+            "reviewcard_only",
+            "Manual candidates are not policy gating inputs for the JSON policy report."
+        ),
+        "policy-report.md": manual_candidate_reviewcard_applicability_entry(
+            "reviewcard_only",
+            "Manual candidates are not policy gating inputs for the Markdown policy report."
         )
     })
 }
@@ -961,6 +973,8 @@ fn artifact_kind(path: &str) -> &'static str {
         "comment-plan.json" => "comment_plan",
         "witness-plan.md" => "witness_plan",
         "receipt-audit.md" => "receipt_audit",
+        "policy-report.json" => "policy_report_json",
+        "policy-report.md" => "policy_report_markdown",
         "manual-candidates.json" => "manual_candidates",
         "lsp.json" => "saved_lsp",
         "repair-queue.json" => "repair_queue",
@@ -983,7 +997,7 @@ fn artifact_format(path: &str) -> &'static str {
 fn artifact_schema_version(path: &str) -> Option<&'static str> {
     match path {
         "review-kit.json" | "cards.json" | "comment-plan.json" | "lsp.json"
-        | "repair-queue.json" => Some("0.1"),
+        | "repair-queue.json" | "policy-report.json" => Some("0.1"),
         "manual-candidates.json" => Some("manual-candidates/v1"),
         "cards.sarif" => Some("2.1.0"),
         _ => None,
@@ -1121,9 +1135,14 @@ mod tests {
             0
         );
         assert_eq!(
-            value["handoff"]["manual_candidates"]["reviewcard_artifact_applicability"]["policy-report"]
+            value["handoff"]["manual_candidates"]["reviewcard_artifact_applicability"]["policy-report.json"]
                 ["decision"],
-            "reviewcard_only_follow_up"
+            "reviewcard_only"
+        );
+        assert_eq!(
+            value["handoff"]["manual_candidates"]["reviewcard_artifact_applicability"]["policy-report.md"]
+                ["decision"],
+            "reviewcard_only"
         );
         assert!(value["handoff"]["manual_candidates"]["first_candidate"].is_null());
         assert_eq!(

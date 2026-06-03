@@ -1092,12 +1092,20 @@ fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dy
         false
     );
     assert_eq!(
-        ledger["reviewcard_artifact_applicability"]["policy-report"]["manual_candidate_markers_allowed"],
+        ledger["reviewcard_artifact_applicability"]["policy-report.json"]["manual_candidate_markers_allowed"],
         false
     );
     assert_eq!(
-        ledger["reviewcard_artifact_applicability"]["policy-report"]["decision"],
-        "reviewcard_only_follow_up"
+        ledger["reviewcard_artifact_applicability"]["policy-report.json"]["decision"],
+        "reviewcard_only"
+    );
+    assert_eq!(
+        ledger["reviewcard_artifact_applicability"]["policy-report.md"]["manual_candidate_markers_allowed"],
+        false
+    );
+    assert_eq!(
+        ledger["reviewcard_artifact_applicability"]["policy-report.md"]["decision"],
+        "reviewcard_only"
     );
     assert!(
         ledger["trust_boundary"]
@@ -1755,14 +1763,24 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         false
     );
     assert_eq!(
-        review_kit["handoff"]["manual_candidates"]["reviewcard_artifact_applicability"]["policy-report"]
+        review_kit["handoff"]["manual_candidates"]["reviewcard_artifact_applicability"]["policy-report.json"]
             ["manual_candidate_markers_allowed"],
         false
     );
     assert_eq!(
-        review_kit["handoff"]["manual_candidates"]["reviewcard_artifact_applicability"]["policy-report"]
+        review_kit["handoff"]["manual_candidates"]["reviewcard_artifact_applicability"]["policy-report.json"]
             ["decision"],
-        "reviewcard_only_follow_up"
+        "reviewcard_only"
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["reviewcard_artifact_applicability"]["policy-report.md"]
+            ["manual_candidate_markers_allowed"],
+        false
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["reviewcard_artifact_applicability"]["policy-report.md"]
+            ["decision"],
+        "reviewcard_only"
     );
     assert_eq!(
         review_kit["handoff"]["manual_candidates"]["first_candidate"]["id"],
@@ -1922,6 +1940,8 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         "comment-plan.json",
         "witness-plan.md",
         "receipt-audit.md",
+        "policy-report.json",
+        "policy-report.md",
         "manual-candidates.json",
         "lsp.json",
         "repair-queue.json",
@@ -1945,7 +1965,9 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         }
         match expected {
             "review-kit.json" | "cards.json" | "comment-plan.json" | "lsp.json"
-            | "repair-queue.json" => assert_eq!(entry["schema_version"], "0.1"),
+            | "repair-queue.json" | "policy-report.json" => {
+                assert_eq!(entry["schema_version"], "0.1")
+            }
             "manual-candidates.json" => {
                 assert_eq!(entry["schema_version"], "manual-candidates/v1")
             }
@@ -1995,12 +2017,15 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(github_summary.contains("Full reviewer cockpit: `pr-summary.md`"));
     assert!(github_summary.contains("Agent repair queue: `repair-queue.json`"));
     assert!(github_summary.contains("Receipt audit: `receipt-audit.md`"));
+    assert!(github_summary.contains("Policy report: `policy-report.md`"));
     assert!(github_summary.contains("Manual candidate index: `manual-candidates.json`"));
     assert!(github_summary.contains("`comment-plan.json` is plan-only"));
     assert!(github_summary.contains("Full advisory bundle"));
     assert!(github_summary.contains("review-kit.json"));
     assert!(github_summary.contains("github-summary.md"));
     assert!(github_summary.contains("receipt-audit.md"));
+    assert!(github_summary.contains("policy-report.json"));
+    assert!(github_summary.contains("policy-report.md"));
     assert!(github_summary.contains("manual-candidates.json"));
     assert!(github_summary.contains("not memory-safety proof"));
     assert!(github_summary.contains("not site-execution proof"));
@@ -2141,12 +2166,20 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         false
     );
     assert_eq!(
-        manual_candidates["reviewcard_artifact_applicability"]["policy-report"]["manual_candidate_markers_allowed"],
+        manual_candidates["reviewcard_artifact_applicability"]["policy-report.json"]["manual_candidate_markers_allowed"],
         false
     );
     assert_eq!(
-        manual_candidates["reviewcard_artifact_applicability"]["policy-report"]["decision"],
-        "reviewcard_only_follow_up"
+        manual_candidates["reviewcard_artifact_applicability"]["policy-report.json"]["decision"],
+        "reviewcard_only"
+    );
+    assert_eq!(
+        manual_candidates["reviewcard_artifact_applicability"]["policy-report.md"]["manual_candidate_markers_allowed"],
+        false
+    );
+    assert_eq!(
+        manual_candidates["reviewcard_artifact_applicability"]["policy-report.md"]["decision"],
+        "reviewcard_only"
     );
     assert!(
         manual_candidates["trust_boundary"]
@@ -2248,6 +2281,42 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             .unwrap_or("")
             .contains("not an automatic repair queue")
     );
+
+    let policy_report = parse_json(&fs::read_to_string(out_dir.join("policy-report.json"))?)?;
+    assert_eq!(policy_report["schema_version"], "0.1");
+    assert_eq!(policy_report["mode"], "policy-report");
+    assert_eq!(policy_report["policy"], "advisory");
+    assert_eq!(policy_report["summary"]["cards"], cards["summary"]["cards"]);
+    assert_eq!(
+        policy_report["summary"]["new_gaps"],
+        cards["summary"]["open_actionable_gaps"]
+    );
+    assert_eq!(policy_report["cards"][0]["card_id"], card_id);
+    assert!(
+        policy_report["limitations"]
+            .as_array()
+            .unwrap_or(&Vec::new())
+            .iter()
+            .any(|limitation| limitation
+                .as_str()
+                .unwrap_or("")
+                .contains("Manual candidates are not policy-report inputs"))
+    );
+    assert!(
+        policy_report["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("does not enforce blocking policy")
+    );
+    let policy_report_raw = fs::read_to_string(out_dir.join("policy-report.json"))?;
+    assert!(!policy_report_raw.contains("R4R2-S001"));
+    assert!(!policy_report_raw.contains("manual_candidate"));
+
+    let policy_report_markdown = fs::read_to_string(out_dir.join("policy-report.md"))?;
+    assert!(policy_report_markdown.contains("# unsafe-review policy report"));
+    assert!(policy_report_markdown.contains("Manual candidates are not policy-report inputs"));
+    assert!(policy_report_markdown.contains("not Miri-clean status"));
+    assert!(!policy_report_markdown.contains("R4R2-S001"));
 
     Ok(())
 }

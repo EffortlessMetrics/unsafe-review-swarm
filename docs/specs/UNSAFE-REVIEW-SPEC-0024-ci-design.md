@@ -637,6 +637,9 @@ witness-plan.md exists
 lsp.json exists and parses
 lsp.json schema_version is checked
 repair-queue.json exists and parses
+policy-report.json exists and parses
+policy-report.json schema_version is checked
+policy-report.md exists
 
 card IDs align across artifacts
 result counts stay internally consistent
@@ -653,9 +656,12 @@ comment-plan carries structured next action, actionability, relevance, and witne
 comment-plan comment bodies stay within the hard 220-word limit
 comment-plan includes trust boundary
 manual-candidate markers are rejected from ReviewCard-only first-pr artifacts:
-cards.json, cards.sarif, comment-plan.json, lsp.json, and repair-queue.json
+cards.json, cards.sarif, comment-plan.json, lsp.json, repair-queue.json,
+policy-report.json, and policy-report.md
 manual-candidate reviewcard_artifact_applicability marks ReviewCard-only
 artifacts as not applicable to manual candidates and rejects marker allowance
+policy-report artifacts remain ReviewCard-only policy simulation and
+exclude manual candidates as policy inputs
 witness-plan includes route limits
 receipt-audit.md exists
 receipt-audit includes saved-receipt metadata summary and trust boundary

@@ -189,16 +189,18 @@ invariant, evidence packet, non-goals, candidate-specific fix options, test
 targets, and stop line when available, and repeat the ReviewCard-only artifact
 relationship plus a structured `reviewcard_artifact_applicability` map. The
 map must mark `cards.json`, SARIF, comment-plan, saved LSP, and repair-queue
-surfaces with `decision = reviewcard_only`, and mark policy-report with
-`decision = reviewcard_only_follow_up` until that rail is explicitly accepted
-or rejected. All entries must keep `applies_to_manual_candidates = false` and
+surfaces with `decision = reviewcard_only`, and must include explicit
+`policy-report.json` and `policy-report.md` entries with
+`decision = reviewcard_only`. All entries must keep
+`applies_to_manual_candidates = false` and
 `manual_candidate_markers_allowed = false`. They must not add manual candidates
 to `cards.json`, SARIF, comment-plan, saved LSP, repair-queue, or policy-report
 surfaces.
 The first-pr artifact verifier must reject manual-candidate marker leakage
 (`source = manual`, `manual_candidate`, or `analyzer_discovered`) in the
 ReviewCard-only first-pr artifacts: `cards.json`, `cards.sarif`,
-`comment-plan.json`, `lsp.json`, and `repair-queue.json`.
+`comment-plan.json`, `lsp.json`, `repair-queue.json`, `policy-report.json`,
+and `policy-report.md`.
 
 `review-kit.json` may include a bounded `candidate_queue` under the manual
 candidate handoff so reviewers and agents can see more than the first imported
@@ -306,14 +308,15 @@ into an analyzer ReviewCard.
   fix/test/non-goal guidance visible as manual advisory handoff context.
 - `first-pr` writes `manual-candidates.json` for imported candidates and keeps
   ReviewCard-derived artifacts, including cards JSON, SARIF, comment-plan,
-  saved LSP, repair queue, and policy-report surfaces, ReviewCard-only.
+  saved LSP, repair queue, and policy-report JSON/Markdown surfaces,
+  ReviewCard-only.
 - The first-pr verifier rejects manual-candidate markers in ReviewCard-only
   artifacts instead of silently accepting leaked manual candidates as analyzer
   output.
 - `manual-candidates.json` and the `review-kit.json` manual candidate handoff
   carry structured ReviewCard-only applicability metadata for SARIF,
-  comment-plan, saved-LSP, repair-queue, and cards, plus policy-report
-  follow-up metadata and advisory candidate-mix summary maps.
+  comment-plan, saved-LSP, repair-queue, cards, and policy-report JSON/Markdown
+  artifacts, plus advisory candidate-mix summary maps.
 - `first-pr` terminal output and `review-kit.json` include a bounded,
   copy-only manual candidate handoff with `manual-candidates.json`,
   a sorted bounded candidate queue, `explain`, `context --json`, and
