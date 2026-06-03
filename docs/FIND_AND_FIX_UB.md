@@ -45,11 +45,18 @@ From the branch you want to review:
 ```bash
 unsafe-review doctor
 unsafe-review first-pr --base origin/main
+cp target/unsafe-review/cards.json target/unsafe-review/before.json
 open target/unsafe-review/pr-summary.md
 unsafe-review explain <card-id>
 unsafe-review context <card-id> --json
 open target/unsafe-review/witness-plan.md
-unsafe-review outcome --before before.json --after after.json --format markdown
+# After repair or receipt work:
+unsafe-review first-pr --base origin/main
+cp target/unsafe-review/cards.json target/unsafe-review/after.json
+unsafe-review outcome \
+  --before target/unsafe-review/before.json \
+  --after target/unsafe-review/after.json \
+  --format markdown
 ```
 
 Use your editor or shell equivalent instead of `open` when needed.
@@ -140,7 +147,7 @@ evidence missing:
   the smallest missing guard, contract, test reach, or witness receipt
 
 next action:
-  one concrete repair or proof step
+  one concrete repair or evidence step
 ```
 
 The card is actionable when you can name the safe caller or input/state that
