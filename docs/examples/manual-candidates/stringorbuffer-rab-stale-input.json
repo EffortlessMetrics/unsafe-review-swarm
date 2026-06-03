@@ -1,0 +1,55 @@
+{
+  "schema_version": "manual-candidate/v1",
+  "id": "R4R2-S004",
+  "source": "manual",
+  "manual_candidate": true,
+  "analyzer_discovered": false,
+  "title": "Async StringOrBuffer RAB input can be resized before worker read",
+  "location": {
+    "file": "src/runtime/node/types.rs",
+    "line": 402
+  },
+  "operation_family": "unsafe_fn_call",
+  "unsafe_operation": "StringOrBuffer::from_js_maybe_async_into(...) captures JS-backed BufferSource input for later async StringOrBuffer::slice() worker reads",
+  "invariant": "Async workers must not read bytes from caller-controlled resizable ArrayBuffer storage after the JS-visible buffer can be resized or detached",
+  "safe_caller": "crypto.scrypt, crypto.pbkdf2, Bun.zstdCompress, or Bun.zstdDecompress with a resizable ArrayBuffer-backed BufferSource input resized before async completion",
+  "fix_options": [
+    "Snapshot or copy resizable/growable ArrayBuffer-backed bytes into stable owned storage before async worker scheduling",
+    "Keep the first implementation slice focused on the non-encoded StringOrBuffer::from_js_maybe_async_into helper boundary",
+    "Preserve existing protect/unprotect ownership for fixed Buffer and string inputs while changing only the RAB/SAB-stale input path"
+  ],
+  "test_targets": [
+    "bun target/unsafe-scout/stringorbuffer-rab-async-matrix.js",
+    "cargo +nightly miri test stringorbuffer_stale_span_model",
+    "test/js/node/crypto/stringorbuffer-rab-stale-input.test.ts"
+  ],
+  "do_not_touch": [
+    "Do not bundle node:fs writeFile or appendFile copy-back semantics into this helper slice",
+    "Do not rewrite JSTranspiler or JSBundler paths; prior scout evidence treated them as owned-copy controls",
+    "Do not claim Node parity, UB proof, Miri-clean status, or analyzer discovery from this manual packet"
+  ],
+  "evidence": [
+    {
+      "kind": "source_trace",
+      "path": "src/runtime/node/types.rs",
+      "summary": "Manual route pins the shared async StringOrBuffer helper at line 402, crypto async captures at node_crypto_binding.rs lines 766 and 786, and zstd async worker reads at BunObject.rs line 2884",
+      "command": "rg -n \"from_js_maybe_async_into|StringOrBuffer::from_js_maybe_async|ThreadSafe<node::StringOrBuffer>|self\\.buffer\\.slice\\(\\)|EVP_PBE_scrypt|bun_zstd::compress|decompress_alloc\" src/runtime/node/types.rs src/runtime/node/node_crypto_binding.rs src/runtime/api/BunObject.rs",
+      "limitation": "source trace only; does not prove a resizable backing store reaches the worker or that a witness executed this site"
+    },
+    {
+      "kind": "runtime_witness",
+      "path": "target/unsafe-scout/stringorbuffer-rab-asan-matrix.out",
+      "summary": "External Bun scout matrix reported ASAN or runtime stale-input failures for async crypto and zstd StringOrBuffer inputs after RAB resize",
+      "command": "bun target/unsafe-scout/stringorbuffer-rab-async-matrix.js",
+      "limitation": "runtime route evidence only; not memory-safety proof, not UB proof, and not analyzer-discovered"
+    },
+    {
+      "kind": "model",
+      "path": "target/unsafe-scout/miri-stringorbuffer-stale-span.out",
+      "summary": "Miri model covers the stale span shape outside the Bun runtime, where a saved pointer/length pair is read after backing storage changes",
+      "command": "cargo +nightly miri test stringorbuffer_stale_span_model",
+      "limitation": "model evidence only; does not prove the Bun site executed under Miri or that every StringOrBuffer async caller shares the same fix"
+    }
+  ],
+  "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
+}

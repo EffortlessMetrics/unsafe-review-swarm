@@ -1,7 +1,8 @@
 # Dogfood report: 2026-06-03 Bun manual candidates first-pr smoke
 
 Status: focused manual-candidate projection smoke report
-Swarm commit: `37678918`
+Swarm commit: `37678918` initial smoke; later manual-candidate example slices
+extend the same checked example set.
 Artifact status: local, untracked under `target/unsafe-review-manual-candidate-smoke/`
 
 This report records the committed Bun manual-candidate examples as a fixture
@@ -46,8 +47,12 @@ runs the first-pr artifact verifier.
   `src/runtime/webcore/TextDecoder.rs:237`.
 - `R4R2-S002`: MySQL BLOB SharedArrayBuffer bind route at
   `src/sql_jsc/mysql/MySQLValue.rs:411`.
+- `R4R2-S003`: zlib/Zstd overlapping-buffer contract route at
+  `src/runtime/node/node_zlib_binding.rs:207`.
+- `R4R2-S004`: async StringOrBuffer resizable-ArrayBuffer stale-input route at
+  `src/runtime/node/types.rs:402`.
 
-The useful cockpit behavior is that both entries remain manual candidates,
+The useful cockpit behavior is that all entries remain manual candidates,
 carry file:line and safe-caller route context, preserve external evidence
 commands and limitations, and expose copy-only fix/test/non-goal guidance for a
 future Bun implementer lane.
@@ -56,7 +61,7 @@ future Bun implementer lane.
 
 | Target | Card or family | Primary label | Evidence | Follow-up |
 |---|---|---|---|---|
-| `bun-manual-candidates-first-pr-smoke` | manual-candidate projection bundle | `actionable` | The committed Bun examples verify across manual-candidates JSON, review-kit handoff, PR-summary, GitHub-summary, and witness-plan projections while preserving manual/advisory markers. | Re-run this smoke after future manual-candidate import, first-pr, review-kit, witness-plan, or implementer-handoff projection changes. |
+| `bun-manual-candidates-first-pr-smoke` | manual-candidate projection bundle | `actionable` | The committed Bun examples verify across manual-candidates JSON, review-kit handoff, PR-summary, GitHub-summary, and witness-plan projections while preserving manual/advisory markers. | Re-run this smoke after future manual-candidate import, first-pr, review-kit, witness-plan, implementer-handoff projection, or Bun example-packet changes. |
 
 ## Trust boundary
 

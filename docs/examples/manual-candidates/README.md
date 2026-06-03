@@ -14,6 +14,8 @@ manual-candidate projections.
 - `textdecoder-sab.json` records a TextDecoder SharedArrayBuffer route.
 - `mysql-blob-sab.json` records a Bun.SQL MySQL BLOB SharedArrayBuffer route.
 - `zstd-overlap.json` records a zlib/Zstd overlapping-buffer contract route.
+- `stringorbuffer-rab-stale-input.json` records an async StringOrBuffer
+  resizable-ArrayBuffer stale-input route.
 
 Trust boundary: these examples do not execute witnesses, prove UB, prove
 site execution, prove repository safety, or create policy-ready findings.
