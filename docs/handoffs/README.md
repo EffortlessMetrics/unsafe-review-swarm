@@ -5,6 +5,7 @@ what not to do next. Do not put active specs here.
 
 | Handoff | Date | Scope |
 |---|---|---|
+| [Source manual candidate handoff cross-check sync](2026-06-03-source-manual-candidate-handoff-crosscheck-sync.md) | 2026-06-03 | acknowledges source PR #522 history-preserving manual-candidate first-pr handoff cross-check promotion and source CI budget acknowledgement without claiming publication, proof, or policy readiness |
 | [Source changelog history sync](2026-06-03-source-changelog-history-sync.md) | 2026-06-03 | acknowledges source PR #521 history-preserving changelog/usability catch-up and source CI budget acknowledgement without claiming publication, proof, or policy readiness |
 | [Source usability docs and repair readiness sync](2026-06-03-source-usability-docs-repair-readiness-sync.md) | 2026-06-03 | acknowledges source PR #520 history-preserving catch-up, source validation fixes, and source-sync checkpoint movement without claiming publication, proof, or policy readiness |
 | [get_unchecked applicability closeout](2026-06-03-get-unchecked-applicability-closeout.md) | 2026-06-03 | closes out fixture-pinned `get_unchecked` / `get_unchecked_mut` same-target, freshness, and dominance applicability rails without support-tier, proof, or dogfood-outcome claims |
