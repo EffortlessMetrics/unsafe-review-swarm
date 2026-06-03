@@ -11484,6 +11484,70 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_manual_candidate_operation_family_summary_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-manual-candidate-family-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("manual-candidates.json");
+        let mut manual_candidates = parse_json_file(&path)?;
+        manual_candidates["summary"]["operation_families"]["raw_pointer_read"] =
+            serde_json::json!(2);
+        fs::write(&path, manual_candidates.to_string())
+            .map_err(|err| format!("write manual candidates failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "manual candidate operation-family summary drift should fail verification"
+                        .to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("manual-candidates.json summary.operation_families"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_manual_candidate_evidence_kind_summary_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-manual-evidence-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit = parse_json_file(&path)?;
+        review_kit["handoff"]["manual_candidates"]["evidence_kinds"]["runtime_witness"] =
+            serde_json::json!(2);
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "review-kit manual candidate evidence-kind summary drift should fail verification"
+                        .to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("review-kit.json handoff manual_candidates.evidence_kinds"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_review_kit_manual_candidate_id_drift() -> Result<(), String>
     {
         let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-manual-candidate-id-drift")?;
@@ -16582,6 +16646,8 @@ review_after = "2026-08-01"
                     "artifact": "manual-candidates.json",
                     "manual_candidates": 0,
                     "analyzer_discovered": 0,
+                    "operation_families": {},
+                    "evidence_kinds": {},
                     "reviewcard_artifact_applicability": manual_candidate_reviewcard_applicability_fixture(),
                     "first_candidate": serde_json::Value::Null,
                     "candidate_queue_limit": 5,
@@ -16621,6 +16687,8 @@ review_after = "2026-08-01"
             "summary": {
                 "manual_candidates": 0,
                 "external_evidence_refs": 0,
+                "operation_families": {},
+                "evidence_kinds": {},
                 "analyzer_discovered": 0
             },
             "candidates": [],
@@ -16783,6 +16851,12 @@ review_after = "2026-08-01"
             "summary": {
                 "manual_candidates": 1,
                 "external_evidence_refs": 1,
+                "operation_families": {
+                    "raw_pointer_read": 1
+                },
+                "evidence_kinds": {
+                    "runtime_witness": 1
+                },
                 "analyzer_discovered": 0
             },
             "candidates": [manual_candidate_fixture()],
@@ -16806,6 +16880,12 @@ review_after = "2026-08-01"
             "artifact": "manual-candidates.json",
             "manual_candidates": 1,
             "analyzer_discovered": 0,
+            "operation_families": {
+                "raw_pointer_read": 1
+            },
+            "evidence_kinds": {
+                "runtime_witness": 1
+            },
             "reviewcard_artifact_applicability": manual_candidate_reviewcard_applicability_fixture(),
             "first_candidate": {
                 "id": "R4R2-S001",
@@ -16886,11 +16966,11 @@ review_after = "2026-08-01"
     }
 
     fn manual_candidate_front_panel_fixture() -> &'static str {
-        "## Manual candidates\n\n- Imported manual candidates: 1 (manual/advisory; not analyzer-discovered ReviewCards)\n- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)\n- Safe caller route: TextDecoder.decode SharedArrayBuffer route\n- Invariant at risk: &[u8] memory must not be concurrently mutated\n- External evidence refs: 1\n- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)\n- First fix option: copy SharedArrayBuffer-backed bytes before constructing the slice\n- First test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`\n- First do-not-touch note: Do not rewrite TextDecoder unrelated encodings\n- Explain: `unsafe-review explain R4R2-S001`\n- Agent context: `unsafe-review context R4R2-S001 --json`\n- Witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Manual candidate queue preview: first 1 of 1 manual candidate(s)\n  - `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 1; first test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`\n    - Agent context: `unsafe-review context R4R2-S001 --json`\n    - Witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only outputs.\n- Boundary: copy-only manual handoff; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n"
+        "## Manual candidates\n\n- Imported manual candidates: 1 (manual/advisory; not analyzer-discovered ReviewCards)\n- Operation families: `raw_pointer_read: 1`\n- Evidence kinds: `runtime_witness: 1`\n- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)\n- Safe caller route: TextDecoder.decode SharedArrayBuffer route\n- Invariant at risk: &[u8] memory must not be concurrently mutated\n- External evidence refs: 1\n- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)\n- First fix option: copy SharedArrayBuffer-backed bytes before constructing the slice\n- First test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`\n- First do-not-touch note: Do not rewrite TextDecoder unrelated encodings\n- Explain: `unsafe-review explain R4R2-S001`\n- Agent context: `unsafe-review context R4R2-S001 --json`\n- Witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Manual candidate queue preview: first 1 of 1 manual candidate(s)\n  - `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 1; first test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`\n    - Agent context: `unsafe-review context R4R2-S001 --json`\n    - Witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only outputs.\n- Boundary: copy-only manual handoff; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n"
     }
 
     fn manual_candidate_witness_follow_up_fixture() -> &'static str {
-        "## Manual candidate witness follow-up\n\n- Imported manual candidates: 1 (manual/advisory; not analyzer-discovered ReviewCards)\n- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)\n- Safe caller route: TextDecoder.decode SharedArrayBuffer route\n- Invariant at risk: &[u8] memory must not be concurrently mutated\n- External evidence refs: 1\n- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)\n- First fix option: copy SharedArrayBuffer-backed bytes before constructing the slice\n- First test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`\n- First do-not-touch note: Do not rewrite TextDecoder unrelated encodings\n- Full manual witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Agent context: `unsafe-review context R4R2-S001 --json`\n- Manual candidate queue preview: first 1 of 1 manual candidate(s)\n  - `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 1; first test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`\n    - Agent context: `unsafe-review context R4R2-S001 --json`\n    - Witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only witness route groups.\n- Receipt boundary: manual candidate receipts attach external evidence to the manual candidate ID only; they do not import ReviewCard witness evidence.\n- Boundary: copy-only manual follow-up; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n"
+        "## Manual candidate witness follow-up\n\n- Imported manual candidates: 1 (manual/advisory; not analyzer-discovered ReviewCards)\n- Operation families: `raw_pointer_read: 1`\n- Evidence kinds: `runtime_witness: 1`\n- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)\n- Safe caller route: TextDecoder.decode SharedArrayBuffer route\n- Invariant at risk: &[u8] memory must not be concurrently mutated\n- External evidence refs: 1\n- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)\n- First fix option: copy SharedArrayBuffer-backed bytes before constructing the slice\n- First test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`\n- First do-not-touch note: Do not rewrite TextDecoder unrelated encodings\n- Full manual witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Agent context: `unsafe-review context R4R2-S001 --json`\n- Manual candidate queue preview: first 1 of 1 manual candidate(s)\n  - `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 1; first test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`\n    - Agent context: `unsafe-review context R4R2-S001 --json`\n    - Witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only witness route groups.\n- Receipt boundary: manual candidate receipts attach external evidence to the manual candidate ID only; they do not import ReviewCard witness evidence.\n- Boundary: copy-only manual follow-up; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n"
     }
 
     fn add_repair_queue_boundaries(text: &str) -> String {

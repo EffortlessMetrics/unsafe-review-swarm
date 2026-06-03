@@ -177,9 +177,11 @@ witnesses, edit source, or broaden the task to unrelated unsafe sites.
 Manual candidate list/reporting projections must load only
 `.unsafe-review/candidates/*.json` artifacts, preserve sorted manual IDs,
 include `source = manual`, `manual_candidate = true`, and
-`analyzer_discovered = false`, include copy-only implementer handoff cues for
-the file:line target, safe caller route, invariant, evidence packet, non-goals,
-candidate-specific fix options, test targets, and stop line when available, and repeat the ReviewCard-only artifact
+`analyzer_discovered = false`, summarize the imported candidate mix with
+advisory `operation_families` and `evidence_kinds` count maps, include
+copy-only implementer handoff cues for the file:line target, safe caller route,
+invariant, evidence packet, non-goals, candidate-specific fix options, test
+targets, and stop line when available, and repeat the ReviewCard-only artifact
 relationship plus a structured `reviewcard_artifact_applicability` map. The
 map must mark `cards.json`, SARIF, comment-plan, saved LSP, and repair-queue
 surfaces with `decision = reviewcard_only`, and mark policy-report with
@@ -206,8 +208,9 @@ ReviewCard repair queue.
 
 When imported candidates are present in a `first-pr` run, `pr-summary.md` and
 `github-summary.md` must include a compact manual-candidate front-door cue with
-the manual count, first candidate ID, file:line, operation family, safe caller
-route, invariant, evidence count, optional first-candidate fix/test/do-not-touch
+the manual count, advisory operation-family and evidence-kind count summaries,
+first candidate ID, file:line, operation family, safe caller route, invariant,
+evidence count, optional first-candidate fix/test/do-not-touch
 guidance, a bounded manual-candidate queue preview with file:line, operation
 family, evidence count, first guidance cue, copy-only context/witness-plan
 commands, and advisory boundary. The full candidate payload remains in
@@ -245,6 +248,10 @@ into an analyzer ReviewCard.
   sorted imported candidates, copy-only explain/context/witness-plan commands,
   optional fix options, test targets, do-not-touch guidance, and
   ReviewCard-only artifact relationship wording
+- projection tests proving advisory operation-family and evidence-kind summary
+  maps are derived from imported manual candidates and stay aligned across
+  candidate list, first-pr `manual-candidates.json`, `review-kit.json`, and
+  Markdown front-door cues
 - projection tests proving `source = manual` and `manual_candidate = true` are
   preserved with `analyzer_discovered = false` in explain, context,
   witness-plan, saved JSON, first-pr `manual-candidates.json`, and outcome
@@ -271,9 +278,10 @@ into an analyzer ReviewCard.
   evidence commands and limitations, candidate-specific fix options, test
   targets, non-goals, and stop line from the same manual candidate.
 - `candidate list` reports imported candidates as a manual/advisory ledger with
-  sorted IDs, file:line locations, compact implementer handoff cues, evidence
-  counts, optional fix options, test targets, do-not-touch guidance, copy-only
-  projection commands, and ReviewCard-only artifact boundaries.
+  sorted IDs, advisory operation-family and evidence-kind summaries, file:line
+  locations, compact implementer handoff cues, evidence counts, optional fix
+  options, test targets, do-not-touch guidance, copy-only projection commands,
+  and ReviewCard-only artifact boundaries.
 - `witness-plan` routes manual evidence as suggested follow-up work without
   executing witnesses.
 - A receipt against a manual candidate ID can be imported or audited only as
@@ -290,16 +298,17 @@ into an analyzer ReviewCard.
 - `manual-candidates.json` and the `review-kit.json` manual candidate handoff
   carry structured ReviewCard-only applicability metadata for SARIF,
   comment-plan, saved-LSP, repair-queue, and cards, plus policy-report
-  follow-up metadata.
+  follow-up metadata and advisory candidate-mix summary maps.
 - `first-pr` terminal output and `review-kit.json` include a bounded,
   copy-only manual candidate handoff with `manual-candidates.json`,
   a sorted bounded candidate queue, `explain`, `context --json`, and
   `candidate witness-plan` commands while preserving `source = manual`,
   `manual_candidate = true`, and `analyzer_discovered = false`.
 - `first-pr` `pr-summary.md` and `github-summary.md` show a compact manual
-  candidate front-door cue, including a bounded queue preview and optional
-  guidance when present, so reviewers can notice and open the copy-only handoff
-  without treating candidates as analyzer ReviewCards.
+  candidate front-door cue, including advisory operation-family/evidence-kind
+  summaries, a bounded queue preview, and optional guidance when present, so
+  reviewers can notice and open the copy-only handoff without treating
+  candidates as analyzer ReviewCards.
 - `first-pr` `witness-plan.md` shows a compact manual candidate follow-up cue
   before the ReviewCard trust boundary, points to `candidate witness-plan`,
   includes a bounded queue preview plus optional guidance when present, and

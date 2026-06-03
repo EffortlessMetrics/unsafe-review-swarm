@@ -83,6 +83,8 @@ struct ManualCandidateIndexProjection {
     candidates: Vec<ManualCandidateProjection>,
     count: usize,
     first_id: Option<String>,
+    operation_families: BTreeMap<String, usize>,
+    evidence_kinds: BTreeMap<String, usize>,
 }
 
 struct ManualCandidateProjection {
@@ -265,6 +267,22 @@ fn check_manual_candidate_front_door_text(
         &format!(
             "- Imported manual candidates: {} (manual/advisory; not analyzer-discovered ReviewCards)",
             manual_candidates.count
+        ),
+        path,
+    )?;
+    super::require_text_contains(
+        text,
+        &format!(
+            "- Operation families: `{}`",
+            render_count_map(&manual_candidates.operation_families)
+        ),
+        path,
+    )?;
+    super::require_text_contains(
+        text,
+        &format!(
+            "- Evidence kinds: `{}`",
+            render_count_map(&manual_candidates.evidence_kinds)
         ),
         path,
     )?;
@@ -645,6 +663,20 @@ fn check_manual_candidates_artifact(dir: &Path) -> Result<ManualCandidateIndexPr
             "manual-candidates.json summary.external_evidence_refs is {summary_evidence_refs}, but candidates contain {actual_evidence_refs} evidence reference(s)"
         ));
     }
+    let operation_families = manual_candidate_operation_family_counts(&candidate_projections);
+    let evidence_kinds = manual_candidate_evidence_kind_counts(&candidate_projections);
+    require_summary_count_map(
+        &value,
+        "/summary/operation_families",
+        &operation_families,
+        "manual-candidates.json summary.operation_families",
+    )?;
+    require_summary_count_map(
+        &value,
+        "/summary/evidence_kinds",
+        &evidence_kinds,
+        "manual-candidates.json summary.evidence_kinds",
+    )?;
     let first_id = candidate_projections
         .first()
         .map(|projection| projection.id.clone());
@@ -654,7 +686,67 @@ fn check_manual_candidates_artifact(dir: &Path) -> Result<ManualCandidateIndexPr
         count: candidate_projections.len(),
         first_id,
         candidates: candidate_projections,
+        operation_families,
+        evidence_kinds,
     })
+}
+
+fn manual_candidate_operation_family_counts(
+    candidates: &[ManualCandidateProjection],
+) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
+    for candidate in candidates {
+        *counts
+            .entry(candidate.operation_family.clone())
+            .or_insert(0) += 1;
+    }
+    counts
+}
+
+fn manual_candidate_evidence_kind_counts(
+    candidates: &[ManualCandidateProjection],
+) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
+    for candidate in candidates {
+        for evidence in &candidate.evidence {
+            *counts.entry(evidence.kind.clone()).or_insert(0) += 1;
+        }
+    }
+    counts
+}
+
+fn require_summary_count_map(
+    value: &serde_json::Value,
+    pointer: &str,
+    expected: &BTreeMap<String, usize>,
+    context: &str,
+) -> Result<(), String> {
+    let object = value
+        .pointer(pointer)
+        .and_then(serde_json::Value::as_object)
+        .ok_or_else(|| format!("{context} must be an object"))?;
+    let mut actual = BTreeMap::new();
+    for (key, value) in object {
+        let Some(count) = value.as_u64() else {
+            return Err(format!("{context}.{key} must be a non-negative integer"));
+        };
+        actual.insert(key.clone(), count as usize);
+    }
+    if &actual != expected {
+        return Err(format!("{context} is {actual:?}, expected {expected:?}"));
+    }
+    Ok(())
+}
+
+fn render_count_map(counts: &BTreeMap<String, usize>) -> String {
+    if counts.is_empty() {
+        return "none".to_string();
+    }
+    counts
+        .iter()
+        .map(|(key, count)| format!("{key}: {count}"))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn check_manual_candidate_artifact_entry(
@@ -1552,6 +1644,18 @@ fn check_review_kit_manual_candidate_handoff(
             "review-kit.json handoff manual_candidates analyzer_discovered must stay 0".to_string(),
         );
     }
+    require_summary_count_map(
+        manual,
+        "/operation_families",
+        &manual_candidates.operation_families,
+        "review-kit.json handoff manual_candidates.operation_families",
+    )?;
+    require_summary_count_map(
+        manual,
+        "/evidence_kinds",
+        &manual_candidates.evidence_kinds,
+        "review-kit.json handoff manual_candidates.evidence_kinds",
+    )?;
     check_manual_candidate_reviewcard_applicability(
         manual,
         "review-kit.json handoff manual_candidates",

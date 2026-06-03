@@ -63,6 +63,14 @@ fn print_manual_candidate_handoff(
         out_dir.join("manual-candidates.json").display()
     );
     println!("  Count: {}", manual_candidates.len());
+    println!(
+        "  Operation families: {}",
+        render_count_map(&manual_candidate_operation_family_counts(manual_candidates))
+    );
+    println!(
+        "  Evidence kinds: {}",
+        render_count_map(&manual_candidate_evidence_kind_counts(manual_candidates))
+    );
     if let Some(candidate) = manual_candidates.first() {
         println!("  First manual candidate: {}", candidate.id);
         if let Some(summary) = manual_candidate_guidance_summary(candidate) {
@@ -477,6 +485,8 @@ fn review_kit_manual_candidate_handoff(
         "artifact": "manual-candidates.json",
         "manual_candidates": manual_candidates.len(),
         "analyzer_discovered": 0,
+        "operation_families": manual_candidate_operation_family_counts(manual_candidates),
+        "evidence_kinds": manual_candidate_evidence_kind_counts(manual_candidates),
         "reviewcard_artifact_applicability": manual_candidate_reviewcard_applicability(),
         "first_candidate": first_candidate,
         "candidate_queue_limit": MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT,
@@ -570,6 +580,7 @@ fn render_manual_candidate_front_panel(
         "- Imported manual candidates: {} (manual/advisory; not analyzer-discovered ReviewCards)\n",
         manual_candidates.len()
     ));
+    append_manual_candidate_summary_mix(&mut out, manual_candidates);
     if let Some(candidate) = manual_candidates.first() {
         out.push_str(&format!(
             "- First manual candidate: `{}` at `{}` (`{}`)\n",
@@ -614,6 +625,7 @@ fn render_manual_candidate_witness_follow_up(
         "- Imported manual candidates: {} (manual/advisory; not analyzer-discovered ReviewCards)",
         manual_candidates.len()
     );
+    append_manual_candidate_summary_mix(&mut out, manual_candidates);
     if let Some(candidate) = manual_candidates.first() {
         let _ = writeln!(
             &mut out,
@@ -731,6 +743,54 @@ fn manual_candidate_guidance_summary(candidate: &ManualCandidate) -> Option<Stri
     ))
 }
 
+fn append_manual_candidate_summary_mix(out: &mut String, candidates: &[ManualCandidate]) {
+    let _ = writeln!(
+        out,
+        "- Operation families: `{}`",
+        render_count_map(&manual_candidate_operation_family_counts(candidates))
+    );
+    let _ = writeln!(
+        out,
+        "- Evidence kinds: `{}`",
+        render_count_map(&manual_candidate_evidence_kind_counts(candidates))
+    );
+}
+
+fn manual_candidate_operation_family_counts(
+    candidates: &[ManualCandidate],
+) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
+    for candidate in candidates {
+        *counts
+            .entry(candidate.operation_family.clone())
+            .or_insert(0) += 1;
+    }
+    counts
+}
+
+fn manual_candidate_evidence_kind_counts(
+    candidates: &[ManualCandidate],
+) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
+    for candidate in candidates {
+        for evidence in &candidate.evidence {
+            *counts.entry(evidence.kind.clone()).or_insert(0) += 1;
+        }
+    }
+    counts
+}
+
+fn render_count_map(counts: &BTreeMap<String, usize>) -> String {
+    if counts.is_empty() {
+        return "none".to_string();
+    }
+    counts
+        .iter()
+        .map(|(key, count)| format!("{key}: {count}"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 fn manual_candidate_location_text(candidate: &ManualCandidate) -> String {
     format!(
         "{}:{}",
@@ -751,6 +811,8 @@ pub(super) fn render_manual_candidates_artifact(
         .iter()
         .map(|candidate| candidate.evidence.len())
         .sum::<usize>();
+    let operation_families = manual_candidate_operation_family_counts(candidates);
+    let evidence_kinds = manual_candidate_evidence_kind_counts(candidates);
     let value = json!({
         "schema_version": "manual-candidates/v1",
         "tool": "unsafe-review",
@@ -760,6 +822,8 @@ pub(super) fn render_manual_candidates_artifact(
         "summary": {
             "manual_candidates": candidates.len(),
             "external_evidence_refs": evidence_refs,
+            "operation_families": operation_families,
+            "evidence_kinds": evidence_kinds,
             "analyzer_discovered": 0,
         },
         "candidates": candidate_values,

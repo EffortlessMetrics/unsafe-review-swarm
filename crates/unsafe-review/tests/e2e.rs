@@ -894,6 +894,17 @@ fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dy
     assert_eq!(ledger["root"], temp.path().display().to_string());
     assert_eq!(ledger["summary"]["manual_candidates"], 2);
     assert_eq!(ledger["summary"]["external_evidence_refs"], 5);
+    assert_eq!(
+        ledger["summary"]["operation_families"]["raw_pointer_read"],
+        1
+    );
+    assert_eq!(
+        ledger["summary"]["operation_families"]["slice_from_raw_parts"],
+        1
+    );
+    assert_eq!(ledger["summary"]["evidence_kinds"]["model"], 2);
+    assert_eq!(ledger["summary"]["evidence_kinds"]["runtime_witness"], 2);
+    assert_eq!(ledger["summary"]["evidence_kinds"]["source_trace"], 1);
     assert_eq!(ledger["summary"]["analyzer_discovered"], 0);
     assert_eq!(ledger["candidates"][0]["id"], "R4R2-S001");
     assert_eq!(ledger["candidates"][1]["id"], "R4R2-S002");
@@ -1063,6 +1074,10 @@ fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dy
     let markdown = stdout_text(&markdown)?;
     assert!(markdown.contains("# unsafe-review manual candidate list"));
     assert!(markdown.contains("Manual candidates: `2`"));
+    assert!(
+        markdown.contains("Operation families: `raw_pointer_read: 1, slice_from_raw_parts: 1`")
+    );
+    assert!(markdown.contains("Evidence kinds: `model: 2, runtime_witness: 2, source_trace: 1`"));
     assert!(markdown.contains("Analyzer-discovered: `0`"));
     assert!(markdown.contains("### `R4R2-S001`"));
     assert!(markdown.contains("Location: `src/runtime/webcore/TextDecoder.rs:237`"));
@@ -1318,6 +1333,8 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("Manual candidates:"));
     assert!(stdout.contains("manual-candidates.json"));
     assert!(stdout.contains("Count: 2"));
+    assert!(stdout.contains("Operation families: raw_pointer_read: 1, slice_from_raw_parts: 1"));
+    assert!(stdout.contains("Evidence kinds: model: 2, runtime_witness: 2, source_trace: 1"));
     assert!(stdout.contains("First manual candidate: R4R2-S001"));
     assert!(stdout.contains("Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)"));
     assert!(
@@ -1535,6 +1552,26 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(
         review_kit["handoff"]["manual_candidates"]["analyzer_discovered"],
         0
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["operation_families"]["raw_pointer_read"],
+        1
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["operation_families"]["slice_from_raw_parts"],
+        1
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["evidence_kinds"]["model"],
+        2
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["evidence_kinds"]["runtime_witness"],
+        2
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["evidence_kinds"]["source_trace"],
+        1
     );
     assert_eq!(
         review_kit["handoff"]["manual_candidates"]["reviewcard_artifact_applicability"]["cards.sarif"]
@@ -1810,6 +1847,23 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(manual_candidates["mode"], "manual_candidate_index");
     assert_eq!(manual_candidates["source"], "first_pr");
     assert_eq!(manual_candidates["summary"]["manual_candidates"], 2);
+    assert_eq!(
+        manual_candidates["summary"]["operation_families"]["raw_pointer_read"],
+        1
+    );
+    assert_eq!(
+        manual_candidates["summary"]["operation_families"]["slice_from_raw_parts"],
+        1
+    );
+    assert_eq!(manual_candidates["summary"]["evidence_kinds"]["model"], 2);
+    assert_eq!(
+        manual_candidates["summary"]["evidence_kinds"]["runtime_witness"],
+        2
+    );
+    assert_eq!(
+        manual_candidates["summary"]["evidence_kinds"]["source_trace"],
+        1
+    );
     assert_eq!(manual_candidates["summary"]["analyzer_discovered"], 0);
     assert_eq!(manual_candidates["candidates"][0]["id"], "R4R2-S001");
     assert_eq!(manual_candidates["candidates"][1]["id"], "R4R2-S002");
@@ -4217,6 +4271,8 @@ fn assert_manual_candidate_front_panel(text: &str, later_heading: &str) {
     assert!(text.contains(
         "- Imported manual candidates: 2 (manual/advisory; not analyzer-discovered ReviewCards)"
     ));
+    assert!(text.contains("- Operation families: `raw_pointer_read: 1, slice_from_raw_parts: 1`"));
+    assert!(text.contains("- Evidence kinds: `model: 2, runtime_witness: 2, source_trace: 1`"));
     assert!(text.contains(
         "- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)"
     ));
@@ -4265,6 +4321,8 @@ fn assert_manual_candidate_witness_follow_up(text: &str) {
     assert!(text.contains(
         "- Imported manual candidates: 2 (manual/advisory; not analyzer-discovered ReviewCards)"
     ));
+    assert!(text.contains("- Operation families: `raw_pointer_read: 1, slice_from_raw_parts: 1`"));
+    assert!(text.contains("- Evidence kinds: `model: 2, runtime_witness: 2, source_trace: 1`"));
     assert!(text.contains(
         "- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)"
     ));
