@@ -24,6 +24,23 @@ CI lanes have separate jobs and authority:
 - Release readiness is explicit package/install smoke proof, not every-PR cost.
 - Trusted comment posting is future split-token infrastructure, not default CI.
 
+The repo-facing control surface is `xtask`. Upstream tools are engine-room
+substrates, not the public repo contract. A workflow may install or invoke tools
+such as `cargo-llvm-cov`, `cargo-deny`, `cargo-nextest`, `ripr`,
+`cargo-mutants`, Miri, `actionlint`, `zizmor`, `taplo`, or `typos`, but the
+repository policy must still be expressed through accepted specs, policy
+ledgers, ReviewCard-derived artifacts, or a stable `xtask` wrapper.
+
+The standard rule is:
+
+```text
+xtask decides what the repo proves.
+Upstream tools produce bounded evidence for that decision.
+```
+
+That keeps tool churn out of the user-facing CI contract and prevents direct
+upstream-tool invocations from silently becoming new blocking policy.
+
 ## Default workspace gate
 
 Default PR CI runs the cheap repository policy gate on the pinned Rust

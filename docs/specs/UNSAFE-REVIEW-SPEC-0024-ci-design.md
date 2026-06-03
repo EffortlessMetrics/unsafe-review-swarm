@@ -105,6 +105,20 @@ Malformed or dishonest unsafe-review artifacts fail CI.
 Unsafe-review findings do not fail CI by default.
 ```
 
+The CI control-plane line:
+
+```text
+xtask is the repo-facing policy surface.
+Upstream tools are engine-room substrates.
+```
+
+CI policy must be encoded in `xtask`, policy ledgers, and source-of-truth docs
+instead of scattering repository authority across workflow YAML, one-off shell
+scripts, or direct upstream-tool invocations. Workflows may invoke upstream
+tools, but a repo contract change is accepted only when the stable `xtask` or
+policy surface names what is being proved, when it runs, and which claims it
+does not make.
+
 ## 3. Default CI contract
 
 The default workflow runs on:
@@ -136,6 +150,47 @@ The live swarm workflow may route a cheaper Rust Small lane through
 local, release, or future full-lane proof. That routing must stay explicit and
 must not smuggle witnesses, publishing, comment posting, or source edits into
 the default gate.
+
+### 3.1 Upstream substrate policy
+
+The repo standardizes on a small upstream substrate set, but keeps repository
+authority behind `xtask` and ReviewCard-derived artifacts. The current substrate
+map is:
+
+| Plane | Upstream substrate | Repo-facing surface | Default CI posture |
+| --- | --- | --- | --- |
+| Syntax and codemod candidates | `ast-grep`; Rust-specific authority through Rust-aware syntax data such as rust-analyzer crates | `xtask` policy checks, analyzer code, ReviewCard projections | Candidate generation only; not final Rust identity authority |
+| Workspace graph | `cargo_metadata`; `guppy` when richer graph queries are justified | `xtask` lane planning, package-boundary checks, release planning | Allowed when wrapped by repo policy |
+| Test execution | `cargo test` today; `cargo-nextest` may become the wrapped serious test runner when introduced | `xtask check-pr` / future explicit test wrappers | Cheap deterministic PR testing; doctests remain separate |
+| Coverage | `cargo-llvm-cov` and Codecov | coverage lane and CI-lane ledger | Advisory telemetry only |
+| Static mutation exposure | `ripr` | future explicit `xtask`/artifact lane | Candidate weak-oracle signal; not killed/survived mutation proof |
+| Runtime mutation | `cargo-mutants` | targeted, nightly, or release lane | Not default PR full-workspace tax |
+| Unsafe contract review | `unsafe-review` | ReviewCards and first-pr bundle | Advisory by default |
+| Runtime UB witness | Miri and other witness tools | witness routes and imported receipts | Not default CI execution |
+| Source exceptions | `cargo-allow` | policy ledgers and receipts when introduced | Exception evidence, not broad suppression |
+| Dependency trust | `cargo-deny`; later `cargo-vet`; RustSec/`cargo-audit` where appropriate | future supply-chain wrapper and policy ledger | Dependency policy only; no unsafe-correctness claims |
+| Public API / release | `cargo-semver-checks`; rustdoc JSON for custom inventories | release-readiness lane | Release/manual proof, not ordinary PR cost |
+| Workflow policy | `actionlint`; `zizmor` | workflow allowlist, CI-lane whitelist, `xtask` checks | Correctness/security linting without expanding tokens |
+| Text and config hygiene | `taplo`; `typos`; markdown/link tooling | docs/policy wrappers | Advisory until baselined, then explicitly gated |
+
+Substrate adoption rules:
+
+```text
+ast-grep finds syntactic candidates; Rust-aware tooling decides Rust identity.
+cargo_metadata/guppy describe the workspace; xtask decides CI routing.
+cargo-nextest may run tests; xtask decides which test lane is authoritative.
+cargo-llvm-cov measures execution surface; it does not prove correctness.
+ripr shifts mutation signal left; cargo-mutants remains the runtime backstop.
+unsafe-review makes unsafe changes reviewable; Miri provides concrete witness evidence only when run and receipted.
+cargo-deny/vet/audit own dependency trust; they do not review unsafe contracts.
+cargo-semver-checks owns release API compatibility; it is not a default PR witness.
+```
+
+A new upstream tool may be added to workflow YAML only when the PR also records
+its repo-facing surface, trigger policy, artifact policy, cost posture, and
+claim boundary in the relevant spec or policy ledger. If the wrapper does not
+yet exist, the spec must describe it as future or planned rather than as a live
+command.
 
 ## 4. CI lane taxonomy
 

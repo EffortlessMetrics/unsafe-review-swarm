@@ -26,6 +26,11 @@ The repository needs a machine-linked contract stack for why/what/how/now/proof 
 
 The repository MUST maintain linked artifacts: proposal, spec, optional ADR, implementation plan, active goal manifest, support tiers, and policy ledgers.
 
+The repository-facing policy and orchestration surface is `xtask` plus the
+source-of-truth ledgers. Upstream tools are implementation substrates; they do
+not become durable repo authority until an accepted spec, plan item, support
+tier, or policy ledger records the wrapper, proof command, and claim boundary.
+
 ## Non-goals
 
 This spec does not define runtime unsafe-analysis behavior.
