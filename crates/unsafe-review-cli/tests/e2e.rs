@@ -163,6 +163,7 @@ fn candidate_help_is_command_specific() -> Result<(), Box<dyn Error>> {
         stdout.contains("unsafe-review candidate: import and project manual advisory candidates")
     );
     assert!(stdout.contains("unsafe-review candidate import <manual-candidate.json>"));
+    assert!(stdout.contains("unsafe-review candidate list"));
     assert!(stdout.contains("unsafe-review candidate witness-plan"));
     assert!(stdout.contains("manual_candidate `true`"));
     assert!(stdout.contains("analyzer_discovered `false`"));

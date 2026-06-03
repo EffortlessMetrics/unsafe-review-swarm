@@ -806,6 +806,126 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
 }
 
 #[test]
+fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-manual-candidate-list-e2e")?;
+    let candidate_dir = temp.path().join(".unsafe-review/candidates");
+    fs::create_dir_all(&candidate_dir)?;
+    fs::write(
+        candidate_dir.join("R4R2-S002.json"),
+        manual_candidate_json().replace("\"id\": \"R4R2-S001\"", "\"id\": \"R4R2-S002\""),
+    )?;
+    fs::write(
+        candidate_dir.join("R4R2-S001.json"),
+        manual_candidate_json(),
+    )?;
+
+    let json = run_success([
+        os("candidate"),
+        os("list"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let ledger = parse_json(&stdout_text(&json)?)?;
+
+    assert_eq!(ledger["schema_version"], "manual-candidates/v1");
+    assert_eq!(ledger["mode"], "manual_candidate_index");
+    assert_eq!(ledger["source"], "candidate_list");
+    assert_eq!(ledger["root"], temp.path().display().to_string());
+    assert_eq!(ledger["summary"]["manual_candidates"], 2);
+    assert_eq!(ledger["summary"]["external_evidence_refs"], 4);
+    assert_eq!(ledger["summary"]["analyzer_discovered"], 0);
+    assert_eq!(ledger["candidates"][0]["id"], "R4R2-S001");
+    assert_eq!(ledger["candidates"][1]["id"], "R4R2-S002");
+    assert_eq!(ledger["candidates"][0]["source"], "manual");
+    assert_eq!(ledger["candidates"][0]["manual_candidate"], true);
+    assert_eq!(ledger["candidates"][0]["analyzer_discovered"], false);
+    assert_eq!(
+        ledger["candidates"][0]["location_text"],
+        "src/runtime/webcore/TextDecoder.rs:237"
+    );
+    assert!(
+        ledger["candidates"][0]["explain_command"]
+            .as_str()
+            .unwrap_or("")
+            .contains("unsafe-review explain --root")
+    );
+    assert!(
+        ledger["candidates"][0]["context_json_command"]
+            .as_str()
+            .unwrap_or("")
+            .contains("unsafe-review context --root")
+    );
+    assert!(
+        ledger["candidates"][0]["witness_plan_command"]
+            .as_str()
+            .unwrap_or("")
+            .contains("unsafe-review candidate witness-plan --root")
+    );
+    assert!(
+        ledger["reviewcard_artifact_relationship"]["cards.json"]
+            .as_str()
+            .unwrap_or("")
+            .contains("ReviewCard-only analyzer output")
+    );
+    assert!(
+        ledger["reviewcard_artifact_relationship"]["repair-queue.json"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not automatic repair tasks")
+    );
+    assert!(
+        ledger["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not analyzer-discovered ReviewCards")
+    );
+    assert!(
+        ledger["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("unsafe-review did not run witnesses")
+    );
+
+    let markdown = run_success([
+        os("candidate"),
+        os("list"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+    ])?;
+    let markdown = stdout_text(&markdown)?;
+    assert!(markdown.contains("# unsafe-review manual candidate list"));
+    assert!(markdown.contains("Manual candidates: `2`"));
+    assert!(markdown.contains("Analyzer-discovered: `0`"));
+    assert!(markdown.contains("### `R4R2-S001`"));
+    assert!(markdown.contains("Location: `src/runtime/webcore/TextDecoder.rs:237`"));
+    assert!(markdown.contains("Context: `unsafe-review context --root"));
+    assert!(markdown.contains("ReviewCard-only repair queue"));
+    assert!(markdown.contains("not analyzer-discovered ReviewCards"));
+    assert!(markdown.contains("did not run witnesses"));
+
+    let out = temp.path().join("manual-candidates-list.json");
+    let wrote = run_success([
+        os("candidate"),
+        os("list"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+        os("--out"),
+        out.as_os_str().to_os_string(),
+    ])?;
+    assert_eq!(stdout_text(&wrote)?.trim(), "");
+    assert_eq!(
+        parse_json(&fs::read_to_string(out)?)?["summary"]["manual_candidates"],
+        2
+    );
+
+    Ok(())
+}
+
+#[test]
 fn manual_candidate_receipts_audit_as_manual_advisory_targets() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment");
     let temp = TempDir::new("unsafe-review-manual-candidate-receipt-e2e")?;

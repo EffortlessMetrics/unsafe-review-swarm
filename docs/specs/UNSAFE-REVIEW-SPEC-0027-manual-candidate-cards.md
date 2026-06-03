@@ -71,6 +71,7 @@ Import command shape:
 ```bash
 unsafe-review candidate import target/unsafe-scout/textdecoder-candidate.json \
   --out .unsafe-review/candidates/R4R2-S001.json
+unsafe-review candidate list --format json
 ```
 
 The repository keeps the example below at
@@ -154,6 +155,13 @@ non-goals, and stop condition. It must
 remain copy-only and must not mark the candidate analyzer-discovered, run
 witnesses, edit source, or broaden the task to unrelated unsafe sites.
 
+Manual candidate list/reporting projections must load only
+`.unsafe-review/candidates/*.json` artifacts, preserve sorted manual IDs,
+include `source = manual`, `manual_candidate = true`, and
+`analyzer_discovered = false`, and repeat the ReviewCard-only artifact
+relationship. They must not add manual candidates to `cards.json`, SARIF,
+comment-plan, saved LSP, repair-queue, or policy-report surfaces.
+
 If a manual candidate cannot be projected faithfully into a surface, that
 surface must reject or omit it with an explicit reason instead of degrading it
 into an analyzer ReviewCard.
@@ -174,6 +182,9 @@ into an analyzer ReviewCard.
 
 - schema parser tests for valid and invalid `manual-candidate/v1` JSON
 - CLI import e2e coverage for `candidate import`
+- CLI list e2e coverage for `candidate list --format json`, Markdown output,
+  sorted imported candidates, copy-only explain/context/witness-plan commands,
+  and ReviewCard-only artifact relationship wording
 - projection tests proving `source = manual` and `manual_candidate = true` are
   preserved with `analyzer_discovered = false` in explain, context,
   witness-plan, saved JSON, first-pr `manual-candidates.json`, and outcome
@@ -193,6 +204,9 @@ into an analyzer ReviewCard.
   file:line, safe caller route, invariant at risk, external evidence references,
   evidence commands and limitations, non-goals, and stop line from the same
   manual candidate.
+- `candidate list` reports imported candidates as a manual/advisory ledger with
+  sorted IDs, file:line locations, evidence counts, copy-only projection
+  commands, and ReviewCard-only artifact boundaries.
 - `witness-plan` routes manual evidence as suggested follow-up work without
   executing witnesses.
 - A receipt against a manual candidate ID can be imported or audited only as

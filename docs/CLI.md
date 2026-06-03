@@ -264,10 +264,19 @@ After import, `explain` and `context` can load the candidate by ID from
 `.unsafe-review/candidates/` when no analyzer ReviewCard with that ID exists:
 
 ```bash
+unsafe-review candidate list
+unsafe-review candidate list --format json --out target/unsafe-review/manual-candidates-list.json
 unsafe-review explain R4R2-S001
 unsafe-review context R4R2-S001
 unsafe-review candidate witness-plan R4R2-S001
 ```
+
+`candidate list` reports the imported manual candidate ledger from
+`.unsafe-review/candidates/`. It preserves sorted manual candidate IDs,
+file:line locations, ReviewCard-only artifact boundaries, and copy-only
+explain/context/witness-plan commands without adding those candidates to
+`cards.json`, SARIF, comment plans, saved LSP diagnostics, repair queues, or
+policy reports.
 
 Manual candidate projections preserve the manual marker and external evidence
 references, including optional exact evidence commands and limitations. The

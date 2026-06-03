@@ -1,6 +1,6 @@
 use crate::command::{
-    CandidateCommand, CandidateImportOptions, CandidateWitnessPlanOptions, CheckOptions, Command,
-    DiffInput, FirstPrOptions, Format, OutcomeOptions, RepoOptions,
+    CandidateCommand, CandidateImportOptions, CandidateListOptions, CandidateWitnessPlanOptions,
+    CheckOptions, Command, DiffInput, FirstPrOptions, Format, OutcomeOptions, RepoOptions,
 };
 use std::path::PathBuf;
 use unsafe_review_core::PolicyMode;
@@ -65,6 +65,7 @@ fn parse_candidate(args: Vec<String>) -> Result<CandidateCommand, String> {
     let rest = rest.collect::<Vec<_>>();
     match subcommand.as_str() {
         "import" => parse_candidate_import(rest).map(CandidateCommand::Import),
+        "list" => parse_candidate_list(rest).map(CandidateCommand::List),
         "witness-plan" => parse_candidate_witness_plan(rest).map(CandidateCommand::WitnessPlan),
         other => Err(format!("unknown candidate subcommand `{other}`")),
     }
@@ -96,6 +97,50 @@ fn parse_candidate_import(args: Vec<String>) -> Result<CandidateImportOptions, S
         input: input.ok_or_else(|| "missing manual candidate input".to_string())?,
         out,
     })
+}
+
+fn parse_candidate_list(args: Vec<String>) -> Result<CandidateListOptions, String> {
+    let mut root = PathBuf::from(".");
+    let mut format = Format::Markdown;
+    let mut out = None;
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--root" => {
+                idx += 1;
+                root = parse_path_value(&args, idx, "--root")?;
+            }
+            arg if arg.starts_with("--root=") => {
+                root = parse_inline_path_value(arg, "--root")?;
+            }
+            "--format" => {
+                idx += 1;
+                format = json_or_markdown_format(
+                    parse_format(value(&args, idx, "--format")?)?,
+                    "candidate list",
+                )?;
+            }
+            arg if arg.starts_with("--format=") => {
+                format = json_or_markdown_format(
+                    parse_format(inline_value(arg, "--format")?)?,
+                    "candidate list",
+                )?;
+            }
+            "--out" => {
+                idx += 1;
+                out = Some(parse_path_value(&args, idx, "--out")?);
+            }
+            arg if arg.starts_with("--out=") => {
+                out = Some(parse_inline_path_value(arg, "--out")?);
+            }
+            value if value.starts_with('-') => {
+                return Err(format!("unknown candidate list argument `{value}`"));
+            }
+            value => return Err(format!("unexpected candidate list argument `{value}`")),
+        }
+        idx += 1;
+    }
+    Ok(CandidateListOptions { root, format, out })
 }
 
 fn parse_candidate_witness_plan(args: Vec<String>) -> Result<CandidateWitnessPlanOptions, String> {
@@ -742,6 +787,31 @@ mod tests {
         assert_eq!(
             options.out,
             Some(PathBuf::from(".unsafe-review/candidates/R4R2-S001.json"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parses_candidate_list_command() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "candidate",
+            "list",
+            "--root",
+            ".",
+            "--format=json",
+            "--out",
+            "target/manual-candidates.json",
+        ]))?;
+
+        let Command::Candidate(CandidateCommand::List(options)) = command else {
+            return Err("expected candidate list command".to_string());
+        };
+        assert_eq!(options.root, PathBuf::from("."));
+        assert_eq!(options.format, Format::Json);
+        assert_eq!(
+            options.out,
+            Some(PathBuf::from("target/manual-candidates.json"))
         );
         Ok(())
     }

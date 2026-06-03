@@ -1,7 +1,7 @@
 use crate::command::{
-    CandidateCommand, CandidateImportOptions, CandidateWitnessPlanOptions, CheckOptions, Command,
-    DiffInput, FirstPrOptions, Format, OutcomeOptions, ReceiptTemplateOptions, RepoOptions,
-    SavedOutputReceiptOptions,
+    CandidateCommand, CandidateImportOptions, CandidateListOptions, CandidateWitnessPlanOptions,
+    CheckOptions, Command, DiffInput, FirstPrOptions, Format, OutcomeOptions,
+    ReceiptTemplateOptions, RepoOptions, SavedOutputReceiptOptions,
 };
 #[cfg(unix)]
 use signal_hook::consts::signal::{SIGINT, SIGTERM};
@@ -1248,6 +1248,7 @@ fn context(root: &Path, id: &str) -> Result<(), String> {
 fn candidate(command: CandidateCommand) -> Result<(), String> {
     match command {
         CandidateCommand::Import(options) => candidate_import(options),
+        CandidateCommand::List(options) => candidate_list(options),
         CandidateCommand::WitnessPlan(options) => candidate_witness_plan(options),
     }
 }
@@ -1268,6 +1269,205 @@ fn candidate_import(options: CandidateImportOptions) -> Result<(), String> {
         print!("{rendered}");
     }
     Ok(())
+}
+
+fn candidate_list(options: CandidateListOptions) -> Result<(), String> {
+    let candidates = load_manual_candidates(&options.root)?;
+    let rendered = match options.format {
+        Format::Json => render_candidate_list_json(&options.root, &candidates)?,
+        Format::Markdown => render_candidate_list_markdown(&options.root, &candidates),
+        _ => return Err("candidate list only supports json or markdown output".to_string()),
+    };
+    if let Some(out) = options.out {
+        write_artifact(&out, rendered)?;
+    } else {
+        print!("{rendered}");
+    }
+    Ok(())
+}
+
+fn render_candidate_list_json(
+    root: &Path,
+    candidates: &[unsafe_review_core::ManualCandidate],
+) -> Result<String, String> {
+    let evidence_refs = candidates
+        .iter()
+        .map(|candidate| candidate.evidence.len())
+        .sum::<usize>();
+    let value = serde_json::json!({
+        "schema_version": "manual-candidates/v1",
+        "tool": "unsafe-review",
+        "tool_version": env!("CARGO_PKG_VERSION"),
+        "mode": "manual_candidate_index",
+        "source": "candidate_list",
+        "root": root.display().to_string(),
+        "summary": {
+            "manual_candidates": candidates.len(),
+            "external_evidence_refs": evidence_refs,
+            "analyzer_discovered": 0,
+        },
+        "candidates": candidates
+            .iter()
+            .map(|candidate| manual_candidate_list_entry(root, candidate))
+            .collect::<Vec<_>>(),
+        "reviewcard_artifact_relationship": manual_candidate_reviewcard_relationship(),
+        "trust_boundary": manual_candidate_list_trust_boundary(),
+    });
+    let mut rendered = serde_json::to_string_pretty(&value)
+        .map_err(|err| format!("render manual candidate list JSON failed: {err}"))?;
+    rendered.push('\n');
+    Ok(rendered)
+}
+
+fn manual_candidate_list_entry(
+    root: &Path,
+    candidate: &unsafe_review_core::ManualCandidate,
+) -> serde_json::Value {
+    let mut value = serde_json::to_value(candidate).unwrap_or_else(|_| serde_json::json!({}));
+    if let Some(object) = value.as_object_mut() {
+        object.insert("source".to_string(), serde_json::json!("manual"));
+        object.insert("manual_candidate".to_string(), serde_json::json!(true));
+        object.insert("analyzer_discovered".to_string(), serde_json::json!(false));
+        object.insert(
+            "location_text".to_string(),
+            serde_json::json!(manual_candidate_location_text(candidate)),
+        );
+        object.insert(
+            "explain_command".to_string(),
+            serde_json::json!(candidate_explain_command(root, &candidate.id)),
+        );
+        object.insert(
+            "context_json_command".to_string(),
+            serde_json::json!(candidate_context_command(root, &candidate.id)),
+        );
+        object.insert(
+            "witness_plan_command".to_string(),
+            serde_json::json!(candidate_witness_plan_command(root, &candidate.id)),
+        );
+    }
+    value
+}
+
+fn render_candidate_list_markdown(
+    root: &Path,
+    candidates: &[unsafe_review_core::ManualCandidate],
+) -> String {
+    let evidence_refs = candidates
+        .iter()
+        .map(|candidate| candidate.evidence.len())
+        .sum::<usize>();
+    let mut out = String::new();
+    out.push_str("# unsafe-review manual candidate list\n\n");
+    out.push_str("This is a manual/advisory candidate ledger. It lists imported `.unsafe-review/candidates/*.json` artifacts and does not make them analyzer-discovered ReviewCards.\n\n");
+    out.push_str("## Summary\n\n");
+    out.push_str(&format!("- Root: `{}`\n", root.display()));
+    out.push_str(&format!("- Manual candidates: `{}`\n", candidates.len()));
+    out.push_str(&format!("- External evidence refs: `{evidence_refs}`\n"));
+    out.push_str("- Analyzer-discovered: `0`\n\n");
+    if candidates.is_empty() {
+        out.push_str("No imported manual candidates found.\n\n");
+    } else {
+        out.push_str("## Candidates\n\n");
+        for candidate in candidates {
+            out.push_str(&format!("### `{}`\n\n", candidate.id));
+            out.push_str(&format!("- Title: {}\n", candidate.title));
+            out.push_str(&format!(
+                "- Location: `{}`\n",
+                manual_candidate_location_text(candidate)
+            ));
+            out.push_str(&format!(
+                "- Operation family: `{}`\n",
+                candidate.operation_family
+            ));
+            out.push_str(&format!("- Source: `manual`\n"));
+            out.push_str("- Manual candidate: `true`\n");
+            out.push_str("- Analyzer-discovered: `false`\n");
+            out.push_str(&format!(
+                "- Evidence refs: `{}`\n",
+                candidate.evidence.len()
+            ));
+            out.push_str(&format!(
+                "- Explain: `{}`\n",
+                candidate_explain_command(root, &candidate.id)
+            ));
+            out.push_str(&format!(
+                "- Context: `{}`\n",
+                candidate_context_command(root, &candidate.id)
+            ));
+            out.push_str(&format!(
+                "- Witness plan: `{}`\n\n",
+                candidate_witness_plan_command(root, &candidate.id)
+            ));
+        }
+    }
+    out.push_str("## ReviewCard Artifact Relationship\n\n");
+    out.push_str("- `cards.json`: ReviewCard-only analyzer output; manual candidates are listed only by manual-candidate ledger surfaces.\n");
+    out.push_str("- `comment-plan.json`: ReviewCard-only comment planning; manual candidates are not selected for automatic comment plans.\n");
+    out.push_str("- `repair-queue.json`: ReviewCard-only repair queue; manual candidates are not automatic repair tasks.\n");
+    out.push_str("- `policy-report`: ReviewCard-only policy simulation; manual candidates are not policy gating inputs.\n\n");
+    out.push_str("## Trust Boundary\n\n");
+    out.push_str(manual_candidate_list_trust_boundary());
+    out.push('\n');
+    out
+}
+
+fn manual_candidate_reviewcard_relationship() -> serde_json::Value {
+    serde_json::json!({
+        "cards.json": "ReviewCard-only analyzer output; manual candidates are listed only by manual-candidate ledger surfaces.",
+        "cards.sarif": "ReviewCard-only analyzer output; manual candidates are not emitted as SARIF analyzer results.",
+        "comment-plan.json": "ReviewCard-only comment planning; manual candidates are not selected for automatic comment plans.",
+        "lsp.json": "ReviewCard-only saved editor projection; manual candidates are not emitted as analyzer diagnostics.",
+        "repair-queue.json": "ReviewCard-only repair queue; manual candidates are not automatic repair tasks.",
+        "receipt-audit.md": "Receipts may match manual candidate IDs as manual/advisory targets without importing them as ReviewCard witness evidence.",
+        "policy-report": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs."
+    })
+}
+
+fn manual_candidate_list_trust_boundary() -> &'static str {
+    "Manual/advisory static unsafe contract review candidate ledger only; candidates are not analyzer-discovered ReviewCards, not a proof of UB, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repository safety, and not policy gating. unsafe-review did not run witnesses, post comments, edit source, run an agent, or enforce blocking policy."
+}
+
+fn manual_candidate_location_text(candidate: &unsafe_review_core::ManualCandidate) -> String {
+    format!(
+        "{}:{}",
+        candidate.location.file.display(),
+        candidate.location.line
+    )
+}
+
+fn candidate_explain_command(root: &Path, candidate_id: &str) -> String {
+    format!(
+        "unsafe-review explain --root {} {}",
+        shell_arg(&root.display().to_string()),
+        shell_arg(candidate_id)
+    )
+}
+
+fn candidate_context_command(root: &Path, candidate_id: &str) -> String {
+    format!(
+        "unsafe-review context --root {} {} --json",
+        shell_arg(&root.display().to_string()),
+        shell_arg(candidate_id)
+    )
+}
+
+fn candidate_witness_plan_command(root: &Path, candidate_id: &str) -> String {
+    format!(
+        "unsafe-review candidate witness-plan --root {} {}",
+        shell_arg(&root.display().to_string()),
+        shell_arg(candidate_id)
+    )
+}
+
+fn shell_arg(value: &str) -> String {
+    if value
+        .bytes()
+        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'.' | b'_' | b'-'))
+    {
+        value.to_string()
+    } else {
+        format!("\"{}\"", value.replace('"', "\\\""))
+    }
 }
 
 fn candidate_witness_plan(options: CandidateWitnessPlanOptions) -> Result<(), String> {
@@ -1561,6 +1761,7 @@ fn print_help() {
     println!(
         "  candidate import <manual-candidate.json> [--out .unsafe-review/candidates/<id>.json]"
     );
+    println!("  candidate list [--root .] [--format json|markdown] [--out file]");
     println!("  candidate witness-plan [--root .] <candidate-id> [--out file]");
     println!("  support");
     println!(
@@ -1680,6 +1881,7 @@ fn print_candidate_help() {
     println!(
         "  unsafe-review candidate import <manual-candidate.json> [--out .unsafe-review/candidates/<id>.json]"
     );
+    println!("  unsafe-review candidate list [--root .] [--format json|markdown] [--out file]");
     println!("  unsafe-review candidate witness-plan [--root .] <candidate-id> [--out file]");
     println!();
     println!("What manual candidates are:");
@@ -1696,6 +1898,9 @@ fn print_candidate_help() {
     println!("Commands:");
     println!(
         "- import reads a manual candidate JSON file, validates it, and writes a canonical artifact."
+    );
+    println!(
+        "- list reports imported manual candidates from .unsafe-review/candidates without adding them to ReviewCard-only outputs."
     );
     println!(
         "- witness-plan renders the candidate's advisory witness-plan projection by candidate ID."
