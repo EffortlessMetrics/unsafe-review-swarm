@@ -131,6 +131,16 @@ const DOGFOOD_FOLLOW_UP_SEEDS: &str = "docs/dogfood/follow-up-seeds.md";
 const DOGFOOD_JUDGMENT_DIR: &str = "docs/dogfood/judgments";
 const DOGFOOD_JUDGMENTS_README: &str = "docs/dogfood/judgments/README.md";
 const DOGFOOD_REPORT_DIR: &str = "docs/dogfood/reports";
+const BUN_MANUAL_CANDIDATE_SMOKE_ID: &str = "bun-manual-candidates-first-pr-smoke";
+const BUN_MANUAL_CANDIDATE_SMOKE_ARTIFACTS: &[&str] = &[
+    "target/unsafe-review-manual-candidate-smoke/manual-candidates.json",
+    "target/unsafe-review-manual-candidate-smoke/manual-repair-queue.json",
+    "target/unsafe-review-manual-candidate-smoke/review-kit.json",
+    "target/unsafe-review-manual-candidate-smoke/pr-summary.md",
+    "target/unsafe-review-manual-candidate-smoke/github-summary.md",
+    "target/unsafe-review-manual-candidate-smoke/witness-plan.md",
+    "target/unsafe-review-manual-candidate-smoke/repair-queue.json",
+];
 const ACCURACY_CALIBRATION_POLICY: &str = "policy/accuracy-calibration.toml";
 const ACCURACY_CALIBRATION_REPORT: &str = "docs/accuracy/CALIBRATION_REPORT.md";
 const OBJECTIVE_AUDIT: &str = "docs/status/OBJECTIVE_AUDIT.md";
@@ -3132,7 +3142,7 @@ mod dogfood_checks {
                 "{DOGFOOD_MANIFEST} targets[{idx}] uses unknown artifact_status `{artifact_status}`"
             ));
         }
-        validate_artifacts(target, idx, artifact_status)?;
+        validate_artifacts(target, idx, id, artifact_status)?;
         let (repo_snapshots, pr_diffs, fixture_controls) = validate_kind_fields(target, idx, kind)?;
         let fixture_control_id = (fixture_controls > 0).then(|| id.to_string());
         Ok(TargetStats {
@@ -3159,6 +3169,7 @@ mod dogfood_checks {
     fn validate_artifacts(
         target: &toml::Table,
         idx: usize,
+        id: &str,
         artifact_status: &str,
     ) -> Result<(), String> {
         let artifacts = target
@@ -3183,6 +3194,18 @@ mod dogfood_checks {
                 return Err(format!(
                     "{DOGFOOD_MANIFEST} targets[{idx}] checked-in artifact missing: {artifact}"
                 ));
+            }
+        }
+        if id == BUN_MANUAL_CANDIDATE_SMOKE_ID {
+            for required in BUN_MANUAL_CANDIDATE_SMOKE_ARTIFACTS {
+                if !artifacts
+                    .iter()
+                    .any(|artifact| artifact.as_str() == Some(*required))
+                {
+                    return Err(format!(
+                        "{DOGFOOD_MANIFEST} target `{id}` must list Bun manual-candidate smoke artifact `{required}`"
+                    ));
+                }
             }
         }
         Ok(())
@@ -9517,6 +9540,39 @@ impl WitnessKind {
     #[test]
     fn dogfood_manifest_validates_current_corpus_contract() -> Result<(), String> {
         check_dogfood()
+    }
+
+    #[test]
+    fn dogfood_manifest_requires_bun_manual_smoke_repair_sidecar() -> Result<(), String> {
+        let target = toml::from_str::<toml::Value>(
+            r#"
+id = "bun-manual-candidates-first-pr-smoke"
+crate = "bun-manual-candidates"
+kind = "fixture-control"
+status = "active"
+fixture = "fixtures/raw_pointer_alignment"
+root = "fixtures/raw_pointer_alignment"
+diff = "fixtures/raw_pointer_alignment/change.diff"
+purpose = "fixture-level first-pr smoke for committed Bun manual-candidate projection through manual-candidates.json and review-kit handoff surfaces"
+command = "rtk cargo run --locked -p xtask -- check-manual-candidate-examples"
+artifact_status = "local_untracked"
+artifacts = [
+  "target/unsafe-review-manual-candidate-smoke/manual-candidates.json",
+  "target/unsafe-review-manual-candidate-smoke/review-kit.json",
+  "target/unsafe-review-manual-candidate-smoke/pr-summary.md",
+  "target/unsafe-review-manual-candidate-smoke/github-summary.md",
+  "target/unsafe-review-manual-candidate-smoke/witness-plan.md",
+  "target/unsafe-review-manual-candidate-smoke/repair-queue.json",
+]
+"#,
+        )
+        .map_err(|err| err.to_string())?;
+        let mut ids = BTreeSet::new();
+        let err = err_text(dogfood_checks::validate_target(&target, 0, &mut ids))?;
+
+        assert!(err.contains("manual-repair-queue.json"), "{err}");
+        assert!(err.contains("Bun manual-candidate smoke artifact"), "{err}");
+        Ok(())
     }
 
     #[test]

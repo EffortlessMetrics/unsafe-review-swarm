@@ -36,10 +36,12 @@ runs the first-pr artifact verifier.
 | Surface | Result | Reviewer note |
 |---|---:|---|
 | `manual-candidates.json` | Verified | Preserves sorted manual IDs, manual/advisory markers, source route, invariant, evidence commands and limitations, fix options, test targets, do-not-touch notes, and trust boundary from the committed examples. |
+| `manual-repair-queue.json` | Verified | Preserves the same manual IDs, implementer handoff, fix/test/non-goal guidance, and copy-only commands as `manual-candidates.json`; it is not the ReviewCard repair queue and does not run an agent. |
 | `review-kit.json` | Verified | Includes a bounded manual-candidate queue with implementer handoff cues that match `manual-candidates.json`; candidates stay out of the ReviewCard repair queue. |
 | `pr-summary.md` | Verified | Shows a compact manual-candidate front door with count, first candidate, queue preview, commands, guidance, and advisory boundary. |
 | `github-summary.md` | Verified | Keeps the doorway bounded and points to the manual-candidate index instead of duplicating full packets. |
 | `witness-plan.md` | Verified | Adds manual-candidate follow-up cues while keeping them outside ReviewCard witness route groups. |
+| `repair-queue.json` | Verified | Remains ReviewCard-only and free of manual-candidate markers. |
 
 ## Bun candidates
 
@@ -63,7 +65,7 @@ future Bun implementer lane.
 
 | Target | Card or family | Primary label | Evidence | Follow-up |
 |---|---|---|---|---|
-| `bun-manual-candidates-first-pr-smoke` | manual-candidate projection bundle | `actionable` | The committed Bun examples verify across manual-candidates JSON, review-kit handoff, PR-summary, GitHub-summary, and witness-plan projections while preserving manual/advisory markers. | Re-run this smoke after future manual-candidate import, first-pr, review-kit, witness-plan, implementer-handoff projection, or Bun example-packet changes. |
+| `bun-manual-candidates-first-pr-smoke` | manual-candidate projection bundle | `actionable` | The committed Bun examples verify across manual-candidates JSON, manual repair queue, review-kit handoff, PR-summary, GitHub-summary, witness-plan, and ReviewCard repair-queue boundaries while preserving manual/advisory markers. | Re-run this smoke after future manual-candidate import, first-pr, review-kit, manual repair queue, witness-plan, implementer-handoff projection, or Bun example-packet changes. |
 
 ## Trust boundary
 

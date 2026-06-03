@@ -85,7 +85,7 @@
     {
       "id": "bun-manual-candidates-first-pr-smoke",
       "fixture": "fixtures/raw_pointer_alignment",
-      "primary_exercise": "Committed Bun manual candidates remain manual/advisory and project through first-pr manual-candidate handoff artifacts.",
+      "primary_exercise": "Committed Bun manual candidates remain manual/advisory and project through first-pr manual-candidate handoff artifacts, including the manual repair queue sidecar.",
       "report": "docs/dogfood/reports/2026-06-03-bun-manual-candidates-first-pr-smoke.md"
     }
   ],

@@ -10,14 +10,14 @@ trust_boundary = "Static unsafe contract review measurement input; not calibrate
 [[cards]]
 family = "manual_candidate_projection"
 judgment = "actionable"
-reason = "The first-pr bundle keeps the Bun TextDecoder, MySQL SAB, zstd overlap, async StringOrBuffer RAB, and node:fs scalar write RAB examples manual/advisory while preserving file:line, safe caller route, invariant, evidence commands, limitations, and implementer guidance."
-next_step = "Keep this as projection regression pressure for manual-candidate import, review-kit handoff, PR summaries, and witness-plan follow-up wording."
+reason = "The first-pr bundle keeps the Bun TextDecoder, MySQL SAB, zstd overlap, async StringOrBuffer RAB, and node:fs scalar write RAB examples manual/advisory while preserving file:line, safe caller route, invariant, evidence commands, limitations, implementer guidance, and manual repair queue sidecar entries."
+next_step = "Keep this as projection regression pressure for manual-candidate import, manual repair queue sidecar, review-kit handoff, PR summaries, and witness-plan follow-up wording."
 
 [[cards]]
 family = "first_pr_projection"
 judgment = "actionable"
-reason = "The reviewer doorway shows a bounded manual-candidate queue and points to full context and witness-plan commands without adding candidates to ReviewCard-only artifacts."
-next_step = "Re-run the smoke after future first-pr bundle changes that touch manual candidate queues or artifact relationships."
+reason = "The reviewer doorway shows a bounded manual-candidate queue and points to full context, witness-plan, and manual repair handoff commands without adding candidates to ReviewCard-only artifacts."
+next_step = "Re-run the smoke after future first-pr bundle changes that touch manual candidate queues, manual repair queue entries, or artifact relationships."
 
 [[cards]]
 family = "witness_plan"
