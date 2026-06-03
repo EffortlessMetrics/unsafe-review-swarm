@@ -186,13 +186,18 @@ const DOGFOOD_TRIAGE_HEADER: &[&str] = &[
     "Follow-up",
 ];
 const DOGFOOD_FOLLOW_UP_STATUSES: &[&str] = &["open", "done", "parked", "superseded"];
-const DOGFOOD_FOLLOW_UP_SURFACES: &[&str] =
-    &["comment_plan", "first_pr_projection", "repo_posture"];
+const DOGFOOD_FOLLOW_UP_SURFACES: &[&str] = &[
+    "comment_plan",
+    "first_pr_projection",
+    "manual_candidate_projection",
+    "repo_posture",
+];
 const DOGFOOD_JUDGMENT_SURFACES: &[&str] = &[
     "comment_plan",
     "context_packet",
     "first_pr_projection",
     "github_summary",
+    "manual_candidate_projection",
     "pr_summary",
     "receipt_audit",
     "repair_queue",
@@ -415,6 +420,7 @@ fn check_ci_routing_contract() -> Result<(), String> {
 struct ManualCandidateExample {
     path: PathBuf,
     id: String,
+    expected: serde_json::Value,
 }
 
 fn check_manual_candidate_examples() -> Result<(), String> {
@@ -492,7 +498,11 @@ fn manual_candidate_examples() -> Result<Vec<ManualCandidateExample>, String> {
                 "{path_display} id `{id}` is not safe for a candidate artifact filename"
             ));
         }
-        examples.push(ManualCandidateExample { path, id });
+        examples.push(ManualCandidateExample {
+            path,
+            id,
+            expected: value,
+        });
     }
     if examples.is_empty() {
         return Err(format!(
@@ -527,25 +537,132 @@ fn check_manual_candidate_smoke_matches_examples(
             examples.len()
         ));
     }
-    let actual_ids = json_array_at(&value, "/candidates", &path_display)?
-        .iter()
-        .map(|candidate| {
-            require_non_empty_json_str(candidate, "id", &path_display).map(str::to_string)
-        })
-        .collect::<Result<BTreeSet<_>, _>>()?;
+    let candidates = json_array_at(&value, "/candidates", &path_display)?;
+    let mut actual_ids = Vec::new();
+    let mut actual_by_id = BTreeMap::new();
+    for candidate in candidates {
+        let id = require_non_empty_json_str(candidate, "id", &path_display)?.to_string();
+        if actual_by_id.insert(id.clone(), candidate).is_some() {
+            return Err(format!("{} repeats candidate ID `{id}`", path.display()));
+        }
+        actual_ids.push(id);
+    }
     let expected_ids = examples
         .iter()
         .map(|example| example.id.clone())
-        .collect::<BTreeSet<_>>();
+        .collect::<Vec<_>>();
     if actual_ids != expected_ids {
         return Err(format!(
-            "{} candidate IDs {:?} do not match committed example IDs {:?}",
+            "{} candidate IDs {:?} do not match sorted committed example IDs {:?}",
             path.display(),
             actual_ids,
             expected_ids
         ));
     }
+    for example in examples {
+        let actual = actual_by_id.get(&example.id).ok_or_else(|| {
+            format!(
+                "{} is missing generated candidate ID `{}`",
+                path.display(),
+                example.id
+            )
+        })?;
+        check_manual_candidate_smoke_entry_matches_example(actual, example)?;
+    }
     Ok(())
+}
+
+fn check_manual_candidate_smoke_entry_matches_example(
+    actual: &serde_json::Value,
+    example: &ManualCandidateExample,
+) -> Result<(), String> {
+    let example_path = example.path.display().to_string();
+    let context = format!("manual-candidates.json candidate `{}`", example.id);
+    for field in [
+        "schema_version",
+        "id",
+        "source",
+        "manual_candidate",
+        "analyzer_discovered",
+        "title",
+        "location",
+        "operation_family",
+        "unsafe_operation",
+        "invariant",
+        "safe_caller",
+        "evidence",
+        "trust_boundary",
+    ] {
+        require_generated_example_field_match(
+            actual,
+            &example.expected,
+            field,
+            &context,
+            &example_path,
+        )?;
+    }
+    for field in ["fix_options", "test_targets", "do_not_touch"] {
+        require_generated_example_optional_array_match(
+            actual,
+            &example.expected,
+            field,
+            &context,
+            &example_path,
+        )?;
+    }
+    Ok(())
+}
+
+fn require_generated_example_field_match(
+    actual: &serde_json::Value,
+    expected: &serde_json::Value,
+    field: &str,
+    context: &str,
+    example_path: &str,
+) -> Result<(), String> {
+    if actual.get(field) == expected.get(field) {
+        return Ok(());
+    }
+    Err(format!(
+        "{context} field `{field}` must match committed example {example_path}; expected {}, got {}",
+        json_field_display(expected.get(field)),
+        json_field_display(actual.get(field))
+    ))
+}
+
+fn require_generated_example_optional_array_match(
+    actual: &serde_json::Value,
+    expected: &serde_json::Value,
+    field: &str,
+    context: &str,
+    example_path: &str,
+) -> Result<(), String> {
+    let actual = optional_json_array(actual, field);
+    let expected = optional_json_array(expected, field);
+    if actual == expected {
+        return Ok(());
+    }
+    Err(format!(
+        "{context} field `{field}` must match committed example {example_path}; expected {}, got {}",
+        json_field_display(expected),
+        json_field_display(actual)
+    ))
+}
+
+fn optional_json_array<'a>(
+    value: &'a serde_json::Value,
+    field: &str,
+) -> Option<&'a serde_json::Value> {
+    match value.get(field) {
+        Some(serde_json::Value::Array(items)) if items.is_empty() => None,
+        other => other,
+    }
+}
+
+fn json_field_display(value: Option<&serde_json::Value>) -> String {
+    value
+        .map(serde_json::Value::to_string)
+        .unwrap_or_else(|| "<missing>".to_string())
 }
 
 fn reset_target_dir(path: &Path) -> Result<(), String> {
@@ -3004,9 +3121,9 @@ mod dogfood_checks {
             ));
         }
         let command = required_target_string(target, "command", idx)?;
-        if !command.contains("unsafe-review") || !command.contains("--format json") {
+        if !command_matches_dogfood_target_kind(command, kind) {
             return Err(format!(
-                "{DOGFOOD_MANIFEST} targets[{idx}] command must run unsafe-review JSON output"
+                "{DOGFOOD_MANIFEST} targets[{idx}] command must run unsafe-review JSON output or the manual-candidate example smoke"
             ));
         }
         let artifact_status = required_target_string(target, "artifact_status", idx)?;
@@ -3026,6 +3143,17 @@ mod dogfood_checks {
             fixture_controls,
             fixture_control_id,
         })
+    }
+
+    fn command_matches_dogfood_target_kind(command: &str, kind: &str) -> bool {
+        let unsafe_review_json =
+            command.contains("unsafe-review") && command.contains("--format json");
+        if unsafe_review_json {
+            return true;
+        }
+        kind == "fixture-control"
+            && command.contains("xtask")
+            && command.contains("check-manual-candidate-examples")
     }
 
     fn validate_artifacts(
@@ -9389,6 +9517,26 @@ impl WitnessKind {
     #[test]
     fn dogfood_manifest_validates_current_corpus_contract() -> Result<(), String> {
         check_dogfood()
+    }
+
+    #[test]
+    fn manual_candidate_smoke_rejects_example_projection_drift() -> Result<(), String> {
+        let mut actual = manual_candidate_fixture();
+        let example = ManualCandidateExample {
+            path: PathBuf::from("docs/examples/manual-candidates/textdecoder-sab.json"),
+            id: "R4R2-S001".to_string(),
+            expected: actual.clone(),
+        };
+        actual["safe_caller"] = serde_json::json!("unrelated JS route");
+
+        let err = err_text(check_manual_candidate_smoke_entry_matches_example(
+            &actual, &example,
+        ))?;
+
+        assert!(err.contains("safe_caller"), "{err}");
+        assert!(err.contains("must match committed example"), "{err}");
+        assert!(err.contains("unrelated JS route"), "{err}");
+        Ok(())
     }
 
     #[test]

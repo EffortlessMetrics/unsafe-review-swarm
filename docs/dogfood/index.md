@@ -1,6 +1,6 @@
 # Dogfood outcome index
 
-Date: 2026-05-18
+Date: 2026-06-03
 Status: experimental selected-corpus evidence
 Source manifest: [`corpus.toml`](corpus.toml)
 Machine-readable index: [`index.json`](index.json)
@@ -26,10 +26,10 @@ local artifact is needed.
 | Measure | Count |
 |---|---:|
 | Repositories | 7 |
-| Total targets | 31 |
+| Total targets | 32 |
 | Capped repo snapshots | 7 |
 | PR diff targets | 23 |
-| Fixture control targets | 1 |
+| Fixture control targets | 2 |
 | Checked-in scan outputs | 0 |
 
 ## Repository Coverage
@@ -93,6 +93,11 @@ local artifact is needed.
 - `safe-code-no-cards-control` - fixture-level quiet/no-card control linked to
   [2026-05-26 no-card fixture smoke](reports/2026-05-26-no-card-control.md).
   It is not real-crate precision evidence.
+- `bun-manual-candidates-first-pr-smoke` - fixture-level manual-candidate
+  projection control linked to
+  [2026-06-03 Bun manual candidates first-pr smoke](reports/2026-06-03-bun-manual-candidates-first-pr-smoke.md).
+  It is not Bun runtime evidence, analyzer discovery evidence, or real-crate
+  precision evidence.
 
 ## Local Workflow
 
