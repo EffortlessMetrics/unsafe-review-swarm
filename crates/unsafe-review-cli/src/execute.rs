@@ -1392,28 +1392,7 @@ fn render_candidate_list_markdown(
                 candidate.evidence.len()
             ));
             out.push_str("#### Implementer Handoff\n\n");
-            out.push_str(&format!(
-                "- Inspect: `{}`\n",
-                manual_candidate_location_text(candidate)
-            ));
-            out.push_str(&format!(
-                "- Route: `{}` -> `{}`\n",
-                candidate.safe_caller, candidate.unsafe_operation
-            ));
-            out.push_str(&format!("- Invariant at risk: {}\n", candidate.invariant));
-            out.push_str("- Stop line: stop before source edits if the route no longer matches this manual candidate, or if the repair would broaden into unrelated unsafe sites.\n");
-            out.push_str(&format!(
-                "- Explain: `{}`\n",
-                candidate_explain_command(root, &candidate.id)
-            ));
-            out.push_str(&format!(
-                "- Context: `{}`\n",
-                candidate_context_command(root, &candidate.id)
-            ));
-            out.push_str(&format!(
-                "- Witness plan: `{}`\n\n",
-                candidate_witness_plan_command(root, &candidate.id)
-            ));
+            append_manual_candidate_list_handoff_markdown(&mut out, root, candidate);
         }
     }
     out.push_str("## ReviewCard Artifact Relationship\n\n");
@@ -1425,6 +1404,97 @@ fn render_candidate_list_markdown(
     out.push_str(manual_candidate_list_trust_boundary());
     out.push('\n');
     out
+}
+
+fn append_manual_candidate_list_handoff_markdown(
+    out: &mut String,
+    root: &Path,
+    candidate: &unsafe_review_core::ManualCandidate,
+) {
+    let handoff = manual_candidate_implementer_handoff(candidate);
+    out.push_str(&format!(
+        "- Inspect: `{}`\n",
+        manual_candidate_location_text(candidate)
+    ));
+    out.push_str(&format!(
+        "- Route: `{}` -> `{}`\n",
+        candidate.safe_caller, candidate.unsafe_operation
+    ));
+    out.push_str(&format!("- Invariant at risk: {}\n", candidate.invariant));
+    if let Some(evidence) = handoff
+        .get("external_evidence")
+        .and_then(serde_json::Value::as_array)
+    {
+        if evidence.is_empty() {
+            out.push_str("- Evidence packet: no external evidence refs yet.\n");
+        } else {
+            out.push_str(&format!(
+                "- Evidence packet: `{}` external reference(s)\n",
+                evidence.len()
+            ));
+            for item in evidence {
+                let kind = json_string_field(item, "kind").unwrap_or("other");
+                out.push_str(&format!("  - `{kind}`"));
+                if let Some(path) = json_string_field(item, "path") {
+                    out.push_str(&format!(" at `{path}`"));
+                }
+                if let Some(summary) = json_string_field(item, "summary") {
+                    out.push_str(&format!(": {summary}"));
+                }
+                out.push('\n');
+                if let Some(command) = json_string_field(item, "command") {
+                    out.push_str(&format!("    - Command: `{command}`\n"));
+                }
+                if let Some(limitation) = json_string_field(item, "limitation") {
+                    out.push_str(&format!("    - Limitation: {limitation}\n"));
+                }
+            }
+        }
+    }
+    append_json_string_list_markdown(&handoff, "suggested_next_steps", "Next steps", out);
+    append_json_string_list_markdown(&handoff, "non_goals", "Non-goals", out);
+    let stop_condition = json_string_field(&handoff, "stop_condition")
+        .unwrap_or("stop before source edits if the route no longer matches this manual candidate");
+    out.push_str(&format!("- Stop line: {stop_condition}.\n"));
+    out.push_str(&format!(
+        "- Explain: `{}`\n",
+        candidate_explain_command(root, &candidate.id)
+    ));
+    out.push_str(&format!(
+        "- Context: `{}`\n",
+        candidate_context_command(root, &candidate.id)
+    ));
+    out.push_str(&format!(
+        "- Witness plan: `{}`\n\n",
+        candidate_witness_plan_command(root, &candidate.id)
+    ));
+}
+
+fn append_json_string_list_markdown(
+    value: &serde_json::Value,
+    field: &str,
+    label: &str,
+    out: &mut String,
+) {
+    let Some(items) = value.get(field).and_then(serde_json::Value::as_array) else {
+        return;
+    };
+    if items.is_empty() {
+        return;
+    }
+    out.push_str(&format!("- {label}:\n"));
+    for item in items {
+        if let Some(text) = item.as_str().filter(|text| !text.trim().is_empty()) {
+            out.push_str(&format!("  - {text}\n"));
+        }
+    }
+}
+
+fn json_string_field<'a>(value: &'a serde_json::Value, field: &str) -> Option<&'a str> {
+    value
+        .get(field)
+        .and_then(serde_json::Value::as_str)
+        .filter(|text| !text.trim().is_empty())
 }
 
 fn manual_candidate_reviewcard_relationship() -> serde_json::Value {

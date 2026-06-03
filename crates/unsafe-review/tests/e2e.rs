@@ -925,6 +925,34 @@ fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dy
     assert!(markdown.contains("#### Implementer Handoff"));
     assert!(markdown.contains("Route: `new TextDecoder().decode"));
     assert!(markdown.contains("Invariant at risk: &[u8] memory must not be concurrently mutated"));
+    assert!(markdown.contains("Evidence packet: `2` external reference(s)"));
+    assert!(
+        markdown.contains(
+            "`runtime_witness` at `target/unsafe-scout/textdecoder-shared-race-route.out`"
+        )
+    );
+    assert!(
+        markdown.contains("Bun TextDecoder route reaches shared backing bytes through safe JS")
+    );
+    assert!(
+        markdown
+            .contains("Command: `bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts`")
+    );
+    assert!(markdown.contains(
+        "Limitation: runtime route evidence only; not memory-safety proof and not analyzer-discovered"
+    ));
+    assert!(
+        markdown.contains("`model` at `target/unsafe-scout/miri-textdecoder-shared-slice.out`")
+    );
+    assert!(markdown.contains("Next steps:"));
+    assert!(markdown.contains("confirm the file:line and safe caller route before editing"));
+    assert!(markdown.contains("Non-goals:"));
+    assert!(markdown.contains("do not treat this as analyzer-discovered"));
+    assert!(
+        markdown
+            .contains("do not claim proof, UB-free status, Miri-clean status, or site execution")
+    );
+    assert!(markdown.contains("do not broaden the task to unrelated unsafe sites"));
     assert!(markdown.contains("Stop line: stop before source edits"));
     assert!(markdown.contains("Context: `unsafe-review context --root"));
     assert!(markdown.contains("ReviewCard-only repair queue"));
