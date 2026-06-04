@@ -39,6 +39,13 @@ unsafe-review check --diff change.diff --format json
 git diff origin/main...HEAD | unsafe-review check --diff - --format json
 ```
 
+JSON summaries include `changed_files`, `changed_rust_files`, and
+`changed_non_rust_files`. In diff-backed runs these counters describe the input
+diff breadth, so mixed Rust/JavaScript/C++ PRs can show non-Rust scale without
+creating non-Rust ReviewCards or changing advisory policy.
+`pr-summary` and `github-summary` render the same diff scope as a reviewer-facing
+header bullet when a diff is supplied.
+
 Use `--root` when reviewing a fixture or another workspace:
 
 ```bash
@@ -100,6 +107,7 @@ target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
 target/unsafe-review/receipt-audit.md
 target/unsafe-review/manual-candidates.json
+target/unsafe-review/manual-repair-queue.json
 target/unsafe-review/lsp.json
 target/unsafe-review/repair-queue.json
 ```
@@ -122,10 +130,19 @@ saved witness receipt metadata still matches the current first-pr cards. The
 audit is metadata-only and does not run the witness.
 
 When imported manual candidates are present, the terminal handoff and
-`review-kit.json` also point to `manual-candidates.json` and copy-only
+`review-kit.json` also point to `manual-candidates.json`,
+`manual-repair-queue.json`, and copy-only
 `explain`, `context --json`, and `candidate witness-plan` commands for the
 first manual candidate. Those candidates remain manual/advisory targets, not
-analyzer ReviewCards, not policy inputs, and not witness execution.
+analyzer ReviewCards, not policy inputs, not repair-queue inputs, and not
+witness execution.
+The review-kit manifest summary mirrors the canonical card summary counts,
+including diff-scope file counts, so downstream reviewers and agents can see
+mixed-language PR breadth without treating non-Rust files as ReviewCards.
+Its handoff also includes a bounded ReviewCard queue preview that points to the
+first cards, their `explain`/`context --json` commands, and checked
+`repair-queue.json` bucket/readiness state; this is a discovery index, not a
+second analyzer truth or repair execution claim.
 
 ## Output Formats
 
@@ -148,7 +165,8 @@ findings independently.
 into copy-only guard, contract, test, witness, human-review, and
 do-not-auto-repair buckets, each pointing back to
 `unsafe-review context <card-id> --json`. It is not a standalone `--format`
-yet, and it does not run agents.
+yet, and it does not run agents. Its summary mirrors the canonical diff-scope
+file counts from `cards.json`; the bucket entries remain ReviewCard-only.
 
 Each repair-queue entry carries `agent_readiness` with a closed state:
 `ready_for_agent`, `requires_human_review`, `requires_witness_receipt`, or
@@ -261,6 +279,12 @@ analyzer-discovered finding.
 
 The example input above is a committed smoke fixture. In a real scout lane,
 replace it with the candidate JSON produced by the external investigation.
+The repository-level smoke imports every committed example into a disposable
+first-pr fixture and verifies the advisory bundle:
+
+```bash
+cargo run --locked -p xtask -- check-manual-candidate-examples
+```
 
 After import, `explain` and `context` can load the candidate by ID from
 `.unsafe-review/candidates/` when no analyzer ReviewCard with that ID exists:
@@ -284,7 +308,8 @@ Manual candidate projections preserve the manual marker and external evidence
 references, including optional exact evidence commands and limitations. The
 context JSON and witness plan also include a derived, copy-only implementer
 handoff with the file:line target, safe caller route, invariant at risk,
-external evidence references, non-goals, and stop line.
+external evidence references, optional fix options, test targets,
+do-not-touch guidance, non-goals, and stop line.
 Receipts may reference the same manual candidate ID and audit as a
 manual/advisory target:
 
@@ -310,8 +335,15 @@ saved LSP, repair-queue, and policy-report surfaces remain ReviewCard-only.
 The saved index keeps the same copy-only implementer handoff cues as
 `candidate list`.
 The first-pr terminal handoff and `review-kit.json` may include copy-only
-commands for manual candidate explain/context/witness-plan projection, while
-still labeling them manual/advisory and not analyzer-discovered.
+commands for manual candidate explain/context/witness-plan projection. The
+review-kit manifest also includes a bounded, sorted manual candidate queue with
+file:line and implementer handoff cues, while still labeling every entry
+manual/advisory and not analyzer-discovered.
+When imported candidates are present, `pr-summary.md` and `github-summary.md`
+also include a compact manual-candidate front-door cue with the count, first
+file:line handoff, route, invariant, evidence count, and copy-only commands.
+The full manual candidate payload remains in `manual-candidates.json` and
+`review-kit.json`.
 
 Manual candidate projections do not execute witnesses, post comments, edit
 source, enforce policy, prove UB, prove site execution, or prove repository
@@ -385,7 +417,11 @@ unsafe-review repo \
 ```
 
 `--list-files` prints the selected root-relative Rust files and exits without
-running analysis. `--max-files <n>` truncates the selected file list after
+running analysis. Add `--format json` or `--format markdown` when a handoff or
+automation needs the selected files, replayable scan scope, and explicit
+no-analysis/no-witness boundary as a saved artifact. ReviewCard-derived formats
+such as SARIF, comment-plan, LSP, and witness-plan are not valid for
+`--list-files`. `--max-files <n>` truncates the selected file list after
 sorting, so it bounds both `--list-files` output and repo analysis input.
 `--timeout-seconds <n>` bounds repo analysis wall time cooperatively; it does
 not interrupt a single file mid-scan, but it prevents a long scan from looking

@@ -38,6 +38,7 @@ pub(crate) const FIRST_PR_BUNDLE_ARTIFACT_PATHS: &[&str] = &[
     "target/unsafe-review/comment-plan.json",
     "target/unsafe-review/witness-plan.md",
     "target/unsafe-review/lsp.json",
+    "target/unsafe-review/manual-repair-queue.json",
     "target/unsafe-review/repair-queue.json",
 ];
 

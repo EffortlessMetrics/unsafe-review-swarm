@@ -30,6 +30,7 @@ Snapshot reports:
 - [2026-05-28 memchr target-feature posture](reports/2026-05-28-memchr-target-feature-posture.md)
 - [2026-05-28 arrayvec first-pr projection smoke](reports/2026-05-28-arrayvec-first-pr-projection-smoke.md)
 - [2026-05-29 arrayvec Self::new capacity control](reports/2026-05-29-arrayvec-self-new-capacity-control.md)
+- [2026-06-03 Bun manual candidates first-pr smoke](reports/2026-06-03-bun-manual-candidates-first-pr-smoke.md)
 
 Report requirements:
 

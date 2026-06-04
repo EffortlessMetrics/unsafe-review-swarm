@@ -11,6 +11,22 @@ impl DiffIndex {
         self.changed_lines.is_empty()
     }
 
+    pub(crate) fn changed_file_count(&self) -> usize {
+        self.changed_lines.len()
+    }
+
+    pub(crate) fn changed_rust_file_count(&self) -> usize {
+        self.changed_lines
+            .keys()
+            .filter(|path| is_rust_path(path))
+            .count()
+    }
+
+    pub(crate) fn changed_non_rust_file_count(&self) -> usize {
+        self.changed_file_count()
+            .saturating_sub(self.changed_rust_file_count())
+    }
+
     pub(crate) fn contains_file(&self, path: &PathBuf) -> bool {
         self.changed_lines.contains_key(path)
     }
@@ -94,6 +110,12 @@ impl DiffParserState {
     }
 }
 
+fn is_rust_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension == "rs")
+}
+
 pub(crate) fn parse_unified_diff(input: &str) -> DiffIndex {
     let mut parser = DiffParserState::default();
 
@@ -173,6 +195,37 @@ index 1111111..2222222 100644
         assert!(index.contains_file(&path));
         assert!(index.changed_lines[&path].is_empty());
         assert!(!index.contains_near(&path, 1));
+    }
+
+    #[test]
+    fn parse_unified_diff_counts_mixed_language_changed_files() {
+        let diff = r#"diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,1 @@
++pub fn added() {}
+diff --git a/src/js/buffer.ts b/src/js/buffer.ts
+--- a/src/js/buffer.ts
++++ b/src/js/buffer.ts
+@@ -1,0 +1,1 @@
++export const changed = true;
+diff --git a/src/binding.cpp b/src/binding.cpp
+--- a/src/binding.cpp
++++ b/src/binding.cpp
+@@ -1,0 +1,1 @@
++void changed() {}
+diff --git a/package.json b/package.json
+--- a/package.json
++++ b/package.json
+@@ -1,0 +1,1 @@
++{"type":"module"}
+"#;
+
+        let index = parse_unified_diff(diff);
+
+        assert_eq!(index.changed_file_count(), 4);
+        assert_eq!(index.changed_rust_file_count(), 1);
+        assert_eq!(index.changed_non_rust_file_count(), 3);
     }
 
     #[test]

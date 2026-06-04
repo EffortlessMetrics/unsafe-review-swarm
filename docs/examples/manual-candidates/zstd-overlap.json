@@ -1,0 +1,62 @@
+{
+  "schema_version": "manual-candidate/v1",
+  "id": "R4R2-S003",
+  "source": "manual",
+  "manual_candidate": true,
+  "analyzer_discovered": false,
+  "title": "Zstd overlap path passes aliased JS buffers into compression refs",
+  "location": {
+    "file": "src/runtime/node/node_zlib_binding.rs",
+    "line": 207
+  },
+  "operation_family": "ffi",
+  "unsafe_operation": "byte_slice / byte_slice_mut -> CompressionContext::set_buffers(Option<&[u8]>, Option<&mut [u8]>) -> NativeZstd FFI buffer handoff",
+  "invariant": "Compression input &[u8] and output &mut [u8] must not alias the same caller-controlled JS backing storage",
+  "safe_caller": "zlib Zstd _processChunk / _handle.writeSync with caller-controlled overlapping ArrayBuffer input and output",
+  "fix_options": [
+    "Replace reference-based buffer passing with raw spans before calling native compression contexts",
+    "Add an explicit overlap policy before mutating compression state; reject overlap or copy into stable disjoint storage",
+    "If overlap is rejected on async paths, unpin both buffers before returning"
+  ],
+  "test_targets": [
+    "bun target/unsafe-scout/zstd-overlap-witness.js",
+    "node target/unsafe-scout/zstd-overlap-node-control.js",
+    "cargo +nightly miri test zstd_overlap_reference_model"
+  ],
+  "do_not_touch": [
+    "Do not rewrite unrelated zlib, brotli, or zstd mode dispatch",
+    "Do not claim a public API regression beyond the underscored/backcompat route without a public-route witness",
+    "Do not remove the manual/advisory marker or treat this as analyzer-discovered"
+  ],
+  "evidence": [
+    {
+      "kind": "source_trace",
+      "path": "src/runtime/node/node_zlib_binding.rs",
+      "summary": "Manual route shows CompressionContext::set_buffers accepting input and output Rust references, with async and sync buffer construction sites feeding native Zstd contexts",
+      "command": "rg -n \"set_buffers|byte_slice_mut|byte_slice|write_sync|write\" src/runtime/node/node_zlib_binding.rs src/runtime/node/zlib/NativeZstd.rs src/js/node/zlib.ts src/zlib/lib.rs",
+      "limitation": "source trace only; does not prove the safe JS route reaches this site or that the caller supplied overlapping buffers"
+    },
+    {
+      "kind": "runtime_witness",
+      "path": "target/unsafe-scout/zstd-overlap-bun.out",
+      "summary": "Bun debug witness produced deterministic wrong output for exact and shifted overlapping Zstd buffers while separate buffers matched expected output",
+      "command": "bun target/unsafe-scout/zstd-overlap-witness.js",
+      "limitation": "runtime route evidence only; uses underscored/backcompat zlib internals and is not memory-safety proof"
+    },
+    {
+      "kind": "node_parity",
+      "path": "target/unsafe-scout/zstd-overlap-node.out",
+      "summary": "Node 24 control matched the same overlap-output behavior for the constructed _processChunk / writeSync route",
+      "command": "node target/unsafe-scout/zstd-overlap-node-control.js",
+      "limitation": "comparison witness only; does not make this a policy-ready compatibility claim"
+    },
+    {
+      "kind": "model",
+      "path": "target/unsafe-scout/miri-zstd-overlap-reference-model.out",
+      "summary": "Miri model isolates the reference-shaped aliasing pattern: the current &[u8] plus &mut [u8] shape trips Stacked Borrows, while the raw-span variant passes",
+      "command": "cargo +nightly miri test zstd_overlap_reference_model",
+      "limitation": "model evidence only; does not prove the Bun site executed under Miri or that native compression behavior is memory-safe"
+    }
+  ],
+  "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
+}

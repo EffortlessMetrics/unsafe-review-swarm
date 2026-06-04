@@ -376,7 +376,7 @@ pub(crate) fn render_github_summary(output: &AnalyzeOutput) -> String {
     render_github_summary_open_next(&mut out);
     out.push_str("---\n\n");
     out.push_str(
-        "Full advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, manual-candidates.json, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n",
+        "Full advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, policy-report.json, policy-report.md, manual-candidates.json, manual-repair-queue.json, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n",
     );
     out.push_str(
         "> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",
@@ -394,6 +394,9 @@ fn render_github_summary_open_next(out: &mut String) {
     out.push_str("- Machine-readable ReviewCards: `cards.json`\n");
     out.push_str("- Witness routes: `witness-plan.md`\n");
     out.push_str("- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n");
+    out.push_str(
+        "- Policy report: `policy-report.md`; ReviewCard-only; manual candidates are not policy inputs.\n",
+    );
     out.push_str("- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n");
     out.push_str("- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n");
     out.push_str(
@@ -409,6 +412,7 @@ fn render_pr_summary_header_bullets(out: &mut String, output: &AnalyzeOutput) {
             crate::api::Scope::Repo => "repo",
         }
     ));
+    render_diff_scope_bullet(out, output);
     out.push_str(&format!("- Review cards: {}\n", output.summary.cards));
     out.push_str(&format!(
         "- Open actionable gaps: {}\n",
@@ -417,21 +421,27 @@ fn render_pr_summary_header_bullets(out: &mut String, output: &AnalyzeOutput) {
     out.push_str(&format!("- Policy mode: `{}`\n\n", output.policy.as_str()));
 }
 
+fn render_diff_scope_bullet(out: &mut String, output: &AnalyzeOutput) {
+    if output.summary.changed_files == 0 {
+        return;
+    }
+
+    out.push_str(&format!(
+        "- Diff scope: {} {} changed ({} Rust, {} non-Rust)\n",
+        output.summary.changed_files,
+        file_word(output.summary.changed_files),
+        output.summary.changed_rust_files,
+        output.summary.changed_non_rust_files,
+    ));
+}
+
+fn file_word(count: usize) -> &'static str {
+    if count == 1 { "file" } else { "files" }
+}
+
 fn render_pr_summary_header(out: &mut String, output: &AnalyzeOutput) {
     out.push_str("# unsafe-review PR summary\n\n");
-    out.push_str(&format!(
-        "- Scope: `{}`\n",
-        match output.scope {
-            crate::api::Scope::Diff => "diff",
-            crate::api::Scope::Repo => "repo",
-        }
-    ));
-    out.push_str(&format!("- Review cards: {}\n", output.summary.cards));
-    out.push_str(&format!(
-        "- Open actionable gaps: {}\n",
-        output.summary.open_actionable_gaps
-    ));
-    out.push_str(&format!("- Policy mode: `{}`\n\n", output.policy.as_str()));
+    render_pr_summary_header_bullets(out, output);
 }
 
 fn render_pr_summary_reviewer_cockpit(out: &mut String, output: &AnalyzeOutput) {
@@ -857,6 +867,7 @@ mod tests {
 
         assert!(rendered.contains("# unsafe-review PR summary"));
         assert!(rendered.contains("## Reviewer cockpit"));
+        assert!(rendered.contains("- Diff scope: 1 file changed (1 Rust, 0 non-Rust)"));
         assert!(rendered.contains(&format!("- Top card: `{}`", card.id)));
         assert!(rendered.contains("## Card table"));
         assert!(rendered.contains("- Operation: `unsafe { ptr.cast::<Header>().read() }`"));
@@ -923,6 +934,7 @@ mod tests {
             .ok_or_else(|| "raw pointer fixture should emit a card".to_string())?;
 
         assert!(rendered.contains("## unsafe-review advisory summary"));
+        assert!(rendered.contains("- Diff scope: 1 file changed (1 Rust, 0 non-Rust)"));
         assert!(rendered.contains("## Top card"));
         assert!(rendered.contains(&format!("- ID: `{}`", card.id)));
         assert!(rendered.contains("- Proof path: `source_route_only`"));

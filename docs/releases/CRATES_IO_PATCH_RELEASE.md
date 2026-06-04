@@ -95,8 +95,11 @@ target/install-published-0.3.2/bin/unsafe-review doctor
 target/install-published-0.3.2/bin/unsafe-review repo --help
 target/install-published-0.3.2/bin/unsafe-review repo --root fixtures --include '**/*.rs' --list-files
 target/install-published-0.3.2/bin/unsafe-review repo --root fixtures/raw_pointer_alignment --format markdown --out target/unsafe-review-published-0.3.2-repo.md --timeout-seconds 300
-target/install-published-0.3.2/bin/unsafe-review candidate import docs/examples/manual-candidates/textdecoder-sab.json --out target/unsafe-review-published-0.3.2-candidates/R4R2-S001.json
-target/install-published-0.3.2/bin/unsafe-review first-pr --root fixtures/raw_pointer_alignment --diff fixtures/raw_pointer_alignment/change.diff --out-dir target/unsafe-review-published-0.3.2-smoke
+rm -rf target/unsafe-review-published-0.3.2-fixture target/unsafe-review-published-0.3.2-smoke
+cp -R fixtures/raw_pointer_alignment target/unsafe-review-published-0.3.2-fixture
+mkdir -p target/unsafe-review-published-0.3.2-fixture/.unsafe-review/candidates
+target/install-published-0.3.2/bin/unsafe-review candidate import docs/examples/manual-candidates/textdecoder-sab.json --out target/unsafe-review-published-0.3.2-fixture/.unsafe-review/candidates/R4R2-S001.json
+target/install-published-0.3.2/bin/unsafe-review first-pr --root target/unsafe-review-published-0.3.2-fixture --diff target/unsafe-review-published-0.3.2-fixture/change.diff --out-dir target/unsafe-review-published-0.3.2-smoke
 rtk cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review-published-0.3.2-smoke
 target/install-published-0.3.2/bin/unsafe-review explain <card-id>
 target/install-published-0.3.2/bin/unsafe-review context <card-id> --json

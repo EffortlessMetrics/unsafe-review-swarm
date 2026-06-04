@@ -1,5 +1,5 @@
 use crate::api::AnalyzeOutput;
-use crate::candidate::{ManualCandidate, load_manual_candidates};
+use crate::candidate::{ManualCandidate, ManualCandidateProofMode, load_manual_candidates};
 use crate::domain::{
     CardId, ReachEvidence, ReceiptCardIdKind, ReviewCard, WitnessEvidence, WitnessReceipt,
     WitnessRoute,
@@ -280,11 +280,32 @@ pub struct ReceiptAuditManualCandidate {
     pub location: String,
     pub operation: String,
     pub operation_family: String,
+    pub safe_caller: String,
+    pub invariant: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub proof_mode: Option<ManualCandidateProofMode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fix_boundary: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pr_aperture: Option<String>,
+    pub evidence: Vec<ReceiptAuditManualCandidateEvidence>,
+    pub fix_options: Vec<String>,
+    pub test_targets: Vec<String>,
+    pub do_not_touch: Vec<String>,
     pub next_action: String,
     pub trust_boundary: String,
     pub source: String,
     pub manual_candidate: bool,
     pub analyzer_discovered: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct ReceiptAuditManualCandidateEvidence {
+    pub kind: String,
+    pub path: Option<String>,
+    pub summary: Option<String>,
+    pub command: Option<String>,
+    pub limitation: Option<String>,
 }
 
 pub(crate) fn audit_receipts(output: &AnalyzeOutput) -> Result<ReceiptAuditReport, String> {
@@ -708,6 +729,28 @@ fn receipt_audit_manual_candidate_from_manual_candidate(
         ),
         operation: candidate.unsafe_operation.clone(),
         operation_family: candidate.operation_family.clone(),
+        safe_caller: candidate.safe_caller.clone(),
+        invariant: candidate.invariant.clone(),
+        proof_mode: candidate.proof_mode.clone(),
+        fix_boundary: candidate.fix_boundary.clone(),
+        pr_aperture: candidate.pr_aperture.clone(),
+        evidence: candidate
+            .evidence
+            .iter()
+            .map(|evidence| ReceiptAuditManualCandidateEvidence {
+                kind: evidence.kind.clone(),
+                path: evidence
+                    .path
+                    .as_ref()
+                    .map(|path| path.display().to_string()),
+                summary: evidence.summary.clone(),
+                command: evidence.command.clone(),
+                limitation: evidence.limitation.clone(),
+            })
+            .collect(),
+        fix_options: candidate.fix_options.clone(),
+        test_targets: candidate.test_targets.clone(),
+        do_not_touch: candidate.do_not_touch.clone(),
         next_action:
             "Review the manual candidate and preserve receipts as external evidence for this manual ID"
                 .to_string(),
@@ -1594,6 +1637,55 @@ mod tests {
         assert_eq!(matched.location, "src/runtime/webcore/TextDecoder.rs:237");
         assert_eq!(matched.operation_family, "raw_pointer_read");
         assert_eq!(matched.operation, "core::slice::from_raw_parts");
+        assert_eq!(
+            matched.safe_caller,
+            "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))"
+        );
+        assert_eq!(
+            matched.invariant,
+            "&[u8] memory must not be concurrently mutated"
+        );
+        assert_eq!(
+            matched.proof_mode.as_ref().map(|mode| mode.kind.as_str()),
+            Some("mutation-plus-miri")
+        );
+        assert_eq!(
+            matched.fix_boundary.as_deref(),
+            Some("Snapshot shared/growable/resizable bytes before Rust receives &[u8]")
+        );
+        assert!(
+            matched
+                .pr_aperture
+                .as_deref()
+                .unwrap_or("")
+                .contains("do not patch S3")
+        );
+        assert_eq!(matched.evidence.len(), 1);
+        assert_eq!(
+            matched.evidence[0].command.as_deref(),
+            Some("bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts")
+        );
+        assert!(
+            matched.evidence[0]
+                .limitation
+                .as_deref()
+                .unwrap_or("")
+                .contains("not memory-safety proof")
+        );
+        assert!(
+            matched.fix_options[0].contains("Copy SharedArrayBuffer-backed bytes"),
+            "{:?}",
+            matched.fix_options
+        );
+        assert_eq!(
+            matched.test_targets[0],
+            "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+        );
+        assert!(
+            matched.do_not_touch[0].contains("unrelated TextDecoder"),
+            "{:?}",
+            matched.do_not_touch
+        );
         assert!(
             matched
                 .next_action
@@ -1800,11 +1892,30 @@ mod tests {
   "unsafe_operation": "core::slice::from_raw_parts",
   "invariant": "&[u8] memory must not be concurrently mutated",
   "safe_caller": "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))",
+  "proof_mode": {
+    "kind": "mutation-plus-miri",
+    "system_bun_expected": "nondiscriminating",
+    "mutation_required": true,
+    "miri_required": true
+  },
+  "fix_boundary": "Snapshot shared/growable/resizable bytes before Rust receives &[u8]",
+  "pr_aperture": "TextDecoder shared-byte snapshot only; do not patch S3, fs, writev, or unrelated encodings",
   "evidence": [
     {
       "kind": "runtime_witness",
-      "path": "target/unsafe-scout/textdecoder-shared-race-route.out"
+      "path": "target/unsafe-scout/textdecoder-shared-race-route.out",
+      "command": "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts",
+      "limitation": "runtime route evidence only; not memory-safety proof and not analyzer-discovered"
     }
+  ],
+  "fix_options": [
+    "Copy SharedArrayBuffer-backed bytes into stable owned storage before creating a Rust slice"
+  ],
+  "test_targets": [
+    "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+  ],
+  "do_not_touch": [
+    "Do not rewrite unrelated TextDecoder encoding paths"
   ],
   "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
 }"#

@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 use std::collections::{BTreeMap, BTreeSet};
+use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -118,6 +119,10 @@ const FIXTURE_EXPECTED_CARDS_EXCEPTIONS: &[&str] = &[
 
 const FIXTURE_PACKAGE_PREFIX_EXCEPTIONS: &[(&str, &str)] =
     &[("raw_pointer_alignment_line_drift", "raw-pointer-alignment")];
+const MANUAL_CANDIDATE_EXAMPLE_DIR: &str = "docs/examples/manual-candidates";
+const MANUAL_CANDIDATE_SMOKE_FIXTURE_DIR: &str =
+    "target/unsafe-review-manual-candidate-smoke-fixture";
+const MANUAL_CANDIDATE_SMOKE_OUT_DIR: &str = "target/unsafe-review-manual-candidate-smoke";
 
 const DOGFOOD_MANIFEST: &str = "docs/dogfood/corpus.toml";
 const DOGFOOD_INDEX: &str = "docs/dogfood/index.json";
@@ -126,6 +131,16 @@ const DOGFOOD_FOLLOW_UP_SEEDS: &str = "docs/dogfood/follow-up-seeds.md";
 const DOGFOOD_JUDGMENT_DIR: &str = "docs/dogfood/judgments";
 const DOGFOOD_JUDGMENTS_README: &str = "docs/dogfood/judgments/README.md";
 const DOGFOOD_REPORT_DIR: &str = "docs/dogfood/reports";
+const BUN_MANUAL_CANDIDATE_SMOKE_ID: &str = "bun-manual-candidates-first-pr-smoke";
+const BUN_MANUAL_CANDIDATE_SMOKE_ARTIFACTS: &[&str] = &[
+    "target/unsafe-review-manual-candidate-smoke/manual-candidates.json",
+    "target/unsafe-review-manual-candidate-smoke/manual-repair-queue.json",
+    "target/unsafe-review-manual-candidate-smoke/review-kit.json",
+    "target/unsafe-review-manual-candidate-smoke/pr-summary.md",
+    "target/unsafe-review-manual-candidate-smoke/github-summary.md",
+    "target/unsafe-review-manual-candidate-smoke/witness-plan.md",
+    "target/unsafe-review-manual-candidate-smoke/repair-queue.json",
+];
 const ACCURACY_CALIBRATION_POLICY: &str = "policy/accuracy-calibration.toml";
 const ACCURACY_CALIBRATION_REPORT: &str = "docs/accuracy/CALIBRATION_REPORT.md";
 const OBJECTIVE_AUDIT: &str = "docs/status/OBJECTIVE_AUDIT.md";
@@ -181,13 +196,18 @@ const DOGFOOD_TRIAGE_HEADER: &[&str] = &[
     "Follow-up",
 ];
 const DOGFOOD_FOLLOW_UP_STATUSES: &[&str] = &["open", "done", "parked", "superseded"];
-const DOGFOOD_FOLLOW_UP_SURFACES: &[&str] =
-    &["comment_plan", "first_pr_projection", "repo_posture"];
+const DOGFOOD_FOLLOW_UP_SURFACES: &[&str] = &[
+    "comment_plan",
+    "first_pr_projection",
+    "manual_candidate_projection",
+    "repo_posture",
+];
 const DOGFOOD_JUDGMENT_SURFACES: &[&str] = &[
     "comment_plan",
     "context_packet",
     "first_pr_projection",
     "github_summary",
+    "manual_candidate_projection",
     "pr_summary",
     "receipt_audit",
     "repair_queue",
@@ -245,7 +265,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
     match commands::XtaskCommand::parse(&args)? {
         commands::XtaskCommand::Help => {
             println!(
-                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-first-hour, source-divergence, check-source-sync"
+                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, source-divergence, check-source-sync"
             );
             Ok(())
         }
@@ -278,6 +298,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckFuzz => check_manual_fuzz_harness(),
         commands::XtaskCommand::CheckAdvisoryArtifacts(dir) => check_advisory_artifacts(&dir),
         commands::XtaskCommand::CheckFirstPrArtifacts(dir) => check_first_pr_artifacts(&dir),
+        commands::XtaskCommand::CheckManualCandidateExamples => check_manual_candidate_examples(),
         commands::XtaskCommand::CheckFirstHour => check_first_hour(),
         commands::XtaskCommand::SourceDivergence => source_sync::report_source_divergence(),
     }
@@ -404,6 +425,368 @@ fn check_ci_routing_contract() -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+struct ManualCandidateExample {
+    path: PathBuf,
+    id: String,
+    expected: serde_json::Value,
+}
+
+fn check_manual_candidate_examples() -> Result<(), String> {
+    let examples = manual_candidate_examples()?;
+    let fixture_dir = Path::new(MANUAL_CANDIDATE_SMOKE_FIXTURE_DIR);
+    let out_dir = Path::new(MANUAL_CANDIDATE_SMOKE_OUT_DIR);
+
+    reset_target_dir(fixture_dir)?;
+    reset_target_dir(out_dir)?;
+    copy_dir_all(Path::new("fixtures/raw_pointer_alignment"), fixture_dir)?;
+
+    let candidate_dir = fixture_dir.join(".unsafe-review").join("candidates");
+    fs::create_dir_all(&candidate_dir)
+        .map_err(|err| format!("create {} failed: {err}", candidate_dir.display()))?;
+    for example in &examples {
+        let out = candidate_dir.join(format!("{}.json", example.id));
+        run_unsafe_review([
+            os("candidate"),
+            os("import"),
+            example.path.as_os_str().to_os_string(),
+            os("--out"),
+            out.as_os_str().to_os_string(),
+        ])?;
+    }
+
+    run_unsafe_review([
+        os("first-pr"),
+        os("--root"),
+        fixture_dir.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture_dir.join("change.diff").as_os_str().to_os_string(),
+        os("--out-dir"),
+        out_dir.as_os_str().to_os_string(),
+    ])?;
+
+    check_first_pr_artifacts(out_dir)?;
+    check_manual_candidate_smoke_matches_examples(out_dir, &examples)?;
+    println!(
+        "check-manual-candidate-examples: ok ({} candidates -> {})",
+        examples.len(),
+        out_dir.display()
+    );
+    Ok(())
+}
+
+fn manual_candidate_examples() -> Result<Vec<ManualCandidateExample>, String> {
+    let dir = Path::new(MANUAL_CANDIDATE_EXAMPLE_DIR);
+    let mut examples = Vec::new();
+    let entries =
+        fs::read_dir(dir).map_err(|err| format!("read {} failed: {err}", dir.display()))?;
+    for entry in entries {
+        let entry = entry.map_err(|err| format!("read_dir entry failed: {err}"))?;
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json") {
+            continue;
+        }
+        let path_display = path.display().to_string();
+        let value = parse_json_file(&path)?;
+        require_json_str(
+            &value,
+            "schema_version",
+            "manual-candidate/v1",
+            &path_display,
+        )?;
+        require_json_str(&value, "source", "manual", &path_display)?;
+        if value.get("manual_candidate") != Some(&serde_json::Value::Bool(true)) {
+            return Err(format!("{path_display} manual_candidate must be true"));
+        }
+        if value.get("analyzer_discovered") != Some(&serde_json::Value::Bool(false)) {
+            return Err(format!("{path_display} analyzer_discovered must be false"));
+        }
+        let id = require_non_empty_json_str(&value, "id", &path_display)?.to_string();
+        if !is_path_safe_manual_candidate_id(&id) {
+            return Err(format!(
+                "{path_display} id `{id}` is not safe for a candidate artifact filename"
+            ));
+        }
+        examples.push(ManualCandidateExample {
+            path,
+            id,
+            expected: value,
+        });
+    }
+    if examples.is_empty() {
+        return Err(format!(
+            "{MANUAL_CANDIDATE_EXAMPLE_DIR} has no JSON examples"
+        ));
+    }
+    examples.sort_by(|left, right| left.id.cmp(&right.id).then(left.path.cmp(&right.path)));
+    let mut ids = BTreeSet::new();
+    for example in &examples {
+        if !ids.insert(example.id.clone()) {
+            return Err(format!(
+                "{MANUAL_CANDIDATE_EXAMPLE_DIR} contains duplicate manual candidate id `{}`",
+                example.id
+            ));
+        }
+    }
+    Ok(examples)
+}
+
+fn check_manual_candidate_smoke_matches_examples(
+    out_dir: &Path,
+    examples: &[ManualCandidateExample],
+) -> Result<(), String> {
+    let path = out_dir.join("manual-candidates.json");
+    let value = parse_json_file(&path)?;
+    let path_display = path.display().to_string();
+    let actual_count = json_usize_at(&value, "/summary/manual_candidates", &path_display)?;
+    if actual_count != examples.len() {
+        return Err(format!(
+            "{} summary.manual_candidates is {actual_count}, expected {} committed examples",
+            path.display(),
+            examples.len()
+        ));
+    }
+    let candidates = json_array_at(&value, "/candidates", &path_display)?;
+    let mut actual_ids = Vec::new();
+    let mut actual_by_id = BTreeMap::new();
+    for candidate in candidates {
+        let id = require_non_empty_json_str(candidate, "id", &path_display)?.to_string();
+        if actual_by_id.insert(id.clone(), candidate).is_some() {
+            return Err(format!("{} repeats candidate ID `{id}`", path.display()));
+        }
+        actual_ids.push(id);
+    }
+    let expected_ids = examples
+        .iter()
+        .map(|example| example.id.clone())
+        .collect::<Vec<_>>();
+    if actual_ids != expected_ids {
+        return Err(format!(
+            "{} candidate IDs {:?} do not match sorted committed example IDs {:?}",
+            path.display(),
+            actual_ids,
+            expected_ids
+        ));
+    }
+    for example in examples {
+        let actual = actual_by_id.get(&example.id).ok_or_else(|| {
+            format!(
+                "{} is missing generated candidate ID `{}`",
+                path.display(),
+                example.id
+            )
+        })?;
+        check_manual_candidate_smoke_entry_matches_example(actual, example)?;
+    }
+    Ok(())
+}
+
+fn check_manual_candidate_smoke_entry_matches_example(
+    actual: &serde_json::Value,
+    example: &ManualCandidateExample,
+) -> Result<(), String> {
+    let example_path = example.path.display().to_string();
+    let context = format!("manual-candidates.json candidate `{}`", example.id);
+    for field in [
+        "schema_version",
+        "id",
+        "source",
+        "manual_candidate",
+        "analyzer_discovered",
+        "title",
+        "location",
+        "operation_family",
+        "unsafe_operation",
+        "invariant",
+        "safe_caller",
+        "evidence",
+        "trust_boundary",
+    ] {
+        require_generated_example_field_match(
+            actual,
+            &example.expected,
+            field,
+            &context,
+            &example_path,
+        )?;
+    }
+    for field in ["fix_options", "test_targets", "do_not_touch"] {
+        require_generated_example_optional_array_match(
+            actual,
+            &example.expected,
+            field,
+            &context,
+            &example_path,
+        )?;
+    }
+    for field in ["proof_mode", "fix_boundary", "pr_aperture"] {
+        require_generated_example_optional_field_match(
+            actual,
+            &example.expected,
+            field,
+            &context,
+            &example_path,
+        )?;
+    }
+    Ok(())
+}
+
+fn require_generated_example_field_match(
+    actual: &serde_json::Value,
+    expected: &serde_json::Value,
+    field: &str,
+    context: &str,
+    example_path: &str,
+) -> Result<(), String> {
+    if actual.get(field) == expected.get(field) {
+        return Ok(());
+    }
+    Err(format!(
+        "{context} field `{field}` must match committed example {example_path}; expected {}, got {}",
+        json_field_display(expected.get(field)),
+        json_field_display(actual.get(field))
+    ))
+}
+
+fn require_generated_example_optional_array_match(
+    actual: &serde_json::Value,
+    expected: &serde_json::Value,
+    field: &str,
+    context: &str,
+    example_path: &str,
+) -> Result<(), String> {
+    let actual = optional_json_array(actual, field);
+    let expected = optional_json_array(expected, field);
+    if actual == expected {
+        return Ok(());
+    }
+    Err(format!(
+        "{context} field `{field}` must match committed example {example_path}; expected {}, got {}",
+        json_field_display(expected),
+        json_field_display(actual)
+    ))
+}
+
+fn require_generated_example_optional_field_match(
+    actual: &serde_json::Value,
+    expected: &serde_json::Value,
+    field: &str,
+    context: &str,
+    example_path: &str,
+) -> Result<(), String> {
+    let actual = actual.get(field);
+    let expected = expected.get(field);
+    if actual == expected {
+        return Ok(());
+    }
+    Err(format!(
+        "{context} field `{field}` must match committed example {example_path}; expected {}, got {}",
+        json_field_display(expected),
+        json_field_display(actual)
+    ))
+}
+
+fn optional_json_array<'a>(
+    value: &'a serde_json::Value,
+    field: &str,
+) -> Option<&'a serde_json::Value> {
+    match value.get(field) {
+        Some(serde_json::Value::Array(items)) if items.is_empty() => None,
+        other => other,
+    }
+}
+
+fn json_field_display(value: Option<&serde_json::Value>) -> String {
+    value
+        .map(serde_json::Value::to_string)
+        .unwrap_or_else(|| "<missing>".to_string())
+}
+
+fn reset_target_dir(path: &Path) -> Result<(), String> {
+    require_target_subpath(path)?;
+    if path.exists() {
+        fs::remove_dir_all(path)
+            .map_err(|err| format!("remove {} failed: {err}", path.display()))?;
+    }
+    Ok(())
+}
+
+fn require_target_subpath(path: &Path) -> Result<(), String> {
+    if path.is_absolute()
+        || !matches!(
+            path.components().next(),
+            Some(std::path::Component::Normal(component)) if component == "target"
+        )
+        || path
+            .components()
+            .any(|component| matches!(component, std::path::Component::ParentDir))
+    {
+        return Err(format!(
+            "{} must be a relative generated path under target/",
+            path.display()
+        ));
+    }
+    Ok(())
+}
+
+fn copy_dir_all(source: &Path, target: &Path) -> Result<(), String> {
+    fs::create_dir_all(target)
+        .map_err(|err| format!("create {} failed: {err}", target.display()))?;
+    for entry in
+        fs::read_dir(source).map_err(|err| format!("read {} failed: {err}", source.display()))?
+    {
+        let entry = entry.map_err(|err| format!("read_dir entry failed: {err}"))?;
+        let source_path = entry.path();
+        let target_path = target.join(entry.file_name());
+        if source_path.is_dir() {
+            copy_dir_all(&source_path, &target_path)?;
+        } else {
+            fs::copy(&source_path, &target_path).map_err(|err| {
+                format!(
+                    "copy {} to {} failed: {err}",
+                    source_path.display(),
+                    target_path.display()
+                )
+            })?;
+        }
+    }
+    Ok(())
+}
+
+fn run_unsafe_review(args: impl IntoIterator<Item = OsString>) -> Result<(), String> {
+    let args = args.into_iter().collect::<Vec<_>>();
+    let display_args = args
+        .iter()
+        .map(|arg| arg.to_string_lossy())
+        .collect::<Vec<_>>()
+        .join(" ");
+    let output = Command::new("cargo")
+        .args(["run", "--locked", "-p", "unsafe-review", "--"])
+        .args(&args)
+        .output()
+        .map_err(|err| format!("failed to run unsafe-review {display_args}: {err}"))?;
+    if output.status.success() {
+        return Ok(());
+    }
+    Err(format!(
+        "unsafe-review {display_args} failed with status {}\nstdout:\n{}\nstderr:\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout).trim(),
+        String::from_utf8_lossy(&output.stderr).trim()
+    ))
+}
+
+fn os(value: &str) -> OsString {
+    OsString::from(value)
+}
+
+fn is_path_safe_manual_candidate_id(id: &str) -> bool {
+    !id.is_empty()
+        && id
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' || ch == '.')
+        && !id.contains("..")
 }
 
 fn check_doc_artifacts() -> Result<(), String> {
@@ -2776,9 +3159,9 @@ mod dogfood_checks {
             ));
         }
         let command = required_target_string(target, "command", idx)?;
-        if !command.contains("unsafe-review") || !command.contains("--format json") {
+        if !command_matches_dogfood_target_kind(command, kind) {
             return Err(format!(
-                "{DOGFOOD_MANIFEST} targets[{idx}] command must run unsafe-review JSON output"
+                "{DOGFOOD_MANIFEST} targets[{idx}] command must run unsafe-review JSON output or the manual-candidate example smoke"
             ));
         }
         let artifact_status = required_target_string(target, "artifact_status", idx)?;
@@ -2787,7 +3170,7 @@ mod dogfood_checks {
                 "{DOGFOOD_MANIFEST} targets[{idx}] uses unknown artifact_status `{artifact_status}`"
             ));
         }
-        validate_artifacts(target, idx, artifact_status)?;
+        validate_artifacts(target, idx, id, artifact_status)?;
         let (repo_snapshots, pr_diffs, fixture_controls) = validate_kind_fields(target, idx, kind)?;
         let fixture_control_id = (fixture_controls > 0).then(|| id.to_string());
         Ok(TargetStats {
@@ -2800,9 +3183,21 @@ mod dogfood_checks {
         })
     }
 
+    fn command_matches_dogfood_target_kind(command: &str, kind: &str) -> bool {
+        let unsafe_review_json =
+            command.contains("unsafe-review") && command.contains("--format json");
+        if unsafe_review_json {
+            return true;
+        }
+        kind == "fixture-control"
+            && command.contains("xtask")
+            && command.contains("check-manual-candidate-examples")
+    }
+
     fn validate_artifacts(
         target: &toml::Table,
         idx: usize,
+        id: &str,
         artifact_status: &str,
     ) -> Result<(), String> {
         let artifacts = target
@@ -2827,6 +3222,18 @@ mod dogfood_checks {
                 return Err(format!(
                     "{DOGFOOD_MANIFEST} targets[{idx}] checked-in artifact missing: {artifact}"
                 ));
+            }
+        }
+        if id == BUN_MANUAL_CANDIDATE_SMOKE_ID {
+            for required in BUN_MANUAL_CANDIDATE_SMOKE_ARTIFACTS {
+                if !artifacts
+                    .iter()
+                    .any(|artifact| artifact.as_str() == Some(*required))
+                {
+                    return Err(format!(
+                        "{DOGFOOD_MANIFEST} target `{id}` must list Bun manual-candidate smoke artifact `{required}`"
+                    ));
+                }
             }
         }
         Ok(())
@@ -9210,6 +9617,59 @@ impl WitnessKind {
     }
 
     #[test]
+    fn dogfood_manifest_requires_bun_manual_smoke_repair_sidecar() -> Result<(), String> {
+        let target = toml::from_str::<toml::Value>(
+            r#"
+id = "bun-manual-candidates-first-pr-smoke"
+crate = "bun-manual-candidates"
+kind = "fixture-control"
+status = "active"
+fixture = "fixtures/raw_pointer_alignment"
+root = "fixtures/raw_pointer_alignment"
+diff = "fixtures/raw_pointer_alignment/change.diff"
+purpose = "fixture-level first-pr smoke for committed Bun manual-candidate projection through manual-candidates.json and review-kit handoff surfaces"
+command = "rtk cargo run --locked -p xtask -- check-manual-candidate-examples"
+artifact_status = "local_untracked"
+artifacts = [
+  "target/unsafe-review-manual-candidate-smoke/manual-candidates.json",
+  "target/unsafe-review-manual-candidate-smoke/review-kit.json",
+  "target/unsafe-review-manual-candidate-smoke/pr-summary.md",
+  "target/unsafe-review-manual-candidate-smoke/github-summary.md",
+  "target/unsafe-review-manual-candidate-smoke/witness-plan.md",
+  "target/unsafe-review-manual-candidate-smoke/repair-queue.json",
+]
+"#,
+        )
+        .map_err(|err| err.to_string())?;
+        let mut ids = BTreeSet::new();
+        let err = err_text(dogfood_checks::validate_target(&target, 0, &mut ids))?;
+
+        assert!(err.contains("manual-repair-queue.json"), "{err}");
+        assert!(err.contains("Bun manual-candidate smoke artifact"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn manual_candidate_smoke_rejects_example_projection_drift() -> Result<(), String> {
+        let mut actual = manual_candidate_fixture();
+        let example = ManualCandidateExample {
+            path: PathBuf::from("docs/examples/manual-candidates/textdecoder-sab.json"),
+            id: "R4R2-S001".to_string(),
+            expected: actual.clone(),
+        };
+        actual["safe_caller"] = serde_json::json!("unrelated JS route");
+
+        let err = err_text(check_manual_candidate_smoke_entry_matches_example(
+            &actual, &example,
+        ))?;
+
+        assert!(err.contains("safe_caller"), "{err}");
+        assert!(err.contains("must match committed example"), "{err}");
+        assert!(err.contains("unrelated JS route"), "{err}");
+        Ok(())
+    }
+
+    #[test]
     fn manual_fuzz_harness_validates_current_shape() -> Result<(), String> {
         check_manual_fuzz_harness()
     }
@@ -10856,6 +11316,178 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_review_card_queue_id_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-review-card-queue-id-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit = parse_json_file(&path)?;
+        let entry = &mut review_kit["handoff"]["review_cards"]["card_queue"][0];
+        entry["card_id"] = serde_json::json!("missing-card");
+        entry["explain"] = serde_json::json!("unsafe-review explain missing-card");
+        entry["context_json"] = serde_json::json!("unsafe-review context missing-card --json");
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err("ReviewCard queue id drift should fail verification".to_string());
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains(
+                "review-kit.json handoff review_cards card_queue[0] card_id `missing-card` must match cards.json card `card-1`"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_review_card_queue_projection_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir(
+            "unsafe-review-first-pr-review-kit-review-card-queue-projection-drift",
+        )?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit = parse_json_file(&path)?;
+        review_kit["handoff"]["review_cards"]["card_queue"][0]["operation_family"] =
+            serde_json::json!("slice_from_raw_parts");
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "ReviewCard queue cards.json projection drift should fail verification"
+                        .to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("review-kit.json handoff review_cards card_queue[0] operation_family"),
+            "{err}"
+        );
+        assert!(err.contains("raw_pointer_read"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_review_card_queue_verify_command_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir(
+            "unsafe-review-first-pr-review-kit-review-card-queue-verify-command-drift",
+        )?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit = parse_json_file(&path)?;
+        review_kit["handoff"]["review_cards"]["card_queue"][0]["verify_commands"][0] =
+            serde_json::json!("cargo test unrelated");
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "ReviewCard queue verify command drift should fail verification".to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("review-kit.json handoff review_cards card_queue[0] verify_commands"),
+            "{err}"
+        );
+        assert!(err.contains("cargo +nightly miri test card"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_review_card_queue_witness_route_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir(
+            "unsafe-review-first-pr-review-kit-review-card-queue-witness-route-drift",
+        )?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit = parse_json_file(&path)?;
+        review_kit["handoff"]["review_cards"]["card_queue"][0]["witness_routes"][0]["kind"] =
+            serde_json::json!("asan");
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "ReviewCard queue witness route drift should fail verification".to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains(
+                "review-kit.json handoff review_cards card_queue[0] witness_routes[0] kind"
+            ),
+            "{err}"
+        );
+        assert!(err.contains("miri"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_review_card_queue_repair_drift()
+    -> Result<(), String> {
+        let dir =
+            unique_temp_dir("unsafe-review-first-pr-review-kit-review-card-queue-repair-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit = parse_json_file(&path)?;
+        review_kit["handoff"]["review_cards"]["card_queue"][0]["repair_queue_buckets"] =
+            serde_json::json!(["repairable_by_safety_docs"]);
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "ReviewCard queue repair-queue projection drift should fail verification"
+                        .to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("review-kit.json handoff review_cards card_queue[0] repair_queue_buckets"),
+            "{err}"
+        );
+        assert!(err.contains("requires_witness_receipt"), "{err}");
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_review_kit_receipt_handoff_drift() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-receipt-handoff-drift")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -10887,6 +11519,70 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_changed_file_count_drift() -> Result<(), String>
+    {
+        let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-changed-count-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit = parse_json_file(&path)?;
+        review_kit["summary"]["changed_non_rust_files"] = serde_json::json!(7);
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "changed-file count drift should fail review-kit verification".to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains(
+                "review-kit.json summary.changed_non_rust_files is 7, but cards.json summary.changed_non_rust_files is 0"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_repair_queue_changed_file_count_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-repair-queue-changed-count-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("repair-queue.json");
+        let mut repair_queue = parse_json_file(&path)?;
+        repair_queue["summary"]["changed_non_rust_files"] = serde_json::json!(7);
+        fs::write(&path, repair_queue.to_string())
+            .map_err(|err| format!("write repair queue failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "changed-file count drift should fail repair-queue verification".to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains(
+                "repair-queue.json summary.changed_non_rust_files is 7, but cards.json summary.changed_non_rust_files is 0"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_review_kit_manual_candidate_count_drift()
     -> Result<(), String> {
         let dir =
@@ -10912,6 +11608,70 @@ Snapshot reports:
         };
         assert!(
             err.contains("review-kit.json handoff manual_candidates.manual_candidates is 2, but manual-candidates.json has 1"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_manual_candidate_operation_family_summary_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-manual-candidate-family-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("manual-candidates.json");
+        let mut manual_candidates = parse_json_file(&path)?;
+        manual_candidates["summary"]["operation_families"]["raw_pointer_read"] =
+            serde_json::json!(2);
+        fs::write(&path, manual_candidates.to_string())
+            .map_err(|err| format!("write manual candidates failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "manual candidate operation-family summary drift should fail verification"
+                        .to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("manual-candidates.json summary.operation_families"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_manual_candidate_evidence_kind_summary_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-manual-evidence-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit = parse_json_file(&path)?;
+        review_kit["handoff"]["manual_candidates"]["evidence_kinds"]["runtime_witness"] =
+            serde_json::json!(2);
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "review-kit manual candidate evidence-kind summary drift should fail verification"
+                        .to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("review-kit.json handoff manual_candidates.evidence_kinds"),
             "{err}"
         );
         Ok(())
@@ -10950,6 +11710,210 @@ Snapshot reports:
             err.contains("review-kit.json handoff manual_candidates first_candidate id `R4R2-S999` is not present in manual-candidates.json"),
             "{err}"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_manual_candidate_queue_drift()
+    -> Result<(), String> {
+        let dir =
+            unique_temp_dir("unsafe-review-first-pr-review-kit-manual-candidate-queue-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit = parse_json_file(&path)?;
+        let queue_entry = &mut review_kit["handoff"]["manual_candidates"]["candidate_queue"][0];
+        queue_entry["id"] = serde_json::json!("R4R2-S999");
+        queue_entry["explain"] = serde_json::json!("unsafe-review explain R4R2-S999");
+        queue_entry["context_json"] = serde_json::json!("unsafe-review context R4R2-S999 --json");
+        queue_entry["witness_plan"] =
+            serde_json::json!("unsafe-review candidate witness-plan R4R2-S999");
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "manual candidate queue drift should fail review-kit verification".to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("review-kit.json handoff manual_candidates candidate_queue[0] id `R4R2-S999` must match manual-candidates.json candidate `R4R2-S001`"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_manual_candidate_handoff_route_drift() -> Result<(), String>
+    {
+        let dir = unique_temp_dir("unsafe-review-first-pr-manual-candidate-handoff-route-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("manual-candidates.json");
+        let mut manual_candidates = parse_json_file(&path)?;
+        manual_candidates["candidates"][0]["implementer_handoff"]["route"]["safe_caller"] =
+            serde_json::json!("unrelated JS route");
+        fs::write(&path, manual_candidates.to_string())
+            .map_err(|err| format!("write manual candidates failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "manual candidate handoff route drift should fail verification".to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("manual-candidates.json candidate implementer_handoff safe_caller"),
+            "{err}"
+        );
+        assert!(
+            err.contains("TextDecoder.decode SharedArrayBuffer route"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_manual_candidate_guidance_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-manual-candidate-guidance-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("manual-candidates.json");
+        let mut manual_candidates = parse_json_file(&path)?;
+        manual_candidates["candidates"][0]["implementer_handoff"]["fix_options"][0] =
+            serde_json::json!("unrelated repair");
+        fs::write(&path, manual_candidates.to_string())
+            .map_err(|err| format!("write manual candidates failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err("manual candidate guidance drift should fail verification".to_string());
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains(
+                "manual-candidates.json candidate implementer_handoff fix_options must match manual-candidates.json candidate fix_options"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_manual_candidate_handoff_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-manual-handoff-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit = parse_json_file(&path)?;
+        review_kit["handoff"]["manual_candidates"]["candidate_queue"][0]["implementer_handoff"]["route"]
+            ["safe_caller"] = serde_json::json!("unrelated JS route");
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "review-kit manual candidate handoff drift should fail verification"
+                        .to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains(
+                "review-kit.json handoff manual_candidates candidate_queue[0] implementer_handoff must match manual-candidates.json candidate `R4R2-S001` implementer_handoff"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_manual_candidate_markers_in_reviewcard_only_artifacts()
+    -> Result<(), String> {
+        for (artifact, object_pointer) in [
+            ("cards.json", "/cards/0"),
+            ("cards.sarif", "/runs/0/results/0/properties"),
+            ("comment-plan.json", "/comments/0"),
+            ("lsp.json", "/diagnostics/0"),
+            ("repair-queue.json", "/buckets/repairable_by_guard/0"),
+        ] {
+            let dir = unique_temp_dir(&format!(
+                "unsafe-review-first-pr-reviewcard-only-manual-marker-{artifact}"
+            ))?;
+            fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+            write_one_manual_candidate_first_pr_artifacts(&dir)?;
+            let path = dir.join(artifact);
+            let mut value = parse_json_file(&path)?;
+            value
+                .pointer_mut(object_pointer)
+                .and_then(serde_json::Value::as_object_mut)
+                .ok_or_else(|| format!("{artifact} fixture is missing object `{object_pointer}`"))?
+                .insert("manual_candidate".to_string(), serde_json::json!(true));
+            fs::write(&path, value.to_string())
+                .map_err(|err| format!("write {artifact} failed: {err}"))?;
+
+            let result = check_first_pr_artifacts(&dir);
+
+            fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+            let err = match result {
+                Ok(()) => {
+                    return Err(format!(
+                        "{artifact} manual candidate marker should fail verification"
+                    ));
+                }
+                Err(err) => err,
+            };
+            assert!(err.contains(artifact), "{artifact}: {err}");
+            assert!(err.contains("manual_candidate"), "{artifact}: {err}");
+            assert!(err.contains("manual-candidates.json"), "{artifact}: {err}");
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_manual_candidate_front_door_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-manual-front-door-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("pr-summary.md");
+        let text =
+            fs::read_to_string(&path).map_err(|err| format!("read pr summary failed: {err}"))?;
+        let text = text.replace(manual_candidate_front_panel_fixture(), "");
+        fs::write(&path, text).map_err(|err| format!("write pr summary failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => return Err("missing manual candidate summary cue should fail".to_string()),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("pr-summary.md"),
+            "expected pr-summary front-door drift, got {err}"
+        );
+        assert!(err.contains("## Manual candidates"), "{err}");
         Ok(())
     }
 
@@ -11348,12 +12312,15 @@ Snapshot reports:
     fn first_pr_artifact_checker_rejects_missing_witness_plan() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-missing-witness")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
-        write_valid_artifacts(&dir)?;
+        write_valid_first_pr_artifacts(&dir)?;
+        fs::remove_file(dir.join("witness-plan.md"))
+            .map_err(|err| format!("remove witness plan failed: {err}"))?;
 
         let result = check_first_pr_artifacts(&dir);
 
         fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
-        assert!(result.err().unwrap_or_default().contains("witness-plan.md"));
+        let err = result.err().unwrap_or_default();
+        assert!(err.contains("witness-plan.md"), "{err}");
         Ok(())
     }
 
@@ -13194,11 +14161,11 @@ Snapshot reports:
         let dir = unique_temp_dir("unsafe-review-first-pr-github-card-id")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
         write_valid_first_pr_artifacts(&dir)?;
-        fs::write(
-            dir.join("github-summary.md"),
-            "## unsafe-review advisory summary\n\n- Scope: `diff`\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Top card\n\n- ID: `missing`\n- Class: `guard_missing`\n- Next action: add an alignment guard\n\nKnown ReviewCard: `card-1`\n\n## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n---\n\nFull advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, manual-candidates.json, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",
-        )
-        .map_err(|err| format!("write github summary failed: {err}"))?;
+        let path = dir.join("github-summary.md");
+        let summary = fs::read_to_string(&path)
+            .map_err(|err| format!("read github summary failed: {err}"))?;
+        fs::write(&path, summary.replace("- ID: `card-1`", "- ID: `missing`"))
+            .map_err(|err| format!("write github summary failed: {err}"))?;
 
         let result = check_first_pr_artifacts(&dir);
 
@@ -13218,9 +14185,12 @@ Snapshot reports:
         let dir = unique_temp_dir("unsafe-review-first-pr-github-card-class")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
         write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("github-summary.md");
+        let summary = fs::read_to_string(&path)
+            .map_err(|err| format!("read github summary failed: {err}"))?;
         fs::write(
-            dir.join("github-summary.md"),
-            "## unsafe-review advisory summary\n\n- Scope: `diff`\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Top card\n\n- ID: `card-1`\n- Class: `contract_missing`\n- Next action: add an alignment guard\n\n## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n---\n\nFull advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, manual-candidates.json, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",
+            &path,
+            summary.replace("- Class: `guard_missing`", "- Class: `contract_missing`"),
         )
         .map_err(|err| format!("write github summary failed: {err}"))?;
 
@@ -13387,7 +14357,7 @@ Snapshot reports:
         fs::write(
             &path,
             summary.replace(
-                "## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n",
+                "## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Policy report: `policy-report.md`; ReviewCard-only; manual candidates are not policy inputs.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n",
                 "",
             ),
         )
@@ -15333,10 +16303,14 @@ Snapshot reports:
             &fs::read_to_string(&path).map_err(|err| format!("read repair queue failed: {err}"))?,
         )
         .map_err(|err| format!("parse repair queue failed: {err}"))?;
-        let readiness =
+        let guard_readiness =
+            &mut repair_queue["buckets"]["repairable_by_guard"][0]["agent_readiness"];
+        guard_readiness["ready"] = serde_json::json!(false);
+        guard_readiness["state"] = serde_json::json!("requires_witness_receipt");
+        let witness_readiness =
             &mut repair_queue["buckets"]["requires_witness_receipt"][0]["agent_readiness"];
-        readiness["ready"] = serde_json::json!(false);
-        readiness["state"] = serde_json::json!("requires_human_review");
+        witness_readiness["ready"] = serde_json::json!(false);
+        witness_readiness["state"] = serde_json::json!("requires_human_review");
         fs::write(&path, repair_queue.to_string())
             .map_err(|err| format!("write repair queue failed: {err}"))?;
 
@@ -15738,6 +16712,44 @@ review_after = "2026-08-01"
                 })
             })
             .unwrap_or(serde_json::Value::Null);
+        let review_card_queue = top_card_id
+            .map(|card_id| {
+                serde_json::json!({
+                    "card_id": card_id,
+                    "source": "review_card",
+                    "class": "guard_missing",
+                    "priority": "high",
+                    "confidence": "medium",
+                    "path": "src/lib.rs",
+                    "line": 7,
+                    "location_text": "src/lib.rs:7",
+                    "operation_family": "raw_pointer_read",
+                    "operation": "unsafe { ptr.cast::<Header>().read() }",
+                    "missing_evidence": [],
+                    "next_action": "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.",
+                    "verify_commands": ["cargo +nightly miri test card"],
+                    "witness_routes": [{
+                        "kind": "miri",
+                        "reason": "route",
+                        "command": "cargo +nightly miri test card",
+                        "required": false
+                    }],
+                    "repair_queue_buckets": ["repairable_by_guard", "requires_witness_receipt"],
+                    "repair_queue_bucket_reasons": ["guard_evidence_missing", "witness_receipt_missing"],
+                    "agent_readiness": {
+                        "ready": true,
+                        "state": "ready_for_agent",
+                        "reasons": ["specific operation family"]
+                    },
+                    "explain": format!("unsafe-review explain {card_id}"),
+                    "context_json": format!("unsafe-review context {card_id} --json"),
+                    "trust_boundary": "Static unsafe contract review only; copy-only ReviewCard queue entry projected from cards.json and repair-queue.json; it is not a proof of memory safety, not UB-free status, not a Miri result, and not site-execution proof. unsafe-review did not run agents, run witnesses, edit source, post comments, suppress cards, resolve cards, or enforce blocking policy."
+                })
+            })
+            .into_iter()
+            .collect::<Vec<_>>();
+        let changed_files = usize::from(card_count > 0);
+        let omitted_cards = card_count.saturating_sub(review_card_queue.len());
         let value = serde_json::json!({
             "schema_version": "0.1",
             "tool": "unsafe-review",
@@ -15749,6 +16761,9 @@ review_after = "2026-08-01"
             "base_ref": "origin/main",
             "head_commit": serde_json::Value::Null,
             "summary": {
+                "changed_files": changed_files,
+                "changed_rust_files": changed_files,
+                "changed_non_rust_files": 0,
                 "cards": card_count,
                 "open_actionable_gaps": open_actionable_gaps,
             },
@@ -15756,11 +16771,27 @@ review_after = "2026-08-01"
             "handoff": {
                 "reviewer_summary": "pr-summary.md",
                 "receipt_audit_markdown": "unsafe-review receipt audit --root fixtures/raw_pointer_alignment --base origin/main --format markdown",
+                "review_cards": {
+                    "artifact": "cards.json",
+                    "repair_queue_artifact": "repair-queue.json",
+                    "review_cards": card_count,
+                    "card_queue_limit": 5,
+                    "card_queue": review_card_queue,
+                    "omitted_cards": omitted_cards,
+                    "trust_boundary": "Static unsafe contract review only; copy-only ReviewCard queue preview projected from cards.json and repair-queue.json. It does not run agents, run witnesses, edit source, post comments, suppress cards, resolve cards, or enforce blocking policy. It is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repair success, and not policy readiness."
+                },
                 "manual_candidates": {
                     "artifact": "manual-candidates.json",
+                    "manual_repair_queue_artifact": "manual-repair-queue.json",
                     "manual_candidates": 0,
                     "analyzer_discovered": 0,
+                    "operation_families": {},
+                    "evidence_kinds": {},
+                    "reviewcard_artifact_applicability": manual_candidate_reviewcard_applicability_fixture(),
                     "first_candidate": serde_json::Value::Null,
+                    "candidate_queue_limit": 5,
+                    "candidate_queue": [],
+                    "omitted_candidates": 0,
                     "trust_boundary": "manual/advisory candidates are not analyzer-discovered ReviewCards, not policy inputs, and not witness execution; receipts against manual candidates do not import ReviewCard witness evidence."
                 },
                 "top_card": top_card_handoff,
@@ -15775,7 +16806,10 @@ review_after = "2026-08-01"
                 {"path":"comment-plan.json","kind":"comment_plan","format":"json","schema_version":"0.1"},
                 {"path":"witness-plan.md","kind":"witness_plan","format":"markdown","schema_version":serde_json::Value::Null},
                 {"path":"receipt-audit.md","kind":"receipt_audit","format":"markdown","schema_version":serde_json::Value::Null},
+                {"path":"policy-report.json","kind":"policy_report_json","format":"json","schema_version":"0.1"},
+                {"path":"policy-report.md","kind":"policy_report_markdown","format":"markdown","schema_version":serde_json::Value::Null},
                 {"path":"manual-candidates.json","kind":"manual_candidates","format":"json","schema_version":"manual-candidates/v1"},
+                {"path":"manual-repair-queue.json","kind":"manual_repair_queue","format":"json","schema_version":"manual-repair-queue/v1"},
                 {"path":"lsp.json","kind":"saved_lsp","format":"json","schema_version":"0.1"},
                 {"path":"repair-queue.json","kind":"repair_queue","format":"json","schema_version":"0.1"}
             ],
@@ -15786,47 +16820,428 @@ review_after = "2026-08-01"
     }
 
     fn write_empty_manual_candidates_artifact(dir: &Path) -> Result<(), String> {
-        fs::write(
-            dir.join("manual-candidates.json"),
-            r#"{"schema_version":"manual-candidates/v1","tool":"unsafe-review","tool_version":"0.2.1-test","mode":"manual_candidate_index","source":"first_pr","summary":{"manual_candidates":0,"external_evidence_refs":0,"analyzer_discovered":0},"candidates":[],"reviewcard_artifact_relationship":{"cards.json":"ReviewCard-only analyzer output; manual candidates are listed only in manual-candidates.json.","cards.sarif":"ReviewCard-only analyzer output; manual candidates are not emitted as SARIF analyzer results.","comment-plan.json":"ReviewCard-only comment planning; manual candidates are not selected for automatic comment plans.","lsp.json":"ReviewCard-only saved editor projection; manual candidates are not emitted as analyzer diagnostics.","repair-queue.json":"ReviewCard-only repair queue; manual candidates are not automatic repair tasks.","receipt-audit.md":"Receipts may match manual candidate IDs as manual/advisory targets without importing them as ReviewCard witness evidence.","policy-report":"ReviewCard-only policy simulation; manual candidates are not policy gating inputs."},"trust_boundary":"Manual/advisory static unsafe contract review candidate index only; candidates are not analyzer-discovered ReviewCards, not a proof of UB, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repository safety, and not policy gating. unsafe-review did not run witnesses, post comments, edit source, run an agent, or enforce blocking policy."}"#,
-        )
-        .map_err(|err| format!("write manual candidates failed: {err}"))
+        let value = serde_json::json!({
+            "schema_version": "manual-candidates/v1",
+            "tool": "unsafe-review",
+            "tool_version": "0.2.1-test",
+            "mode": "manual_candidate_index",
+            "source": "first_pr",
+            "summary": {
+                "manual_candidates": 0,
+                "external_evidence_refs": 0,
+                "operation_families": {},
+                "evidence_kinds": {},
+                "analyzer_discovered": 0
+            },
+            "candidates": [],
+            "reviewcard_artifact_relationship": manual_candidate_reviewcard_relationship_fixture(),
+            "reviewcard_artifact_applicability": manual_candidate_reviewcard_applicability_fixture(),
+            "trust_boundary": "Manual/advisory static unsafe contract review candidate index only; candidates are not analyzer-discovered ReviewCards, not a proof of UB, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repository safety, and not policy gating. unsafe-review did not run witnesses, post comments, edit source, run an agent, or enforce blocking policy."
+        });
+        fs::write(dir.join("manual-candidates.json"), value.to_string())
+            .map_err(|err| format!("write manual candidates failed: {err}"))
+    }
+
+    fn write_empty_manual_repair_queue_artifact(dir: &Path) -> Result<(), String> {
+        let value = serde_json::json!({
+            "schema_version": "manual-repair-queue/v1",
+            "tool": "unsafe-review",
+            "tool_version": "0.2.1-test",
+            "mode": "manual_candidate_repair_queue",
+            "source": "manual_candidate",
+            "policy": "advisory",
+            "summary": {
+                "manual_candidates": 0,
+                "queued_candidates": 0,
+                "analyzer_discovered": 0,
+                "external_evidence_refs": 0,
+                "operation_families": {},
+                "evidence_kinds": {},
+                "with_fix_options": 0,
+                "with_test_targets": 0,
+                "with_do_not_touch": 0,
+                "with_proof_mode": 0,
+                "with_fix_boundary": 0,
+                "with_pr_aperture": 0
+            },
+            "queue": [],
+            "trust_boundary": "Copy-only manual candidate repair queue; entries come from imported manual candidates, not analyzer-discovered ReviewCards. This is not an automatic repair queue, not proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not policy gating, and not repair success. unsafe-review did not run agents, did not run witnesses, did not edit source, did not post comments, and did not enforce blocking policy."
+        });
+        fs::write(dir.join("manual-repair-queue.json"), value.to_string())
+            .map_err(|err| format!("write manual repair queue failed: {err}"))
+    }
+
+    fn manual_candidate_reviewcard_relationship_fixture() -> serde_json::Value {
+        serde_json::json!({
+            "cards.json": "ReviewCard-only analyzer output; manual candidates are listed only in manual-candidates.json.",
+            "cards.sarif": "ReviewCard-only analyzer output; manual candidates are not emitted as SARIF analyzer results.",
+            "comment-plan.json": "ReviewCard-only comment planning; manual candidates are not selected for automatic comment plans.",
+            "lsp.json": "ReviewCard-only saved editor projection; manual candidates are not emitted as analyzer diagnostics.",
+            "repair-queue.json": "ReviewCard-only repair queue; manual candidates are not automatic repair tasks.",
+            "receipt-audit.md": "Receipts may match manual candidate IDs as manual/advisory targets without importing them as ReviewCard witness evidence.",
+            "policy-report.json": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs.",
+            "policy-report.md": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs."
+        })
+    }
+
+    fn manual_candidate_reviewcard_applicability_fixture() -> serde_json::Value {
+        serde_json::json!({
+            "cards.json": manual_candidate_reviewcard_applicability_entry_fixture(
+                "reviewcard_only",
+                "Manual candidates stay in manual-candidate ledger surfaces and are not emitted as analyzer ReviewCards."
+            ),
+            "cards.sarif": manual_candidate_reviewcard_applicability_entry_fixture(
+                "reviewcard_only",
+                "Manual candidates are not emitted as SARIF analyzer results."
+            ),
+            "comment-plan.json": manual_candidate_reviewcard_applicability_entry_fixture(
+                "reviewcard_only",
+                "Manual candidates are not selected for automatic comment plans."
+            ),
+            "lsp.json": manual_candidate_reviewcard_applicability_entry_fixture(
+                "reviewcard_only",
+                "Manual candidates are not emitted as saved editor diagnostics."
+            ),
+            "repair-queue.json": manual_candidate_reviewcard_applicability_entry_fixture(
+                "reviewcard_only",
+                "Manual candidates are not automatic repair tasks."
+            ),
+            "policy-report.json": manual_candidate_reviewcard_applicability_entry_fixture(
+                "reviewcard_only",
+                "Manual candidates are not policy gating inputs for the JSON policy report."
+            ),
+            "policy-report.md": manual_candidate_reviewcard_applicability_entry_fixture(
+                "reviewcard_only",
+                "Manual candidates are not policy gating inputs for the Markdown policy report."
+            )
+        })
+    }
+
+    fn manual_candidate_reviewcard_applicability_entry_fixture(
+        decision: &str,
+        reason: &str,
+    ) -> serde_json::Value {
+        serde_json::json!({
+            "decision": decision,
+            "applies_to_manual_candidates": false,
+            "manual_candidate_markers_allowed": false,
+            "reason": reason,
+        })
+    }
+
+    fn manual_candidate_handoff_fixture() -> serde_json::Value {
+        serde_json::json!({
+            "target": {
+                "file": "src/runtime/webcore/TextDecoder.rs",
+                "line": 237,
+                "location_text": "src/runtime/webcore/TextDecoder.rs:237"
+            },
+            "route": {
+                "safe_caller": "TextDecoder.decode SharedArrayBuffer route",
+                "unsafe_operation": "core::slice::from_raw_parts",
+                "operation_family": "raw_pointer_read"
+            },
+            "invariant_at_risk": "&[u8] memory must not be concurrently mutated",
+            "proof_mode": {
+                "kind": "mutation-plus-miri",
+                "system_bun_expected": "nondiscriminating",
+                "mutation_required": true,
+                "miri_required": true
+            },
+            "fix_boundary": "copy shared bytes before constructing the Rust slice",
+            "pr_aperture": "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings",
+            "external_evidence": [{
+                "kind": "runtime_witness",
+                "path": "target/unsafe-scout/textdecoder-shared-race-route.out",
+                "summary": "Bun TextDecoder route reaches shared backing bytes through safe JS",
+                "command": "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts",
+                "limitation": "runtime route evidence only; not memory-safety proof and not analyzer-discovered"
+            }],
+            "fix_options": [
+                "copy SharedArrayBuffer-backed bytes before constructing the slice"
+            ],
+            "test_targets": [
+                "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+            ],
+            "do_not_touch": [
+                "Do not rewrite TextDecoder unrelated encodings"
+            ],
+            "suggested_next_steps": [
+                "confirm the file:line and safe caller route before editing",
+                "preserve or add concrete contract, guard, test, or witness evidence for the invariant",
+                "attach receipts only when the external run targets this manual candidate ID",
+                "evaluate the candidate-specific fix options before editing",
+                "run or preserve the candidate-specific test targets listed in this handoff",
+                "respect the candidate-specific do-not-touch notes before editing"
+            ],
+            "non_goals": [
+                "do not treat this as analyzer-discovered",
+                "do not claim proof, UB-free status, Miri-clean status, or site execution",
+                "do not broaden the task to unrelated unsafe sites",
+                "Do not rewrite TextDecoder unrelated encodings"
+            ],
+            "stop_condition": "stop before source edits if the route no longer matches this manual candidate, or if the repair would broaden into unrelated unsafe sites"
+        })
+    }
+
+    fn manual_candidate_fixture() -> serde_json::Value {
+        serde_json::json!({
+            "schema_version": "manual-candidate/v1",
+            "id": "R4R2-S001",
+            "source": "manual",
+            "manual_candidate": true,
+            "analyzer_discovered": false,
+            "title": "TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes",
+            "location": {
+                "file": "src/runtime/webcore/TextDecoder.rs",
+                "line": 237
+            },
+            "operation_family": "raw_pointer_read",
+            "unsafe_operation": "core::slice::from_raw_parts",
+            "invariant": "&[u8] memory must not be concurrently mutated",
+            "safe_caller": "TextDecoder.decode SharedArrayBuffer route",
+            "proof_mode": {
+                "kind": "mutation-plus-miri",
+                "system_bun_expected": "nondiscriminating",
+                "mutation_required": true,
+                "miri_required": true
+            },
+            "fix_boundary": "copy shared bytes before constructing the Rust slice",
+            "pr_aperture": "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings",
+            "fix_options": [
+                "copy SharedArrayBuffer-backed bytes before constructing the slice"
+            ],
+            "test_targets": [
+                "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+            ],
+            "do_not_touch": [
+                "Do not rewrite TextDecoder unrelated encodings"
+            ],
+            "evidence": [{
+                "kind": "runtime_witness",
+                "path": "target/unsafe-scout/textdecoder-shared-race-route.out",
+                "summary": "Bun TextDecoder route reaches shared backing bytes through safe JS",
+                "command": "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts",
+                "limitation": "runtime route evidence only; not memory-safety proof and not analyzer-discovered"
+            }],
+            "location_text": "src/runtime/webcore/TextDecoder.rs:237",
+            "explain_command": "unsafe-review explain R4R2-S001",
+            "context_command": "unsafe-review context R4R2-S001 --json",
+            "witness_plan_command": "unsafe-review candidate witness-plan R4R2-S001",
+            "implementer_handoff": manual_candidate_handoff_fixture(),
+            "trust_boundary": "Manual/advisory candidate only; not analyzer-discovered ReviewCard, not site-execution proof, and not policy gating."
+        })
     }
 
     fn write_one_manual_candidates_artifact(dir: &Path) -> Result<(), String> {
-        fs::write(
-            dir.join("manual-candidates.json"),
-            r#"{"schema_version":"manual-candidates/v1","tool":"unsafe-review","tool_version":"0.2.1-test","mode":"manual_candidate_index","source":"first_pr","summary":{"manual_candidates":1,"external_evidence_refs":0,"analyzer_discovered":0},"candidates":[{"schema_version":"manual-candidate/v1","id":"R4R2-S001","source":"manual","manual_candidate":true,"analyzer_discovered":false,"operation_family":"raw_pointer_read","unsafe_operation":"core::slice::from_raw_parts","invariant":"&[u8] memory must not be concurrently mutated","safe_caller":"TextDecoder.decode SharedArrayBuffer route","location_text":"src/runtime/webcore/TextDecoder.rs:237","explain_command":"unsafe-review explain R4R2-S001","context_command":"unsafe-review context R4R2-S001 --json","witness_plan_command":"unsafe-review candidate witness-plan R4R2-S001","implementer_handoff":{"invariant_at_risk":"&[u8] memory must not be concurrently mutated","stop_condition":"stop before source edits"},"trust_boundary":"Manual/advisory candidate only; not analyzer-discovered ReviewCard, not site-execution proof, and not policy gating."}],"reviewcard_artifact_relationship":{"cards.json":"ReviewCard-only analyzer output; manual candidates are listed only in manual-candidates.json.","cards.sarif":"ReviewCard-only analyzer output; manual candidates are not emitted as SARIF analyzer results.","comment-plan.json":"ReviewCard-only comment planning; manual candidates are not selected for automatic comment plans.","lsp.json":"ReviewCard-only saved editor projection; manual candidates are not emitted as analyzer diagnostics.","repair-queue.json":"ReviewCard-only repair queue; manual candidates are not automatic repair tasks.","receipt-audit.md":"Receipts may match manual candidate IDs as manual/advisory targets without importing them as ReviewCard witness evidence.","policy-report":"ReviewCard-only policy simulation; manual candidates are not policy gating inputs."},"trust_boundary":"Manual/advisory static unsafe contract review candidate index only; candidates are not analyzer-discovered ReviewCards, not a proof of UB, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repository safety, and not policy gating. unsafe-review did not run witnesses, post comments, edit source, run an agent, or enforce blocking policy."}"#,
-        )
-        .map_err(|err| format!("write manual candidates failed: {err}"))
+        let value = serde_json::json!({
+            "schema_version": "manual-candidates/v1",
+            "tool": "unsafe-review",
+            "tool_version": "0.2.1-test",
+            "mode": "manual_candidate_index",
+            "source": "first_pr",
+            "summary": {
+                "manual_candidates": 1,
+                "external_evidence_refs": 1,
+                "operation_families": {
+                    "raw_pointer_read": 1
+                },
+                "evidence_kinds": {
+                    "runtime_witness": 1
+                },
+                "analyzer_discovered": 0
+            },
+            "candidates": [manual_candidate_fixture()],
+            "reviewcard_artifact_relationship": manual_candidate_reviewcard_relationship_fixture(),
+            "reviewcard_artifact_applicability": manual_candidate_reviewcard_applicability_fixture(),
+            "trust_boundary": "Manual/advisory static unsafe contract review candidate index only; candidates are not analyzer-discovered ReviewCards, not a proof of UB, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repository safety, and not policy gating. unsafe-review did not run witnesses, post comments, edit source, run an agent, or enforce blocking policy."
+        });
+        fs::write(dir.join("manual-candidates.json"), value.to_string())
+            .map_err(|err| format!("write manual candidates failed: {err}"))
+    }
+
+    fn write_one_manual_repair_queue_artifact(dir: &Path) -> Result<(), String> {
+        let handoff = manual_candidate_handoff_fixture();
+        let value = serde_json::json!({
+            "schema_version": "manual-repair-queue/v1",
+            "tool": "unsafe-review",
+            "tool_version": "0.2.1-test",
+            "mode": "manual_candidate_repair_queue",
+            "source": "manual_candidate",
+            "policy": "advisory",
+            "summary": {
+                "manual_candidates": 1,
+                "queued_candidates": 1,
+                "analyzer_discovered": 0,
+                "external_evidence_refs": 1,
+                "operation_families": {
+                    "raw_pointer_read": 1
+                },
+                "evidence_kinds": {
+                    "runtime_witness": 1
+                },
+                "with_fix_options": 1,
+                "with_test_targets": 1,
+                "with_do_not_touch": 1,
+                "with_proof_mode": 1,
+                "with_fix_boundary": 1,
+                "with_pr_aperture": 1
+            },
+            "queue": [{
+                "id": "R4R2-S001",
+                "source": "manual",
+                "manual_candidate": true,
+                "analyzer_discovered": false,
+                "title": "TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes",
+                "location_text": "src/runtime/webcore/TextDecoder.rs:237",
+                "operation_family": "raw_pointer_read",
+                "unsafe_operation": "core::slice::from_raw_parts",
+                "safe_caller": "TextDecoder.decode SharedArrayBuffer route",
+                "invariant_at_risk": "&[u8] memory must not be concurrently mutated",
+                "external_evidence_refs": 1,
+                "proof_mode": {
+                    "kind": "mutation-plus-miri",
+                    "system_bun_expected": "nondiscriminating",
+                    "mutation_required": true,
+                    "miri_required": true
+                },
+                "fix_boundary": "copy shared bytes before constructing the Rust slice",
+                "pr_aperture": "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings",
+                "fix_options": [
+                    "copy SharedArrayBuffer-backed bytes before constructing the slice"
+                ],
+                "test_targets": [
+                    "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+                ],
+                "do_not_touch": [
+                    "Do not rewrite TextDecoder unrelated encodings"
+                ],
+                "implementer_handoff": handoff,
+                "explain": "unsafe-review explain R4R2-S001",
+                "context_json": "unsafe-review context R4R2-S001 --json",
+                "witness_plan": "unsafe-review candidate witness-plan R4R2-S001",
+                "bucket": "manual_candidate_handoff",
+                "bucket_reason": "manual_candidate_copy_only",
+                "agent_handoff": {
+                    "state": "copy_ready",
+                    "automatic": false,
+                    "reasons": [
+                        "manual candidate includes file:line, safe caller route, invariant, evidence, fix/test/non-goal guidance, and stop condition",
+                        "candidate must stay manual/advisory and separate from ReviewCard repair-queue.json"
+                    ]
+                },
+                "trust_boundary": "Copy-only manual candidate repair queue entry; not analyzer-discovered, not automatic repair, not witness execution, not source editing, not proof, and not policy gating."
+            }],
+            "trust_boundary": "Copy-only manual candidate repair queue; entries come from imported manual candidates, not analyzer-discovered ReviewCards. This is not an automatic repair queue, not proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not policy gating, and not repair success. unsafe-review did not run agents, did not run witnesses, did not edit source, did not post comments, and did not enforce blocking policy."
+        });
+        fs::write(dir.join("manual-repair-queue.json"), value.to_string())
+            .map_err(|err| format!("write manual repair queue failed: {err}"))
     }
 
     fn write_one_manual_candidate_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         write_valid_first_pr_artifacts(dir)?;
         write_one_manual_candidates_artifact(dir)?;
+        write_one_manual_repair_queue_artifact(dir)?;
+        insert_manual_candidate_front_panel_fixture(dir)?;
+        insert_manual_candidate_witness_follow_up_fixture(dir)?;
         let path = dir.join("review-kit.json");
         let mut review_kit = parse_json_file(&path)?;
+        let handoff = manual_candidate_handoff_fixture();
         review_kit["handoff"]["manual_candidates"] = serde_json::json!({
             "artifact": "manual-candidates.json",
             "manual_candidates": 1,
             "analyzer_discovered": 0,
+            "operation_families": {
+                "raw_pointer_read": 1
+            },
+            "evidence_kinds": {
+                "runtime_witness": 1
+            },
+            "reviewcard_artifact_applicability": manual_candidate_reviewcard_applicability_fixture(),
             "first_candidate": {
                 "id": "R4R2-S001",
                 "source": "manual",
                 "manual_candidate": true,
                 "analyzer_discovered": false,
-                "implementer_handoff": {
-                    "invariant_at_risk": "&[u8] memory must not be concurrently mutated",
-                    "stop_condition": "stop before source edits"
-                },
+                "title": "TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes",
+                "location_text": "src/runtime/webcore/TextDecoder.rs:237",
+                "operation_family": "raw_pointer_read",
+                "evidence_refs": 1,
+                "implementer_handoff": handoff.clone(),
                 "explain": "unsafe-review explain R4R2-S001",
                 "context_json": "unsafe-review context R4R2-S001 --json",
                 "witness_plan": "unsafe-review candidate witness-plan R4R2-S001"
             },
+            "candidate_queue_limit": 5,
+            "candidate_queue": [{
+                "id": "R4R2-S001",
+                "source": "manual",
+                "manual_candidate": true,
+                "analyzer_discovered": false,
+                "title": "TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes",
+                "location_text": "src/runtime/webcore/TextDecoder.rs:237",
+                "operation_family": "raw_pointer_read",
+                "evidence_refs": 1,
+                "implementer_handoff": handoff,
+                "explain": "unsafe-review explain R4R2-S001",
+                "context_json": "unsafe-review context R4R2-S001 --json",
+                "witness_plan": "unsafe-review candidate witness-plan R4R2-S001"
+            }],
+            "omitted_candidates": 0,
             "trust_boundary": "manual/advisory candidates are not analyzer-discovered ReviewCards, not policy inputs, and not witness execution; receipts against manual candidates do not import ReviewCard witness evidence."
         });
         fs::write(&path, review_kit.to_string())
             .map_err(|err| format!("write review kit failed: {err}"))
+    }
+
+    fn insert_manual_candidate_front_panel_fixture(dir: &Path) -> Result<(), String> {
+        for (artifact, marker) in [
+            ("pr-summary.md", "## Card table"),
+            ("github-summary.md", "## Open next"),
+        ] {
+            let path = dir.join(artifact);
+            let text = fs::read_to_string(&path)
+                .map_err(|err| format!("read {artifact} failed: {err}"))?;
+            if !text.contains(marker) {
+                return Err(format!("{artifact} fixture is missing `{marker}`"));
+            }
+            fs::write(
+                &path,
+                text.replace(
+                    marker,
+                    &format!("{}{}", manual_candidate_front_panel_fixture(), marker),
+                ),
+            )
+            .map_err(|err| format!("write {artifact} failed: {err}"))?;
+        }
+        Ok(())
+    }
+
+    fn insert_manual_candidate_witness_follow_up_fixture(dir: &Path) -> Result<(), String> {
+        let artifact = "witness-plan.md";
+        let marker = "## Trust boundary";
+        let path = dir.join(artifact);
+        let text =
+            fs::read_to_string(&path).map_err(|err| format!("read {artifact} failed: {err}"))?;
+        if !text.contains(marker) {
+            return Err(format!("{artifact} fixture is missing `{marker}`"));
+        }
+        fs::write(
+            &path,
+            text.replace(
+                marker,
+                &format!("{}{}", manual_candidate_witness_follow_up_fixture(), marker),
+            ),
+        )
+        .map_err(|err| format!("write {artifact} failed: {err}"))
+    }
+
+    fn manual_candidate_front_panel_fixture() -> &'static str {
+        "## Manual candidates\n\n- Imported manual candidates: 1 (manual/advisory; not analyzer-discovered ReviewCards)\n- Operation families: `raw_pointer_read: 1`\n- Evidence kinds: `runtime_witness: 1`\n- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)\n- Safe caller route: TextDecoder.decode SharedArrayBuffer route\n- Invariant at risk: &[u8] memory must not be concurrently mutated\n- External evidence refs: 1\n- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)\n- First fix option: copy SharedArrayBuffer-backed bytes before constructing the slice\n- First test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`\n- First do-not-touch note: Do not rewrite TextDecoder unrelated encodings\n- Explain: `unsafe-review explain R4R2-S001`\n- Agent context: `unsafe-review context R4R2-S001 --json`\n- Witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Manual candidate queue preview: first 1 of 1 manual candidate(s)\n  - `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 1; first test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`\n    - Agent context: `unsafe-review context R4R2-S001 --json`\n    - Witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only outputs.\n- Boundary: copy-only manual handoff; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n"
+    }
+
+    fn manual_candidate_witness_follow_up_fixture() -> &'static str {
+        "## Manual candidate witness follow-up\n\n- Imported manual candidates: 1 (manual/advisory; not analyzer-discovered ReviewCards)\n- Operation families: `raw_pointer_read: 1`\n- Evidence kinds: `runtime_witness: 1`\n- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)\n- Safe caller route: TextDecoder.decode SharedArrayBuffer route\n- Invariant at risk: &[u8] memory must not be concurrently mutated\n- External evidence refs: 1\n- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)\n- First fix option: copy SharedArrayBuffer-backed bytes before constructing the slice\n- First test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`\n- First do-not-touch note: Do not rewrite TextDecoder unrelated encodings\n- Full manual witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Agent context: `unsafe-review context R4R2-S001 --json`\n- Manual candidate queue preview: first 1 of 1 manual candidate(s)\n  - `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 1; first test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`\n    - Agent context: `unsafe-review context R4R2-S001 --json`\n    - Witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only witness route groups.\n- Receipt boundary: manual candidate receipts attach external evidence to the manual candidate ID only; they do not import ReviewCard witness evidence.\n- Boundary: copy-only manual follow-up; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n"
     }
 
     fn add_repair_queue_boundaries(text: &str) -> String {
@@ -15853,7 +17268,7 @@ review_after = "2026-08-01"
     fn write_valid_artifacts(dir: &Path) -> Result<(), String> {
         fs::write(
             dir.join("cards.json"),
-            r#"{"schema_version":"0.1","tool":"unsafe-review","policy":"advisory","scope":"diff","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"cards":1,"open_actionable_gaps":1},"cards":[{"id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hazards":["alignment"],"site":{"file":"src/lib.rs","line":7,"column":5},"operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","obligation_evidence":[{"key":"alignment","description":"pointer aligned","contract":{"present":true,"state":"present","summary":"safety contract"},"discharge":{"present":false,"state":"missing","summary":"No visible local guard"},"reach":{"present":true,"state":"present","summary":"related test mention"},"witness":{"present":false,"state":"missing","summary":"No imported witness receipt"}}],"contract":"safety contract","discharge":"No visible local guard","reach":"related test mention","witness":"No imported witness receipt","verify_commands":["cargo +nightly miri test card"],"witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}]}]}"#,
+            r#"{"schema_version":"0.1","tool":"unsafe-review","policy":"advisory","scope":"diff","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"changed_files":1,"changed_rust_files":1,"changed_non_rust_files":0,"cards":1,"open_actionable_gaps":1},"cards":[{"id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hazards":["alignment"],"site":{"file":"src/lib.rs","line":7,"column":5},"operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","obligation_evidence":[{"key":"alignment","description":"pointer aligned","contract":{"present":true,"state":"present","summary":"safety contract"},"discharge":{"present":false,"state":"missing","summary":"No visible local guard"},"reach":{"present":true,"state":"present","summary":"related test mention"},"witness":{"present":false,"state":"missing","summary":"No imported witness receipt"}}],"contract":"safety contract","discharge":"No visible local guard","reach":"related test mention","witness":"No imported witness receipt","verify_commands":["cargo +nightly miri test card"],"witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}]}]}"#,
         )
         .map_err(|err| format!("write cards failed: {err}"))?;
         fs::write(
@@ -15873,19 +17288,102 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write comment plan failed: {err}"))?;
         fs::write(
             dir.join("repair-queue.json"),
-            add_repair_queue_boundaries(r#"{"schema_version":"0.1","tool":"unsafe-review","mode":"aggregate_repair_queue","source":"review_card","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue","summary":{"cards":1,"repairable_by_guard":1,"repairable_by_safety_docs":0,"repairable_by_test":0,"requires_witness_receipt":1,"requires_human_review":0,"do_not_auto_repair":0},"buckets":{"repairable_by_guard":[{"card_id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","operation_family":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":true,"state":"ready_for_agent","reasons":["specific operation family"]},"bucket_reason":"guard_evidence_missing","context_command":"unsafe-review context card-1 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"repairable_by_safety_docs":[],"repairable_by_test":[],"requires_witness_receipt":[{"card_id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","operation_family":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":true,"state":"ready_for_agent","reasons":["specific operation family"]},"bucket_reason":"witness_receipt_missing","context_command":"unsafe-review context card-1 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"requires_human_review":[],"do_not_auto_repair":[]}}"#),
+            add_repair_queue_boundaries(r#"{"schema_version":"0.1","tool":"unsafe-review","mode":"aggregate_repair_queue","source":"review_card","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue","summary":{"changed_files":1,"changed_rust_files":1,"changed_non_rust_files":0,"cards":1,"repairable_by_guard":1,"repairable_by_safety_docs":0,"repairable_by_test":0,"requires_witness_receipt":1,"requires_human_review":0,"do_not_auto_repair":0},"buckets":{"repairable_by_guard":[{"card_id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","operation_family":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":true,"state":"ready_for_agent","reasons":["specific operation family"]},"bucket_reason":"guard_evidence_missing","context_command":"unsafe-review context card-1 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"repairable_by_safety_docs":[],"repairable_by_test":[],"requires_witness_receipt":[{"card_id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","operation_family":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":true,"state":"ready_for_agent","reasons":["specific operation family"]},"bucket_reason":"witness_receipt_missing","context_command":"unsafe-review context card-1 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"requires_human_review":[],"do_not_auto_repair":[]}}"#),
         )
         .map_err(|err| format!("write repair queue failed: {err}"))?;
         fs::write(dir.join("receipt-audit.md"), receipt_audit_markdown())
             .map_err(|err| format!("write receipt audit failed: {err}"))?;
+        write_policy_report_artifacts(
+            dir,
+            vec![policy_report_card_fixture(
+                "card-1",
+                "guard_missing",
+                "raw_pointer_read",
+                "unsafe { ptr.cast::<Header>().read() }",
+                0,
+                "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.",
+            )],
+            1,
+        )?;
         Ok(())
+    }
+
+    fn policy_report_card_fixture(
+        card_id: &str,
+        class_name: &str,
+        operation_family: &str,
+        operation: &str,
+        missing_count: usize,
+        next_action: &str,
+    ) -> serde_json::Value {
+        serde_json::json!({
+            "card_id": card_id,
+            "class": class_name,
+            "operation_family": operation_family,
+            "operation": operation,
+            "policy_status": "new_gap",
+            "policy_reason": "Exact ReviewCard identity was not found in the baseline ledger or active suppression ledger.",
+            "missing_count": missing_count,
+            "next_action": next_action
+        })
+    }
+
+    fn write_policy_report_artifacts(
+        dir: &Path,
+        cards: Vec<serde_json::Value>,
+        new_gaps: usize,
+    ) -> Result<(), String> {
+        let card_count = cards.len();
+        let report = serde_json::json!({
+            "schema_version": "0.1",
+            "tool": "unsafe-review",
+            "mode": "policy-report",
+            "policy": "advisory",
+            "generated_at": "2026-05-18",
+            "trust_boundary": "Advisory no-new-debt policy report only; this is static unsafe contract review over existing ReviewCards and policy ledgers. It does not execute witnesses, is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, and does not enforce blocking policy.",
+            "summary": {
+                "cards": card_count,
+                "new_gaps": new_gaps,
+                "baseline_known": 0,
+                "suppressed": 0,
+                "expired_suppressions": 0,
+                "unmatched_baseline": 0,
+                "invalid_ledger_entries": 0
+            },
+            "cards": cards,
+            "unmatched_baseline": [],
+            "invalid_ledger_entries": [],
+            "limitations": [
+                "Advisory report only; review ledgers and source context before making policy decisions.",
+                "Manual candidates are not policy-report inputs and remain separate advisory artifacts.",
+                "The report does not execute witnesses, post comments, edit source, or prove memory safety."
+            ]
+        });
+        fs::write(dir.join("policy-report.json"), report.to_string())
+            .map_err(|err| format!("write policy report json failed: {err}"))?;
+        fs::write(
+            dir.join("policy-report.md"),
+            "# unsafe-review policy report\n\n## Reviewer front panel\n\n- Policy mode: `advisory`\n\n## Current cards\n\nReviewCard-only advisory policy simulation.\n\n## Limitations\n\n- Manual candidates are not policy-report inputs and remain separate advisory artifacts.\n\n## Trust boundary\n\nAdvisory no-new-debt policy report only; this is static unsafe contract review over existing ReviewCards and policy ledgers. It does not execute witnesses, is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, and does not enforce blocking policy.\n",
+        )
+        .map_err(|err| format!("write policy report markdown failed: {err}"))?;
+        Ok(())
+    }
+
+    fn github_summary_fixture(
+        review_cards: usize,
+        open_actionable_gaps: usize,
+        top_card: &str,
+    ) -> String {
+        format!(
+            "## unsafe-review advisory summary\n\n- Scope: `diff`\n- Review cards: {review_cards}\n- Open actionable gaps: {open_actionable_gaps}\n- Policy mode: `advisory`\n\n## Top card\n\n{top_card}\n\n## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Policy report: `policy-report.md`; ReviewCard-only; manual candidates are not policy inputs.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n---\n\nFull advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, policy-report.json, policy-report.md, manual-candidates.json, manual-repair-queue.json, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n"
+        )
     }
 
     fn write_two_card_artifacts(dir: &Path) -> Result<(), String> {
         write_valid_artifacts(dir)?;
         fs::write(
             dir.join("cards.json"),
-            r#"{"schema_version":"0.1","tool":"unsafe-review","policy":"advisory","scope":"diff","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"cards":2,"open_actionable_gaps":2},"cards":[{"id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hazards":["alignment"],"site":{"file":"src/lib.rs","line":7,"column":5},"operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verify_commands":["cargo +nightly miri test card"],"witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}]},{"id":"card-2","class":"contract_missing","priority":"high","confidence":"high","proof_path":"human_review_only","hazards":["unknown"],"site":{"file":"src/lib.rs","line":7,"column":1},"operation":"unsafe fn read_header(ptr: *const u8)","operation_family":"unknown","next_action":"Add a precise public `# Safety` section that names the required caller obligations.","verify_commands":[],"witness_routes":[{"kind":"human-deep-review","reason":"route","command":null,"required":false}]}]}"#,
+            r#"{"schema_version":"0.1","tool":"unsafe-review","policy":"advisory","scope":"diff","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"changed_files":1,"changed_rust_files":1,"changed_non_rust_files":0,"cards":2,"open_actionable_gaps":2},"cards":[{"id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hazards":["alignment"],"site":{"file":"src/lib.rs","line":7,"column":5},"operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verify_commands":["cargo +nightly miri test card"],"witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}]},{"id":"card-2","class":"contract_missing","priority":"high","confidence":"high","proof_path":"human_review_only","hazards":["unknown"],"site":{"file":"src/lib.rs","line":7,"column":1},"operation":"unsafe fn read_header(ptr: *const u8)","operation_family":"unknown","next_action":"Add a precise public `# Safety` section that names the required caller obligations.","verify_commands":[],"witness_routes":[{"kind":"human-deep-review","reason":"route","command":null,"required":false}]}]}"#,
         )
         .map_err(|err| format!("write cards failed: {err}"))?;
         fs::write(
@@ -15905,11 +17403,33 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write comment plan failed: {err}"))?;
         fs::write(
             dir.join("repair-queue.json"),
-            add_repair_queue_boundaries(r#"{"schema_version":"0.1","tool":"unsafe-review","mode":"aggregate_repair_queue","source":"review_card","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue","summary":{"cards":2,"repairable_by_guard":1,"repairable_by_safety_docs":1,"repairable_by_test":0,"requires_witness_receipt":1,"requires_human_review":1,"do_not_auto_repair":1},"buckets":{"repairable_by_guard":[{"card_id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","operation_family":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":true,"state":"ready_for_agent","reasons":["specific operation family"]},"bucket_reason":"guard_evidence_missing","context_command":"unsafe-review context card-1 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"repairable_by_safety_docs":[{"card_id":"card-2","class":"contract_missing","priority":"high","confidence":"high","proof_path":"human_review_only","operation_family":"unknown","operation":"unsafe fn read_header(ptr: *const u8)","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":false,"state":"requires_human_review","reasons":["operation family `unknown` is not safe for automatic repair delegation"]},"bucket_reason":"safety_docs_evidence_missing","context_command":"unsafe-review context card-2 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"repairable_by_test":[],"requires_witness_receipt":[{"card_id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","operation_family":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":true,"state":"ready_for_agent","reasons":["specific operation family"]},"bucket_reason":"witness_receipt_missing","context_command":"unsafe-review context card-1 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"requires_human_review":[{"card_id":"card-2","class":"contract_missing","priority":"high","confidence":"high","proof_path":"human_review_only","operation_family":"unknown","operation":"unsafe fn read_header(ptr: *const u8)","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":false,"state":"requires_human_review","reasons":["operation family `unknown` is not safe for automatic repair delegation"]},"bucket_reason":"human_review_required","context_command":"unsafe-review context card-2 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"do_not_auto_repair":[{"card_id":"card-2","class":"contract_missing","priority":"high","confidence":"high","proof_path":"human_review_only","operation_family":"unknown","operation":"unsafe fn read_header(ptr: *const u8)","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":false,"state":"requires_human_review","reasons":["operation family `unknown` is not safe for automatic repair delegation"]},"bucket_reason":"not_ready_for_automatic_repair","context_command":"unsafe-review context card-2 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}]}}"#),
+            add_repair_queue_boundaries(r#"{"schema_version":"0.1","tool":"unsafe-review","mode":"aggregate_repair_queue","source":"review_card","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue","summary":{"changed_files":1,"changed_rust_files":1,"changed_non_rust_files":0,"cards":2,"repairable_by_guard":1,"repairable_by_safety_docs":1,"repairable_by_test":0,"requires_witness_receipt":1,"requires_human_review":1,"do_not_auto_repair":1},"buckets":{"repairable_by_guard":[{"card_id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","operation_family":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":true,"state":"ready_for_agent","reasons":["specific operation family"]},"bucket_reason":"guard_evidence_missing","context_command":"unsafe-review context card-1 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"repairable_by_safety_docs":[{"card_id":"card-2","class":"contract_missing","priority":"high","confidence":"high","proof_path":"human_review_only","operation_family":"unknown","operation":"unsafe fn read_header(ptr: *const u8)","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":false,"state":"requires_human_review","reasons":["operation family `unknown` is not safe for automatic repair delegation"]},"bucket_reason":"safety_docs_evidence_missing","context_command":"unsafe-review context card-2 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"repairable_by_test":[],"requires_witness_receipt":[{"card_id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","operation_family":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":true,"state":"ready_for_agent","reasons":["specific operation family"]},"bucket_reason":"witness_receipt_missing","context_command":"unsafe-review context card-1 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"requires_human_review":[{"card_id":"card-2","class":"contract_missing","priority":"high","confidence":"high","proof_path":"human_review_only","operation_family":"unknown","operation":"unsafe fn read_header(ptr: *const u8)","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":false,"state":"requires_human_review","reasons":["operation family `unknown` is not safe for automatic repair delegation"]},"bucket_reason":"human_review_required","context_command":"unsafe-review context card-2 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"do_not_auto_repair":[{"card_id":"card-2","class":"contract_missing","priority":"high","confidence":"high","proof_path":"human_review_only","operation_family":"unknown","operation":"unsafe fn read_header(ptr: *const u8)","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":false,"state":"requires_human_review","reasons":["operation family `unknown` is not safe for automatic repair delegation"]},"bucket_reason":"not_ready_for_automatic_repair","context_command":"unsafe-review context card-2 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}]}}"#),
         )
         .map_err(|err| format!("write repair queue failed: {err}"))?;
         fs::write(dir.join("receipt-audit.md"), receipt_audit_markdown())
             .map_err(|err| format!("write receipt audit failed: {err}"))?;
+        write_policy_report_artifacts(
+            dir,
+            vec![
+                policy_report_card_fixture(
+                    "card-1",
+                    "guard_missing",
+                    "raw_pointer_read",
+                    "unsafe { ptr.cast::<Header>().read() }",
+                    0,
+                    "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.",
+                ),
+                policy_report_card_fixture(
+                    "card-2",
+                    "contract_missing",
+                    "unknown",
+                    "unsafe fn read_header(ptr: *const u8)",
+                    0,
+                    "Add a precise public `# Safety` section that names the required caller obligations.",
+                ),
+            ],
+            2,
+        )?;
         Ok(())
     }
 
@@ -15929,10 +17449,15 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write lsp failed: {err}"))?;
         fs::write(
             dir.join("github-summary.md"),
-            "## unsafe-review advisory summary\n\n- Scope: `diff`\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Top card\n\n- ID: `card-1`\n- Class: `guard_missing`\n- Proof path: `source_route_only`\n- Location: src/lib.rs:7\n- Operation: `unsafe { ptr.cast::<Header>().read() }`\n- Operation family: `raw_pointer_read`\n- Proof path: `source_route_only`\n- Missing evidence: No missing evidence recorded\n- Primary route: `miri` because route\n\n```bash\ncargo +nightly miri test card\n```\n- Next action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n- Explain: `unsafe-review explain card-1`\n- Agent context: `unsafe-review context card-1 --json`\n\n## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n---\n\nFull advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, manual-candidates.json, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",
+            github_summary_fixture(
+                1,
+                1,
+                "- ID: `card-1`\n- Class: `guard_missing`\n- Proof path: `source_route_only`\n- Location: src/lib.rs:7\n- Operation: `unsafe { ptr.cast::<Header>().read() }`\n- Operation family: `raw_pointer_read`\n- Missing evidence: No missing evidence recorded\n- Primary route: `miri` because route\n\n```bash\ncargo +nightly miri test card\n```\n- Next action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n- Explain: `unsafe-review explain card-1`\n- Agent context: `unsafe-review context card-1 --json`",
+            ),
         )
         .map_err(|err| format!("write github summary failed: {err}"))?;
         write_empty_manual_candidates_artifact(dir)?;
+        write_empty_manual_repair_queue_artifact(dir)?;
         write_review_kit_artifact(dir, 1, 1, Some("card-1"))?;
         Ok(())
     }
@@ -15961,7 +17486,7 @@ review_after = "2026-08-01"
     fn write_valid_zero_card_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         fs::write(
             dir.join("cards.json"),
-            r#"{"schema_version":"0.1","tool":"unsafe-review","policy":"advisory","scope":"diff","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"cards":0,"open_actionable_gaps":0},"cards":[]}"#,
+            r#"{"schema_version":"0.1","tool":"unsafe-review","policy":"advisory","scope":"diff","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"changed_files":0,"changed_rust_files":0,"changed_non_rust_files":0,"cards":0,"open_actionable_gaps":0},"cards":[]}"#,
         )
         .map_err(|err| format!("write cards failed: {err}"))?;
         fs::write(
@@ -15991,17 +17516,23 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write lsp failed: {err}"))?;
         fs::write(
             dir.join("github-summary.md"),
-            "## unsafe-review advisory summary\n\n- Scope: `diff`\n- Review cards: 0\n- Open actionable gaps: 0\n- Policy mode: `advisory`\n\n## Top card\n\nNo changed unsafe-review gaps were found.\nThis does not prove the repo safe, UB-free, Miri-clean, or that any unsafe site executed.\n\n## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n---\n\nFull advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, manual-candidates.json, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",
+            github_summary_fixture(
+                0,
+                0,
+                "No changed unsafe-review gaps were found.\nThis does not prove the repo safe, UB-free, Miri-clean, or that any unsafe site executed.",
+            ),
         )
         .map_err(|err| format!("write github summary failed: {err}"))?;
         fs::write(
             dir.join("repair-queue.json"),
-            add_repair_queue_boundaries(r#"{"schema_version":"0.1","tool":"unsafe-review","mode":"aggregate_repair_queue","source":"review_card","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue","summary":{"cards":0,"repairable_by_guard":0,"repairable_by_safety_docs":0,"repairable_by_test":0,"requires_witness_receipt":0,"requires_human_review":0,"do_not_auto_repair":0},"buckets":{"repairable_by_guard":[],"repairable_by_safety_docs":[],"repairable_by_test":[],"requires_witness_receipt":[],"requires_human_review":[],"do_not_auto_repair":[]}}"#),
+            add_repair_queue_boundaries(r#"{"schema_version":"0.1","tool":"unsafe-review","mode":"aggregate_repair_queue","source":"review_card","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue","summary":{"changed_files":0,"changed_rust_files":0,"changed_non_rust_files":0,"cards":0,"repairable_by_guard":0,"repairable_by_safety_docs":0,"repairable_by_test":0,"requires_witness_receipt":0,"requires_human_review":0,"do_not_auto_repair":0},"buckets":{"repairable_by_guard":[],"repairable_by_safety_docs":[],"repairable_by_test":[],"requires_witness_receipt":[],"requires_human_review":[],"do_not_auto_repair":[]}}"#),
         )
         .map_err(|err| format!("write repair queue failed: {err}"))?;
         fs::write(dir.join("receipt-audit.md"), receipt_audit_markdown())
             .map_err(|err| format!("write receipt audit failed: {err}"))?;
+        write_policy_report_artifacts(dir, Vec::new(), 0)?;
         write_empty_manual_candidates_artifact(dir)?;
+        write_empty_manual_repair_queue_artifact(dir)?;
         write_review_kit_artifact(dir, 0, 0, None)?;
         Ok(())
     }

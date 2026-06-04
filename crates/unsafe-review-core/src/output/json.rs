@@ -48,7 +48,9 @@ impl<'a> From<&'a AnalyzeOutput> for JsonAnalyzeOutput<'a> {
 #[derive(Serialize)]
 struct JsonSummary {
     rust_files: usize,
+    changed_files: usize,
     changed_rust_files: usize,
+    changed_non_rust_files: usize,
     unsafe_sites: usize,
     cards: usize,
     open_actionable_gaps: usize,
@@ -65,7 +67,9 @@ impl From<&Summary> for JsonSummary {
     fn from(summary: &Summary) -> Self {
         Self {
             rust_files: summary.rust_files,
+            changed_files: summary.changed_files,
             changed_rust_files: summary.changed_rust_files,
+            changed_non_rust_files: summary.changed_non_rust_files,
             unsafe_sites: summary.unsafe_sites,
             cards: summary.cards,
             open_actionable_gaps: summary.open_actionable_gaps,
@@ -315,7 +319,12 @@ mod tests {
         "nested_unsafe_operation_call_dedupe",
         "adjacent_unchanged_unsafe_fn_no_card",
         "js_buffer_reentry_sync_compression",
+        "js_buffer_reentry_async_helper_capture",
+        "js_buffer_reentry_raw_parts_materialization",
         "js_buffer_reentry_options_before_capture_no_card",
+        "js_buffer_reentry_recapture_after_reentry_no_card",
+        "js_buffer_reentry_async_options_before_capture_no_card",
+        "js_buffer_reentry_async_recapture_after_reentry_no_card",
         "split_unsafe_block",
         "raw_pointer_deref",
         "raw_pointer_read_unaligned",

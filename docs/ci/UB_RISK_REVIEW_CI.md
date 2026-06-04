@@ -104,6 +104,7 @@ jobs:
             witness-plan.md \
             receipt-audit.md \
             manual-candidates.json \
+            manual-repair-queue.json \
             lsp.json \
             repair-queue.json
           do

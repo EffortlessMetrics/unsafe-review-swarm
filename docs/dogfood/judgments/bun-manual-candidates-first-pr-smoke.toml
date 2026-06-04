@@ -1,0 +1,26 @@
+schema_version = "1.0"
+target = "bun-manual-candidates-first-pr-smoke"
+report = "reports/2026-06-03-bun-manual-candidates-first-pr-smoke.md"
+reviewer = "manual"
+date = "2026-06-03"
+scope = "manual-candidate first-pr projection usefulness sample"
+artifact_set = "target/unsafe-review-manual-candidate-smoke"
+trust_boundary = "Static unsafe contract review measurement input; not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not witness adequacy, and not policy readiness."
+
+[[cards]]
+family = "manual_candidate_projection"
+judgment = "actionable"
+reason = "The first-pr bundle keeps the Bun TextDecoder, MySQL SAB, zstd overlap, async StringOrBuffer RAB, and node:fs scalar write RAB examples manual/advisory while preserving file:line, safe caller route, invariant, evidence commands, limitations, implementer guidance, and manual repair queue sidecar entries."
+next_step = "Keep this as projection regression pressure for manual-candidate import, manual repair queue sidecar, review-kit handoff, PR summaries, and witness-plan follow-up wording."
+
+[[cards]]
+family = "first_pr_projection"
+judgment = "actionable"
+reason = "The reviewer doorway shows a bounded manual-candidate queue and points to full context, witness-plan, and manual repair handoff commands without adding candidates to ReviewCard-only artifacts."
+next_step = "Re-run the smoke after future first-pr bundle changes that touch manual candidate queues, manual repair queue entries, or artifact relationships."
+
+[[cards]]
+family = "witness_plan"
+judgment = "actionable"
+reason = "The witness-plan follow-up names manual candidates as copy-only external evidence targets and keeps them out of ReviewCard witness route groups."
+next_step = "Preserve the no-witness-execution boundary until an exact manual-candidate receipt is imported and audited."

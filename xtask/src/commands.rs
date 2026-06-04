@@ -20,6 +20,7 @@ pub(crate) enum XtaskCommand {
     CheckFuzz,
     CheckAdvisoryArtifacts(PathBuf),
     CheckFirstPrArtifacts(PathBuf),
+    CheckManualCandidateExamples,
     CheckFirstHour,
     SourceDivergence,
 }
@@ -63,6 +64,11 @@ impl XtaskCommand {
             Some("check-first-pr-artifacts") => Ok(Self::CheckFirstPrArtifacts(
                 command_args::require_subcommand_dir_arg(args, "check-first-pr-artifacts")?,
             )),
+            Some("check-manual-candidate-examples") => parse_no_extra(
+                args,
+                "check-manual-candidate-examples",
+                Self::CheckManualCandidateExamples,
+            ),
             Some("check-first-hour") => {
                 parse_no_extra(args, "check-first-hour", Self::CheckFirstHour)
             }

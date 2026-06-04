@@ -24,6 +24,23 @@ CI lanes have separate jobs and authority:
 - Release readiness is explicit package/install smoke proof, not every-PR cost.
 - Trusted comment posting is future split-token infrastructure, not default CI.
 
+The repo-facing control surface is `xtask`. Upstream tools are engine-room
+substrates, not the public repo contract. A workflow may install or invoke tools
+such as `cargo-llvm-cov`, `cargo-deny`, `cargo-nextest`, `ripr`,
+`cargo-mutants`, Miri, `actionlint`, `zizmor`, `taplo`, or `typos`, but the
+repository policy must still be expressed through accepted specs, policy
+ledgers, ReviewCard-derived artifacts, or a stable `xtask` wrapper.
+
+The standard rule is:
+
+```text
+xtask decides what the repo proves.
+Upstream tools produce bounded evidence for that decision.
+```
+
+That keeps tool churn out of the user-facing CI contract and prevents direct
+upstream-tool invocations from silently becoming new blocking policy.
+
 ## Default workspace gate
 
 Default PR CI runs the cheap repository policy gate on the pinned Rust
@@ -138,6 +155,7 @@ target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
 target/unsafe-review/receipt-audit.md
 target/unsafe-review/manual-candidates.json
+target/unsafe-review/manual-repair-queue.json
 target/unsafe-review/lsp.json
 target/unsafe-review/repair-queue.json
 ```
@@ -268,7 +286,9 @@ Default behavior of the example workflow:
 - runs `unsafe-review first-pr --base origin/<base>`;
 - verifies with `cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review`;
 - uploads `cards.json`, `pr-summary.md`, `github-summary.md`, `cards.sarif`,
-`comment-plan.json`, `witness-plan.md`, `lsp.json`, and `repair-queue.json`;
+`comment-plan.json`, `witness-plan.md`, `receipt-audit.md`,
+`manual-candidates.json`, `manual-repair-queue.json`, `lsp.json`, and
+`repair-queue.json`;
 - does not post comments;
 - does not run witnesses;
 - does not block on findings, only on artifact/tooling contract failures.

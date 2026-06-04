@@ -77,6 +77,8 @@ cards.sarif
 comment-plan.json
 witness-plan.md
 receipt-audit.md
+manual-candidates.json
+manual-repair-queue.json
 lsp.json
 repair-queue.json
 ```
@@ -92,6 +94,8 @@ The bundle is artifact-first:
 | `comment-plan.json` | Planned comments, not posted |
 | `witness-plan.md` | Suggested witness routes and limits |
 | `receipt-audit.md` | Saved receipt metadata audit; no witness was run |
+| `manual-candidates.json` | Imported manual/advisory candidates, separate from ReviewCards |
+| `manual-repair-queue.json` | Copy-only manual candidate repair handoff; no agent was run |
 | `lsp.json` | Saved read-only editor projection |
 | `repair-queue.json` | Copy-only agent repair queue; no agent was run |
 

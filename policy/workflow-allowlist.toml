@@ -26,7 +26,7 @@ actions = [
   "Swatinem/rust-cache@v2",
   "actions/upload-artifact@v7",
 ]
-reason = "Advisory unsafe-review first-pr packet workflow, routed to the EM shared self-hosted rust-small tier behind the maintainer-applied full-ci label gate. It uploads cards.json, pr-summary.md, cards.sarif, comment-plan.json, witness-plan.md, and lsp.json without witness execution, comment posting, source edits, or write permissions."
+reason = "Advisory unsafe-review first-pr packet workflow, routed to the EM shared self-hosted rust-small tier behind the maintainer-applied full-ci label gate. It uploads the first-pr bundle, including ReviewCards, summaries, SARIF, comment-plan, witness-plan, receipt audit, manual-candidates, manual repair queue sidecar, saved LSP, and repair queue artifacts without witness execution, comment posting, source edits, or write permissions."
 created = "2026-05-18"
 review_after = "2026-06-18"
 

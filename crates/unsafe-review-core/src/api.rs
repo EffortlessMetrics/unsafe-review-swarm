@@ -132,7 +132,9 @@ impl Default for AnalyzeInput {
 #[derive(Clone, Debug, Default)]
 pub struct Summary {
     pub rust_files: usize,
+    pub changed_files: usize,
     pub changed_rust_files: usize,
+    pub changed_non_rust_files: usize,
     pub unsafe_sites: usize,
     pub cards: usize,
     pub open_actionable_gaps: usize,
@@ -216,6 +218,10 @@ pub fn evaluate_policy_report(mut input: AnalyzeInput) -> Result<PolicyReport, S
     input.policy = PolicyMode::Advisory;
     let output = pipeline::analyze(input)?;
     policy_report::evaluate(&output)
+}
+
+pub fn evaluate_policy_report_from_output(output: &AnalyzeOutput) -> Result<PolicyReport, String> {
+    policy_report::evaluate(output)
 }
 
 pub fn render_json(output: &AnalyzeOutput) -> String {
