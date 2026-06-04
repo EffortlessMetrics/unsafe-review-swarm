@@ -90,9 +90,10 @@ const UB_RISK_REVIEW_CI_REQUIRED_SECTIONS: &[(&str, &[&str])] = &[
             "Upload the full `target/unsafe-review/` review kit",
             "$GITHUB_STEP_SUMMARY",
             "Optionally upload `cards.sarif`",
-            "post PR comments",
-            "fail because ReviewCards exist",
-            "claim UB, safety, UB-free status",
+            "The default CI job should not:",
+            "- post PR comments",
+            "- fail because ReviewCards exist",
+            "- claim UB, safety, UB-free status",
         ],
     ),
     (
@@ -10808,6 +10809,22 @@ OperationFamily::RawPointerRead => vec![
     }
 
     #[test]
+    fn ub_risk_review_ci_doc_checker_rejects_inverted_default_policy() -> Result<(), String> {
+        let text = ub_risk_review_ci_doc_fixture().replace(
+            "The default CI job should not:",
+            "The default CI job should:",
+        );
+
+        let err = err_text(check_ub_risk_review_ci_text(
+            &text,
+            Path::new("docs/ci/UB_RISK_REVIEW_CI.md"),
+        ))?;
+
+        assert!(err.contains("The default CI job should not:"));
+        Ok(())
+    }
+
+    #[test]
     fn markdown_link_target_parser_finds_plain_local_links() {
         let targets = markdown::link_targets(
             "[First use](docs/FIRST_USE.md) [external](https://example.com) [anchor](#trust)",
@@ -10901,7 +10918,10 @@ OperationFamily::RawPointerRead => vec![
         text.push_str("Upload the full `target/unsafe-review/` review kit.\n");
         text.push_str("Append github-summary.md to $GITHUB_STEP_SUMMARY.\n");
         text.push_str("Optionally upload `cards.sarif`.\n");
-        text.push_str("Do not post PR comments, fail because ReviewCards exist, or claim UB, safety, UB-free status.\n");
+        text.push_str("The default CI job should not:\n");
+        text.push_str("- post PR comments,\n");
+        text.push_str("- fail because ReviewCards exist,\n");
+        text.push_str("- claim UB, safety, UB-free status.\n");
         text.push_str("\n## Copy-Ready Workflow\n\n");
         text.push_str("pull_request\npermissions:\n  contents: read\n");
         text.push_str("unsafe-review first-pr --base \"origin/${BASE_REF}\"\n");
