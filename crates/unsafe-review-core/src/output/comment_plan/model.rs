@@ -10,7 +10,8 @@ use std::collections::BTreeSet;
 
 use super::selection::{
     MAX_COMMENT_BUDGET_REASON, OPERATION_FAMILY_BUDGET_REASON, ReviewBudgetReason, actionability,
-    comment_body, non_selection_reason, relevance, selection_reason, should_plan_comment,
+    comment_body, confirmation_step, hypothesis_to_confirm, non_selection_reason, relevance,
+    selection_reason, should_plan_comment,
 };
 
 const MAX_PLANNED_COMMENTS: usize = 3;
@@ -138,11 +139,13 @@ pub(super) struct PlannedComment {
     priority: &'static str,
     confidence: &'static str,
     proof_path: &'static str,
+    hypothesis_to_confirm: String,
     operation: String,
     operation_family: &'static str,
     witness_routes: Vec<PlannedWitnessRoute>,
     next_action: String,
     verify_commands: Vec<String>,
+    confirmation_step: String,
     selection_reason: &'static str,
     selection_reason_code: &'static str,
     actionability: &'static str,
@@ -163,11 +166,13 @@ impl From<&ReviewCard> for PlannedComment {
             priority: card.priority.as_str(),
             confidence: card.confidence.as_str(),
             proof_path: card.proof_path.as_str(),
+            hypothesis_to_confirm: hypothesis_to_confirm(card),
             operation: card.operation.expression.clone(),
             operation_family: card.operation.family.as_str(),
             witness_routes: card.routes.iter().map(PlannedWitnessRoute::from).collect(),
             next_action: card.next_action.summary.clone(),
             verify_commands: card.next_action.verify_commands.clone(),
+            confirmation_step: confirmation_step(card),
             selection_reason: selection_reason.message,
             selection_reason_code: selection_reason.code,
             actionability: actionability(card),

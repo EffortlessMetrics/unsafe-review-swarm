@@ -356,11 +356,13 @@ changed_line
 class
 priority
 confidence
+hypothesis_to_confirm
 operation
 operation_family
 next_action
 witness_routes
 verify_commands
+confirmation_step
 selection_reason
 selection_reason_code
 actionability

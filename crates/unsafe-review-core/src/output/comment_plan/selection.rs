@@ -136,8 +136,8 @@ pub(super) fn comment_body(card: &ReviewCard) -> String {
     body.push_str(&format!("Missing evidence: {}\n\n", missing_summary(card)));
     body.push_str(&format!("Proof path: `{}`.\n\n", card.proof_path.as_str()));
     body.push_str(&format!(
-        "Hypothesis to confirm: static `{}` ReviewCard; confirm with external evidence before treating it as observed runtime behavior.\n\n",
-        card.class.as_str()
+        "Hypothesis to confirm: {}.\n\n",
+        hypothesis_to_confirm(card)
     ));
     body.push_str(&format!("Next action: {}\n\n", card.next_action.summary));
     body.push_str(&format!(
@@ -161,7 +161,15 @@ pub(super) fn comment_body(card: &ReviewCard) -> String {
     body
 }
 
-fn confirmation_step(card: &ReviewCard) -> String {
+pub(super) fn hypothesis_to_confirm(card: &ReviewCard) -> String {
+    format!(
+        "static `{}` ReviewCard for `{}`; confirm with external evidence before treating it as observed runtime behavior",
+        card.class.as_str(),
+        one_line(&card.operation.expression)
+    )
+}
+
+pub(super) fn confirmation_step(card: &ReviewCard) -> String {
     if let Some(command) = card.next_action.verify_commands.first() {
         return format!(
             "build/run `{command}` first, then attach a matching receipt if it confirms the route"

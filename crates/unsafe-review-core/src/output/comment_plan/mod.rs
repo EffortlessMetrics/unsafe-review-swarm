@@ -31,8 +31,16 @@ mod tests {
         );
         assert_eq!(value["comments"][0]["operation_family"], "raw_pointer_read");
         assert_eq!(
+            value["comments"][0]["hypothesis_to_confirm"],
+            "static `guard_missing` ReviewCard for `unsafe { ptr.cast::<Header>().read() }`; confirm with external evidence before treating it as observed runtime behavior"
+        );
+        assert_eq!(
             value["comments"][0]["next_action"],
             "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation."
+        );
+        assert_eq!(
+            value["comments"][0]["confirmation_step"],
+            "build/run `cargo +nightly miri test read_header` first, then attach a matching receipt if it confirms the route"
         );
         assert_eq!(
             value["comments"][0]["selection_reason"],

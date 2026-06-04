@@ -5015,6 +5015,18 @@ fn require_comment_body_card_projection(
             "{context} body must project ReviewCard confirmation step"
         ));
     }
+    let expected_hypothesis = expected_comment_hypothesis(card);
+    if !body.contains(&expected_hypothesis) {
+        return Err(format!(
+            "{context} body must project structured hypothesis_to_confirm `{expected_hypothesis}`"
+        ));
+    }
+    let expected_confirmation_step = expected_comment_confirmation_step(card);
+    if !body.contains(&expected_confirmation_step) {
+        return Err(format!(
+            "{context} body must project structured confirmation_step `{expected_confirmation_step}`"
+        ));
+    }
     if let Some(command) = card.verify_commands.first() {
         let expected = format!("Confirmation step: build/run `{command}` first");
         if !body.contains(&expected) {
@@ -5450,11 +5462,46 @@ fn require_comment_card_projection(
     require_projected_str(comment, "proof_path", &card.proof_path, context)?;
     require_projected_str(comment, "path", &card.path, context)?;
     require_projected_u64(comment, "line", card.line, context)?;
+    require_projected_str(
+        comment,
+        "hypothesis_to_confirm",
+        &expected_comment_hypothesis(card),
+        context,
+    )?;
     require_projected_str(comment, "operation", &card.operation, context)?;
     require_projected_str(comment, "next_action", &card.next_action, context)?;
     require_projected_string_array(comment, "verify_commands", &card.verify_commands, context)?;
+    require_projected_str(
+        comment,
+        "confirmation_step",
+        &expected_comment_confirmation_step(card),
+        context,
+    )?;
     require_projected_witness_routes(comment, &card.witness_routes, context)?;
     require_projected_str(comment, "operation_family", &card.operation_family, context)
+}
+
+fn expected_comment_hypothesis(card: &CardProjection) -> String {
+    format!(
+        "static `{}` ReviewCard for `{}`; confirm with external evidence before treating it as observed runtime behavior",
+        card.class_name,
+        collapse_whitespace(&card.operation)
+    )
+}
+
+fn expected_comment_confirmation_step(card: &CardProjection) -> String {
+    if let Some(command) = card.verify_commands.first() {
+        return format!(
+            "build/run `{command}` first, then attach a matching receipt if it confirms the route"
+        );
+    }
+    if let Some(route) = card.witness_routes.first() {
+        return format!(
+            "use the `{}` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+            route.kind
+        );
+    }
+    "derive a focused confirmation from `unsafe-review explain` and human review before upgrading confidence".to_string()
 }
 
 fn require_not_selected_card_projection(
