@@ -64,6 +64,9 @@ The goal is reviewer leverage, not commenting on every card.
 - Candidate bodies must include a trust boundary statement.
 - The selected comment hypothesis and confirmation step are structured fields,
   not body-only prose; bodies must render those same values without drift.
+- `build_this_first` is a structured plan-only cue for the first confirmation
+  action; it must project from the first verify command when present, otherwise
+  from the selected witness route or human review path.
 
 Each selected candidate includes required fields:
 
@@ -71,7 +74,8 @@ Each selected candidate includes required fields:
 - `changed_line`
 - `operation`, `operation_family`, `class`, `priority`, `confidence`
 - `hypothesis_to_confirm`
-- `next_action`, `witness_routes`, `verify_commands`, `confirmation_step`
+- `next_action`, `witness_routes`, `verify_commands`, `build_this_first`,
+  `confirmation_step`
 - `selection_reason`, `selection_reason_code`, `actionability`, `relevance`
 - `body`, `trust_boundary`
 
@@ -222,17 +226,17 @@ document is a future-lane contract, not a live workflow.
 - a `not_selected` card that is also present in `comments[]`
 - duplicate `card_id` or duplicate `path`/`line` inline anchors
 - invalid line/path
-- missing `hypothesis_to_confirm`, `next_action`, `confirmation_step`,
-  `selection_reason`, `selection_reason_code`, `actionability`, `relevance`, or
-  candidate `trust_boundary`
+- missing `hypothesis_to_confirm`, `next_action`, `build_this_first`,
+  `confirmation_step`, `selection_reason`, `selection_reason_code`,
+  `actionability`, `relevance`, or candidate `trust_boundary`
 - planned comments with `changed_line = false`
 - `not_selected[]` entries with `changed_line = false` whose reason is not
   `outside changed hunk`
 - missing, unknown, or drifted `not_selected[].reason_code`
 - drift between `not_selected` review context and the referenced ReviewCard
 - `relevance` outside the documented set (`high`, `medium`, `low`)
-- selected comment `hypothesis_to_confirm` or `confirmation_step` that drifts
-  from the referenced ReviewCard
+- selected comment `hypothesis_to_confirm`, `build_this_first`, or
+  `confirmation_step` that drifts from the referenced ReviewCard
 - body text that drifts from the structured ReviewCard projection
 - missing trust boundary in body
 - body text over 220 words

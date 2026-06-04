@@ -59,6 +59,13 @@ struct WitnessRouteProjection {
     required: bool,
 }
 
+struct CommentBuildFirstProjection {
+    kind: &'static str,
+    command: Option<String>,
+    route_kind: Option<String>,
+    summary: String,
+}
+
 struct RepairQueueProjection {
     buckets: Vec<String>,
     readiness_ready: bool,
@@ -5027,6 +5034,13 @@ fn require_comment_body_card_projection(
             "{context} body must project structured confirmation_step `{expected_confirmation_step}`"
         ));
     }
+    let expected_build_first = expected_comment_build_this_first(card);
+    if !body.contains(&expected_build_first.summary) {
+        return Err(format!(
+            "{context} body must project structured build_this_first summary `{}`",
+            expected_build_first.summary
+        ));
+    }
     if let Some(command) = card.verify_commands.first() {
         let expected = format!("Confirmation step: build/run `{command}` first");
         if !body.contains(&expected) {
@@ -5471,6 +5485,7 @@ fn require_comment_card_projection(
     require_projected_str(comment, "operation", &card.operation, context)?;
     require_projected_str(comment, "next_action", &card.next_action, context)?;
     require_projected_string_array(comment, "verify_commands", &card.verify_commands, context)?;
+    require_comment_build_this_first_projection(comment, card, context)?;
     require_projected_str(
         comment,
         "confirmation_step",
@@ -5479,6 +5494,56 @@ fn require_comment_card_projection(
     )?;
     require_projected_witness_routes(comment, &card.witness_routes, context)?;
     require_projected_str(comment, "operation_family", &card.operation_family, context)
+}
+
+fn require_comment_build_this_first_projection(
+    comment: &serde_json::Value,
+    card: &CardProjection,
+    context: &str,
+) -> Result<(), String> {
+    let Some(value) = comment.get("build_this_first") else {
+        return Err(format!("{context} is missing build_this_first"));
+    };
+    let Some(object) = value.as_object() else {
+        return Err(format!("{context} build_this_first must be an object"));
+    };
+    let expected = expected_comment_build_this_first(card);
+    let kind = super::require_non_empty_json_str(value, "kind", context)?;
+    require_expected_value(
+        kind,
+        expected.kind,
+        &format!("{context} build_this_first.kind"),
+    )?;
+    require_optional_string_value(
+        object.get("command"),
+        expected.command.as_deref(),
+        &format!("{context} build_this_first.command"),
+    )?;
+    require_optional_string_value(
+        object.get("route_kind"),
+        expected.route_kind.as_deref(),
+        &format!("{context} build_this_first.route_kind"),
+    )?;
+    require_projected_str(value, "summary", &expected.summary, context)
+}
+
+fn require_optional_string_value(
+    actual: Option<&serde_json::Value>,
+    expected: Option<&str>,
+    context: &str,
+) -> Result<(), String> {
+    match (actual, expected) {
+        (Some(value), Some(expected)) => {
+            let Some(actual) = value.as_str() else {
+                return Err(format!("{context} must be a string"));
+            };
+            require_expected_value(actual, expected, context)
+        }
+        (Some(value), None) if value.is_null() => Ok(()),
+        (None, None) => Ok(()),
+        (Some(value), None) => Err(format!("{context} must be null; got `{value}`")),
+        (None, Some(expected)) => Err(format!("{context} must be `{expected}`; got missing")),
+    }
 }
 
 fn expected_comment_hypothesis(card: &CardProjection) -> String {
@@ -5502,6 +5567,36 @@ fn expected_comment_confirmation_step(card: &CardProjection) -> String {
         );
     }
     "derive a focused confirmation from `unsafe-review explain` and human review before upgrading confidence".to_string()
+}
+
+fn expected_comment_build_this_first(card: &CardProjection) -> CommentBuildFirstProjection {
+    if let Some(command) = card.verify_commands.first() {
+        return CommentBuildFirstProjection {
+            kind: "verify_command",
+            command: Some(command.clone()),
+            route_kind: card.witness_routes.first().map(|route| route.kind.clone()),
+            summary: format!(
+                "Build/run `{command}` first for this card; attach a matching receipt only if it confirms the route"
+            ),
+        };
+    }
+    if let Some(route) = card.witness_routes.first() {
+        return CommentBuildFirstProjection {
+            kind: "witness_route",
+            command: route.command.clone(),
+            route_kind: Some(route.kind.clone()),
+            summary: format!(
+                "No automatic build/run command is available; use the `{}` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+                route.kind
+            ),
+        };
+    }
+    CommentBuildFirstProjection {
+        kind: "human_review",
+        command: None,
+        route_kind: None,
+        summary: "No automatic build/run command is available; derive the first confirmation from `unsafe-review explain` and human review before upgrading confidence".to_string(),
+    }
 }
 
 fn require_not_selected_card_projection(

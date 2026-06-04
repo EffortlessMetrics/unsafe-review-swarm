@@ -39,6 +39,24 @@ mod tests {
             "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation."
         );
         assert_eq!(
+            value["comments"][0]["build_this_first"]["kind"],
+            "verify_command"
+        );
+        assert_eq!(
+            value["comments"][0]["build_this_first"]["command"],
+            "cargo +nightly miri test read_header"
+        );
+        assert_eq!(
+            value["comments"][0]["build_this_first"]["route_kind"],
+            "miri"
+        );
+        assert!(
+            value["comments"][0]["build_this_first"]["summary"]
+                .as_str()
+                .unwrap_or("")
+                .contains("Build/run `cargo +nightly miri test read_header` first")
+        );
+        assert_eq!(
             value["comments"][0]["confirmation_step"],
             "build/run `cargo +nightly miri test read_header` first, then attach a matching receipt if it confirms the route"
         );
@@ -84,6 +102,14 @@ mod tests {
                 .as_str()
                 .unwrap_or("")
                 .contains("Hypothesis to confirm: static `guard_missing` ReviewCard")
+        );
+        assert!(
+            value["comments"][0]["body"]
+                .as_str()
+                .unwrap_or("")
+                .contains(
+                    "Build/run this first: Build/run `cargo +nightly miri test read_header` first"
+                )
         );
         assert!(
             value["comments"][0]["body"]

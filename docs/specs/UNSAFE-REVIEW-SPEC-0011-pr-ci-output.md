@@ -362,6 +362,7 @@ operation_family
 next_action
 witness_routes
 verify_commands
+build_this_first
 confirmation_step
 selection_reason
 selection_reason_code
@@ -372,6 +373,11 @@ trust_boundary
 ```
 
 `line` must be one-based and nonzero.
+
+`build_this_first` must be a plan-only cue object projected from the first
+verify command when available, otherwise from the first witness route or human
+review path. It must not imply that unsafe-review ran the command or observed
+runtime behavior.
 
 Planned comments must not repeat a `card_id` or a `path`/`line` inline anchor.
 Planned comments also must not repeat an `operation_family` plus

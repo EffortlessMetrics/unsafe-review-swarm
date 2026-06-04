@@ -1,6 +1,8 @@
 use crate::domain::{Confidence, OperationFamily, Priority, ReviewCard, ReviewClass};
 use crate::output::REVIEWCARD_TRUST_BOUNDARY;
 
+use super::model::PlannedBuildFirst;
+
 const PLAN_BOUNDARY: &str = "Plan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision.";
 
 #[derive(Clone, Copy)]
@@ -141,6 +143,10 @@ pub(super) fn comment_body(card: &ReviewCard) -> String {
     ));
     body.push_str(&format!("Next action: {}\n\n", card.next_action.summary));
     body.push_str(&format!(
+        "Build/run this first: {}\n\n",
+        build_this_first(card).summary
+    ));
+    body.push_str(&format!(
         "Confirmation step: {}\n\n",
         confirmation_step(card)
     ));
@@ -166,6 +172,36 @@ pub(super) fn hypothesis_to_confirm(card: &ReviewCard) -> String {
         "static `{}` ReviewCard for `{}`; confirm with external evidence before treating it as observed runtime behavior",
         card.class.as_str(),
         one_line(&card.operation.expression)
+    )
+}
+
+pub(super) fn build_this_first(card: &ReviewCard) -> PlannedBuildFirst {
+    if let Some(command) = card.next_action.verify_commands.first() {
+        return PlannedBuildFirst::new(
+            "verify_command",
+            Some(command.clone()),
+            card.routes.first().map(|route| route.kind.as_str()),
+            format!(
+                "Build/run `{command}` first for this card; attach a matching receipt only if it confirms the route"
+            ),
+        );
+    }
+    if let Some(route) = card.routes.first() {
+        return PlannedBuildFirst::new(
+            "witness_route",
+            route.command.clone(),
+            Some(route.kind.as_str()),
+            format!(
+                "No automatic build/run command is available; use the `{}` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+                route.kind.as_str()
+            ),
+        );
+    }
+    PlannedBuildFirst::new(
+        "human_review",
+        None,
+        None,
+        "No automatic build/run command is available; derive the first confirmation from `unsafe-review explain` and human review before upgrading confidence".to_string(),
     )
 }
 

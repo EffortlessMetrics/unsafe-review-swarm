@@ -10,8 +10,8 @@ use std::collections::BTreeSet;
 
 use super::selection::{
     MAX_COMMENT_BUDGET_REASON, OPERATION_FAMILY_BUDGET_REASON, ReviewBudgetReason, actionability,
-    comment_body, confirmation_step, hypothesis_to_confirm, non_selection_reason, relevance,
-    selection_reason, should_plan_comment,
+    build_this_first, comment_body, confirmation_step, hypothesis_to_confirm, non_selection_reason,
+    relevance, selection_reason, should_plan_comment,
 };
 
 const MAX_PLANNED_COMMENTS: usize = 3;
@@ -145,6 +145,7 @@ pub(super) struct PlannedComment {
     witness_routes: Vec<PlannedWitnessRoute>,
     next_action: String,
     verify_commands: Vec<String>,
+    build_this_first: PlannedBuildFirst,
     confirmation_step: String,
     selection_reason: &'static str,
     selection_reason_code: &'static str,
@@ -172,6 +173,7 @@ impl From<&ReviewCard> for PlannedComment {
             witness_routes: card.routes.iter().map(PlannedWitnessRoute::from).collect(),
             next_action: card.next_action.summary.clone(),
             verify_commands: card.next_action.verify_commands.clone(),
+            build_this_first: build_this_first(card),
             confirmation_step: confirmation_step(card),
             selection_reason: selection_reason.message,
             selection_reason_code: selection_reason.code,
@@ -220,6 +222,30 @@ impl NotSelectedCard {
             relevance: relevance(card),
             reason: reason.message,
             reason_code: reason.code,
+        }
+    }
+}
+
+#[derive(Serialize)]
+pub(super) struct PlannedBuildFirst {
+    kind: &'static str,
+    command: Option<String>,
+    route_kind: Option<&'static str>,
+    pub(super) summary: String,
+}
+
+impl PlannedBuildFirst {
+    pub(super) fn new(
+        kind: &'static str,
+        command: Option<String>,
+        route_kind: Option<&'static str>,
+        summary: String,
+    ) -> Self {
+        Self {
+            kind,
+            command,
+            route_kind,
+            summary,
         }
     }
 }
