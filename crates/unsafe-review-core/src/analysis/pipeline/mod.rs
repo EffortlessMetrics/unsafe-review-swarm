@@ -2803,6 +2803,34 @@ pub fn zstd_sync(
     }
 
     #[test]
+    fn js_buffer_reentry_fixture_pins_node_fs_rab_scalar_write_card() -> Result<(), String> {
+        let output = fixture_output("js_buffer_reentry_node_fs_rab_scalar_write")?;
+        let card = single_card("js_buffer_reentry_node_fs_rab_scalar_write", &output)?;
+
+        assert_eq!(
+            card.operation.family,
+            OperationFamily::StableByteSourceRabAsync
+        );
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert_eq!(card.proof_path, ProofPath::ObservableRedGreen);
+        assert_eq!(card.site.owner.as_deref(), Some("node_fs_rab_scalar_write"));
+        assert_eq!(card.site.location.line, 36);
+        assert!(
+            card.operation
+                .expression
+                .contains("stable-byte-source-rab-async")
+        );
+        assert!(card.operation.expression.contains("dispatch_async_worker"));
+        assert!(card.operation.expression.contains("write_scalar_worker"));
+        assert!(
+            card.next_action
+                .summary
+                .contains("observable-red-green proof path")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn js_buffer_reentry_fixture_pins_raw_parts_materialization_card() -> Result<(), String> {
         let output = fixture_output("js_buffer_reentry_raw_parts_materialization")?;
         assert_eq!(output.cards.len(), 2);
@@ -2874,6 +2902,20 @@ pub fn zstd_sync(
         assert!(
             output.cards.is_empty(),
             "callback reentry before async descriptor capture should stay a no-card control"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn js_buffer_reentry_fixture_keeps_node_fs_schedule_before_capture_no_card()
+    -> Result<(), String> {
+        let output = fixture_output(
+            "js_buffer_reentry_node_fs_rab_scalar_write_scheduled_before_capture_no_card",
+        )?;
+
+        assert!(
+            output.cards.is_empty(),
+            "async scheduling before scalar write capture should stay a no-card control"
         );
         Ok(())
     }

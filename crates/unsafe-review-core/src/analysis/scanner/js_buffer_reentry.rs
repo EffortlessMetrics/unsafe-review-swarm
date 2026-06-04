@@ -42,11 +42,14 @@ pub(super) fn detect_js_buffer_reentry_sites(
         else {
             continue;
         };
+        let capture = &owner_lines[capture_idx];
         let Some(reentry_idx) = owner_lines
             .iter()
             .enumerate()
             .skip(capture_idx + 1)
-            .find_map(|(idx, line)| is_possible_js_reentry(&line.text).then_some(idx))
+            .find_map(|(idx, line)| {
+                is_js_buffer_stability_boundary(capture, &line.text).then_some(idx)
+            })
         else {
             continue;
         };
@@ -60,7 +63,6 @@ pub(super) fn detect_js_buffer_reentry_sites(
         ) else {
             continue;
         };
-        let capture = &owner_lines[capture_idx];
         let reentry = &owner_lines[reentry_idx];
         let materialize = &owner_lines[materialize_idx];
         if !js_buffer_reentry_changed(diff, repo_mode, rel, capture, reentry, materialize) {
@@ -253,6 +255,23 @@ fn is_possible_js_reentry(line: &str) -> bool {
             && contains_call_name(line, "get"))
 }
 
+fn is_js_buffer_stability_boundary(capture: &JsBufferLine, line: &str) -> bool {
+    is_possible_js_reentry(line)
+        || (is_js_buffer_async_descriptor_helper(&capture.text)
+            && is_async_scheduling_boundary(line))
+}
+
+fn is_async_scheduling_boundary(line: &str) -> bool {
+    let lower = line.to_ascii_lowercase();
+    lower.contains("will_be_async")
+        || lower.contains("dispatch_async")
+        || lower.contains("dispatch_worker")
+        || lower.contains("schedule_async")
+        || lower.contains("schedule_worker")
+        || lower.contains("nodefs::dispatch")
+        || (lower.contains("dispatch") && lower.contains("worker"))
+}
+
 fn is_js_buffer_materialization(line: &str) -> bool {
     contains_call_name(line, "byte_slice")
         || contains_call_name(line, "byte_slice_mut")
@@ -275,7 +294,7 @@ fn js_buffer_stable_byte_expression(
 ) -> String {
     if is_js_buffer_async_descriptor_helper(&capture.text) {
         format!(
-            "stable-byte-source-rab-async candidate; proof required: observable-red-green; RAB-backed JS buffer descriptor captured through async helper before possible JS reentry and later helper/native materialization; capture: {}; reentry: {}; materialize: {}",
+            "stable-byte-source-rab-async candidate; proof required: observable-red-green; RAB-backed JS buffer descriptor captured through async helper before possible JS reentry or async scheduling and later helper/native materialization; capture: {}; boundary: {}; materialize: {}",
             one_line(&capture.text),
             one_line(&reentry.text),
             one_line(&materialize.text)

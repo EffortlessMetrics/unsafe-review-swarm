@@ -1,0 +1,46 @@
+pub struct JSValue;
+pub struct GlobalObject;
+pub struct StringOrBuffer;
+
+pub fn from_js_maybe_async_into<T>(
+    _global: &mut GlobalObject,
+    _value: JSValue,
+) -> Result<T, ()>
+where
+    T: Default,
+{
+    Ok(T::default())
+}
+
+impl Default for StringOrBuffer {
+    fn default() -> Self {
+        Self
+    }
+}
+
+impl StringOrBuffer {
+    pub fn byte_slice(&self) -> &[u8] {
+        &[]
+    }
+}
+
+pub struct WriteArgs {
+    buffer: StringOrBuffer,
+}
+
+pub fn node_fs_rab_scalar_write(global: &mut GlobalObject, data: JSValue) -> Result<usize, ()> {
+    dispatch_async_worker()?;
+    let args = WriteArgs {
+        buffer: from_js_maybe_async_into::<StringOrBuffer>(global, data)?,
+    };
+    write_scalar_worker(&args)
+}
+
+fn dispatch_async_worker() -> Result<(), ()> {
+    Ok(())
+}
+
+fn write_scalar_worker(args: &WriteArgs) -> Result<usize, ()> {
+    let bytes = args.buffer.byte_slice();
+    Ok(bytes.len())
+}
