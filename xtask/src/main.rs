@@ -10341,7 +10341,6 @@ command = "rtk cargo run --locked -p xtask -- check-manual-candidate-examples"
 artifact_status = "local_untracked"
 artifacts = [
   "target/unsafe-review-manual-candidate-smoke/manual-candidates.json",
-  "target/unsafe-review-manual-candidate-smoke/manual-repair-queue.json",
   "target/unsafe-review-manual-candidate-smoke/tokmd-packets.json",
   "target/unsafe-review-manual-candidate-smoke/review-kit.json",
   "target/unsafe-review-manual-candidate-smoke/pr-summary.md",
