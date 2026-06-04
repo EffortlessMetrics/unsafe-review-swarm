@@ -10855,6 +10855,45 @@ next_step = "Record this as a usefulness sample without promoting calibration."
     }
 
     #[test]
+    fn dogfood_judgment_accepts_agent_task_labels() -> Result<(), String> {
+        let text = format!(
+            r#"
+schema_version = "1.0"
+target = "arrayvec-pr288"
+report = "reports/2026-05-28-arrayvec-first-pr-projection-smoke.md"
+reviewer = "manual"
+date = "2026-05-31"
+scope = "agent-task label schema coverage"
+trust_boundary = "{}"
+
+[[cards]]
+family = "repair_queue"
+judgment = "good-agent-task"
+reason = "The packet gives a bounded, reviewer-checkable task in the schema sample."
+next_step = "Use only after a real report records matching agent-task evidence."
+
+[[cards]]
+family = "repair_queue"
+judgment = "bad-agent-task"
+reason = "The packet is underconstrained in the schema sample."
+next_step = "Keep this as label coverage, not as evidence about a real target."
+"#,
+            dogfood_judgment_boundary_for_tests()
+        );
+
+        let rows = check_dogfood_judgment_text(
+            "docs/dogfood/judgments/arrayvec-pr288.toml",
+            &text,
+            &dogfood_judgment_targets_for_tests(),
+            &dogfood_judgment_families_for_tests(),
+            &dogfood_judgment_reports_for_tests(),
+        )?;
+
+        assert_eq!(rows, 2);
+        Ok(())
+    }
+
+    #[test]
     fn dogfood_judgment_accepts_missed_obligation_sample() -> Result<(), String> {
         let text = format!(
             r#"
