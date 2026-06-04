@@ -1739,16 +1739,25 @@ fn check_tokmd_packet_entry(
         &context,
     )?;
     let missing_inputs = require_non_empty_string_array(entry, "missing_inputs", &context)?;
-    for expected_input in [
-        "ReviewCard projection",
-        "receipt audit JSON",
-        "stable-byte ledger state",
-    ] {
+    for expected_input in ["ReviewCard projection", "receipt audit JSON"] {
         if !missing_inputs.iter().any(|input| input == expected_input) {
             return Err(format!(
                 "{context} missing_inputs must include `{expected_input}`"
             ));
         }
+    }
+    let has_missing_stable_byte_ledger = missing_inputs
+        .iter()
+        .any(|input| input == "stable-byte ledger state");
+    if expected.stable_byte_ledger_state.is_some() && has_missing_stable_byte_ledger {
+        return Err(format!(
+            "{context} missing_inputs must not include `stable-byte ledger state` when packet-local ledger_state is present"
+        ));
+    }
+    if expected.stable_byte_ledger_state.is_none() && !has_missing_stable_byte_ledger {
+        return Err(format!(
+            "{context} missing_inputs must include `stable-byte ledger state` when packet-local ledger_state is absent"
+        ));
     }
     let boundary = super::require_non_empty_json_str(entry, "trust_boundary", &context)?;
     for expected_text in [

@@ -353,7 +353,9 @@ for future Bun packet presets. It must use
 project the same target, route, invariant, external evidence, optional
 `proof_mode`, `fix_boundary`, `pr_aperture`, implementer handoff, and
 copy-only commands as `manual-candidates.json`, and record absent ReviewCard,
-receipt, and stable-byte ledger inputs as explicit limitations. It is not
+receipt, and stable-byte ledger inputs as explicit limitations. Packet-local
+`stable_byte.ledger_state` must be preserved when supplied and must not be
+reported as a missing stable-byte ledger input. It is not
 rendered tokmd output, not analyzer-discovered ReviewCard output, not automatic
 repair, not proof, not witness execution, and not policy gating.
 

@@ -1236,11 +1236,7 @@ fn tokmd_packet_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::V
             "context_json": context_command(root, &candidate.id),
             "witness_plan": candidate_witness_plan_command(root, &candidate.id),
         },
-        "missing_inputs": [
-            "ReviewCard projection",
-            "receipt audit JSON",
-            "stable-byte ledger state"
-        ],
+        "missing_inputs": tokmd_packet_missing_inputs(candidate),
         "trust_boundary": "Manual candidate tokmd packet input only; not analyzer-discovered, not tokmd output, not automatic repair, not witness execution, not source editing, not proof, and not policy gating.",
     });
     if let Some(object) = value.as_object_mut() {
@@ -1258,6 +1254,14 @@ fn tokmd_packet_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::V
         }
     }
     value
+}
+
+fn tokmd_packet_missing_inputs(candidate: &ManualCandidate) -> Vec<&'static str> {
+    let mut missing = vec!["ReviewCard projection", "receipt audit JSON"];
+    if stable_byte_ledger_state(candidate).is_none() {
+        missing.push("stable-byte ledger state");
+    }
+    missing
 }
 
 fn manual_candidate_artifact_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::Value {

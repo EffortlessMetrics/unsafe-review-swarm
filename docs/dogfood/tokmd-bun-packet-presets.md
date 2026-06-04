@@ -127,9 +127,12 @@ The preset renderer should accept a JSON bundle that can be composed from:
 - `docs/dogfood/stable-byte-follow-up-seeds.md` or a future seed JSON export.
 
 The current `tokmd-packets.json` sidecar records which inputs were absent for
-the manual-candidate packet export. The future renderer should preserve those
-limitations and add any renderer-specific absent-input notes. Missing inputs
-must produce an explicit limitation, not an empty result or all-clear statement.
+the manual-candidate packet export. Packet-local `stable_byte.ledger_state`
+metadata is preserved when supplied by a manual candidate and should not be
+reported as missing external seed-ledger data. The future renderer should
+preserve those limitations and add any renderer-specific absent-input notes.
+Missing inputs must produce an explicit limitation, not an empty result or
+all-clear statement.
 
 ## Trust Boundary
 

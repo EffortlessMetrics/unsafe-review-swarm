@@ -2539,7 +2539,13 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(
         missing_inputs
             .iter()
-            .any(|input| input == "stable-byte ledger state")
+            .any(|input| input == "ReviewCard projection")
+    );
+    assert!(
+        !missing_inputs
+            .iter()
+            .any(|input| input == "stable-byte ledger state"),
+        "packet-local stable_byte.ledger_state should not be reported as missing"
     );
     assert!(
         tokmd_packets["trust_boundary"]
