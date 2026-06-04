@@ -28,10 +28,10 @@ pub use api::{
 };
 pub use candidate::{
     MANUAL_CANDIDATE_SCHEMA_VERSION, ManualCandidate, ManualCandidateEvidence,
-    ManualCandidateLocation, ManualCandidateProofMode, load_manual_candidate,
-    load_manual_candidates, manual_candidate_implementer_handoff, manual_candidate_path,
-    read_manual_candidate, render_manual_candidate_context, render_manual_candidate_explain,
-    render_manual_candidate_witness_plan,
+    ManualCandidateLocation, ManualCandidateProofMode, ManualCandidateStableByte,
+    load_manual_candidate, load_manual_candidates, manual_candidate_implementer_handoff,
+    manual_candidate_path, read_manual_candidate, render_manual_candidate_context,
+    render_manual_candidate_explain, render_manual_candidate_witness_plan,
 };
 pub use domain::{
     CardId, CargoCarefulReceiptInput, ConcurrencyReceiptInput, Confidence, ContractEvidence,

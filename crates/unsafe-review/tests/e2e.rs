@@ -2181,6 +2181,18 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         "nondiscriminating"
     );
     assert_eq!(
+        manual_candidates["candidates"][0]["stable_byte"]["class"],
+        "stable-byte-source-sab-race"
+    );
+    assert_eq!(
+        manual_candidates["candidates"][0]["stable_byte"]["proof_required"],
+        manual_candidates["candidates"][0]["proof_mode"]["kind"]
+    );
+    assert_eq!(
+        manual_candidates["candidates"][0]["stable_byte"]["ledger_state"],
+        "handoff-ready"
+    );
+    assert_eq!(
         manual_candidates["candidates"][0]["fix_boundary"],
         "Snapshot shared/growable/resizable bytes before Rust receives &[u8]"
     );
@@ -2193,6 +2205,10 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(
         manual_candidates["candidates"][0]["implementer_handoff"]["proof_mode"]["kind"],
         "mutation-plus-miri"
+    );
+    assert_eq!(
+        manual_candidates["candidates"][0]["implementer_handoff"]["stable_byte"],
+        manual_candidates["candidates"][0]["stable_byte"]
     );
     assert_eq!(
         manual_candidates["candidates"][0]["implementer_handoff"]["fix_boundary"],
@@ -2331,6 +2347,10 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         manual_candidates["candidates"][0]["proof_mode"]
     );
     assert_eq!(
+        manual_repair_queue["queue"][0]["stable_byte"],
+        manual_candidates["candidates"][0]["stable_byte"]
+    );
+    assert_eq!(
         manual_repair_queue["queue"][0]["fix_boundary"],
         manual_candidates["candidates"][0]["fix_boundary"]
     );
@@ -2416,7 +2436,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(tokmd_packets["summary"]["with_proof_mode"], 2);
     assert_eq!(tokmd_packets["summary"]["with_fix_boundary"], 2);
     assert_eq!(tokmd_packets["summary"]["with_pr_aperture"], 2);
-    assert_eq!(tokmd_packets["summary"]["with_stable_byte_source_class"], 0);
+    assert_eq!(tokmd_packets["summary"]["with_stable_byte_source_class"], 2);
     assert_eq!(
         tokmd_packets["summary"]["operation_families"]["raw_pointer_read"],
         1
@@ -2430,7 +2450,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         tokmd_packets["inputs"]["stable-byte seed ledger"]["limitation"]
             .as_str()
             .unwrap_or("")
-            .contains("future seed JSON export")
+            .contains("packet-local stable_byte.ledger_state")
     );
     assert_eq!(tokmd_packets["packets"][0]["id"], "R4R2-S001");
     assert_eq!(tokmd_packets["packets"][0]["source"], "manual");
@@ -2444,13 +2464,23 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         tokmd_packets["packets"][0]["tokmd_presets"][2],
         "bun-ub-ledger-note"
     );
-    assert!(tokmd_packets["packets"][0]["stable_byte_source_class"].is_null());
-    assert!(tokmd_packets["packets"][0]["ledger_state"].is_null());
+    assert_eq!(
+        tokmd_packets["packets"][0]["stable_byte_source_class"],
+        manual_candidates["candidates"][0]["stable_byte"]["class"]
+    );
+    assert_eq!(
+        tokmd_packets["packets"][0]["stable_byte"],
+        manual_candidates["candidates"][0]["stable_byte"]
+    );
+    assert_eq!(
+        tokmd_packets["packets"][0]["ledger_state"],
+        manual_candidates["candidates"][0]["stable_byte"]["ledger_state"]
+    );
     assert!(
         tokmd_packets["packets"][0]["ledger_state_limitation"]
             .as_str()
             .unwrap_or("")
-            .contains("future seed JSON export")
+            .contains("packet-local manual candidate metadata")
     );
     assert_eq!(
         tokmd_packets["packets"][0]["target"]["location_text"],

@@ -13,6 +13,17 @@
   "unsafe_operation": "byte_slice / byte_slice_mut -> CompressionContext::set_buffers(Option<&[u8]>, Option<&mut [u8]>) -> NativeZstd FFI buffer handoff",
   "invariant": "Compression input &[u8] and output &mut [u8] must not alias the same caller-controlled JS backing storage",
   "safe_caller": "zlib Zstd _processChunk / _handle.writeSync with caller-controlled overlapping ArrayBuffer input and output",
+  "stable_byte": {
+    "class": "stable-byte-source-native-ffi-read",
+    "source": "Overlapping caller-controlled ArrayBuffer input and output",
+    "sink": "src/runtime/node/node_zlib_binding.rs native Zstd buffer handoff",
+    "hazard": "Native Zstd compression can read and write aliased caller-controlled JS-backed buffers through Rust references without an established disjointness boundary",
+    "observable": "yes",
+    "proof_required": "observable-red-green",
+    "suggested_fix_boundary": "Reject overlap or copy into stable disjoint storage before passing input and output buffers to native Zstd compression contexts",
+    "pr_aperture": "Zstd _processChunk / _handle.writeSync overlap route only; do not rewrite unrelated zlib, brotli, public API routes, or zstd mode dispatch",
+    "ledger_state": "handoff-ready"
+  },
   "proof_mode": {
     "kind": "observable-red-green",
     "system_bun_expected": "fail",

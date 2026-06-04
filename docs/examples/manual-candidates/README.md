@@ -3,8 +3,8 @@
 These examples are committed smoke inputs for `unsafe-review candidate import`.
 They preserve external Bun evidence as manual/advisory packets, not
 analyzer-discovered ReviewCards.
-Inputs may include optional `proof_mode`, `fix_boundary`, `pr_aperture`,
-`fix_options`, `test_targets`, and `do_not_touch` fields so
+Inputs may include optional `stable_byte`, `proof_mode`, `fix_boundary`,
+`pr_aperture`, `fix_options`, `test_targets`, and `do_not_touch` fields so
 candidate-specific proof bars and implementer guidance project through the
 copy-only handoff surfaces without adding candidates to ReviewCard-only
 artifacts.

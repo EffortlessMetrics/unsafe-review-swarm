@@ -101,6 +101,9 @@ struct ManualCandidateProjection {
     proof_mode: Option<ManualCandidateProofModeProjection>,
     fix_boundary: Option<String>,
     pr_aperture: Option<String>,
+    stable_byte: Option<serde_json::Value>,
+    stable_byte_source_class: Option<String>,
+    stable_byte_ledger_state: Option<String>,
     evidence: Vec<ManualCandidateEvidenceProjection>,
     fix_options: Vec<String>,
     test_targets: Vec<String>,
@@ -1343,7 +1346,7 @@ fn check_tokmd_packets_artifact(
         manual_candidates
             .candidates
             .iter()
-            .filter(|candidate| stable_byte_source_class_from_title(&candidate.title).is_some())
+            .filter(|candidate| candidate.stable_byte_source_class().is_some())
             .count(),
         "tokmd-packets.json",
     )?;
@@ -1463,22 +1466,28 @@ fn check_tokmd_packet_entry(
     require_projected_optional_str(
         entry,
         "stable_byte_source_class",
-        &stable_byte_source_class_from_title(&expected.title).map(str::to_string),
+        &expected.stable_byte_source_class(),
         &context,
     )?;
-    if !entry
-        .get("ledger_state")
-        .is_none_or(serde_json::Value::is_null)
-    {
-        return Err(format!("{context} ledger_state must be null"));
-    }
+    require_projected_optional_str(
+        entry,
+        "ledger_state",
+        &expected.stable_byte_ledger_state,
+        &context,
+    )?;
     let ledger_limitation =
         super::require_non_empty_json_str(entry, "ledger_state_limitation", &context)?;
-    if !super::text_contains_ignore_ascii_case(ledger_limitation, "future seed JSON export") {
+    let expected_ledger_limitation = if expected.stable_byte_ledger_state.is_some() {
+        "packet-local manual candidate metadata"
+    } else {
+        "future seed JSON export"
+    };
+    if !super::text_contains_ignore_ascii_case(ledger_limitation, expected_ledger_limitation) {
         return Err(format!(
-            "{context} ledger_state_limitation must name the future seed JSON export limit"
+            "{context} ledger_state_limitation must mention `{expected_ledger_limitation}`"
         ));
     }
+    require_projected_optional_json_value(entry, "stable_byte", &expected.stable_byte, &context)?;
 
     let target = entry
         .get("target")
@@ -1647,6 +1656,14 @@ fn stable_byte_source_class_from_title(title: &str) -> Option<&'static str> {
         .find(|class| title.contains(class))
 }
 
+impl ManualCandidateProjection {
+    fn stable_byte_source_class(&self) -> Option<String> {
+        self.stable_byte_source_class
+            .clone()
+            .or_else(|| stable_byte_source_class_from_title(&self.title).map(str::to_string))
+    }
+}
+
 fn require_manual_command(
     value: &serde_json::Value,
     field: &str,
@@ -1792,6 +1809,17 @@ fn check_manual_candidate_artifact_entry(
         "pr_aperture",
         "manual-candidates.json candidate",
     )?;
+    let stable_byte = candidate.get("stable_byte").cloned();
+    let stable_byte_source_class = stable_byte
+        .as_ref()
+        .and_then(|value| value.get("class"))
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string);
+    let stable_byte_ledger_state = stable_byte
+        .as_ref()
+        .and_then(|value| value.get("ledger_state"))
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string);
     let location = candidate
         .get("location")
         .ok_or_else(|| "manual-candidates.json candidate is missing location".to_string())?;
@@ -1873,6 +1901,9 @@ fn check_manual_candidate_artifact_entry(
         proof_mode,
         fix_boundary,
         pr_aperture,
+        stable_byte,
+        stable_byte_source_class,
+        stable_byte_ledger_state,
         evidence_refs: evidence.len(),
         evidence,
         fix_options,
@@ -2108,6 +2139,27 @@ fn require_projected_optional_str(
             Some(actual) => Err(format!(
                 "{context} {field} must be null or omitted, got `{actual}`"
             )),
+        },
+    }
+}
+
+fn require_projected_optional_json_value(
+    value: &serde_json::Value,
+    field: &str,
+    expected: &Option<serde_json::Value>,
+    context: &str,
+) -> Result<(), String> {
+    match expected {
+        Some(expected) => match value.get(field) {
+            Some(actual) if actual == expected => Ok(()),
+            Some(_) => Err(format!(
+                "{context} {field} must match manual-candidates.json candidate {field}"
+            )),
+            None => Err(format!("{context} is missing {field}")),
+        },
+        None => match value.get(field) {
+            None | Some(serde_json::Value::Null) => Ok(()),
+            Some(_) => Err(format!("{context} {field} must be null or absent")),
         },
     }
 }

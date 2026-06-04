@@ -767,8 +767,15 @@ fn check_manual_candidate_example_handoff_fields(
     }
     require_object_bool(proof_mode, "mutation_required", path, "proof_mode")?;
     require_object_bool(proof_mode, "miri_required", path, "proof_mode")?;
-    require_non_empty_json_str(value, "fix_boundary", path)?;
-    require_non_empty_json_str(value, "pr_aperture", path)?;
+    let fix_boundary = require_non_empty_json_str(value, "fix_boundary", path)?;
+    let pr_aperture = require_non_empty_json_str(value, "pr_aperture", path)?;
+    check_manual_candidate_example_stable_byte_fields(
+        value,
+        path,
+        kind,
+        fix_boundary,
+        pr_aperture,
+    )?;
 
     let trust_boundary = require_non_empty_json_str(value, "trust_boundary", path)?;
     for needle in ["manual candidate", "not analyzer-discovered", "not proof"] {
@@ -777,6 +784,67 @@ fn check_manual_candidate_example_handoff_fields(
                 "{path} trust_boundary must include `{needle}` for committed manual examples"
             ));
         }
+    }
+    Ok(())
+}
+
+fn check_manual_candidate_example_stable_byte_fields(
+    value: &serde_json::Value,
+    path: &str,
+    proof_kind: &str,
+    fix_boundary: &str,
+    pr_aperture: &str,
+) -> Result<(), String> {
+    let Some(stable_byte) = value
+        .get("stable_byte")
+        .and_then(serde_json::Value::as_object)
+    else {
+        return Err(format!(
+            "{path} committed manual candidate example must include stable_byte"
+        ));
+    };
+    let class = require_object_str(stable_byte, "class", path, "stable_byte")?;
+    if !DOGFOOD_STABLE_BYTE_CLASSES.contains(&class) {
+        return Err(format!(
+            "{path} stable_byte.class `{class}` is not a known stable-byte class"
+        ));
+    }
+    require_object_str(stable_byte, "source", path, "stable_byte")?;
+    require_object_str(stable_byte, "sink", path, "stable_byte")?;
+    require_object_str(stable_byte, "hazard", path, "stable_byte")?;
+    let observable = require_object_str(stable_byte, "observable", path, "stable_byte")?;
+    if !matches!(
+        observable,
+        "yes" | "no" | "source-route-only" | "helper-gated"
+    ) {
+        return Err(format!(
+            "{path} stable_byte.observable `{observable}` is not supported"
+        ));
+    }
+    let proof_required = require_object_str(stable_byte, "proof_required", path, "stable_byte")?;
+    if proof_required != proof_kind {
+        return Err(format!(
+            "{path} stable_byte.proof_required `{proof_required}` must match proof_mode.kind `{proof_kind}`"
+        ));
+    }
+    let suggested_fix_boundary =
+        require_object_str(stable_byte, "suggested_fix_boundary", path, "stable_byte")?;
+    if suggested_fix_boundary != fix_boundary {
+        return Err(format!(
+            "{path} stable_byte.suggested_fix_boundary must match fix_boundary"
+        ));
+    }
+    let stable_pr_aperture = require_object_str(stable_byte, "pr_aperture", path, "stable_byte")?;
+    if stable_pr_aperture != pr_aperture {
+        return Err(format!(
+            "{path} stable_byte.pr_aperture must match pr_aperture"
+        ));
+    }
+    let ledger_state = require_object_str(stable_byte, "ledger_state", path, "stable_byte")?;
+    if !DOGFOOD_STABLE_BYTE_LEDGER_STATES.contains(&ledger_state) {
+        return Err(format!(
+            "{path} stable_byte.ledger_state `{ledger_state}` is not supported"
+        ));
     }
     Ok(())
 }
@@ -898,7 +966,7 @@ fn check_manual_candidate_smoke_entry_matches_example(
             &example_path,
         )?;
     }
-    for field in ["proof_mode", "fix_boundary", "pr_aperture"] {
+    for field in ["stable_byte", "proof_mode", "fix_boundary", "pr_aperture"] {
         require_generated_example_optional_field_match(
             actual,
             &example.expected,

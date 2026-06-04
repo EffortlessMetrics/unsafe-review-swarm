@@ -881,11 +881,24 @@ fn manual_candidate_location_text(candidate: &ManualCandidate) -> String {
     )
 }
 
-fn stable_byte_source_class(candidate: &ManualCandidate) -> Option<&'static str> {
-    STABLE_BYTE_SOURCE_CLASSES
-        .iter()
-        .copied()
-        .find(|class| candidate.title.contains(class))
+fn stable_byte_source_class(candidate: &ManualCandidate) -> Option<&str> {
+    candidate
+        .stable_byte
+        .as_ref()
+        .map(|stable_byte| stable_byte.class.as_str())
+        .or_else(|| {
+            STABLE_BYTE_SOURCE_CLASSES
+                .iter()
+                .copied()
+                .find(|class| candidate.title.contains(class))
+        })
+}
+
+fn stable_byte_ledger_state(candidate: &ManualCandidate) -> Option<&str> {
+    candidate
+        .stable_byte
+        .as_ref()
+        .map(|stable_byte| stable_byte.ledger_state.as_str())
 }
 
 pub(super) fn render_manual_candidates_artifact(
@@ -1057,6 +1070,9 @@ fn manual_repair_queue_entry(root: &Path, candidate: &ManualCandidate) -> serde_
         if let Some(pr_aperture) = &candidate.pr_aperture {
             object.insert("pr_aperture".to_string(), json!(pr_aperture));
         }
+        if let Some(stable_byte) = &candidate.stable_byte {
+            object.insert("stable_byte".to_string(), json!(stable_byte));
+        }
     }
     value
 }
@@ -1093,7 +1109,7 @@ fn tokmd_packet_inputs() -> serde_json::Value {
         },
         "stable-byte seed ledger": {
             "included": false,
-            "limitation": "Ledger state is not imported into tokmd-packets.json; use docs/dogfood/stable-byte-follow-up-seeds.md or a future seed JSON export"
+            "limitation": "External seed ledger rows are not imported; packet-local stable_byte.ledger_state is preserved when the manual candidate supplies it"
         }
     })
 }
@@ -1108,8 +1124,13 @@ fn tokmd_packet_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::V
         "tokmd_presets": TOKMD_PACKET_PRESETS,
         "title": candidate.title.as_str(),
         "stable_byte_source_class": stable_byte_source_class(candidate),
-        "ledger_state": null,
-        "ledger_state_limitation": "ledger state is not present in manual-candidate/v1; use the stable-byte seed ledger or a future seed JSON export",
+        "stable_byte": candidate.stable_byte.as_ref(),
+        "ledger_state": stable_byte_ledger_state(candidate),
+        "ledger_state_limitation": if stable_byte_ledger_state(candidate).is_some() {
+            "ledger state is packet-local manual candidate metadata; external seed ledger rows are not imported"
+        } else {
+            "ledger state is not present in this manual candidate; use the stable-byte seed ledger or a future seed JSON export"
+        },
         "target": {
             "file": candidate.location.file.display().to_string(),
             "line": candidate.location.line,
@@ -1153,6 +1174,9 @@ fn tokmd_packet_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::V
         }
         if let Some(pr_aperture) = &candidate.pr_aperture {
             object.insert("pr_aperture".to_string(), json!(pr_aperture));
+        }
+        if candidate.stable_byte.is_none() {
+            object.remove("stable_byte");
         }
     }
     value

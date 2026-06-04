@@ -13,6 +13,17 @@
   "unsafe_operation": "parse_compress_buffer_and_options captures StringOrBuffer input, sync compression option getters can reenter JS, then gzip_or_deflate_sync or JSZstd::compress_sync materializes buffer.slice() for native compression",
   "invariant": "Sync compression must not read bytes from caller-controlled JS backing storage after options getter reentry can mutate, resize, detach, or replace that storage",
   "safe_caller": "Bun.gzipSync, Bun.deflateSync, or Bun.zstdCompressSync with a BufferSource input and an options getter that mutates or replaces the backing storage after input capture",
+  "stable_byte": {
+    "class": "stable-byte-source-getter-reentry",
+    "source": "BufferSource input plus sync compression options getter reentry",
+    "sink": "src/runtime/api/BunObject.rs sync compression native read",
+    "hazard": "Options getter reentry can mutate, resize, detach, or replace JS backing storage between input capture and native compression read",
+    "observable": "yes",
+    "proof_required": "observable-red-green",
+    "suggested_fix_boundary": "Parse sync compression options before input capture, or re-fetch/copy BufferSource bytes after getter reentry before native compression reads",
+    "pr_aperture": "Sync compression getter-reentry only: Bun.gzipSync, Bun.deflateSync, and Bun.zstdCompressSync; do not include async compression, crypto, fs, markdown, S3, TextDecoder, or decompression broadening",
+    "ledger_state": "handoff-ready"
+  },
   "proof_mode": {
     "kind": "observable-red-green",
     "system_bun_expected": "fail",
