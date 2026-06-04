@@ -1624,7 +1624,6 @@ owner = "calibration"
 support_tier = "JS-backed buffer reentry heuristic"
 fixtures = [
   "js_buffer_reentry_sync_compression",
-  "js_buffer_reentry_async_helper_capture",
   "js_buffer_reentry_raw_parts_materialization",
   "js_buffer_reentry_options_before_capture_no_card",
   "js_buffer_reentry_recapture_after_reentry_no_card",
@@ -1638,11 +1637,43 @@ label_ledgers = [
 labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned JS-backed buffer reentry heuristic behavior emits one advisory
-ReviewCard for the listed sync compression or async helper capture, getter or
-callback reentry, helper materialization, and direct raw-parts materialization
-fixtures. The direct raw-parts fixture also retains the underlying raw-parts
-operation ReviewCard. The heuristic emits zero ReviewCards for the listed
-options-before-capture and post-reentry recapture controls.
+ReviewCard for the listed sync compression getter or callback reentry, helper
+materialization, and direct raw-parts materialization fixtures. The direct
+raw-parts fixture also retains the underlying raw-parts operation ReviewCard.
+The heuristic emits zero ReviewCards for the listed options-before-capture and
+post-reentry recapture controls.
+"""
+forbidden_claims = [
+  "Bun vulnerability",
+  "stale backing storage proof",
+  "site-execution proof",
+  "witness execution proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
+id = "stable-byte-rab-async-heuristic"
+status = "fixture_pinned"
+kind = "operation_family"
+owner = "calibration"
+support_tier = "Stable-byte RAB async heuristic"
+operation_family = "stable_byte_source_rab_async"
+hazard = "stable_byte_source"
+fixtures = [
+  "js_buffer_reentry_async_helper_capture",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/stable-byte-rab-async-heuristic.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned stable-byte RAB async heuristic behavior emits one advisory
+ReviewCard for the listed async StringOrBuffer helper capture before callback
+reentry and later helper byte materialization. The fixture is advisory static
+review pressure for the Bun RAB async seed only and does not execute witnesses.
 """
 forbidden_claims = [
   "Bun vulnerability",

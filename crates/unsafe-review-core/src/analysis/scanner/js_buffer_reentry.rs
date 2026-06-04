@@ -89,8 +89,8 @@ pub(super) fn detect_js_buffer_reentry_sites(
                 snippet: materialize.text.clone(),
             },
             operation: UnsafeOperation {
-                family: OperationFamily::StableByteSourceGetterReentry,
-                expression: js_buffer_reentry_expression(capture, reentry, materialize),
+                family: js_buffer_stable_byte_family(capture),
+                expression: js_buffer_stable_byte_expression(capture, reentry, materialize),
             },
             context_before,
             context_after,
@@ -260,15 +260,32 @@ fn is_js_buffer_materialization(line: &str) -> bool {
         || contains_call_name(line, "from_raw_parts_mut")
 }
 
-fn js_buffer_reentry_expression(
+fn js_buffer_stable_byte_family(capture: &JsBufferLine) -> OperationFamily {
+    if is_js_buffer_async_descriptor_helper(&capture.text) {
+        OperationFamily::StableByteSourceRabAsync
+    } else {
+        OperationFamily::StableByteSourceGetterReentry
+    }
+}
+
+fn js_buffer_stable_byte_expression(
     capture: &JsBufferLine,
     reentry: &JsBufferLine,
     materialize: &JsBufferLine,
 ) -> String {
-    format!(
-        "stable-byte-source-getter-reentry candidate; proof required: observable-red-green; JS-backed buffer descriptor captured before possible JS reentry and materialized afterward; capture: {}; reentry: {}; materialize: {}",
-        one_line(&capture.text),
-        one_line(&reentry.text),
-        one_line(&materialize.text)
-    )
+    if is_js_buffer_async_descriptor_helper(&capture.text) {
+        format!(
+            "stable-byte-source-rab-async candidate; proof required: observable-red-green; RAB-backed JS buffer descriptor captured through async helper before possible JS reentry and later helper/native materialization; capture: {}; reentry: {}; materialize: {}",
+            one_line(&capture.text),
+            one_line(&reentry.text),
+            one_line(&materialize.text)
+        )
+    } else {
+        format!(
+            "stable-byte-source-getter-reentry candidate; proof required: observable-red-green; JS-backed buffer descriptor captured before possible JS reentry and materialized afterward; capture: {}; reentry: {}; materialize: {}",
+            one_line(&capture.text),
+            one_line(&reentry.text),
+            one_line(&materialize.text)
+        )
+    }
 }

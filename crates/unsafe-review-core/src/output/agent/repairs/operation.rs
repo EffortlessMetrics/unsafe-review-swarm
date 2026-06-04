@@ -249,6 +249,12 @@ pub(super) fn add_operation_repairs(card: &ReviewCard, repairs: &mut Vec<String>
             repairs.push("parse JS options/getters before capturing JS-backed bytes, or re-fetch and copy the bytes after getter reentry before Rust/native materialization".to_string());
             repairs.push("keep the repair limited to this getter-reentry stable-byte aperture and attach only external observable-red-green evidence after running it outside unsafe-review".to_string());
         }
+        OperationFamily::StableByteSourceRabAsync
+            if common::missing_discharge(card, "byte-stability") =>
+        {
+            repairs.push("snapshot or copy RAB-backed JS bytes before async worker scheduling or helper/native materialization".to_string());
+            repairs.push("keep the repair limited to this RAB async stable-byte aperture and attach only external observable-red-green evidence after running it outside unsafe-review".to_string());
+        }
         _ => {}
     }
 }

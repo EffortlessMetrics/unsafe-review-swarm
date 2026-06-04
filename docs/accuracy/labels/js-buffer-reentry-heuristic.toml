@@ -30,23 +30,6 @@ label_source = "fixture_golden"
 rationale = "A same-owner JS-backed buffer descriptor captured before options getter reentry and materialized through a helper should stay an advisory stable-byte ReviewCard with observable-red-green proof-path wording and manual-review routing."
 
 [[samples]]
-id = "js-buffer-reentry-async-helper-capture-emits-advisory-card"
-fixture = "js_buffer_reentry_async_helper_capture"
-kind = "positive"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "stable_byte_source_getter_reentry"
-expected_hazard = "stable_byte_source"
-expected_owner = "async_rab_input"
-expected_site_kind = "operation"
-expected_obligation_key = "byte-stability"
-expected_contract_state = "present"
-expected_discharge_state = "missing"
-expected_witness_route_kinds = ["human-deep-review"]
-label_source = "fixture_golden"
-rationale = "A same-owner async JS-backed buffer descriptor captured before callback reentry and materialized through a helper should stay an advisory stable-byte ReviewCard with observable-red-green proof-path wording and manual-review routing."
-
-[[samples]]
 id = "js-buffer-reentry-raw-parts-materialization-emits-advisory-card"
 fixture = "js_buffer_reentry_raw_parts_materialization"
 kind = "positive"

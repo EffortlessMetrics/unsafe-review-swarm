@@ -82,6 +82,10 @@ pub(crate) fn obligations_for(family: &OperationFamily) -> Vec<SafetyObligation>
             "byte-stability",
             "JS-owned bytes remain stable after getter reentry and before Rust/native materialization",
         )),
+        OperationFamily::StableByteSourceRabAsync => single(SafetyObligation::new(
+            "byte-stability",
+            "RAB-backed JS bytes are snapshotted before async worker or helper materialization",
+        )),
         OperationFamily::StrFromUtf8Unchecked => {
             single(SafetyObligation::new("utf8", "bytes are valid UTF-8"))
         }

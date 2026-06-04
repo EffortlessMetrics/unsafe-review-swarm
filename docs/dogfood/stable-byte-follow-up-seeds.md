@@ -49,6 +49,7 @@ evidence, and not proof of memory safety.
 | Seed ID | Positive fixture | Controls | Analyzer/support tier | Boundary |
 |---|---|---|---|---|
 | `bun-stable-byte-candidate7-sync-compression` | `fixtures/js_buffer_reentry_sync_compression` | `fixtures/js_buffer_reentry_options_before_capture_no_card`, `fixtures/js_buffer_reentry_recapture_after_reentry_no_card` | `JS-backed buffer reentry heuristic` | Confirms descriptor-capture-before-reentry static shape only; `observable-red-green` proof still needs external system Bun red and patched-green evidence. |
+| `bun-stable-byte-stringorbuffer-rab-async` | `fixtures/js_buffer_reentry_async_helper_capture` | `fixtures/js_buffer_reentry_async_options_before_capture_no_card`, `fixtures/js_buffer_reentry_async_recapture_after_reentry_no_card` | `Stable-byte RAB async heuristic` | Confirms non-encoded async helper capture before callback reentry and later helper materialization static shape only; `observable-red-green` proof still needs external system Bun red and patched-green evidence. |
 
 ## How To Use
 

@@ -1,0 +1,30 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "stable-byte-rab-async-heuristic"
+operation_family = "stable_byte_source_rab_async"
+hazard = "stable_byte_source"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+stable-byte RAB async heuristic behavior; they are not a proof of memory safety,
+not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence,
+not calibrated precision or recall, not witness adequacy, and not policy readiness.
+"""
+
+[[samples]]
+id = "stable-byte-rab-async-helper-capture-emits-advisory-card"
+fixture = "js_buffer_reentry_async_helper_capture"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "stable_byte_source_rab_async"
+expected_hazard = "stable_byte_source"
+expected_owner = "async_rab_input"
+expected_site_kind = "operation"
+expected_obligation_key = "byte-stability"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A same-owner async StringOrBuffer helper capture before callback reentry and later byte materialization should stay an advisory stable-byte RAB async ReviewCard with observable-red-green proof-path wording and manual-review routing."

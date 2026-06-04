@@ -2772,11 +2772,16 @@ pub fn zstd_sync(
 
         assert_eq!(
             card.operation.family,
-            OperationFamily::StableByteSourceGetterReentry
+            OperationFamily::StableByteSourceRabAsync
         );
         assert_eq!(card.class, ReviewClass::GuardMissing);
         assert_eq!(card.proof_path, ProofPath::ObservableRedGreen);
         assert_eq!(card.site.owner.as_deref(), Some("async_rab_input"));
+        assert!(
+            card.operation
+                .expression
+                .contains("stable-byte-source-rab-async")
+        );
         assert!(
             card.operation
                 .expression

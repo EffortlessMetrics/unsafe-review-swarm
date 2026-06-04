@@ -1,6 +1,6 @@
 [
   {
-    "id": "UR-js-buffer-reentry-async-helper-capture-fixture-src-lib-rs-async-rab-input-operation-stable_byte_source_getter_reentry-stringorbuffer-40bccb4ef198-stable_byte_source-c1",
+    "id": "UR-js-buffer-reentry-async-helper-capture-fixture-src-lib-rs-async-rab-input-operation-stable_byte_source_rab_async-stringorbuffer-e64e047cbe47-stable_byte_source-c1",
     "class": "guard_missing",
     "priority": "high",
     "confidence": "medium",
@@ -15,22 +15,22 @@
       "public_api_surface": false,
       "snippet": "finish_async_input(&input)"
     },
-    "operation": "stable-byte-source-getter-reentry candidate; proof required: observable-red-green; JS-backed buffer descriptor captured before possible JS reentry and materialized afterward; capture: let input = from_js_maybe_async_into::<StringOrBuffer>(global, arg0)?;; reentry: callback.call(global)?;; materialize: finish_async_input(&input)",
-    "operation_family": "stable_byte_source_getter_reentry",
+    "operation": "stable-byte-source-rab-async candidate; proof required: observable-red-green; RAB-backed JS buffer descriptor captured through async helper before possible JS reentry and later helper/native materialization; capture: let input = from_js_maybe_async_into::<StringOrBuffer>(global, arg0)?;; reentry: callback.call(global)?;; materialize: finish_async_input(&input)",
+    "operation_family": "stable_byte_source_rab_async",
     "hazards": [
       "stable_byte_source"
     ],
     "obligations": [
-      "JS-owned bytes remain stable after getter reentry and before Rust/native materialization"
+      "RAB-backed JS bytes are snapshotted before async worker or helper materialization"
     ],
     "obligation_evidence": [
       {
         "key": "byte-stability",
-        "description": "JS-owned bytes remain stable after getter reentry and before Rust/native materialization",
+        "description": "RAB-backed JS bytes are snapshotted before async worker or helper materialization",
         "contract": {
           "present": true,
           "state": "present",
-          "summary": "Stable-byte-source heuristic uses byte-stability evidence, not unsafe API safety docs"
+          "summary": "Stable-byte-source RAB async heuristic uses byte-stability evidence, not unsafe API safety docs"
         },
         "discharge": {
           "present": false,
@@ -49,7 +49,7 @@
         }
       }
     ],
-    "contract": "Stable-byte-source heuristic uses byte-stability evidence, not unsafe API safety docs",
+    "contract": "Stable-byte-source RAB async heuristic uses byte-stability evidence, not unsafe API safety docs",
     "discharge": "No visible local guard detected",
     "reach": "No static test mention of owner `async_rab_input` was found",
     "witness": "No imported witness receipt was found",
@@ -66,7 +66,7 @@
       "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Review this stable-byte-source-getter-reentry card through an observable-red-green proof path: add or expose byte-stability guard evidence, confirm the safe JS caller route, then parse options before capture or re-fetch/copy bytes after reentry, and keep the PR inside that getter-reentry aperture.",
+    "next_action": "Review this stable-byte-source-rab-async card through an observable-red-green proof path: add or expose byte-stability guard evidence, confirm the safe JS caller route, snapshot before async scheduling or helper materialization, and keep the PR inside that RAB async aperture.",
     "verify_commands": []
   }
 ]

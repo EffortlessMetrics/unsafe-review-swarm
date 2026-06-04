@@ -65,6 +65,7 @@ pub enum OperationFamily {
     TargetFeature,
     PanicFromSafeJs,
     StableByteSourceGetterReentry,
+    StableByteSourceRabAsync,
     Unknown,
 }
 
@@ -103,6 +104,7 @@ impl OperationFamily {
             Self::TargetFeature => "target_feature",
             Self::PanicFromSafeJs => "panic_from_safe_js",
             Self::StableByteSourceGetterReentry => "stable_byte_source_getter_reentry",
+            Self::StableByteSourceRabAsync => "stable_byte_source_rab_async",
             Self::Unknown => "unknown",
         }
     }
@@ -201,6 +203,10 @@ mod tests {
             (
                 OperationFamily::StableByteSourceGetterReentry,
                 "stable_byte_source_getter_reentry",
+            ),
+            (
+                OperationFamily::StableByteSourceRabAsync,
+                "stable_byte_source_rab_async",
             ),
             (OperationFamily::Unknown, "unknown"),
         ];

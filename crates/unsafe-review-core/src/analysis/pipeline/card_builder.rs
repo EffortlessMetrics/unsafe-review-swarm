@@ -88,6 +88,8 @@ pub(super) fn build_card(
         == OperationFamily::StableByteSourceGetterReentry
     {
         "Review this stable-byte-source-getter-reentry card through an observable-red-green proof path: add or expose byte-stability guard evidence, confirm the safe JS caller route, then parse options before capture or re-fetch/copy bytes after reentry, and keep the PR inside that getter-reentry aperture.".to_string()
+    } else if scanned_site.operation.family == OperationFamily::StableByteSourceRabAsync {
+        "Review this stable-byte-source-rab-async card through an observable-red-green proof path: add or expose byte-stability guard evidence, confirm the safe JS caller route, snapshot before async scheduling or helper materialization, and keep the PR inside that RAB async aperture.".to_string()
     } else if scanned_site.operation.family == OperationFamily::PanicFromSafeJs {
         "Add an explicit sign/range guard or fallible error return before converting the JS-derived signed value to an unsigned type, then attach a focused Bun runtime receipt showing safe JS throws/returns instead of aborting.".to_string()
     } else {
@@ -102,12 +104,14 @@ pub(super) fn build_card(
         summary: next_action_summary,
         verify_commands,
     };
-    let proof_path =
-        if scanned_site.operation.family == OperationFamily::StableByteSourceGetterReentry {
-            ProofPath::ObservableRedGreen
-        } else {
-            proof_path_for(&class, &routes)
-        };
+    let proof_path = if scanned_site.operation.family
+        == OperationFamily::StableByteSourceGetterReentry
+        || scanned_site.operation.family == OperationFamily::StableByteSourceRabAsync
+    {
+        ProofPath::ObservableRedGreen
+    } else {
+        proof_path_for(&class, &routes)
+    };
 
     if !witness_evidence.present {
         missing.push(MissingEvidence::new(
@@ -178,6 +182,9 @@ fn operation_contract_override(family: &OperationFamily) -> Option<ContractEvide
         )),
         OperationFamily::StableByteSourceGetterReentry => Some(ContractEvidence::present(
             "Stable-byte-source heuristic uses byte-stability evidence, not unsafe API safety docs",
+        )),
+        OperationFamily::StableByteSourceRabAsync => Some(ContractEvidence::present(
+            "Stable-byte-source RAB async heuristic uses byte-stability evidence, not unsafe API safety docs",
         )),
         _ => None,
     }
