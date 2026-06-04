@@ -90,6 +90,126 @@ const FIX_RECIPE_REQUIRED_SUBHEADINGS: &[&str] = &[
     "Witness route:",
     "What this does not prove:",
 ];
+const AGENT_REPAIR_WORKFLOW_DOC: &str = "docs/explanation/agent-repair-workflow.md";
+const AGENT_PACKET_EXAMPLES_DOC: &str = "docs/explanation/agent-packet-examples.md";
+const AGENT_REPAIR_WORKFLOW_REQUIRED_GLOBAL_TEXT: &[&str] = &[
+    "`unsafe-review` does not run agents, edit source, run witnesses, post comments",
+    "The reviewer remains responsible",
+    "`repair-queue.json`",
+    "`unsafe-review context <card-id> --json`",
+    "`agent_readiness`",
+    "`ready_for_agent`",
+    "`requires_human_review`",
+    "`requires_witness_receipt`",
+    "`unsupported`",
+    "ready = true  -> state == ready_for_agent",
+    "ready = false -> state != ready_for_agent",
+];
+const AGENT_REPAIR_WORKFLOW_REQUIRED_SECTIONS: &[(&str, &[&str])] = &[
+    (
+        "## Inputs",
+        &[
+            "target/unsafe-review/repair-queue.json",
+            "unsafe-review context <card-id> --json",
+            "copy-only artifacts",
+        ],
+    ),
+    (
+        "## Readiness Decision",
+        &[
+            "`ready_for_agent`",
+            "`requires_human_review`",
+            "`requires_witness_receipt`",
+            "`unsupported`",
+            "If the state is not `ready_for_agent`",
+        ],
+    ),
+    (
+        "## Queue Triage",
+        &[
+            "Can an agent work this card?",
+            "What kind of work is allowed?",
+            "What must the agent not do?",
+            "What validation proves the repair improved evidence?",
+        ],
+    ),
+    (
+        "## Freshness Check",
+        &[
+            "rerun `unsafe-review first-pr --base origin/main`",
+            "confirm the `card_id`, file, owner, operation family, and unsafe operation",
+            "stop if the card disappeared, split into different cards, moved to a",
+            "`allowed_repairs` no longer apply",
+        ],
+    ),
+    (
+        "## Packet Fields To Copy",
+        &[
+            "`allowed_repairs`",
+            "`do_not_do`",
+            "`verify_commands`",
+            "`stop_conditions`",
+            "the trust boundary",
+        ],
+    ),
+    (
+        "## Allowed Repairs",
+        &[
+            "`allowed_repairs` names repair shapes for the current card only",
+            "An allowed repair must improve the card's named missing evidence after rerun.",
+        ],
+    ),
+    (
+        "## Do-Not-Do Rules",
+        &[
+            "do not suppress this card as the repair",
+            "do not replace executable guard or discharge evidence with a comment",
+            "do not invent witness results or say witnesses were run",
+            "do not post comments or block a PR from this packet",
+        ],
+    ),
+    (
+        "## Stop Conditions",
+        &[
+            "`agent_readiness.state` is not `ready_for_agent`",
+            "receipt-only work",
+            "outside the reviewer-supplied file scope",
+            "rerun creates new or noisier ReviewCards",
+        ],
+    ),
+    (
+        "## External Witness Receipts",
+        &[
+            "Run the suggested witness tool outside `unsafe-review`.",
+            "Record receipt metadata only after the witness or human review happened.",
+            "It must not fabricate witness execution",
+        ],
+    ),
+    (
+        "## Handoff Template",
+        &[
+            "Use only the packet's allowed_repairs.",
+            "Copy and obey do_not_do and stop_conditions.",
+            "Allowed file scope: <paths>.",
+        ],
+    ),
+    (
+        "## Validation",
+        &[
+            "unsafe-review outcome",
+            "The patch improved review evidence only when",
+            "not a proof that the unsafe site executed",
+        ],
+    ),
+    (
+        "## Relationship To Dogfood",
+        &[
+            "good agent task",
+            "bad agent task",
+            "do not calibrate precision/recall",
+        ],
+    ),
+];
 
 const POLICY_FILES: &[&str] = &[
     "policy/unsafe-review.toml",
@@ -348,6 +468,7 @@ fn check_docs() -> Result<(), String> {
     spec_status::check_dashboard_impl()?;
     check_docs_map_paths("docs/README.md")?;
     check_fix_recipes_doc()?;
+    check_agent_repair_workflow_doc()?;
     public_surfaces::check_first_pr_artifact_list_surfaces()?;
     check_index(
         Path::new("docs/specs"),
@@ -6361,6 +6482,50 @@ fn check_fix_recipes_text(text: &str, path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn check_agent_repair_workflow_doc() -> Result<(), String> {
+    let path = Path::new(AGENT_REPAIR_WORKFLOW_DOC);
+    let text = read_to_string(path)?;
+    check_agent_repair_workflow_text(&text, path)?;
+
+    let public_workflow_path = Path::new(FIX_RECIPE_WORKFLOW_DOC);
+    let public_workflow_text = read_to_string(public_workflow_path)?;
+    require_text_contains(
+        &public_workflow_text,
+        "(explanation/agent-repair-workflow.md)",
+        public_workflow_path,
+    )?;
+
+    let packet_examples_path = Path::new(AGENT_PACKET_EXAMPLES_DOC);
+    let packet_examples_text = read_to_string(packet_examples_path)?;
+    require_text_contains(
+        &packet_examples_text,
+        "(agent-repair-workflow.md)",
+        packet_examples_path,
+    )?;
+    Ok(())
+}
+
+fn check_agent_repair_workflow_text(text: &str, path: &Path) -> Result<(), String> {
+    let normalized = text.replace("\r\n", "\n");
+    require_text_contains_all(
+        &normalized,
+        path,
+        AGENT_REPAIR_WORKFLOW_REQUIRED_GLOBAL_TEXT,
+    )?;
+
+    for (heading, required_text) in AGENT_REPAIR_WORKFLOW_REQUIRED_SECTIONS {
+        let section = markdown_heading_section(&normalized, heading)
+            .ok_or_else(|| format!("{} is missing required section `{heading}`", path.display()))?;
+        require_text_contains_all(section, path, required_text).map_err(|err| {
+            format!(
+                "{} section `{heading}` is incomplete: {err}",
+                path.display()
+            )
+        })?;
+    }
+    Ok(())
+}
+
 fn markdown_heading_section<'a>(text: &'a str, heading: &str) -> Option<&'a str> {
     let marker = format!("{heading}\n");
     let start = text.find(&marker)? + marker.len();
@@ -9591,6 +9756,60 @@ OperationFamily::RawPointerRead => vec![
     }
 
     #[test]
+    fn agent_repair_workflow_doc_checker_accepts_required_shape() -> Result<(), String> {
+        check_agent_repair_workflow_text(
+            &agent_repair_workflow_doc_fixture(),
+            Path::new("docs/explanation/agent-repair-workflow.md"),
+        )
+    }
+
+    #[test]
+    fn agent_repair_workflow_doc_checker_rejects_missing_readiness_consistency()
+    -> Result<(), String> {
+        let text = agent_repair_workflow_doc_fixture()
+            .replace("ready = true  -> state == ready_for_agent", "ready = true");
+
+        let err = err_text(check_agent_repair_workflow_text(
+            &text,
+            Path::new("docs/explanation/agent-repair-workflow.md"),
+        ))?;
+
+        assert!(err.contains("ready = true  -> state == ready_for_agent"));
+        Ok(())
+    }
+
+    #[test]
+    fn agent_repair_workflow_doc_checker_rejects_missing_required_section() -> Result<(), String> {
+        let text =
+            agent_repair_workflow_doc_fixture().replace("## Stop Conditions", "## Stop Reasons");
+
+        let err = err_text(check_agent_repair_workflow_text(
+            &text,
+            Path::new("docs/explanation/agent-repair-workflow.md"),
+        ))?;
+
+        assert!(err.contains("missing required section `## Stop Conditions`"));
+        Ok(())
+    }
+
+    #[test]
+    fn agent_repair_workflow_doc_checker_rejects_missing_do_not_do_boundary() -> Result<(), String>
+    {
+        let text = agent_repair_workflow_doc_fixture().replace(
+            "do not suppress this card as the repair",
+            "do not suppress broadly",
+        );
+
+        let err = err_text(check_agent_repair_workflow_text(
+            &text,
+            Path::new("docs/explanation/agent-repair-workflow.md"),
+        ))?;
+
+        assert!(err.contains("do not suppress this card as the repair"));
+        Ok(())
+    }
+
+    #[test]
     fn markdown_link_target_parser_finds_plain_local_links() {
         let targets = markdown::link_targets(
             "[First use](docs/FIRST_USE.md) [external](https://example.com) [anchor](#trust)",
@@ -9627,6 +9846,43 @@ OperationFamily::RawPointerRead => vec![
             text.push_str("What this does not prove:\n\n");
             text.push_str("- UB-free or safety status.\n");
         }
+        text
+    }
+
+    fn agent_repair_workflow_doc_fixture() -> String {
+        let mut text = "# Bounded Agent Repair Workflow\n\n".to_string();
+        text.push_str(
+            "`unsafe-review` does not run agents, edit source, run witnesses, post comments.\n",
+        );
+        text.push_str("The reviewer remains responsible for validation and outcome decisions.\n");
+        text.push_str("Use `repair-queue.json` and `unsafe-review context <card-id> --json`.\n");
+        text.push_str("Every packet carries `agent_readiness` with `ready_for_agent`, `requires_human_review`, `requires_witness_receipt`, and `unsupported`.\n");
+        text.push_str("ready = true  -> state == ready_for_agent\n");
+        text.push_str("ready = false -> state != ready_for_agent\n");
+        text.push_str("\n## Inputs\n\n");
+        text.push_str("Use target/unsafe-review/repair-queue.json and unsafe-review context <card-id> --json as copy-only artifacts.\n");
+        text.push_str("\n## Readiness Decision\n\n");
+        text.push_str("States are `ready_for_agent`, `requires_human_review`, `requires_witness_receipt`, and `unsupported`. If the state is not `ready_for_agent`, do not delegate edits.\n");
+        text.push_str("\n## Queue Triage\n\n");
+        text.push_str("Can an agent work this card? What kind of work is allowed? What must the agent not do? What validation proves the repair improved evidence?\n");
+        text.push_str("\n## Freshness Check\n\n");
+        text.push_str("rerun `unsafe-review first-pr --base origin/main` and confirm the `card_id`, file, owner, operation family, and unsafe operation still match. stop if the card disappeared, split into different cards, moved to a different unsafe operation, or `allowed_repairs` no longer apply.\n");
+        text.push_str("\n## Packet Fields To Copy\n\n");
+        text.push_str("Copy `allowed_repairs`, `do_not_do`, `verify_commands`, `stop_conditions`, and the trust boundary.\n");
+        text.push_str("\n## Allowed Repairs\n\n");
+        text.push_str("`allowed_repairs` names repair shapes for the current card only. An allowed repair must improve the card's named missing evidence after rerun.\n");
+        text.push_str("\n## Do-Not-Do Rules\n\n");
+        text.push_str("do not suppress this card as the repair; do not replace executable guard or discharge evidence with a comment; do not invent witness results or say witnesses were run; do not post comments or block a PR from this packet.\n");
+        text.push_str("\n## Stop Conditions\n\n");
+        text.push_str("Stop when `agent_readiness.state` is not `ready_for_agent`, receipt-only work is needed, a repair is outside the reviewer-supplied file scope, or rerun creates new or noisier ReviewCards.\n");
+        text.push_str("\n## External Witness Receipts\n\n");
+        text.push_str("Run the suggested witness tool outside `unsafe-review`. Record receipt metadata only after the witness or human review happened. It must not fabricate witness execution.\n");
+        text.push_str("\n## Handoff Template\n\n");
+        text.push_str("Use only the packet's allowed_repairs. Copy and obey do_not_do and stop_conditions. Allowed file scope: <paths>.\n");
+        text.push_str("\n## Validation\n\n");
+        text.push_str("Run unsafe-review outcome. The patch improved review evidence only when the card posture changes; a test is not a proof that the unsafe site executed.\n");
+        text.push_str("\n## Relationship To Dogfood\n\n");
+        text.push_str("Record good agent task and bad agent task judgments; they do not calibrate precision/recall.\n");
         text
     }
 
