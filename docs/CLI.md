@@ -129,6 +129,10 @@ The bundle also includes `receipt-audit.md`, and the terminal handoff prints the
 matching `unsafe-review receipt audit` command so reviewers can check whether
 saved witness receipt metadata still matches the current first-pr cards. The
 audit is metadata-only and does not run the witness.
+When a top ReviewCard is present, the terminal handoff also prints its
+hypothesis, build/run-this-first cue, minimal repro cue, and confirmation step.
+Those cues are recipes for external confirmation only; unsafe-review does not
+run them or observe runtime behavior.
 
 When imported manual candidates are present, the terminal handoff and
 `review-kit.json` also point to `manual-candidates.json`,

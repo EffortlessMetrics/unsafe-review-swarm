@@ -8,7 +8,7 @@ use crate::command::{CheckOptions, DiffInput};
 use serde_json::json;
 use unsafe_review_core::{
     AnalyzeOutput, ManualCandidate, ReviewCard, Scope, manual_candidate_implementer_handoff,
-    render_repair_queue,
+    project_review_card_confirmation, render_repair_queue,
 };
 
 const MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
@@ -303,28 +303,23 @@ fn print_top_card_summary(
     if let Some(route) = card.routes.first() {
         println!("  Route: `{}`", route.kind.as_str());
     }
-    println!("  Posture: hypothesis pending runtime or receipt confirmation");
-    println!("  Confirm: {}", terminal_confirmation_step(card));
+    let confirmation = project_review_card_confirmation(card);
+    println!("  Hypothesis: {}", confirmation.hypothesis_to_confirm);
+    println!("  Build/run this first: {}", confirmation.build_this_first);
+    println!("  Minimal repro cue:");
+    for step in &confirmation.minimal_repro_steps {
+        println!("    - {step}");
+    }
+    println!(
+        "    - Limitation: {}",
+        confirmation.minimal_repro_limitation
+    );
+    println!("  Confirmation step: {}", confirmation.confirmation_step);
     println!("  Next: {}", card.next_action.summary);
     println!("Explain top card:");
     println!("  {}", explain_command(root, &card.id));
     println!("Agent packet:");
     println!("  {}", context_command(root, &card.id));
-}
-
-fn terminal_confirmation_step(card: &ReviewCard) -> String {
-    if let Some(command) = card.next_action.verify_commands.first() {
-        return format!(
-            "build/run `{command}` first, then attach a matching receipt if it confirms the route"
-        );
-    }
-    if let Some(route) = card.routes.first() {
-        return format!(
-            "use the `{}` route in witness-plan.md to derive a focused confirmation before upgrading confidence",
-            route.kind.as_str()
-        );
-    }
-    "derive a focused confirmation from unsafe-review explain and human review before upgrading confidence".to_string()
 }
 
 fn explain_command(root: &Path, card_id: &impl fmt::Display) -> String {

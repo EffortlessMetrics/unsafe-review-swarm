@@ -71,6 +71,10 @@ On successful bundle write, terminal output MUST include:
 
 - Artifact directory.
 - Card count.
+- Top-card hypothesis, build/run-this-first cue, minimal repro cue, and
+  confirmation step when a card is present. The cue must state that
+  unsafe-review did not run the command, observe runtime behavior, prove site
+  execution, prove UB, or prove repository safety.
 - Top-card handoff commands (`unsafe-review explain <card-id>` and
   `unsafe-review context <card-id> --json` when present).
 - `pr-summary.md` location.

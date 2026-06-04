@@ -1637,6 +1637,22 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("`raw_pointer_read`"));
     assert!(stdout.contains("Class: `guard_missing`"));
     assert!(stdout.contains("Route: `miri`"));
+    assert!(stdout.contains("Hypothesis: static `guard_missing` ReviewCard"));
+    assert!(
+        stdout.contains(
+            "Build/run this first: Build/run `cargo +nightly miri test read_header` first"
+        )
+    );
+    assert!(stdout.contains("Minimal repro cue:"));
+    assert!(stdout.contains("Confirm ReviewCard `"));
+    assert!(
+        stdout
+            .contains("Limitation: Minimal repro cue only; unsafe-review did not run this command")
+    );
+    assert!(
+        stdout
+            .contains("Confirmation step: build/run `cargo +nightly miri test read_header` first")
+    );
     assert!(stdout.contains("Explain top card:"));
     assert!(stdout.contains("Agent packet:"));
     assert!(stdout.contains("Artifacts:"));

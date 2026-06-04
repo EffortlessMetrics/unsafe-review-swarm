@@ -2,8 +2,8 @@ use crate::analysis::{pipeline, receipts};
 use crate::domain::{CardId, ReviewCard};
 use crate::input::workspace;
 use crate::output::{
-    agent, badges, comment_plan, human, json, lsp, markdown, outcome, policy_report, receipt_audit,
-    repair_queue, sarif, witness_plan,
+    agent, badges, comment_plan, confirmation, human, json, lsp, markdown, outcome, policy_report,
+    receipt_audit, repair_queue, sarif, witness_plan,
 };
 use std::path::PathBuf;
 
@@ -159,6 +159,15 @@ pub struct AnalyzeOutput {
     pub cards: Vec<ReviewCard>,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReviewCardConfirmationProjection {
+    pub hypothesis_to_confirm: String,
+    pub build_this_first: String,
+    pub minimal_repro_steps: Vec<String>,
+    pub minimal_repro_limitation: String,
+    pub confirmation_step: String,
+}
+
 #[derive(Clone, Debug)]
 pub struct RepoScanEvent {
     pub status: RepoScanStatus,
@@ -266,6 +275,17 @@ pub fn render_witness_plan(output: &AnalyzeOutput) -> String {
 
 pub fn render_repair_queue(output: &AnalyzeOutput) -> String {
     repair_queue::render(output)
+}
+
+pub fn project_review_card_confirmation(card: &ReviewCard) -> ReviewCardConfirmationProjection {
+    let minimal_repro = confirmation::minimal_repro(card);
+    ReviewCardConfirmationProjection {
+        hypothesis_to_confirm: confirmation::hypothesis_to_confirm(card),
+        build_this_first: confirmation::build_this_first(card).summary,
+        minimal_repro_steps: minimal_repro.steps().to_vec(),
+        minimal_repro_limitation: minimal_repro.limitation().to_string(),
+        confirmation_step: confirmation::confirmation_step(card),
+    }
 }
 
 pub fn render_badge_jsons(output: &AnalyzeOutput) -> (String, String) {
