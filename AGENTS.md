@@ -170,6 +170,17 @@ For Codex Web or other generated PR batches:
    repository-level disposition comment that names the replacement PR, commit,
    or future lane.
 
+Out-of-lane is a scheduling fact, not a close reason. If an aligned PR is not
+in the current lane, leave it open as deferred, draft, blocked, or parked and
+name the next lane or owner decision needed. Close only duplicate, superseded,
+rejected, abandoned, or unrecoverable work, and record the repository-level
+evidence for that disposition.
+
+Automation-review PRs such as Droid/MiniMax follow the same rule: aligned but
+parked automation stays visible. Capture actionable bot findings and the next
+validation path in a PR comment or handoff, but do not reopen automation work
+solely to satisfy an unrelated lane unless the owner asks.
+
 Agent runtime state is not PR state. Never close or mark a PR superseded because
 the current Codex session is busy, capped, on another branch, or working on a
 different PR. Those are handoff facts, not repository facts.

@@ -93,7 +93,10 @@ For analyzer behavior changes only:
 - [ ] I am not closing, merging, parking, superseding, or otherwise materially
       mutating this PR due to Codex session state, agent cap, or because
       another PR is active.
-- [ ] If closing, I named the repository-level reason.
+- [ ] If out-of-lane but aligned, I left the PR open as deferred, draft,
+      blocked, or parked and named the next lane or owner decision needed.
+- [ ] If closing, the repository-level reason is duplicate, superseded,
+      rejected, abandoned, or unrecoverable.
 - [ ] If closing as superseded, I linked the merged replacement.
 - [ ] If parking, I left the PR open unless the owner explicitly requested
       closure.

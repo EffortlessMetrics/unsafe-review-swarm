@@ -117,6 +117,12 @@ while it waits for a concrete fix such as a missing secret, overbroad
 permission, inaccurate allowlist, missing timeout, checkout posture issue,
 failing CI, or required reviewer decision.
 
+The Droid/MiniMax automation lesson follows the same rule. Aligned automation
+work can be blocked or parked while the active lane stays elsewhere. Capture the
+bot findings, validation gap, and next lane in a PR comment or handoff, but do
+not reopen automation work solely to satisfy an unrelated lane unless the owner
+asks.
+
 Valid PR dispositions must be based on repository facts:
 
 - merged,

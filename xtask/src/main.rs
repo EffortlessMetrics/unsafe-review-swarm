@@ -92,6 +92,38 @@ const FIX_RECIPE_REQUIRED_SUBHEADINGS: &[&str] = &[
 ];
 const AGENT_REPAIR_WORKFLOW_DOC: &str = "docs/explanation/agent-repair-workflow.md";
 const AGENT_PACKET_EXAMPLES_DOC: &str = "docs/explanation/agent-packet-examples.md";
+const PR_DISPOSITION_POLICY_DOC: &str = "docs/contributing/SWARM_TO_MAIN.md";
+const PR_RELEASE_DISCIPLINE_DOC: &str = "docs/process/PR_RELEASE_DISCIPLINE.md";
+const PULL_REQUEST_TEMPLATE_DOC: &str = ".github/PULL_REQUEST_TEMPLATE.md";
+const PR_DISPOSITION_POLICY_REQUIRED_TEXT: &[&str] = &[
+    "## PR disposition policy",
+    "out-of-lane = defer / draft / blocked",
+    "not close",
+    "Parking is not closure",
+    "Droid/MiniMax automation lesson",
+    "`duplicate`",
+    "`superseded`",
+    "`rejected`",
+    "`abandoned`",
+    "`unrecoverable`",
+];
+const PR_RELEASE_DISCIPLINE_REQUIRED_TEXT: &[&str] = &[
+    "deferred, draft, blocked, or parked",
+    "## Out-Of-Lane Handling",
+    "Out-of-lane means defer, not close",
+    "Droid/MiniMax automation lesson",
+    "Closure is limited to duplicate, superseded, rejected, abandoned, or",
+    "unrecoverable work",
+    "If useful or aligned but out-of-lane",
+];
+const PULL_REQUEST_TEMPLATE_DISPOSITION_REQUIRED_TEXT: &[&str] = &[
+    "## Disposition authority",
+    "If out-of-lane but aligned",
+    "deferred, draft,",
+    "blocked, or parked",
+    "duplicate, superseded,",
+    "rejected, abandoned, or unrecoverable",
+];
 const AGENT_REPAIR_WORKFLOW_REQUIRED_GLOBAL_TEXT: &[&str] = &[
     "`unsafe-review` does not run agents, edit source, run witnesses, post comments",
     "The reviewer remains responsible",
@@ -520,6 +552,7 @@ fn check_docs() -> Result<(), String> {
     check_docs_map_paths("docs/README.md")?;
     check_fix_recipes_doc()?;
     check_agent_repair_workflow_doc()?;
+    check_pr_disposition_policy_docs()?;
     public_surfaces::check_first_pr_artifact_list_surfaces()?;
     check_index(
         Path::new("docs/specs"),
@@ -6997,6 +7030,37 @@ fn check_agent_repair_workflow_text(text: &str, path: &Path) -> Result<(), Strin
     Ok(())
 }
 
+fn check_pr_disposition_policy_docs() -> Result<(), String> {
+    let policy_text = read_to_string(&workspace_path(PR_DISPOSITION_POLICY_DOC))?;
+    let process_text = read_to_string(&workspace_path(PR_RELEASE_DISCIPLINE_DOC))?;
+    let template_text = read_to_string(&workspace_path(PULL_REQUEST_TEMPLATE_DOC))?;
+
+    check_pr_disposition_policy_texts(&policy_text, &process_text, &template_text)
+}
+
+fn check_pr_disposition_policy_texts(
+    policy_text: &str,
+    process_text: &str,
+    template_text: &str,
+) -> Result<(), String> {
+    require_text_contains_all(
+        policy_text,
+        Path::new(PR_DISPOSITION_POLICY_DOC),
+        PR_DISPOSITION_POLICY_REQUIRED_TEXT,
+    )?;
+    require_text_contains_all(
+        process_text,
+        Path::new(PR_RELEASE_DISCIPLINE_DOC),
+        PR_RELEASE_DISCIPLINE_REQUIRED_TEXT,
+    )?;
+    require_text_contains_all(
+        template_text,
+        Path::new(PULL_REQUEST_TEMPLATE_DOC),
+        PULL_REQUEST_TEMPLATE_DISPOSITION_REQUIRED_TEXT,
+    )?;
+    Ok(())
+}
+
 fn markdown_heading_section<'a>(text: &'a str, heading: &str) -> Option<&'a str> {
     let marker = format!("{heading}\n");
     let start = text.find(&marker)? + marker.len();
@@ -10110,6 +10174,61 @@ OperationFamily::RawPointerRead => vec![
     #[test]
     fn docs_map_paths_point_at_existing_repository_files() -> Result<(), String> {
         check_docs_map_paths("../docs/README.md")
+    }
+
+    #[test]
+    fn pr_disposition_policy_docs_validate_current_text() -> Result<(), String> {
+        check_pr_disposition_policy_docs()
+    }
+
+    #[test]
+    fn pr_disposition_policy_rejects_policy_without_out_of_lane_rule() -> Result<(), String> {
+        let policy_text = PR_DISPOSITION_POLICY_REQUIRED_TEXT
+            .iter()
+            .copied()
+            .filter(|needle| *needle != "out-of-lane = defer / draft / blocked")
+            .collect::<Vec<_>>()
+            .join("\n");
+        let process_text = PR_RELEASE_DISCIPLINE_REQUIRED_TEXT.join("\n");
+        let template_text = PULL_REQUEST_TEMPLATE_DISPOSITION_REQUIRED_TEXT.join("\n");
+
+        let Err(err) =
+            check_pr_disposition_policy_texts(&policy_text, &process_text, &template_text)
+        else {
+            return Err("policy missing out-of-lane rule should fail".to_string());
+        };
+
+        assert!(err.contains(PR_DISPOSITION_POLICY_DOC), "{err}");
+        assert!(
+            err.contains("out-of-lane = defer / draft / blocked"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn pr_disposition_policy_rejects_template_without_close_only_reasons() -> Result<(), String> {
+        let policy_text = PR_DISPOSITION_POLICY_REQUIRED_TEXT.join("\n");
+        let process_text = PR_RELEASE_DISCIPLINE_REQUIRED_TEXT.join("\n");
+        let template_text = PULL_REQUEST_TEMPLATE_DISPOSITION_REQUIRED_TEXT
+            .iter()
+            .copied()
+            .filter(|needle| *needle != "rejected, abandoned, or unrecoverable")
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let Err(err) =
+            check_pr_disposition_policy_texts(&policy_text, &process_text, &template_text)
+        else {
+            return Err("template missing close-only reasons should fail".to_string());
+        };
+
+        assert!(err.contains(PULL_REQUEST_TEMPLATE_DOC), "{err}");
+        assert!(
+            err.contains("rejected, abandoned, or unrecoverable"),
+            "{err}"
+        );
+        Ok(())
     }
 
     #[test]

@@ -12,11 +12,14 @@ An empty open PR queue is not the goal. Truthful disposition is the goal.
 
 Every PR must be in exactly one of these states:
 
-- open and awaiting review, fix, rebase, CI, owner decision, or a later lane;
+- open and awaiting review, fix, rebase, CI, owner decision, or a later lane
+  as deferred, draft, blocked, or parked;
 - merged after review and validation;
 - closed as duplicate or superseded by a named merged PR or commit;
 - recreated from current `main`, with the original PR linked;
-- explicitly abandoned by owner decision.
+- closed as rejected or abandoned by owner decision;
+- closed as unrecoverable only after a current-main/head-ref audit proves the
+  useful work cannot be restored or recreated.
 
 No other disposition counts.
 
@@ -37,6 +40,21 @@ Do not close a useful PR for:
 
 Review quota, CI budget, and release timing are scheduling facts, not repository
 quality findings.
+
+## Out-Of-Lane Handling
+
+Out-of-lane means defer, not close. A useful or aligned PR that is outside the
+current lane stays open as deferred, draft, blocked, or parked with the next
+lane, owner decision, or validation need named.
+
+The Droid/MiniMax automation lesson is the same: aligned automation work may be
+parked without being rejected. Capture the bot findings, validation gap, and
+next lane in a PR comment or handoff, but do not reopen automation work just to
+dispose of it unless the owner asks.
+
+Closure is limited to duplicate, superseded, rejected, abandoned, or
+unrecoverable work. Do not use "out of lane" as shorthand for any of those
+states.
 
 ## Required Triage Sequence
 
@@ -61,9 +79,12 @@ For each PR:
 2. Decide whether the PR advances a repo goal, source-of-truth rail, test goal,
    refactor goal, release/sync task, or owner-requested feature.
 3. If useful but stale, keep it open or recreate it from current `main`.
-4. If duplicate, name the exact merged PR or commit that already contains the
+4. If useful or aligned but out-of-lane, keep it open as deferred, draft,
+   blocked, or parked and name the next lane or owner decision needed.
+5. If duplicate, name the exact merged PR or commit that already contains the
    useful work.
-5. If abandoned, record the owner decision.
+6. If rejected or abandoned, record the owner decision.
+7. If unrecoverable, record the current-main/head-ref audit evidence.
 
 ## Generated Refactor PRs
 
