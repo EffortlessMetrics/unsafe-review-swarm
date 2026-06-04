@@ -7306,16 +7306,41 @@ fn require_text_contains_all(text: &str, path: &Path, needles: &[&str]) -> Resul
     Ok(())
 }
 
+fn require_text_contains_any(text: &str, path: &Path, needles: &[&str]) -> Result<(), String> {
+    if needles
+        .iter()
+        .any(|needle| text_contains_ignore_ascii_case(text, needle))
+    {
+        return Ok(());
+    }
+    Err(format!(
+        "{} is missing any of `{}`",
+        path.display(),
+        needles.join("`, `")
+    ))
+}
+
 fn require_boundary_text(text: &str, path: &str) -> Result<(), String> {
-    for needle in [
-        "static unsafe contract review",
-        "not a proof of memory safety",
-        "not UB-free status",
-        "not a Miri result",
-    ] {
+    for needle in ["static unsafe contract review", "not UB-free status"] {
         if !text_contains_ignore_ascii_case(text, needle) {
             return Err(format!("{path} trust boundary is missing `{needle}`"));
         }
+    }
+    if !["not a proof of memory safety", "not memory-safety proof"]
+        .iter()
+        .any(|needle| text_contains_ignore_ascii_case(text, needle))
+    {
+        return Err(format!(
+            "{path} trust boundary is missing memory-safety proof boundary wording"
+        ));
+    }
+    if !["not a Miri result", "not Miri-clean status"]
+        .iter()
+        .any(|needle| text_contains_ignore_ascii_case(text, needle))
+    {
+        return Err(format!(
+            "{path} trust boundary is missing Miri-result boundary wording"
+        ));
     }
     Ok(())
 }
@@ -12912,7 +12937,7 @@ Snapshot reports:
         let path = dir.join("pr-summary.md");
         let text =
             fs::read_to_string(&path).map_err(|err| format!("read pr summary failed: {err}"))?;
-        let text = text.replace(manual_candidate_front_panel_fixture(), "");
+        let text = text.replace(manual_candidate_front_panel_fixture(false), "");
         fs::write(&path, text).map_err(|err| format!("write pr summary failed: {err}"))?;
 
         let result = check_first_pr_artifacts(&dir);
@@ -18462,14 +18487,9 @@ review_after = "2026-08-01"
             if !text.contains(marker) {
                 return Err(format!("{artifact} fixture is missing `{marker}`"));
             }
-            fs::write(
-                &path,
-                text.replace(
-                    marker,
-                    &format!("{}{}", manual_candidate_front_panel_fixture(), marker),
-                ),
-            )
-            .map_err(|err| format!("write {artifact} failed: {err}"))?;
+            let panel = manual_candidate_front_panel_fixture(artifact == "github-summary.md");
+            fs::write(&path, text.replace(marker, &format!("{panel}{marker}")))
+                .map_err(|err| format!("write {artifact} failed: {err}"))?;
         }
         Ok(())
     }
@@ -18493,8 +18513,11 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write {artifact} failed: {err}"))
     }
 
-    fn manual_candidate_front_panel_fixture() -> &'static str {
-        "## Manual candidates\n\n- Imported manual candidates: 1 (manual/advisory; not analyzer-discovered ReviewCards)\n- Operation families: `raw_pointer_read: 1`\n- Evidence kinds: `runtime_witness: 1`\n- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)\n- Safe caller route: TextDecoder.decode SharedArrayBuffer route\n- Invariant at risk: &[u8] memory must not be concurrently mutated\n- External evidence refs: 1\n- Proof mode: `mutation-plus-miri` (system Bun expected: `nondiscriminating`; mutation required: `true`; Miri/model required: `true`)\n- Fix boundary: copy shared bytes before constructing the Rust slice\n- PR aperture: TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings\n- Stop line: keep the PR inside this aperture; stop before source edits if the route no longer matches or the work would broaden into unrelated unsafe sites.\n- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)\n- First fix option: copy SharedArrayBuffer-backed bytes before constructing the slice\n- First test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`\n- First do-not-touch note: Do not rewrite TextDecoder unrelated encodings\n- Explain: `unsafe-review explain R4R2-S001`\n- Agent context: `unsafe-review context R4R2-S001 --json`\n- Witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Manual candidate queue preview: first 1 of 1 manual candidate(s)\n  - `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 1; proof mode: `mutation-plus-miri`\n    - Agent context: `unsafe-review context R4R2-S001 --json`\n    - Witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only outputs.\n- Boundary: copy-only manual handoff; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n"
+    fn manual_candidate_front_panel_fixture(compact: bool) -> &'static str {
+        if compact {
+            return "## Manual candidates\n\n- Imported manual candidates: 1 (manual/advisory; not analyzer-discovered ReviewCards)\n- Operation families: `raw_pointer_read: 1`\n- Evidence kinds: `runtime_witness: 1`\n- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)\n- Safe caller route: TextDecoder.decode SharedArrayBuffer route\n- Invariant at risk: &[u8] memory must not be concurrently mutated\n- External evidence refs: 1\n- Proof mode: `mutation-plus-miri` (system Bun expected: `nondiscriminating`; mutation required: `true`; Miri/model required: `true`)\n- Fix boundary: copy shared bytes before constructing the Rust slice\n- PR aperture: TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings\n- Stop line: keep the PR inside this aperture; stop before source edits if the route no longer matches or the work would broaden into unrelated unsafe sites.\n- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)\n- Agent context: `unsafe-review context R4R2-S001 --json`\n- Witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Manual candidate queue preview: first 1 of 1 manual candidate(s)\n  - `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 1; proof mode: `mutation-plus-miri`\n- Manual candidate index: `manual-candidates.json`; ReviewCard-only outputs clean.\n- Manual repair queue: `manual-repair-queue.json`; copy-only, separate from ReviewCard `repair-queue.json`; no agent was run.\n- Boundary: did not discover, did not run witnesses, edit source, or make policy inputs.\n\n";
+        }
+        "## Manual candidates\n\n- Imported manual candidates: 1 (manual/advisory; not analyzer-discovered ReviewCards)\n- Operation families: `raw_pointer_read: 1`\n- Evidence kinds: `runtime_witness: 1`\n- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)\n- Safe caller route: TextDecoder.decode SharedArrayBuffer route\n- Invariant at risk: &[u8] memory must not be concurrently mutated\n- External evidence refs: 1\n- Proof mode: `mutation-plus-miri` (system Bun expected: `nondiscriminating`; mutation required: `true`; Miri/model required: `true`)\n- Fix boundary: copy shared bytes before constructing the Rust slice\n- PR aperture: TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings\n- Stop line: keep the PR inside this aperture; stop before source edits if the route no longer matches or the work would broaden into unrelated unsafe sites.\n- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)\n- First fix option: copy SharedArrayBuffer-backed bytes before constructing the slice\n- First test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`\n- First do-not-touch note: Do not rewrite TextDecoder unrelated encodings\n- Explain: `unsafe-review explain R4R2-S001`\n- Agent context: `unsafe-review context R4R2-S001 --json`\n- Witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Manual candidate queue preview: first 1 of 1 manual candidate(s)\n  - `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 1; proof mode: `mutation-plus-miri`\n    - Agent context: `unsafe-review context R4R2-S001 --json`\n    - Witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only outputs.\n- Manual repair queue: `manual-repair-queue.json`; copy-only manual candidate repair handoff, separate from ReviewCard `repair-queue.json`; no agent was run.\n- Boundary: copy-only manual handoff; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n"
     }
 
     fn manual_candidate_witness_follow_up_fixture() -> &'static str {

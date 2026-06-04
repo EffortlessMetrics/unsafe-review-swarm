@@ -376,12 +376,17 @@ fn check_manual_candidate_front_door_text(
     )?;
     check_manual_candidate_front_door_guidance_text(text, path, first, compact)?;
     check_manual_candidate_queue_preview_text(text, path, manual_candidates, queue_limit, compact)?;
+    if !compact {
+        super::require_text_contains(text, "unsafe-review explain", path)?;
+    }
     for expected in [
-        "unsafe-review explain",
         "unsafe-review context",
         "unsafe-review candidate witness-plan",
         &first.id,
         "manual-candidates.json",
+        "manual-repair-queue.json",
+        "separate from ReviewCard `repair-queue.json`",
+        "no agent was run",
         "ReviewCard-only outputs",
         "not analyzer-discovered",
         "did not discover",
@@ -655,7 +660,11 @@ fn check_github_summary_artifact(
     super::require_text_contains(&text, "not memory-safety proof", &path)?;
     super::require_text_contains(&text, "not UB-free status", &path)?;
     super::require_text_contains(&text, "not Miri-clean status", &path)?;
-    super::require_text_contains(&text, "not site-execution proof", &path)?;
+    super::require_text_contains_any(
+        &text,
+        &path,
+        &["not site-execution proof", "not a site-execution claim"],
+    )?;
     super::require_text_contains(
         &text,
         "Full advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, policy-report.json, policy-report.md, manual-candidates.json, manual-repair-queue.json, tokmd-packets.json, lsp.json, repair-queue.json)",
@@ -3916,13 +3925,17 @@ fn check_pr_summary_artifact(
         "static unsafe contract review",
         &pr_summary_path,
     )?;
-    super::require_text_contains(
+    super::require_text_contains_any(
         &pr_summary,
-        "not a proof of memory safety",
         &pr_summary_path,
+        &["not a proof of memory safety", "not memory-safety proof"],
     )?;
     super::require_text_contains(&pr_summary, "not UB-free status", &pr_summary_path)?;
-    super::require_text_contains(&pr_summary, "not a Miri result", &pr_summary_path)?;
+    super::require_text_contains_any(
+        &pr_summary,
+        &pr_summary_path,
+        &["not a Miri result", "not Miri-clean status"],
+    )?;
     super::require_text_contains(
         &pr_summary,
         "- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.",
@@ -5714,10 +5727,18 @@ fn check_witness_plan_artifact(
             policy_mode_line,
             "does not run Miri",
             "cargo-careful",
-            "not a proof of memory safety",
             "not UB-free status",
-            "not a Miri result",
         ],
+    )?;
+    super::require_text_contains_any(
+        &text,
+        &path,
+        &["not a proof of memory safety", "not memory-safety proof"],
+    )?;
+    super::require_text_contains_any(
+        &text,
+        &path,
+        &["not a Miri result", "not Miri-clean status"],
     )?;
     if card_count > 0 {
         super::require_text_contains_all(

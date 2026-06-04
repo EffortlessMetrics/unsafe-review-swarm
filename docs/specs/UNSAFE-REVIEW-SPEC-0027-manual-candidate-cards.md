@@ -360,8 +360,10 @@ first candidate ID, file:line, operation family, safe caller route, invariant,
 evidence count, optional first-candidate fix/test/do-not-touch
 guidance, optional proof mode, fix boundary, PR aperture, stop line, a bounded
 manual-candidate queue preview with file:line, operation family, evidence
-count, first guidance cue, copy-only context/witness-plan commands, and advisory
-boundary. The full candidate payload remains in
+count, first guidance cue, copy-only context/witness-plan commands, a
+`manual-repair-queue.json` cue naming it as a copy-only manual candidate repair
+handoff separate from ReviewCard `repair-queue.json`, and advisory boundary.
+The full candidate payload remains in
 `manual-candidates.json` and `review-kit.json`; the cue must not add manual
 candidates to ReviewCard-only artifacts.
 When the first candidate carries `stable_byte`, the front-door cue must also

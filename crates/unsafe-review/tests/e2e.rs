@@ -4921,15 +4921,19 @@ fn assert_manual_candidate_front_panel(
             "`R4R2-S002` at `src/sql_jsc/mysql/MySQLValue.rs:411` (`slice_from_raw_parts`); evidence refs: 3; proof mode: `mutation-plus-miri`"
         ));
     }
-    assert!(text.contains("unsafe-review explain --root"));
+    if !compact {
+        assert!(text.contains("unsafe-review explain --root"));
+    }
     assert!(text.contains("unsafe-review context --root"));
     assert!(text.contains("unsafe-review candidate witness-plan --root"));
     assert!(text.contains("manual-candidates.json"));
-    assert!(text.contains("candidates stay out of ReviewCard-only outputs"));
-    assert!(text.contains("copy-only manual handoff"));
-    assert!(text.contains("did not discover these candidates"));
+    assert!(text.contains("manual-repair-queue.json"));
+    assert!(text.contains("separate from ReviewCard `repair-queue.json`"));
+    assert!(text.contains("no agent was run"));
+    assert!(text.contains("ReviewCard-only outputs"));
+    assert!(text.contains("did not discover"));
     assert!(text.contains("did not run witnesses"));
-    assert!(text.contains("did not edit source"));
+    assert!(text.contains("edit source"));
     assert!(text.contains("policy inputs"));
     assert!(
         text.find("## Manual candidates")

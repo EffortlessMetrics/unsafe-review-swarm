@@ -656,10 +656,12 @@ fn render_manual_candidate_front_panel(
             candidate.evidence.len()
         ));
         append_manual_candidate_guidance_lines(&mut out, candidate, !compact);
-        out.push_str(&format!(
-            "- Explain: `{}`\n",
-            explain_command(root, &candidate.id)
-        ));
+        if !compact {
+            out.push_str(&format!(
+                "- Explain: `{}`\n",
+                explain_command(root, &candidate.id)
+            ));
+        }
         out.push_str(&format!(
             "- Agent context: `{}`\n",
             context_command(root, &candidate.id)
@@ -670,8 +672,19 @@ fn render_manual_candidate_front_panel(
         ));
     }
     append_manual_candidate_queue_preview(&mut out, root, manual_candidates, queue_limit, !compact);
-    out.push_str("- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only outputs.\n");
-    out.push_str("- Boundary: copy-only manual handoff; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n");
+    if compact {
+        out.push_str(
+            "- Manual candidate index: `manual-candidates.json`; ReviewCard-only outputs clean.\n",
+        );
+        out.push_str("- Manual repair queue: `manual-repair-queue.json`; copy-only, separate from ReviewCard `repair-queue.json`; no agent was run.\n");
+        out.push_str(
+            "- Boundary: did not discover, did not run witnesses, edit source, or make policy inputs.\n\n",
+        );
+    } else {
+        out.push_str("- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only outputs.\n");
+        out.push_str("- Manual repair queue: `manual-repair-queue.json`; copy-only manual candidate repair handoff, separate from ReviewCard `repair-queue.json`; no agent was run.\n");
+        out.push_str("- Boundary: copy-only manual handoff; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n");
+    }
     out
 }
 
