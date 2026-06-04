@@ -23,7 +23,7 @@ state rather than treating it as a separate truth.
 | `needs-manual-candidate` | The scout observation has no canonical manual candidate artifact yet. | Write a `manual-candidate/v1` packet with file:line, proof mode, fix boundary, and stop line. | The analyzer discovered the route. |
 | `needs-analyzer` | Manual workflow and fixture pressure are solid enough for one narrow advisory heuristic. | Open one detector PR for one family and one false-positive control. | Broad stable-byte analyzer expansion is justified. |
 | `needs-ripr` | The seed is blocked on diff-first repository inventory or seam-cache behavior. | Record the exact ripr requirement or unblock command in [`ripr-bun-diff-first-requirements.md`](ripr-bun-diff-first-requirements.md). | The current unsafe-review artifact already has complete Bun-scale inventory. |
-| `needs-tokmd` | The seed needs a packet preset or Markdown/JSON export shape for implementer handoff. | Add or update a tokmd-friendly packet export or preset contract. | The packet was executed, repaired, or posted. |
+| `needs-tokmd` | The seed needs a packet preset or Markdown/JSON export shape for implementer handoff. | Add or update a tokmd-friendly packet export or preset contract in [`tokmd-bun-packet-presets.md`](tokmd-bun-packet-presets.md). | The packet was executed, repaired, or posted. |
 
 ## Reporting Rules
 

@@ -19,6 +19,8 @@ with labels from the
 [`stable-byte triage taxonomy`](stable-byte-triage-taxonomy.md). Bun diff-first
 inventory requirements for `ripr` are tracked in
 [`ripr-bun-diff-first-requirements.md`](ripr-bun-diff-first-requirements.md).
+Bun packet preset requirements for `tokmd` are tracked in
+[`tokmd-bun-packet-presets.md`](tokmd-bun-packet-presets.md).
 Reviewer judgment files follow the [`dogfood judgment schema`](judgments/README.md).
 Card-scoped agent repair dry runs follow the
 [`agent repair experiment protocol`](agent-repair-experiments.md).
