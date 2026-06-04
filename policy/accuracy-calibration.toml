@@ -1686,6 +1686,40 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "stable-byte-sab-race-heuristic"
+status = "fixture_pinned"
+kind = "operation_family"
+owner = "calibration"
+support_tier = "Stable-byte SAB race heuristic"
+operation_family = "stable_byte_source_sab_race"
+hazard = "stable_byte_source"
+fixtures = [
+  "stable_byte_sab_borrowed_slice",
+  "stable_byte_sab_snapshot_no_card",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/stable-byte-sab-race-heuristic.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned stable-byte SAB race heuristic behavior emits one advisory
+ReviewCard for the listed shared-backing borrowed-slice fixture while retaining
+the underlying raw-parts ReviewCard. The listed snapshot fixture remains a
+no-card control because shared bytes are copied into owned storage before decode.
+"""
+forbidden_claims = [
+  "Bun vulnerability",
+  "stale backing storage proof",
+  "SAB proof",
+  "site-execution proof",
+  "witness execution proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "panic-from-safe-js-heuristic"
 status = "fixture_pinned"
 kind = "operation_family"

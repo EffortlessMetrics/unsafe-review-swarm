@@ -255,6 +255,12 @@ pub(super) fn add_operation_repairs(card: &ReviewCard, repairs: &mut Vec<String>
             repairs.push("snapshot or copy RAB-backed JS bytes before async worker scheduling or helper/native materialization".to_string());
             repairs.push("keep the repair limited to this RAB async stable-byte aperture and attach only external observable-red-green evidence after running it outside unsafe-review".to_string());
         }
+        OperationFamily::StableByteSourceSabRace
+            if common::missing_discharge(card, "byte-stability") =>
+        {
+            repairs.push("snapshot or copy SharedArrayBuffer-backed bytes before constructing Rust/native borrowed slices".to_string());
+            repairs.push("keep the repair limited to this SAB race stable-byte aperture and attach only external mutation-plus-Miri/model evidence after running it outside unsafe-review".to_string());
+        }
         _ => {}
     }
 }

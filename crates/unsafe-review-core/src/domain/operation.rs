@@ -66,6 +66,7 @@ pub enum OperationFamily {
     PanicFromSafeJs,
     StableByteSourceGetterReentry,
     StableByteSourceRabAsync,
+    StableByteSourceSabRace,
     Unknown,
 }
 
@@ -105,6 +106,7 @@ impl OperationFamily {
             Self::PanicFromSafeJs => "panic_from_safe_js",
             Self::StableByteSourceGetterReentry => "stable_byte_source_getter_reentry",
             Self::StableByteSourceRabAsync => "stable_byte_source_rab_async",
+            Self::StableByteSourceSabRace => "stable_byte_source_sab_race",
             Self::Unknown => "unknown",
         }
     }
@@ -207,6 +209,10 @@ mod tests {
             (
                 OperationFamily::StableByteSourceRabAsync,
                 "stable_byte_source_rab_async",
+            ),
+            (
+                OperationFamily::StableByteSourceSabRace,
+                "stable_byte_source_sab_race",
             ),
             (OperationFamily::Unknown, "unknown"),
         ];

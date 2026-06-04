@@ -1,0 +1,32 @@
+diff --git a/src/lib.rs b/src/lib.rs
+index 0000000..1111111 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -0,0 +1,26 @@
++pub struct Uint8Array {
++    bytes: Vec<u8>,
++    shared: bool,
++}
++
++impl Uint8Array {
++    pub fn is_shared_array_buffer(&self) -> bool {
++        self.shared
++    }
++
++    pub fn to_vec(&self) -> Vec<u8> {
++        self.bytes.clone()
++    }
++}
++
++pub fn textdecoder_sab_decode(view: &Uint8Array) -> usize {
++    if view.is_shared_array_buffer() {
++        let owned = view.to_vec();
++        return decode_utf8(&owned);
++    }
++
++    0
++}
++
++fn decode_utf8(bytes: &[u8]) -> usize {
++    bytes.len()
++}

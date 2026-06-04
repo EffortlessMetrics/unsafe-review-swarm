@@ -1,0 +1,32 @@
+pub struct Uint8Array {
+    ptr: *const u8,
+    len: usize,
+    shared: bool,
+}
+
+impl Uint8Array {
+    pub fn is_shared_array_buffer(&self) -> bool {
+        self.shared
+    }
+
+    pub fn as_ptr(&self) -> *const u8 {
+        self.ptr
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+}
+
+pub fn textdecoder_sab_decode(view: &Uint8Array) -> usize {
+    if view.is_shared_array_buffer() {
+        let bytes = unsafe { core::slice::from_raw_parts(view.as_ptr(), view.len()) };
+        return decode_utf8(bytes);
+    }
+
+    0
+}
+
+fn decode_utf8(bytes: &[u8]) -> usize {
+    bytes.len()
+}

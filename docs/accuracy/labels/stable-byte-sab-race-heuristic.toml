@@ -1,0 +1,38 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "stable-byte-sab-race-heuristic"
+operation_family = "stable_byte_source_sab_race"
+hazard = "stable_byte_source"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+stable-byte SAB race heuristic behavior; they are not a proof of memory safety,
+not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence,
+not calibrated precision or recall, not witness adequacy, and not policy readiness.
+"""
+
+[[samples]]
+id = "stable-byte-sab-borrowed-slice-emits-advisory-card"
+fixture = "stable_byte_sab_borrowed_slice"
+kind = "positive"
+expected_cards = 2
+expected_class = "guard_missing"
+expected_operation_family = "stable_byte_source_sab_race"
+expected_hazard = "stable_byte_source"
+expected_owner = "textdecoder_sab_decode"
+expected_site_kind = "operation"
+expected_obligation_key = "byte-stability"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A same-owner SharedArrayBuffer-style backing signal before borrowed raw-parts materialization should stay an advisory stable-byte SAB race ReviewCard with mutation-plus-Miri proof-path wording while retaining the raw-parts card."
+
+[[samples]]
+id = "stable-byte-sab-snapshot-emits-no-card"
+fixture = "stable_byte_sab_snapshot_no_card"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "Copying shared bytes into owned storage before decode should not trigger the stable-byte SAB race heuristic or create a ReviewCard."

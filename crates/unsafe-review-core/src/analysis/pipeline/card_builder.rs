@@ -90,6 +90,8 @@ pub(super) fn build_card(
         "Review this stable-byte-source-getter-reentry card through an observable-red-green proof path: add or expose byte-stability guard evidence, confirm the safe JS caller route, then parse options before capture or re-fetch/copy bytes after reentry, and keep the PR inside that getter-reentry aperture.".to_string()
     } else if scanned_site.operation.family == OperationFamily::StableByteSourceRabAsync {
         "Review this stable-byte-source-rab-async card through an observable-red-green proof path: add or expose byte-stability guard evidence, confirm the safe JS caller route, snapshot before async scheduling or helper materialization, and keep the PR inside that RAB async aperture.".to_string()
+    } else if scanned_site.operation.family == OperationFamily::StableByteSourceSabRace {
+        "Review this stable-byte-source-sab-race card through a mutation-plus-Miri/model proof path: add or expose byte-stability guard evidence, confirm the safe JS caller route, snapshot shared bytes before Rust/native borrowed-slice materialization, and keep the PR inside that SAB race aperture.".to_string()
     } else if scanned_site.operation.family == OperationFamily::PanicFromSafeJs {
         "Add an explicit sign/range guard or fallible error return before converting the JS-derived signed value to an unsigned type, then attach a focused Bun runtime receipt showing safe JS throws/returns instead of aborting.".to_string()
     } else {
@@ -109,6 +111,8 @@ pub(super) fn build_card(
         || scanned_site.operation.family == OperationFamily::StableByteSourceRabAsync
     {
         ProofPath::ObservableRedGreen
+    } else if scanned_site.operation.family == OperationFamily::StableByteSourceSabRace {
+        ProofPath::MutationMiriModel
     } else {
         proof_path_for(&class, &routes)
     };
@@ -185,6 +189,9 @@ fn operation_contract_override(family: &OperationFamily) -> Option<ContractEvide
         )),
         OperationFamily::StableByteSourceRabAsync => Some(ContractEvidence::present(
             "Stable-byte-source RAB async heuristic uses byte-stability evidence, not unsafe API safety docs",
+        )),
+        OperationFamily::StableByteSourceSabRace => Some(ContractEvidence::present(
+            "Stable-byte-source SAB race heuristic uses byte-stability evidence, not unsafe API safety docs",
         )),
         _ => None,
     }

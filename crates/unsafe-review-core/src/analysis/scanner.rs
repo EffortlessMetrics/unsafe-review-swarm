@@ -24,6 +24,7 @@ mod fallback_scan;
 mod file_scan;
 mod item_names;
 mod js_buffer_reentry;
+mod js_shared_byte_source;
 mod owner_context;
 mod panic_from_safe_js;
 mod scan_site;

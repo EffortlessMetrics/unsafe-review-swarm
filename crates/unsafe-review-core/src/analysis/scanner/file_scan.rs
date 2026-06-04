@@ -1,6 +1,6 @@
 use super::{
     ScannedSite, detect_syntax_sites, extern_fn_names, fallback_scan, js_buffer_reentry,
-    local_module_names, panic_from_safe_js, syntax_scan,
+    js_shared_byte_source, local_module_names, panic_from_safe_js, syntax_scan,
 };
 use crate::input::diff::DiffIndex;
 use std::collections::BTreeSet;
@@ -43,6 +43,9 @@ pub(crate) fn scan_file(
         &mut seen,
     ));
     out.extend(js_buffer_reentry::detect_js_buffer_reentry_sites(
+        rel, diff, repo_mode, &lines,
+    ));
+    out.extend(js_shared_byte_source::detect_js_shared_byte_sites(
         rel, diff, repo_mode, &lines,
     ));
     out.extend(panic_from_safe_js::detect_panic_from_safe_js_sites(

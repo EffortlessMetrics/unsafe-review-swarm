@@ -50,6 +50,7 @@ evidence, and not proof of memory safety.
 |---|---|---|---|---|
 | `bun-stable-byte-candidate7-sync-compression` | `fixtures/js_buffer_reentry_sync_compression` | `fixtures/js_buffer_reentry_options_before_capture_no_card`, `fixtures/js_buffer_reentry_recapture_after_reentry_no_card` | `JS-backed buffer reentry heuristic` | Confirms descriptor-capture-before-reentry static shape only; `observable-red-green` proof still needs external system Bun red and patched-green evidence. |
 | `bun-stable-byte-stringorbuffer-rab-async` | `fixtures/js_buffer_reentry_async_helper_capture` | `fixtures/js_buffer_reentry_async_options_before_capture_no_card`, `fixtures/js_buffer_reentry_async_recapture_after_reentry_no_card` | `Stable-byte RAB async heuristic` | Confirms non-encoded async helper capture before callback reentry and later helper materialization static shape only; `observable-red-green` proof still needs external system Bun red and patched-green evidence. |
+| `bun-stable-byte-textdecoder-sab` | `fixtures/stable_byte_sab_borrowed_slice` | `fixtures/stable_byte_sab_snapshot_no_card` | `Stable-byte SAB race heuristic` | Confirms shared backing before borrowed raw-parts materialization static shape only; `mutation-plus-Miri/model` proof still needs external mutation pressure plus a focused model artifact. |
 
 ## How To Use
 
