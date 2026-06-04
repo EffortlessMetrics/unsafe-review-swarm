@@ -217,6 +217,8 @@ const REPAIR_QUEUE_BUCKETS: [&str; 6] = [
     "requires_human_review",
     "do_not_auto_repair",
 ];
+const MANUAL_REPAIR_QUEUE_BUCKET: &str = "manual_candidate_handoff";
+const MANUAL_REPAIR_QUEUE_BUCKET_REASON: &str = "manual_candidate_copy_only";
 const REPAIR_QUEUE_READINESS_STATES: [&str; 4] = [
     "ready_for_agent",
     "requires_human_review",
@@ -305,6 +307,7 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         &summary.card_projections,
         &summary.repair_queue_projections,
         &manual_candidates,
+        &manual_repair_queue,
     )?;
     check_advisory_artifact_overclaims(dir)?;
 
@@ -561,7 +564,7 @@ fn check_manual_candidate_front_door_stable_byte_text(
         super::require_text_contains(
             text,
             &format!(
-                "- Stable-byte: `{class}`; proof `{proof_required}`; ledger `{ledger_state}`; route `{source}` -> `{sink}`; hazard in sidecars"
+                "- Stable-byte class: `{class}`; proof `{proof_required}`; ledger `{ledger_state}`; route `{source}` -> `{sink}`; hazard in sidecars"
             ),
             path,
         )?;
@@ -2694,6 +2697,7 @@ fn check_review_kit_manifest(
     card_projections: &BTreeMap<String, CardProjection>,
     repair_queue_projections: &BTreeMap<String, RepairQueueProjection>,
     manual_candidates: &ManualCandidateIndexProjection,
+    manual_repair_queue: &ManualRepairQueueProjection,
 ) -> Result<(), String> {
     let path = dir.join("review-kit.json");
     let review_kit = super::parse_json_file(&path)?;
@@ -2791,6 +2795,7 @@ fn check_review_kit_manifest(
         card_projections,
         repair_queue_projections,
         manual_candidates,
+        manual_repair_queue,
     )?;
 
     let artifacts = super::json_array_at(&review_kit, "/artifacts", "review-kit.json")?;
@@ -2859,6 +2864,7 @@ fn check_review_kit_handoff(
     card_projections: &BTreeMap<String, CardProjection>,
     repair_queue_projections: &BTreeMap<String, RepairQueueProjection>,
     manual_candidates: &ManualCandidateIndexProjection,
+    manual_repair_queue: &ManualRepairQueueProjection,
 ) -> Result<(), String> {
     let handoff = review_kit
         .get("handoff")
@@ -2900,6 +2906,13 @@ fn check_review_kit_handoff(
         repair_queue_projections,
     )?;
     check_review_kit_manual_candidate_handoff(handoff, manual_candidates)?;
+    check_review_kit_repair_queue_front_panel(
+        handoff,
+        card_count,
+        repair_queue_projections,
+        manual_candidates,
+        manual_repair_queue,
+    )?;
 
     let boundary =
         super::require_non_empty_json_str(handoff, "trust_boundary", "review-kit.json handoff")?;
@@ -2918,6 +2931,206 @@ fn check_review_kit_handoff(
     }
 
     Ok(())
+}
+
+fn check_review_kit_repair_queue_front_panel(
+    handoff: &serde_json::Value,
+    card_count: usize,
+    repair_queue_projections: &BTreeMap<String, RepairQueueProjection>,
+    manual_candidates: &ManualCandidateIndexProjection,
+    manual_repair_queue: &ManualRepairQueueProjection,
+) -> Result<(), String> {
+    let context = "review-kit.json handoff repair_queues";
+    let repair_queues = handoff
+        .get("repair_queues")
+        .ok_or_else(|| format!("{context} is missing"))?;
+    if !repair_queues.is_object() {
+        return Err(format!("{context} must be an object"));
+    }
+
+    let review_card = repair_queues
+        .get("review_card")
+        .ok_or_else(|| format!("{context} is missing review_card"))?;
+    if !review_card.is_object() {
+        return Err(format!("{context}.review_card must be an object"));
+    }
+    super::require_json_str(
+        review_card,
+        "artifact",
+        "repair-queue.json",
+        "review-kit.json handoff repair_queues.review_card",
+    )?;
+    super::require_json_str(
+        review_card,
+        "source",
+        "review_card",
+        "review-kit.json handoff repair_queues.review_card",
+    )?;
+    let review_card_cards = super::json_usize_at(
+        review_card,
+        "/cards",
+        "review-kit.json handoff repair_queues.review_card",
+    )?;
+    if review_card_cards != card_count {
+        return Err(format!(
+            "{context}.review_card.cards is {review_card_cards}, but cards.json has {card_count}"
+        ));
+    }
+    let unique_cards = super::json_usize_at(
+        review_card,
+        "/unique_repair_queue_cards",
+        "review-kit.json handoff repair_queues.review_card",
+    )?;
+    if unique_cards != repair_queue_projections.len() {
+        return Err(format!(
+            "{context}.review_card.unique_repair_queue_cards is {unique_cards}, but repair-queue.json has {} unique card(s)",
+            repair_queue_projections.len()
+        ));
+    }
+    let agent_ready_cards = super::json_usize_at(
+        review_card,
+        "/agent_ready_cards",
+        "review-kit.json handoff repair_queues.review_card",
+    )?;
+    let expected_agent_ready = repair_queue_projections
+        .values()
+        .filter(|projection| projection.readiness_ready)
+        .count();
+    if agent_ready_cards != expected_agent_ready {
+        return Err(format!(
+            "{context}.review_card.agent_ready_cards is {agent_ready_cards}, but repair-queue.json has {expected_agent_ready} agent-ready card(s)"
+        ));
+    }
+    let bucket_counts = review_card
+        .get("bucket_counts")
+        .ok_or_else(|| format!("{context}.review_card is missing bucket_counts"))?;
+    if !bucket_counts.is_object() {
+        return Err(format!(
+            "{context}.review_card.bucket_counts must be an object"
+        ));
+    }
+    let expected_bucket_counts =
+        review_kit_expected_repair_queue_bucket_counts(repair_queue_projections);
+    for bucket in REPAIR_QUEUE_BUCKETS {
+        let actual = super::json_usize_at(
+            bucket_counts,
+            &format!("/{bucket}"),
+            "review-kit.json handoff repair_queues.review_card.bucket_counts",
+        )?;
+        let expected = expected_bucket_counts.get(bucket).copied().unwrap_or(0);
+        if actual != expected {
+            return Err(format!(
+                "{context}.review_card.bucket_counts.{bucket} is {actual}, but repair-queue.json has {expected}"
+            ));
+        }
+    }
+
+    let manual = repair_queues
+        .get("manual_candidate")
+        .ok_or_else(|| format!("{context} is missing manual_candidate"))?;
+    if !manual.is_object() {
+        return Err(format!("{context}.manual_candidate must be an object"));
+    }
+    super::require_json_str(
+        manual,
+        "artifact",
+        "manual-repair-queue.json",
+        "review-kit.json handoff repair_queues.manual_candidate",
+    )?;
+    super::require_json_str(
+        manual,
+        "source",
+        "manual_candidate",
+        "review-kit.json handoff repair_queues.manual_candidate",
+    )?;
+    let manual_count = super::json_usize_at(
+        manual,
+        "/manual_candidates",
+        "review-kit.json handoff repair_queues.manual_candidate",
+    )?;
+    if manual_count != manual_candidates.count {
+        return Err(format!(
+            "{context}.manual_candidate.manual_candidates is {manual_count}, but manual-candidates.json has {}",
+            manual_candidates.count
+        ));
+    }
+    let queued_candidates = super::json_usize_at(
+        manual,
+        "/queued_candidates",
+        "review-kit.json handoff repair_queues.manual_candidate",
+    )?;
+    if queued_candidates != manual_repair_queue.entries.len() {
+        return Err(format!(
+            "{context}.manual_candidate.queued_candidates is {queued_candidates}, but manual-repair-queue.json has {} queue entrie(s)",
+            manual_repair_queue.entries.len()
+        ));
+    }
+    super::require_json_str(
+        manual,
+        "bucket",
+        MANUAL_REPAIR_QUEUE_BUCKET,
+        "review-kit.json handoff repair_queues.manual_candidate",
+    )?;
+    super::require_json_str(
+        manual,
+        "bucket_reason",
+        MANUAL_REPAIR_QUEUE_BUCKET_REASON,
+        "review-kit.json handoff repair_queues.manual_candidate",
+    )?;
+    super::require_json_str(
+        manual,
+        "agent_handoff_state",
+        "copy_ready",
+        "review-kit.json handoff repair_queues.manual_candidate",
+    )?;
+    if manual.get("automatic").and_then(serde_json::Value::as_bool) != Some(false) {
+        return Err(format!(
+            "{context}.manual_candidate.automatic must be false"
+        ));
+    }
+
+    let separation = super::require_non_empty_json_str(repair_queues, "separation", context)?;
+    for expected in ["stay separate", "source ledgers", "side by side"] {
+        if !super::text_contains_ignore_ascii_case(separation, expected) {
+            return Err(format!("{context}.separation must include `{expected}`"));
+        }
+    }
+    let boundary = super::require_non_empty_json_str(repair_queues, "trust_boundary", context)?;
+    for expected in [
+        "does not merge manual candidates",
+        "repair-queue.json",
+        "does not run agents",
+        "does not run witnesses",
+        "does not edit source",
+        "does not post comments",
+        "not proof",
+        "repair success",
+        "policy readiness",
+    ] {
+        if !super::text_contains_ignore_ascii_case(boundary, expected) {
+            return Err(format!(
+                "{context} trust_boundary must include `{expected}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn review_kit_expected_repair_queue_bucket_counts(
+    repair_queue_projections: &BTreeMap<String, RepairQueueProjection>,
+) -> BTreeMap<String, usize> {
+    let mut counts = REPAIR_QUEUE_BUCKETS
+        .iter()
+        .map(|bucket| ((*bucket).to_string(), 0usize))
+        .collect::<BTreeMap<_, _>>();
+    for projection in repair_queue_projections.values() {
+        for bucket in &projection.buckets {
+            if let Some(count) = counts.get_mut(bucket) {
+                *count += 1;
+            }
+        }
+    }
+    counts
 }
 
 fn check_review_kit_review_card_handoff(

@@ -1807,6 +1807,94 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             .unwrap_or("")
             .contains("repair-queue.json")
     );
+    assert_eq!(
+        review_kit["handoff"]["repair_queues"]["review_card"]["artifact"],
+        "repair-queue.json"
+    );
+    assert_eq!(
+        review_kit["handoff"]["repair_queues"]["review_card"]["source"],
+        "review_card"
+    );
+    assert_eq!(
+        review_kit["handoff"]["repair_queues"]["review_card"]["cards"],
+        1
+    );
+    assert_eq!(
+        review_kit["handoff"]["repair_queues"]["review_card"]["unique_repair_queue_cards"],
+        1
+    );
+    assert_eq!(
+        review_kit["handoff"]["repair_queues"]["review_card"]["agent_ready_cards"],
+        1
+    );
+    assert_eq!(
+        review_kit["handoff"]["repair_queues"]["review_card"]["bucket_counts"]["repairable_by_guard"],
+        1
+    );
+    assert_eq!(
+        review_kit["handoff"]["repair_queues"]["review_card"]["bucket_counts"]["requires_witness_receipt"],
+        1
+    );
+    assert_eq!(
+        review_kit["handoff"]["repair_queues"]["review_card"]["bucket_counts"]["do_not_auto_repair"],
+        0
+    );
+    assert_eq!(
+        review_kit["handoff"]["repair_queues"]["manual_candidate"]["artifact"],
+        "manual-repair-queue.json"
+    );
+    assert_eq!(
+        review_kit["handoff"]["repair_queues"]["manual_candidate"]["source"],
+        "manual_candidate"
+    );
+    assert_eq!(
+        review_kit["handoff"]["repair_queues"]["manual_candidate"]["manual_candidates"],
+        2
+    );
+    assert_eq!(
+        review_kit["handoff"]["repair_queues"]["manual_candidate"]["queued_candidates"],
+        2
+    );
+    assert_eq!(
+        review_kit["handoff"]["repair_queues"]["manual_candidate"]["bucket"],
+        "manual_candidate_handoff"
+    );
+    assert_eq!(
+        review_kit["handoff"]["repair_queues"]["manual_candidate"]["bucket_reason"],
+        "manual_candidate_copy_only"
+    );
+    assert_eq!(
+        review_kit["handoff"]["repair_queues"]["manual_candidate"]["agent_handoff_state"],
+        "copy_ready"
+    );
+    assert_eq!(
+        review_kit["handoff"]["repair_queues"]["manual_candidate"]["automatic"],
+        false
+    );
+    assert!(
+        review_kit["handoff"]["repair_queues"]["separation"]
+            .as_str()
+            .unwrap_or("")
+            .contains("stay separate source ledgers")
+    );
+    assert!(
+        review_kit["handoff"]["repair_queues"]["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("does not merge manual candidates into ReviewCard repair-queue.json")
+    );
+    assert!(
+        review_kit["handoff"]["repair_queues"]["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("does not run agents")
+    );
+    assert!(
+        review_kit["handoff"]["repair_queues"]["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("is not proof, repair success, or policy readiness")
+    );
     assert!(
         review_kit["handoff"]["receipt_audit_markdown"]
             .as_str()
@@ -5063,15 +5151,21 @@ fn assert_manual_candidate_front_panel(
     ));
     assert!(text.contains("- Invariant at risk: &[u8] memory must not be concurrently mutated"));
     assert!(text.contains("- External evidence refs: 2"));
-    assert!(text.contains(
-        "- Stable-byte class: `stable-byte-source-sab-race` (observable: `no`; proof required: `mutation-plus-miri`; ledger state: `handoff-ready`)"
-    ));
-    assert!(text.contains(
-        "- Stable-byte route: source `SharedArrayBuffer-backed typed array decode` -> sink `src/runtime/webcore/TextDecoder.rs slice materialization`"
-    ));
-    assert!(text.contains(
-        "- Stable-byte hazard: Rust slice materialization can treat shared JS bytes as stable while JS can mutate the backing storage concurrently"
-    ));
+    if compact {
+        assert!(text.contains(
+            "- Stable-byte class: `stable-byte-source-sab-race`; proof `mutation-plus-miri`; ledger `handoff-ready`; route `SharedArrayBuffer-backed typed array decode` -> `src/runtime/webcore/TextDecoder.rs slice materialization`; hazard in sidecars"
+        ));
+    } else {
+        assert!(text.contains(
+            "- Stable-byte class: `stable-byte-source-sab-race` (observable: `no`; proof required: `mutation-plus-miri`; ledger state: `handoff-ready`)"
+        ));
+        assert!(text.contains(
+            "- Stable-byte route: source `SharedArrayBuffer-backed typed array decode` -> sink `src/runtime/webcore/TextDecoder.rs slice materialization`"
+        ));
+        assert!(text.contains(
+            "- Stable-byte hazard: Rust slice materialization can treat shared JS bytes as stable while JS can mutate the backing storage concurrently"
+        ));
+    }
     assert!(text.contains(
         "- Proof mode: `mutation-plus-miri` (system Bun expected: `nondiscriminating`; mutation required: `true`; Miri/model required: `true`)"
     ));

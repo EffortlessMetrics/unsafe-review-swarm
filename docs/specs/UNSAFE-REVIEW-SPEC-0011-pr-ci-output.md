@@ -150,6 +150,9 @@ must include manual candidate handoff metadata pointing to
   analyzer_discovered = 0 and copy-only explain/context/witness-plan commands,
   a bounded candidate_queue, omitted count, and implementer handoff cues when
   manual candidates exist
+must include handoff.repair_queues as a side-by-side front panel with
+  ReviewCard repair-queue.json counts and manual-repair-queue.json counts,
+  without merging their sources
 must list every required first-pr artifact with relative paths
 must include artifact kind, format, and schema_version/null metadata
 must include trust boundary wording
@@ -166,6 +169,14 @@ and advisory; `repair-queue.json` remains the checked aggregate queue truth.
 ReviewCard queue entries project `verify_commands` and full `witness_routes`
 route objects from `cards.json`; they are reviewer handoff cues only and do not
 claim witness execution.
+
+`handoff.repair_queues` may place the checked ReviewCard repair queue and the
+manual-candidate repair queue side by side for reviewer and agent routing. It
+must cross-check ReviewCard counts, bucket counts, and agent-ready counts
+against `repair-queue.json`, and manual candidate queued counts against
+`manual-repair-queue.json`. It must not merge manual candidates into
+`repair-queue.json`, create a new repair vocabulary, run agents, run witnesses,
+edit source, post comments, claim repair success, or claim policy readiness.
 
 Manual candidate markers (`source = manual`, `manual_candidate`, or
 `analyzer_discovered`) must not appear in ReviewCard-only first-pr artifacts:

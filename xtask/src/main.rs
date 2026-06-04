@@ -13110,6 +13110,37 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_repair_queue_front_panel_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-repair-front-panel-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit = parse_json_file(&path)?;
+        review_kit["handoff"]["repair_queues"]["review_card"]["bucket_counts"]["repairable_by_guard"] =
+            serde_json::json!(0);
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err("repair queue front-panel drift should fail verification".to_string());
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains(
+                "review-kit.json handoff repair_queues.review_card.bucket_counts.repairable_by_guard"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_review_kit_receipt_handoff_drift() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-receipt-handoff-drift")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -18629,6 +18660,15 @@ review_after = "2026-08-01"
             .collect::<Vec<_>>();
         let changed_files = usize::from(card_count > 0);
         let omitted_cards = card_count.saturating_sub(review_card_queue.len());
+        let repair_queue_bucket_count = usize::from(top_card_id.is_some());
+        let review_card_repair_bucket_counts = serde_json::json!({
+            "repairable_by_guard": repair_queue_bucket_count,
+            "repairable_by_safety_docs": 0,
+            "repairable_by_test": 0,
+            "requires_witness_receipt": repair_queue_bucket_count,
+            "requires_human_review": 0,
+            "do_not_auto_repair": 0
+        });
         let value = serde_json::json!({
             "schema_version": "0.1",
             "tool": "unsafe-review",
@@ -18682,6 +18722,28 @@ review_after = "2026-08-01"
                     "candidate_queue": [],
                     "omitted_candidates": 0,
                     "trust_boundary": "manual/advisory candidates are not analyzer-discovered ReviewCards, not policy inputs, and not witness execution; receipts against manual candidates do not import ReviewCard witness evidence."
+                },
+                "repair_queues": {
+                    "review_card": {
+                        "artifact": "repair-queue.json",
+                        "source": "review_card",
+                        "cards": card_count,
+                        "unique_repair_queue_cards": repair_queue_bucket_count,
+                        "bucket_counts": review_card_repair_bucket_counts,
+                        "agent_ready_cards": repair_queue_bucket_count
+                    },
+                    "manual_candidate": {
+                        "artifact": "manual-repair-queue.json",
+                        "source": "manual_candidate",
+                        "manual_candidates": 0,
+                        "queued_candidates": 0,
+                        "bucket": "manual_candidate_handoff",
+                        "bucket_reason": "manual_candidate_copy_only",
+                        "agent_handoff_state": "copy_ready",
+                        "automatic": false
+                    },
+                    "separation": "ReviewCard repair queues and manual-candidate repair queues stay separate source ledgers; this front panel only places their counts side by side for reviewer and agent routing.",
+                    "trust_boundary": "Unified repair-queue front panel only; it does not merge manual candidates into ReviewCard repair-queue.json, does not run agents, does not run witnesses, does not edit source, does not post comments, and is not proof, repair success, or policy readiness."
                 },
                 "top_card": top_card_handoff,
                 "trust_boundary": "Copy-only review-kit handoff commands; unsafe-review did not run witnesses, run agents, post comments, edit source, or enforce blocking policy."

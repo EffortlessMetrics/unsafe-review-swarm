@@ -418,8 +418,60 @@ fn review_kit_handoff(
             root,
             stable_byte_seed_ledger,
         ),
+        "repair_queues": review_kit_repair_queue_front_panel(output, manual_candidates),
         "trust_boundary": "Copy-only review-kit handoff commands; unsafe-review did not run witnesses, run agents, post comments, edit source, or enforce blocking policy.",
     })
+}
+
+fn review_kit_repair_queue_front_panel(
+    output: &AnalyzeOutput,
+    manual_candidates: &[ManualCandidate],
+) -> serde_json::Value {
+    let repair_queue = review_kit_repair_queue_index(output);
+    json!({
+        "review_card": {
+            "artifact": "repair-queue.json",
+            "source": "review_card",
+            "cards": output.cards.len(),
+            "unique_repair_queue_cards": repair_queue.len(),
+            "bucket_counts": review_kit_repair_queue_bucket_counts(&repair_queue),
+            "agent_ready_cards": repair_queue.values().filter(|projection| {
+                projection.agent_readiness
+                    .get("ready")
+                    .and_then(serde_json::Value::as_bool)
+                    == Some(true)
+            }).count(),
+        },
+        "manual_candidate": {
+            "artifact": "manual-repair-queue.json",
+            "source": "manual_candidate",
+            "manual_candidates": manual_candidates.len(),
+            "queued_candidates": manual_candidates.len(),
+            "bucket": MANUAL_REPAIR_QUEUE_BUCKET,
+            "bucket_reason": MANUAL_REPAIR_QUEUE_BUCKET_REASON,
+            "agent_handoff_state": "copy_ready",
+            "automatic": false,
+        },
+        "separation": "ReviewCard repair queues and manual-candidate repair queues stay separate source ledgers; this front panel only places their counts side by side for reviewer and agent routing.",
+        "trust_boundary": "Unified repair-queue front panel only; it does not merge manual candidates into ReviewCard repair-queue.json, does not run agents, does not run witnesses, does not edit source, does not post comments, and is not proof, repair success, or policy readiness.",
+    })
+}
+
+fn review_kit_repair_queue_bucket_counts(
+    repair_queue: &BTreeMap<String, ReviewKitRepairQueueProjection>,
+) -> BTreeMap<String, usize> {
+    let mut counts = REVIEW_CARD_REPAIR_QUEUE_BUCKETS
+        .iter()
+        .map(|bucket| ((*bucket).to_string(), 0usize))
+        .collect::<BTreeMap<_, _>>();
+    for projection in repair_queue.values() {
+        for bucket in &projection.buckets {
+            if let Some(count) = counts.get_mut(bucket) {
+                *count += 1;
+            }
+        }
+    }
+    counts
 }
 
 fn review_kit_review_card_handoff(output: &AnalyzeOutput, root: &Path) -> serde_json::Value {
@@ -958,7 +1010,7 @@ fn append_manual_candidate_guidance_lines(
         } else {
             let _ = writeln!(
                 out,
-                "- Stable-byte: `{}`; proof `{}`; ledger `{}`; route `{}` -> `{}`; hazard in sidecars",
+                "- Stable-byte class: `{}`; proof `{}`; ledger `{}`; route `{}` -> `{}`; hazard in sidecars",
                 stable_byte.class,
                 stable_byte.proof_required,
                 stable_byte.ledger_state,
@@ -995,6 +1047,15 @@ fn append_manual_candidate_guidance_lines(
                 oracle_map.oracle_kind,
                 oracle_map.coverage_confidence,
                 oracle_map.limitation
+            );
+        } else {
+            let _ = writeln!(
+                out,
+                "- Oracle map: `{}` -> `{}` (`{}`; `{}`; limitation in sidecars)",
+                oracle_map.rust_seam,
+                oracle_map.oracle_path.display(),
+                oracle_map.oracle_language,
+                oracle_map.oracle_kind
             );
         }
     }

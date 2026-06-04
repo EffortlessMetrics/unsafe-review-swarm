@@ -362,6 +362,13 @@ can see observable, Miri/model, helper-gated, handoff-ready, or parked-followup
 work at queue level without treating the sidecar as a second source of truth.
 It is not `repair-queue.json`, not analyzer-discovered ReviewCard output, not
 automatic repair, not proof, not witness execution, and not policy gating.
+`review-kit.json` may include a `handoff.repair_queues` front panel that places
+the checked ReviewCard `repair-queue.json` summary and the checked
+manual-candidate `manual-repair-queue.json` summary side by side. This is only
+a cockpit routing cue: it must keep `source = review_card` and
+`source = manual_candidate` separated, cross-check counts against the two queue
+artifacts, and must not merge manual candidates into ReviewCard repair queues
+or imply automatic repair.
 
 `first-pr` may also write `tokmd-packets.json` as a formatting-input sidecar
 for future Bun packet presets. It must use
@@ -542,6 +549,9 @@ into an analyzer ReviewCard.
   owner lane, suggested first PR, and triage labels when a root-local seed row
   exists, while preserving `source = manual`, `manual_candidate = true`, and
   `analyzer_discovered = false`.
+- `review-kit.json` includes a checked `handoff.repair_queues` front panel that
+  shows ReviewCard repair-queue counts and manual-candidate repair-queue counts
+  side by side while keeping both source ledgers separate.
 - `first-pr` `pr-summary.md` and `github-summary.md` show a compact manual
   candidate front-door cue, including advisory operation-family/evidence-kind
   summaries, a bounded queue preview, optional proof mode, fix boundary, PR
