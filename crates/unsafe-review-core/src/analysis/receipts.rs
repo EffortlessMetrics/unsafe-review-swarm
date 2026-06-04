@@ -1,5 +1,7 @@
 use crate::api::AnalyzeOutput;
-use crate::candidate::{ManualCandidate, ManualCandidateProofMode, load_manual_candidates};
+use crate::candidate::{
+    ManualCandidate, ManualCandidateOracleMap, ManualCandidateProofMode, load_manual_candidates,
+};
 use crate::domain::{
     CardId, ReachEvidence, ReceiptCardIdKind, ReviewCard, WitnessEvidence, WitnessReceipt,
     WitnessRoute,
@@ -282,6 +284,8 @@ pub struct ReceiptAuditManualCandidate {
     pub operation_family: String,
     pub safe_caller: String,
     pub invariant: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oracle_map: Option<ManualCandidateOracleMap>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub proof_mode: Option<ManualCandidateProofMode>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -731,6 +735,7 @@ fn receipt_audit_manual_candidate_from_manual_candidate(
         operation_family: candidate.operation_family.clone(),
         safe_caller: candidate.safe_caller.clone(),
         invariant: candidate.invariant.clone(),
+        oracle_map: candidate.oracle_map.clone(),
         proof_mode: candidate.proof_mode.clone(),
         fix_boundary: candidate.fix_boundary.clone(),
         pr_aperture: candidate.pr_aperture.clone(),

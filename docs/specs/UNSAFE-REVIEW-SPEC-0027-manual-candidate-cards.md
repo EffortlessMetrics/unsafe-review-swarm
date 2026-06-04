@@ -46,6 +46,7 @@ operation_family
 unsafe_operation
 invariant
 safe_caller
+oracle_map
 proof_mode
 fix_boundary
 pr_aperture
@@ -63,6 +64,11 @@ Field rules:
 - `evidence[]`: zero or more external evidence references.
 - `proof_mode`: optional advisory proof-mode object for candidate packets that
   need an explicit proof bar before implementation or ledger movement.
+- `oracle_map`: optional cross-language oracle object for candidates whose
+  actionable test, witness, or comparison lives outside the Rust seam. It must
+  include `rust_seam`, `oracle_language`, `oracle_path`, `oracle_kind`,
+  `coverage_confidence`, and `limitation`; the limitation must state the oracle
+  map is not witness execution, site-execution proof, or memory-safety proof.
 - `fix_boundary`: optional copy-only statement of the smallest repair boundary
   to try first.
 - `pr_aperture`: optional copy-only statement of the intended upstream PR scope
@@ -351,8 +357,8 @@ for future Bun packet presets. It must use
 `policy = advisory`. It must preserve sorted manual IDs, `source = manual`,
 `manual_candidate = true`, and `analyzer_discovered = false` per packet,
 project the same target, route, invariant, external evidence, optional
-`proof_mode`, `fix_boundary`, `pr_aperture`, implementer handoff, and
-copy-only commands as `manual-candidates.json`, include a
+`oracle_map`, `proof_mode`, `fix_boundary`, `pr_aperture`, implementer
+handoff, and copy-only commands as `manual-candidates.json`, include a
 `manual_repair_queue_item` projection from `manual-repair-queue.json` with the
 candidate ID, bucket, bucket reason, copy-only agent handoff, and trust
 boundary, and record absent ReviewCard, receipt, and stable-byte ledger inputs
@@ -481,8 +487,9 @@ into an analyzer ReviewCard.
   from `manual-candidates.json` while keeping ReviewCard `repair-queue.json`
   free of manual-candidate markers.
 - `first-pr` writes `tokmd-packets.json` as a formatting-input sidecar,
-  preserving manual markers, proof-mode/fix-boundary/PR-aperture guidance,
-  implementer handoff, commands from `manual-candidates.json`, and
+  preserving manual markers, optional oracle-map,
+  proof-mode/fix-boundary/PR-aperture guidance, implementer handoff, commands
+  from `manual-candidates.json`, and
   `manual_repair_queue_item` data from `manual-repair-queue.json` while
   recording absent ledger, receipt, and ReviewCard packet inputs as limitations
   and not running tokmd.

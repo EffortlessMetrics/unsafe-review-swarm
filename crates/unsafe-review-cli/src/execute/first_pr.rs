@@ -774,12 +774,39 @@ fn append_manual_candidate_guidance_lines(
             proof_mode.miri_required
         );
     }
+    if let Some(oracle_map) = &candidate.oracle_map {
+        if include_details {
+            let _ = writeln!(
+                out,
+                "- Oracle map: Rust seam `{}` -> `{}` oracle `{}` (`{}`; confidence: `{}`; limitation: {})",
+                oracle_map.rust_seam,
+                oracle_map.oracle_language,
+                oracle_map.oracle_path.display(),
+                oracle_map.oracle_kind,
+                oracle_map.coverage_confidence,
+                oracle_map.limitation
+            );
+        } else {
+            let _ = writeln!(
+                out,
+                "- Oracle map: `{}` -> `{}` (`{}`; `{}`; limitation in sidecars)",
+                oracle_map.rust_seam,
+                oracle_map.oracle_path.display(),
+                oracle_map.oracle_language,
+                oracle_map.oracle_kind
+            );
+        }
+    }
     if let Some(fix_boundary) = &candidate.fix_boundary {
         let _ = writeln!(out, "- Fix boundary: {fix_boundary}");
     }
     if let Some(pr_aperture) = &candidate.pr_aperture {
         let _ = writeln!(out, "- PR aperture: {pr_aperture}");
-        out.push_str("- Stop line: keep the PR inside this aperture; stop before source edits if the route no longer matches or the work would broaden into unrelated unsafe sites.\n");
+        if include_details {
+            out.push_str("- Stop line: keep the PR inside this aperture; stop before source edits if the route no longer matches or the work would broaden into unrelated unsafe sites.\n");
+        } else {
+            out.push_str("- Stop line: keep the PR inside this aperture.\n");
+        }
     }
     if let Some(summary) = manual_candidate_guidance_summary(candidate) {
         let _ = writeln!(out, "- Guidance: {summary}");
@@ -1055,6 +1082,7 @@ pub(super) fn render_manual_repair_queue_artifact(
             "with_fix_options": candidates.iter().filter(|candidate| !candidate.fix_options.is_empty()).count(),
             "with_test_targets": candidates.iter().filter(|candidate| !candidate.test_targets.is_empty()).count(),
             "with_do_not_touch": candidates.iter().filter(|candidate| !candidate.do_not_touch.is_empty()).count(),
+            "with_oracle_map": candidates.iter().filter(|candidate| candidate.oracle_map.is_some()).count(),
             "with_proof_mode": candidates.iter().filter(|candidate| candidate.proof_mode.is_some()).count(),
             "with_fix_boundary": candidates.iter().filter(|candidate| candidate.fix_boundary.is_some()).count(),
             "with_pr_aperture": candidates.iter().filter(|candidate| candidate.pr_aperture.is_some()).count(),
@@ -1096,6 +1124,7 @@ pub(super) fn render_tokmd_packets_artifact(root: &Path, candidates: &[ManualCan
             "with_proof_mode": candidates.iter().filter(|candidate| candidate.proof_mode.is_some()).count(),
             "with_fix_boundary": candidates.iter().filter(|candidate| candidate.fix_boundary.is_some()).count(),
             "with_pr_aperture": candidates.iter().filter(|candidate| candidate.pr_aperture.is_some()).count(),
+            "with_oracle_map": candidates.iter().filter(|candidate| candidate.oracle_map.is_some()).count(),
             "with_stable_byte_source_class": candidates.iter().filter(|candidate| stable_byte_source_class(candidate).is_some()).count(),
         },
         "inputs": tokmd_packet_inputs(),
@@ -1121,6 +1150,7 @@ fn manual_repair_queue_entry(root: &Path, candidate: &ManualCandidate) -> serde_
         "unsafe_operation": candidate.unsafe_operation.as_str(),
         "safe_caller": candidate.safe_caller.as_str(),
         "invariant_at_risk": candidate.invariant.as_str(),
+        "oracle_map": candidate.oracle_map.as_ref(),
         "external_evidence_refs": candidate.evidence.len(),
         "fix_options": &candidate.fix_options,
         "test_targets": &candidate.test_targets,
@@ -1146,6 +1176,9 @@ fn manual_repair_queue_entry(root: &Path, candidate: &ManualCandidate) -> serde_
         }
         if let Some(stable_byte) = &candidate.stable_byte {
             object.insert("stable_byte".to_string(), json!(stable_byte));
+        }
+        if candidate.oracle_map.is_none() {
+            object.remove("oracle_map");
         }
     }
     value
@@ -1234,6 +1267,7 @@ fn tokmd_packet_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::V
             "command": evidence.command.as_deref(),
             "limitation": evidence.limitation.as_deref(),
         })).collect::<Vec<_>>(),
+        "oracle_map": candidate.oracle_map.as_ref(),
         "fix_options": &candidate.fix_options,
         "test_targets": &candidate.test_targets,
         "do_not_touch": &candidate.do_not_touch,
@@ -1256,6 +1290,9 @@ fn tokmd_packet_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::V
         }
         if let Some(pr_aperture) = &candidate.pr_aperture {
             object.insert("pr_aperture".to_string(), json!(pr_aperture));
+        }
+        if candidate.oracle_map.is_none() {
+            object.remove("oracle_map");
         }
         if candidate.stable_byte.is_none() {
             object.remove("stable_byte");

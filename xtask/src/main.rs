@@ -13054,6 +13054,34 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_tokmd_oracle_map_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-tokmd-oracle-map-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("tokmd-packets.json");
+        let mut tokmd_packets = parse_json_file(&path)?;
+        tokmd_packets["packets"][0]["oracle_map"]["oracle_path"] =
+            serde_json::json!("test/js/unrelated.test.ts");
+        fs::write(&path, tokmd_packets.to_string())
+            .map_err(|err| format!("write tokmd packets failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err("tokmd oracle map drift should fail verification".to_string());
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("tokmd-packets.json packets[0] oracle_map must match manual-candidates.json candidate oracle_map"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_review_kit_manual_candidate_id_drift() -> Result<(), String>
     {
         let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-manual-candidate-id-drift")?;
@@ -18277,6 +18305,7 @@ review_after = "2026-08-01"
                 "with_fix_options": 0,
                 "with_test_targets": 0,
                 "with_do_not_touch": 0,
+                "with_oracle_map": 0,
                 "with_proof_mode": 0,
                 "with_fix_boundary": 0,
                 "with_pr_aperture": 0
@@ -18317,6 +18346,7 @@ review_after = "2026-08-01"
                 "with_proof_mode": 0,
                 "with_fix_boundary": 0,
                 "with_pr_aperture": 0,
+                "with_oracle_map": 0,
                 "with_stable_byte_source_class": 0
             },
             "inputs": {
@@ -18431,6 +18461,7 @@ review_after = "2026-08-01"
                 "operation_family": "raw_pointer_read"
             },
             "invariant_at_risk": "&[u8] memory must not be concurrently mutated",
+            "oracle_map": manual_candidate_oracle_map_fixture(),
             "proof_mode": {
                 "kind": "mutation-plus-miri",
                 "system_bun_expected": "nondiscriminating",
@@ -18473,6 +18504,17 @@ review_after = "2026-08-01"
         })
     }
 
+    fn manual_candidate_oracle_map_fixture() -> serde_json::Value {
+        serde_json::json!({
+            "rust_seam": "src/runtime/webcore/TextDecoder.rs::decode",
+            "oracle_language": "typescript",
+            "oracle_path": "test/js/webcore/textdecoder-sharedarraybuffer.test.ts",
+            "oracle_kind": "shared-byte-mutation-model",
+            "coverage_confidence": "candidate-local",
+            "limitation": "oracle map only; not witness execution, site-execution proof, or memory-safety proof"
+        })
+    }
+
     fn manual_repair_queue_item_fixture() -> serde_json::Value {
         serde_json::json!({
             "artifact": "manual-repair-queue.json",
@@ -18507,6 +18549,7 @@ review_after = "2026-08-01"
             "unsafe_operation": "core::slice::from_raw_parts",
             "invariant": "&[u8] memory must not be concurrently mutated",
             "safe_caller": "TextDecoder.decode SharedArrayBuffer route",
+            "oracle_map": manual_candidate_oracle_map_fixture(),
             "proof_mode": {
                 "kind": "mutation-plus-miri",
                 "system_bun_expected": "nondiscriminating",
@@ -18595,6 +18638,7 @@ review_after = "2026-08-01"
                 "with_fix_options": 1,
                 "with_test_targets": 1,
                 "with_do_not_touch": 1,
+                "with_oracle_map": 1,
                 "with_proof_mode": 1,
                 "with_fix_boundary": 1,
                 "with_pr_aperture": 1
@@ -18611,6 +18655,7 @@ review_after = "2026-08-01"
                 "safe_caller": "TextDecoder.decode SharedArrayBuffer route",
                 "invariant_at_risk": "&[u8] memory must not be concurrently mutated",
                 "external_evidence_refs": 1,
+                "oracle_map": manual_candidate_oracle_map_fixture(),
                 "proof_mode": {
                     "kind": "mutation-plus-miri",
                     "system_bun_expected": "nondiscriminating",
@@ -18684,6 +18729,7 @@ review_after = "2026-08-01"
                 "with_proof_mode": 1,
                 "with_fix_boundary": 1,
                 "with_pr_aperture": 1,
+                "with_oracle_map": 1,
                 "with_stable_byte_source_class": 0
             },
             "inputs": {
@@ -18748,6 +18794,7 @@ review_after = "2026-08-01"
                     "operation_family": "raw_pointer_read"
                 },
                 "invariant_at_risk": "&[u8] memory must not be concurrently mutated",
+                "oracle_map": manual_candidate_oracle_map_fixture(),
                 "proof_mode": {
                     "kind": "mutation-plus-miri",
                     "system_bun_expected": "nondiscriminating",
@@ -18888,7 +18935,7 @@ review_after = "2026-08-01"
 
     fn manual_candidate_front_panel_fixture(compact: bool) -> &'static str {
         if compact {
-            return "## Manual candidates\n\n- Imported manual candidates: 1 (manual/advisory; not analyzer-discovered ReviewCards)\n- Operation families: `raw_pointer_read: 1`\n- Evidence kinds: `runtime_witness: 1`\n- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)\n- Safe caller route: TextDecoder.decode SharedArrayBuffer route\n- Invariant at risk: &[u8] memory must not be concurrently mutated\n- External evidence refs: 1\n- Proof mode: `mutation-plus-miri` (system Bun expected: `nondiscriminating`; mutation required: `true`; Miri/model required: `true`)\n- Fix boundary: copy shared bytes before constructing the Rust slice\n- PR aperture: TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings\n- Stop line: keep the PR inside this aperture; stop before source edits if the route no longer matches or the work would broaden into unrelated unsafe sites.\n- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)\n- Agent context: `unsafe-review context R4R2-S001 --json`\n- Witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Manual candidate queue preview: first 1 of 1 manual candidate(s)\n  - `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 1; proof mode: `mutation-plus-miri`\n- Manual candidate index: `manual-candidates.json`; ReviewCard-only outputs clean.\n- Manual repair queue: `manual-repair-queue.json`; copy-only, separate from ReviewCard `repair-queue.json`; no agent was run.\n- Boundary: did not discover, did not run witnesses, edit source, or make policy inputs.\n\n";
+            return "## Manual candidates\n\n- Imported manual candidates: 1 (manual/advisory; not analyzer-discovered ReviewCards)\n- Operation families: `raw_pointer_read: 1`\n- Evidence kinds: `runtime_witness: 1`\n- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)\n- Safe caller route: TextDecoder.decode SharedArrayBuffer route\n- Invariant at risk: &[u8] memory must not be concurrently mutated\n- External evidence refs: 1\n- Proof mode: `mutation-plus-miri` (system Bun expected: `nondiscriminating`; mutation required: `true`; Miri/model required: `true`)\n- Fix boundary: copy shared bytes before constructing the Rust slice\n- PR aperture: TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings\n- Stop line: keep the PR inside this aperture.\n- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)\n- Agent context: `unsafe-review context R4R2-S001 --json`\n- Witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Manual candidate queue preview: first 1 of 1 manual candidate(s)\n  - `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 1; proof mode: `mutation-plus-miri`\n- Manual candidate index: `manual-candidates.json`; ReviewCard-only outputs clean.\n- Manual repair queue: `manual-repair-queue.json`; copy-only, separate from ReviewCard `repair-queue.json`; no agent was run.\n- Boundary: did not discover, did not run witnesses, edit source, or make policy inputs.\n\n";
         }
         "## Manual candidates\n\n- Imported manual candidates: 1 (manual/advisory; not analyzer-discovered ReviewCards)\n- Operation families: `raw_pointer_read: 1`\n- Evidence kinds: `runtime_witness: 1`\n- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)\n- Safe caller route: TextDecoder.decode SharedArrayBuffer route\n- Invariant at risk: &[u8] memory must not be concurrently mutated\n- External evidence refs: 1\n- Proof mode: `mutation-plus-miri` (system Bun expected: `nondiscriminating`; mutation required: `true`; Miri/model required: `true`)\n- Fix boundary: copy shared bytes before constructing the Rust slice\n- PR aperture: TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings\n- Stop line: keep the PR inside this aperture; stop before source edits if the route no longer matches or the work would broaden into unrelated unsafe sites.\n- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)\n- First fix option: copy SharedArrayBuffer-backed bytes before constructing the slice\n- First test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`\n- First do-not-touch note: Do not rewrite TextDecoder unrelated encodings\n- Explain: `unsafe-review explain R4R2-S001`\n- Agent context: `unsafe-review context R4R2-S001 --json`\n- Witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Manual candidate queue preview: first 1 of 1 manual candidate(s)\n  - `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 1; proof mode: `mutation-plus-miri`\n    - Agent context: `unsafe-review context R4R2-S001 --json`\n    - Witness plan: `unsafe-review candidate witness-plan R4R2-S001`\n- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only outputs.\n- Manual repair queue: `manual-repair-queue.json`; copy-only manual candidate repair handoff, separate from ReviewCard `repair-queue.json`; no agent was run.\n- Boundary: copy-only manual handoff; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n"
     }

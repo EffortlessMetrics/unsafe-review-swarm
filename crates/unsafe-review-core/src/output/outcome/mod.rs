@@ -1,6 +1,6 @@
 use crate::candidate::{
     MANUAL_CANDIDATE_INDEX_SCHEMA_VERSION, MANUAL_CANDIDATE_SCHEMA_VERSION, ManualCandidate,
-    ManualCandidateEvidence, ManualCandidateProofMode,
+    ManualCandidateEvidence, ManualCandidateOracleMap, ManualCandidateProofMode,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -135,6 +135,8 @@ pub struct OutcomeCardState {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub invariant: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub oracle_map: Option<ManualCandidateOracleMap>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub proof_mode: Option<ManualCandidateProofMode>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fix_boundary: Option<String>,
@@ -225,6 +227,8 @@ struct SnapshotCard {
     safe_caller: Option<String>,
     #[serde(skip)]
     invariant: Option<String>,
+    #[serde(skip)]
+    oracle_map: Option<ManualCandidateOracleMap>,
     #[serde(skip)]
     proof_mode: Option<ManualCandidateProofMode>,
     #[serde(skip)]
@@ -409,6 +413,7 @@ fn snapshot_card_from_manual_candidate(candidate: ManualCandidate) -> SnapshotCa
         evidence_count: Some(evidence_count),
         safe_caller: Some(candidate.safe_caller),
         invariant: Some(candidate.invariant),
+        oracle_map: candidate.oracle_map,
         proof_mode: candidate.proof_mode,
         fix_boundary: candidate.fix_boundary,
         pr_aperture: candidate.pr_aperture,
@@ -714,6 +719,14 @@ fn snapshot_id(snapshot: &Snapshot) -> String {
         feed_hash(&mut hash, card.trust_boundary.as_deref().unwrap_or(""));
         feed_hash(&mut hash, card.safe_caller.as_deref().unwrap_or(""));
         feed_hash(&mut hash, card.invariant.as_deref().unwrap_or(""));
+        if let Some(oracle_map) = &card.oracle_map {
+            feed_hash(&mut hash, &oracle_map.rust_seam);
+            feed_hash(&mut hash, &oracle_map.oracle_language);
+            feed_hash(&mut hash, &oracle_map.oracle_path.display().to_string());
+            feed_hash(&mut hash, &oracle_map.oracle_kind);
+            feed_hash(&mut hash, &oracle_map.coverage_confidence);
+            feed_hash(&mut hash, &oracle_map.limitation);
+        }
         if let Some(proof_mode) = &card.proof_mode {
             feed_hash(&mut hash, &proof_mode.kind);
             feed_hash(&mut hash, &proof_mode.system_bun_expected);
@@ -909,6 +922,7 @@ impl From<&SnapshotCard> for OutcomeCardState {
             evidence_count: card.evidence_count,
             safe_caller: card.safe_caller.clone(),
             invariant: card.invariant.clone(),
+            oracle_map: card.oracle_map.clone(),
             proof_mode: card.proof_mode.clone(),
             fix_boundary: card.fix_boundary.clone(),
             pr_aperture: card.pr_aperture.clone(),
@@ -964,6 +978,7 @@ fn manual_handoff_changed(before: &SnapshotCard, after: &SnapshotCard) -> bool {
     }
     before.safe_caller != after.safe_caller
         || before.invariant != after.invariant
+        || before.oracle_map != after.oracle_map
         || before.proof_mode != after.proof_mode
         || before.fix_boundary != after.fix_boundary
         || before.pr_aperture != after.pr_aperture

@@ -3,11 +3,11 @@
 These examples are committed smoke inputs for `unsafe-review candidate import`.
 They preserve external Bun evidence as manual/advisory packets, not
 analyzer-discovered ReviewCards.
-Inputs may include optional `stable_byte`, `proof_mode`, `fix_boundary`,
-`pr_aperture`, `fix_options`, `test_targets`, and `do_not_touch` fields so
-candidate-specific proof bars and implementer guidance project through the
-copy-only handoff surfaces without adding candidates to ReviewCard-only
-artifacts.
+Inputs may include optional `stable_byte`, `oracle_map`, `proof_mode`,
+`fix_boundary`, `pr_aperture`, `fix_options`, `test_targets`, and
+`do_not_touch` fields so candidate-specific proof bars, cross-language oracle
+metadata, and implementer guidance project through the copy-only handoff
+surfaces without adding candidates to ReviewCard-only artifacts.
 
 `cargo run --locked -p xtask -- check-manual-candidate-examples` imports every
 JSON file in this directory into a disposable first-pr fixture and verifies the

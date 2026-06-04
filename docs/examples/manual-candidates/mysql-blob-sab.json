@@ -13,6 +13,14 @@
   "unsafe_operation": "JSC__JSValue__borrowBytesForOffThread -> core::slice::from_raw_parts -> Data::Temporary(RawSlice)",
   "invariant": "MySQL packet construction must not borrow mutable or shared JS backing storage through a temporary raw slice",
   "safe_caller": "Bun.SQL MySQL prepared statement binding a SharedArrayBuffer-backed Uint8Array as a BLOB parameter",
+  "oracle_map": {
+    "rust_seam": "src/sql_jsc/mysql/MySQLValue.rs::data_cell_to_js",
+    "oracle_language": "typescript",
+    "oracle_path": "test/js/sql/sql-mysql-bind-blob-borrow.test.ts",
+    "oracle_kind": "shared-byte-mutation-model",
+    "coverage_confidence": "candidate-local",
+    "limitation": "oracle map only; not witness execution, site-execution proof, or memory-safety proof"
+  },
   "stable_byte": {
     "class": "stable-byte-source-sab-race",
     "source": "SharedArrayBuffer-backed typed array as prepared-statement BLOB",

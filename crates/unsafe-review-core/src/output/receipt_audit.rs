@@ -242,6 +242,16 @@ fn manual_candidate_target(candidate: &ReceiptAuditManualCandidate) -> String {
             markdown_cell(&proof_mode.system_bun_expected)
         ));
     }
+    if let Some(oracle_map) = &candidate.oracle_map {
+        parts.push(format!(
+            "oracle: `{}` `{}` / `{}` / confidence `{}` / limitation {}",
+            markdown_cell(&oracle_map.oracle_language),
+            markdown_cell(&oracle_map.oracle_path.display().to_string()),
+            markdown_cell(&oracle_map.oracle_kind),
+            markdown_cell(&oracle_map.coverage_confidence),
+            markdown_cell(&oracle_map.limitation)
+        ));
+    }
     if let Some(fix_boundary) = &candidate.fix_boundary {
         parts.push(format!("fix boundary: {}", markdown_cell(fix_boundary)));
     }
@@ -520,6 +530,7 @@ mod tests {
                     operation_family: "raw_pointer_read".to_string(),
                     safe_caller: "TextDecoder.decode SharedArrayBuffer route".to_string(),
                     invariant: "&[u8] memory must not be concurrently mutated".to_string(),
+                    oracle_map: None,
                     proof_mode: None,
                     fix_boundary: None,
                     pr_aperture: None,

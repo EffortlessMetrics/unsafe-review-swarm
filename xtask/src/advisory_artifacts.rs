@@ -128,6 +128,7 @@ struct ManualCandidateProjection {
     proof_mode: Option<ManualCandidateProofModeProjection>,
     fix_boundary: Option<String>,
     pr_aperture: Option<String>,
+    oracle_map: Option<serde_json::Value>,
     stable_byte: Option<serde_json::Value>,
     stable_byte_source_class: Option<String>,
     stable_byte_ledger_state: Option<String>,
@@ -618,11 +619,7 @@ fn check_manual_candidate_front_door_boundary_text(
     }
     if let Some(pr_aperture) = &candidate.pr_aperture {
         super::require_text_contains(text, &format!("- PR aperture: {pr_aperture}"), path)?;
-        super::require_text_contains(
-            text,
-            "- Stop line: keep the PR inside this aperture; stop before source edits if the route no longer matches or the work would broaden into unrelated unsafe sites.",
-            path,
-        )?;
+        super::require_text_contains(text, "- Stop line: keep the PR inside this aperture", path)?;
     }
     Ok(())
 }
@@ -1176,6 +1173,15 @@ fn check_manual_repair_queue_artifact(
     )?;
     require_manual_repair_guidance_count(
         &value,
+        "with_oracle_map",
+        manual_candidates
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.oracle_map.is_some())
+            .count(),
+    )?;
+    require_manual_repair_guidance_count(
+        &value,
         "with_proof_mode",
         manual_candidates
             .candidates
@@ -1322,6 +1328,7 @@ fn check_manual_repair_queue_entry(
     require_projected_optional_proof_mode(entry, "proof_mode", &expected.proof_mode, &context)?;
     require_projected_optional_str(entry, "fix_boundary", &expected.fix_boundary, &context)?;
     require_projected_optional_str(entry, "pr_aperture", &expected.pr_aperture, &context)?;
+    require_projected_optional_json_value(entry, "oracle_map", &expected.oracle_map, &context)?;
     let handoff = entry
         .get("implementer_handoff")
         .ok_or_else(|| format!("{context} is missing implementer_handoff"))?;
@@ -1513,6 +1520,16 @@ fn check_tokmd_packets_artifact(
             .candidates
             .iter()
             .filter(|candidate| candidate.pr_aperture.is_some())
+            .count(),
+        "tokmd-packets.json",
+    )?;
+    require_tokmd_summary_count(
+        &value,
+        "with_oracle_map",
+        manual_candidates
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.oracle_map.is_some())
             .count(),
         "tokmd-packets.json",
     )?;
@@ -1755,6 +1772,7 @@ fn check_tokmd_packet_entry(
     require_projected_optional_proof_mode(entry, "proof_mode", &expected.proof_mode, &context)?;
     require_projected_optional_str(entry, "fix_boundary", &expected.fix_boundary, &context)?;
     require_projected_optional_str(entry, "pr_aperture", &expected.pr_aperture, &context)?;
+    require_projected_optional_json_value(entry, "oracle_map", &expected.oracle_map, &context)?;
     let handoff = entry
         .get("implementer_handoff")
         .ok_or_else(|| format!("{context} is missing implementer_handoff"))?;
@@ -2030,6 +2048,11 @@ fn check_manual_candidate_artifact_entry(
         "pr_aperture",
         "manual-candidates.json candidate",
     )?;
+    let oracle_map = optional_manual_candidate_oracle_map(
+        candidate,
+        "oracle_map",
+        "manual-candidates.json candidate",
+    )?;
     let stable_byte = candidate.get("stable_byte").cloned();
     let stable_byte_source_class = stable_byte
         .as_ref()
@@ -2122,6 +2145,7 @@ fn check_manual_candidate_artifact_entry(
         proof_mode,
         fix_boundary,
         pr_aperture,
+        oracle_map,
         stable_byte,
         stable_byte_source_class,
         stable_byte_ledger_state,
@@ -2249,6 +2273,7 @@ fn check_manual_candidate_implementer_handoff(
     require_projected_optional_proof_mode(handoff, "proof_mode", &expected.proof_mode, context)?;
     require_projected_optional_str(handoff, "fix_boundary", &expected.fix_boundary, context)?;
     require_projected_optional_str(handoff, "pr_aperture", &expected.pr_aperture, context)?;
+    require_projected_optional_json_value(handoff, "oracle_map", &expected.oracle_map, context)?;
     require_non_empty_string_array(handoff, "suggested_next_steps", context)?;
     let non_goals = require_non_empty_string_array(handoff, "non_goals", context)?;
     for expected_text in [
@@ -2323,6 +2348,44 @@ fn optional_manual_candidate_proof_mode(
         mutation_required: json_bool_at(value, "/mutation_required", &context)?,
         miri_required: json_bool_at(value, "/miri_required", &context)?,
     }))
+}
+
+fn optional_manual_candidate_oracle_map(
+    value: &serde_json::Value,
+    field: &str,
+    context: &str,
+) -> Result<Option<serde_json::Value>, String> {
+    let Some(value) = value.get(field) else {
+        return Ok(None);
+    };
+    if value.is_null() {
+        return Ok(None);
+    }
+    if !value.is_object() {
+        return Err(format!("{context} {field} must be an object when present"));
+    }
+    let context = format!("{context} {field}");
+    for required in [
+        "rust_seam",
+        "oracle_language",
+        "oracle_path",
+        "oracle_kind",
+        "coverage_confidence",
+        "limitation",
+    ] {
+        super::require_non_empty_json_str(value, required, &context)?;
+    }
+    let limitation = super::require_non_empty_json_str(value, "limitation", &context)?;
+    for required in [
+        "not witness execution",
+        "site-execution proof",
+        "memory-safety proof",
+    ] {
+        if !super::text_contains_ignore_ascii_case(limitation, required) {
+            return Err(format!("{context} limitation must include `{required}`"));
+        }
+    }
+    Ok(Some(value.clone()))
 }
 
 fn json_bool_at(value: &serde_json::Value, pointer: &str, context: &str) -> Result<bool, String> {

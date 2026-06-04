@@ -13,6 +13,14 @@
   "unsafe_operation": "core::slice::from_raw_parts",
   "invariant": "&[u8] memory must not be concurrently mutated",
   "safe_caller": "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))",
+  "oracle_map": {
+    "rust_seam": "src/runtime/webcore/TextDecoder.rs::decode",
+    "oracle_language": "typescript",
+    "oracle_path": "test/js/webcore/textdecoder-sharedarraybuffer.test.ts",
+    "oracle_kind": "shared-byte-mutation-model",
+    "coverage_confidence": "candidate-local",
+    "limitation": "oracle map only; not witness execution, site-execution proof, or memory-safety proof"
+  },
   "stable_byte": {
     "class": "stable-byte-source-sab-race",
     "source": "SharedArrayBuffer-backed typed array decode",

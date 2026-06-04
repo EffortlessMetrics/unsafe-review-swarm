@@ -18,6 +18,8 @@ pub struct ManualCandidate {
     pub invariant: String,
     pub safe_caller: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oracle_map: Option<ManualCandidateOracleMap>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stable_byte: Option<ManualCandidateStableByte>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub proof_mode: Option<ManualCandidateProofMode>,
@@ -54,6 +56,16 @@ pub struct ManualCandidateProofMode {
     pub system_bun_expected: String,
     pub mutation_required: bool,
     pub miri_required: bool,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ManualCandidateOracleMap {
+    pub rust_seam: String,
+    pub oracle_language: String,
+    pub oracle_path: PathBuf,
+    pub oracle_kind: String,
+    pub coverage_confidence: String,
+    pub limitation: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -125,6 +137,9 @@ impl ManualCandidate {
         require_nonempty("unsafe_operation", &self.unsafe_operation)?;
         require_nonempty("invariant", &self.invariant)?;
         require_nonempty("safe_caller", &self.safe_caller)?;
+        if let Some(oracle_map) = &self.oracle_map {
+            oracle_map.validate()?;
+        }
         if let Some(stable_byte) = &self.stable_byte {
             stable_byte.validate(
                 self.proof_mode.as_ref(),
@@ -150,6 +165,31 @@ impl ManualCandidate {
             }
             require_optional_nonempty("evidence.command", evidence.command.as_deref())?;
             require_optional_nonempty("evidence.limitation", evidence.limitation.as_deref())?;
+        }
+        Ok(())
+    }
+}
+
+impl ManualCandidateOracleMap {
+    fn validate(&self) -> Result<(), String> {
+        require_nonempty("oracle_map.rust_seam", &self.rust_seam)?;
+        require_nonempty("oracle_map.oracle_language", &self.oracle_language)?;
+        if self.oracle_path.as_os_str().is_empty() {
+            return Err("manual candidate oracle_map.oracle_path must not be empty".to_string());
+        }
+        require_nonempty("oracle_map.oracle_kind", &self.oracle_kind)?;
+        require_nonempty("oracle_map.coverage_confidence", &self.coverage_confidence)?;
+        require_nonempty("oracle_map.limitation", &self.limitation)?;
+        for required in [
+            "not witness execution",
+            "site-execution proof",
+            "memory-safety proof",
+        ] {
+            if !self.limitation.to_ascii_lowercase().contains(required) {
+                return Err(format!(
+                    "manual candidate oracle_map.limitation must include `{required}`"
+                ));
+            }
         }
         Ok(())
     }
@@ -335,6 +375,7 @@ pub fn render_manual_candidate_context(candidate: &ManualCandidate) -> Result<St
         "unsafe_operation": candidate.unsafe_operation,
         "invariant": candidate.invariant,
         "safe_caller": candidate.safe_caller,
+        "oracle_map": candidate.oracle_map.as_ref(),
         "stable_byte": candidate.stable_byte.as_ref(),
         "implementer_handoff": manual_candidate_implementer_handoff(candidate),
         "evidence": candidate.evidence.iter().map(|evidence| serde_json::json!({
@@ -359,6 +400,9 @@ pub fn render_manual_candidate_context(candidate: &ManualCandidate) -> Result<St
     if let Some(object) = value.as_object_mut() {
         if candidate.stable_byte.is_none() {
             object.remove("stable_byte");
+        }
+        if candidate.oracle_map.is_none() {
+            object.remove("oracle_map");
         }
         if let Some(proof_mode) = &candidate.proof_mode {
             object.insert("proof_mode".to_string(), serde_json::json!(proof_mode));
@@ -450,6 +494,17 @@ fn render_candidate_handoff_markdown(out: &mut String, candidate: &ManualCandida
         candidate.safe_caller, candidate.unsafe_operation
     ));
     out.push_str(&format!("- Invariant at risk: {}\n", candidate.invariant));
+    if let Some(oracle_map) = &candidate.oracle_map {
+        out.push_str(&format!(
+            "- Oracle map: Rust seam `{}` -> `{}` oracle `{}` (`{}`; confidence: `{}`; limitation: {})\n",
+            oracle_map.rust_seam,
+            oracle_map.oracle_language,
+            oracle_map.oracle_path.display(),
+            oracle_map.oracle_kind,
+            oracle_map.coverage_confidence,
+            oracle_map.limitation
+        ));
+    }
     if let Some(proof_mode) = &candidate.proof_mode {
         out.push_str(&format!(
             "- Proof mode: `{}` (system Bun expected: `{}`; mutation required: `{}`; Miri/model required: `{}`)\n",
@@ -499,6 +554,7 @@ pub fn manual_candidate_implementer_handoff(candidate: &ManualCandidate) -> serd
             "operation_family": candidate.operation_family,
         },
         "invariant_at_risk": candidate.invariant,
+        "oracle_map": candidate.oracle_map.as_ref(),
         "stable_byte": candidate.stable_byte.as_ref(),
         "external_evidence": candidate.evidence.iter().map(|evidence| serde_json::json!({
             "kind": evidence.kind,
@@ -514,6 +570,9 @@ pub fn manual_candidate_implementer_handoff(candidate: &ManualCandidate) -> serd
     if let Some(object) = value.as_object_mut() {
         if candidate.stable_byte.is_none() {
             object.remove("stable_byte");
+        }
+        if candidate.oracle_map.is_none() {
+            object.remove("oracle_map");
         }
         if let Some(proof_mode) = &candidate.proof_mode {
             object.insert("proof_mode".to_string(), serde_json::json!(proof_mode));
@@ -544,6 +603,12 @@ fn manual_candidate_suggested_next_steps(candidate: &ManualCandidate) -> Vec<Str
     if candidate.proof_mode.is_some() {
         steps.push(
             "preserve the candidate proof mode and evidence bar before claiming the lane outcome"
+                .to_string(),
+        );
+    }
+    if candidate.oracle_map.is_some() {
+        steps.push(
+            "preserve the cross-language oracle map and limitation when preparing handoffs"
                 .to_string(),
         );
     }
@@ -746,6 +811,13 @@ mod tests {
             candidate.pr_aperture.as_deref(),
             Some("TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings")
         );
+        assert_eq!(
+            candidate
+                .oracle_map
+                .as_ref()
+                .map(|oracle_map| oracle_map.oracle_language.as_str()),
+            Some("typescript")
+        );
         assert_eq!(candidate.fix_options.len(), 1);
         assert_eq!(candidate.test_targets.len(), 1);
         assert_eq!(candidate.do_not_touch.len(), 1);
@@ -754,6 +826,7 @@ mod tests {
         assert!(canonical.contains("\"analyzer_discovered\": false"));
         assert!(canonical.contains("\"stable_byte\""));
         assert!(canonical.contains("\"proof_mode\""));
+        assert!(canonical.contains("\"oracle_map\""));
         assert!(canonical.contains("\"fix_boundary\""));
         assert!(canonical.contains("\"pr_aperture\""));
         assert!(canonical.contains("\"fix_options\""));
@@ -921,6 +994,18 @@ mod tests {
     }
 
     #[test]
+    fn manual_candidate_rejects_empty_oracle_map_limitation() {
+        let err = ManualCandidate::from_json_str(&example_json().replace(
+            "\"limitation\": \"oracle map only; not witness execution, site-execution proof, or memory-safety proof\"",
+            "\"limitation\": \"   \"",
+        ))
+        .err()
+        .unwrap_or_default();
+
+        assert!(err.contains("oracle_map.limitation"), "{err}");
+    }
+
+    #[test]
     fn manual_candidate_explain_context_and_witness_plan_preserve_manual_marker()
     -> Result<(), String> {
         let candidate = ManualCandidate::from_json_str(example_json())?;
@@ -938,6 +1023,8 @@ mod tests {
         assert!(
             explain.contains("Stable-byte source: `SharedArrayBuffer-backed typed array decode`")
         );
+        assert!(explain.contains("Oracle map: Rust seam"));
+        assert!(explain.contains("textdecoder-sharedarraybuffer.test.ts"));
         assert!(explain.contains("Fix boundary: copy shared bytes"));
         assert!(explain.contains("PR aperture: TextDecoder shared-byte snapshot"));
         assert!(explain.contains("Fix options"));
@@ -953,6 +1040,8 @@ mod tests {
         assert!(context.contains("\"implementer_handoff\""));
         assert!(context.contains("\"invariant_at_risk\""));
         assert!(context.contains("\"stable_byte\""));
+        assert!(context.contains("\"oracle_map\""));
+        assert!(context.contains("\"oracle_language\": \"typescript\""));
         assert!(context.contains("\"ledger_state\": \"handoff-ready\""));
         assert!(context.contains("\"proof_mode\""));
         assert!(context.contains("\"fix_boundary\""));
@@ -968,6 +1057,7 @@ mod tests {
         assert!(witness_plan.contains("## Implementer handoff"));
         assert!(witness_plan.contains("Proof mode: `mutation-plus-miri`"));
         assert!(witness_plan.contains("Stable-byte class: `stable-byte-source-sab-race`"));
+        assert!(witness_plan.contains("Oracle map: Rust seam"));
         assert!(witness_plan.contains("Fix options"));
         assert!(witness_plan.contains("Test targets"));
         assert!(witness_plan.contains("Do not touch"));
@@ -991,6 +1081,14 @@ mod tests {
           "unsafe_operation": "core::slice::from_raw_parts",
           "invariant": "&[u8] memory must not be concurrently mutated",
           "safe_caller": "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))",
+          "oracle_map": {
+            "rust_seam": "src/runtime/webcore/TextDecoder.rs::decode",
+            "oracle_language": "typescript",
+            "oracle_path": "test/js/webcore/textdecoder-sharedarraybuffer.test.ts",
+            "oracle_kind": "shared-byte-mutation-model",
+            "coverage_confidence": "candidate-local",
+            "limitation": "oracle map only; not witness execution, site-execution proof, or memory-safety proof"
+          },
           "stable_byte": {
             "class": "stable-byte-source-sab-race",
             "source": "SharedArrayBuffer-backed typed array decode",

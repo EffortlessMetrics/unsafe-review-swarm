@@ -172,6 +172,16 @@ fn markdown_state(state: Option<&OutcomeCardState>) -> String {
             if let Some(invariant) = state.invariant.as_deref() {
                 parts.push(format!("invariant {}", markdown_cell(invariant)));
             }
+            if let Some(oracle_map) = state.oracle_map.as_ref() {
+                parts.push(format!(
+                    "oracle `{}` `{}` / `{}` / confidence `{}` / limitation {}",
+                    markdown_cell(&oracle_map.oracle_language),
+                    markdown_cell(&oracle_map.oracle_path.display().to_string()),
+                    markdown_cell(&oracle_map.oracle_kind),
+                    markdown_cell(&oracle_map.coverage_confidence),
+                    markdown_cell(&oracle_map.limitation)
+                ));
+            }
             if let Some(evidence) = state.evidence.first() {
                 let mut evidence_parts = vec![format!(
                     "first evidence `{}`",

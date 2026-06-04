@@ -715,6 +715,17 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
         canonical["evidence"][0]["command"],
         "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
     );
+    assert_eq!(canonical["oracle_map"]["oracle_language"], "typescript");
+    assert_eq!(
+        canonical["oracle_map"]["oracle_path"],
+        "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+    );
+    assert!(
+        canonical["oracle_map"]["limitation"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not witness execution")
+    );
     assert!(
         canonical["evidence"][0]["limitation"]
             .as_str()
@@ -763,6 +774,16 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
     assert_eq!(
         outcome["cards"]["new"][0]["after"]["invariant"],
         "&[u8] memory must not be concurrently mutated"
+    );
+    assert_eq!(
+        outcome["cards"]["new"][0]["after"]["oracle_map"]["oracle_path"],
+        "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+    );
+    assert!(
+        outcome["cards"]["new"][0]["after"]["oracle_map"]["limitation"]
+            .as_str()
+            .unwrap_or("")
+            .contains("memory-safety proof")
     );
     assert_eq!(
         outcome["cards"]["new"][0]["after"]["evidence"][0]["command"],
@@ -1470,6 +1491,20 @@ fn manual_candidate_receipts_audit_as_manual_advisory_targets() -> Result<(), Bo
         "&[u8] memory must not be concurrently mutated"
     );
     assert_eq!(
+        receipt["matched_manual_candidate"]["oracle_map"]["oracle_language"],
+        "typescript"
+    );
+    assert_eq!(
+        receipt["matched_manual_candidate"]["oracle_map"]["oracle_path"],
+        "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+    );
+    assert!(
+        receipt["matched_manual_candidate"]["oracle_map"]["limitation"]
+            .as_str()
+            .unwrap_or("")
+            .contains("site-execution proof")
+    );
+    assert_eq!(
         receipt["matched_manual_candidate"]["evidence"][0]["command"],
         "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
     );
@@ -1510,6 +1545,8 @@ fn manual_candidate_receipts_audit_as_manual_advisory_targets() -> Result<(), Bo
     assert!(audit_markdown.contains("manual_candidate, matched"));
     assert!(audit_markdown.contains("route: new TextDecoder().decode"));
     assert!(audit_markdown.contains("invariant: &[u8] memory must not be concurrently mutated"));
+    assert!(audit_markdown.contains("oracle: `typescript`"));
+    assert!(audit_markdown.contains("site-execution proof"));
     assert!(audit_markdown.contains("first fix: Copy SharedArrayBuffer-backed bytes"));
     assert!(
         audit_markdown
@@ -2215,6 +2252,20 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         "handoff-ready"
     );
     assert_eq!(
+        manual_candidates["candidates"][0]["oracle_map"]["oracle_language"],
+        "typescript"
+    );
+    assert_eq!(
+        manual_candidates["candidates"][0]["oracle_map"]["oracle_path"],
+        "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+    );
+    assert!(
+        manual_candidates["candidates"][0]["oracle_map"]["limitation"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not witness execution")
+    );
+    assert_eq!(
         manual_candidates["candidates"][0]["fix_boundary"],
         "Snapshot shared/growable/resizable bytes before Rust receives &[u8]"
     );
@@ -2231,6 +2282,10 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(
         manual_candidates["candidates"][0]["implementer_handoff"]["stable_byte"],
         manual_candidates["candidates"][0]["stable_byte"]
+    );
+    assert_eq!(
+        manual_candidates["candidates"][0]["implementer_handoff"]["oracle_map"],
+        manual_candidates["candidates"][0]["oracle_map"]
     );
     assert_eq!(
         manual_candidates["candidates"][0]["implementer_handoff"]["fix_boundary"],
@@ -2354,6 +2409,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(manual_repair_queue["summary"]["with_fix_options"], 2);
     assert_eq!(manual_repair_queue["summary"]["with_test_targets"], 2);
     assert_eq!(manual_repair_queue["summary"]["with_do_not_touch"], 2);
+    assert_eq!(manual_repair_queue["summary"]["with_oracle_map"], 2);
     assert_eq!(manual_repair_queue["summary"]["with_proof_mode"], 2);
     assert_eq!(manual_repair_queue["summary"]["with_fix_boundary"], 2);
     assert_eq!(manual_repair_queue["summary"]["with_pr_aperture"], 2);
@@ -2383,6 +2439,10 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(
         manual_repair_queue["queue"][0]["stable_byte"],
         manual_candidates["candidates"][0]["stable_byte"]
+    );
+    assert_eq!(
+        manual_repair_queue["queue"][0]["oracle_map"],
+        manual_candidates["candidates"][0]["oracle_map"]
     );
     assert_eq!(
         manual_repair_queue["queue"][0]["fix_boundary"],
@@ -2470,6 +2530,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(tokmd_packets["summary"]["with_proof_mode"], 2);
     assert_eq!(tokmd_packets["summary"]["with_fix_boundary"], 2);
     assert_eq!(tokmd_packets["summary"]["with_pr_aperture"], 2);
+    assert_eq!(tokmd_packets["summary"]["with_oracle_map"], 2);
     assert_eq!(tokmd_packets["summary"]["with_stable_byte_source_class"], 2);
     assert_eq!(
         tokmd_packets["summary"]["operation_families"]["raw_pointer_read"],
@@ -2531,6 +2592,10 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(
         tokmd_packets["packets"][0]["proof_mode"],
         manual_candidates["candidates"][0]["proof_mode"]
+    );
+    assert_eq!(
+        tokmd_packets["packets"][0]["oracle_map"],
+        manual_candidates["candidates"][0]["oracle_map"]
     );
     assert_eq!(
         tokmd_packets["packets"][0]["fix_boundary"],
@@ -4970,6 +5035,18 @@ fn assert_manual_candidate_front_panel(
     assert!(text.contains(
         "- Proof mode: `mutation-plus-miri` (system Bun expected: `nondiscriminating`; mutation required: `true`; Miri/model required: `true`)"
     ));
+    if compact {
+        assert!(text.contains(
+            "- Oracle map: `src/runtime/webcore/TextDecoder.rs::decode` -> `test/js/webcore/textdecoder-sharedarraybuffer.test.ts` (`typescript`; `shared-byte-mutation-model`; limitation in sidecars)"
+        ));
+    } else {
+        assert!(text.contains(
+            "- Oracle map: Rust seam `src/runtime/webcore/TextDecoder.rs::decode` -> `typescript` oracle `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`"
+        ));
+        assert!(
+            text.contains("not witness execution, site-execution proof, or memory-safety proof")
+        );
+    }
     assert!(text.contains(
         "- Fix boundary: Snapshot shared/growable/resizable bytes before Rust receives &[u8]"
     ));
@@ -5058,6 +5135,10 @@ fn assert_manual_candidate_witness_follow_up(text: &str) {
     assert!(text.contains(
         "- Proof mode: `mutation-plus-miri` (system Bun expected: `nondiscriminating`; mutation required: `true`; Miri/model required: `true`)"
     ));
+    assert!(text.contains(
+        "- Oracle map: Rust seam `src/runtime/webcore/TextDecoder.rs::decode` -> `typescript` oracle `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`"
+    ));
+    assert!(text.contains("not witness execution, site-execution proof, or memory-safety proof"));
     assert!(text.contains(
         "- Fix boundary: Snapshot shared/growable/resizable bytes before Rust receives &[u8]"
     ));
