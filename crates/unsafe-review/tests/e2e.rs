@@ -473,6 +473,14 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
             .contains("attach a matching receipt")
     );
     assert_eq!(
+        packet["confirmation_cue"]["minimal_repro"]["kind"],
+        "verify_command"
+    );
+    assert!(
+        serde_json::to_string(&packet["confirmation_cue"]["minimal_repro"])?
+            .contains("unsafe-review did not run this command")
+    );
+    assert_eq!(
         packet["context"]["operation"],
         "unsafe { ptr.cast::<Header>().read() }"
     );

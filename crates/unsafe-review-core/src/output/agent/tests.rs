@@ -48,6 +48,24 @@ fn agent_packet_is_parseable_bounded_and_card_sourced() -> Result<(), String> {
             .contains("Build/run `cargo +nightly miri test read_header` first")
     );
     assert_eq!(
+        value["confirmation_cue"]["minimal_repro"]["kind"],
+        "verify_command"
+    );
+    assert_eq!(
+        value["confirmation_cue"]["minimal_repro"]["command"],
+        "cargo +nightly miri test read_header"
+    );
+    assert_eq!(
+        value["confirmation_cue"]["minimal_repro"]["route_kind"],
+        "miri"
+    );
+    let minimal_repro = serde_json::to_string(&value["confirmation_cue"]["minimal_repro"])
+        .map_err(|err| format!("render minimal repro cue failed: {err}"))?;
+    assert!(minimal_repro.contains("Confirm ReviewCard"));
+    assert!(minimal_repro.contains("src/lib.rs"));
+    assert!(minimal_repro.contains("cargo +nightly miri test read_header"));
+    assert!(minimal_repro.contains("unsafe-review did not run this command"));
+    assert_eq!(
         value["confirmation_cue"]["confirmation_step"],
         "build/run `cargo +nightly miri test read_header` first, then attach a matching receipt if it confirms the route"
     );
@@ -721,6 +739,19 @@ fn agent_packet_scopes_target_feature_repairs_to_dispatch_invariant() -> Result<
         value["confirmation_cue"]["confirmation_step"],
         "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
     );
+    assert_eq!(
+        value["confirmation_cue"]["minimal_repro"]["kind"],
+        "witness_route"
+    );
+    assert_eq!(
+        value["confirmation_cue"]["minimal_repro"]["route_kind"],
+        "human-deep-review"
+    );
+    let minimal_repro = serde_json::to_string(&value["confirmation_cue"]["minimal_repro"])
+        .map_err(|err| format!("render minimal repro cue failed: {err}"))?;
+    assert!(minimal_repro.contains("witness-plan.md"));
+    assert!(minimal_repro.contains("derive a focused repro"));
+    assert!(minimal_repro.contains("did not run this command"));
     assert!(reasons.contains("target_feature"));
     assert!(reasons.contains("human deep review"));
     assert!(reasons.contains("no verify command"));

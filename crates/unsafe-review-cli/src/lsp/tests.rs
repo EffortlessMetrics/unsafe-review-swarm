@@ -278,7 +278,9 @@ fn execute_collect_agent_packet_returns_packet_for_card() -> Result<(), Box<dyn 
     assert!(packet.contains(&output.cards[0].id.0));
     assert!(packet.contains("\"confirmation_cue\""));
     assert!(packet.contains("\"build_this_first\""));
+    assert!(packet.contains("\"minimal_repro\""));
     assert!(packet.contains("attach a matching receipt"));
+    assert!(packet.contains("unsafe-review did not run this command"));
     assert!(packet.contains("do_not_do"));
     Ok(())
 }

@@ -27,8 +27,8 @@ source of analyzer truth. It carries:
 - `policy = advisory`
 - the card identity, class, priority, and confidence
 - `confirmation_cue`, an advisory first-confirmation projection with the
-  static hypothesis to confirm, `build_this_first` cue, confirmation step, and
-  trust boundary
+  static hypothesis to confirm, `build_this_first` cue, minimal repro cue,
+  confirmation step, and trust boundary
 - the unsafe site context, concrete operation expression, operation family,
   snippet, and hazards
 - bounded source context containing the unsafe site, nearby safety-contract
@@ -78,10 +78,10 @@ routing are marked not ready with reasons. This classification does not execute
 an agent, apply edits, run witnesses, or resolve the card.
 
 Packets constrain LLMs with task, contract, missing evidence, allowed repairs,
-do-not-do list, verify commands, first-confirmation cue, and stop conditions.
-They are copy-only in v0.x; `unsafe-review` does not run an agent, edit source,
-post comments, execute the `build_this_first` command, or claim that the packet
-resolves the card.
+do-not-do list, verify commands, first-confirmation/minimal-repro cue, and stop
+conditions. They are copy-only in v0.x; `unsafe-review` does not run an agent,
+edit source, post comments, execute the `build_this_first` or minimal repro
+command, or claim that the packet resolves the card.
 The do-not-do list must make that automation boundary visible to packet
 consumers: a packet must not let downstream tooling claim `unsafe-review` ran
 an agent, ran witnesses, applied source edits, or posted comments, and it must
@@ -192,9 +192,9 @@ agent-ready.
 - The packet includes obligation-level evidence, missing evidence, witness
   routes, do-not-do rules, stop conditions, and the trust boundary.
 - The packet includes `confirmation_cue` projected from the ReviewCard: a
-  hypothesis to confirm, a first build/run or witness-route cue, and a
-  receipt/confidence-upgrade reminder. The cue is advisory and does not mean
-  unsafe-review ran the command or observed runtime behavior.
+  hypothesis to confirm, a first build/run or witness-route cue, a minimal
+  repro cue, and a receipt/confidence-upgrade reminder. The cue is advisory and
+  does not mean unsafe-review ran the command or observed runtime behavior.
 - The do-not-do rules explicitly preserve the copy-only boundary: do not claim
   `unsafe-review` ran an agent, ran witnesses, applied source edits, or posted
   comments.
