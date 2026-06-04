@@ -499,13 +499,13 @@ fn check_manual_candidate_front_door_guidance_text(
     let guidance_count =
         candidate.fix_options.len() + candidate.test_targets.len() + candidate.do_not_touch.len();
     if guidance_count == 0 {
-        check_manual_candidate_front_door_stable_byte_text(text, path, candidate)?;
+        check_manual_candidate_front_door_stable_byte_text(text, path, candidate, compact)?;
         check_manual_candidate_front_door_proof_mode_text(text, path, candidate)?;
         check_manual_candidate_front_door_boundary_text(text, path, candidate)?;
         return Ok(());
     }
 
-    check_manual_candidate_front_door_stable_byte_text(text, path, candidate)?;
+    check_manual_candidate_front_door_stable_byte_text(text, path, candidate, compact)?;
     check_manual_candidate_front_door_proof_mode_text(text, path, candidate)?;
     check_manual_candidate_front_door_boundary_text(text, path, candidate)?;
     super::require_text_contains(
@@ -544,6 +544,7 @@ fn check_manual_candidate_front_door_stable_byte_text(
     text: &str,
     path: &Path,
     candidate: &ManualCandidateProjection,
+    compact: bool,
 ) -> Result<(), String> {
     let Some(stable_byte) = &candidate.stable_byte else {
         return Ok(());
@@ -555,6 +556,17 @@ fn check_manual_candidate_front_door_stable_byte_text(
     let source = stable_byte_projection_str(stable_byte, "source", &candidate.id)?;
     let sink = stable_byte_projection_str(stable_byte, "sink", &candidate.id)?;
     let hazard = stable_byte_projection_str(stable_byte, "hazard", &candidate.id)?;
+
+    if compact {
+        super::require_text_contains(
+            text,
+            &format!(
+                "- Stable-byte: `{class}`; proof `{proof_required}`; ledger `{ledger_state}`; route `{source}` -> `{sink}`; hazard in sidecars"
+            ),
+            path,
+        )?;
+        return Ok(());
+    }
 
     super::require_text_contains(
         text,
@@ -3280,6 +3292,7 @@ fn check_review_kit_manual_candidate_handoff(
             .filter(|candidate| candidate.pr_aperture.is_some())
             .count(),
     )?;
+    check_review_kit_stable_byte_seed_summary(manual, manual_candidates)?;
     check_manual_candidate_reviewcard_applicability(
         manual,
         "review-kit.json handoff manual_candidates",
@@ -3301,6 +3314,112 @@ fn check_review_kit_manual_candidate_handoff(
         if !super::text_contains_ignore_ascii_case(boundary, expected) {
             return Err(format!(
                 "review-kit.json handoff manual_candidates trust_boundary must include `{expected}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn check_review_kit_stable_byte_seed_summary(
+    manual: &serde_json::Value,
+    manual_candidates: &ManualCandidateIndexProjection,
+) -> Result<(), String> {
+    let context = "review-kit.json handoff manual_candidates";
+    let Some(with_seed_value) = manual.get("with_stable_byte_seed") else {
+        return Ok(());
+    };
+    let Some(with_seed_u64) = with_seed_value.as_u64() else {
+        return Err(format!(
+            "{context}.with_stable_byte_seed must be an unsigned integer"
+        ));
+    };
+    let with_seed = usize::try_from(with_seed_u64)
+        .map_err(|err| format!("{context}.with_stable_byte_seed is too large: {err}"))?;
+    if with_seed > manual_candidates.count {
+        return Err(format!(
+            "{context}.with_stable_byte_seed is {with_seed}, but manual-candidates.json has {} candidate(s)",
+            manual_candidates.count
+        ));
+    }
+    let queue_seed_count = manual
+        .get("candidate_queue")
+        .and_then(serde_json::Value::as_array)
+        .map(|queue| {
+            queue
+                .iter()
+                .filter(|entry| entry.get("stable_byte_seed").is_some())
+                .count()
+        })
+        .unwrap_or(0);
+    if with_seed < queue_seed_count {
+        return Err(format!(
+            "{context}.with_stable_byte_seed is {with_seed}, but candidate_queue contains {queue_seed_count} stable_byte_seed entrie(s)"
+        ));
+    }
+    let source = manual
+        .get("stable_byte_seed_source")
+        .ok_or_else(|| format!("{context} is missing stable_byte_seed_source"))?;
+    if !source.is_object() {
+        return Err(format!(
+            "{context}.stable_byte_seed_source must be an object"
+        ));
+    }
+    let included = source
+        .get("included")
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| format!("{context}.stable_byte_seed_source.included must be a boolean"))?;
+    let limitation = super::require_non_empty_json_str(
+        source,
+        "limitation",
+        "review-kit.json handoff manual_candidates stable_byte_seed_source",
+    )?;
+    if included {
+        super::require_non_empty_json_str(
+            source,
+            "path",
+            "review-kit.json handoff manual_candidates stable_byte_seed_source",
+        )?;
+        super::require_non_empty_json_str(
+            source,
+            "relationship",
+            "review-kit.json handoff manual_candidates stable_byte_seed_source",
+        )?;
+        let rows = super::json_usize_at(
+            source,
+            "/rows",
+            "review-kit.json handoff manual_candidates stable_byte_seed_source",
+        )?;
+        let matched = super::json_usize_at(
+            source,
+            "/matched_manual_candidates",
+            "review-kit.json handoff manual_candidates stable_byte_seed_source",
+        )?;
+        if matched != with_seed {
+            return Err(format!(
+                "{context}.stable_byte_seed_source matched {matched} manual candidate(s), but with_stable_byte_seed is {with_seed}"
+            ));
+        }
+        if rows < matched {
+            return Err(format!(
+                "{context}.stable_byte_seed_source rows {rows} must be >= matched_manual_candidates {matched}"
+            ));
+        }
+    } else if with_seed != 0 {
+        return Err(format!(
+            "{context}.with_stable_byte_seed is {with_seed}, but stable_byte_seed_source is not included"
+        ));
+    }
+    for expected in [
+        "advisory workflow metadata",
+        "not analyzer discovery",
+        "not witness execution",
+        "not proof",
+        "not policy readiness",
+        "not a ReviewCard truth",
+    ] {
+        if !super::text_contains_ignore_ascii_case(limitation, expected) {
+            return Err(format!(
+                "{context}.stable_byte_seed_source limitation must include `{expected}`"
             ));
         }
     }
@@ -3488,6 +3607,78 @@ fn check_review_kit_manual_candidate_queue_entry(
         let text = super::require_non_empty_json_str(entry, field, &context)?;
         if !text.starts_with(command) || !text.contains(id) {
             return Err(format!("{context} {field} must reference `{id}`"));
+        }
+    }
+    if let Some(seed) = entry.get("stable_byte_seed") {
+        check_review_kit_stable_byte_seed(seed, expected, &context)?;
+    }
+    Ok(())
+}
+
+fn check_review_kit_stable_byte_seed(
+    seed: &serde_json::Value,
+    expected: &ManualCandidateProjection,
+    context: &str,
+) -> Result<(), String> {
+    let context = format!("{context} stable_byte_seed");
+    for field in [
+        "source",
+        "seed_id",
+        "ledger_state",
+        "candidate_family",
+        "surface",
+        "manual_candidate",
+        "safe_js_caller",
+        "rust_native_sink",
+        "proof_mode",
+        "suggested_first_pr",
+        "owner_lane",
+    ] {
+        super::require_non_empty_json_str(seed, field, &context)?;
+    }
+    require_non_empty_string_array(seed, "triage_labels", &context)?;
+    require_projected_optional_str(
+        seed,
+        "candidate_family",
+        &expected.stable_byte_source_class(),
+        &context,
+    )?;
+    require_projected_optional_str(
+        seed,
+        "ledger_state",
+        &expected.stable_byte_ledger_state,
+        &context,
+    )?;
+    if let Some(proof_mode) = &expected.proof_mode {
+        require_projected_str(seed, "proof_mode", &proof_mode.kind, &context)?;
+    }
+    let consistency = seed
+        .get("candidate_consistency")
+        .ok_or_else(|| format!("{context} is missing candidate_consistency"))?;
+    for field in [
+        "stable_byte_class_matches_manual_candidate",
+        "proof_mode_matches_manual_candidate",
+        "ledger_state_matches_manual_candidate",
+    ] {
+        if consistency.get(field).and_then(serde_json::Value::as_bool) != Some(true) {
+            return Err(format!(
+                "{context} candidate_consistency.{field} must be true"
+            ));
+        }
+    }
+    let boundary = super::require_non_empty_json_str(seed, "trust_boundary", &context)?;
+    for expected_text in [
+        "advisory workflow metadata",
+        "not analyzer discovery",
+        "not witness execution",
+        "not proof",
+        "not policy readiness",
+        "not a ReviewCard truth",
+    ] {
+        if !super::text_contains_ignore_ascii_case(boundary, expected_text) {
+            return Err(format!(
+                "{context} trust_boundary must include `{expected_text}`"
+            ));
         }
     }
     Ok(())

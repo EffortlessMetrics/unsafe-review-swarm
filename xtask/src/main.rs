@@ -952,6 +952,7 @@ fn check_manual_candidate_smoke_matches_examples(
         check_manual_candidate_smoke_entry_matches_example(actual, example)?;
     }
     check_manual_candidate_smoke_tokmd_seed_projection(out_dir, examples)?;
+    check_manual_candidate_smoke_review_kit_seed_projection(out_dir, examples)?;
     Ok(())
 }
 
@@ -1032,6 +1033,120 @@ fn check_manual_candidate_smoke_tokmd_seed_projection(
             return Err(format!(
                 "{context} missing_inputs must not include stable-byte seed row"
             ));
+        }
+    }
+    Ok(())
+}
+
+fn check_manual_candidate_smoke_review_kit_seed_projection(
+    out_dir: &Path,
+    examples: &[ManualCandidateExample],
+) -> Result<(), String> {
+    let path = out_dir.join("review-kit.json");
+    let value = parse_json_file(&path)?;
+    let path_display = path.display().to_string();
+    let manual = value
+        .pointer("/handoff/manual_candidates")
+        .ok_or_else(|| format!("{path_display} is missing handoff.manual_candidates"))?;
+    let with_seed = json_usize_at(manual, "/with_stable_byte_seed", &path_display)?;
+    if with_seed != examples.len() {
+        return Err(format!(
+            "{path_display} handoff.manual_candidates.with_stable_byte_seed is {with_seed}, expected {} committed examples",
+            examples.len()
+        ));
+    }
+    let seed_source = manual.get("stable_byte_seed_source").ok_or_else(|| {
+        format!("{path_display} handoff.manual_candidates is missing stable_byte_seed_source")
+    })?;
+    if seed_source
+        .get("included")
+        .and_then(serde_json::Value::as_bool)
+        != Some(true)
+    {
+        return Err(format!(
+            "{path_display} handoff.manual_candidates.stable_byte_seed_source.included must be true for the Bun manual-candidate smoke"
+        ));
+    }
+    let matched = json_usize_at(
+        seed_source,
+        "/matched_manual_candidates",
+        &format!("{path_display} handoff.manual_candidates.stable_byte_seed_source"),
+    )?;
+    if matched != examples.len() {
+        return Err(format!(
+            "{path_display} handoff.manual_candidates.stable_byte_seed_source matched {matched}, expected {} committed examples",
+            examples.len()
+        ));
+    }
+    let queue = json_array_at(
+        manual,
+        "/candidate_queue",
+        &format!("{path_display} handoff.manual_candidates"),
+    )?;
+    if queue.len() != examples.len().min(5) {
+        return Err(format!(
+            "{path_display} handoff.manual_candidates.candidate_queue has {} entries, expected visible committed examples",
+            queue.len()
+        ));
+    }
+    let mut first_seed_identity = None;
+    for (entry, example) in queue.iter().zip(examples) {
+        let context = format!("{path_display} candidate_queue `{}`", example.id);
+        require_json_str(entry, "id", &example.id, &context)?;
+        let seed = entry
+            .get("stable_byte_seed")
+            .ok_or_else(|| format!("{context} is missing stable_byte_seed"))?;
+        let seed_id = require_non_empty_json_str(seed, "seed_id", &context)?;
+        let owner_lane = require_non_empty_json_str(seed, "owner_lane", &context)?;
+        let suggested_first_pr = require_non_empty_json_str(seed, "suggested_first_pr", &context)?;
+        json_array_at(seed, "/triage_labels", &context)?;
+        let consistency = seed.get("candidate_consistency").ok_or_else(|| {
+            format!("{context} stable_byte_seed is missing candidate_consistency")
+        })?;
+        for field in [
+            "stable_byte_class_matches_manual_candidate",
+            "proof_mode_matches_manual_candidate",
+            "ledger_state_matches_manual_candidate",
+        ] {
+            if consistency.get(field).and_then(serde_json::Value::as_bool) != Some(true) {
+                return Err(format!(
+                    "{context} stable_byte_seed candidate_consistency.{field} must be true"
+                ));
+            }
+        }
+        if first_seed_identity.is_none() {
+            first_seed_identity = Some((
+                seed_id.to_string(),
+                owner_lane.to_string(),
+                suggested_first_pr.to_string(),
+            ));
+        }
+    }
+    let Some((seed_id, owner_lane, suggested_first_pr)) = first_seed_identity else {
+        return Err(format!(
+            "{path_display} handoff.manual_candidates.candidate_queue must include a stable-byte seed"
+        ));
+    };
+    for artifact in ["pr-summary.md", "github-summary.md", "witness-plan.md"] {
+        let artifact_path = out_dir.join(artifact);
+        let text = fs::read_to_string(&artifact_path)
+            .map_err(|err| format!("read {} failed: {err}", artifact_path.display()))?;
+        for needle in [
+            "Stable-byte seed:",
+            &format!("`{seed_id}`"),
+            "owner lane:",
+            &format!("`{owner_lane}`"),
+            "suggested first PR:",
+            &format!("`{suggested_first_pr}`"),
+            "seed owner:",
+            "next PR:",
+        ] {
+            if !text.contains(needle) {
+                return Err(format!(
+                    "{} must include stable-byte seed cockpit marker `{needle}`",
+                    artifact_path.display()
+                ));
+            }
         }
     }
     Ok(())

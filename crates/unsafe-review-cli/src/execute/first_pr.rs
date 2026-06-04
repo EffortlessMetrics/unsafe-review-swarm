@@ -122,6 +122,7 @@ fn print_manual_candidate_handoff(
     root: &Path,
     manual_candidates: &[ManualCandidate],
 ) {
+    let stable_byte_seed_ledger = load_stable_byte_seed_ledger(root);
     println!("Manual candidates:");
     println!(
         "  {} (manual/advisory; not analyzer ReviewCards)",
@@ -138,6 +139,9 @@ fn print_manual_candidate_handoff(
     );
     if let Some(candidate) = manual_candidates.first() {
         println!("  First manual candidate: {}", candidate.id);
+        if let Some(seed) = stable_byte_seed_ledger.by_candidate_id.get(&candidate.id) {
+            println!("  {}", stable_byte_seed_terminal_summary(seed));
+        }
         if let Some(summary) = manual_candidate_guidance_summary(candidate) {
             println!("  Guidance: {summary}");
         }
@@ -151,7 +155,7 @@ fn print_manual_candidate_handoff(
             candidate_witness_plan_command(root, &candidate.id)
         );
     }
-    print_manual_candidate_queue_preview(root, manual_candidates);
+    print_manual_candidate_queue_preview(root, manual_candidates, &stable_byte_seed_ledger);
     println!(
         "  Review-kit candidate queue: first {} of {} manual candidate(s)",
         manual_candidates
@@ -172,7 +176,11 @@ fn print_manual_candidate_handoff(
     );
 }
 
-fn print_manual_candidate_queue_preview(root: &Path, manual_candidates: &[ManualCandidate]) {
+fn print_manual_candidate_queue_preview(
+    root: &Path,
+    manual_candidates: &[ManualCandidate],
+    stable_byte_seed_ledger: &StableByteSeedLedger,
+) {
     let queue_len = manual_candidates
         .len()
         .min(MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT);
@@ -190,6 +198,9 @@ fn print_manual_candidate_queue_preview(root: &Path, manual_candidates: &[Manual
         );
         if let Some((label, value)) = manual_candidate_first_guidance_cue(candidate) {
             println!("      {label}: {value}");
+        }
+        if let Some(seed) = stable_byte_seed_ledger.by_candidate_id.get(&candidate.id) {
+            println!("      {}", stable_byte_seed_terminal_summary(seed));
         }
         println!(
             "      Agent packet: {}",
@@ -345,6 +356,7 @@ pub(super) fn render_review_kit_manifest(
     manual_candidates: &[ManualCandidate],
     artifacts: &[&str],
 ) -> String {
+    let stable_byte_seed_ledger = load_stable_byte_seed_ledger(root);
     let value = json!({
         "schema_version": "0.1",
         "tool": "unsafe-review",
@@ -363,7 +375,13 @@ pub(super) fn render_review_kit_manifest(
             "open_actionable_gaps": output.summary.open_actionable_gaps,
         },
         "top_card_id": output.cards.first().map(|card| card.id.to_string()),
-        "handoff": review_kit_handoff(output, root, check, manual_candidates),
+        "handoff": review_kit_handoff(
+            output,
+            root,
+            check,
+            manual_candidates,
+            &stable_byte_seed_ledger,
+        ),
         "artifacts": artifacts
             .iter()
             .map(|path| artifact_entry(path))
@@ -380,6 +398,7 @@ fn review_kit_handoff(
     root: &Path,
     check: &CheckOptions,
     manual_candidates: &[ManualCandidate],
+    stable_byte_seed_ledger: &StableByteSeedLedger,
 ) -> serde_json::Value {
     let top_card = output.cards.first().map(|card| {
         json!({
@@ -394,7 +413,11 @@ fn review_kit_handoff(
         "receipt_audit_markdown": receipt_audit_command(check),
         "top_card": top_card,
         "review_cards": review_kit_review_card_handoff(output, root),
-        "manual_candidates": review_kit_manual_candidate_handoff(manual_candidates, root),
+        "manual_candidates": review_kit_manual_candidate_handoff(
+            manual_candidates,
+            root,
+            stable_byte_seed_ledger,
+        ),
         "trust_boundary": "Copy-only review-kit handoff commands; unsafe-review did not run witnesses, run agents, post comments, edit source, or enforce blocking policy.",
     })
 }
@@ -558,15 +581,34 @@ fn review_kit_repair_queue_index(
 fn review_kit_manual_candidate_handoff(
     manual_candidates: &[ManualCandidate],
     root: &Path,
+    stable_byte_seed_ledger: &StableByteSeedLedger,
 ) -> serde_json::Value {
-    let first_candidate = manual_candidates
-        .first()
-        .map(|candidate| review_kit_manual_candidate_queue_entry(candidate, root));
+    let first_candidate = manual_candidates.first().map(|candidate| {
+        review_kit_manual_candidate_queue_entry(
+            candidate,
+            root,
+            stable_byte_seed_ledger.by_candidate_id.get(&candidate.id),
+        )
+    });
     let candidate_queue = manual_candidates
         .iter()
         .take(MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT)
-        .map(|candidate| review_kit_manual_candidate_queue_entry(candidate, root))
+        .map(|candidate| {
+            review_kit_manual_candidate_queue_entry(
+                candidate,
+                root,
+                stable_byte_seed_ledger.by_candidate_id.get(&candidate.id),
+            )
+        })
         .collect::<Vec<_>>();
+    let matched_stable_byte_seeds = manual_candidates
+        .iter()
+        .filter(|candidate| {
+            stable_byte_seed_ledger
+                .by_candidate_id
+                .contains_key(&candidate.id)
+        })
+        .count();
     let omitted_candidates = manual_candidates
         .len()
         .saturating_sub(candidate_queue.len());
@@ -588,6 +630,11 @@ fn review_kit_manual_candidate_handoff(
         "with_proof_mode": manual_candidates.iter().filter(|candidate| candidate.proof_mode.is_some()).count(),
         "with_fix_boundary": manual_candidates.iter().filter(|candidate| candidate.fix_boundary.is_some()).count(),
         "with_pr_aperture": manual_candidates.iter().filter(|candidate| candidate.pr_aperture.is_some()).count(),
+        "with_stable_byte_seed": matched_stable_byte_seeds,
+        "stable_byte_seed_source": review_kit_stable_byte_seed_source(
+            stable_byte_seed_ledger,
+            matched_stable_byte_seeds,
+        ),
         "reviewcard_artifact_applicability": manual_candidate_reviewcard_applicability(),
         "first_candidate": first_candidate,
         "candidate_queue_limit": MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT,
@@ -597,11 +644,39 @@ fn review_kit_manual_candidate_handoff(
     })
 }
 
+fn review_kit_stable_byte_seed_source(
+    stable_byte_seed_ledger: &StableByteSeedLedger,
+    matched_stable_byte_seeds: usize,
+) -> serde_json::Value {
+    if !stable_byte_seed_ledger.present {
+        return json!({
+            "included": false,
+            "limitation": "Root-local stable-byte seed ledger was absent; manual candidate stable_byte metadata is still projected"
+        });
+    }
+    if let Some(parse_error) = &stable_byte_seed_ledger.parse_error {
+        return json!({
+            "included": false,
+            "path": stable_byte_seed_ledger.path,
+            "limitation": format!("Stable-byte seed ledger was present but not imported: {parse_error}; manual candidate stable_byte metadata is still projected")
+        });
+    }
+    json!({
+        "included": true,
+        "path": stable_byte_seed_ledger.path,
+        "rows": stable_byte_seed_ledger.rows,
+        "matched_manual_candidates": matched_stable_byte_seeds,
+        "relationship": "root-local stable-byte seed ledger rows are joined to review-kit manual candidate entries by manual candidate ID",
+        "limitation": "Stable-byte seed rows are advisory workflow metadata only; not analyzer discovery, not witness execution, not proof, not policy readiness, and not a ReviewCard truth"
+    })
+}
+
 fn review_kit_manual_candidate_queue_entry(
     candidate: &ManualCandidate,
     root: &Path,
+    stable_byte_seed: Option<&StableByteSeed>,
 ) -> serde_json::Value {
-    json!({
+    let mut value = json!({
         "id": candidate.id.as_str(),
         "source": "manual",
         "manual_candidate": true,
@@ -618,6 +693,45 @@ fn review_kit_manual_candidate_queue_entry(
         "explain": explain_command(root, &candidate.id),
         "context_json": context_command(root, &candidate.id),
         "witness_plan": candidate_witness_plan_command(root, &candidate.id),
+    });
+    if let Some(seed) = stable_byte_seed {
+        if let Some(object) = value.as_object_mut() {
+            object.insert(
+                "stable_byte_seed".to_string(),
+                review_kit_stable_byte_seed(seed, candidate),
+            );
+        }
+    }
+    value
+}
+
+fn review_kit_stable_byte_seed(
+    seed: &StableByteSeed,
+    candidate: &ManualCandidate,
+) -> serde_json::Value {
+    json!({
+        "source": STABLE_BYTE_SEED_LEDGER_PATH,
+        "seed_id": seed.seed_id.as_str(),
+        "ledger_state": seed.ledger_state.as_str(),
+        "candidate_family": seed.candidate_family.as_str(),
+        "surface": seed.surface.as_str(),
+        "manual_candidate": seed.manual_candidate.as_str(),
+        "safe_js_caller": seed.safe_js_caller.as_str(),
+        "rust_native_sink": seed.rust_native_sink.as_str(),
+        "proof_mode": seed.proof_mode.as_str(),
+        "suggested_first_pr": seed.suggested_first_pr.as_str(),
+        "owner_lane": seed.owner_lane.as_str(),
+        "triage_labels": &seed.triage_labels,
+        "candidate_consistency": {
+            "stable_byte_class_matches_manual_candidate": stable_byte_source_class(candidate)
+                == Some(seed.candidate_family.as_str()),
+            "proof_mode_matches_manual_candidate": candidate.proof_mode.as_ref()
+                .map(|proof_mode| proof_mode.kind.as_str())
+                == Some(seed.proof_mode.as_str()),
+            "ledger_state_matches_manual_candidate": stable_byte_ledger_state(candidate)
+                == Some(seed.ledger_state.as_str()),
+        },
+        "trust_boundary": "Stable-byte seed row is advisory workflow metadata only; not analyzer discovery, not witness execution, not proof, not policy readiness, and not a ReviewCard truth."
     })
 }
 
@@ -630,6 +744,7 @@ pub(super) fn render_first_pr_front_door_artifact(
     if manual_candidates.is_empty() {
         return rendered;
     }
+    let stable_byte_seed_ledger = load_stable_byte_seed_ledger(root);
 
     match artifact_name {
         "pr-summary.md" => insert_before_section(
@@ -638,6 +753,7 @@ pub(super) fn render_first_pr_front_door_artifact(
             &render_manual_candidate_front_panel(
                 root,
                 manual_candidates,
+                &stable_byte_seed_ledger,
                 MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT,
                 false,
             ),
@@ -648,6 +764,7 @@ pub(super) fn render_first_pr_front_door_artifact(
             &render_manual_candidate_front_panel(
                 root,
                 manual_candidates,
+                &stable_byte_seed_ledger,
                 MANUAL_CANDIDATE_GITHUB_QUEUE_LIMIT,
                 true,
             ),
@@ -655,7 +772,11 @@ pub(super) fn render_first_pr_front_door_artifact(
         "witness-plan.md" => insert_before_section(
             rendered,
             "## Trust boundary",
-            &render_manual_candidate_witness_follow_up(root, manual_candidates),
+            &render_manual_candidate_witness_follow_up(
+                root,
+                manual_candidates,
+                &stable_byte_seed_ledger,
+            ),
         ),
         _ => rendered,
     }
@@ -684,6 +805,7 @@ fn insert_before_section(rendered: String, heading: &str, section: &str) -> Stri
 fn render_manual_candidate_front_panel(
     root: &Path,
     manual_candidates: &[ManualCandidate],
+    stable_byte_seed_ledger: &StableByteSeedLedger,
     queue_limit: usize,
     compact: bool,
 ) -> String {
@@ -707,7 +829,12 @@ fn render_manual_candidate_front_panel(
             "- External evidence refs: {}\n",
             candidate.evidence.len()
         ));
-        append_manual_candidate_guidance_lines(&mut out, candidate, !compact);
+        append_manual_candidate_guidance_lines(
+            &mut out,
+            candidate,
+            stable_byte_seed_ledger.by_candidate_id.get(&candidate.id),
+            !compact,
+        );
         if !compact {
             out.push_str(&format!(
                 "- Explain: `{}`\n",
@@ -723,7 +850,14 @@ fn render_manual_candidate_front_panel(
             candidate_witness_plan_command(root, &candidate.id)
         ));
     }
-    append_manual_candidate_queue_preview(&mut out, root, manual_candidates, queue_limit, !compact);
+    append_manual_candidate_queue_preview(
+        &mut out,
+        root,
+        manual_candidates,
+        stable_byte_seed_ledger,
+        queue_limit,
+        !compact,
+    );
     if compact {
         out.push_str(
             "- Manual candidate index: `manual-candidates.json`; ReviewCard-only outputs clean.\n",
@@ -743,6 +877,7 @@ fn render_manual_candidate_front_panel(
 fn render_manual_candidate_witness_follow_up(
     root: &Path,
     manual_candidates: &[ManualCandidate],
+    stable_byte_seed_ledger: &StableByteSeedLedger,
 ) -> String {
     let mut out = String::new();
     out.push_str("## Manual candidate witness follow-up\n\n");
@@ -767,7 +902,12 @@ fn render_manual_candidate_witness_follow_up(
             "- External evidence refs: {}",
             candidate.evidence.len()
         );
-        append_manual_candidate_guidance_lines(&mut out, candidate, true);
+        append_manual_candidate_guidance_lines(
+            &mut out,
+            candidate,
+            stable_byte_seed_ledger.by_candidate_id.get(&candidate.id),
+            true,
+        );
         let _ = writeln!(
             &mut out,
             "- Full manual witness plan: `{}`",
@@ -783,6 +923,7 @@ fn render_manual_candidate_witness_follow_up(
         &mut out,
         root,
         manual_candidates,
+        stable_byte_seed_ledger,
         MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT,
         true,
     );
@@ -795,23 +936,43 @@ fn render_manual_candidate_witness_follow_up(
 fn append_manual_candidate_guidance_lines(
     out: &mut String,
     candidate: &ManualCandidate,
+    stable_byte_seed: Option<&StableByteSeed>,
     include_details: bool,
 ) {
     if let Some(stable_byte) = &candidate.stable_byte {
+        if include_details {
+            let _ = writeln!(
+                out,
+                "- Stable-byte class: `{}` (observable: `{}`; proof required: `{}`; ledger state: `{}`)",
+                stable_byte.class,
+                stable_byte.observable,
+                stable_byte.proof_required,
+                stable_byte.ledger_state
+            );
+            let _ = writeln!(
+                out,
+                "- Stable-byte route: source `{}` -> sink `{}`",
+                stable_byte.source, stable_byte.sink
+            );
+            let _ = writeln!(out, "- Stable-byte hazard: {}", stable_byte.hazard);
+        } else {
+            let _ = writeln!(
+                out,
+                "- Stable-byte: `{}`; proof `{}`; ledger `{}`; route `{}` -> `{}`; hazard in sidecars",
+                stable_byte.class,
+                stable_byte.proof_required,
+                stable_byte.ledger_state,
+                stable_byte.source,
+                stable_byte.sink
+            );
+        }
+    }
+    if let Some(seed) = stable_byte_seed {
         let _ = writeln!(
             out,
-            "- Stable-byte class: `{}` (observable: `{}`; proof required: `{}`; ledger state: `{}`)",
-            stable_byte.class,
-            stable_byte.observable,
-            stable_byte.proof_required,
-            stable_byte.ledger_state
+            "- {}",
+            stable_byte_seed_markdown_summary(seed, include_details)
         );
-        let _ = writeln!(
-            out,
-            "- Stable-byte route: source `{}` -> sink `{}`",
-            stable_byte.source, stable_byte.sink
-        );
-        let _ = writeln!(out, "- Stable-byte hazard: {}", stable_byte.hazard);
     }
     if let Some(proof_mode) = &candidate.proof_mode {
         let _ = writeln!(
@@ -834,15 +995,6 @@ fn append_manual_candidate_guidance_lines(
                 oracle_map.oracle_kind,
                 oracle_map.coverage_confidence,
                 oracle_map.limitation
-            );
-        } else {
-            let _ = writeln!(
-                out,
-                "- Oracle map: `{}` -> `{}` (`{}`; `{}`; limitation in sidecars)",
-                oracle_map.rust_seam,
-                oracle_map.oracle_path.display(),
-                oracle_map.oracle_language,
-                oracle_map.oracle_kind
             );
         }
     }
@@ -874,10 +1026,37 @@ fn append_manual_candidate_guidance_lines(
     }
 }
 
+fn stable_byte_seed_markdown_summary(seed: &StableByteSeed, include_details: bool) -> String {
+    if include_details {
+        return format!(
+            "Stable-byte seed: `{}` (owner lane: `{}`; suggested first PR: `{}`; triage: `{}`)",
+            seed.seed_id,
+            seed.owner_lane,
+            seed.suggested_first_pr,
+            seed.triage_labels.join("`, `")
+        );
+    }
+    format!(
+        "Stable-byte seed: `{}` (owner lane: `{}`; suggested first PR: `{}`)",
+        seed.seed_id, seed.owner_lane, seed.suggested_first_pr
+    )
+}
+
+fn stable_byte_seed_terminal_summary(seed: &StableByteSeed) -> String {
+    format!(
+        "Stable-byte seed: {}; owner lane: {}; suggested first PR: {}; triage: {}",
+        seed.seed_id,
+        seed.owner_lane,
+        seed.suggested_first_pr,
+        seed.triage_labels.join(", ")
+    )
+}
+
 fn append_manual_candidate_queue_preview(
     out: &mut String,
     root: &Path,
     manual_candidates: &[ManualCandidate],
+    stable_byte_seed_ledger: &StableByteSeedLedger,
     queue_limit: usize,
     include_commands: bool,
 ) {
@@ -898,6 +1077,13 @@ fn append_manual_candidate_queue_preview(
         );
         if let Some((label, value)) = manual_candidate_first_guidance_cue(candidate) {
             let _ = write!(out, "; {label}: `{value}`");
+        }
+        if let Some(seed) = stable_byte_seed_ledger.by_candidate_id.get(&candidate.id) {
+            let _ = write!(
+                out,
+                "; seed owner: `{}`; next PR: `{}`",
+                seed.owner_lane, seed.suggested_first_pr
+            );
         }
         out.push('\n');
         if include_commands {

@@ -340,6 +340,13 @@ truth. The verifier must also reject implementer handoff drift: target, route,
 invariant, external evidence commands, limitations, and candidate-specific fix
 options, test targets, non-goals, and stop lines must still project from the
 imported manual candidate. It is not the ReviewCard repair queue.
+When a root-local `docs/dogfood/stable-byte-follow-up-seeds.md` ledger exists
+and joins by manual candidate ID, the review-kit manual candidate handoff may
+also project `with_stable_byte_seed`, `stable_byte_seed_source`, and
+per-candidate `stable_byte_seed` entries with seed ID, owner lane, suggested
+first PR, and triage labels. Seed rows are advisory workflow metadata only:
+they are not analyzer discovery, not witness execution, not proof, not policy
+readiness, and not a ReviewCard truth.
 
 `first-pr` may also write `manual-repair-queue.json` as a dedicated
 manual-candidate repair handoff sidecar. It must use
@@ -391,9 +398,17 @@ handoff separate from ReviewCard `repair-queue.json`, and advisory boundary.
 The full candidate payload remains in
 `manual-candidates.json` and `review-kit.json`; the cue must not add manual
 candidates to ReviewCard-only artifacts.
-When the first candidate carries `stable_byte`, the front-door cue must also
-render its class, observable/proof/ledger state, source-to-sink route, and
-hazard so the cockpit remains useful without opening raw JSON.
+When the first candidate carries `stable_byte`, the full reviewer cockpit and
+witness follow-up cue must also render its class, observable/proof/ledger state,
+source-to-sink route, and hazard so the cockpit remains useful without opening
+raw JSON. The compact GitHub summary may collapse this to class, proof mode,
+ledger state, source-to-sink route, and a sidecar pointer to keep the hosted
+summary within its word budget.
+When a joined stable-byte seed row is present, the front-door cue and bounded
+queue preview may also render the seed ID, owner lane, suggested first PR, and
+triage labels as next-lane workflow metadata. This must not replace the
+candidate-local `stable_byte` packet fields or upgrade the candidate into a
+ReviewCard finding.
 
 The bundled `first-pr` `witness-plan.md` may include a compact manual-candidate
 follow-up cue that points to `candidate witness-plan` for the full copy-only
@@ -402,6 +417,9 @@ guidance, proof mode, fix boundary, PR aperture, stop line, plus the bounded
 manual-candidate queue preview, must preserve the manual/advisory markers, and
 must not add manual candidates to ReviewCard witness route groups or import
 ReviewCard witness evidence.
+If a joined stable-byte seed row is present, the follow-up cue may render the
+same seed ID, owner lane, suggested first PR, and triage labels as advisory
+workflow metadata only.
 
 If a manual candidate cannot be projected faithfully into a surface, that
 surface must reject or omit it with an explicit reason instead of degrading it
@@ -515,23 +533,27 @@ into an analyzer ReviewCard.
   carry structured ReviewCard-only applicability metadata for SARIF,
   comment-plan, saved-LSP, repair-queue, cards, and policy-report JSON/Markdown
   artifacts, plus advisory candidate-mix summary maps including proof-mode,
-  stable-byte-source-class, ledger-state, oracle-map, and guidance counts.
+  stable-byte-source-class, ledger-state, oracle-map, guidance counts, and
+  optional stable-byte seed-row source/count metadata.
 - `first-pr` terminal output and `review-kit.json` include a bounded,
   copy-only manual candidate handoff with `manual-candidates.json`,
   a sorted bounded candidate queue, `explain`, `context --json`, and
-  `candidate witness-plan` commands while preserving `source = manual`,
-  `manual_candidate = true`, and `analyzer_discovered = false`.
+  `candidate witness-plan` commands, plus optional joined stable-byte seed ID,
+  owner lane, suggested first PR, and triage labels when a root-local seed row
+  exists, while preserving `source = manual`, `manual_candidate = true`, and
+  `analyzer_discovered = false`.
 - `first-pr` `pr-summary.md` and `github-summary.md` show a compact manual
   candidate front-door cue, including advisory operation-family/evidence-kind
   summaries, a bounded queue preview, optional proof mode, fix boundary, PR
-  aperture, stop line, and optional guidance when present, so reviewers can
-  notice and open the copy-only handoff without treating candidates as analyzer
-  ReviewCards.
+  aperture, stop line, optional guidance, and optional joined stable-byte seed
+  owner/next-PR metadata when present, so reviewers can notice and open the
+  copy-only handoff without treating candidates as analyzer ReviewCards.
 - `first-pr` `witness-plan.md` shows a compact manual candidate follow-up cue
   before the ReviewCard trust boundary, points to `candidate witness-plan`,
   includes a bounded queue preview plus optional proof mode, fix boundary, PR
-  aperture, stop line, and guidance when present, and keeps manual candidates
-  out of ReviewCard witness route groups.
+  aperture, stop line, guidance, and optional joined stable-byte seed
+  owner/next-PR metadata when present, and keeps manual candidates out of
+  ReviewCard witness route groups.
 
 ## CI Proof
 
