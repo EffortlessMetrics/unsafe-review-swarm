@@ -89,7 +89,7 @@ pub(super) fn detect_js_buffer_reentry_sites(
                 snippet: materialize.text.clone(),
             },
             operation: UnsafeOperation {
-                family: OperationFamily::UnsafeFnCall,
+                family: OperationFamily::StableByteSourceGetterReentry,
                 expression: js_buffer_reentry_expression(capture, reentry, materialize),
             },
             context_before,
@@ -266,7 +266,7 @@ fn js_buffer_reentry_expression(
     materialize: &JsBufferLine,
 ) -> String {
     format!(
-        "JS-backed buffer descriptor captured before possible JS reentry and materialized afterward; capture: {}; reentry: {}; materialize: {}",
+        "stable-byte-source-getter-reentry candidate; proof required: observable-red-green; JS-backed buffer descriptor captured before possible JS reentry and materialized afterward; capture: {}; reentry: {}; materialize: {}",
         one_line(&capture.text),
         one_line(&reentry.text),
         one_line(&materialize.text)

@@ -4,6 +4,7 @@
     "class": "contract_missing",
     "priority": "high",
     "confidence": "high",
+    "proof_path": "source_route_only",
     "site": {
       "file": "src/lib.rs",
       "line": 32,
@@ -16,7 +17,6 @@
     },
     "operation": "let bytes = unsafe { core::slice::from_raw_parts(input.ptr, input.len) };",
     "operation_family": "slice_from_raw_parts",
-    "proof_path": "source_route_only",
     "hazards": [
       "pointer_validity",
       "alignment",
@@ -159,10 +159,11 @@
     ]
   },
   {
-    "id": "UR-js-buffer-reentry-raw-parts-materialization-fixture-src-lib-rs-zstd-raw-parts-operation-unsafe_fn_call-from-raw-parts-fcbf21e8dd70-unknown-c1",
-    "class": "contract_missing",
+    "id": "UR-js-buffer-reentry-raw-parts-materialization-fixture-src-lib-rs-zstd-raw-parts-operation-stable_byte_source_getter_reentry-from-js-9a6250c1b7be-stable_byte_source-c1",
+    "class": "guard_missing",
     "priority": "high",
-    "confidence": "high",
+    "confidence": "medium",
+    "proof_path": "observable_red_green",
     "site": {
       "file": "src/lib.rs",
       "line": 32,
@@ -173,23 +174,22 @@
       "public_api_surface": false,
       "snippet": "let bytes = unsafe { core::slice::from_raw_parts(input.ptr, input.len) };"
     },
-    "operation": "JS-backed buffer descriptor captured before possible JS reentry and materialized afterward; capture: let input = StringOrBuffer::from_js(global, arg0)?;; reentry: let level = options.get(global, \"\")?;; materialize: let bytes = unsafe { core::slice::from_raw_parts(input.ptr, input.len) };",
-    "operation_family": "unsafe_fn_call",
-    "proof_path": "human_review_only",
+    "operation": "stable-byte-source-getter-reentry candidate; proof required: observable-red-green; JS-backed buffer descriptor captured before possible JS reentry and materialized afterward; capture: let input = StringOrBuffer::from_js(global, arg0)?;; reentry: let level = options.get(global, \"\")?;; materialize: let bytes = unsafe { core::slice::from_raw_parts(input.ptr, input.len) };",
+    "operation_family": "stable_byte_source_getter_reentry",
     "hazards": [
-      "unknown"
+      "stable_byte_source"
     ],
     "obligations": [
-      "callee safety preconditions are satisfied"
+      "JS-owned bytes remain stable after getter reentry and before Rust/native materialization"
     ],
     "obligation_evidence": [
       {
-        "key": "callee-contract",
-        "description": "callee safety preconditions are satisfied",
+        "key": "byte-stability",
+        "description": "JS-owned bytes remain stable after getter reentry and before Rust/native materialization",
         "contract": {
-          "present": false,
-          "state": "missing",
-          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          "present": true,
+          "state": "present",
+          "summary": "Stable-byte-source heuristic uses byte-stability evidence, not unsafe API safety docs"
         },
         "discharge": {
           "present": false,
@@ -208,7 +208,7 @@
         }
       }
     ],
-    "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+    "contract": "Stable-byte-source heuristic uses byte-stability evidence, not unsafe API safety docs",
     "discharge": "No visible local guard detected",
     "reach": "No static test mention of owner `zstd_raw_parts` was found",
     "witness": "No imported witness receipt was found",
@@ -221,12 +221,11 @@
       }
     ],
     "missing": [
-      "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
       "Missing visible local guard for inferred safety obligations",
       "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Review the JS-backed buffer descriptor captured before a possible JS reentry point and materialized afterward; parse options before capture or re-fetch/copy bytes after reentry, then attach a focused sanitizer/runtime receipt if available.",
+    "next_action": "Review this stable-byte-source-getter-reentry card through an observable-red-green proof path: add or expose byte-stability guard evidence, confirm the safe JS caller route, then parse options before capture or re-fetch/copy bytes after reentry, and keep the PR inside that getter-reentry aperture.",
     "verify_commands": []
   }
 ]

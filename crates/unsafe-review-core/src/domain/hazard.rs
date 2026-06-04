@@ -19,6 +19,7 @@ pub enum HazardKind {
     TargetFeature,
     InlineAsm,
     LeakOrOwnershipTransfer,
+    StableByteSource,
     Unknown,
 }
 
@@ -44,6 +45,7 @@ impl HazardKind {
             Self::TargetFeature => "target_feature",
             Self::InlineAsm => "inline_asm",
             Self::LeakOrOwnershipTransfer => "leak_or_ownership_transfer",
+            Self::StableByteSource => "stable_byte_source",
             Self::Unknown => "unknown",
         }
     }
@@ -78,6 +80,7 @@ mod tests {
                 HazardKind::LeakOrOwnershipTransfer,
                 "leak_or_ownership_transfer",
             ),
+            (HazardKind::StableByteSource, "stable_byte_source"),
             (HazardKind::Unknown, "unknown"),
         ];
 

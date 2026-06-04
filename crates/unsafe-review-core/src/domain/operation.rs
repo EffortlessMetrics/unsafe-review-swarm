@@ -64,6 +64,7 @@ pub enum OperationFamily {
     InlineAsm,
     TargetFeature,
     PanicFromSafeJs,
+    StableByteSourceGetterReentry,
     Unknown,
 }
 
@@ -101,6 +102,7 @@ impl OperationFamily {
             Self::InlineAsm => "inline_asm",
             Self::TargetFeature => "target_feature",
             Self::PanicFromSafeJs => "panic_from_safe_js",
+            Self::StableByteSourceGetterReentry => "stable_byte_source_getter_reentry",
             Self::Unknown => "unknown",
         }
     }
@@ -196,6 +198,10 @@ mod tests {
             (OperationFamily::InlineAsm, "inline_asm"),
             (OperationFamily::TargetFeature, "target_feature"),
             (OperationFamily::PanicFromSafeJs, "panic_from_safe_js"),
+            (
+                OperationFamily::StableByteSourceGetterReentry,
+                "stable_byte_source_getter_reentry",
+            ),
             (OperationFamily::Unknown, "unknown"),
         ];
 

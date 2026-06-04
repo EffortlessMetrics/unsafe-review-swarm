@@ -118,6 +118,14 @@ mod tests {
             vec!["callee-contract".to_string()]
         );
         assert_eq!(
+            hazards_for(&OperationFamily::StableByteSourceGetterReentry),
+            vec![HazardKind::StableByteSource]
+        );
+        assert_eq!(
+            obligation_keys(&OperationFamily::StableByteSourceGetterReentry),
+            vec!["byte-stability".to_string()]
+        );
+        assert_eq!(
             hazards_for(&OperationFamily::AtomicPointerState),
             vec![HazardKind::AtomicOrdering, HazardKind::DropOrDeallocation]
         );

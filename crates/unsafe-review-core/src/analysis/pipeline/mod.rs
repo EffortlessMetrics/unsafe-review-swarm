@@ -327,8 +327,8 @@ mod tests {
     use super::*;
     use crate::api::{AnalysisMode, DiffSource, DiscoveryOptions, PolicyMode, Scope};
     use crate::domain::{
-        CardId, HazardKind, OperationFamily, Priority, ReviewCard, ReviewClass, UnsafeSiteKind,
-        WitnessKind, WitnessRoute,
+        CardId, HazardKind, OperationFamily, Priority, ProofPath, ReviewCard, ReviewClass,
+        UnsafeSiteKind, WitnessKind, WitnessRoute,
     };
     use std::fs;
     use std::path::Path;
@@ -2656,13 +2656,17 @@ fn native_compress(input: &StringOrBuffer, level: i32) -> Result<usize, ()> {
         )?;
         let card = single_card("js_buffer_reentry", &output)?;
 
-        assert_eq!(card.operation.family, OperationFamily::UnsafeFnCall);
-        assert_eq!(card.class, ReviewClass::ContractMissing);
+        assert_eq!(
+            card.operation.family,
+            OperationFamily::StableByteSourceGetterReentry
+        );
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert_eq!(card.proof_path, ProofPath::ObservableRedGreen);
         assert_eq!(card.site.owner.as_deref(), Some("zstd_sync"));
         assert!(
             card.operation
                 .expression
-                .contains("JS-backed buffer descriptor")
+                .contains("stable-byte-source-getter-reentry")
         );
         assert!(
             card.operation
@@ -2674,7 +2678,7 @@ fn native_compress(input: &StringOrBuffer, level: i32) -> Result<usize, ()> {
         assert!(
             card.next_action
                 .summary
-                .contains("parse options before capture")
+                .contains("observable-red-green proof path")
         );
         assert!(
             card.routes
@@ -2735,19 +2739,23 @@ pub fn zstd_sync(
         let output = fixture_output("js_buffer_reentry_sync_compression")?;
         let card = single_card("js_buffer_reentry_sync_compression", &output)?;
 
-        assert_eq!(card.operation.family, OperationFamily::UnsafeFnCall);
-        assert_eq!(card.class, ReviewClass::ContractMissing);
+        assert_eq!(
+            card.operation.family,
+            OperationFamily::StableByteSourceGetterReentry
+        );
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert_eq!(card.proof_path, ProofPath::ObservableRedGreen);
         assert_eq!(card.site.owner.as_deref(), Some("zstd_sync"));
-        assert!(card.hazards.contains(&HazardKind::Unknown));
+        assert!(card.hazards.contains(&HazardKind::StableByteSource));
         assert!(
             card.operation
                 .expression
-                .contains("JS-backed buffer descriptor")
+                .contains("stable-byte-source-getter-reentry")
         );
         assert!(
             card.next_action
                 .summary
-                .contains("parse options before capture")
+                .contains("observable-red-green proof path")
         );
         assert!(
             card.routes
@@ -2762,8 +2770,12 @@ pub fn zstd_sync(
         let output = fixture_output("js_buffer_reentry_async_helper_capture")?;
         let card = single_card("js_buffer_reentry_async_helper_capture", &output)?;
 
-        assert_eq!(card.operation.family, OperationFamily::UnsafeFnCall);
-        assert_eq!(card.class, ReviewClass::ContractMissing);
+        assert_eq!(
+            card.operation.family,
+            OperationFamily::StableByteSourceGetterReentry
+        );
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert_eq!(card.proof_path, ProofPath::ObservableRedGreen);
         assert_eq!(card.site.owner.as_deref(), Some("async_rab_input"));
         assert!(
             card.operation
@@ -2775,7 +2787,7 @@ pub fn zstd_sync(
         assert!(
             card.next_action
                 .summary
-                .contains("parse options before capture")
+                .contains("observable-red-green proof path")
         );
         assert!(
             card.routes
@@ -2797,7 +2809,7 @@ pub fn zstd_sync(
         let reentry_card = output
             .cards
             .iter()
-            .find(|card| card.operation.family == OperationFamily::UnsafeFnCall)
+            .find(|card| card.operation.family == OperationFamily::StableByteSourceGetterReentry)
             .ok_or_else(|| "fixture should emit the JS-backed reentry card".to_string())?;
 
         assert_eq!(raw_parts_card.site.owner.as_deref(), Some("zstd_raw_parts"));
@@ -2814,7 +2826,7 @@ pub fn zstd_sync(
             reentry_card
                 .operation
                 .expression
-                .contains("JS-backed buffer descriptor")
+                .contains("stable-byte-source-getter-reentry")
         );
         assert!(
             reentry_card
@@ -2827,7 +2839,7 @@ pub fn zstd_sync(
             reentry_card
                 .next_action
                 .summary
-                .contains("re-fetch/copy bytes after reentry")
+                .contains("observable-red-green proof path")
         );
         assert!(
             reentry_card

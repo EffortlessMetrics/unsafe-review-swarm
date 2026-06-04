@@ -4292,6 +4292,7 @@ fn fixture_known_operation_family(operation_family: &str) -> bool {
             | "inline_asm"
             | "target_feature"
             | "panic_from_safe_js"
+            | "stable_byte_source_getter_reentry"
             | "unknown"
     )
 }
@@ -4376,6 +4377,7 @@ fn fixture_known_hazard(hazard: &str) -> bool {
             | "target_feature"
             | "inline_asm"
             | "leak_or_ownership_transfer"
+            | "stable_byte_source"
             | "unknown"
     )
 }
@@ -4455,7 +4457,8 @@ fn check_fixture_site_metadata(
 fn is_fixture_operation_snippet_exception(path: &str, operation: &str) -> bool {
     let normalized = path.replace('\\', "/");
     (normalized.contains("fixtures/js_buffer_reentry_")
-        && operation.starts_with("JS-backed buffer descriptor captured before possible JS reentry"))
+        && operation
+            .starts_with("stable-byte-source-getter-reentry candidate; proof required: observable-red-green; JS-backed buffer descriptor captured before possible JS reentry"))
         || (normalized.contains("fixtures/panic_from_safe_js_")
             && operation
                 .starts_with("JS-derived signed value reaches panicking unsigned conversion"))

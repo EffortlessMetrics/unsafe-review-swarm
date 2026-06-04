@@ -19,14 +19,8 @@ pub(super) fn build_card(
     let hazards = obligations::hazards_for(&scanned_site.operation.family);
     let obligations = obligations::obligations_for(&scanned_site.operation.family);
     let contract = evidence::contract_evidence(&scanned_site);
-    let contract_for_classification =
-        if operation_skips_safety_contract(&scanned_site.operation.family) {
-            ContractEvidence::present(
-                "Panic-safety heuristic uses local guard evidence, not unsafe API safety docs",
-            )
-        } else {
-            contract.clone()
-        };
+    let contract_for_classification = operation_contract_override(&scanned_site.operation.family)
+        .unwrap_or_else(|| contract.clone());
     let (reach, related_tests) =
         evidence::reach_evidence(ctx.root, scanned_site.site.owner.as_ref());
     let id =
@@ -90,9 +84,10 @@ pub(super) fn build_card(
         priority = Priority::Low;
     }
 
-    let next_action_summary = if is_js_buffer_reentry_heuristic(&scanned_site.operation.expression)
+    let next_action_summary = if scanned_site.operation.family
+        == OperationFamily::StableByteSourceGetterReentry
     {
-        "Review the JS-backed buffer descriptor captured before a possible JS reentry point and materialized afterward; parse options before capture or re-fetch/copy bytes after reentry, then attach a focused sanitizer/runtime receipt if available.".to_string()
+        "Review this stable-byte-source-getter-reentry card through an observable-red-green proof path: add or expose byte-stability guard evidence, confirm the safe JS caller route, then parse options before capture or re-fetch/copy bytes after reentry, and keep the PR inside that getter-reentry aperture.".to_string()
     } else if scanned_site.operation.family == OperationFamily::PanicFromSafeJs {
         "Add an explicit sign/range guard or fallible error return before converting the JS-derived signed value to an unsigned type, then attach a focused Bun runtime receipt showing safe JS throws/returns instead of aborting.".to_string()
     } else {
@@ -107,7 +102,12 @@ pub(super) fn build_card(
         summary: next_action_summary,
         verify_commands,
     };
-    let proof_path = proof_path_for(&class, &routes);
+    let proof_path =
+        if scanned_site.operation.family == OperationFamily::StableByteSourceGetterReentry {
+            ProofPath::ObservableRedGreen
+        } else {
+            proof_path_for(&class, &routes)
+        };
 
     if !witness_evidence.present {
         missing.push(MissingEvidence::new(
@@ -167,10 +167,18 @@ fn proof_path_for(class: &ReviewClass, routes: &[WitnessRoute]) -> ProofPath {
     }
 }
 
-fn is_js_buffer_reentry_heuristic(expression: &str) -> bool {
-    expression.contains("JS-backed buffer descriptor captured before possible JS reentry")
+fn operation_skips_safety_contract(family: &OperationFamily) -> bool {
+    operation_contract_override(family).is_some()
 }
 
-fn operation_skips_safety_contract(family: &OperationFamily) -> bool {
-    matches!(family, OperationFamily::PanicFromSafeJs)
+fn operation_contract_override(family: &OperationFamily) -> Option<ContractEvidence> {
+    match family {
+        OperationFamily::PanicFromSafeJs => Some(ContractEvidence::present(
+            "Panic-safety heuristic uses local guard evidence, not unsafe API safety docs",
+        )),
+        OperationFamily::StableByteSourceGetterReentry => Some(ContractEvidence::present(
+            "Stable-byte-source heuristic uses byte-stability evidence, not unsafe API safety docs",
+        )),
+        _ => None,
+    }
 }
