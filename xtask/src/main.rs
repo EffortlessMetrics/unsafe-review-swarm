@@ -66,10 +66,83 @@ const FRONT_DOOR_MARKDOWN_DOCS: &[&str] = &[
 ];
 const FIX_RECIPE_DOC: &str = "docs/explanation/fix-recipes.md";
 const FIX_RECIPE_WORKFLOW_DOC: &str = "docs/FIND_AND_FIX_UB.md";
+const UB_RISK_REVIEW_CI_DOC: &str = "docs/ci/UB_RISK_REVIEW_CI.md";
 const FIX_RECIPE_REQUIRED_GLOBAL_TEXT: &[&str] = &[
     "`unsafe-review` does not prove UB",
     "A suggested witness route is not evidence",
     "`agent_readiness.state`",
+];
+const UB_RISK_REVIEW_CI_REQUIRED_GLOBAL_TEXT: &[&str] = &[
+    "unsafe-review does not prove UB",
+    "Use CI to publish the review kit, not to make `unsafe-review` the PR decider",
+    "unsafe-review first-pr --base origin/<base>",
+    "Upload the full `target/unsafe-review/` review kit",
+    "$GITHUB_STEP_SUMMARY",
+    "Optionally upload `cards.sarif`",
+    "Malformed or missing artifacts may fail CI",
+    "Advisory findings should not fail",
+];
+const UB_RISK_REVIEW_CI_REQUIRED_SECTIONS: &[(&str, &[&str])] = &[
+    (
+        "## Default Shape",
+        &[
+            "Run `unsafe-review first-pr --base origin/<base>`",
+            "Upload the full `target/unsafe-review/` review kit",
+            "$GITHUB_STEP_SUMMARY",
+            "Optionally upload `cards.sarif`",
+            "post PR comments",
+            "fail because ReviewCards exist",
+            "claim UB, safety, UB-free status",
+        ],
+    ),
+    (
+        "## Copy-Ready Workflow",
+        &[
+            "pull_request",
+            "contents: read",
+            "unsafe-review first-pr",
+            "--base \"origin/${BASE_REF}\"",
+            "github-summary.md",
+            "actions/upload-artifact",
+            "unsafe-review-review-kit",
+        ],
+    ),
+    (
+        "## Optional SARIF",
+        &[
+            "Keep it optional",
+            "security-events: write",
+            "github/codeql-action/upload-sarif",
+            "SARIF upload does not post comments",
+            "separate repository policy decision",
+        ],
+    ),
+    (
+        "## Failure Semantics",
+        &[
+            "Fail CI for:",
+            "Do not fail CI by default for:",
+            "new ReviewCards",
+            "missing witness receipts",
+            "SARIF results",
+            "explicit no-new-debt or blocking policy",
+        ],
+    ),
+    (
+        "## Comment Boundaries",
+        &[
+            "The default workflow must not post them",
+            "Automatic comments require a separate trusted poster design",
+        ],
+    ),
+    (
+        "## Witness Boundaries",
+        &[
+            "should not run witnesses by default",
+            "run outside",
+            "receipt",
+        ],
+    ),
 ];
 const FIX_RECIPE_REQUIRED_SECTIONS: &[&str] = &[
     "## `get_unchecked` / `get_unchecked_mut`",
@@ -552,6 +625,7 @@ fn check_docs() -> Result<(), String> {
     check_docs_map_paths("docs/README.md")?;
     check_fix_recipes_doc()?;
     check_agent_repair_workflow_doc()?;
+    check_ub_risk_review_ci_doc()?;
     check_pr_disposition_policy_docs()?;
     public_surfaces::check_first_pr_artifact_list_surfaces()?;
     check_index(
@@ -7254,6 +7328,29 @@ fn check_agent_repair_workflow_text(text: &str, path: &Path) -> Result<(), Strin
     Ok(())
 }
 
+fn check_ub_risk_review_ci_doc() -> Result<(), String> {
+    let path = Path::new(UB_RISK_REVIEW_CI_DOC);
+    let text = read_to_string(path)?;
+    check_ub_risk_review_ci_text(&text, path)
+}
+
+fn check_ub_risk_review_ci_text(text: &str, path: &Path) -> Result<(), String> {
+    let normalized = text.replace("\r\n", "\n");
+    require_text_contains_all(&normalized, path, UB_RISK_REVIEW_CI_REQUIRED_GLOBAL_TEXT)?;
+
+    for (heading, required_text) in UB_RISK_REVIEW_CI_REQUIRED_SECTIONS {
+        let section = markdown_heading_section(&normalized, heading)
+            .ok_or_else(|| format!("{} is missing required section `{heading}`", path.display()))?;
+        require_text_contains_all(section, path, required_text).map_err(|err| {
+            format!(
+                "{} section `{heading}` is incomplete: {err}",
+                path.display()
+            )
+        })?;
+    }
+    Ok(())
+}
+
 fn check_pr_disposition_policy_docs() -> Result<(), String> {
     let policy_text = read_to_string(&workspace_path(PR_DISPOSITION_POLICY_DOC))?;
     let process_text = read_to_string(&workspace_path(PR_RELEASE_DISCIPLINE_DOC))?;
@@ -10658,6 +10755,59 @@ OperationFamily::RawPointerRead => vec![
     }
 
     #[test]
+    fn ub_risk_review_ci_doc_checker_accepts_required_shape() -> Result<(), String> {
+        check_ub_risk_review_ci_text(
+            &ub_risk_review_ci_doc_fixture(),
+            Path::new("docs/ci/UB_RISK_REVIEW_CI.md"),
+        )
+    }
+
+    #[test]
+    fn ub_risk_review_ci_doc_checker_rejects_missing_comment_boundary() -> Result<(), String> {
+        let text = ub_risk_review_ci_doc_fixture().replace(
+            "The default workflow must not post them",
+            "The default workflow may post them",
+        );
+
+        let err = err_text(check_ub_risk_review_ci_text(
+            &text,
+            Path::new("docs/ci/UB_RISK_REVIEW_CI.md"),
+        ))?;
+
+        assert!(err.contains("The default workflow must not post them"));
+        Ok(())
+    }
+
+    #[test]
+    fn ub_risk_review_ci_doc_checker_rejects_missing_failure_boundary() -> Result<(), String> {
+        let text = ub_risk_review_ci_doc_fixture()
+            .replace("Do not fail CI by default for:", "Fail CI for findings:");
+
+        let err = err_text(check_ub_risk_review_ci_text(
+            &text,
+            Path::new("docs/ci/UB_RISK_REVIEW_CI.md"),
+        ))?;
+
+        assert!(err.contains("Do not fail CI by default for:"));
+        Ok(())
+    }
+
+    #[test]
+    fn ub_risk_review_ci_doc_checker_rejects_missing_optional_sarif_boundary() -> Result<(), String>
+    {
+        let text =
+            ub_risk_review_ci_doc_fixture().replace("Keep it optional", "Enable it by default");
+
+        let err = err_text(check_ub_risk_review_ci_text(
+            &text,
+            Path::new("docs/ci/UB_RISK_REVIEW_CI.md"),
+        ))?;
+
+        assert!(err.contains("Keep it optional"));
+        Ok(())
+    }
+
+    #[test]
     fn markdown_link_target_parser_finds_plain_local_links() {
         let targets = markdown::link_targets(
             "[First use](docs/FIRST_USE.md) [external](https://example.com) [anchor](#trust)",
@@ -10731,6 +10881,50 @@ OperationFamily::RawPointerRead => vec![
         text.push_str("Run unsafe-review outcome. The patch improved review evidence only when the card posture changes; a test is not a proof that the unsafe site executed.\n");
         text.push_str("\n## Relationship To Dogfood\n\n");
         text.push_str("Record good agent task and bad agent task judgments; they do not calibrate precision/recall.\n");
+        text
+    }
+
+    fn ub_risk_review_ci_doc_fixture() -> String {
+        let mut text = "# UB-Risk Review CI Cookbook\n\n".to_string();
+        text.push_str("unsafe-review does not prove UB.\n");
+        text.push_str(
+            "Use CI to publish the review kit, not to make `unsafe-review` the PR decider.\n",
+        );
+        text.push_str("unsafe-review first-pr --base origin/<base>\n");
+        text.push_str("Upload the full `target/unsafe-review/` review kit.\n");
+        text.push_str("Append to $GITHUB_STEP_SUMMARY.\n");
+        text.push_str("Optionally upload `cards.sarif`.\n");
+        text.push_str("Malformed or missing artifacts may fail CI.\n");
+        text.push_str("Advisory findings should not fail.\n");
+        text.push_str("\n## Default Shape\n\n");
+        text.push_str("Run `unsafe-review first-pr --base origin/<base>`.\n");
+        text.push_str("Upload the full `target/unsafe-review/` review kit.\n");
+        text.push_str("Append github-summary.md to $GITHUB_STEP_SUMMARY.\n");
+        text.push_str("Optionally upload `cards.sarif`.\n");
+        text.push_str("Do not post PR comments, fail because ReviewCards exist, or claim UB, safety, UB-free status.\n");
+        text.push_str("\n## Copy-Ready Workflow\n\n");
+        text.push_str("pull_request\npermissions:\n  contents: read\n");
+        text.push_str("unsafe-review first-pr --base \"origin/${BASE_REF}\"\n");
+        text.push_str("github-summary.md\nactions/upload-artifact\nunsafe-review-review-kit\n");
+        text.push_str("\n## Optional SARIF\n\n");
+        text.push_str("Keep it optional.\n");
+        text.push_str("security-events: write\n");
+        text.push_str("github/codeql-action/upload-sarif\n");
+        text.push_str(
+            "SARIF upload does not post comments; blocking is a separate repository policy decision.\n",
+        );
+        text.push_str("\n## Failure Semantics\n\n");
+        text.push_str("Fail CI for:\n- missing artifacts\n");
+        text.push_str("Do not fail CI by default for:\n- new ReviewCards\n- missing witness receipts\n- SARIF results\n");
+        text.push_str(
+            "Downstream repositories can later add explicit no-new-debt or blocking policy.\n",
+        );
+        text.push_str("\n## Comment Boundaries\n\n");
+        text.push_str("The default workflow must not post them.\n");
+        text.push_str("Automatic comments require a separate trusted poster design.\n");
+        text.push_str("\n## Witness Boundaries\n\n");
+        text.push_str("CI should not run witnesses by default.\n");
+        text.push_str("Witnesses should run outside unsafe-review before recording a receipt.\n");
         text
     }
 
