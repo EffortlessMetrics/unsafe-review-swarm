@@ -20,6 +20,8 @@ manual-candidate projections.
   resizable-ArrayBuffer stale-input route.
 - `node-fs-rab-scalar-write.json` records a node:fs async scalar write
   resizable-ArrayBuffer stale-input route.
+- `candidate7-sync-compression-getter-reentry.json` records Candidate 7, a Bun
+  sync compression `stable-byte-source-getter-reentry` route.
 
 Trust boundary: these examples do not execute witnesses, prove UB, prove
 site execution, prove repository safety, or create policy-ready findings.

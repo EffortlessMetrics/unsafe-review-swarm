@@ -1,0 +1,64 @@
+{
+  "schema_version": "manual-candidate/v1",
+  "id": "R4R2-S007",
+  "source": "manual",
+  "manual_candidate": true,
+  "analyzer_discovered": false,
+  "title": "Candidate 7 stable-byte-source-getter-reentry sync compression can read stale JS-backed input",
+  "location": {
+    "file": "src/runtime/api/BunObject.rs",
+    "line": 2345
+  },
+  "operation_family": "unsafe_fn_call",
+  "unsafe_operation": "parse_compress_buffer_and_options captures StringOrBuffer input, sync compression option getters can reenter JS, then gzip_or_deflate_sync or JSZstd::compress_sync materializes buffer.slice() for native compression",
+  "invariant": "Sync compression must not read bytes from caller-controlled JS backing storage after options getter reentry can mutate, resize, detach, or replace that storage",
+  "safe_caller": "Bun.gzipSync, Bun.deflateSync, or Bun.zstdCompressSync with a BufferSource input and an options getter that mutates or replaces the backing storage after input capture",
+  "proof_mode": {
+    "kind": "observable-red-green",
+    "system_bun_expected": "fail",
+    "mutation_required": true,
+    "miri_required": false
+  },
+  "fix_boundary": "Parse sync compression options before input capture, or re-fetch/copy BufferSource bytes after getter reentry before native compression reads",
+  "pr_aperture": "Sync compression getter-reentry only: Bun.gzipSync, Bun.deflateSync, and Bun.zstdCompressSync; do not include async compression, crypto, fs, markdown, S3, TextDecoder, or decompression broadening",
+  "fix_options": [
+    "Move sync compression option parsing ahead of StringOrBuffer::from_js so JS getter reentry happens before the input descriptor is captured",
+    "Alternatively re-fetch and snapshot BufferSource bytes after option getter reentry and before buffer.slice() reaches native compression",
+    "Preserve current error ordering and Node-compatible empty-input behavior while changing only the stale-byte window"
+  ],
+  "test_targets": [
+    "test/js/bun/util/compression-getter-reentry.test.ts",
+    "test/js/bun/util/zstd.test.ts",
+    "test/js/node/zlib/zlib.test.js",
+    "node target/unsafe-scout/candidate7-sync-compression-node-control.js"
+  ],
+  "do_not_touch": [
+    "Do not patch Bun.zstdCompress, Bun.zstdDecompress, crypto, fs, markdown, S3, TextDecoder, or unrelated stable-byte families in this PR",
+    "Do not reject SharedArrayBuffer, resizable ArrayBuffer, or other BufferSource inputs unless compatibility evidence requires that policy",
+    "Do not claim analyzer discovery, proof of UB, Miri-clean status, site execution proof, or policy readiness from this manual packet"
+  ],
+  "evidence": [
+    {
+      "kind": "source_trace",
+      "path": "src/runtime/api/BunObject.rs",
+      "summary": "Manual route pins input capture at parse_compress_buffer_and_options lines 2345-2347, sync gzip/deflate option getter reentry at lines 2622-2645, gzip native-read slice materialization at line 2656, zstd level getter reentry at lines 2764-2779, and zstd native-read slice materialization at line 2817",
+      "command": "rg -n \"parse_compress_buffer_and_options|gzip_or_deflate_sync|get_level|compress_sync|buffer\\\\.slice\\\\(\\)\" src/runtime/api/BunObject.rs",
+      "limitation": "source trace only; does not prove the safe JS route is observable or fixed"
+    },
+    {
+      "kind": "runtime_witness",
+      "path": "target/unsafe-scout/candidate7-sync-compression-asan.out",
+      "summary": "External Bun scout witness exercised sync compression with an options getter mutating captured BufferSource storage and reported observable red behavior for the observable-red-green proof-mode bar",
+      "command": "bun target/unsafe-scout/candidate7-sync-compression-getter-reentry.js",
+      "limitation": "runtime witness only; not analyzer-discovered, not proof of UB, and not a general site-execution claim"
+    },
+    {
+      "kind": "node_parity",
+      "path": "target/unsafe-scout/candidate7-sync-compression-node.out",
+      "summary": "Node comparison records the post-getter empty-input oracle and compatibility shape for the same sync compression option-getter route",
+      "command": "node target/unsafe-scout/candidate7-sync-compression-node-control.js",
+      "limitation": "comparison oracle only; does not prove Bun memory safety or make a policy-ready compatibility claim"
+    }
+  ],
+  "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
+}
