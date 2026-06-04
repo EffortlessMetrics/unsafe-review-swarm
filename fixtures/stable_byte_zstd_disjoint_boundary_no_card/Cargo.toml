@@ -1,0 +1,4 @@
+[package]
+name = "stable-byte-zstd-disjoint-boundary-no-card-fixture"
+version = "0.0.0"
+edition = "2024"

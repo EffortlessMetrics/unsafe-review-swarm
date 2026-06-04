@@ -1,0 +1,72 @@
+[
+  {
+    "id": "UR-stable-byte-zstd-native-ffi-read-fixture-src-lib-rs-zstd-overlap-native-ffi-operation-stable_byte_source_native_ffi_read-byte-slice-2b2aaae6461f-stable_byte_source-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "proof_path": "observable_red_green",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 29,
+      "column": 5,
+      "kind": "operation",
+      "owner": "zstd_overlap_native_ffi",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "ctx.set_buffers(Some(input_bytes), Some(output_bytes));"
+    },
+    "operation": "stable-byte-source-native-ffi-read candidate; proof required: observable-red-green; JS-backed input and mutable output byte spans reach native FFI handoff before disjointness or copy boundary; input: let input_bytes = input.byte_slice();; output: let output_bytes = output.byte_slice_mut();; handoff: ctx.set_buffers(Some(input_bytes), Some(output_bytes));",
+    "operation_family": "stable_byte_source_native_ffi_read",
+    "hazards": [
+      "stable_byte_source"
+    ],
+    "obligations": [
+      "native FFI input and output byte spans have a disjointness or copy boundary before handoff"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "byte-stability",
+        "description": "native FFI input and output byte spans have a disjointness or copy boundary before handoff",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Stable-byte-source native FFI read heuristic uses byte-stability evidence, not unsafe API safety docs"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `zstd_overlap_native_ffi` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Stable-byte-source native FFI read heuristic uses byte-stability evidence, not unsafe API safety docs",
+    "discharge": "No visible local guard detected",
+    "reach": "No static test mention of owner `zstd_overlap_native_ffi` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Review this stable-byte-source-native-ffi-read card through an observable-red-green proof path: add or expose guard evidence for a disjointness or copy boundary, confirm the safe JS caller route through manual review, keep input/output byte spans stable before native handoff, and keep the PR inside that native-FFI aperture.",
+    "verify_commands": []
+  }
+]

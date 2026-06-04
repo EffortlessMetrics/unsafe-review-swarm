@@ -3050,6 +3050,104 @@ pub fn zstd_sync(
     }
 
     #[test]
+    fn stable_byte_zstd_native_ffi_temp_source_emits_advisory_card() -> Result<(), String> {
+        let output = temp_source_output(
+            "unsafe-review-stable-byte-zstd-native-ffi",
+            r#"
+pub struct JsBuffer;
+pub struct ZstdContext;
+
+impl JsBuffer {
+    pub fn byte_slice(&self) -> &[u8] {
+        &[]
+    }
+
+    pub fn byte_slice_mut(&mut self) -> &mut [u8] {
+        &mut []
+    }
+}
+
+impl ZstdContext {
+    pub fn set_buffers(&mut self, _input: Option<&[u8]>, _output: Option<&mut [u8]>) {}
+
+    pub fn compress(&mut self) -> Result<usize, ()> {
+        Ok(0)
+    }
+}
+
+pub fn zstd_overlap_native_ffi(
+    input: &JsBuffer,
+    output: &mut JsBuffer,
+    ctx: &mut ZstdContext,
+) -> Result<usize, ()> {
+    let input_bytes = input.byte_slice();
+    let output_bytes = output.byte_slice_mut();
+    ctx.set_buffers(Some(input_bytes), Some(output_bytes));
+    ctx.compress()
+}
+"#,
+        )?;
+        let card = single_card("stable_byte_zstd_native_ffi", &output)?;
+
+        assert_eq!(
+            card.operation.family,
+            OperationFamily::StableByteSourceNativeFfiRead
+        );
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert_eq!(card.proof_path, ProofPath::ObservableRedGreen);
+        assert_eq!(card.site.owner.as_deref(), Some("zstd_overlap_native_ffi"));
+        assert_eq!(card.site.location.line, 30);
+        assert!(card.hazards.contains(&HazardKind::StableByteSource));
+        assert!(
+            card.operation
+                .expression
+                .contains("stable-byte-source-native-ffi-read")
+        );
+        assert!(card.operation.expression.contains("input.byte_slice"));
+        assert!(card.operation.expression.contains("output.byte_slice_mut"));
+        assert!(card.operation.expression.contains("ctx.set_buffers"));
+        assert!(
+            card.next_action
+                .summary
+                .contains("observable-red-green proof path")
+        );
+        assert!(
+            card.routes
+                .iter()
+                .any(|route| route.kind == WitnessKind::HumanDeepReview)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn stable_byte_zstd_native_ffi_fixture_pins_advisory_card() -> Result<(), String> {
+        let output = fixture_output("stable_byte_zstd_native_ffi_read")?;
+        let card = single_card("stable_byte_zstd_native_ffi_read", &output)?;
+
+        assert_eq!(
+            card.operation.family,
+            OperationFamily::StableByteSourceNativeFfiRead
+        );
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert_eq!(card.proof_path, ProofPath::ObservableRedGreen);
+        assert_eq!(card.site.owner.as_deref(), Some("zstd_overlap_native_ffi"));
+        assert_eq!(card.site.location.line, 29);
+        assert!(card.next_action.summary.contains("native-FFI aperture"));
+        Ok(())
+    }
+
+    #[test]
+    fn stable_byte_zstd_native_ffi_fixture_keeps_disjoint_boundary_no_card() -> Result<(), String> {
+        let output = fixture_output("stable_byte_zstd_disjoint_boundary_no_card")?;
+
+        assert!(
+            output.cards.is_empty(),
+            "rejecting overlap before native handoff should stay a no-card control"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn panic_from_safe_js_direct_try_from_expect_emits_guard_missing_card() -> Result<(), String> {
         let output = temp_source_output(
             "unsafe-review-panic-from-safe-js-direct",

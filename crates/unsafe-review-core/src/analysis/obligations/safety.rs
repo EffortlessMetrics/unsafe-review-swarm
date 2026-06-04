@@ -90,6 +90,10 @@ pub(crate) fn obligations_for(family: &OperationFamily) -> Vec<SafetyObligation>
             "byte-stability",
             "shared JS bytes are snapshotted before Rust/native borrowed-slice materialization",
         )),
+        OperationFamily::StableByteSourceNativeFfiRead => single(SafetyObligation::new(
+            "byte-stability",
+            "native FFI input and output byte spans have a disjointness or copy boundary before handoff",
+        )),
         OperationFamily::StrFromUtf8Unchecked => {
             single(SafetyObligation::new("utf8", "bytes are valid UTF-8"))
         }

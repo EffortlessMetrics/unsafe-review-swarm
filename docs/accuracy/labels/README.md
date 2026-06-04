@@ -27,6 +27,9 @@ Current ledgers:
 - `js-buffer-reentry-heuristic.toml`: fixture-pinned operation-family labels
   for JS-backed buffer descriptor capture before getter/callback reentry and
   later byte materialization behavior.
+- `stable-byte-native-ffi-read-heuristic.toml`: fixture-pinned
+  operation-family labels for JS-backed input and mutable output byte spans
+  reaching native FFI handoff before disjointness or copy-boundary evidence.
 - `local-unsafe-contract-evidence.toml`: fixture-pinned obligation-level
   labels for private/local unsafe contract evidence.
 - `maybeuninit-assume-init-initialized.toml`: fixture-pinned

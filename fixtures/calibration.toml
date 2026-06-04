@@ -538,6 +538,8 @@ required_core_fixtures = [
   "stable_byte_sab_mysql_blob_rawslice",
   "stable_byte_sab_snapshot_no_card",
   "stable_byte_sab_mysql_blob_owned_copy_no_card",
+  "stable_byte_zstd_native_ffi_read",
+  "stable_byte_zstd_disjoint_boundary_no_card",
   "panic_from_safe_js_direct_try_from_expect",
   "panic_from_safe_js_bound_try_from_unwrap",
   "panic_from_safe_js_observed_only_not_guard",
@@ -5859,6 +5861,23 @@ fixture = "stable_byte_sab_mysql_blob_owned_copy_no_card"
 kind = "false_positive_control"
 claim = "Stable-byte SAB race heuristic does not emit a ReviewCard when MySQL BLOB shared bytes are copied into owned storage before packet data storage"
 support_tier = "Stable-byte SAB race heuristic"
+expected_cards = 0
+
+[[cases]]
+fixture = "stable_byte_zstd_native_ffi_read"
+kind = "positive"
+claim = "Zstd-style JS-backed input and mutable output byte spans reaching native FFI handoff before a disjointness or copy boundary emit one advisory native-FFI stable-byte ReviewCard"
+support_tier = "Stable-byte native FFI read heuristic"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "stable_byte_source_native_ffi_read"
+expected_hazard = "stable_byte_source"
+
+[[cases]]
+fixture = "stable_byte_zstd_disjoint_boundary_no_card"
+kind = "false_positive_control"
+claim = "Stable-byte native FFI read heuristic does not emit a ReviewCard when overlap is rejected before native handoff"
+support_tier = "Stable-byte native FFI read heuristic"
 expected_cards = 0
 
 [[cases]]

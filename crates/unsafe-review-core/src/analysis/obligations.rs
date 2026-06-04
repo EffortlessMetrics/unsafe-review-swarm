@@ -142,6 +142,14 @@ mod tests {
             vec!["byte-stability".to_string()]
         );
         assert_eq!(
+            hazards_for(&OperationFamily::StableByteSourceNativeFfiRead),
+            vec![HazardKind::StableByteSource]
+        );
+        assert_eq!(
+            obligation_keys(&OperationFamily::StableByteSourceNativeFfiRead),
+            vec!["byte-stability".to_string()]
+        );
+        assert_eq!(
             hazards_for(&OperationFamily::AtomicPointerState),
             vec![HazardKind::AtomicOrdering, HazardKind::DropOrDeallocation]
         );

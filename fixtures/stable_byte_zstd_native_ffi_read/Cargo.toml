@@ -1,0 +1,4 @@
+[package]
+name = "stable-byte-zstd-native-ffi-read-fixture"
+version = "0.0.0"
+edition = "2024"

@@ -1,0 +1,38 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "stable-byte-native-ffi-read-heuristic"
+operation_family = "stable_byte_source_native_ffi_read"
+hazard = "stable_byte_source"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+stable-byte native FFI read heuristic behavior; they are not a proof of memory safety,
+not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence,
+not calibrated precision or recall, not witness adequacy, and not policy readiness.
+"""
+
+[[samples]]
+id = "stable-byte-zstd-native-ffi-read-emits-advisory-card"
+fixture = "stable_byte_zstd_native_ffi_read"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "stable_byte_source_native_ffi_read"
+expected_hazard = "stable_byte_source"
+expected_owner = "zstd_overlap_native_ffi"
+expected_site_kind = "operation"
+expected_obligation_key = "byte-stability"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A same-owner Zstd-style byte-slice input and mutable byte-slice output reaching native handoff before an overlap rejection or copy boundary should stay an advisory native-FFI stable-byte ReviewCard with observable-red-green proof-path wording and manual-review routing."
+
+[[samples]]
+id = "stable-byte-zstd-disjoint-boundary-emits-no-card"
+fixture = "stable_byte_zstd_disjoint_boundary_no_card"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "Rejecting overlap before the native handoff should not trigger the stable-byte native FFI read heuristic or create a ReviewCard."
