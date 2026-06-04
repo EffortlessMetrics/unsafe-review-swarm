@@ -13,6 +13,14 @@
   "unsafe_operation": "byte_slice / byte_slice_mut -> CompressionContext::set_buffers(Option<&[u8]>, Option<&mut [u8]>) -> NativeZstd FFI buffer handoff",
   "invariant": "Compression input &[u8] and output &mut [u8] must not alias the same caller-controlled JS backing storage",
   "safe_caller": "zlib Zstd _processChunk / _handle.writeSync with caller-controlled overlapping ArrayBuffer input and output",
+  "proof_mode": {
+    "kind": "observable-red-green",
+    "system_bun_expected": "fail",
+    "mutation_required": true,
+    "miri_required": false
+  },
+  "fix_boundary": "Reject overlap or copy into stable disjoint storage before passing input and output buffers to native Zstd compression contexts",
+  "pr_aperture": "Zstd _processChunk / _handle.writeSync overlap route only; do not rewrite unrelated zlib, brotli, public API routes, or zstd mode dispatch",
   "fix_options": [
     "Replace reference-based buffer passing with raw spans before calling native compression contexts",
     "Add an explicit overlap policy before mutating compression state; reject overlap or copy into stable disjoint storage",

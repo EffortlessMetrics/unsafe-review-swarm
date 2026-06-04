@@ -13,6 +13,14 @@
   "unsafe_operation": "node:fs async scalar write arguments capture StringOrBuffer input for later worker-side args.buffer.slice() or args.data.slice() writes",
   "invariant": "Async filesystem writes must not read bytes from caller-controlled resizable ArrayBuffer storage after the JS-visible buffer can be resized or detached",
   "safe_caller": "fs.write, fs.promises.write, FileHandle.write, fs.writeFile, fs.promises.writeFile, fs.appendFile, fs.promises.appendFile, FileHandle.writeFile, or FileHandle.appendFile with a resizable ArrayBuffer-backed BufferSource resized before async completion",
+  "proof_mode": {
+    "kind": "observable-red-green",
+    "system_bun_expected": "fail",
+    "mutation_required": true,
+    "miri_required": false
+  },
+  "fix_boundary": "Snapshot or copy resizable ArrayBuffer-backed scalar write inputs before async filesystem worker scheduling",
+  "pr_aperture": "node:fs scalar write input APIs only: write, writeFile, and appendFile; do not include read, readv, writev, FdVectorIo, pathlike, or vector copy-back semantics",
   "fix_options": [
     "Snapshot or copy resizable ArrayBuffer-backed scalar write inputs into stable owned storage before async filesystem worker scheduling",
     "Keep the first implementation slice focused on input-only scalar write APIs: write, writeFile, and appendFile",

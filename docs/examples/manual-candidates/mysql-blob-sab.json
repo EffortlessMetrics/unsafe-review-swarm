@@ -13,6 +13,14 @@
   "unsafe_operation": "JSC__JSValue__borrowBytesForOffThread -> core::slice::from_raw_parts -> Data::Temporary(RawSlice)",
   "invariant": "MySQL packet construction must not borrow mutable or shared JS backing storage through a temporary raw slice",
   "safe_caller": "Bun.SQL MySQL prepared statement binding a SharedArrayBuffer-backed Uint8Array as a BLOB parameter",
+  "proof_mode": {
+    "kind": "mutation-plus-miri",
+    "system_bun_expected": "nondiscriminating",
+    "mutation_required": true,
+    "miri_required": true
+  },
+  "fix_boundary": "Copy or otherwise stabilize MySQL BLOB bytes before storing Data::Temporary(RawSlice) for packet construction",
+  "pr_aperture": "MySQL BLOB bind-value conversion only; do not rewrite unrelated MySQL protocol encoding or claim Postgres bytea parity without checking the helper contract",
   "fix_options": [
     "Reuse an existing stable BufferSource copy helper only if it preserves the MySQL packet lifetime contract",
     "Otherwise convert the MySQL BLOB bind branch to owned or stable bytes before storing Data::Temporary(RawSlice)",

@@ -13,6 +13,14 @@
   "unsafe_operation": "StringOrBuffer::from_js_maybe_async_into(...) captures JS-backed BufferSource input for later async StringOrBuffer::slice() worker reads",
   "invariant": "Async workers must not read bytes from caller-controlled resizable ArrayBuffer storage after the JS-visible buffer can be resized or detached",
   "safe_caller": "crypto.scrypt, crypto.pbkdf2, Bun.zstdCompress, or Bun.zstdDecompress with a resizable ArrayBuffer-backed BufferSource input resized before async completion",
+  "proof_mode": {
+    "kind": "observable-red-green",
+    "system_bun_expected": "fail",
+    "mutation_required": true,
+    "miri_required": false
+  },
+  "fix_boundary": "Snapshot or copy resizable ArrayBuffer-backed BufferSource bytes before async StringOrBuffer worker scheduling",
+  "pr_aperture": "Non-encoded async StringOrBuffer helper boundary for crypto and zstd inputs only; do not include node:fs scalar writes, writeFile, appendFile, JSTranspiler, or JSBundler",
   "fix_options": [
     "Snapshot or copy resizable/growable ArrayBuffer-backed bytes into stable owned storage before async worker scheduling",
     "Keep the first implementation slice focused on the non-encoded StringOrBuffer::from_js_maybe_async_into helper boundary",

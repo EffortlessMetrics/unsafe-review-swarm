@@ -508,6 +508,7 @@ fn manual_candidate_examples() -> Result<Vec<ManualCandidateExample>, String> {
                 "{path_display} id `{id}` is not safe for a candidate artifact filename"
             ));
         }
+        check_manual_candidate_example_handoff_fields(&value, &path_display)?;
         examples.push(ManualCandidateExample {
             path,
             id,
@@ -530,6 +531,82 @@ fn manual_candidate_examples() -> Result<Vec<ManualCandidateExample>, String> {
         }
     }
     Ok(examples)
+}
+
+fn check_manual_candidate_example_handoff_fields(
+    value: &serde_json::Value,
+    path: &str,
+) -> Result<(), String> {
+    let Some(proof_mode) = value
+        .get("proof_mode")
+        .and_then(serde_json::Value::as_object)
+    else {
+        return Err(format!(
+            "{path} committed manual candidate example must include proof_mode"
+        ));
+    };
+    let kind = require_object_str(proof_mode, "kind", path, "proof_mode")?;
+    if !matches!(
+        kind,
+        "observable-red-green" | "mutation-plus-miri" | "source-route-only" | "helper-gated"
+    ) {
+        return Err(format!(
+            "{path} proof_mode.kind `{kind}` is not a known manual candidate proof mode"
+        ));
+    }
+    let system_bun_expected =
+        require_object_str(proof_mode, "system_bun_expected", path, "proof_mode")?;
+    if !matches!(
+        system_bun_expected,
+        "fail" | "nondiscriminating" | "unavailable"
+    ) {
+        return Err(format!(
+            "{path} proof_mode.system_bun_expected `{system_bun_expected}` is not supported"
+        ));
+    }
+    require_object_bool(proof_mode, "mutation_required", path, "proof_mode")?;
+    require_object_bool(proof_mode, "miri_required", path, "proof_mode")?;
+    require_non_empty_json_str(value, "fix_boundary", path)?;
+    require_non_empty_json_str(value, "pr_aperture", path)?;
+
+    let trust_boundary = require_non_empty_json_str(value, "trust_boundary", path)?;
+    for needle in ["manual candidate", "not analyzer-discovered", "not proof"] {
+        if !trust_boundary.to_ascii_lowercase().contains(needle) {
+            return Err(format!(
+                "{path} trust_boundary must include `{needle}` for committed manual examples"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn require_object_str<'a>(
+    object: &'a serde_json::Map<String, serde_json::Value>,
+    key: &str,
+    path: &str,
+    object_name: &str,
+) -> Result<&'a str, String> {
+    let Some(value) = object.get(key).and_then(serde_json::Value::as_str) else {
+        return Err(format!("{path} {object_name}.{key} must be a string"));
+    };
+    if value.trim().is_empty() {
+        Err(format!("{path} {object_name}.{key} must not be empty"))
+    } else {
+        Ok(value)
+    }
+}
+
+fn require_object_bool(
+    object: &serde_json::Map<String, serde_json::Value>,
+    key: &str,
+    path: &str,
+    object_name: &str,
+) -> Result<(), String> {
+    if object.get(key).is_some_and(serde_json::Value::is_boolean) {
+        Ok(())
+    } else {
+        Err(format!("{path} {object_name}.{key} must be a boolean"))
+    }
 }
 
 fn check_manual_candidate_smoke_matches_examples(
