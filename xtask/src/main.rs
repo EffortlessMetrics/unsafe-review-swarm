@@ -3164,7 +3164,8 @@ fn check_dogfood_stable_byte_seed_text(
             ));
         }
     }
-    check_dogfood_stable_byte_coverage_labels(path, text, &labels_by_seed)?;
+    let calibrated_fixtures = calibrated_fixture_names()?;
+    check_dogfood_stable_byte_coverage_labels(path, text, &labels_by_seed, &calibrated_fixtures)?;
     Ok(rows)
 }
 
@@ -3172,9 +3173,11 @@ fn check_dogfood_stable_byte_coverage_labels(
     path: &str,
     text: &str,
     labels_by_seed: &BTreeMap<String, BTreeSet<String>>,
+    calibrated_fixtures: &BTreeSet<String>,
 ) -> Result<usize, String> {
     let mut in_table = false;
     let mut rows = 0usize;
+    let mut covered_seed_ids = BTreeSet::new();
     for (line_idx, line) in text.lines().enumerate() {
         if !in_table {
             if line.contains("| Seed ID | Positive fixture |") {
@@ -3204,6 +3207,12 @@ fn check_dogfood_stable_byte_coverage_labels(
             ));
         }
         let seed_id = markdown_code_cell_value(columns[0]);
+        if !covered_seed_ids.insert(seed_id.clone()) {
+            return Err(format!(
+                "{path}:{} duplicate stable-byte coverage row for `{seed_id}`",
+                line_idx + 1
+            ));
+        }
         let labels = labels_by_seed.get(&seed_id).ok_or_else(|| {
             format!(
                 "{path}:{} stable-byte coverage row references unknown seed `{seed_id}`",
@@ -3216,6 +3225,13 @@ fn check_dogfood_stable_byte_coverage_labels(
                 line_idx + 1
             ));
         }
+        check_stable_byte_coverage_fixture_path(
+            path,
+            line_idx + 1,
+            &seed_id,
+            columns[1],
+            calibrated_fixtures,
+        )?;
 
         let support_tier = columns[3].trim();
         let has_support_tier = !support_tier.is_empty()
@@ -3230,7 +3246,61 @@ fn check_dogfood_stable_byte_coverage_labels(
         }
         rows += 1;
     }
+    for (seed_id, labels) in labels_by_seed {
+        if !labels.contains("needs-fixture") && !covered_seed_ids.contains(seed_id) {
+            return Err(format!(
+                "{path} stable-byte seed `{seed_id}` no longer has triage label `needs-fixture` but has no fixture/control coverage row"
+            ));
+        }
+    }
     Ok(rows)
+}
+
+fn check_stable_byte_coverage_fixture_path(
+    path: &str,
+    line: usize,
+    seed_id: &str,
+    fixture_cell: &str,
+    calibrated_fixtures: &BTreeSet<String>,
+) -> Result<(), String> {
+    let fixture_path = markdown_code_cell_value(fixture_cell);
+    let Some(fixture_name) = fixture_path.strip_prefix("fixtures/") else {
+        return Err(format!(
+            "{path}:{line} stable-byte coverage row for `{seed_id}` positive fixture must be a `fixtures/` path; got `{fixture_path}`"
+        ));
+    };
+    if fixture_name.contains('/') || fixture_name.contains('\\') || fixture_name.is_empty() {
+        return Err(format!(
+            "{path}:{line} stable-byte coverage row for `{seed_id}` positive fixture must name one fixture directory; got `{fixture_path}`"
+        ));
+    }
+    if !calibrated_fixtures.contains(fixture_name) {
+        return Err(format!(
+            "{path}:{line} stable-byte coverage row for `{seed_id}` positive fixture `{fixture_path}` is not registered in fixtures/calibration.toml"
+        ));
+    }
+    Ok(())
+}
+
+fn calibrated_fixture_names() -> Result<BTreeSet<String>, String> {
+    let value = parse_toml_file(&workspace_path("fixtures/calibration.toml"))?;
+    let cases = value
+        .get("cases")
+        .and_then(toml::Value::as_array)
+        .ok_or_else(|| "fixtures/calibration.toml must contain cases".to_string())?;
+    let mut fixtures = BTreeSet::new();
+    for (idx, case) in cases.iter().enumerate() {
+        let table = case
+            .as_table()
+            .ok_or_else(|| format!("fixtures/calibration.toml cases[{idx}] must be a table"))?;
+        let fixture = table
+            .get("fixture")
+            .and_then(toml::Value::as_str)
+            .filter(|fixture| !fixture.trim().is_empty())
+            .ok_or_else(|| format!("fixtures/calibration.toml cases[{idx}] is missing fixture"))?;
+        fixtures.insert(fixture.to_string());
+    }
+    Ok(fixtures)
 }
 
 fn check_dogfood_follow_up_seeds_text(
@@ -11088,6 +11158,12 @@ Triage labels come from [taxonomy](stable-byte-triage-taxonomy.md).
 | Seed ID | Ledger state | Candidate family | Surface | Manual candidate | Safe JS caller | Rust/native sink | Proof mode | Suggested first PR | Owner lane | Triage labels |
 |---|---|---|---|---|---|---|---|---|---|---|
 | `bun-stable-byte-textdecoder-sab` | `handoff-ready` | `stable-byte-source-sab-race` | `TextDecoder.decode` | `docs/examples/manual-candidates/textdecoder-sab.json` | SharedArrayBuffer-backed typed array decode | `src/runtime/webcore/TextDecoder.rs` slice materialization | `mutation-plus-miri` | `TextDecoder shared-byte snapshot only` | `rust2` | `non-observable`, `needs-miri-model` |
+
+## Fixture And Control Coverage
+
+| Seed ID | Positive fixture | Controls | Analyzer/support tier | Boundary |
+|---|---|---|---|---|
+| `bun-stable-byte-textdecoder-sab` | `fixtures/stable_byte_sab_borrowed_slice` | `fixtures/stable_byte_sab_snapshot_no_card` | `Stable-byte SAB race heuristic` | Static pressure only. |
 "#;
         let manual_candidates = BTreeMap::from([(
             "docs/examples/manual-candidates/textdecoder-sab.json".to_string(),
@@ -11105,6 +11181,41 @@ Triage labels come from [taxonomy](stable-byte-triage-taxonomy.md).
         )?;
 
         assert_eq!(rows, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_stable_byte_seed_index_rejects_missing_coverage_after_fixture_label_removed()
+    -> Result<(), String> {
+        let text = r#"
+# Bun stable-byte follow-up seed index
+
+Triage labels come from [taxonomy](stable-byte-triage-taxonomy.md).
+
+## Seeds
+
+| Seed ID | Ledger state | Candidate family | Surface | Manual candidate | Safe JS caller | Rust/native sink | Proof mode | Suggested first PR | Owner lane | Triage labels |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `bun-stable-byte-zstd-overlap-native-ffi` | `handoff-ready` | `stable-byte-source-native-ffi-read` | `zlib Zstd _processChunk / _handle.writeSync` | `docs/examples/manual-candidates/zstd-overlap.json` | Overlapping caller-controlled ArrayBuffer input and output | `src/runtime/node/node_zlib_binding.rs` native Zstd buffer handoff | `observable-red-green` | `Zstd overlap reference boundary only` | `rust-zstd` | `observable` |
+"#;
+        let manual_candidates = BTreeMap::from([(
+            "docs/examples/manual-candidates/zstd-overlap.json".to_string(),
+            serde_json::json!({
+                "proof_mode": {
+                    "kind": "observable-red-green"
+                }
+            }),
+        )]);
+
+        let err = err_text(check_dogfood_stable_byte_seed_text(
+            "docs/dogfood/stable-byte-follow-up-seeds.md",
+            text,
+            &manual_candidates,
+        ))?;
+
+        assert!(err.contains("no longer has triage label `needs-fixture`"));
+        assert!(err.contains("no fixture/control coverage row"));
+        assert!(err.contains("bun-stable-byte-zstd-overlap-native-ffi"));
         Ok(())
     }
 

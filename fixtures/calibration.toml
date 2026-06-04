@@ -470,6 +470,7 @@ required_core_fixtures = [
   "ffi_call_sanitizer_route",
   "ffi_qualified_call_sanitizer_route",
   "ffi_libc_call_sanitizer_route",
+  "stable_byte_native_ffi_zstd_handoff",
   "ffi_non_libc_wrapper_call_not_route",
   "ffi_local_libc_module_call_not_route",
   "safe_code_no_cards",
@@ -5221,6 +5222,16 @@ expected_hazard = "ffi_abi"
 fixture = "ffi_libc_call_sanitizer_route"
 kind = "positive"
 claim = "unsafe libc path call routes away from Miri-first review"
+support_tier = "Witness routing"
+expected_cards = 1
+expected_class = "miri_unsupported"
+expected_operation_family = "ffi"
+expected_hazard = "ffi_abi"
+
+[[cases]]
+fixture = "stable_byte_native_ffi_zstd_handoff"
+kind = "positive"
+claim = "zstd-style native FFI pointer/length handoff routes as an FFI seam without adding native-FFI stable-byte analyzer discovery"
 support_tier = "Witness routing"
 expected_cards = 1
 expected_class = "miri_unsupported"

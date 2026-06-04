@@ -1,0 +1,112 @@
+[
+  {
+    "id": "UR-stable-byte-native-ffi-zstd-handoff-src-lib-rs-zstd-overlap-handoff-ffi_call-ffi-ffi-94233876e270-ffi_abi-c1",
+    "class": "miri_unsupported",
+    "priority": "medium",
+    "confidence": "medium",
+    "proof_path": "observable_red_green",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 13,
+      "column": 5,
+      "kind": "ffi_call",
+      "owner": "zstd_overlap_handoff",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { zstd_compress_into(input.as_ptr(), input.len(), output.as_mut_ptr(), output.len()) }"
+    },
+    "operation": "unsafe { zstd_compress_into(input.as_ptr(), input.len(), output.as_mut_ptr(), output.len()) }",
+    "operation_family": "ffi",
+    "hazards": [
+      "ffi_abi",
+      "ffi_ownership"
+    ],
+    "obligations": [
+      "foreign declaration matches ABI and layout on both sides",
+      "ownership, lifetime, and nullability contract is explicit"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "abi",
+        "description": "foreign declaration matches ABI and layout on both sides",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `zstd_overlap_handoff`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "ownership",
+        "description": "ownership, lifetime, and nullability contract is explicit",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `zstd_overlap_handoff`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "No visible local guard detected",
+    "reach": "1 related test file(s) mention owner `zstd_overlap_handoff`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "asan",
+        "reason": "FFI boundary detected; sanitizer/cargo-careful is usually more suitable than Miri for foreign calls",
+        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test zstd_overlap_handoff",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful can cheaply exercise Rust-side FFI boundary assumptions when a focused test exists",
+        "command": "cargo +nightly careful test zstd_overlap_handoff",
+        "required": false
+      },
+      {
+        "kind": "human-deep-review",
+        "reason": "Reviewed FFI ABI and ownership seams can be recorded with a human deep-review receipt when executable witnesses cannot cross the foreign boundary",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Use sanitizer/cargo-careful or an explicit FFI boundary contract; Miri may not exercise this seam.",
+    "verify_commands": [
+      "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test zstd_overlap_handoff",
+      "cargo +nightly careful test zstd_overlap_handoff"
+    ]
+  }
+]
