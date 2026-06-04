@@ -587,6 +587,7 @@ pub(super) fn render_first_pr_front_door_artifact(
                 root,
                 manual_candidates,
                 MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT,
+                false,
             ),
         ),
         "github-summary.md" => insert_before_section(
@@ -596,6 +597,7 @@ pub(super) fn render_first_pr_front_door_artifact(
                 root,
                 manual_candidates,
                 MANUAL_CANDIDATE_GITHUB_QUEUE_LIMIT,
+                true,
             ),
         ),
         "witness-plan.md" => insert_before_section(
@@ -631,6 +633,7 @@ fn render_manual_candidate_front_panel(
     root: &Path,
     manual_candidates: &[ManualCandidate],
     queue_limit: usize,
+    compact: bool,
 ) -> String {
     let mut out = String::new();
     out.push_str("## Manual candidates\n\n");
@@ -652,7 +655,7 @@ fn render_manual_candidate_front_panel(
             "- External evidence refs: {}\n",
             candidate.evidence.len()
         ));
-        append_manual_candidate_guidance_lines(&mut out, candidate);
+        append_manual_candidate_guidance_lines(&mut out, candidate, !compact);
         out.push_str(&format!(
             "- Explain: `{}`\n",
             explain_command(root, &candidate.id)
@@ -666,7 +669,7 @@ fn render_manual_candidate_front_panel(
             candidate_witness_plan_command(root, &candidate.id)
         ));
     }
-    append_manual_candidate_queue_preview(&mut out, root, manual_candidates, queue_limit);
+    append_manual_candidate_queue_preview(&mut out, root, manual_candidates, queue_limit, !compact);
     out.push_str("- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only outputs.\n");
     out.push_str("- Boundary: copy-only manual handoff; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n");
     out
@@ -699,7 +702,7 @@ fn render_manual_candidate_witness_follow_up(
             "- External evidence refs: {}",
             candidate.evidence.len()
         );
-        append_manual_candidate_guidance_lines(&mut out, candidate);
+        append_manual_candidate_guidance_lines(&mut out, candidate, true);
         let _ = writeln!(
             &mut out,
             "- Full manual witness plan: `{}`",
@@ -716,6 +719,7 @@ fn render_manual_candidate_witness_follow_up(
         root,
         manual_candidates,
         MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT,
+        true,
     );
     out.push_str("- Manual candidate index: `manual-candidates.json`; candidates stay out of ReviewCard-only witness route groups.\n");
     out.push_str("- Receipt boundary: manual candidate receipts attach external evidence to the manual candidate ID only; they do not import ReviewCard witness evidence.\n");
@@ -723,7 +727,27 @@ fn render_manual_candidate_witness_follow_up(
     out
 }
 
-fn append_manual_candidate_guidance_lines(out: &mut String, candidate: &ManualCandidate) {
+fn append_manual_candidate_guidance_lines(
+    out: &mut String,
+    candidate: &ManualCandidate,
+    include_details: bool,
+) {
+    if let Some(stable_byte) = &candidate.stable_byte {
+        let _ = writeln!(
+            out,
+            "- Stable-byte class: `{}` (observable: `{}`; proof required: `{}`; ledger state: `{}`)",
+            stable_byte.class,
+            stable_byte.observable,
+            stable_byte.proof_required,
+            stable_byte.ledger_state
+        );
+        let _ = writeln!(
+            out,
+            "- Stable-byte route: source `{}` -> sink `{}`",
+            stable_byte.source, stable_byte.sink
+        );
+        let _ = writeln!(out, "- Stable-byte hazard: {}", stable_byte.hazard);
+    }
     if let Some(proof_mode) = &candidate.proof_mode {
         let _ = writeln!(
             out,
@@ -744,6 +768,9 @@ fn append_manual_candidate_guidance_lines(out: &mut String, candidate: &ManualCa
     if let Some(summary) = manual_candidate_guidance_summary(candidate) {
         let _ = writeln!(out, "- Guidance: {summary}");
     }
+    if !include_details {
+        return;
+    }
     if let Some(option) = candidate.fix_options.first() {
         let _ = writeln!(out, "- First fix option: {option}");
     }
@@ -760,6 +787,7 @@ fn append_manual_candidate_queue_preview(
     root: &Path,
     manual_candidates: &[ManualCandidate],
     queue_limit: usize,
+    include_commands: bool,
 ) {
     let queue_len = manual_candidates.len().min(queue_limit);
     let _ = writeln!(
@@ -780,16 +808,18 @@ fn append_manual_candidate_queue_preview(
             let _ = write!(out, "; {label}: `{value}`");
         }
         out.push('\n');
-        let _ = writeln!(
-            out,
-            "    - Agent context: `{}`",
-            context_command(root, &candidate.id)
-        );
-        let _ = writeln!(
-            out,
-            "    - Witness plan: `{}`",
-            candidate_witness_plan_command(root, &candidate.id)
-        );
+        if include_commands {
+            let _ = writeln!(
+                out,
+                "    - Agent context: `{}`",
+                context_command(root, &candidate.id)
+            );
+            let _ = writeln!(
+                out,
+                "    - Witness plan: `{}`",
+                candidate_witness_plan_command(root, &candidate.id)
+            );
+        }
     }
 }
 

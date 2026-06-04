@@ -301,7 +301,14 @@ fn check_manual_candidate_front_door_artifacts(
         } else {
             MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT
         };
-        check_manual_candidate_front_door_text(&text, &path, manual_candidates, queue_limit)?;
+        let compact = artifact == "github-summary.md";
+        check_manual_candidate_front_door_text(
+            &text,
+            &path,
+            manual_candidates,
+            queue_limit,
+            compact,
+        )?;
     }
     Ok(())
 }
@@ -311,6 +318,7 @@ fn check_manual_candidate_front_door_text(
     path: &Path,
     manual_candidates: &ManualCandidateIndexProjection,
     queue_limit: usize,
+    compact: bool,
 ) -> Result<(), String> {
     super::require_text_contains(text, "## Manual candidates", path)?;
     super::require_text_contains(
@@ -366,8 +374,8 @@ fn check_manual_candidate_front_door_text(
         &format!("- External evidence refs: {}", first.evidence_refs),
         path,
     )?;
-    check_manual_candidate_front_door_guidance_text(text, path, first)?;
-    check_manual_candidate_queue_preview_text(text, path, manual_candidates, queue_limit)?;
+    check_manual_candidate_front_door_guidance_text(text, path, first, compact)?;
+    check_manual_candidate_queue_preview_text(text, path, manual_candidates, queue_limit, compact)?;
     for expected in [
         "unsafe-review explain",
         "unsafe-review context",
@@ -391,6 +399,7 @@ fn check_manual_candidate_queue_preview_text(
     path: &Path,
     manual_candidates: &ManualCandidateIndexProjection,
     queue_limit: usize,
+    compact: bool,
 ) -> Result<(), String> {
     let queue_len = manual_candidates.count.min(queue_limit);
     super::require_text_contains(
@@ -416,12 +425,14 @@ fn check_manual_candidate_queue_preview_text(
         if let Some((label, value)) = manual_candidate_first_guidance_cue(candidate) {
             super::require_text_contains(text, &format!("{label}: `{value}`"), path)?;
         }
-        for expected in [
-            "unsafe-review context",
-            "unsafe-review candidate witness-plan",
-            &candidate.id,
-        ] {
-            super::require_text_contains(text, expected, path)?;
+        if !compact {
+            for expected in [
+                "unsafe-review context",
+                "unsafe-review candidate witness-plan",
+                &candidate.id,
+            ] {
+                super::require_text_contains(text, expected, path)?;
+            }
         }
     }
     Ok(())
@@ -449,15 +460,18 @@ fn check_manual_candidate_front_door_guidance_text(
     text: &str,
     path: &Path,
     candidate: &ManualCandidateProjection,
+    compact: bool,
 ) -> Result<(), String> {
     let guidance_count =
         candidate.fix_options.len() + candidate.test_targets.len() + candidate.do_not_touch.len();
     if guidance_count == 0 {
+        check_manual_candidate_front_door_stable_byte_text(text, path, candidate)?;
         check_manual_candidate_front_door_proof_mode_text(text, path, candidate)?;
         check_manual_candidate_front_door_boundary_text(text, path, candidate)?;
         return Ok(());
     }
 
+    check_manual_candidate_front_door_stable_byte_text(text, path, candidate)?;
     check_manual_candidate_front_door_proof_mode_text(text, path, candidate)?;
     check_manual_candidate_front_door_boundary_text(text, path, candidate)?;
     super::require_text_contains(
@@ -471,15 +485,73 @@ fn check_manual_candidate_front_door_guidance_text(
         path,
     )?;
     if let Some(option) = candidate.fix_options.first() {
-        super::require_text_contains(text, &format!("- First fix option: {option}"), path)?;
+        if !compact {
+            super::require_text_contains(text, &format!("- First fix option: {option}"), path)?;
+        }
     }
     if let Some(target) = candidate.test_targets.first() {
-        super::require_text_contains(text, &format!("- First test target: `{target}`"), path)?;
+        if !compact {
+            super::require_text_contains(text, &format!("- First test target: `{target}`"), path)?;
+        }
     }
     if let Some(note) = candidate.do_not_touch.first() {
-        super::require_text_contains(text, &format!("- First do-not-touch note: {note}"), path)?;
+        if !compact {
+            super::require_text_contains(
+                text,
+                &format!("- First do-not-touch note: {note}"),
+                path,
+            )?;
+        }
     }
     Ok(())
+}
+
+fn check_manual_candidate_front_door_stable_byte_text(
+    text: &str,
+    path: &Path,
+    candidate: &ManualCandidateProjection,
+) -> Result<(), String> {
+    let Some(stable_byte) = &candidate.stable_byte else {
+        return Ok(());
+    };
+    let class = stable_byte_projection_str(stable_byte, "class", &candidate.id)?;
+    let observable = stable_byte_projection_str(stable_byte, "observable", &candidate.id)?;
+    let proof_required = stable_byte_projection_str(stable_byte, "proof_required", &candidate.id)?;
+    let ledger_state = stable_byte_projection_str(stable_byte, "ledger_state", &candidate.id)?;
+    let source = stable_byte_projection_str(stable_byte, "source", &candidate.id)?;
+    let sink = stable_byte_projection_str(stable_byte, "sink", &candidate.id)?;
+    let hazard = stable_byte_projection_str(stable_byte, "hazard", &candidate.id)?;
+
+    super::require_text_contains(
+        text,
+        &format!(
+            "- Stable-byte class: `{class}` (observable: `{observable}`; proof required: `{proof_required}`; ledger state: `{ledger_state}`)"
+        ),
+        path,
+    )?;
+    super::require_text_contains(
+        text,
+        &format!("- Stable-byte route: source `{source}` -> sink `{sink}`"),
+        path,
+    )?;
+    super::require_text_contains(text, &format!("- Stable-byte hazard: {hazard}"), path)?;
+    Ok(())
+}
+
+fn stable_byte_projection_str<'a>(
+    stable_byte: &'a serde_json::Value,
+    field: &str,
+    candidate_id: &str,
+) -> Result<&'a str, String> {
+    stable_byte
+        .get(field)
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| {
+            format!(
+                "manual-candidates.json candidate `{candidate_id}` stable_byte.{field} must be a non-empty string"
+            )
+        })
 }
 
 fn check_manual_candidate_front_door_proof_mode_text(
@@ -5722,12 +5794,13 @@ fn check_manual_candidate_witness_plan_text(
         &format!("- External evidence refs: {}", first.evidence_refs),
         path,
     )?;
-    check_manual_candidate_front_door_guidance_text(text, path, first)?;
+    check_manual_candidate_front_door_guidance_text(text, path, first, false)?;
     check_manual_candidate_queue_preview_text(
         text,
         path,
         manual_candidates,
         MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT,
+        false,
     )?;
     for expected in [
         "unsafe-review candidate witness-plan",

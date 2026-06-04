@@ -364,6 +364,9 @@ count, first guidance cue, copy-only context/witness-plan commands, and advisory
 boundary. The full candidate payload remains in
 `manual-candidates.json` and `review-kit.json`; the cue must not add manual
 candidates to ReviewCard-only artifacts.
+When the first candidate carries `stable_byte`, the front-door cue must also
+render its class, observable/proof/ledger state, source-to-sink route, and
+hazard so the cockpit remains useful without opening raw JSON.
 
 The bundled `first-pr` `witness-plan.md` may include a compact manual-candidate
 follow-up cue that points to `candidate witness-plan` for the full copy-only

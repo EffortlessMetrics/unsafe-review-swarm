@@ -2054,7 +2054,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(summary.contains(&format!("unsafe-review context {card_id} --json")));
     assert!(summary.contains("## Trust boundary"));
     assert!(summary.contains("not a Miri result unless a witness receipt is attached"));
-    assert_manual_candidate_front_panel(&summary, "## Card table", 2);
+    assert_manual_candidate_front_panel(&summary, "## Card table", 2, false);
 
     let github_summary = fs::read_to_string(out_dir.join("github-summary.md"))?;
     assert!(github_summary.contains("## unsafe-review advisory summary"));
@@ -2090,7 +2090,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(github_summary.contains("enforce blocking policy"));
     assert!(!github_summary.contains("# unsafe-review PR summary"));
     assert!(!github_summary.contains("## Card table"));
-    assert_manual_candidate_front_panel(&github_summary, "## Open next", 1);
+    assert_manual_candidate_front_panel(&github_summary, "## Open next", 1, true);
 
     let manual_candidates =
         parse_json(&fs::read_to_string(out_dir.join("manual-candidates.json"))?)?;
@@ -4851,7 +4851,12 @@ fn json_array<'a>(value: &'a Value, path: &str) -> Result<&'a Vec<Value>, Box<dy
         .ok_or_else(|| format!("{path} should be an array").into())
 }
 
-fn assert_manual_candidate_front_panel(text: &str, later_heading: &str, expected_queue_len: usize) {
+fn assert_manual_candidate_front_panel(
+    text: &str,
+    later_heading: &str,
+    expected_queue_len: usize,
+    compact: bool,
+) {
     assert!(text.contains("## Manual candidates"));
     assert!(text.contains(
         "- Imported manual candidates: 2 (manual/advisory; not analyzer-discovered ReviewCards)"
@@ -4867,6 +4872,15 @@ fn assert_manual_candidate_front_panel(text: &str, later_heading: &str, expected
     assert!(text.contains("- Invariant at risk: &[u8] memory must not be concurrently mutated"));
     assert!(text.contains("- External evidence refs: 2"));
     assert!(text.contains(
+        "- Stable-byte class: `stable-byte-source-sab-race` (observable: `no`; proof required: `mutation-plus-miri`; ledger state: `handoff-ready`)"
+    ));
+    assert!(text.contains(
+        "- Stable-byte route: source `SharedArrayBuffer-backed typed array decode` -> sink `src/runtime/webcore/TextDecoder.rs slice materialization`"
+    ));
+    assert!(text.contains(
+        "- Stable-byte hazard: Rust slice materialization can treat shared JS bytes as stable while JS can mutate the backing storage concurrently"
+    ));
+    assert!(text.contains(
         "- Proof mode: `mutation-plus-miri` (system Bun expected: `nondiscriminating`; mutation required: `true`; Miri/model required: `true`)"
     ));
     assert!(text.contains(
@@ -4877,17 +4891,21 @@ fn assert_manual_candidate_front_panel(text: &str, later_heading: &str, expected
     ));
     assert!(text.contains("- Stop line: keep the PR inside this aperture"));
     assert!(text.contains("- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)"));
-    assert!(text.contains(
-        "- First fix option: Copy SharedArrayBuffer-backed bytes into stable owned storage before creating a Rust slice"
-    ));
-    assert!(
-        text.contains(
+    if compact {
+        assert!(!text.contains("- First fix option:"));
+        assert!(!text.contains("- First test target:"));
+        assert!(!text.contains("- First do-not-touch note:"));
+    } else {
+        assert!(text.contains(
+            "- First fix option: Copy SharedArrayBuffer-backed bytes into stable owned storage before creating a Rust slice"
+        ));
+        assert!(text.contains(
             "- First test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`"
-        )
-    );
-    assert!(text.contains(
-        "- First do-not-touch note: Do not rewrite unrelated TextDecoder encoding paths"
-    ));
+        ));
+        assert!(text.contains(
+            "- First do-not-touch note: Do not rewrite unrelated TextDecoder encoding paths"
+        ));
+    }
     assert!(text.contains(&format!(
         "- Manual candidate queue preview: first {expected_queue_len} of 2 manual candidate(s)"
     )));
@@ -4937,6 +4955,15 @@ fn assert_manual_candidate_witness_follow_up(text: &str) {
     ));
     assert!(text.contains("- Invariant at risk: &[u8] memory must not be concurrently mutated"));
     assert!(text.contains("- External evidence refs: 2"));
+    assert!(text.contains(
+        "- Stable-byte class: `stable-byte-source-sab-race` (observable: `no`; proof required: `mutation-plus-miri`; ledger state: `handoff-ready`)"
+    ));
+    assert!(text.contains(
+        "- Stable-byte route: source `SharedArrayBuffer-backed typed array decode` -> sink `src/runtime/webcore/TextDecoder.rs slice materialization`"
+    ));
+    assert!(text.contains(
+        "- Stable-byte hazard: Rust slice materialization can treat shared JS bytes as stable while JS can mutate the backing storage concurrently"
+    ));
     assert!(text.contains(
         "- Proof mode: `mutation-plus-miri` (system Bun expected: `nondiscriminating`; mutation required: `true`; Miri/model required: `true`)"
     ));
