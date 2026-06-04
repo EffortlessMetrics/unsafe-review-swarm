@@ -2777,6 +2777,7 @@ fn require_witness_plan_headings_known(
     path: &Path,
     card_ids: &BTreeSet<String>,
 ) -> Result<(), String> {
+    let mut seen = BTreeSet::new();
     for line in text.lines() {
         let trimmed = line.trim();
         let Some(rest) = trimmed.strip_prefix("#### `") else {
@@ -2797,6 +2798,12 @@ fn require_witness_plan_headings_known(
         if !card_ids.contains(card_id) {
             return Err(format!(
                 "{} witness-plan route heading references unknown card id `{card_id}`",
+                path.display()
+            ));
+        }
+        if !seen.insert(card_id.to_string()) {
+            return Err(format!(
+                "{} witness-plan route heading duplicates ReviewCard id `{card_id}`",
                 path.display()
             ));
         }

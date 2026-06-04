@@ -13153,6 +13153,36 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_witness_plan_duplicate_card_heading() -> Result<(), String>
+    {
+        let dir = unique_temp_dir("unsafe-review-first-pr-witness-duplicate-heading")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("witness-plan.md");
+        let witness_plan =
+            fs::read_to_string(&path).map_err(|err| format!("read witness plan failed: {err}"))?;
+        fs::write(
+            &path,
+            witness_plan.replace(
+                "## Trust boundary",
+                "#### `card-1`\n\n- Route: `human-deep-review`\n  - Reason: duplicate route section\n  - What it can show: focused reviewer attention\n  - What it cannot prove: arbitrary callers\n  - Receipt hint: unsafe-review receipt import-manual card-1\n\n## Trust boundary",
+            ),
+        )
+        .map_err(|err| format!("write witness plan failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("witness-plan route heading duplicates ReviewCard id `card-1`")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_witness_plan_class_drift() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-witness-class-drift")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
