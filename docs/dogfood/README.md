@@ -13,7 +13,10 @@ The manifest is [`corpus.toml`](corpus.toml). The human-facing index is
 [`index.json`](index.json). Reviewer usefulness notes live in
 [`usefulness-notes.md`](usefulness-notes.md). Dogfood report labels are defined
 in the [`triage taxonomy`](triage-taxonomy.md). Follow-up work seeds are tracked
-in [`follow-up-seeds.md`](follow-up-seeds.md). Reviewer judgment files follow
+in [`follow-up-seeds.md`](follow-up-seeds.md). Bun stable-byte follow-up seeds
+are tracked in [`stable-byte-follow-up-seeds.md`](stable-byte-follow-up-seeds.md)
+with labels from the
+[`stable-byte triage taxonomy`](stable-byte-triage-taxonomy.md). Reviewer judgment files follow
 the [`dogfood judgment schema`](judgments/README.md). Card-scoped agent repair
 dry runs follow the [`agent repair experiment protocol`](agent-repair-experiments.md).
 
@@ -41,6 +44,10 @@ Report requirements:
   projection-surface labels, known triage labels, known statuses, and source
   reports linked from this directory. The linked source report must contain a
   triage row for the same target and primary label.
+- Bun stable-byte follow-up seed rows must reference committed manual
+  candidate examples, use known stable-byte families, preserve the candidate
+  proof mode, use known ledger states, and use labels from
+  [`stable-byte-triage-taxonomy.md`](stable-byte-triage-taxonomy.md).
 - Reviewer judgments record manual usefulness samples for selected dogfood
   targets. They are measurement inputs only; they are not calibration,
   precision/recall, policy readiness, witness adequacy, or safety evidence.

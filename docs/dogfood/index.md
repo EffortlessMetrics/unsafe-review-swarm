@@ -5,6 +5,7 @@ Status: experimental selected-corpus evidence
 Source manifest: [`corpus.toml`](corpus.toml)
 Machine-readable index: [`index.json`](index.json)
 Usefulness notes: [`usefulness-notes.md`](usefulness-notes.md)
+Bun stable-byte seeds: [`stable-byte-follow-up-seeds.md`](stable-byte-follow-up-seeds.md)
 
 This index is a front panel for the real-crate dogfood corpus. It summarizes
 which crates and PR diffs have been used to exercise `unsafe-review`, where the
@@ -125,6 +126,11 @@ readiness.
 For `fixture-control` targets, keep the target under `fixtures/` and describe
 the control as fixture-level evidence. Do not count fixture controls as
 real-crate coverage, calibrated precision, or safety evidence.
+
+Bun stable-byte seeds live in
+[`stable-byte-follow-up-seeds.md`](stable-byte-follow-up-seeds.md). They are
+manual-candidate workflow seeds, not real-crate dogfood measurements and not
+analyzer-discovered ReviewCards.
 
 For `pr-diff` targets, make sure the target checkout under `root` matches the
 saved diff's expected source tree. A zero-card result from checkout drift is not
