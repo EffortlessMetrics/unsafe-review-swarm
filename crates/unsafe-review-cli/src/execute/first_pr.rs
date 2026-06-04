@@ -1582,16 +1582,9 @@ mod tests {
             github_summary
                 .contains("- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)")
         );
-        assert!(github_summary.contains(
-            "- First fix option: Copy SharedArrayBuffer-backed bytes before constructing the slice"
-        ));
-        assert!(github_summary.contains(
-            "- First test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`"
-        ));
-        assert!(
-            github_summary
-                .contains("- First do-not-touch note: Do not rewrite unrelated TextDecoder paths")
-        );
+        assert!(!github_summary.contains("- First fix option:"));
+        assert!(!github_summary.contains("- First test target:"));
+        assert!(!github_summary.contains("- First do-not-touch note:"));
         assert!(
             github_summary
                 .contains("- Manual candidate queue preview: first 1 of 1 manual candidate(s)")
@@ -1600,7 +1593,8 @@ mod tests {
             "`R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 1; first test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`"
         ));
         assert!(
-            github_summary.contains("unsafe-review explain --root \"fixtures/bun fork\" R4R2-S001")
+            !github_summary
+                .contains("unsafe-review explain --root \"fixtures/bun fork\" R4R2-S001")
         );
         assert!(
             github_summary
@@ -1609,7 +1603,14 @@ mod tests {
         assert!(github_summary.contains(
             "unsafe-review candidate witness-plan --root \"fixtures/bun fork\" R4R2-S001"
         ));
-        assert!(github_summary.contains("candidates stay out of ReviewCard-only outputs"));
+        assert!(github_summary.contains("ReviewCard-only outputs clean"));
+        assert!(github_summary.contains("manual-repair-queue.json"));
+        assert!(github_summary.contains("separate from ReviewCard `repair-queue.json`"));
+        assert!(github_summary.contains("no agent was run"));
+        assert!(github_summary.contains("did not discover"));
+        assert!(github_summary.contains("did not run witnesses"));
+        assert!(github_summary.contains("edit source"));
+        assert!(github_summary.contains("policy inputs"));
         assert!(
             github_summary
                 .find("## Manual candidates")
@@ -1626,6 +1627,23 @@ mod tests {
             std::slice::from_ref(&candidate),
         );
         assert!(pr_summary.contains("## Manual candidates"));
+        assert!(pr_summary.contains(
+            "- First fix option: Copy SharedArrayBuffer-backed bytes before constructing the slice"
+        ));
+        assert!(pr_summary.contains(
+            "- First test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`"
+        ));
+        assert!(
+            pr_summary
+                .contains("- First do-not-touch note: Do not rewrite unrelated TextDecoder paths")
+        );
+        assert!(
+            pr_summary.contains("unsafe-review explain --root \"fixtures/bun fork\" R4R2-S001")
+        );
+        assert!(pr_summary.contains("candidates stay out of ReviewCard-only outputs"));
+        assert!(pr_summary.contains(
+            "Manual repair queue: `manual-repair-queue.json`; copy-only manual candidate repair handoff, separate from ReviewCard `repair-queue.json`; no agent was run"
+        ));
         assert!(
             pr_summary
                 .find("## Manual candidates")
