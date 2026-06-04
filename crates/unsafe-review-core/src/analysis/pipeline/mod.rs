@@ -2884,6 +2884,124 @@ pub fn zstd_sync(
     }
 
     #[test]
+    fn js_buffer_reentry_fixture_pins_as_array_buffer_coercion_card() -> Result<(), String> {
+        let output = fixture_output("js_buffer_reentry_coerce_after_as_array_buffer")?;
+        let card = single_card("js_buffer_reentry_coerce_after_as_array_buffer", &output)?;
+
+        assert_eq!(
+            card.operation.family,
+            OperationFamily::StableByteSourceGetterReentry
+        );
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert_eq!(card.proof_path, ProofPath::ObservableRedGreen);
+        assert_eq!(card.site.owner.as_deref(), Some("index_of_line"));
+        assert_eq!(card.site.location.line, 30);
+        assert!(card.hazards.contains(&HazardKind::StableByteSource));
+        assert!(
+            card.operation
+                .expression
+                .contains("stable-byte-source-getter-reentry")
+        );
+        assert!(card.operation.expression.contains("as_array_buffer"));
+        assert!(card.operation.expression.contains("coerce_to_int64"));
+        assert!(card.operation.expression.contains("byte_slice"));
+        assert!(
+            card.next_action
+                .summary
+                .contains("observable-red-green proof path")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn js_buffer_reentry_detects_vector_and_as_ptr_materialization() -> Result<(), String> {
+        let vector_output = temp_source_output(
+            "unsafe-review-js-buffer-reentry-vector-materialization",
+            r#"
+pub struct JSValue;
+pub struct GlobalObject;
+pub struct ArrayBuffer;
+
+impl JSValue {
+    pub fn as_array_buffer(&self, _global: &mut GlobalObject) -> Result<ArrayBuffer, ()> {
+        Ok(ArrayBuffer)
+    }
+
+    pub fn coerce_to_int64(&self, _global: &mut GlobalObject) -> Result<i64, ()> {
+        Ok(0)
+    }
+}
+
+impl ArrayBuffer {
+    pub fn vector(&self) -> *const u8 {
+        core::ptr::null()
+    }
+}
+
+pub fn vector_route(
+    global: &mut GlobalObject,
+    source: JSValue,
+    offset: JSValue,
+) -> Result<usize, ()> {
+    let buffer = source.as_array_buffer(global)?;
+    let _start = offset.coerce_to_int64(global)?;
+    let ptr = buffer.vector();
+    Ok(ptr as usize)
+}
+"#,
+        )?;
+        let vector_card = single_card("js_buffer_reentry_vector", &vector_output)?;
+        assert_eq!(
+            vector_card.operation.family,
+            OperationFamily::StableByteSourceGetterReentry
+        );
+        assert!(vector_card.operation.expression.contains("vector"));
+
+        let as_ptr_output = temp_source_output(
+            "unsafe-review-js-buffer-reentry-as-ptr-materialization",
+            r#"
+pub struct JSValue;
+pub struct GlobalObject;
+pub struct ArrayBuffer;
+
+impl JSValue {
+    pub fn as_array_buffer(&self, _global: &mut GlobalObject) -> Result<ArrayBuffer, ()> {
+        Ok(ArrayBuffer)
+    }
+
+    pub fn coerce_to_int64(&self, _global: &mut GlobalObject) -> Result<i64, ()> {
+        Ok(0)
+    }
+}
+
+impl ArrayBuffer {
+    pub fn as_ptr(&self) -> *const u8 {
+        core::ptr::null()
+    }
+}
+
+pub fn pointer_route(
+    global: &mut GlobalObject,
+    source: JSValue,
+    offset: JSValue,
+) -> Result<usize, ()> {
+    let buffer = source.as_array_buffer(global)?;
+    let _start = offset.coerce_to_int64(global)?;
+    let ptr = buffer.as_ptr();
+    Ok(ptr as usize)
+}
+"#,
+        )?;
+        let as_ptr_card = single_card("js_buffer_reentry_as_ptr", &as_ptr_output)?;
+        assert_eq!(
+            as_ptr_card.operation.family,
+            OperationFamily::StableByteSourceGetterReentry
+        );
+        assert!(as_ptr_card.operation.expression.contains("as_ptr"));
+        Ok(())
+    }
+
+    #[test]
     fn js_buffer_reentry_fixture_keeps_options_before_capture_no_card() -> Result<(), String> {
         let output = fixture_output("js_buffer_reentry_options_before_capture_no_card")?;
 
@@ -2927,6 +3045,17 @@ pub fn zstd_sync(
         assert!(
             output.cards.is_empty(),
             "materialization of a descriptor recaptured after reentry should stay a no-card control"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn js_buffer_reentry_fixture_keeps_refetch_after_coercion_no_card() -> Result<(), String> {
+        let output = fixture_output("js_buffer_reentry_refetch_after_coercion_no_card")?;
+
+        assert!(
+            output.cards.is_empty(),
+            "re-fetching an ArrayBuffer descriptor after coercion should stay a no-card control"
         );
         Ok(())
     }

@@ -1625,8 +1625,10 @@ support_tier = "JS-backed buffer reentry heuristic"
 fixtures = [
   "js_buffer_reentry_sync_compression",
   "js_buffer_reentry_raw_parts_materialization",
+  "js_buffer_reentry_coerce_after_as_array_buffer",
   "js_buffer_reentry_options_before_capture_no_card",
   "js_buffer_reentry_recapture_after_reentry_no_card",
+  "js_buffer_reentry_refetch_after_coercion_no_card",
   "js_buffer_reentry_async_options_before_capture_no_card",
   "js_buffer_reentry_async_recapture_after_reentry_no_card",
 ]
@@ -1638,10 +1640,11 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned JS-backed buffer reentry heuristic behavior emits one advisory
 ReviewCard for the listed sync compression getter or callback reentry, helper
-materialization, and direct raw-parts materialization fixtures. The direct
-raw-parts fixture also retains the underlying raw-parts operation ReviewCard.
-The heuristic emits zero ReviewCards for the listed options-before-capture and
-post-reentry recapture controls.
+materialization, direct raw-parts materialization, and as_array_buffer before
+coerce_to_* materialization fixtures. The direct raw-parts fixture also retains
+the underlying raw-parts operation ReviewCard. The heuristic emits zero
+ReviewCards for the listed options-before-capture, post-reentry recapture, and
+post-coercion re-fetch controls.
 """
 forbidden_claims = [
   "Bun vulnerability",

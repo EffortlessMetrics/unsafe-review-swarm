@@ -1,0 +1,4 @@
+[package]
+name = "js-buffer-reentry-coerce-after-as-array-buffer-fixture"
+version = "0.1.0"
+edition = "2024"

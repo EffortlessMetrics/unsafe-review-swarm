@@ -181,6 +181,7 @@ fn js_buffer_reentry_changed(
 
 fn is_js_buffer_descriptor_capture(line: &str) -> bool {
     line.contains("StringOrBuffer::from_js")
+        || contains_call_name(line, "as_array_buffer")
         || (is_js_buffer_async_descriptor_helper(line)
             && contains_any(line, &["ArrayBuffer", "ArrayBufferView", "StringOrBuffer"]))
         || (contains_call_name(line, "from_js")
@@ -240,6 +241,7 @@ fn is_ident_continue(ch: char) -> bool {
 fn is_possible_js_reentry(line: &str) -> bool {
     let lower = line.to_ascii_lowercase();
     lower.contains("getter")
+        || lower.contains("coerce_to_")
         || lower.contains("get_by_id")
         || lower.contains("getbyid")
         || lower.contains("get_property")
@@ -277,6 +279,8 @@ fn is_js_buffer_materialization(line: &str) -> bool {
         || contains_call_name(line, "byte_slice_mut")
         || contains_call_name(line, "from_raw_parts")
         || contains_call_name(line, "from_raw_parts_mut")
+        || contains_call_name(line, "vector")
+        || contains_call_name(line, "as_ptr")
 }
 
 fn js_buffer_stable_byte_family(capture: &JsBufferLine) -> OperationFamily {
