@@ -2669,6 +2669,48 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         true
     );
     assert_eq!(tokmd_packets["inputs"]["cards.json"]["included"], false);
+    assert_eq!(
+        tokmd_packets["inputs"]["comment-plan.json"]["included"],
+        true
+    );
+    assert_eq!(
+        tokmd_packets["inputs"]["comment-plan.json"]["summary"]["selected_count"],
+        1
+    );
+    assert_eq!(
+        tokmd_packets["inputs"]["comment-plan.json"]["summary"]["not_selected_count"],
+        0
+    );
+    assert_eq!(
+        tokmd_packets["inputs"]["comment-plan.json"]["summary"]["budget"],
+        3
+    );
+    assert_eq!(
+        tokmd_packets["inputs"]["comment-plan.json"]["summary"]["reason_code"],
+        "bounded_reviewer_noise"
+    );
+    assert_eq!(
+        tokmd_packets["inputs"]["comment-plan.json"]["selected_reason_codes"]["top_actionable_card"],
+        1
+    );
+    assert!(
+        tokmd_packets["inputs"]["comment-plan.json"]["relationship"]
+            .as_str()
+            .unwrap_or("")
+            .contains("ReviewCard-only")
+    );
+    assert!(
+        tokmd_packets["inputs"]["comment-plan.json"]["relationship"]
+            .as_str()
+            .unwrap_or("")
+            .contains("manual candidates are not selected")
+    );
+    assert!(
+        tokmd_packets["inputs"]["comment-plan.json"]["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("did not post comments")
+    );
     assert!(
         tokmd_packets["inputs"]["stable-byte seed ledger"]["limitation"]
             .as_str()

@@ -1438,6 +1438,8 @@ fn check_tokmd_packets_artifact(
 ) -> Result<(), String> {
     let path = dir.join("tokmd-packets.json");
     let value = super::parse_json_file(&path)?;
+    let comment_plan = super::parse_json_file(&dir.join("comment-plan.json"))?;
+    let comment_plan_projection = tokmd_comment_plan_projection(&comment_plan)?;
     super::require_json_str(
         &value,
         "schema_version",
@@ -1566,7 +1568,7 @@ fn check_tokmd_packets_artifact(
         "/summary/with_stable_byte_seed",
         "tokmd-packets.json",
     )?;
-    check_tokmd_packet_inputs(&value, with_stable_byte_seed)?;
+    check_tokmd_packet_inputs(&value, with_stable_byte_seed, &comment_plan_projection)?;
 
     let packets = super::json_array_at(&value, "/packets", "tokmd-packets.json")?;
     if packets.len() != manual_candidates.count {
@@ -1649,6 +1651,7 @@ fn require_tokmd_summary_count(
 fn check_tokmd_packet_inputs(
     value: &serde_json::Value,
     with_stable_byte_seed: usize,
+    comment_plan: &TokmdCommentPlanProjection,
 ) -> Result<(), String> {
     for field in ["manual-candidates.json", "manual-repair-queue.json"] {
         let input = value
@@ -1666,7 +1669,6 @@ fn check_tokmd_packet_inputs(
         "witness-plan.md",
         "receipt-audit.md",
         "repair-queue.json",
-        "comment-plan.json",
     ] {
         let input = value
             .pointer(&format!("/inputs/{field}"))
@@ -1678,6 +1680,7 @@ fn check_tokmd_packet_inputs(
         }
         super::require_non_empty_json_str(input, "limitation", "tokmd-packets.json inputs")?;
     }
+    check_tokmd_comment_plan_input(value, comment_plan)?;
     let seed_input = value
         .pointer("/inputs/stable-byte seed ledger")
         .ok_or_else(|| {
@@ -1742,6 +1745,168 @@ fn check_tokmd_packet_inputs(
         return Err(
             "tokmd-packets.json inputs.stable-byte seed ledger limitation must mention packet-local stable_byte.ledger_state when the ledger is absent".to_string(),
         );
+    }
+    Ok(())
+}
+
+struct TokmdCommentPlanProjection {
+    selected_count: usize,
+    not_selected_count: usize,
+    budget: usize,
+    reason: String,
+    reason_code: String,
+    selected_reason_codes: BTreeMap<String, usize>,
+    not_selected_reason_codes: BTreeMap<String, usize>,
+}
+
+fn tokmd_comment_plan_projection(
+    comment_plan: &serde_json::Value,
+) -> Result<TokmdCommentPlanProjection, String> {
+    let selected_count =
+        super::json_usize_at(comment_plan, "/summary/selected_count", "comment-plan.json")?;
+    let not_selected_count = super::json_usize_at(
+        comment_plan,
+        "/summary/not_selected_count",
+        "comment-plan.json",
+    )?;
+    let budget = super::json_usize_at(comment_plan, "/summary/budget", "comment-plan.json")?;
+    let summary = comment_plan
+        .get("summary")
+        .ok_or_else(|| "comment-plan.json is missing summary".to_string())?;
+    let reason = super::require_non_empty_json_str(summary, "reason", "comment-plan.json summary")?
+        .to_string();
+    let reason_code =
+        super::require_non_empty_json_str(summary, "reason_code", "comment-plan.json summary")?
+            .to_string();
+    Ok(TokmdCommentPlanProjection {
+        selected_count,
+        not_selected_count,
+        budget,
+        reason,
+        reason_code,
+        selected_reason_codes: tokmd_comment_plan_reason_counts(
+            comment_plan,
+            "/comments",
+            "selection_reason_code",
+            "comment-plan.json comments",
+        )?,
+        not_selected_reason_codes: tokmd_comment_plan_reason_counts(
+            comment_plan,
+            "/not_selected",
+            "reason_code",
+            "comment-plan.json not_selected",
+        )?,
+    })
+}
+
+fn tokmd_comment_plan_reason_counts(
+    comment_plan: &serde_json::Value,
+    pointer: &str,
+    field: &str,
+    context: &str,
+) -> Result<BTreeMap<String, usize>, String> {
+    let Some(entries) = comment_plan.pointer(pointer) else {
+        return Ok(BTreeMap::new());
+    };
+    let Some(entries) = entries.as_array() else {
+        return Err(format!("{context} must be an array"));
+    };
+    let mut counts = BTreeMap::new();
+    for entry in entries {
+        let value = super::require_non_empty_json_str(entry, field, context)?;
+        *counts.entry(value.to_string()).or_insert(0) += 1;
+    }
+    Ok(counts)
+}
+
+fn check_tokmd_comment_plan_input(
+    value: &serde_json::Value,
+    comment_plan: &TokmdCommentPlanProjection,
+) -> Result<(), String> {
+    let input = value
+        .pointer("/inputs/comment-plan.json")
+        .ok_or_else(|| "tokmd-packets.json inputs is missing `comment-plan.json`".to_string())?;
+    if input.get("included").and_then(serde_json::Value::as_bool) != Some(true) {
+        return Err(
+            "tokmd-packets.json inputs.comment-plan.json.included must be true".to_string(),
+        );
+    }
+    let relationship =
+        super::require_non_empty_json_str(input, "relationship", "tokmd-packets.json inputs")?;
+    for expected in [
+        "ReviewCard-only",
+        "review budget",
+        "manual candidates are not selected",
+    ] {
+        if !super::text_contains_ignore_ascii_case(relationship, expected) {
+            return Err(format!(
+                "tokmd-packets.json inputs.comment-plan.json.relationship must include `{expected}`"
+            ));
+        }
+    }
+    let context = "tokmd-packets.json inputs.comment-plan.json";
+    let selected = super::json_usize_at(input, "/summary/selected_count", context)?;
+    if selected != comment_plan.selected_count {
+        return Err(format!(
+            "{context} summary.selected_count is {selected}, expected {}",
+            comment_plan.selected_count
+        ));
+    }
+    let not_selected = super::json_usize_at(input, "/summary/not_selected_count", context)?;
+    if not_selected != comment_plan.not_selected_count {
+        return Err(format!(
+            "{context} summary.not_selected_count is {not_selected}, expected {}",
+            comment_plan.not_selected_count
+        ));
+    }
+    let budget = super::json_usize_at(input, "/summary/budget", context)?;
+    if budget != comment_plan.budget {
+        return Err(format!(
+            "{context} summary.budget is {budget}, expected {}",
+            comment_plan.budget
+        ));
+    }
+    let summary = input
+        .get("summary")
+        .ok_or_else(|| format!("{context} is missing summary"))?;
+    let reason = super::require_non_empty_json_str(summary, "reason", context)?;
+    require_expected_value(
+        reason,
+        &comment_plan.reason,
+        &format!("{context} summary.reason"),
+    )?;
+    let reason_code = super::require_non_empty_json_str(summary, "reason_code", context)?;
+    require_expected_value(
+        reason_code,
+        &comment_plan.reason_code,
+        &format!("{context} summary.reason_code"),
+    )?;
+    require_summary_count_map(
+        input,
+        "/selected_reason_codes",
+        &comment_plan.selected_reason_codes,
+        "tokmd-packets.json inputs.comment-plan.json selected_reason_codes",
+    )?;
+    require_summary_count_map(
+        input,
+        "/not_selected_reason_codes",
+        &comment_plan.not_selected_reason_codes,
+        "tokmd-packets.json inputs.comment-plan.json not_selected_reason_codes",
+    )?;
+    let boundary =
+        super::require_non_empty_json_str(input, "trust_boundary", "tokmd-packets.json inputs")?;
+    for expected in [
+        "plan-only",
+        "did not post comments",
+        "manual candidates",
+        "did not run witnesses",
+        "policy decisions",
+    ] {
+        if !super::text_contains_ignore_ascii_case(boundary, expected) {
+            return Err(format!(
+                "tokmd-packets.json inputs.comment-plan.json.trust_boundary must include `{expected}`"
+            ));
+        }
     }
     Ok(())
 }

@@ -13519,6 +13519,34 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_tokmd_comment_plan_budget_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-tokmd-comment-plan-budget-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("tokmd-packets.json");
+        let mut tokmd_packets = parse_json_file(&path)?;
+        tokmd_packets["inputs"]["comment-plan.json"]["summary"]["selected_count"] =
+            serde_json::json!(0);
+        fs::write(&path, tokmd_packets.to_string())
+            .map_err(|err| format!("write tokmd packets failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err("tokmd comment-plan budget drift should fail verification".to_string());
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("tokmd-packets.json inputs.comment-plan.json summary.selected_count"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_review_kit_manual_candidate_id_drift() -> Result<(), String>
     {
         let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-manual-candidate-id-drift")?;
@@ -18827,7 +18855,57 @@ review_after = "2026-08-01"
             .map_err(|err| format!("write manual repair queue failed: {err}"))
     }
 
+    fn tokmd_comment_plan_input_fixture(dir: &Path) -> Result<serde_json::Value, String> {
+        let comment_plan = parse_json_file(&dir.join("comment-plan.json"))?;
+        let summary = comment_plan
+            .get("summary")
+            .ok_or_else(|| "comment-plan fixture is missing summary".to_string())?;
+        Ok(serde_json::json!({
+            "included": true,
+            "relationship": "ReviewCard-only comment-plan review budget is projected for future bun-ub-review-map packets; manual candidates are not selected for automatic comment plans",
+            "summary": {
+                "selected_count": summary.get("selected_count").cloned().unwrap_or_else(|| serde_json::json!(0)),
+                "not_selected_count": summary.get("not_selected_count").cloned().unwrap_or_else(|| serde_json::json!(0)),
+                "budget": summary.get("budget").cloned().unwrap_or_else(|| serde_json::json!(0)),
+                "reason": summary.get("reason").cloned().unwrap_or_else(|| serde_json::json!("")),
+                "reason_code": summary.get("reason_code").cloned().unwrap_or_else(|| serde_json::json!("")),
+            },
+            "selected_reason_codes": tokmd_comment_plan_reason_counts_fixture(
+                &comment_plan,
+                "/comments",
+                "selection_reason_code",
+            ),
+            "not_selected_reason_codes": tokmd_comment_plan_reason_counts_fixture(
+                &comment_plan,
+                "/not_selected",
+                "reason_code",
+            ),
+            "trust_boundary": "Plan-only ReviewCard comment budget metadata; unsafe-review did not post comments, did not import manual candidates into comment-plan.json, did not run witnesses, or make policy decisions."
+        }))
+    }
+
+    fn tokmd_comment_plan_reason_counts_fixture(
+        comment_plan: &serde_json::Value,
+        pointer: &str,
+        field: &str,
+    ) -> BTreeMap<String, usize> {
+        let mut counts = BTreeMap::new();
+        let Some(entries) = comment_plan
+            .pointer(pointer)
+            .and_then(serde_json::Value::as_array)
+        else {
+            return counts;
+        };
+        for entry in entries {
+            if let Some(value) = entry.get(field).and_then(serde_json::Value::as_str) {
+                *counts.entry(value.to_string()).or_insert(0) += 1;
+            }
+        }
+        counts
+    }
+
     fn write_empty_tokmd_packets_artifact(dir: &Path) -> Result<(), String> {
+        let comment_plan_input = tokmd_comment_plan_input_fixture(dir)?;
         let value = serde_json::json!({
             "schema_version": "tokmd-packets/v1",
             "tool": "unsafe-review",
@@ -18885,10 +18963,7 @@ review_after = "2026-08-01"
                     "included": false,
                     "limitation": "ReviewCard repair queue stays separate from manual candidate packets"
                 },
-                "comment-plan.json": {
-                    "included": false,
-                    "limitation": "Comment-plan review budget data is not converted to packet JSON in this slice"
-                },
+                "comment-plan.json": comment_plan_input,
                 "stable-byte seed ledger": {
                     "included": false,
                     "limitation": "External seed ledger rows are not imported; packet-local stable_byte.ledger_state is preserved when the manual candidate supplies it"
@@ -19208,6 +19283,7 @@ review_after = "2026-08-01"
 
     fn write_one_tokmd_packets_artifact(dir: &Path) -> Result<(), String> {
         let handoff = manual_candidate_handoff_fixture();
+        let comment_plan_input = tokmd_comment_plan_input_fixture(dir)?;
         let value = serde_json::json!({
             "schema_version": "tokmd-packets/v1",
             "tool": "unsafe-review",
@@ -19269,10 +19345,7 @@ review_after = "2026-08-01"
                     "included": false,
                     "limitation": "ReviewCard repair queue stays separate from manual candidate packets"
                 },
-                "comment-plan.json": {
-                    "included": false,
-                    "limitation": "Comment-plan review budget data is not converted to packet JSON in this slice"
-                },
+                "comment-plan.json": comment_plan_input,
                 "stable-byte seed ledger": {
                     "included": false,
                     "limitation": "External seed ledger rows are not imported; packet-local stable_byte.ledger_state is preserved when the manual candidate supplies it"

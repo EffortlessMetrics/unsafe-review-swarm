@@ -1533,8 +1533,13 @@ pub(super) fn render_manual_repair_queue_artifact(
     rendered
 }
 
-pub(super) fn render_tokmd_packets_artifact(root: &Path, candidates: &[ManualCandidate]) -> String {
+pub(super) fn render_tokmd_packets_artifact(
+    root: &Path,
+    candidates: &[ManualCandidate],
+    comment_plan: Option<&str>,
+) -> String {
     let stable_byte_seed_ledger = load_stable_byte_seed_ledger(root);
+    let comment_plan_input = tokmd_comment_plan_input(comment_plan);
     let packets = candidates
         .iter()
         .map(|candidate| {
@@ -1580,7 +1585,11 @@ pub(super) fn render_tokmd_packets_artifact(root: &Path, candidates: &[ManualCan
             "with_stable_byte_source_class": candidates.iter().filter(|candidate| stable_byte_source_class(candidate).is_some()).count(),
             "with_stable_byte_seed": matched_stable_byte_seeds,
         },
-        "inputs": tokmd_packet_inputs(&stable_byte_seed_ledger, matched_stable_byte_seeds),
+        "inputs": tokmd_packet_inputs(
+            &stable_byte_seed_ledger,
+            matched_stable_byte_seeds,
+            comment_plan_input,
+        ),
         "packets": packets,
         "trust_boundary": "Tokmd-friendly packet bundle for formatting inputs only; manual/advisory candidates are not analyzer-discovered ReviewCards, not policy inputs, not a proof of UB, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repair success, and not policy readiness. unsafe-review did not run tokmd, witnesses, Miri, Bun, Node, agents, post comments, edit source, or enforce blocking policy.",
     });
@@ -1651,6 +1660,7 @@ fn manual_repair_queue_agent_handoff() -> serde_json::Value {
 fn tokmd_packet_inputs(
     stable_byte_seed_ledger: &StableByteSeedLedger,
     matched_stable_byte_seeds: usize,
+    comment_plan_input: serde_json::Value,
 ) -> serde_json::Value {
     json!({
         "manual-candidates.json": {
@@ -1677,15 +1687,64 @@ fn tokmd_packet_inputs(
             "included": false,
             "limitation": "ReviewCard repair queue stays separate from manual candidate packets"
         },
-        "comment-plan.json": {
-            "included": false,
-            "limitation": "Comment-plan review budget data is not converted to packet JSON in this slice"
-        },
+        "comment-plan.json": comment_plan_input,
         "stable-byte seed ledger": tokmd_stable_byte_seed_ledger_input(
             stable_byte_seed_ledger,
             matched_stable_byte_seeds,
         )
     })
+}
+
+fn tokmd_comment_plan_input(comment_plan: Option<&str>) -> serde_json::Value {
+    let Some(comment_plan) = comment_plan else {
+        return json!({
+            "included": false,
+            "limitation": "Comment-plan review budget data is not available to this standalone tokmd packet render"
+        });
+    };
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(comment_plan) else {
+        return json!({
+            "included": false,
+            "limitation": "Comment-plan review budget data was present but could not be parsed"
+        });
+    };
+    let summary = value.get("summary").cloned().unwrap_or_else(|| json!({}));
+    json!({
+        "included": true,
+        "relationship": "ReviewCard-only comment-plan review budget is projected for future bun-ub-review-map packets; manual candidates are not selected for automatic comment plans",
+        "summary": {
+            "selected_count": summary.get("selected_count").cloned().unwrap_or_else(|| json!(0)),
+            "not_selected_count": summary.get("not_selected_count").cloned().unwrap_or_else(|| json!(0)),
+            "budget": summary.get("budget").cloned().unwrap_or_else(|| json!(0)),
+            "reason": summary.get("reason").cloned().unwrap_or_else(|| json!("")),
+            "reason_code": summary.get("reason_code").cloned().unwrap_or_else(|| json!("")),
+        },
+        "selected_reason_codes": tokmd_comment_plan_reason_counts(
+            value.get("comments"),
+            "selection_reason_code",
+        ),
+        "not_selected_reason_codes": tokmd_comment_plan_reason_counts(
+            value.get("not_selected"),
+            "reason_code",
+        ),
+        "trust_boundary": "Plan-only ReviewCard comment budget metadata; unsafe-review did not post comments, did not import manual candidates into comment-plan.json, did not run witnesses, or make policy decisions."
+    })
+}
+
+fn tokmd_comment_plan_reason_counts(
+    entries: Option<&serde_json::Value>,
+    field: &str,
+) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
+    let Some(entries) = entries.and_then(serde_json::Value::as_array) else {
+        return counts;
+    };
+    for entry in entries {
+        if let Some(value) = entry.get(field).and_then(serde_json::Value::as_str) {
+            *counts.entry(value.to_string()).or_insert(0) += 1;
+        }
+    }
+    counts
 }
 
 fn tokmd_stable_byte_seed_ledger_input(
@@ -2323,11 +2382,18 @@ mod tests {
         )
         .map_err(|err| format!("write seed ledger failed: {err}"))?;
 
-        let rendered = render_tokmd_packets_artifact(&root, std::slice::from_ref(&candidate));
+        let rendered = render_tokmd_packets_artifact(&root, std::slice::from_ref(&candidate), None);
         let value: serde_json::Value = serde_json::from_str(&rendered)
             .map_err(|err| format!("tokmd packets should render JSON: {err}"))?;
 
         assert_eq!(value["summary"]["with_stable_byte_seed"], 1);
+        assert_eq!(value["inputs"]["comment-plan.json"]["included"], false);
+        assert!(
+            value["inputs"]["comment-plan.json"]["limitation"]
+                .as_str()
+                .unwrap_or("")
+                .contains("standalone tokmd packet render")
+        );
         assert_eq!(value["inputs"]["stable-byte seed ledger"]["included"], true);
         assert_eq!(
             value["inputs"]["stable-byte seed ledger"]["matched_manual_candidates"],

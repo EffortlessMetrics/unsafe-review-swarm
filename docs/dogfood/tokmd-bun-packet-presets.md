@@ -126,17 +126,21 @@ The preset renderer should accept a JSON bundle that can be composed from:
 - `comment-plan.json`;
 - `docs/dogfood/stable-byte-follow-up-seeds.md` or a future seed JSON export.
 
-The current `tokmd-packets.json` sidecar records which inputs were absent for
-the manual-candidate packet export. Packet-local `stable_byte.ledger_state`
-metadata and optional `oracle_map` cross-language oracle metadata are preserved
-when supplied by a manual candidate and should not be reported as missing
-external seed-ledger data or rendered proof. When the root-local stable-byte
-seed ledger and its referenced manual candidate JSON are readable, matching
-seed rows are exported as `stable_byte_seed` packet metadata with owner lane,
-suggested first PR, and triage labels. The future renderer should preserve
-those limitations and add any renderer-specific absent-input notes. Missing
-inputs must produce an explicit limitation, not an empty result or all-clear
-statement.
+The current `tokmd-packets.json` sidecar records which inputs were present or
+absent for the manual-candidate packet export. Packet-local
+`stable_byte.ledger_state` metadata and optional `oracle_map` cross-language
+oracle metadata are preserved when supplied by a manual candidate and should not
+be reported as missing external seed-ledger data or rendered proof. When the
+root-local stable-byte seed ledger and its referenced manual candidate JSON are
+readable, matching seed rows are exported as `stable_byte_seed` packet metadata
+with owner lane, suggested first PR, and triage labels. When `comment-plan.json`
+is present, the sidecar may project its ReviewCard-only review-budget summary
+and selected/not-selected reason-code counts for future `bun-ub-review-map`
+rendering. That projection remains plan-only: manual candidates are not selected
+for comments, and unsafe-review does not post comments. The future renderer
+should preserve those limitations and add any renderer-specific absent-input
+notes. Missing inputs must produce an explicit limitation, not an empty result
+or all-clear statement.
 
 ## Trust Boundary
 

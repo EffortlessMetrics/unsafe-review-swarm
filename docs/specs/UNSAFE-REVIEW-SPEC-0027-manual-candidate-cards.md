@@ -380,8 +380,12 @@ project the same target, route, invariant, external evidence, optional
 handoff, and copy-only commands as `manual-candidates.json`, include a
 `manual_repair_queue_item` projection from `manual-repair-queue.json` with the
 candidate ID, bucket, bucket reason, copy-only agent handoff, and trust
-boundary, and record absent ReviewCard, receipt, and stable-byte seed-ledger
-inputs as explicit limitations. When a root-local
+boundary, may project the ReviewCard-only `comment-plan.json` review-budget
+summary plus selected/not-selected reason-code counts for future
+`bun-ub-review-map` formatting, and record absent ReviewCard, receipt, and
+stable-byte seed-ledger inputs as explicit limitations. The comment-plan
+projection must remain plan-only and must not select manual candidates for
+comments or imply posting. When a root-local
 `docs/dogfood/stable-byte-follow-up-seeds.md` exists and its referenced manual
 candidate JSON can be read, `tokmd-packets.json` may join a matching seed row
 by manual candidate ID and project `stable_byte_seed` with seed ID, surface,
@@ -529,10 +533,11 @@ into an analyzer ReviewCard.
   preserving manual markers, optional oracle-map,
   proof-mode/fix-boundary/PR-aperture guidance, implementer handoff, commands
   from `manual-candidates.json`, and
-  `manual_repair_queue_item` data from `manual-repair-queue.json`, and
-  optional root-local stable-byte seed-row metadata while recording absent
-  seed-ledger, receipt, and ReviewCard packet inputs as limitations and not
-  running tokmd.
+  `manual_repair_queue_item` data from `manual-repair-queue.json`, optional
+  ReviewCard-only comment-plan review-budget metadata, and optional root-local
+  stable-byte seed-row metadata while recording absent seed-ledger, receipt, and
+  ReviewCard packet inputs as limitations and not running tokmd or posting
+  comments.
 - The first-pr verifier rejects manual-candidate markers in ReviewCard-only
   artifacts instead of silently accepting leaked manual candidates as analyzer
   output.

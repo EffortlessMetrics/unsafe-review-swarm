@@ -1042,6 +1042,7 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
 
     fs::create_dir_all(&options.out_dir)
         .map_err(|err| format!("create {} failed: {err}", options.out_dir.display()))?;
+    let mut comment_plan_artifact = None;
     for (name, renderer) in FIRST_PR_RENDERED_ARTIFACTS {
         let rendered = first_pr::render_first_pr_front_door_artifact(
             name,
@@ -1049,6 +1050,9 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
             &root,
             &manual_candidates,
         );
+        if name == "comment-plan.json" {
+            comment_plan_artifact = Some(rendered.clone());
+        }
         write_artifact(&options.out_dir.join(name), rendered)?;
     }
     write_artifact(
@@ -1073,7 +1077,11 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     )?;
     write_artifact(
         &options.out_dir.join(TOKMD_PACKETS_ARTIFACT),
-        first_pr::render_tokmd_packets_artifact(&root, &manual_candidates),
+        first_pr::render_tokmd_packets_artifact(
+            &root,
+            &manual_candidates,
+            comment_plan_artifact.as_deref(),
+        ),
     )?;
     write_artifact(
         &options.out_dir.join(REVIEW_KIT_ARTIFACT),
