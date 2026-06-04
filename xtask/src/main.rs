@@ -424,6 +424,13 @@ const DOGFOOD_STABLE_BYTE_SEED_HEADER: &[&str] = &[
     "Owner lane",
     "Triage labels",
 ];
+const DOGFOOD_STABLE_BYTE_COVERAGE_HEADER: &[&str] = &[
+    "Seed ID",
+    "Positive fixture",
+    "Controls",
+    "Analyzer/support tier",
+    "Boundary",
+];
 const FUZZ_REQUIRED_FILES: &[&str] = &[
     "docs/FUZZING.md",
     "fuzz/.gitignore",
@@ -2951,6 +2958,7 @@ fn check_dogfood_stable_byte_seed_text(
     let mut rows = 0usize;
     let mut seed_ids = BTreeSet::new();
     let mut manual_candidate_paths = BTreeSet::new();
+    let mut labels_by_seed = BTreeMap::<String, BTreeSet<String>>::new();
     for (line_idx, line) in text.lines().enumerate() {
         if !in_table {
             if line.contains("| Seed ID |") {
@@ -3060,6 +3068,7 @@ fn check_dogfood_stable_byte_seed_text(
                 line_idx + 1
             ));
         }
+        let mut label_set = BTreeSet::new();
         for label in labels {
             if !DOGFOOD_STABLE_BYTE_TRIAGE_LABELS.contains(&label.as_str()) {
                 return Err(format!(
@@ -3067,7 +3076,9 @@ fn check_dogfood_stable_byte_seed_text(
                     line_idx + 1
                 ));
             }
+            label_set.insert(label);
         }
+        labels_by_seed.insert(seed_id, label_set);
 
         rows += 1;
     }
@@ -3084,6 +3095,72 @@ fn check_dogfood_stable_byte_seed_text(
                 "{path} must include a stable-byte seed for `{manual_candidate_path}`"
             ));
         }
+    }
+    check_dogfood_stable_byte_coverage_labels(path, text, &labels_by_seed)?;
+    Ok(rows)
+}
+
+fn check_dogfood_stable_byte_coverage_labels(
+    path: &str,
+    text: &str,
+    labels_by_seed: &BTreeMap<String, BTreeSet<String>>,
+) -> Result<usize, String> {
+    let mut in_table = false;
+    let mut rows = 0usize;
+    for (line_idx, line) in text.lines().enumerate() {
+        if !in_table {
+            if line.contains("| Seed ID | Positive fixture |") {
+                let columns = markdown_table_columns(line);
+                if columns != DOGFOOD_STABLE_BYTE_COVERAGE_HEADER {
+                    return Err(format!(
+                        "{path}:{} stable-byte coverage header must be `{}`",
+                        line_idx + 1,
+                        DOGFOOD_STABLE_BYTE_COVERAGE_HEADER.join(" | ")
+                    ));
+                }
+                in_table = true;
+            }
+            continue;
+        }
+        if !line.trim_start().starts_with('|') {
+            break;
+        }
+        if line.contains("|---") {
+            continue;
+        }
+        let columns = markdown_table_columns(line);
+        if columns.len() != DOGFOOD_STABLE_BYTE_COVERAGE_HEADER.len() {
+            return Err(format!(
+                "{path}:{} stable-byte coverage row must include Seed ID, Positive fixture, Controls, Analyzer/support tier, and Boundary columns",
+                line_idx + 1
+            ));
+        }
+        let seed_id = markdown_code_cell_value(columns[0]);
+        let labels = labels_by_seed.get(&seed_id).ok_or_else(|| {
+            format!(
+                "{path}:{} stable-byte coverage row references unknown seed `{seed_id}`",
+                line_idx + 1
+            )
+        })?;
+        if labels.contains("needs-fixture") {
+            return Err(format!(
+                "{path}:{} stable-byte coverage row for `{seed_id}` makes triage label `needs-fixture` stale",
+                line_idx + 1
+            ));
+        }
+
+        let support_tier = columns[3].trim();
+        let has_support_tier = !support_tier.is_empty()
+            && support_tier != "-"
+            && support_tier != "`pending`"
+            && support_tier != "`none`";
+        if has_support_tier && labels.contains("needs-analyzer") {
+            return Err(format!(
+                "{path}:{} stable-byte coverage row for `{seed_id}` names analyzer/support tier `{support_tier}`, so triage label `needs-analyzer` is stale",
+                line_idx + 1
+            ));
+        }
+        rows += 1;
     }
     Ok(rows)
 }
@@ -10968,6 +11045,87 @@ Triage labels come from [taxonomy](stable-byte-triage-taxonomy.md).
 
         assert!(err.contains("proof mode `observable-red-green`"));
         assert!(err.contains("must match `mutation-plus-miri`"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_stable_byte_seed_index_rejects_stale_fixture_label_after_coverage()
+    -> Result<(), String> {
+        let text = r#"
+# Bun stable-byte follow-up seed index
+
+Triage labels come from [taxonomy](stable-byte-triage-taxonomy.md).
+
+## Seeds
+
+| Seed ID | Ledger state | Candidate family | Surface | Manual candidate | Safe JS caller | Rust/native sink | Proof mode | Suggested first PR | Owner lane | Triage labels |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `bun-stable-byte-textdecoder-sab` | `handoff-ready` | `stable-byte-source-sab-race` | `TextDecoder.decode` | `docs/examples/manual-candidates/textdecoder-sab.json` | SharedArrayBuffer-backed typed array decode | `src/runtime/webcore/TextDecoder.rs` slice materialization | `mutation-plus-miri` | `TextDecoder shared-byte snapshot only` | `rust2` | `non-observable`, `needs-miri-model`, `needs-fixture` |
+
+## Fixture And Control Coverage
+
+| Seed ID | Positive fixture | Controls | Analyzer/support tier | Boundary |
+|---|---|---|---|---|
+| `bun-stable-byte-textdecoder-sab` | `fixtures/stable_byte_sab_borrowed_slice` | `fixtures/stable_byte_sab_snapshot_no_card` | `Stable-byte SAB race heuristic` | Static pressure only. |
+"#;
+        let manual_candidates = BTreeMap::from([(
+            "docs/examples/manual-candidates/textdecoder-sab.json".to_string(),
+            serde_json::json!({
+                "proof_mode": {
+                    "kind": "mutation-plus-miri"
+                }
+            }),
+        )]);
+
+        let err = err_text(check_dogfood_stable_byte_seed_text(
+            "docs/dogfood/stable-byte-follow-up-seeds.md",
+            text,
+            &manual_candidates,
+        ))?;
+
+        assert!(err.contains("needs-fixture"));
+        assert!(err.contains("stale"));
+        assert!(err.contains("bun-stable-byte-textdecoder-sab"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_stable_byte_seed_index_rejects_stale_analyzer_label_after_support_tier()
+    -> Result<(), String> {
+        let text = r#"
+# Bun stable-byte follow-up seed index
+
+Triage labels come from [taxonomy](stable-byte-triage-taxonomy.md).
+
+## Seeds
+
+| Seed ID | Ledger state | Candidate family | Surface | Manual candidate | Safe JS caller | Rust/native sink | Proof mode | Suggested first PR | Owner lane | Triage labels |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `bun-stable-byte-stringorbuffer-rab-async` | `handoff-ready` | `stable-byte-source-rab-async` | `crypto.scrypt` | `docs/examples/manual-candidates/stringorbuffer-rab-stale-input.json` | RAB-backed BufferSource resized before async completion | `src/runtime/node/types.rs` async StringOrBuffer worker read | `observable-red-green` | `non-encoded async StringOrBuffer snapshot only` | `rust3` | `observable`, `needs-analyzer` |
+
+## Fixture And Control Coverage
+
+| Seed ID | Positive fixture | Controls | Analyzer/support tier | Boundary |
+|---|---|---|---|---|
+| `bun-stable-byte-stringorbuffer-rab-async` | `fixtures/js_buffer_reentry_async_helper_capture` | `fixtures/js_buffer_reentry_async_options_before_capture_no_card` | `Stable-byte RAB async heuristic` | Static pressure only. |
+"#;
+        let manual_candidates = BTreeMap::from([(
+            "docs/examples/manual-candidates/stringorbuffer-rab-stale-input.json".to_string(),
+            serde_json::json!({
+                "proof_mode": {
+                    "kind": "observable-red-green"
+                }
+            }),
+        )]);
+
+        let err = err_text(check_dogfood_stable_byte_seed_text(
+            "docs/dogfood/stable-byte-follow-up-seeds.md",
+            text,
+            &manual_candidates,
+        ))?;
+
+        assert!(err.contains("triage label `needs-analyzer` is stale"));
+        assert!(err.contains("Stable-byte RAB async heuristic"));
         Ok(())
     }
 
