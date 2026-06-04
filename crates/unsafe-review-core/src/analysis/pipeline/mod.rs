@@ -3050,6 +3050,163 @@ pub fn zstd_sync(
     }
 
     #[test]
+    fn stable_byte_native_ffi_after_js_capture_emits_advisory_card() -> Result<(), String> {
+        let output = temp_source_output(
+            "unsafe-review-stable-byte-native-ffi",
+            r#"
+pub struct JSValue;
+pub struct GlobalObject;
+pub struct JSArrayBufferView {
+    ptr: *const u8,
+    len: usize,
+}
+
+impl JSArrayBufferView {
+    pub fn from_js(_global: &mut GlobalObject, _value: JSValue) -> Result<Self, ()> {
+        Ok(Self {
+            ptr: core::ptr::null(),
+            len: 0,
+        })
+    }
+
+    pub fn as_ptr(&self) -> *const u8 {
+        self.ptr
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+}
+
+unsafe extern "C" {
+    fn zstd_compress_into(
+        src: *const u8,
+        src_len: usize,
+        dst: *mut u8,
+        dst_len: usize,
+    ) -> usize;
+}
+
+pub fn zstd_overlap_handoff(
+    global: &mut GlobalObject,
+    value: JSValue,
+    output: &mut [u8],
+) -> Result<usize, ()> {
+    let input = JSArrayBufferView::from_js(global, value)?;
+    Ok(unsafe {
+        zstd_compress_into(input.as_ptr(), input.len(), output.as_mut_ptr(), output.len())
+    })
+}
+"#,
+        )?;
+
+        let stable_byte_card = output
+            .cards
+            .iter()
+            .find(|card| card.operation.family == OperationFamily::StableByteSourceNativeFfiRead)
+            .ok_or_else(|| "native FFI stable-byte card should be emitted".to_string())?;
+
+        assert_eq!(stable_byte_card.class, ReviewClass::GuardMissing);
+        assert_eq!(stable_byte_card.proof_path, ProofPath::ObservableRedGreen);
+        assert_eq!(
+            stable_byte_card.site.owner.as_deref(),
+            Some("zstd_overlap_handoff")
+        );
+        assert!(
+            stable_byte_card
+                .operation
+                .expression
+                .contains("stable-byte-source-native-ffi-read")
+        );
+        assert!(
+            stable_byte_card
+                .operation
+                .expression
+                .contains("JSArrayBufferView::from_js")
+        );
+        assert!(
+            stable_byte_card
+                .operation
+                .expression
+                .contains("zstd_compress_into")
+        );
+        assert!(
+            stable_byte_card
+                .hazards
+                .contains(&HazardKind::StableByteSource)
+        );
+        assert!(
+            stable_byte_card
+                .next_action
+                .summary
+                .contains("observable-red-green proof path")
+        );
+        assert!(
+            stable_byte_card
+                .routes
+                .iter()
+                .any(|route| route.kind == WitnessKind::HumanDeepReview)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn stable_byte_native_ffi_fixture_pins_zstd_handoff_card() -> Result<(), String> {
+        let output = fixture_output("stable_byte_native_ffi_zstd_handoff")?;
+        assert_eq!(output.cards.len(), 2);
+        let ffi_card = output
+            .cards
+            .iter()
+            .find(|card| card.operation.family == OperationFamily::Ffi)
+            .ok_or_else(|| "fixture should retain the generic FFI card".to_string())?;
+        let stable_byte_card = output
+            .cards
+            .iter()
+            .find(|card| card.operation.family == OperationFamily::StableByteSourceNativeFfiRead)
+            .ok_or_else(|| "fixture should emit the native FFI stable-byte card".to_string())?;
+
+        assert_eq!(ffi_card.site.owner.as_deref(), Some("zstd_overlap_handoff"));
+        assert_eq!(
+            stable_byte_card.site.owner.as_deref(),
+            Some("zstd_overlap_handoff")
+        );
+        assert_eq!(stable_byte_card.class, ReviewClass::GuardMissing);
+        assert_eq!(stable_byte_card.proof_path, ProofPath::ObservableRedGreen);
+        assert!(
+            stable_byte_card
+                .operation
+                .expression
+                .contains("stable-byte-source-native-ffi-read")
+        );
+        assert!(
+            stable_byte_card
+                .next_action
+                .summary
+                .contains("native FFI aperture")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn stable_byte_native_ffi_fixture_keeps_owned_copy_control_to_ffi_only() -> Result<(), String> {
+        let output = fixture_output("stable_byte_native_ffi_zstd_owned_copy_control")?;
+        assert_eq!(output.cards.len(), 1);
+        assert!(
+            output.cards.iter().all(|card| card.operation.family
+                != OperationFamily::StableByteSourceNativeFfiRead),
+            "owned copy before native FFI should not trigger the native FFI stable-byte heuristic"
+        );
+        assert!(
+            output
+                .cards
+                .iter()
+                .any(|card| card.operation.family == OperationFamily::Ffi),
+            "owned-copy control should still retain the generic FFI seam card"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn panic_from_safe_js_direct_try_from_expect_emits_guard_missing_card() -> Result<(), String> {
         let output = temp_source_output(
             "unsafe-review-panic-from-safe-js-direct",

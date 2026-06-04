@@ -261,6 +261,12 @@ pub(super) fn add_operation_repairs(card: &ReviewCard, repairs: &mut Vec<String>
             repairs.push("snapshot or copy SharedArrayBuffer-backed bytes before constructing Rust/native borrowed slices".to_string());
             repairs.push("keep the repair limited to this SAB race stable-byte aperture and attach only external mutation-plus-Miri/model evidence after running it outside unsafe-review".to_string());
         }
+        OperationFamily::StableByteSourceNativeFfiRead
+            if common::missing_discharge(card, "byte-stability") =>
+        {
+            repairs.push("snapshot or copy JS-backed bytes before passing pointer/length pairs to native FFI".to_string());
+            repairs.push("keep the repair limited to this native FFI stable-byte aperture and attach only external observable-red-green evidence after running it outside unsafe-review".to_string());
+        }
         _ => {}
     }
 }

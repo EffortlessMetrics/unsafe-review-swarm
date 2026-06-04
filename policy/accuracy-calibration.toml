@@ -1727,6 +1727,41 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "stable-byte-native-ffi-heuristic"
+status = "fixture_pinned"
+kind = "operation_family"
+owner = "calibration"
+support_tier = "Stable-byte native FFI heuristic"
+operation_family = "stable_byte_source_native_ffi_read"
+hazard = "stable_byte_source"
+fixtures = [
+  "stable_byte_native_ffi_zstd_handoff",
+  "stable_byte_native_ffi_zstd_owned_copy_control",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/stable-byte-native-ffi-heuristic.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned stable-byte native FFI heuristic behavior emits one advisory
+ReviewCard for the listed JS-backed byte capture before zstd-style native FFI
+pointer/length handoff while retaining the generic FFI ReviewCard. The listed
+owned-copy control remains FFI-only because bytes are copied into owned storage
+before the native handoff.
+"""
+forbidden_claims = [
+  "Bun vulnerability",
+  "overlap proof",
+  "stale backing storage proof",
+  "zstd site-execution proof",
+  "witness execution proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "panic-from-safe-js-heuristic"
 status = "fixture_pinned"
 kind = "operation_family"

@@ -93,7 +93,8 @@ pub(crate) fn hazards_for(family: &OperationFamily) -> Vec<HazardKind> {
         OperationFamily::PanicFromSafeJs => vec![HazardKind::PanicSafety],
         OperationFamily::StableByteSourceGetterReentry
         | OperationFamily::StableByteSourceRabAsync
-        | OperationFamily::StableByteSourceSabRace => vec![HazardKind::StableByteSource],
+        | OperationFamily::StableByteSourceSabRace
+        | OperationFamily::StableByteSourceNativeFfiRead => vec![HazardKind::StableByteSource],
         OperationFamily::Unknown => vec![HazardKind::Unknown],
     }
 }

@@ -4510,6 +4510,7 @@ fn fixture_known_operation_family(operation_family: &str) -> bool {
             | "stable_byte_source_getter_reentry"
             | "stable_byte_source_rab_async"
             | "stable_byte_source_sab_race"
+            | "stable_byte_source_native_ffi_read"
             | "unknown"
     )
 }
@@ -4682,6 +4683,9 @@ fn is_fixture_operation_snippet_exception(path: &str, operation: &str) -> bool {
         || (normalized.contains("fixtures/stable_byte_sab_")
             && operation
                 .starts_with("stable-byte-source-sab-race candidate; proof required: mutation-plus-miri; shared JS backing reaches Rust/native borrowed-slice materialization before snapshot"))
+        || (normalized.contains("fixtures/stable_byte_native_ffi_")
+            && operation
+                .starts_with("stable-byte-source-native-ffi-read candidate; proof required: observable-red-green; JS-backed bytes reach native FFI pointer/length read before snapshot"))
         || (normalized.contains("fixtures/panic_from_safe_js_")
             && operation
                 .starts_with("JS-derived signed value reaches panicking unsigned conversion"))

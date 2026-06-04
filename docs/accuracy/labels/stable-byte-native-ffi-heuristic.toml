@@ -1,0 +1,47 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "stable-byte-native-ffi-heuristic"
+operation_family = "stable_byte_source_native_ffi_read"
+hazard = "stable_byte_source"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+stable-byte native FFI heuristic behavior; they are not a proof of memory safety,
+not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence,
+not calibrated precision or recall, not witness adequacy, and not policy readiness.
+"""
+
+[[samples]]
+id = "stable-byte-native-ffi-zstd-handoff-emits-advisory-card"
+fixture = "stable_byte_native_ffi_zstd_handoff"
+kind = "positive"
+expected_cards = 2
+expected_class = "guard_missing"
+expected_operation_family = "stable_byte_source_native_ffi_read"
+expected_hazard = "stable_byte_source"
+expected_owner = "zstd_overlap_handoff"
+expected_site_kind = "operation"
+expected_obligation_key = "byte-stability"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A same-owner JS-backed byte capture before a zstd-style native FFI pointer/length handoff should emit an advisory stable-byte native FFI ReviewCard with observable-red-green proof-path wording while retaining the generic FFI card."
+
+[[samples]]
+id = "stable-byte-native-ffi-zstd-owned-copy-keeps-ffi-only"
+fixture = "stable_byte_native_ffi_zstd_owned_copy_control"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "miri_unsupported"
+expected_operation_family = "ffi"
+expected_hazard = "ffi_abi"
+expected_owner = "zstd_overlap_handoff"
+expected_site_kind = "ffi_call"
+expected_obligation_key = "abi"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["asan", "cargo-careful", "human-deep-review"]
+label_source = "fixture_golden"
+rationale = "Copying JS-backed bytes into owned storage before the zstd-style FFI handoff should not trigger the stable-byte native FFI heuristic, while the generic FFI seam remains reviewable."

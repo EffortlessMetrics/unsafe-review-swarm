@@ -1,21 +1,21 @@
 [
   {
-    "id": "UR-stable-byte-native-ffi-zstd-handoff-src-lib-rs-zstd-overlap-handoff-ffi_call-ffi-ffi-94233876e270-ffi_abi-c1",
+    "id": "UR-stable-byte-native-ffi-zstd-owned-copy-control-src-lib-rs-zstd-overlap-handoff-ffi_call-ffi-ffi-fbcdff0ba123-ffi_abi-c1",
     "class": "miri_unsupported",
     "priority": "medium",
     "confidence": "medium",
     "proof_path": "observable_red_green",
     "site": {
       "file": "src/lib.rs",
-      "line": 43,
+      "line": 40,
       "column": 5,
       "kind": "ffi_call",
       "owner": "zstd_overlap_handoff",
       "visibility": "private",
       "public_api_surface": false,
-      "snippet": "unsafe { zstd_compress_into(input.as_ptr(), input.len(), output.as_mut_ptr(), output.len()) }"
+      "snippet": "unsafe { zstd_compress_into(bytes.as_ptr(), bytes.len(), output.as_mut_ptr(), output.len()) }"
     },
-    "operation": "unsafe { zstd_compress_into(input.as_ptr(), input.len(), output.as_mut_ptr(), output.len()) }",
+    "operation": "unsafe { zstd_compress_into(bytes.as_ptr(), bytes.len(), output.as_mut_ptr(), output.len()) }",
     "operation_family": "ffi",
     "hazards": [
       "ffi_abi",
@@ -108,74 +108,5 @@
       "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test zstd_overlap_handoff",
       "cargo +nightly careful test zstd_overlap_handoff"
     ]
-  },
-  {
-    "id": "UR-stable-byte-native-ffi-zstd-handoff-src-lib-rs-zstd-overlap-handoff-operation-stable_byte_source_native_ffi_read-from-js-15e3de2d351c-stable_byte_source-c1",
-    "class": "guard_missing",
-    "priority": "high",
-    "confidence": "medium",
-    "proof_path": "observable_red_green",
-    "site": {
-      "file": "src/lib.rs",
-      "line": 43,
-      "column": 5,
-      "kind": "operation",
-      "owner": "zstd_overlap_handoff",
-      "visibility": "private",
-      "public_api_surface": false,
-      "snippet": "unsafe { zstd_compress_into(input.as_ptr(), input.len(), output.as_mut_ptr(), output.len()) }"
-    },
-    "operation": "stable-byte-source-native-ffi-read candidate; proof required: observable-red-green; JS-backed bytes reach native FFI pointer/length read before snapshot; source: let input = JSArrayBufferView::from_js(global, value);; native read: unsafe { zstd_compress_into(input.as_ptr(), input.len(), output.as_mut_ptr(), output.len()) }",
-    "operation_family": "stable_byte_source_native_ffi_read",
-    "hazards": [
-      "stable_byte_source"
-    ],
-    "obligations": [
-      "JS-backed bytes are snapshotted or otherwise stabilized before native FFI pointer/length reads"
-    ],
-    "obligation_evidence": [
-      {
-        "key": "byte-stability",
-        "description": "JS-backed bytes are snapshotted or otherwise stabilized before native FFI pointer/length reads",
-        "contract": {
-          "present": true,
-          "state": "present",
-          "summary": "Stable-byte-source native FFI heuristic uses byte-stability evidence, not unsafe API safety docs"
-        },
-        "discharge": {
-          "present": false,
-          "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
-        },
-        "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `zstd_overlap_handoff`"
-        },
-        "witness": {
-          "present": false,
-          "state": "missing",
-          "summary": "No imported witness receipt was found"
-        }
-      }
-    ],
-    "contract": "Stable-byte-source native FFI heuristic uses byte-stability evidence, not unsafe API safety docs",
-    "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `zstd_overlap_handoff`",
-    "witness": "No imported witness receipt was found",
-    "witness_routes": [
-      {
-        "kind": "human-deep-review",
-        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
-        "command": null,
-        "required": false
-      }
-    ],
-    "missing": [
-      "Missing visible local guard for inferred safety obligations",
-      "No witness receipt imported for this card"
-    ],
-    "next_action": "Review this stable-byte-source-native-ffi-read card through an observable-red-green proof path: add or expose byte-stability guard evidence, confirm the safe JS caller route, snapshot or otherwise stabilize JS-backed bytes before native FFI pointer/length reads, and keep the PR inside that native FFI aperture.",
-    "verify_commands": []
   }
 ]

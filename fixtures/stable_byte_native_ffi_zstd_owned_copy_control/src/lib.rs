@@ -23,12 +23,8 @@ impl JSArrayBufferView {
         }
     }
 
-    pub fn as_ptr(&self) -> *const u8 {
-        self.ptr
-    }
-
-    pub fn len(&self) -> usize {
-        self.len
+    pub fn to_vec(&self) -> Vec<u8> {
+        Vec::new()
     }
 }
 
@@ -38,9 +34,10 @@ pub fn zstd_overlap_handoff(
     output: &mut [u8],
 ) -> usize {
     let input = JSArrayBufferView::from_js(global, value);
-    // SAFETY: this fixture intentionally documents the native Zstd-style FFI seam;
-    // it does not prove caller-provided JS-backed input/output spans are disjoint.
-    unsafe { zstd_compress_into(input.as_ptr(), input.len(), output.as_mut_ptr(), output.len()) }
+    let bytes = input.to_vec();
+    // SAFETY: this fixture keeps the generic native FFI seam while proving the
+    // native-FFI stable-byte heuristic does not fire after an owned copy.
+    unsafe { zstd_compress_into(bytes.as_ptr(), bytes.len(), output.as_mut_ptr(), output.len()) }
 }
 
 #[cfg(test)]
