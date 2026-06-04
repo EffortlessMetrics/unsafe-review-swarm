@@ -12987,6 +12987,73 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_tokmd_missing_manual_repair_queue_item()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-tokmd-missing-manual-repair-item")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("tokmd-packets.json");
+        let mut tokmd_packets = parse_json_file(&path)?;
+        let packet = tokmd_packets["packets"][0]
+            .as_object_mut()
+            .ok_or("tokmd packet fixture must be an object")?;
+        packet.remove("manual_repair_queue_item");
+        fs::write(&path, tokmd_packets.to_string())
+            .map_err(|err| format!("write tokmd packets failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "missing tokmd manual repair queue item should fail verification".to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("tokmd-packets.json packets[0] is missing manual_repair_queue_item"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_tokmd_manual_repair_bucket_reason_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-tokmd-manual-repair-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("tokmd-packets.json");
+        let mut tokmd_packets = parse_json_file(&path)?;
+        tokmd_packets["packets"][0]["manual_repair_queue_item"]["bucket_reason"] =
+            serde_json::json!("manual_candidate_auto_fix");
+        fs::write(&path, tokmd_packets.to_string())
+            .map_err(|err| format!("write tokmd packets failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "tokmd manual repair queue bucket reason drift should fail verification"
+                        .to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains(
+                "manual_repair_queue_item bucket_reason must be `manual_candidate_copy_only`"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_review_kit_manual_candidate_id_drift() -> Result<(), String>
     {
         let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-manual-candidate-id-drift")?;
@@ -18259,7 +18326,7 @@ review_after = "2026-08-01"
                 },
                 "manual-repair-queue.json": {
                     "included": true,
-                    "relationship": "copy-only manual repair handoff fields are duplicated through implementer_handoff"
+                    "relationship": "copy-only manual repair handoff fields are projected through packet manual_repair_queue_item"
                 },
                 "cards.json": {
                     "included": false,
@@ -18403,6 +18470,24 @@ review_after = "2026-08-01"
                 "Do not rewrite TextDecoder unrelated encodings"
             ],
             "stop_condition": "stop before source edits if the route no longer matches this manual candidate, or if the repair would broaden into unrelated unsafe sites"
+        })
+    }
+
+    fn manual_repair_queue_item_fixture() -> serde_json::Value {
+        serde_json::json!({
+            "artifact": "manual-repair-queue.json",
+            "id": "R4R2-S001",
+            "bucket": "manual_candidate_handoff",
+            "bucket_reason": "manual_candidate_copy_only",
+            "agent_handoff": {
+                "state": "copy_ready",
+                "automatic": false,
+                "reasons": [
+                    "manual candidate includes file:line, safe caller route, invariant, evidence, fix/test/non-goal guidance, and stop condition",
+                    "candidate must stay manual/advisory and separate from ReviewCard repair-queue.json"
+                ]
+            },
+            "trust_boundary": "Copy-only manual candidate repair queue entry; not analyzer-discovered, not automatic repair, not witness execution, not source editing, not proof, and not policy gating."
         })
     }
 
@@ -18608,7 +18693,7 @@ review_after = "2026-08-01"
                 },
                 "manual-repair-queue.json": {
                     "included": true,
-                    "relationship": "copy-only manual repair handoff fields are duplicated through implementer_handoff"
+                    "relationship": "copy-only manual repair handoff fields are projected through packet manual_repair_queue_item"
                 },
                 "cards.json": {
                     "included": false,
@@ -18688,6 +18773,7 @@ review_after = "2026-08-01"
                     "Do not rewrite TextDecoder unrelated encodings"
                 ],
                 "implementer_handoff": handoff,
+                "manual_repair_queue_item": manual_repair_queue_item_fixture(),
                 "commands": {
                     "explain": "unsafe-review explain R4R2-S001",
                     "context_json": "unsafe-review context R4R2-S001 --json",

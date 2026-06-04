@@ -36,6 +36,9 @@ const REVIEW_CARD_REPAIR_QUEUE_BUCKETS: [&str; 6] = [
     "requires_human_review",
     "do_not_auto_repair",
 ];
+const MANUAL_REPAIR_QUEUE_BUCKET: &str = "manual_candidate_handoff";
+const MANUAL_REPAIR_QUEUE_BUCKET_REASON: &str = "manual_candidate_copy_only";
+const MANUAL_REPAIR_QUEUE_ENTRY_TRUST_BOUNDARY: &str = "Copy-only manual candidate repair queue entry; not analyzer-discovered, not automatic repair, not witness execution, not source editing, not proof, and not policy gating.";
 
 pub(super) struct FirstPrReport<'a> {
     pub(super) output: &'a AnalyzeOutput,
@@ -1126,17 +1129,10 @@ fn manual_repair_queue_entry(root: &Path, candidate: &ManualCandidate) -> serde_
         "explain": explain_command(root, &candidate.id),
         "context_json": context_command(root, &candidate.id),
         "witness_plan": candidate_witness_plan_command(root, &candidate.id),
-        "bucket": "manual_candidate_handoff",
-        "bucket_reason": "manual_candidate_copy_only",
-        "agent_handoff": {
-            "state": "copy_ready",
-            "automatic": false,
-            "reasons": [
-                "manual candidate includes file:line, safe caller route, invariant, evidence, fix/test/non-goal guidance, and stop condition",
-                "candidate must stay manual/advisory and separate from ReviewCard repair-queue.json"
-            ]
-        },
-        "trust_boundary": "Copy-only manual candidate repair queue entry; not analyzer-discovered, not automatic repair, not witness execution, not source editing, not proof, and not policy gating.",
+        "bucket": MANUAL_REPAIR_QUEUE_BUCKET,
+        "bucket_reason": MANUAL_REPAIR_QUEUE_BUCKET_REASON,
+        "agent_handoff": manual_repair_queue_agent_handoff(),
+        "trust_boundary": MANUAL_REPAIR_QUEUE_ENTRY_TRUST_BOUNDARY,
     });
     if let Some(object) = value.as_object_mut() {
         if let Some(proof_mode) = &candidate.proof_mode {
@@ -1155,6 +1151,17 @@ fn manual_repair_queue_entry(root: &Path, candidate: &ManualCandidate) -> serde_
     value
 }
 
+fn manual_repair_queue_agent_handoff() -> serde_json::Value {
+    json!({
+        "state": "copy_ready",
+        "automatic": false,
+        "reasons": [
+            "manual candidate includes file:line, safe caller route, invariant, evidence, fix/test/non-goal guidance, and stop condition",
+            "candidate must stay manual/advisory and separate from ReviewCard repair-queue.json"
+        ]
+    })
+}
+
 fn tokmd_packet_inputs() -> serde_json::Value {
     json!({
         "manual-candidates.json": {
@@ -1163,7 +1170,7 @@ fn tokmd_packet_inputs() -> serde_json::Value {
         },
         "manual-repair-queue.json": {
             "included": true,
-            "relationship": "copy-only manual repair handoff fields are duplicated through implementer_handoff"
+            "relationship": "copy-only manual repair handoff fields are projected through packet manual_repair_queue_item"
         },
         "cards.json": {
             "included": false,
@@ -1231,6 +1238,7 @@ fn tokmd_packet_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::V
         "test_targets": &candidate.test_targets,
         "do_not_touch": &candidate.do_not_touch,
         "implementer_handoff": manual_candidate_implementer_handoff(candidate),
+        "manual_repair_queue_item": tokmd_manual_repair_queue_item(candidate),
         "commands": {
             "explain": explain_command(root, &candidate.id),
             "context_json": context_command(root, &candidate.id),
@@ -1254,6 +1262,17 @@ fn tokmd_packet_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::V
         }
     }
     value
+}
+
+fn tokmd_manual_repair_queue_item(candidate: &ManualCandidate) -> serde_json::Value {
+    json!({
+        "artifact": "manual-repair-queue.json",
+        "id": candidate.id.as_str(),
+        "bucket": MANUAL_REPAIR_QUEUE_BUCKET,
+        "bucket_reason": MANUAL_REPAIR_QUEUE_BUCKET_REASON,
+        "agent_handoff": manual_repair_queue_agent_handoff(),
+        "trust_boundary": MANUAL_REPAIR_QUEUE_ENTRY_TRUST_BOUNDARY,
+    })
 }
 
 fn tokmd_packet_missing_inputs(candidate: &ManualCandidate) -> Vec<&'static str> {

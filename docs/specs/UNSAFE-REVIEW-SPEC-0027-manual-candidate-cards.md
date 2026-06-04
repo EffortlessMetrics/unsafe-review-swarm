@@ -352,12 +352,15 @@ for future Bun packet presets. It must use
 `manual_candidate = true`, and `analyzer_discovered = false` per packet,
 project the same target, route, invariant, external evidence, optional
 `proof_mode`, `fix_boundary`, `pr_aperture`, implementer handoff, and
-copy-only commands as `manual-candidates.json`, and record absent ReviewCard,
-receipt, and stable-byte ledger inputs as explicit limitations. Packet-local
-`stable_byte.ledger_state` must be preserved when supplied and must not be
-reported as a missing stable-byte ledger input. It is not
-rendered tokmd output, not analyzer-discovered ReviewCard output, not automatic
-repair, not proof, not witness execution, and not policy gating.
+copy-only commands as `manual-candidates.json`, include a
+`manual_repair_queue_item` projection from `manual-repair-queue.json` with the
+candidate ID, bucket, bucket reason, copy-only agent handoff, and trust
+boundary, and record absent ReviewCard, receipt, and stable-byte ledger inputs
+as explicit limitations. Packet-local `stable_byte.ledger_state` must be
+preserved when supplied and must not be reported as a missing stable-byte ledger
+input. It is not rendered tokmd output, not analyzer-discovered ReviewCard
+output, not automatic repair, not proof, not witness execution, and not policy
+gating.
 
 When imported candidates are present in a `first-pr` run, `pr-summary.md` and
 `github-summary.md` must include a compact manual-candidate front-door cue with
@@ -479,9 +482,10 @@ into an analyzer ReviewCard.
   free of manual-candidate markers.
 - `first-pr` writes `tokmd-packets.json` as a formatting-input sidecar,
   preserving manual markers, proof-mode/fix-boundary/PR-aperture guidance,
-  implementer handoff, and commands from `manual-candidates.json` while
-  recording absent ledger, receipt, and ReviewCard packet inputs as
-  limitations and not running tokmd.
+  implementer handoff, commands from `manual-candidates.json`, and
+  `manual_repair_queue_item` data from `manual-repair-queue.json` while
+  recording absent ledger, receipt, and ReviewCard packet inputs as limitations
+  and not running tokmd.
 - The first-pr verifier rejects manual-candidate markers in ReviewCard-only
   artifacts instead of silently accepting leaked manual candidates as analyzer
   output.

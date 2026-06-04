@@ -103,6 +103,18 @@ struct ManualCandidateIndexProjection {
     evidence_kinds: BTreeMap<String, usize>,
 }
 
+struct ManualRepairQueueProjection {
+    entries: Vec<ManualRepairQueueEntryProjection>,
+}
+
+struct ManualRepairQueueEntryProjection {
+    id: String,
+    bucket: String,
+    bucket_reason: String,
+    agent_handoff: serde_json::Value,
+    trust_boundary: String,
+}
+
 struct ManualCandidateProjection {
     id: String,
     title: String,
@@ -261,8 +273,8 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
     )?;
     check_receipt_audit_artifact(dir)?;
     check_policy_report_artifacts(dir, &summary)?;
-    check_manual_repair_queue_artifact(dir, &manual_candidates)?;
-    check_tokmd_packets_artifact(dir, &manual_candidates)?;
+    let manual_repair_queue = check_manual_repair_queue_artifact(dir, &manual_candidates)?;
+    check_tokmd_packets_artifact(dir, &manual_candidates, &manual_repair_queue)?;
     check_manual_candidate_front_door_artifacts(dir, &manual_candidates)?;
     check_lsp_artifact(dir, &summary)?;
     check_github_summary_artifact(
@@ -1011,7 +1023,7 @@ fn check_manual_candidates_artifact(dir: &Path) -> Result<ManualCandidateIndexPr
 fn check_manual_repair_queue_artifact(
     dir: &Path,
     manual_candidates: &ManualCandidateIndexProjection,
-) -> Result<(), String> {
+) -> Result<ManualRepairQueueProjection, String> {
     let path = dir.join("manual-repair-queue.json");
     let value = super::parse_json_file(&path)?;
     super::require_json_str(
@@ -1198,11 +1210,12 @@ fn check_manual_repair_queue_artifact(
             manual_candidates.count
         ));
     }
+    let mut entries = Vec::new();
     for (index, (entry, expected)) in queue.iter().zip(&manual_candidates.candidates).enumerate() {
-        check_manual_repair_queue_entry(entry, expected, index)?;
+        entries.push(check_manual_repair_queue_entry(entry, expected, index)?);
     }
 
-    Ok(())
+    Ok(ManualRepairQueueProjection { entries })
 }
 
 fn manual_candidate_proof_mode_counts(
@@ -1260,7 +1273,7 @@ fn check_manual_repair_queue_entry(
     entry: &serde_json::Value,
     expected: &ManualCandidateProjection,
     index: usize,
-) -> Result<(), String> {
+) -> Result<ManualRepairQueueEntryProjection, String> {
     let context = format!("manual-repair-queue.json queue[{index}]");
     require_projected_str(entry, "id", &expected.id, &context)?;
     require_projected_str(entry, "title", &expected.title, &context)?;
@@ -1339,12 +1352,17 @@ fn check_manual_repair_queue_entry(
         &expected.id,
         &context,
     )?;
-    super::require_json_str(entry, "bucket", "manual_candidate_handoff", &context)?;
-    super::require_json_str(
-        entry,
-        "bucket_reason",
+    let bucket = super::require_non_empty_json_str(entry, "bucket", &context)?;
+    require_expected_value(
+        bucket,
+        "manual_candidate_handoff",
+        &format!("{context} bucket"),
+    )?;
+    let bucket_reason = super::require_non_empty_json_str(entry, "bucket_reason", &context)?;
+    require_expected_value(
+        bucket_reason,
         "manual_candidate_copy_only",
-        &context,
+        &format!("{context} bucket_reason"),
     )?;
     let agent_handoff = entry
         .get("agent_handoff")
@@ -1379,12 +1397,19 @@ fn check_manual_repair_queue_entry(
             ));
         }
     }
-    Ok(())
+    Ok(ManualRepairQueueEntryProjection {
+        id: expected.id.clone(),
+        bucket: bucket.to_string(),
+        bucket_reason: bucket_reason.to_string(),
+        agent_handoff: agent_handoff.clone(),
+        trust_boundary: boundary.to_string(),
+    })
 }
 
 fn check_tokmd_packets_artifact(
     dir: &Path,
     manual_candidates: &ManualCandidateIndexProjection,
+    manual_repair_queue: &ManualRepairQueueProjection,
 ) -> Result<(), String> {
     let path = dir.join("tokmd-packets.json");
     let value = super::parse_json_file(&path)?;
@@ -1511,12 +1536,20 @@ fn check_tokmd_packets_artifact(
             manual_candidates.count
         ));
     }
-    for (index, (entry, expected)) in packets
+    if manual_repair_queue.entries.len() != manual_candidates.count {
+        return Err(format!(
+            "manual-repair-queue.json queue has {} entrie(s), expected {}",
+            manual_repair_queue.entries.len(),
+            manual_candidates.count
+        ));
+    }
+    for (index, ((entry, expected), expected_repair)) in packets
         .iter()
         .zip(&manual_candidates.candidates)
+        .zip(&manual_repair_queue.entries)
         .enumerate()
     {
-        check_tokmd_packet_entry(entry, expected, index)?;
+        check_tokmd_packet_entry(entry, expected, expected_repair, index)?;
     }
 
     let boundary =
@@ -1600,6 +1633,7 @@ fn check_tokmd_packet_inputs(value: &serde_json::Value) -> Result<(), String> {
 fn check_tokmd_packet_entry(
     entry: &serde_json::Value,
     expected: &ManualCandidateProjection,
+    expected_repair: &ManualRepairQueueEntryProjection,
     index: usize,
 ) -> Result<(), String> {
     let context = format!("tokmd-packets.json packets[{index}]");
@@ -1730,6 +1764,10 @@ fn check_tokmd_packet_entry(
             expected.id
         ));
     }
+    let repair_item = entry
+        .get("manual_repair_queue_item")
+        .ok_or_else(|| format!("{context} is missing manual_repair_queue_item"))?;
+    check_tokmd_manual_repair_queue_item(repair_item, expected_repair, &context)?;
     let commands = entry
         .get("commands")
         .ok_or_else(|| format!("{context} is missing commands"))?;
@@ -1791,6 +1829,29 @@ fn check_tokmd_packet_entry(
             ));
         }
     }
+    Ok(())
+}
+
+fn check_tokmd_manual_repair_queue_item(
+    item: &serde_json::Value,
+    expected: &ManualRepairQueueEntryProjection,
+    context: &str,
+) -> Result<(), String> {
+    let context = format!("{context} manual_repair_queue_item");
+    super::require_json_str(item, "artifact", "manual-repair-queue.json", &context)?;
+    require_projected_str(item, "id", &expected.id, &context)?;
+    require_projected_str(item, "bucket", &expected.bucket, &context)?;
+    require_projected_str(item, "bucket_reason", &expected.bucket_reason, &context)?;
+    let agent_handoff = item
+        .get("agent_handoff")
+        .ok_or_else(|| format!("{context} is missing agent_handoff"))?;
+    if agent_handoff != &expected.agent_handoff {
+        return Err(format!(
+            "{context} agent_handoff must match manual-repair-queue.json entry `{}` agent_handoff",
+            expected.id
+        ));
+    }
+    require_projected_str(item, "trust_boundary", &expected.trust_boundary, &context)?;
     Ok(())
 }
 

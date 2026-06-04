@@ -2545,6 +2545,32 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         manual_candidates["candidates"][0]["implementer_handoff"]
     );
     assert_eq!(
+        tokmd_packets["packets"][0]["manual_repair_queue_item"]["artifact"],
+        "manual-repair-queue.json"
+    );
+    assert_eq!(
+        tokmd_packets["packets"][0]["manual_repair_queue_item"]["id"],
+        manual_repair_queue["queue"][0]["id"]
+    );
+    assert_eq!(
+        tokmd_packets["packets"][0]["manual_repair_queue_item"]["bucket"],
+        manual_repair_queue["queue"][0]["bucket"]
+    );
+    assert_eq!(
+        tokmd_packets["packets"][0]["manual_repair_queue_item"]["bucket_reason"],
+        manual_repair_queue["queue"][0]["bucket_reason"]
+    );
+    assert_eq!(
+        tokmd_packets["packets"][0]["manual_repair_queue_item"]["agent_handoff"],
+        manual_repair_queue["queue"][0]["agent_handoff"]
+    );
+    assert!(
+        tokmd_packets["packets"][0]["manual_repair_queue_item"]["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not automatic repair")
+    );
+    assert_eq!(
         tokmd_packets["packets"][1]["external_evidence"][2]["kind"],
         manual_candidates["candidates"][1]["evidence"][2]["kind"]
     );
