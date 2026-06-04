@@ -654,6 +654,32 @@ fn check_manual_candidate_examples() -> Result<(), String> {
             out.as_os_str().to_os_string(),
         ])?;
     }
+    let seed_ledger_out = fixture_dir.join(DOGFOOD_STABLE_BYTE_SEEDS);
+    if let Some(parent) = seed_ledger_out.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|err| format!("create {} failed: {err}", parent.display()))?;
+    }
+    fs::copy(workspace_path(DOGFOOD_STABLE_BYTE_SEEDS), &seed_ledger_out).map_err(|err| {
+        format!(
+            "copy {DOGFOOD_STABLE_BYTE_SEEDS} to {} failed: {err}",
+            seed_ledger_out.display()
+        )
+    })?;
+    for example in &examples {
+        let example_out = fixture_dir.join(&example.path);
+        if let Some(parent) = example_out.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|err| format!("create {} failed: {err}", parent.display()))?;
+        }
+        let example_path = example.path.to_string_lossy();
+        fs::copy(workspace_path(example_path.as_ref()), &example_out).map_err(|err| {
+            format!(
+                "copy {} to {} failed: {err}",
+                example.path.display(),
+                example_out.display()
+            )
+        })?;
+    }
 
     run_unsafe_review([
         os("first-pr"),
@@ -924,6 +950,89 @@ fn check_manual_candidate_smoke_matches_examples(
             )
         })?;
         check_manual_candidate_smoke_entry_matches_example(actual, example)?;
+    }
+    check_manual_candidate_smoke_tokmd_seed_projection(out_dir, examples)?;
+    Ok(())
+}
+
+fn check_manual_candidate_smoke_tokmd_seed_projection(
+    out_dir: &Path,
+    examples: &[ManualCandidateExample],
+) -> Result<(), String> {
+    let path = out_dir.join("tokmd-packets.json");
+    let value = parse_json_file(&path)?;
+    let path_display = path.display().to_string();
+    let seed_input = value
+        .pointer("/inputs/stable-byte seed ledger")
+        .ok_or_else(|| format!("{path_display} inputs is missing stable-byte seed ledger"))?;
+    if seed_input
+        .get("included")
+        .and_then(serde_json::Value::as_bool)
+        != Some(true)
+    {
+        return Err(format!(
+            "{path_display} inputs.stable-byte seed ledger.included must be true for the Bun manual-candidate smoke"
+        ));
+    }
+    let matched = json_usize_at(
+        seed_input,
+        "/matched_manual_candidates",
+        &format!("{path_display} inputs.stable-byte seed ledger"),
+    )?;
+    if matched != examples.len() {
+        return Err(format!(
+            "{path_display} inputs.stable-byte seed ledger matched {matched}, expected {} committed examples",
+            examples.len()
+        ));
+    }
+    let with_seed = json_usize_at(&value, "/summary/with_stable_byte_seed", &path_display)?;
+    if with_seed != examples.len() {
+        return Err(format!(
+            "{path_display} summary.with_stable_byte_seed is {with_seed}, expected {} committed examples",
+            examples.len()
+        ));
+    }
+    let packets = json_array_at(&value, "/packets", &path_display)?;
+    if packets.len() != examples.len() {
+        return Err(format!(
+            "{path_display} packets has {} entries, expected {} committed examples",
+            packets.len(),
+            examples.len()
+        ));
+    }
+    for (packet, example) in packets.iter().zip(examples) {
+        let context = format!("{path_display} packet `{}`", example.id);
+        require_json_str(packet, "id", &example.id, &context)?;
+        let seed = packet
+            .get("stable_byte_seed")
+            .ok_or_else(|| format!("{context} is missing stable_byte_seed"))?;
+        require_non_empty_json_str(seed, "seed_id", &context)?;
+        require_non_empty_json_str(seed, "owner_lane", &context)?;
+        require_non_empty_json_str(seed, "suggested_first_pr", &context)?;
+        json_array_at(seed, "/triage_labels", &context)?;
+        let consistency = seed.get("candidate_consistency").ok_or_else(|| {
+            format!("{context} stable_byte_seed is missing candidate_consistency")
+        })?;
+        for field in [
+            "stable_byte_class_matches_manual_candidate",
+            "proof_mode_matches_manual_candidate",
+            "ledger_state_matches_manual_candidate",
+        ] {
+            if consistency.get(field).and_then(serde_json::Value::as_bool) != Some(true) {
+                return Err(format!(
+                    "{context} stable_byte_seed candidate_consistency.{field} must be true"
+                ));
+            }
+        }
+        let missing_inputs = json_array_at(packet, "/missing_inputs", &context)?;
+        if missing_inputs
+            .iter()
+            .any(|input| input.as_str() == Some("stable-byte seed row"))
+        {
+            return Err(format!(
+                "{context} missing_inputs must not include stable-byte seed row"
+            ));
+        }
     }
     Ok(())
 }
@@ -18420,7 +18529,8 @@ review_after = "2026-08-01"
                 "with_fix_boundary": 0,
                 "with_pr_aperture": 0,
                 "with_oracle_map": 0,
-                "with_stable_byte_source_class": 0
+                "with_stable_byte_source_class": 0,
+                "with_stable_byte_seed": 0
             },
             "inputs": {
                 "manual-candidates.json": {
@@ -18453,7 +18563,7 @@ review_after = "2026-08-01"
                 },
                 "stable-byte seed ledger": {
                     "included": false,
-                    "limitation": "Ledger state is not imported into tokmd-packets.json; use docs/dogfood/stable-byte-follow-up-seeds.md or a future seed JSON export"
+                    "limitation": "External seed ledger rows are not imported; packet-local stable_byte.ledger_state is preserved when the manual candidate supplies it"
                 }
             },
             "packets": [],
@@ -18803,7 +18913,8 @@ review_after = "2026-08-01"
                 "with_fix_boundary": 1,
                 "with_pr_aperture": 1,
                 "with_oracle_map": 1,
-                "with_stable_byte_source_class": 0
+                "with_stable_byte_source_class": 0,
+                "with_stable_byte_seed": 0
             },
             "inputs": {
                 "manual-candidates.json": {
@@ -18836,7 +18947,7 @@ review_after = "2026-08-01"
                 },
                 "stable-byte seed ledger": {
                     "included": false,
-                    "limitation": "Ledger state is not imported into tokmd-packets.json; use docs/dogfood/stable-byte-follow-up-seeds.md or a future seed JSON export"
+                    "limitation": "External seed ledger rows are not imported; packet-local stable_byte.ledger_state is preserved when the manual candidate supplies it"
                 }
             },
             "packets": [{

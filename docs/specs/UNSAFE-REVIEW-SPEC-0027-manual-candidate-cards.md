@@ -366,12 +366,17 @@ project the same target, route, invariant, external evidence, optional
 handoff, and copy-only commands as `manual-candidates.json`, include a
 `manual_repair_queue_item` projection from `manual-repair-queue.json` with the
 candidate ID, bucket, bucket reason, copy-only agent handoff, and trust
-boundary, and record absent ReviewCard, receipt, and stable-byte ledger inputs
-as explicit limitations. Packet-local `stable_byte.ledger_state` must be
-preserved when supplied and must not be reported as a missing stable-byte ledger
-input. It is not rendered tokmd output, not analyzer-discovered ReviewCard
-output, not automatic repair, not proof, not witness execution, and not policy
-gating.
+boundary, and record absent ReviewCard, receipt, and stable-byte seed-ledger
+inputs as explicit limitations. When a root-local
+`docs/dogfood/stable-byte-follow-up-seeds.md` exists and its referenced manual
+candidate JSON can be read, `tokmd-packets.json` may join a matching seed row
+by manual candidate ID and project `stable_byte_seed` with seed ID, surface,
+owner lane, suggested first PR, and triage labels as advisory workflow metadata.
+Packet-local `stable_byte.ledger_state` must be preserved when supplied and
+must not be reported as a missing stable-byte ledger input. Seed rows are not a
+second ReviewCard truth. They are not rendered tokmd output, not
+analyzer-discovered ReviewCard output, not automatic repair, not proof, not
+witness execution, and not policy gating.
 
 When imported candidates are present in a `first-pr` run, `pr-summary.md` and
 `github-summary.md` must include a compact manual-candidate front-door cue with
@@ -499,9 +504,10 @@ into an analyzer ReviewCard.
   preserving manual markers, optional oracle-map,
   proof-mode/fix-boundary/PR-aperture guidance, implementer handoff, commands
   from `manual-candidates.json`, and
-  `manual_repair_queue_item` data from `manual-repair-queue.json` while
-  recording absent ledger, receipt, and ReviewCard packet inputs as limitations
-  and not running tokmd.
+  `manual_repair_queue_item` data from `manual-repair-queue.json`, and
+  optional root-local stable-byte seed-row metadata while recording absent
+  seed-ledger, receipt, and ReviewCard packet inputs as limitations and not
+  running tokmd.
 - The first-pr verifier rejects manual-candidate markers in ReviewCard-only
   artifacts instead of silently accepting leaked manual candidates as analyzer
   output.

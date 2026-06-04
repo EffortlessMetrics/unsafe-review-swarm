@@ -1329,6 +1329,9 @@ fn check_manual_repair_queue_entry(
     require_projected_optional_str(entry, "fix_boundary", &expected.fix_boundary, &context)?;
     require_projected_optional_str(entry, "pr_aperture", &expected.pr_aperture, &context)?;
     require_projected_optional_json_value(entry, "oracle_map", &expected.oracle_map, &context)?;
+    if let Some(seed) = entry.get("stable_byte_seed") {
+        check_tokmd_stable_byte_seed(seed, expected, &context)?;
+    }
     let handoff = entry
         .get("implementer_handoff")
         .ok_or_else(|| format!("{context} is missing implementer_handoff"))?;
@@ -1543,7 +1546,12 @@ fn check_tokmd_packets_artifact(
             .count(),
         "tokmd-packets.json",
     )?;
-    check_tokmd_packet_inputs(&value)?;
+    let with_stable_byte_seed = super::json_usize_at(
+        &value,
+        "/summary/with_stable_byte_seed",
+        "tokmd-packets.json",
+    )?;
+    check_tokmd_packet_inputs(&value, with_stable_byte_seed)?;
 
     let packets = super::json_array_at(&value, "/packets", "tokmd-packets.json")?;
     if packets.len() != manual_candidates.count {
@@ -1551,6 +1559,15 @@ fn check_tokmd_packets_artifact(
             "tokmd-packets.json packets has {} entrie(s), expected {}",
             packets.len(),
             manual_candidates.count
+        ));
+    }
+    let packet_seed_count = packets
+        .iter()
+        .filter(|packet| packet.get("stable_byte_seed").is_some())
+        .count();
+    if packet_seed_count != with_stable_byte_seed {
+        return Err(format!(
+            "tokmd-packets.json summary.with_stable_byte_seed is {with_stable_byte_seed}, expected {packet_seed_count}"
         ));
     }
     if manual_repair_queue.entries.len() != manual_candidates.count {
@@ -1614,7 +1631,10 @@ fn require_tokmd_summary_count(
     Ok(())
 }
 
-fn check_tokmd_packet_inputs(value: &serde_json::Value) -> Result<(), String> {
+fn check_tokmd_packet_inputs(
+    value: &serde_json::Value,
+    with_stable_byte_seed: usize,
+) -> Result<(), String> {
     for field in ["manual-candidates.json", "manual-repair-queue.json"] {
         let input = value
             .pointer(&format!("/inputs/{field}"))
@@ -1632,7 +1652,6 @@ fn check_tokmd_packet_inputs(value: &serde_json::Value) -> Result<(), String> {
         "receipt-audit.md",
         "repair-queue.json",
         "comment-plan.json",
-        "stable-byte seed ledger",
     ] {
         let input = value
             .pointer(&format!("/inputs/{field}"))
@@ -1643,6 +1662,71 @@ fn check_tokmd_packet_inputs(value: &serde_json::Value) -> Result<(), String> {
             ));
         }
         super::require_non_empty_json_str(input, "limitation", "tokmd-packets.json inputs")?;
+    }
+    let seed_input = value
+        .pointer("/inputs/stable-byte seed ledger")
+        .ok_or_else(|| {
+            "tokmd-packets.json inputs is missing `stable-byte seed ledger`".to_string()
+        })?;
+    let seed_included = seed_input
+        .get("included")
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| {
+            "tokmd-packets.json inputs.stable-byte seed ledger.included must be a bool".to_string()
+        })?;
+    let limitation =
+        super::require_non_empty_json_str(seed_input, "limitation", "tokmd-packets.json inputs")?;
+    if seed_included {
+        super::require_non_empty_json_str(
+            seed_input,
+            "path",
+            "tokmd-packets.json inputs.stable-byte seed ledger",
+        )?;
+        super::require_non_empty_json_str(
+            seed_input,
+            "relationship",
+            "tokmd-packets.json inputs.stable-byte seed ledger",
+        )?;
+        let matched = super::json_usize_at(
+            seed_input,
+            "/matched_manual_candidates",
+            "tokmd-packets.json inputs.stable-byte seed ledger",
+        )?;
+        if matched != with_stable_byte_seed {
+            return Err(format!(
+                "tokmd-packets.json inputs.stable-byte seed ledger matched_manual_candidates is {matched}, expected {with_stable_byte_seed}"
+            ));
+        }
+        let rows = super::json_usize_at(
+            seed_input,
+            "/rows",
+            "tokmd-packets.json inputs.stable-byte seed ledger",
+        )?;
+        if rows < matched {
+            return Err(format!(
+                "tokmd-packets.json inputs.stable-byte seed ledger rows is {rows}, expected at least {matched}"
+            ));
+        }
+        for expected in [
+            "advisory workflow metadata",
+            "not analyzer-discovered",
+            "not proof",
+            "not policy-ready",
+            "not rendered tokmd output",
+        ] {
+            if !super::text_contains_ignore_ascii_case(limitation, expected) {
+                return Err(format!(
+                    "tokmd-packets.json inputs.stable-byte seed ledger limitation must include `{expected}`"
+                ));
+            }
+        }
+    } else if !super::text_contains_ignore_ascii_case(
+        limitation,
+        "packet-local stable_byte.ledger_state",
+    ) {
+        return Err(
+            "tokmd-packets.json inputs.stable-byte seed ledger limitation must mention packet-local stable_byte.ledger_state when the ledger is absent".to_string(),
+        );
     }
     Ok(())
 }
@@ -1831,6 +1915,14 @@ fn check_tokmd_packet_entry(
             "{context} missing_inputs must include `stable-byte ledger state` when packet-local ledger_state is absent"
         ));
     }
+    let has_missing_stable_byte_seed_row = missing_inputs
+        .iter()
+        .any(|input| input == "stable-byte seed row");
+    if entry.get("stable_byte_seed").is_some() && has_missing_stable_byte_seed_row {
+        return Err(format!(
+            "{context} missing_inputs must not include `stable-byte seed row` when stable_byte_seed is present"
+        ));
+    }
     let boundary = super::require_non_empty_json_str(entry, "trust_boundary", &context)?;
     for expected_text in [
         "not analyzer-discovered",
@@ -1840,6 +1932,75 @@ fn check_tokmd_packet_entry(
         "not source editing",
         "not proof",
         "not policy gating",
+    ] {
+        if !super::text_contains_ignore_ascii_case(boundary, expected_text) {
+            return Err(format!(
+                "{context} trust_boundary must include `{expected_text}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn check_tokmd_stable_byte_seed(
+    seed: &serde_json::Value,
+    expected: &ManualCandidateProjection,
+    context: &str,
+) -> Result<(), String> {
+    let context = format!("{context} stable_byte_seed");
+    for field in [
+        "source",
+        "seed_id",
+        "ledger_state",
+        "candidate_family",
+        "surface",
+        "manual_candidate",
+        "safe_js_caller",
+        "rust_native_sink",
+        "proof_mode",
+        "suggested_first_pr",
+        "owner_lane",
+    ] {
+        super::require_non_empty_json_str(seed, field, &context)?;
+    }
+    require_non_empty_string_array(seed, "triage_labels", &context)?;
+    require_projected_optional_str(
+        seed,
+        "candidate_family",
+        &expected.stable_byte_source_class(),
+        &context,
+    )?;
+    require_projected_optional_str(
+        seed,
+        "ledger_state",
+        &expected.stable_byte_ledger_state,
+        &context,
+    )?;
+    if let Some(proof_mode) = &expected.proof_mode {
+        require_projected_str(seed, "proof_mode", &proof_mode.kind, &context)?;
+    }
+    let consistency = seed
+        .get("candidate_consistency")
+        .ok_or_else(|| format!("{context} is missing candidate_consistency"))?;
+    for field in [
+        "stable_byte_class_matches_manual_candidate",
+        "proof_mode_matches_manual_candidate",
+        "ledger_state_matches_manual_candidate",
+    ] {
+        if consistency.get(field).and_then(serde_json::Value::as_bool) != Some(true) {
+            return Err(format!(
+                "{context} candidate_consistency.{field} must be true"
+            ));
+        }
+    }
+    let boundary = super::require_non_empty_json_str(seed, "trust_boundary", &context)?;
+    for expected_text in [
+        "advisory workflow metadata",
+        "not analyzer discovery",
+        "not witness execution",
+        "not proof",
+        "not policy readiness",
+        "not rendered tokmd output",
     ] {
         if !super::text_contains_ignore_ascii_case(boundary, expected_text) {
             return Err(format!(

@@ -130,7 +130,10 @@ The current `tokmd-packets.json` sidecar records which inputs were absent for
 the manual-candidate packet export. Packet-local `stable_byte.ledger_state`
 metadata and optional `oracle_map` cross-language oracle metadata are preserved
 when supplied by a manual candidate and should not be reported as missing
-external seed-ledger data or rendered proof. The future renderer should preserve
+external seed-ledger data or rendered proof. When the root-local stable-byte
+seed ledger and its referenced manual candidate JSON are readable, matching
+seed rows are exported as `stable_byte_seed` packet metadata with owner lane,
+suggested first PR, and triage labels. The future renderer should preserve
 those limitations and add any renderer-specific absent-input notes. Missing
 inputs must produce an explicit limitation, not an empty result or all-clear
 statement.

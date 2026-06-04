@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::fmt::{self, Write as _};
+use std::fs;
 use std::path::Path;
 use std::process::Command as ProcessCommand;
 
@@ -20,6 +21,20 @@ const TOKMD_PACKET_PRESETS: [&str; 5] = [
     "bun-ub-review-map",
     "bun-ub-next-pick",
 ];
+const STABLE_BYTE_SEED_LEDGER_PATH: &str = "docs/dogfood/stable-byte-follow-up-seeds.md";
+const STABLE_BYTE_SEED_LEDGER_HEADER: [&str; 11] = [
+    "Seed ID",
+    "Ledger state",
+    "Candidate family",
+    "Surface",
+    "Manual candidate",
+    "Safe JS caller",
+    "Rust/native sink",
+    "Proof mode",
+    "Suggested first PR",
+    "Owner lane",
+    "Triage labels",
+];
 const STABLE_BYTE_SOURCE_CLASSES: [&str; 6] = [
     "stable-byte-source-rab-async",
     "stable-byte-source-sab-race",
@@ -39,6 +54,30 @@ const REVIEW_CARD_REPAIR_QUEUE_BUCKETS: [&str; 6] = [
 const MANUAL_REPAIR_QUEUE_BUCKET: &str = "manual_candidate_handoff";
 const MANUAL_REPAIR_QUEUE_BUCKET_REASON: &str = "manual_candidate_copy_only";
 const MANUAL_REPAIR_QUEUE_ENTRY_TRUST_BOUNDARY: &str = "Copy-only manual candidate repair queue entry; not analyzer-discovered, not automatic repair, not witness execution, not source editing, not proof, and not policy gating.";
+
+#[derive(Clone, Debug)]
+struct StableByteSeed {
+    seed_id: String,
+    ledger_state: String,
+    candidate_family: String,
+    surface: String,
+    manual_candidate: String,
+    safe_js_caller: String,
+    rust_native_sink: String,
+    proof_mode: String,
+    suggested_first_pr: String,
+    owner_lane: String,
+    triage_labels: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+struct StableByteSeedLedger {
+    path: &'static str,
+    present: bool,
+    parse_error: Option<String>,
+    rows: usize,
+    by_candidate_id: BTreeMap<String, StableByteSeed>,
+}
 
 pub(super) struct FirstPrReport<'a> {
     pub(super) output: &'a AnalyzeOutput,
@@ -1016,6 +1055,146 @@ fn stable_byte_ledger_state(candidate: &ManualCandidate) -> Option<&str> {
         .map(|stable_byte| stable_byte.ledger_state.as_str())
 }
 
+fn load_stable_byte_seed_ledger(root: &Path) -> StableByteSeedLedger {
+    let path = root.join(STABLE_BYTE_SEED_LEDGER_PATH);
+    if !path.is_file() {
+        return StableByteSeedLedger {
+            path: STABLE_BYTE_SEED_LEDGER_PATH,
+            present: false,
+            parse_error: None,
+            rows: 0,
+            by_candidate_id: BTreeMap::new(),
+        };
+    }
+    let text = match fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(err) => {
+            return StableByteSeedLedger {
+                path: STABLE_BYTE_SEED_LEDGER_PATH,
+                present: true,
+                parse_error: Some(format!("read failed: {err}")),
+                rows: 0,
+                by_candidate_id: BTreeMap::new(),
+            };
+        }
+    };
+    match parse_stable_byte_seed_ledger(root, &text) {
+        Ok((rows, by_candidate_id)) => StableByteSeedLedger {
+            path: STABLE_BYTE_SEED_LEDGER_PATH,
+            present: true,
+            parse_error: None,
+            rows,
+            by_candidate_id,
+        },
+        Err(err) => StableByteSeedLedger {
+            path: STABLE_BYTE_SEED_LEDGER_PATH,
+            present: true,
+            parse_error: Some(err),
+            rows: 0,
+            by_candidate_id: BTreeMap::new(),
+        },
+    }
+}
+
+fn parse_stable_byte_seed_ledger(
+    root: &Path,
+    text: &str,
+) -> Result<(usize, BTreeMap<String, StableByteSeed>), String> {
+    let mut in_table = false;
+    let mut rows = 0usize;
+    let mut by_candidate_id = BTreeMap::new();
+    for line in text.lines() {
+        if !in_table {
+            if line.contains("| Seed ID |") {
+                let columns = markdown_table_columns(line);
+                if columns != STABLE_BYTE_SEED_LEDGER_HEADER {
+                    return Err("stable-byte seed header is not recognized".to_string());
+                }
+                in_table = true;
+            }
+            continue;
+        }
+        if !line.trim_start().starts_with('|') {
+            break;
+        }
+        if line.contains("|---") {
+            continue;
+        }
+        let columns = markdown_table_columns(line);
+        if columns.len() != STABLE_BYTE_SEED_LEDGER_HEADER.len() {
+            return Err("stable-byte seed row has the wrong column count".to_string());
+        }
+        let seed = StableByteSeed {
+            seed_id: markdown_code_cell_value(columns[0]),
+            ledger_state: markdown_code_cell_value(columns[1]),
+            candidate_family: markdown_code_cell_value(columns[2]),
+            surface: markdown_code_cell_value(columns[3]),
+            manual_candidate: markdown_code_cell_value(columns[4]),
+            safe_js_caller: markdown_code_cell_value(columns[5]),
+            rust_native_sink: markdown_code_cell_value(columns[6]),
+            proof_mode: markdown_code_cell_value(columns[7]),
+            suggested_first_pr: markdown_code_cell_value(columns[8]),
+            owner_lane: markdown_code_cell_value(columns[9]),
+            triage_labels: markdown_code_spans(columns[10]),
+        };
+        if seed.seed_id.is_empty() || seed.manual_candidate.is_empty() {
+            return Err("stable-byte seed row is missing seed id or manual candidate".to_string());
+        }
+        if let Some(candidate_id) = stable_byte_seed_manual_candidate_id(root, &seed) {
+            by_candidate_id.insert(candidate_id, seed);
+        }
+        rows += 1;
+    }
+    if !in_table {
+        return Err("stable-byte seed table was not found".to_string());
+    }
+    Ok((rows, by_candidate_id))
+}
+
+fn stable_byte_seed_manual_candidate_id(root: &Path, seed: &StableByteSeed) -> Option<String> {
+    let text = fs::read_to_string(root.join(&seed.manual_candidate)).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&text).ok()?;
+    value
+        .get("id")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string)
+}
+
+fn markdown_table_columns(line: &str) -> Vec<&str> {
+    let trimmed = line.trim();
+    let trimmed = trimmed.strip_prefix('|').unwrap_or(trimmed);
+    let trimmed = trimmed.strip_suffix('|').unwrap_or(trimmed);
+    trimmed.split('|').map(str::trim).collect()
+}
+
+fn markdown_code_cell_value(cell: &str) -> String {
+    let cell = cell.trim();
+    let Some(start) = cell.find('`') else {
+        return cell.to_string();
+    };
+    let Some(end) = cell[start + 1..].find('`') else {
+        return cell.to_string();
+    };
+    cell[start + 1..start + 1 + end].to_string()
+}
+
+fn markdown_code_spans(cell: &str) -> Vec<String> {
+    let mut spans = Vec::new();
+    let mut rest = cell;
+    while let Some(start) = rest.find('`') {
+        rest = &rest[start + 1..];
+        let Some(end) = rest.find('`') else {
+            break;
+        };
+        let value = rest[..end].trim();
+        if !value.is_empty() {
+            spans.push(value.to_string());
+        }
+        rest = &rest[end + 1..];
+    }
+    spans
+}
+
 pub(super) fn render_manual_candidates_artifact(
     root: &Path,
     candidates: &[ManualCandidate],
@@ -1108,10 +1287,26 @@ pub(super) fn render_manual_repair_queue_artifact(
 }
 
 pub(super) fn render_tokmd_packets_artifact(root: &Path, candidates: &[ManualCandidate]) -> String {
+    let stable_byte_seed_ledger = load_stable_byte_seed_ledger(root);
     let packets = candidates
         .iter()
-        .map(|candidate| tokmd_packet_entry(root, candidate))
+        .map(|candidate| {
+            tokmd_packet_entry(
+                root,
+                candidate,
+                stable_byte_seed_ledger.by_candidate_id.get(&candidate.id),
+                &stable_byte_seed_ledger,
+            )
+        })
         .collect::<Vec<_>>();
+    let matched_stable_byte_seeds = candidates
+        .iter()
+        .filter(|candidate| {
+            stable_byte_seed_ledger
+                .by_candidate_id
+                .contains_key(&candidate.id)
+        })
+        .count();
     let value = json!({
         "schema_version": "tokmd-packets/v1",
         "tool": "unsafe-review",
@@ -1136,8 +1331,9 @@ pub(super) fn render_tokmd_packets_artifact(root: &Path, candidates: &[ManualCan
             "with_pr_aperture": candidates.iter().filter(|candidate| candidate.pr_aperture.is_some()).count(),
             "with_oracle_map": candidates.iter().filter(|candidate| candidate.oracle_map.is_some()).count(),
             "with_stable_byte_source_class": candidates.iter().filter(|candidate| stable_byte_source_class(candidate).is_some()).count(),
+            "with_stable_byte_seed": matched_stable_byte_seeds,
         },
-        "inputs": tokmd_packet_inputs(),
+        "inputs": tokmd_packet_inputs(&stable_byte_seed_ledger, matched_stable_byte_seeds),
         "packets": packets,
         "trust_boundary": "Tokmd-friendly packet bundle for formatting inputs only; manual/advisory candidates are not analyzer-discovered ReviewCards, not policy inputs, not a proof of UB, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repair success, and not policy readiness. unsafe-review did not run tokmd, witnesses, Miri, Bun, Node, agents, post comments, edit source, or enforce blocking policy.",
     });
@@ -1205,7 +1401,10 @@ fn manual_repair_queue_agent_handoff() -> serde_json::Value {
     })
 }
 
-fn tokmd_packet_inputs() -> serde_json::Value {
+fn tokmd_packet_inputs(
+    stable_byte_seed_ledger: &StableByteSeedLedger,
+    matched_stable_byte_seeds: usize,
+) -> serde_json::Value {
     json!({
         "manual-candidates.json": {
             "included": true,
@@ -1235,14 +1434,46 @@ fn tokmd_packet_inputs() -> serde_json::Value {
             "included": false,
             "limitation": "Comment-plan review budget data is not converted to packet JSON in this slice"
         },
-        "stable-byte seed ledger": {
-            "included": false,
-            "limitation": "External seed ledger rows are not imported; packet-local stable_byte.ledger_state is preserved when the manual candidate supplies it"
-        }
+        "stable-byte seed ledger": tokmd_stable_byte_seed_ledger_input(
+            stable_byte_seed_ledger,
+            matched_stable_byte_seeds,
+        )
     })
 }
 
-fn tokmd_packet_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::Value {
+fn tokmd_stable_byte_seed_ledger_input(
+    stable_byte_seed_ledger: &StableByteSeedLedger,
+    matched_stable_byte_seeds: usize,
+) -> serde_json::Value {
+    if !stable_byte_seed_ledger.present {
+        return json!({
+            "included": false,
+            "limitation": "External seed ledger rows are not imported; packet-local stable_byte.ledger_state is preserved when the manual candidate supplies it"
+        });
+    }
+    if let Some(parse_error) = &stable_byte_seed_ledger.parse_error {
+        return json!({
+            "included": false,
+            "path": stable_byte_seed_ledger.path,
+            "limitation": format!("Stable-byte seed ledger was present but not imported: {parse_error}; packet-local stable_byte.ledger_state is preserved when the manual candidate supplies it")
+        });
+    }
+    json!({
+        "included": true,
+        "path": stable_byte_seed_ledger.path,
+        "relationship": "root-local stable-byte seed ledger rows are joined to manual-candidate packets by the ID inside each row's referenced manual candidate JSON",
+        "rows": stable_byte_seed_ledger.rows,
+        "matched_manual_candidates": matched_stable_byte_seeds,
+        "limitation": "Stable-byte seed rows are advisory workflow metadata only; not analyzer-discovered, not proof, not witness execution, not policy-ready, and not rendered tokmd output"
+    })
+}
+
+fn tokmd_packet_entry(
+    root: &Path,
+    candidate: &ManualCandidate,
+    stable_byte_seed: Option<&StableByteSeed>,
+    stable_byte_seed_ledger: &StableByteSeedLedger,
+) -> serde_json::Value {
     let mut value = json!({
         "id": candidate.id.as_str(),
         "source": "manual",
@@ -1281,6 +1512,7 @@ fn tokmd_packet_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::V
         "fix_options": &candidate.fix_options,
         "test_targets": &candidate.test_targets,
         "do_not_touch": &candidate.do_not_touch,
+        "stable_byte_seed": stable_byte_seed.map(|seed| tokmd_stable_byte_seed(seed, candidate)),
         "implementer_handoff": manual_candidate_implementer_handoff(candidate),
         "manual_repair_queue_item": tokmd_manual_repair_queue_item(candidate),
         "commands": {
@@ -1288,7 +1520,11 @@ fn tokmd_packet_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::V
             "context_json": context_command(root, &candidate.id),
             "witness_plan": candidate_witness_plan_command(root, &candidate.id),
         },
-        "missing_inputs": tokmd_packet_missing_inputs(candidate),
+        "missing_inputs": tokmd_packet_missing_inputs(
+            candidate,
+            stable_byte_seed,
+            stable_byte_seed_ledger,
+        ),
         "trust_boundary": "Manual candidate tokmd packet input only; not analyzer-discovered, not tokmd output, not automatic repair, not witness execution, not source editing, not proof, and not policy gating.",
     });
     if let Some(object) = value.as_object_mut() {
@@ -1307,8 +1543,38 @@ fn tokmd_packet_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::V
         if candidate.stable_byte.is_none() {
             object.remove("stable_byte");
         }
+        if stable_byte_seed.is_none() {
+            object.remove("stable_byte_seed");
+        }
     }
     value
+}
+
+fn tokmd_stable_byte_seed(seed: &StableByteSeed, candidate: &ManualCandidate) -> serde_json::Value {
+    json!({
+        "source": STABLE_BYTE_SEED_LEDGER_PATH,
+        "seed_id": seed.seed_id.as_str(),
+        "ledger_state": seed.ledger_state.as_str(),
+        "candidate_family": seed.candidate_family.as_str(),
+        "surface": seed.surface.as_str(),
+        "manual_candidate": seed.manual_candidate.as_str(),
+        "safe_js_caller": seed.safe_js_caller.as_str(),
+        "rust_native_sink": seed.rust_native_sink.as_str(),
+        "proof_mode": seed.proof_mode.as_str(),
+        "suggested_first_pr": seed.suggested_first_pr.as_str(),
+        "owner_lane": seed.owner_lane.as_str(),
+        "triage_labels": &seed.triage_labels,
+        "candidate_consistency": {
+            "stable_byte_class_matches_manual_candidate": stable_byte_source_class(candidate)
+                == Some(seed.candidate_family.as_str()),
+            "proof_mode_matches_manual_candidate": candidate.proof_mode.as_ref()
+                .map(|proof_mode| proof_mode.kind.as_str())
+                == Some(seed.proof_mode.as_str()),
+            "ledger_state_matches_manual_candidate": stable_byte_ledger_state(candidate)
+                == Some(seed.ledger_state.as_str()),
+        },
+        "trust_boundary": "Stable-byte seed row is advisory workflow metadata only; not analyzer discovery, not witness execution, not proof, not policy readiness, and not rendered tokmd output."
+    })
 }
 
 fn tokmd_manual_repair_queue_item(candidate: &ManualCandidate) -> serde_json::Value {
@@ -1322,10 +1588,20 @@ fn tokmd_manual_repair_queue_item(candidate: &ManualCandidate) -> serde_json::Va
     })
 }
 
-fn tokmd_packet_missing_inputs(candidate: &ManualCandidate) -> Vec<&'static str> {
+fn tokmd_packet_missing_inputs(
+    candidate: &ManualCandidate,
+    stable_byte_seed: Option<&StableByteSeed>,
+    stable_byte_seed_ledger: &StableByteSeedLedger,
+) -> Vec<&'static str> {
     let mut missing = vec!["ReviewCard projection", "receipt audit JSON"];
     if stable_byte_ledger_state(candidate).is_none() {
         missing.push("stable-byte ledger state");
+    }
+    if stable_byte_seed_ledger.present
+        && stable_byte_seed_ledger.parse_error.is_none()
+        && stable_byte_seed.is_none()
+    {
+        missing.push("stable-byte seed row");
     }
     missing
 }
@@ -1772,6 +2048,74 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn tokmd_packets_join_root_local_stable_byte_seed_rows() -> Result<(), String> {
+        let root = unique_test_root("unsafe-review-tokmd-seed-ledger")?;
+        let docs_dir = root.join("docs/dogfood");
+        fs::create_dir_all(&docs_dir)
+            .map_err(|err| format!("create {} failed: {err}", docs_dir.display()))?;
+        let candidate_dir = root.join("docs/examples/manual-candidates");
+        fs::create_dir_all(&candidate_dir)
+            .map_err(|err| format!("create {} failed: {err}", candidate_dir.display()))?;
+        let candidate = manual_candidate_fixture_with_stable_byte()?;
+        fs::write(
+            candidate_dir.join("textdecoder-sab.json"),
+            manual_candidate_fixture_with_stable_byte_json(),
+        )
+        .map_err(|err| format!("write candidate fixture failed: {err}"))?;
+        fs::write(
+            docs_dir.join("stable-byte-follow-up-seeds.md"),
+            r#"# Bun stable-byte follow-up seed index
+
+## Seeds
+
+| Seed ID | Ledger state | Candidate family | Surface | Manual candidate | Safe JS caller | Rust/native sink | Proof mode | Suggested first PR | Owner lane | Triage labels |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `bun-stable-byte-textdecoder-sab` | `handoff-ready` | `stable-byte-source-sab-race` | `TextDecoder.decode` | `docs/examples/manual-candidates/textdecoder-sab.json` | SharedArrayBuffer-backed typed array decode | `src/runtime/webcore/TextDecoder.rs` slice materialization | `mutation-plus-miri` | `TextDecoder shared-byte snapshot only` | `rust2` | `non-observable`, `needs-miri-model` |
+"#,
+        )
+        .map_err(|err| format!("write seed ledger failed: {err}"))?;
+
+        let rendered = render_tokmd_packets_artifact(&root, std::slice::from_ref(&candidate));
+        let value: serde_json::Value = serde_json::from_str(&rendered)
+            .map_err(|err| format!("tokmd packets should render JSON: {err}"))?;
+
+        assert_eq!(value["summary"]["with_stable_byte_seed"], 1);
+        assert_eq!(value["inputs"]["stable-byte seed ledger"]["included"], true);
+        assert_eq!(
+            value["inputs"]["stable-byte seed ledger"]["matched_manual_candidates"],
+            1
+        );
+        let seed = &value["packets"][0]["stable_byte_seed"];
+        assert_eq!(seed["seed_id"], "bun-stable-byte-textdecoder-sab");
+        assert_eq!(seed["owner_lane"], "rust2");
+        assert_eq!(
+            seed["suggested_first_pr"],
+            "TextDecoder shared-byte snapshot only"
+        );
+        assert_eq!(seed["triage_labels"][1], "needs-miri-model");
+        assert_eq!(
+            seed["candidate_consistency"]["stable_byte_class_matches_manual_candidate"],
+            true
+        );
+        assert_eq!(
+            seed["candidate_consistency"]["proof_mode_matches_manual_candidate"],
+            true
+        );
+        assert_eq!(
+            seed["candidate_consistency"]["ledger_state_matches_manual_candidate"],
+            true
+        );
+        assert!(
+            seed["trust_boundary"]
+                .as_str()
+                .unwrap_or("")
+                .contains("not rendered tokmd output")
+        );
+        let _ = fs::remove_dir_all(&root);
+        Ok(())
+    }
+
     fn manual_candidate_fixture() -> Result<ManualCandidate, String> {
         ManualCandidate::from_json_str(
             r#"{
@@ -1805,5 +2149,70 @@ mod tests {
               "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
             }"#,
         )
+    }
+
+    fn manual_candidate_fixture_with_stable_byte() -> Result<ManualCandidate, String> {
+        ManualCandidate::from_json_str(manual_candidate_fixture_with_stable_byte_json())
+    }
+
+    fn manual_candidate_fixture_with_stable_byte_json() -> &'static str {
+        r#"{
+          "schema_version": "manual-candidate/v1",
+          "id": "R4R2-S001",
+          "source": "manual",
+          "manual_candidate": true,
+          "analyzer_discovered": false,
+          "title": "TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes",
+          "location": {
+            "file": "src/runtime/webcore/TextDecoder.rs",
+            "line": 237
+          },
+          "operation_family": "raw_pointer_read",
+          "unsafe_operation": "core::slice::from_raw_parts",
+          "invariant": "&[u8] memory must not be concurrently mutated",
+          "safe_caller": "TextDecoder.decode SharedArrayBuffer route",
+          "stable_byte": {
+            "class": "stable-byte-source-sab-race",
+            "source": "SharedArrayBuffer-backed typed array decode",
+            "sink": "src/runtime/webcore/TextDecoder.rs slice materialization",
+            "hazard": "Rust slice materialization can treat shared JS bytes as stable while JS can mutate the backing storage concurrently",
+            "observable": "no",
+            "proof_required": "mutation-plus-miri",
+            "suggested_fix_boundary": "copy shared bytes before constructing the Rust slice",
+            "pr_aperture": "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings",
+            "ledger_state": "handoff-ready"
+          },
+          "proof_mode": {
+            "kind": "mutation-plus-miri",
+            "system_bun_expected": "nondiscriminating",
+            "mutation_required": true,
+            "miri_required": true
+          },
+          "fix_boundary": "copy shared bytes before constructing the Rust slice",
+          "pr_aperture": "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings",
+          "evidence": [{
+            "kind": "runtime_witness",
+            "path": "target/unsafe-scout/textdecoder-shared-race-route.out",
+            "summary": "Bun TextDecoder route reaches shared backing bytes through safe JS",
+            "command": "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts",
+            "limitation": "runtime route evidence only; not memory-safety proof and not analyzer-discovered"
+          }],
+          "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
+        }"#
+    }
+
+    fn unique_test_root(name: &str) -> Result<std::path::PathBuf, String> {
+        let suffix = format!(
+            "{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(|err| format!("system clock before epoch: {err}"))?
+                .as_nanos()
+        );
+        let root = std::env::temp_dir().join(format!("{name}-{suffix}"));
+        fs::create_dir_all(&root)
+            .map_err(|err| format!("create {} failed: {err}", root.display()))?;
+        Ok(root)
     }
 }
