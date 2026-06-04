@@ -170,6 +170,26 @@ pub(crate) fn minimal_repro(card: &ReviewCard) -> MinimalReproCue {
     )
 }
 
+pub(crate) fn minimal_repro_comment(card: &ReviewCard) -> String {
+    if let Some(command) = card.next_action.verify_commands.first() {
+        return format!(
+            "confirm ReviewCard `{}` still maps to this site, then build/run `{command}`; attach a receipt only for the same route and identity; cue was not executed",
+            card.id
+        );
+    }
+    if let Some(route) = card.routes.first() {
+        return format!(
+            "confirm ReviewCard `{}` still maps to this site, then use the `{}` witness route; attach a receipt only for the same route and identity; cue was not executed",
+            card.id,
+            route.kind.as_str()
+        );
+    }
+    format!(
+        "confirm ReviewCard `{}` still maps to this site, then derive a focused repro with `unsafe-review explain`; keep it advisory without external evidence; cue was not executed",
+        card.id
+    )
+}
+
 pub(crate) fn confirmation_step(card: &ReviewCard) -> String {
     if let Some(command) = card.next_action.verify_commands.first() {
         return format!(

@@ -12380,6 +12380,33 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_comment_plan_missing_minimal_repro() -> Result<(), String>
+    {
+        let dir = unique_temp_dir("unsafe-review-first-pr-comment-missing-minimal-repro")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("comment-plan.json");
+        let mut comment_plan = parse_json_file(&path)?;
+        comment_plan["comments"][0]
+            .as_object_mut()
+            .ok_or_else(|| "comment plan fixture comment must be an object".to_string())?
+            .remove("minimal_repro");
+        fs::write(&path, comment_plan.to_string())
+            .map_err(|err| format!("write comment plan failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("comment-plan.json comment is missing minimal_repro")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_comment_plan_build_this_first_command_drift()
     -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-comment-build-first-command-drift")?;
@@ -18762,6 +18789,68 @@ review_after = "2026-08-01"
         )
     }
 
+    fn add_minimal_repro_to_valid_comment_plan(path: &Path) -> Result<(), String> {
+        let mut value = parse_json_file(path)?;
+        let comments = value
+            .get_mut("comments")
+            .and_then(serde_json::Value::as_array_mut)
+            .ok_or_else(|| "comment-plan fixture comments must be an array".to_string())?;
+        for comment in comments {
+            let Some(card_id) = comment
+                .get("card_id")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_string)
+            else {
+                continue;
+            };
+            if card_id != "card-1" {
+                continue;
+            }
+            let command = comment
+                .get("verify_commands")
+                .and_then(serde_json::Value::as_array)
+                .and_then(|commands| commands.first())
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| "comment-plan fixture card-1 verify command missing".to_string())?
+                .to_string();
+            let route_kind = comment
+                .get("witness_routes")
+                .and_then(serde_json::Value::as_array)
+                .and_then(|routes| routes.first())
+                .and_then(|route| route.get("kind"))
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| "comment-plan fixture card-1 route kind missing".to_string())?
+                .to_string();
+            comment["minimal_repro"] = serde_json::json!({
+                "kind": "verify_command",
+                "command": command.clone(),
+                "route_kind": route_kind,
+                "steps": [
+                    "Confirm ReviewCard `card-1` still maps to `unsafe { ptr.cast::<Header>().read() }` at `src/lib.rs:7:5` before upgrading confidence.",
+                    format!("Build/run `{command}` as the smallest available command for this card."),
+                    "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+                ],
+                "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+            });
+            let body = comment
+                .get("body")
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| "comment-plan fixture card-1 body missing".to_string())?
+                .to_string();
+            let cue = format!(
+                "Minimal repro cue: confirm ReviewCard `card-1` still maps to this site, then build/run `{command}`; attach a receipt only for the same route and identity; cue was not executed."
+            );
+            if !body.contains("Minimal repro cue:") {
+                comment["body"] = serde_json::json!(body.replace(
+                    "\n\nConfirmation step:",
+                    &format!("\n\n{cue}\n\nConfirmation step:")
+                ));
+            }
+        }
+        fs::write(path, value.to_string())
+            .map_err(|err| format!("write comment plan failed: {err}"))
+    }
+
     fn write_valid_artifacts(dir: &Path) -> Result<(), String> {
         fs::write(
             dir.join("cards.json"),
@@ -18783,6 +18872,7 @@ review_after = "2026-08-01"
             r#"{"schema_version":"0.1","mode":"plan_only","policy":"advisory","summary":{"selected_count":1,"not_selected_count":0,"budget":3,"reason":"bounded reviewer noise","reason_code":"bounded_reviewer_noise"},"comments":[{"card_id":"card-1","path":"src/lib.rs","line":7,"changed_line":true,"class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hypothesis_to_confirm":"static `guard_missing` ReviewCard for `unsafe { ptr.cast::<Header>().read() }`; confirm with external evidence before treating it as observed runtime behavior","operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verify_commands":["cargo +nightly miri test card"],"build_this_first":{"kind":"verify_command","command":"cargo +nightly miri test card","route_kind":"miri","summary":"Build/run `cargo +nightly miri test card` first for this card; attach a matching receipt only if it confirms the route"},"confirmation_step":"build/run `cargo +nightly miri test card` first, then attach a matching receipt if it confirms the route","selection_reason":"actionable high-priority review card","selection_reason_code":"top_actionable_card","actionability":"specific_guard_missing","relevance":"medium","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","body":"`unsafe-review` found `guard_missing` for `unsafe { ptr.cast::<Header>().read() }` (`raw_pointer_read`).\n\nMissing evidence: No missing evidence recorded\n\nProof path: `source_route_only`.\n\nHypothesis to confirm: static `guard_missing` ReviewCard for `unsafe { ptr.cast::<Header>().read() }`; confirm with external evidence before treating it as observed runtime behavior.\n\nNext action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n\nBuild/run this first: Build/run `cargo +nightly miri test card` first for this card; attach a matching receipt only if it confirms the route\n\nConfirmation step: build/run `cargo +nightly miri test card` first, then attach a matching receipt if it confirms the route.\n\nWitness route: `miri` because route.\n\nVerify command: `cargo +nightly miri test card`\n\nPlan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision.\n\nTrust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and not a Miri result unless a witness receipt is attached."}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
         )
         .map_err(|err| format!("write comment plan failed: {err}"))?;
+        add_minimal_repro_to_valid_comment_plan(&dir.join("comment-plan.json"))?;
         fs::write(
             dir.join("repair-queue.json"),
             add_repair_queue_boundaries(r#"{"schema_version":"0.1","tool":"unsafe-review","mode":"aggregate_repair_queue","source":"review_card","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue","summary":{"changed_files":1,"changed_rust_files":1,"changed_non_rust_files":0,"cards":1,"repairable_by_guard":1,"repairable_by_safety_docs":0,"repairable_by_test":0,"requires_witness_receipt":1,"requires_human_review":0,"do_not_auto_repair":0},"buckets":{"repairable_by_guard":[{"card_id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","operation_family":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":true,"state":"ready_for_agent","reasons":["specific operation family"]},"bucket_reason":"guard_evidence_missing","context_command":"unsafe-review context card-1 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"repairable_by_safety_docs":[],"repairable_by_test":[],"requires_witness_receipt":[{"card_id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","operation_family":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":true,"state":"ready_for_agent","reasons":["specific operation family"]},"bucket_reason":"witness_receipt_missing","context_command":"unsafe-review context card-1 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"requires_human_review":[],"do_not_auto_repair":[]}}"#),
@@ -18898,6 +18988,7 @@ review_after = "2026-08-01"
             r##"{"schema_version":"0.1","mode":"plan_only","policy":"advisory","summary":{"selected_count":1,"not_selected_count":1,"budget":3,"reason":"bounded reviewer noise","reason_code":"bounded_reviewer_noise"},"comments":[{"card_id":"card-1","path":"src/lib.rs","line":7,"changed_line":true,"class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hypothesis_to_confirm":"static `guard_missing` ReviewCard for `unsafe { ptr.cast::<Header>().read() }`; confirm with external evidence before treating it as observed runtime behavior","operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verify_commands":["cargo +nightly miri test card"],"build_this_first":{"kind":"verify_command","command":"cargo +nightly miri test card","route_kind":"miri","summary":"Build/run `cargo +nightly miri test card` first for this card; attach a matching receipt only if it confirms the route"},"confirmation_step":"build/run `cargo +nightly miri test card` first, then attach a matching receipt if it confirms the route","selection_reason":"actionable high-priority review card","selection_reason_code":"top_actionable_card","actionability":"specific_guard_missing","relevance":"medium","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","body":"`unsafe-review` found `guard_missing` for `unsafe { ptr.cast::<Header>().read() }` (`raw_pointer_read`).\n\nMissing evidence: No missing evidence recorded\n\nProof path: `source_route_only`.\n\nHypothesis to confirm: static `guard_missing` ReviewCard for `unsafe { ptr.cast::<Header>().read() }`; confirm with external evidence before treating it as observed runtime behavior.\n\nNext action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n\nBuild/run this first: Build/run `cargo +nightly miri test card` first for this card; attach a matching receipt only if it confirms the route\n\nConfirmation step: build/run `cargo +nightly miri test card` first, then attach a matching receipt if it confirms the route.\n\nWitness route: `miri` because route.\n\nVerify command: `cargo +nightly miri test card`\n\nPlan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision.\n\nTrust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and not a Miri result unless a witness receipt is attached."}],"not_selected":[{"card_id":"card-2","path":"src/lib.rs","line":7,"changed_line":true,"class":"contract_missing","priority":"high","confidence":"high","proof_path":"human_review_only","hypothesis_to_confirm":"static `contract_missing` ReviewCard for `unsafe fn read_header(ptr: *const u8)`; confirm with external evidence before treating it as observed runtime behavior","operation":"unsafe fn read_header(ptr: *const u8)","operation_family":"unknown","next_action":"Add a precise public `# Safety` section that names the required caller obligations.","actionability":"specific_contract_missing","relevance":"high","reason":"operation family unknown","reason_code":"human_deep_review_only"}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"##,
         )
         .map_err(|err| format!("write comment plan failed: {err}"))?;
+        add_minimal_repro_to_valid_comment_plan(&dir.join("comment-plan.json"))?;
         fs::write(
             dir.join("repair-queue.json"),
             add_repair_queue_boundaries(r#"{"schema_version":"0.1","tool":"unsafe-review","mode":"aggregate_repair_queue","source":"review_card","policy":"advisory","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue","summary":{"changed_files":1,"changed_rust_files":1,"changed_non_rust_files":0,"cards":2,"repairable_by_guard":1,"repairable_by_safety_docs":1,"repairable_by_test":0,"requires_witness_receipt":1,"requires_human_review":1,"do_not_auto_repair":1},"buckets":{"repairable_by_guard":[{"card_id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","operation_family":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":true,"state":"ready_for_agent","reasons":["specific operation family"]},"bucket_reason":"guard_evidence_missing","context_command":"unsafe-review context card-1 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"repairable_by_safety_docs":[{"card_id":"card-2","class":"contract_missing","priority":"high","confidence":"high","proof_path":"human_review_only","operation_family":"unknown","operation":"unsafe fn read_header(ptr: *const u8)","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":false,"state":"requires_human_review","reasons":["operation family `unknown` is not safe for automatic repair delegation"]},"bucket_reason":"safety_docs_evidence_missing","context_command":"unsafe-review context card-2 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"repairable_by_test":[],"requires_witness_receipt":[{"card_id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","operation_family":"raw_pointer_read","operation":"unsafe { ptr.cast::<Header>().read() }","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":true,"state":"ready_for_agent","reasons":["specific operation family"]},"bucket_reason":"witness_receipt_missing","context_command":"unsafe-review context card-1 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"requires_human_review":[{"card_id":"card-2","class":"contract_missing","priority":"high","confidence":"high","proof_path":"human_review_only","operation_family":"unknown","operation":"unsafe fn read_header(ptr: *const u8)","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":false,"state":"requires_human_review","reasons":["operation family `unknown` is not safe for automatic repair delegation"]},"bucket_reason":"human_review_required","context_command":"unsafe-review context card-2 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}],"do_not_auto_repair":[{"card_id":"card-2","class":"contract_missing","priority":"high","confidence":"high","proof_path":"human_review_only","operation_family":"unknown","operation":"unsafe fn read_header(ptr: *const u8)","path":"src/lib.rs","line":7,"missing_evidence":[],"agent_readiness":{"ready":false,"state":"requires_human_review","reasons":["operation family `unknown` is not safe for automatic repair delegation"]},"bucket_reason":"not_ready_for_automatic_repair","context_command":"unsafe-review context card-2 --json","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue"}]}}"#),

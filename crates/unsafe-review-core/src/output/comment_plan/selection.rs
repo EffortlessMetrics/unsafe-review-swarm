@@ -1,6 +1,8 @@
 use crate::domain::{Confidence, OperationFamily, Priority, ReviewCard, ReviewClass};
 use crate::output::REVIEWCARD_TRUST_BOUNDARY;
-use crate::output::confirmation::{build_this_first, confirmation_step, hypothesis_to_confirm};
+use crate::output::confirmation::{
+    build_this_first, confirmation_step, hypothesis_to_confirm, minimal_repro_comment,
+};
 
 const PLAN_BOUNDARY: &str = "Plan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision.";
 
@@ -144,6 +146,10 @@ pub(super) fn comment_body(card: &ReviewCard) -> String {
     body.push_str(&format!(
         "Build/run this first: {}\n\n",
         build_this_first(card).summary
+    ));
+    body.push_str(&format!(
+        "Minimal repro cue: {}.\n\n",
+        minimal_repro_comment(card)
     ));
     body.push_str(&format!(
         "Confirmation step: {}\n\n",

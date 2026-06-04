@@ -57,6 +57,27 @@ mod tests {
                 .contains("Build/run `cargo +nightly miri test read_header` first")
         );
         assert_eq!(
+            value["comments"][0]["minimal_repro"]["kind"],
+            "verify_command"
+        );
+        assert_eq!(
+            value["comments"][0]["minimal_repro"]["command"],
+            "cargo +nightly miri test read_header"
+        );
+        assert_eq!(value["comments"][0]["minimal_repro"]["route_kind"], "miri");
+        assert!(
+            value["comments"][0]["minimal_repro"]["steps"][0]
+                .as_str()
+                .unwrap_or("")
+                .contains("Confirm ReviewCard")
+        );
+        assert!(
+            value["comments"][0]["minimal_repro"]["limitation"]
+                .as_str()
+                .unwrap_or("")
+                .contains("unsafe-review did not run this command")
+        );
+        assert_eq!(
             value["comments"][0]["confirmation_step"],
             "build/run `cargo +nightly miri test read_header` first, then attach a matching receipt if it confirms the route"
         );
@@ -110,6 +131,12 @@ mod tests {
                 .contains(
                     "Build/run this first: Build/run `cargo +nightly miri test read_header` first"
                 )
+        );
+        assert!(
+            value["comments"][0]["body"]
+                .as_str()
+                .unwrap_or("")
+                .contains("Minimal repro cue: confirm ReviewCard")
         );
         assert!(
             value["comments"][0]["body"]

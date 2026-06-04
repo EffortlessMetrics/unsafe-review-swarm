@@ -1,7 +1,8 @@
 use crate::api::AnalyzeOutput;
 use crate::domain::{ReviewCard, WitnessRoute};
 use crate::output::confirmation::{
-    BuildThisFirstCue, build_this_first, confirmation_step, hypothesis_to_confirm,
+    BuildThisFirstCue, MinimalReproCue, build_this_first, confirmation_step, hypothesis_to_confirm,
+    minimal_repro,
 };
 use crate::output::{
     NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE,
@@ -148,6 +149,7 @@ pub(super) struct PlannedComment {
     next_action: String,
     verify_commands: Vec<String>,
     build_this_first: BuildThisFirstCue,
+    minimal_repro: MinimalReproCue,
     confirmation_step: String,
     selection_reason: &'static str,
     selection_reason_code: &'static str,
@@ -176,6 +178,7 @@ impl From<&ReviewCard> for PlannedComment {
             next_action: card.next_action.summary.clone(),
             verify_commands: card.next_action.verify_commands.clone(),
             build_this_first: build_this_first(card),
+            minimal_repro: minimal_repro(card),
             confirmation_step: confirmation_step(card),
             selection_reason: selection_reason.message,
             selection_reason_code: selection_reason.code,

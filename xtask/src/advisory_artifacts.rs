@@ -66,6 +66,14 @@ struct CommentBuildFirstProjection {
     summary: String,
 }
 
+struct CommentMinimalReproProjection {
+    kind: &'static str,
+    command: Option<String>,
+    route_kind: Option<String>,
+    steps: Vec<String>,
+    limitation: &'static str,
+}
+
 struct RepairQueueProjection {
     buckets: Vec<String>,
     readiness_ready: bool,
@@ -140,6 +148,7 @@ const COMMENT_PLAN_REVIEW_BUDGET: usize = 3;
 const MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
 const MANUAL_CANDIDATE_GITHUB_QUEUE_LIMIT: usize = 1;
 const REVIEW_CARD_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
+const MINIMAL_REPRO_LIMITATION: &str = "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety.";
 const COMMENT_PLAN_REVIEW_BUDGET_REASON: &str = "bounded reviewer noise";
 const COMMENT_PLAN_REVIEW_BUDGET_REASON_CODE: &str = "bounded_reviewer_noise";
 const COMMENT_PLAN_SELECTION_REASONS: &[&str] = &[
@@ -4375,7 +4384,7 @@ fn check_comment_plan_artifact(
                     .to_string(),
             );
         }
-        comment_body_projections.push((body, card_projection));
+        comment_body_projections.push((comment, body, card_projection));
     }
     let mut not_selected_card_ids = BTreeSet::new();
     if let Some(not_selected) = comment_plan.get("not_selected") {
@@ -4496,8 +4505,13 @@ fn check_comment_plan_artifact(
             ));
         }
     }
-    for (body, card_projection) in comment_body_projections {
+    for (comment, body, card_projection) in comment_body_projections {
         require_comment_body_card_projection(body, card_projection, "comment-plan.json comment")?;
+        require_comment_minimal_repro_projection(
+            comment,
+            card_projection,
+            "comment-plan.json comment",
+        )?;
     }
     let comment_boundary = comment_plan
         .get("trust_boundary")
@@ -5041,6 +5055,12 @@ fn require_comment_body_card_projection(
             expected_build_first.summary
         ));
     }
+    let expected_minimal_repro = expected_comment_minimal_repro_body(card);
+    if !body.contains(&expected_minimal_repro) {
+        return Err(format!(
+            "{context} body must project structured minimal_repro cue `{expected_minimal_repro}`"
+        ));
+    }
     if let Some(command) = card.verify_commands.first() {
         let expected = format!("Confirmation step: build/run `{command}` first");
         if !body.contains(&expected) {
@@ -5527,6 +5547,35 @@ fn require_comment_build_this_first_projection(
     require_projected_str(value, "summary", &expected.summary, context)
 }
 
+fn require_comment_minimal_repro_projection(
+    comment: &serde_json::Value,
+    card: &CardProjection,
+    context: &str,
+) -> Result<(), String> {
+    let Some(value) = comment.get("minimal_repro") else {
+        return Err(format!("{context} is missing minimal_repro"));
+    };
+    let Some(object) = value.as_object() else {
+        return Err(format!("{context} minimal_repro must be an object"));
+    };
+    let expected = expected_comment_minimal_repro(card);
+    let cue_context = format!("{context} minimal_repro");
+    let kind = super::require_non_empty_json_str(value, "kind", &cue_context)?;
+    require_expected_value(kind, expected.kind, &format!("{cue_context}.kind"))?;
+    require_optional_string_value(
+        object.get("command"),
+        expected.command.as_deref(),
+        &format!("{cue_context}.command"),
+    )?;
+    require_optional_string_value(
+        object.get("route_kind"),
+        expected.route_kind.as_deref(),
+        &format!("{cue_context}.route_kind"),
+    )?;
+    require_projected_string_array(value, "steps", &expected.steps, &cue_context)?;
+    require_projected_str(value, "limitation", expected.limitation, &cue_context)
+}
+
 fn require_optional_string_value(
     actual: Option<&serde_json::Value>,
     expected: Option<&str>,
@@ -5597,6 +5646,88 @@ fn expected_comment_build_this_first(card: &CardProjection) -> CommentBuildFirst
         route_kind: None,
         summary: "No automatic build/run command is available; derive the first confirmation from `unsafe-review explain` and human review before upgrading confidence".to_string(),
     }
+}
+
+fn expected_comment_minimal_repro(card: &CardProjection) -> CommentMinimalReproProjection {
+    let identity_step = format!(
+        "Confirm ReviewCard `{}` still maps to `{}` at `{}:{}:{}` before upgrading confidence.",
+        card.id,
+        collapse_whitespace(&card.operation),
+        card.path,
+        card.line,
+        card.column
+    );
+    if let Some(command) = card.verify_commands.first() {
+        return CommentMinimalReproProjection {
+            kind: "verify_command",
+            command: Some(command.clone()),
+            route_kind: card.witness_routes.first().map(|route| route.kind.clone()),
+            steps: vec![
+                identity_step,
+                format!("Build/run `{command}` as the smallest available command for this card."),
+                "Attach a matching receipt only if that run confirms the same route and ReviewCard identity.".to_string(),
+            ],
+            limitation: MINIMAL_REPRO_LIMITATION,
+        };
+    }
+    if let Some(route) = card.witness_routes.first() {
+        let route_step = if let Some(command) = &route.command {
+            format!(
+                "Use the `{}` route from `witness-plan.md`; start with `{command}` if it still targets this card.",
+                route.kind
+            )
+        } else {
+            format!(
+                "Use the `{}` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+                route.kind
+            )
+        };
+        return CommentMinimalReproProjection {
+            kind: "witness_route",
+            command: route.command.clone(),
+            route_kind: Some(route.kind.clone()),
+            steps: vec![
+                identity_step,
+                route_step,
+                "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review.".to_string(),
+            ],
+            limitation: MINIMAL_REPRO_LIMITATION,
+        };
+    }
+    CommentMinimalReproProjection {
+        kind: "human_review",
+        command: None,
+        route_kind: None,
+        steps: vec![
+            identity_step,
+            format!(
+                "Use `unsafe-review explain {}` and human review to derive a focused repro before upgrading confidence.",
+                card.id
+            ),
+            "Keep the finding advisory unless external evidence confirms the same route."
+                .to_string(),
+        ],
+        limitation: MINIMAL_REPRO_LIMITATION,
+    }
+}
+
+fn expected_comment_minimal_repro_body(card: &CardProjection) -> String {
+    if let Some(command) = card.verify_commands.first() {
+        return format!(
+            "Minimal repro cue: confirm ReviewCard `{}` still maps to this site, then build/run `{command}`; attach a receipt only for the same route and identity; cue was not executed.",
+            card.id
+        );
+    }
+    if let Some(route) = card.witness_routes.first() {
+        return format!(
+            "Minimal repro cue: confirm ReviewCard `{}` still maps to this site, then use the `{}` witness route; attach a receipt only for the same route and identity; cue was not executed.",
+            card.id, route.kind
+        );
+    }
+    format!(
+        "Minimal repro cue: confirm ReviewCard `{}` still maps to this site, then derive a focused repro with `unsafe-review explain`; keep it advisory without external evidence; cue was not executed.",
+        card.id
+    )
 }
 
 fn require_not_selected_card_projection(
