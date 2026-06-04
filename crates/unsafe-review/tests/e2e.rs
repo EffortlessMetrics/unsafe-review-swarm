@@ -3908,11 +3908,28 @@ fn outcome_compares_existing_json_snapshots_without_safety_claim() -> Result<(),
             .starts_with("snapshot-")
     );
     assert!(outcome["limitations"].is_array());
+    let trust_boundary = outcome["trust_boundary"].as_str().unwrap_or("");
+    for phrase in [
+        "not memory-safety proof",
+        "not UB-free status",
+        "not Miri-clean status",
+        "not site-execution evidence",
+        "not calibrated precision/recall",
+        "not policy-ready status",
+        "not witness execution",
+    ] {
+        assert!(
+            trust_boundary.contains(phrase),
+            "missing outcome trust boundary phrase: {phrase}"
+        );
+    }
+    let limitations = outcome["limitations"]
+        .as_array()
+        .expect("limitations should be an array");
     assert!(
-        outcome["trust_boundary"]
-            .as_str()
-            .unwrap_or("")
-            .contains("not memory-safety proof")
+        limitations
+            .iter()
+            .any(|item| item.as_str().unwrap_or("").contains("Miri-clean status"))
     );
 
     let markdown = run_success([
@@ -3942,6 +3959,10 @@ fn outcome_compares_existing_json_snapshots_without_safety_claim() -> Result<(),
     assert!(markdown.contains("| Status | Card | Reason | Before | After |"));
     assert!(markdown.contains("## Limitations"));
     assert!(markdown.contains("## Trust boundary"));
+    assert!(markdown.contains("not Miri-clean status"));
+    assert!(markdown.contains("not site-execution evidence"));
+    assert!(markdown.contains("not calibrated precision/recall"));
+    assert!(markdown.contains("not policy-ready status"));
     assert!(markdown.contains("| 1 | 0 | 0 | 0 | 0 |"));
     assert!(markdown.contains("raw_pointer_read"));
     assert!(markdown.contains("unsafe { ptr.cast::<Header>().read() }"));

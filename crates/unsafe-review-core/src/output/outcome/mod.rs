@@ -11,7 +11,7 @@ use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
 mod markdown;
 mod witness;
 
-const TRUST_BOUNDARY: &str = "Static unsafe contract review outcome only; this compares existing ReviewCard snapshots and manual candidate snapshots, not memory-safety proof, not UB-free status, and not witness execution.";
+const TRUST_BOUNDARY: &str = "Static unsafe contract review outcome only; this compares existing ReviewCard snapshots and manual candidate snapshots, not memory-safety proof, not UB-free status, not Miri-clean status, not site-execution evidence, not calibrated precision/recall, not policy-ready status, and not witness execution.";
 const MAX_REVIEWER_MOVEMENT_REASONS: usize = 5;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -482,6 +482,7 @@ fn compare_snapshots(before: Snapshot, after: Snapshot) -> Result<OutcomeReport,
             "compares existing saved ReviewCard JSON snapshots and manual candidate JSON artifacts only".to_string(),
             "manual candidates remain source=manual advisory artifacts, not analyzer-discovered findings".to_string(),
             "does not rerun analysis or execute witness tools".to_string(),
+            "does not claim Miri-clean status, site-execution evidence, calibrated precision/recall, or policy-ready status".to_string(),
             "does not make policy or blocking decisions".to_string(),
         ],
         before: before_summary,
@@ -1120,11 +1121,28 @@ mod tests {
                 .starts_with("snapshot-")
         );
         assert!(value["limitations"].is_array());
+        let trust_boundary = value["trust_boundary"].as_str().unwrap_or("");
+        for phrase in [
+            "not memory-safety proof",
+            "not UB-free status",
+            "not Miri-clean status",
+            "not site-execution evidence",
+            "not calibrated precision/recall",
+            "not policy-ready status",
+            "not witness execution",
+        ] {
+            assert!(
+                trust_boundary.contains(phrase),
+                "missing trust boundary phrase: {phrase}"
+            );
+        }
+        let limitations = value["limitations"]
+            .as_array()
+            .ok_or("limitations should be an array")?;
         assert!(
-            value["trust_boundary"]
-                .as_str()
-                .unwrap_or("")
-                .contains("not memory-safety proof")
+            limitations
+                .iter()
+                .any(|item| item.as_str().unwrap_or("").contains("Miri-clean status"))
         );
 
         let markdown = render_markdown(&report);
@@ -1138,6 +1156,10 @@ mod tests {
         assert!(markdown.contains("| Status | Card | Reason | Before | After |"));
         assert!(markdown.contains("## Limitations"));
         assert!(markdown.contains("## Trust boundary"));
+        assert!(markdown.contains("not Miri-clean status"));
+        assert!(markdown.contains("not site-execution evidence"));
+        assert!(markdown.contains("not calibrated precision/recall"));
+        assert!(markdown.contains("not policy-ready status"));
         assert!(markdown.contains("UR-new-c1"));
         assert!(markdown.contains("raw_pointer_read"));
         assert!(markdown.contains("unsafe { ptr.cast::<Header>().read() }"));
