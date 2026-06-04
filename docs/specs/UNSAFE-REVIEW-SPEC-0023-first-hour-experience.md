@@ -144,8 +144,8 @@ cargo run --locked -p xtask -- check-pr
 - Missing evidence is obligation-specific, not a generic "unsafe issue" label.
 - No-card output says no changed unsafe-review gaps were found and preserves the
   no-proof limitation.
-- A bounded agent packet has a card-scoped task, allowed repairs, do-not-do
-  rules, verify commands, stop condition, and trust boundary.
+- A bounded agent packet has a card-scoped task, allowed repairs, confirmation
+  cue, do-not-do rules, verify commands, stop condition, and trust boundary.
 - Saved LSP data is read-only and does not imply a live editor is required.
 
 ## 8. Promotion rule

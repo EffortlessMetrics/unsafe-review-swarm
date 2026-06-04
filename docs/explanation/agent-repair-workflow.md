@@ -115,6 +115,7 @@ When a card is `ready_for_agent`, copy these fields into the agent task:
 - `source_context.unsafe_site`
 - `missing_evidence`
 - `allowed_repairs`
+- `confirmation_cue`
 - `do_not_do`
 - `verify_commands`
 - `stop_conditions`

@@ -459,6 +459,20 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     assert_eq!(packet["card_id"], card_id);
     assert_eq!(packet["card"]["id"], card_id);
     assert_eq!(
+        packet["confirmation_cue"]["build_this_first"]["kind"],
+        "verify_command"
+    );
+    assert_eq!(
+        packet["confirmation_cue"]["build_this_first"]["command"],
+        "cargo +nightly miri test read_header"
+    );
+    assert!(
+        packet["confirmation_cue"]["confirmation_step"]
+            .as_str()
+            .unwrap_or("")
+            .contains("attach a matching receipt")
+    );
+    assert_eq!(
         packet["context"]["operation"],
         "unsafe { ptr.cast::<Header>().read() }"
     );

@@ -1,7 +1,6 @@
 use crate::domain::{Confidence, OperationFamily, Priority, ReviewCard, ReviewClass};
 use crate::output::REVIEWCARD_TRUST_BOUNDARY;
-
-use super::model::PlannedBuildFirst;
+use crate::output::confirmation::{build_this_first, confirmation_step, hypothesis_to_confirm};
 
 const PLAN_BOUNDARY: &str = "Plan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision.";
 
@@ -165,59 +164,6 @@ pub(super) fn comment_body(card: &ReviewCard) -> String {
     body.push_str("Trust boundary: ");
     body.push_str(REVIEWCARD_TRUST_BOUNDARY);
     body
-}
-
-pub(super) fn hypothesis_to_confirm(card: &ReviewCard) -> String {
-    format!(
-        "static `{}` ReviewCard for `{}`; confirm with external evidence before treating it as observed runtime behavior",
-        card.class.as_str(),
-        one_line(&card.operation.expression)
-    )
-}
-
-pub(super) fn build_this_first(card: &ReviewCard) -> PlannedBuildFirst {
-    if let Some(command) = card.next_action.verify_commands.first() {
-        return PlannedBuildFirst::new(
-            "verify_command",
-            Some(command.clone()),
-            card.routes.first().map(|route| route.kind.as_str()),
-            format!(
-                "Build/run `{command}` first for this card; attach a matching receipt only if it confirms the route"
-            ),
-        );
-    }
-    if let Some(route) = card.routes.first() {
-        return PlannedBuildFirst::new(
-            "witness_route",
-            route.command.clone(),
-            Some(route.kind.as_str()),
-            format!(
-                "No automatic build/run command is available; use the `{}` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
-                route.kind.as_str()
-            ),
-        );
-    }
-    PlannedBuildFirst::new(
-        "human_review",
-        None,
-        None,
-        "No automatic build/run command is available; derive the first confirmation from `unsafe-review explain` and human review before upgrading confidence".to_string(),
-    )
-}
-
-pub(super) fn confirmation_step(card: &ReviewCard) -> String {
-    if let Some(command) = card.next_action.verify_commands.first() {
-        return format!(
-            "build/run `{command}` first, then attach a matching receipt if it confirms the route"
-        );
-    }
-    if let Some(route) = card.routes.first() {
-        return format!(
-            "use the `{}` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
-            route.kind.as_str()
-        );
-    }
-    "derive a focused confirmation from `unsafe-review explain` and human review before upgrading confidence".to_string()
 }
 
 fn missing_summary(card: &ReviewCard) -> String {

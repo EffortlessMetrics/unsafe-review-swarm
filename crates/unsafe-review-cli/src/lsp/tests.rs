@@ -276,6 +276,9 @@ fn execute_collect_agent_packet_returns_packet_for_card() -> Result<(), Box<dyn 
         .as_str()
         .ok_or("packet should be returned as a string")?;
     assert!(packet.contains(&output.cards[0].id.0));
+    assert!(packet.contains("\"confirmation_cue\""));
+    assert!(packet.contains("\"build_this_first\""));
+    assert!(packet.contains("attach a matching receipt"));
     assert!(packet.contains("do_not_do"));
     Ok(())
 }

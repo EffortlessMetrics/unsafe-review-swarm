@@ -261,9 +261,9 @@ unsafe-review context --root fixtures/raw_pointer_alignment <card-id> --json
 ```
 
 The context packet is copy-only. It includes a card-scoped task, missing
-evidence, allowed repairs, do-not-do rules, verify commands, stop conditions,
-and the static-review trust boundary. It does not execute an agent and does not
-edit source. See
+evidence, allowed repairs, confirmation cue, do-not-do rules, verify commands,
+stop conditions, and the static-review trust boundary. It does not execute an
+agent, run the suggested command, or edit source. See
 [Agent packet examples](explanation/agent-packet-examples.md) for
 fixture-backed examples of repair-ready and human-review-only packets.
 
