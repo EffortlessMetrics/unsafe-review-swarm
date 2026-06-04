@@ -668,17 +668,19 @@ fn check_manual_candidate_examples() -> Result<(), String> {
 }
 
 fn manual_candidate_examples() -> Result<Vec<ManualCandidateExample>, String> {
-    let dir = Path::new(MANUAL_CANDIDATE_EXAMPLE_DIR);
+    let dir = workspace_path(MANUAL_CANDIDATE_EXAMPLE_DIR);
+    let relative_dir = Path::new(MANUAL_CANDIDATE_EXAMPLE_DIR);
     let mut examples = Vec::new();
     let entries =
-        fs::read_dir(dir).map_err(|err| format!("read {} failed: {err}", dir.display()))?;
+        fs::read_dir(&dir).map_err(|err| format!("read {} failed: {err}", dir.display()))?;
     for entry in entries {
         let entry = entry.map_err(|err| format!("read_dir entry failed: {err}"))?;
         let path = entry.path();
         if path.extension().and_then(|value| value.to_str()) != Some("json") {
             continue;
         }
-        let path_display = path.display().to_string();
+        let relative_path = relative_dir.join(entry.file_name());
+        let path_display = relative_path.display().to_string();
         let value = parse_json_file(&path)?;
         require_json_str(
             &value,
@@ -701,7 +703,7 @@ fn manual_candidate_examples() -> Result<Vec<ManualCandidateExample>, String> {
         }
         check_manual_candidate_example_handoff_fields(&value, &path_display)?;
         examples.push(ManualCandidateExample {
-            path,
+            path: relative_path,
             id,
             expected: value,
         });
