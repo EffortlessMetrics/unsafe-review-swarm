@@ -1,6 +1,9 @@
 use crate::api::AnalyzeOutput;
 use crate::domain::{ReviewCard, WitnessRoute};
-use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
+use crate::output::{
+    NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE,
+    REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY,
+};
 use crate::util::path_display;
 use serde::Serialize;
 use std::collections::BTreeSet;
@@ -15,8 +18,6 @@ const REVIEW_BUDGET_REASON: ReviewBudgetReason = ReviewBudgetReason {
     code: "bounded_reviewer_noise",
     message: "bounded reviewer noise",
 };
-pub(super) const TRUST_BOUNDARY: &str = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.";
-
 #[derive(Serialize)]
 pub(super) struct CommentPlan {
     pub(super) schema_version: String,

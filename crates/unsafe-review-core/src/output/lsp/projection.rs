@@ -1,12 +1,11 @@
 use crate::api::{AnalyzeOutput, Scope};
 use crate::domain::{EvidenceState, ObligationEvidence, Priority, ReviewCard, WitnessRoute};
+use crate::output::REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY;
 use crate::util::path_display;
 use serde::{Deserialize, Serialize};
 
 mod code_actions;
 mod hover;
-
-const TRUST_BOUNDARY: &str = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EditorProjection {

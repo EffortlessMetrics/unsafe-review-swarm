@@ -260,7 +260,7 @@ fn lsp_projection_is_parseable_and_read_only() -> Result<(), String> {
         value["trust_boundary"]
             .as_str()
             .unwrap_or("")
-            .contains("not a Miri result")
+            .contains("not a site-execution claim")
     );
     Ok(())
 }

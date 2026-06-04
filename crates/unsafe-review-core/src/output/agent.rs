@@ -1,9 +1,9 @@
 use crate::domain::ReviewCard;
+use crate::output::REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY;
 use serde::Serialize;
 
 pub(crate) use queue::{AgentQueueProjection, AgentReadiness};
 
-const TRUST_BOUNDARY: &str = "Static unsafe contract review only; this is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.";
 pub(crate) const DO_NOT_DO: &[&str] = &[
     "do not widen unsafe code without reducing the missing evidence",
     "do not suppress this card instead of adding, exposing, or explicitly waiving evidence",

@@ -2,7 +2,9 @@ mod card;
 mod header;
 
 use crate::api::AnalyzeOutput;
-use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
+use crate::output::{
+    NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE, REVIEWCARD_TRUST_BOUNDARY,
+};
 
 pub(crate) fn render(output: &AnalyzeOutput) -> String {
     let mut out = String::new();
@@ -18,7 +20,9 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
         card::render_card(&mut out, card);
     }
 
-    out.push_str("Trust boundary: static unsafe contract review; not a proof of memory safety and not a Miri result unless a witness receipt is attached.\n");
+    out.push_str("Trust boundary: ");
+    out.push_str(REVIEWCARD_TRUST_BOUNDARY);
+    out.push('\n');
     out
 }
 

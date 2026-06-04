@@ -1,4 +1,5 @@
 use crate::domain::{Confidence, OperationFamily, Priority, ReviewCard, ReviewClass};
+use crate::output::REVIEWCARD_TRUST_BOUNDARY;
 
 const PLAN_BOUNDARY: &str = "Plan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision.";
 
@@ -155,7 +156,8 @@ pub(super) fn comment_body(card: &ReviewCard) -> String {
     }
     body.push_str(PLAN_BOUNDARY);
     body.push_str("\n\n");
-    body.push_str("Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and not a Miri result unless a witness receipt is attached.");
+    body.push_str("Trust boundary: ");
+    body.push_str(REVIEWCARD_TRUST_BOUNDARY);
     body
 }
 

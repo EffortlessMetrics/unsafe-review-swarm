@@ -1,6 +1,8 @@
 use crate::api::AnalyzeOutput;
 use crate::domain::{ReviewCard, WitnessKind, WitnessRoute};
-use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
+use crate::output::{
+    NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE, REVIEWCARD_TRUST_BOUNDARY,
+};
 use crate::util::path_display;
 
 struct RouteGroup {
@@ -73,7 +75,9 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
     }
 
     out.push_str("## Trust boundary\n\n");
-    out.push_str("This artifact is static unsafe contract review. It routes reviewers to credible witnesses but does not run Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux. It is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n");
+    out.push_str("This artifact routes reviewers to credible witnesses but does not run Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux. It is ");
+    out.push_str(REVIEWCARD_TRUST_BOUNDARY);
+    out.push('\n');
     out
 }
 
@@ -416,7 +420,7 @@ mod tests {
         assert!(rendered.contains("expires_at: 2026-08-18"));
         assert!(rendered.contains("Missing visible local guard"));
         assert!(rendered.contains("Receipt hint"));
-        assert!(rendered.contains("not a Miri result unless a witness receipt is attached"));
+        assert!(rendered.contains("not a site-execution claim"));
         Ok(())
     }
 

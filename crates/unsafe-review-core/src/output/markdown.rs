@@ -2,7 +2,9 @@ use crate::api::AnalyzeOutput;
 use crate::api::Scope;
 use crate::domain::ReviewCard;
 use crate::output::agent;
-use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
+use crate::output::{
+    NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE, REVIEWCARD_TRUST_BOUNDARY,
+};
 use crate::util::path_display;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -59,7 +61,7 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
         ));
     }
     out.push_str("\n## Trust boundary\n\n");
-    out.push_str("This is static unsafe contract review. It is not a proof of memory safety and not a Miri result unless a witness receipt is attached.\n");
+    push_reviewcard_trust_boundary(&mut out);
     out
 }
 
@@ -123,7 +125,9 @@ fn render_repo_posture(output: &AnalyzeOutput) -> String {
     }
 
     out.push_str("## Trust boundary\n\n");
-    out.push_str("This is static repo posture evidence from unsafe-review cards. It counts open review gaps, not raw unsafe usage, not memory-safety proof, not UB-free status, and not a Miri result unless a witness receipt is attached.\n");
+    out.push_str("This is static repo posture evidence from unsafe-review cards. It counts open review gaps, not raw unsafe usage. It is ");
+    out.push_str(REVIEWCARD_TRUST_BOUNDARY);
+    out.push('\n');
     out
 }
 
@@ -378,9 +382,9 @@ pub(crate) fn render_github_summary(output: &AnalyzeOutput) -> String {
     out.push_str(
         "Full advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, policy-report.json, policy-report.md, manual-candidates.json, manual-repair-queue.json, tokmd-packets.json, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n",
     );
-    out.push_str(
-        "> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n",
-    );
+    out.push_str("> Trust boundary: ");
+    out.push_str(REVIEWCARD_TRUST_BOUNDARY);
+    out.push('\n');
     out.push_str(
         "> Execution boundary: unsafe-review did not run witnesses, post comments, edit source, run an agent, or enforce blocking policy.\n",
     );
@@ -514,7 +518,9 @@ fn render_pr_summary_reviewer_cockpit(out: &mut String, output: &AnalyzeOutput) 
             card.id
         ));
         out.push_str(&format!("- {}\n", agent_handoff_summary(card)));
-        out.push_str("- Trust boundary: static unsafe contract review only; not proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n\n");
+        out.push_str("- Trust boundary: ");
+        out.push_str(REVIEWCARD_TRUST_BOUNDARY);
+        out.push_str("\n\n");
     } else {
         render_no_changed_gaps(out);
         out.push_str(
@@ -666,7 +672,9 @@ fn render_pr_summary_witness_plan(out: &mut String, output: &AnalyzeOutput) {
 
 fn render_pr_summary_trust_boundary(out: &mut String) {
     out.push_str("## Trust boundary\n\n");
-    out.push_str("This artifact projects existing unsafe-review cards for PR review. It is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n");
+    out.push_str("This artifact projects existing unsafe-review cards for PR review. It is ");
+    out.push_str(REVIEWCARD_TRUST_BOUNDARY);
+    out.push('\n');
 }
 
 fn render_no_changed_gaps(out: &mut String) {
@@ -750,8 +758,14 @@ pub(crate) fn render_card_detail(card: &ReviewCard) -> String {
     render_non_resolution_guidance(&mut out);
     render_witness_routes(&mut out, card);
     out.push_str("\n## Trust boundary\n\n");
-    out.push_str("This is static unsafe contract review. It is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n");
+    push_reviewcard_trust_boundary(&mut out);
     out
+}
+
+fn push_reviewcard_trust_boundary(out: &mut String) {
+    out.push_str("This is ");
+    out.push_str(REVIEWCARD_TRUST_BOUNDARY);
+    out.push('\n');
 }
 
 fn render_resolution_guidance(out: &mut String, card: &ReviewCard) {
@@ -847,7 +861,7 @@ mod tests {
         assert!(rendered.contains("`source_route_only`"));
         assert!(rendered.contains("unsafe { ptr.cast::<Header>().read() }"));
         assert!(rendered.contains("Add or expose the local guard"));
-        assert!(rendered.contains("not a proof of memory safety"));
+        assert!(rendered.contains("not memory-safety proof"));
         Ok(())
     }
 
@@ -963,9 +977,8 @@ mod tests {
         assert!(rendered.contains("- Receipt audit: `receipt-audit.md`"));
         assert!(rendered.contains("no witness was run"));
         assert!(rendered.contains("not Miri-clean status"));
-        assert!(rendered.contains("not site-execution proof"));
-        assert!(rendered.contains("not a proof of memory safety"));
-        assert!(rendered.contains("not a Miri result unless a witness receipt is attached"));
+        assert!(rendered.contains("not a site-execution claim"));
+        assert!(rendered.contains("not memory-safety proof"));
         Ok(())
     }
 

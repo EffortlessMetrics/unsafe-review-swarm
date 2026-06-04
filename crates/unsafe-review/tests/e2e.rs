@@ -163,7 +163,7 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     )));
     assert!(github_summary_text.contains("## Open next"));
     assert!(github_summary_text.contains("Full reviewer cockpit: `pr-summary.md`"));
-    assert!(github_summary_text.contains("not site-execution proof"));
+    assert!(github_summary_text.contains("not a site-execution claim"));
     assert!(github_summary_text.contains("unsafe-review did not run witnesses"));
     assert!(github_summary_text.contains("post comments"));
     assert!(github_summary_text.contains("edit source"));
@@ -1615,7 +1615,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         cards["trust_boundary"]
             .as_str()
             .unwrap_or("")
-            .contains("not a proof of memory safety")
+            .contains("not memory-safety proof")
     );
     let card_id = json_str(&cards["cards"][0]["id"], "cards[0].id")?;
     assert!(stdout.contains("unsafe-review explain --root"));
@@ -2053,7 +2053,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(summary.contains(&format!("unsafe-review explain {card_id}")));
     assert!(summary.contains(&format!("unsafe-review context {card_id} --json")));
     assert!(summary.contains("## Trust boundary"));
-    assert!(summary.contains("not a Miri result unless a witness receipt is attached"));
+    assert!(summary.contains("not a site-execution claim"));
     assert_manual_candidate_front_panel(&summary, "## Card table", 2, false);
 
     let github_summary = fs::read_to_string(out_dir.join("github-summary.md"))?;
@@ -2083,7 +2083,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(github_summary.contains("manual-repair-queue.json"));
     assert!(github_summary.contains("tokmd-packets.json"));
     assert!(github_summary.contains("not memory-safety proof"));
-    assert!(github_summary.contains("not site-execution proof"));
+    assert!(github_summary.contains("not a site-execution claim"));
     assert!(github_summary.contains("unsafe-review did not run witnesses"));
     assert!(github_summary.contains("post comments"));
     assert!(github_summary.contains("edit source"));
@@ -2594,7 +2594,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         lsp["trust_boundary"]
             .as_str()
             .unwrap_or("")
-            .contains("not a Miri result")
+            .contains("not a site-execution claim")
     );
 
     let repair_queue = parse_json(&fs::read_to_string(out_dir.join("repair-queue.json"))?)?;
@@ -2713,7 +2713,7 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
         cards["trust_boundary"]
             .as_str()
             .unwrap_or("")
-            .contains("not a proof of memory safety")
+            .contains("not memory-safety proof")
     );
 
     let review_kit = parse_json(&fs::read_to_string(out_dir.join("review-kit.json"))?)?;
@@ -2805,7 +2805,7 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
         lsp["trust_boundary"]
             .as_str()
             .unwrap_or("")
-            .contains("not a Miri result")
+            .contains("not a site-execution claim")
     );
 
     let repair_queue = parse_json(&fs::read_to_string(out_dir.join("repair-queue.json"))?)?;

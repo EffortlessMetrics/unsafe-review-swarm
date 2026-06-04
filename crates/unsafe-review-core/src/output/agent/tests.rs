@@ -172,7 +172,7 @@ fn agent_packet_is_parseable_bounded_and_card_sourced() -> Result<(), String> {
         value["trust_boundary"]
             .as_str()
             .unwrap_or("")
-            .contains("not a Miri result")
+            .contains("not a site-execution claim")
     );
     Ok(())
 }

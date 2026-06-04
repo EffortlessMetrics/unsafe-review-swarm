@@ -95,7 +95,7 @@ mod tests {
             value["comments"][0]["body"]
                 .as_str()
                 .unwrap_or("")
-                .contains("not a Miri result")
+                .contains("not a site-execution claim")
         );
         Ok(())
     }
