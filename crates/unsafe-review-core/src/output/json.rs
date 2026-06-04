@@ -321,6 +321,8 @@ mod tests {
         "js_buffer_reentry_sync_compression",
         "js_buffer_reentry_async_helper_capture",
         "js_buffer_reentry_raw_parts_materialization",
+        "stable_byte_sab_borrowed_slice",
+        "stable_byte_sab_snapshot_no_card",
         "js_buffer_reentry_options_before_capture_no_card",
         "js_buffer_reentry_recapture_after_reentry_no_card",
         "js_buffer_reentry_async_options_before_capture_no_card",
