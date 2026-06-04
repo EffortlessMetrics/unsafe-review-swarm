@@ -338,6 +338,10 @@ preserve sorted manual IDs, `source = manual`, `manual_candidate = true`, and
 `analyzer_discovered = false`, project the same implementer handoff, guidance,
 and copy-only explain/context/witness-plan commands as `manual-candidates.json`,
 and cross-check summary counts and guidance against `manual-candidates.json`.
+Its summary must expose proof-mode, stable-byte-source class, and ledger-state
+count maps derived only from the imported manual candidate fields so a reviewer
+can see observable, Miri/model, helper-gated, handoff-ready, or parked-followup
+work at queue level without treating the sidecar as a second source of truth.
 It is not `repair-queue.json`, not analyzer-discovered ReviewCard output, not
 automatic repair, not proof, not witness execution, and not policy gating.
 

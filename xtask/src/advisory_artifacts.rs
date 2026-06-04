@@ -1101,6 +1101,24 @@ fn check_manual_repair_queue_artifact(
         &manual_candidates.evidence_kinds,
         "manual-repair-queue.json summary.evidence_kinds",
     )?;
+    require_summary_count_map(
+        &value,
+        "/summary/proof_modes",
+        &manual_candidate_proof_mode_counts(manual_candidates),
+        "manual-repair-queue.json summary.proof_modes",
+    )?;
+    require_summary_count_map(
+        &value,
+        "/summary/stable_byte_source_classes",
+        &manual_candidate_stable_byte_class_counts(manual_candidates),
+        "manual-repair-queue.json summary.stable_byte_source_classes",
+    )?;
+    require_summary_count_map(
+        &value,
+        "/summary/ledger_states",
+        &manual_candidate_ledger_state_counts(manual_candidates),
+        "manual-repair-queue.json summary.ledger_states",
+    )?;
     require_manual_repair_guidance_count(
         &value,
         "with_fix_options",
@@ -1169,6 +1187,42 @@ fn check_manual_repair_queue_artifact(
     }
 
     Ok(())
+}
+
+fn manual_candidate_proof_mode_counts(
+    manual_candidates: &ManualCandidateIndexProjection,
+) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
+    for candidate in &manual_candidates.candidates {
+        if let Some(proof_mode) = &candidate.proof_mode {
+            *counts.entry(proof_mode.kind.clone()).or_insert(0) += 1;
+        }
+    }
+    counts
+}
+
+fn manual_candidate_stable_byte_class_counts(
+    manual_candidates: &ManualCandidateIndexProjection,
+) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
+    for candidate in &manual_candidates.candidates {
+        if let Some(class) = &candidate.stable_byte_source_class {
+            *counts.entry(class.clone()).or_insert(0) += 1;
+        }
+    }
+    counts
+}
+
+fn manual_candidate_ledger_state_counts(
+    manual_candidates: &ManualCandidateIndexProjection,
+) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
+    for candidate in &manual_candidates.candidates {
+        if let Some(ledger_state) = &candidate.stable_byte_ledger_state {
+            *counts.entry(ledger_state.clone()).or_insert(0) += 1;
+        }
+    }
+    counts
 }
 
 fn require_manual_repair_guidance_count(

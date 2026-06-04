@@ -12716,6 +12716,36 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_manual_repair_proof_mode_summary_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-manual-repair-proof-mode-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("manual-repair-queue.json");
+        let mut manual_repair_queue = parse_json_file(&path)?;
+        manual_repair_queue["summary"]["proof_modes"]["mutation-plus-miri"] = serde_json::json!(2);
+        fs::write(&path, manual_repair_queue.to_string())
+            .map_err(|err| format!("write manual repair queue failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "manual repair proof-mode summary drift should fail verification".to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("manual-repair-queue.json summary.proof_modes"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_review_kit_manual_candidate_id_drift() -> Result<(), String>
     {
         let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-manual-candidate-id-drift")?;
@@ -17925,6 +17955,9 @@ review_after = "2026-08-01"
                 "external_evidence_refs": 0,
                 "operation_families": {},
                 "evidence_kinds": {},
+                "proof_modes": {},
+                "stable_byte_source_classes": {},
+                "ledger_states": {},
                 "with_fix_options": 0,
                 "with_test_targets": 0,
                 "with_do_not_touch": 0,
@@ -18220,6 +18253,11 @@ review_after = "2026-08-01"
                 "evidence_kinds": {
                     "runtime_witness": 1
                 },
+                "proof_modes": {
+                    "mutation-plus-miri": 1
+                },
+                "stable_byte_source_classes": {},
+                "ledger_states": {},
                 "with_fix_options": 1,
                 "with_test_targets": 1,
                 "with_do_not_touch": 1,

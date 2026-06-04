@@ -2317,6 +2317,18 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         manual_repair_queue["summary"]["operation_families"]["slice_from_raw_parts"],
         1
     );
+    assert_eq!(
+        manual_repair_queue["summary"]["proof_modes"]["mutation-plus-miri"],
+        2
+    );
+    assert_eq!(
+        manual_repair_queue["summary"]["stable_byte_source_classes"]["stable-byte-source-sab-race"],
+        2
+    );
+    assert_eq!(
+        manual_repair_queue["summary"]["ledger_states"]["handoff-ready"],
+        2
+    );
     assert_eq!(manual_repair_queue["summary"]["with_fix_options"], 2);
     assert_eq!(manual_repair_queue["summary"]["with_test_targets"], 2);
     assert_eq!(manual_repair_queue["summary"]["with_do_not_touch"], 2);

@@ -905,6 +905,38 @@ pub(super) fn manual_candidate_evidence_kind_counts(
     counts
 }
 
+fn manual_candidate_proof_mode_counts(candidates: &[ManualCandidate]) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
+    for candidate in candidates {
+        if let Some(proof_mode) = &candidate.proof_mode {
+            *counts.entry(proof_mode.kind.clone()).or_insert(0) += 1;
+        }
+    }
+    counts
+}
+
+fn manual_candidate_stable_byte_class_counts(
+    candidates: &[ManualCandidate],
+) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
+    for candidate in candidates {
+        if let Some(class) = stable_byte_source_class(candidate) {
+            *counts.entry(class.to_string()).or_insert(0) += 1;
+        }
+    }
+    counts
+}
+
+fn manual_candidate_ledger_state_counts(candidates: &[ManualCandidate]) -> BTreeMap<String, usize> {
+    let mut counts = BTreeMap::new();
+    for candidate in candidates {
+        if let Some(ledger_state) = stable_byte_ledger_state(candidate) {
+            *counts.entry(ledger_state.to_string()).or_insert(0) += 1;
+        }
+    }
+    counts
+}
+
 pub(super) fn render_count_map(counts: &BTreeMap<String, usize>) -> String {
     if counts.is_empty() {
         return "none".to_string();
@@ -1014,6 +1046,9 @@ pub(super) fn render_manual_repair_queue_artifact(
             "external_evidence_refs": candidates.iter().map(|candidate| candidate.evidence.len()).sum::<usize>(),
             "operation_families": manual_candidate_operation_family_counts(candidates),
             "evidence_kinds": manual_candidate_evidence_kind_counts(candidates),
+            "proof_modes": manual_candidate_proof_mode_counts(candidates),
+            "stable_byte_source_classes": manual_candidate_stable_byte_class_counts(candidates),
+            "ledger_states": manual_candidate_ledger_state_counts(candidates),
             "with_fix_options": candidates.iter().filter(|candidate| !candidate.fix_options.is_empty()).count(),
             "with_test_targets": candidates.iter().filter(|candidate| !candidate.test_targets.is_empty()).count(),
             "with_do_not_touch": candidates.iter().filter(|candidate| !candidate.do_not_touch.is_empty()).count(),
