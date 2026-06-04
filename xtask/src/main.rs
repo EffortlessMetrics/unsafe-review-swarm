@@ -8093,13 +8093,14 @@ jobs:
 
     #[test]
     fn fixture_card_identity_allows_js_buffer_reentry_operation_context() {
+        let getter_reentry_operation = "stable-byte-source-getter-reentry candidate; proof required: observable-red-green; JS-backed buffer descriptor captured before possible JS reentry and materialized afterward; capture: let input = StringOrBuffer::from_js(global, arg0)?;; reentry: let level = options.get(global, \"\")?;; materialize: native_compress(&input, level)";
         assert!(is_fixture_operation_snippet_exception(
             "fixtures/js_buffer_reentry_sync_compression/expected.cards.json",
-            "JS-backed buffer descriptor captured before possible JS reentry and materialized afterward; capture: let input = StringOrBuffer::from_js(global, arg0)?;; reentry: let level = options.get(global, \"\")?;; materialize: native_compress(&input, level)",
+            getter_reentry_operation,
         ));
         assert!(is_fixture_operation_snippet_exception(
             "fixtures\\js_buffer_reentry_sync_compression\\expected.cards.json",
-            "JS-backed buffer descriptor captured before possible JS reentry and materialized afterward; capture: let input = StringOrBuffer::from_js(global, arg0)?;; reentry: let level = options.get(global, \"\")?;; materialize: native_compress(&input, level)",
+            getter_reentry_operation,
         ));
         assert!(is_fixture_operation_snippet_exception(
             "fixtures/panic_from_safe_js_direct_try_from_expect/expected.cards.json",
