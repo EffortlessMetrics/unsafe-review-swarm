@@ -211,7 +211,7 @@ fn matched_target(
     }
     if let Some(card) = card {
         return format!(
-            "`{}` / `{}` / proof `{}` / source `{}` / `{}` / {} missing; next: {}",
+            "`{}` / `{}` / proof path `{}` / source `{}` / `{}` / {} missing; next: {}",
             card.class_name,
             card.operation_family,
             card.proof_path,
@@ -464,7 +464,7 @@ mod tests {
         );
         assert!(markdown.contains("receipt strength `configured` is weaker"));
         assert!(markdown.contains(
-            "`guard_missing` / `raw_pointer_read` / proof `source_route_only` / source `analyzer`"
+            "`guard_missing` / `raw_pointer_read` / proof path `source_route_only` / source `analyzer`"
         ));
         assert!(markdown.contains("unsafe { ptr.cast::<Header>().read() }"));
         assert!(markdown.contains("Add or expose guard \\| witness Then attach receipt"));
