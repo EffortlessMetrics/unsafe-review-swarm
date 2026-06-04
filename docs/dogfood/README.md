@@ -16,9 +16,12 @@ in the [`triage taxonomy`](triage-taxonomy.md). Follow-up work seeds are tracked
 in [`follow-up-seeds.md`](follow-up-seeds.md). Bun stable-byte follow-up seeds
 are tracked in [`stable-byte-follow-up-seeds.md`](stable-byte-follow-up-seeds.md)
 with labels from the
-[`stable-byte triage taxonomy`](stable-byte-triage-taxonomy.md). Reviewer judgment files follow
-the [`dogfood judgment schema`](judgments/README.md). Card-scoped agent repair
-dry runs follow the [`agent repair experiment protocol`](agent-repair-experiments.md).
+[`stable-byte triage taxonomy`](stable-byte-triage-taxonomy.md). Bun diff-first
+inventory requirements for `ripr` are tracked in
+[`ripr-bun-diff-first-requirements.md`](ripr-bun-diff-first-requirements.md).
+Reviewer judgment files follow the [`dogfood judgment schema`](judgments/README.md).
+Card-scoped agent repair dry runs follow the
+[`agent repair experiment protocol`](agent-repair-experiments.md).
 
 Snapshot reports:
 

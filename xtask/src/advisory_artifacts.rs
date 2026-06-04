@@ -128,7 +128,7 @@ struct ManualCandidateEvidenceProjection {
 const COMMENT_PLAN_BODY_WORD_LIMIT: usize = 220;
 const COMMENT_PLAN_REVIEW_BUDGET: usize = 3;
 const MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
-const MANUAL_CANDIDATE_GITHUB_QUEUE_LIMIT: usize = 2;
+const MANUAL_CANDIDATE_GITHUB_QUEUE_LIMIT: usize = 1;
 const REVIEW_CARD_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
 const COMMENT_PLAN_REVIEW_BUDGET_REASON: &str = "bounded reviewer noise";
 const COMMENT_PLAN_REVIEW_BUDGET_REASON_CODE: &str = "bounded_reviewer_noise";
