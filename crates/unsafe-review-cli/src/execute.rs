@@ -44,6 +44,7 @@ const POLICY_REPORT_JSON_ARTIFACT: &str = "policy-report.json";
 const POLICY_REPORT_MARKDOWN_ARTIFACT: &str = "policy-report.md";
 const MANUAL_CANDIDATES_ARTIFACT: &str = "manual-candidates.json";
 const MANUAL_REPAIR_QUEUE_ARTIFACT: &str = "manual-repair-queue.json";
+const TOKMD_PACKETS_ARTIFACT: &str = "tokmd-packets.json";
 const FIRST_PR_RENDERED_ARTIFACTS: [(&str, FirstPrRenderer); 8] = [
     ("cards.json", render_json),
     ("pr-summary.md", render_pr_summary),
@@ -54,7 +55,7 @@ const FIRST_PR_RENDERED_ARTIFACTS: [(&str, FirstPrRenderer); 8] = [
     ("lsp.json", render_lsp),
     ("repair-queue.json", render_repair_queue),
 ];
-const FIRST_PR_ARTIFACTS: [&str; 14] = [
+const FIRST_PR_ARTIFACTS: [&str; 15] = [
     REVIEW_KIT_ARTIFACT,
     "cards.json",
     "pr-summary.md",
@@ -67,6 +68,7 @@ const FIRST_PR_ARTIFACTS: [&str; 14] = [
     POLICY_REPORT_MARKDOWN_ARTIFACT,
     MANUAL_CANDIDATES_ARTIFACT,
     MANUAL_REPAIR_QUEUE_ARTIFACT,
+    TOKMD_PACKETS_ARTIFACT,
     "lsp.json",
     "repair-queue.json",
 ];
@@ -1068,6 +1070,10 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     write_artifact(
         &options.out_dir.join(MANUAL_REPAIR_QUEUE_ARTIFACT),
         first_pr::render_manual_repair_queue_artifact(&root, &manual_candidates),
+    )?;
+    write_artifact(
+        &options.out_dir.join(TOKMD_PACKETS_ARTIFACT),
+        first_pr::render_tokmd_packets_artifact(&root, &manual_candidates),
     )?;
     write_artifact(
         &options.out_dir.join(REVIEW_KIT_ARTIFACT),

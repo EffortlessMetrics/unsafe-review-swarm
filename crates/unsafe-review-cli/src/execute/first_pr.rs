@@ -13,6 +13,21 @@ use unsafe_review_core::{
 const MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
 const MANUAL_CANDIDATE_GITHUB_QUEUE_LIMIT: usize = 1;
 const REVIEW_CARD_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
+const TOKMD_PACKET_PRESETS: [&str; 5] = [
+    "bun-ub-handoff",
+    "bun-ub-pr-body",
+    "bun-ub-ledger-note",
+    "bun-ub-review-map",
+    "bun-ub-next-pick",
+];
+const STABLE_BYTE_SOURCE_CLASSES: [&str; 6] = [
+    "stable-byte-source-rab-async",
+    "stable-byte-source-sab-race",
+    "stable-byte-source-getter-reentry",
+    "stable-byte-source-helper-dependent",
+    "stable-byte-source-pathlike-live-view",
+    "stable-byte-source-native-ffi-read",
+];
 const REVIEW_CARD_REPAIR_QUEUE_BUCKETS: [&str; 6] = [
     "repairable_by_guard",
     "repairable_by_safety_docs",
@@ -105,6 +120,10 @@ fn print_manual_candidate_handoff(
     println!(
         "  Manual repair queue: {} (copy-only; unsafe-review did not run an agent)",
         out_dir.join("manual-repair-queue.json").display()
+    );
+    println!(
+        "  Tokmd packet export: {} (formatting input only; tokmd was not run)",
+        out_dir.join("tokmd-packets.json").display()
     );
     println!(
         "  manual candidates are advisory manual targets, not analyzer-discovered, not policy inputs, and unsafe-review did not run witnesses"
@@ -862,6 +881,13 @@ fn manual_candidate_location_text(candidate: &ManualCandidate) -> String {
     )
 }
 
+fn stable_byte_source_class(candidate: &ManualCandidate) -> Option<&'static str> {
+    STABLE_BYTE_SOURCE_CLASSES
+        .iter()
+        .copied()
+        .find(|class| candidate.title.contains(class))
+}
+
 pub(super) fn render_manual_candidates_artifact(
     root: &Path,
     candidates: &[ManualCandidate],
@@ -949,6 +975,46 @@ pub(super) fn render_manual_repair_queue_artifact(
     rendered
 }
 
+pub(super) fn render_tokmd_packets_artifact(root: &Path, candidates: &[ManualCandidate]) -> String {
+    let packets = candidates
+        .iter()
+        .map(|candidate| tokmd_packet_entry(root, candidate))
+        .collect::<Vec<_>>();
+    let value = json!({
+        "schema_version": "tokmd-packets/v1",
+        "tool": "unsafe-review",
+        "tool_version": env!("CARGO_PKG_VERSION"),
+        "mode": "tokmd_packet_bundle",
+        "source": "first_pr",
+        "policy": "advisory",
+        "renderer": {
+            "tokmd_run": false,
+            "available_presets": TOKMD_PACKET_PRESETS,
+            "presets_status": "formatting requirements only; unsafe-review exported packet inputs but did not render tokmd output",
+        },
+        "summary": {
+            "manual_candidates": candidates.len(),
+            "packets": packets.len(),
+            "analyzer_discovered": 0,
+            "external_evidence_refs": candidates.iter().map(|candidate| candidate.evidence.len()).sum::<usize>(),
+            "operation_families": manual_candidate_operation_family_counts(candidates),
+            "evidence_kinds": manual_candidate_evidence_kind_counts(candidates),
+            "with_proof_mode": candidates.iter().filter(|candidate| candidate.proof_mode.is_some()).count(),
+            "with_fix_boundary": candidates.iter().filter(|candidate| candidate.fix_boundary.is_some()).count(),
+            "with_pr_aperture": candidates.iter().filter(|candidate| candidate.pr_aperture.is_some()).count(),
+            "with_stable_byte_source_class": candidates.iter().filter(|candidate| stable_byte_source_class(candidate).is_some()).count(),
+        },
+        "inputs": tokmd_packet_inputs(),
+        "packets": packets,
+        "trust_boundary": "Tokmd-friendly packet bundle for formatting inputs only; manual/advisory candidates are not analyzer-discovered ReviewCards, not policy inputs, not a proof of UB, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repair success, and not policy readiness. unsafe-review did not run tokmd, witnesses, Miri, Bun, Node, agents, post comments, edit source, or enforce blocking policy.",
+    });
+    let mut rendered = serde_json::to_string_pretty(&value).unwrap_or_else(|err| {
+        format!("{{\n  \"error\": \"tokmd packet serialization failed: {err}\"\n}}")
+    });
+    rendered.push('\n');
+    rendered
+}
+
 fn manual_repair_queue_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::Value {
     let mut value = json!({
         "id": candidate.id.as_str(),
@@ -980,6 +1046,103 @@ fn manual_repair_queue_entry(root: &Path, candidate: &ManualCandidate) -> serde_
             ]
         },
         "trust_boundary": "Copy-only manual candidate repair queue entry; not analyzer-discovered, not automatic repair, not witness execution, not source editing, not proof, and not policy gating.",
+    });
+    if let Some(object) = value.as_object_mut() {
+        if let Some(proof_mode) = &candidate.proof_mode {
+            object.insert("proof_mode".to_string(), json!(proof_mode));
+        }
+        if let Some(fix_boundary) = &candidate.fix_boundary {
+            object.insert("fix_boundary".to_string(), json!(fix_boundary));
+        }
+        if let Some(pr_aperture) = &candidate.pr_aperture {
+            object.insert("pr_aperture".to_string(), json!(pr_aperture));
+        }
+    }
+    value
+}
+
+fn tokmd_packet_inputs() -> serde_json::Value {
+    json!({
+        "manual-candidates.json": {
+            "included": true,
+            "relationship": "primary manual/advisory candidate index projected into packets"
+        },
+        "manual-repair-queue.json": {
+            "included": true,
+            "relationship": "copy-only manual repair handoff fields are duplicated through implementer_handoff"
+        },
+        "cards.json": {
+            "included": false,
+            "limitation": "ReviewCard packet export is outside this manual-candidate slice"
+        },
+        "witness-plan.md": {
+            "included": false,
+            "limitation": "Markdown witness-plan content is not converted to packet JSON in this slice"
+        },
+        "receipt-audit.md": {
+            "included": false,
+            "limitation": "Saved receipt audit data is not converted to packet JSON in this slice"
+        },
+        "repair-queue.json": {
+            "included": false,
+            "limitation": "ReviewCard repair queue stays separate from manual candidate packets"
+        },
+        "comment-plan.json": {
+            "included": false,
+            "limitation": "Comment-plan review budget data is not converted to packet JSON in this slice"
+        },
+        "stable-byte seed ledger": {
+            "included": false,
+            "limitation": "Ledger state is not imported into tokmd-packets.json; use docs/dogfood/stable-byte-follow-up-seeds.md or a future seed JSON export"
+        }
+    })
+}
+
+fn tokmd_packet_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::Value {
+    let mut value = json!({
+        "id": candidate.id.as_str(),
+        "source": "manual",
+        "manual_candidate": true,
+        "analyzer_discovered": false,
+        "packet_kind": "manual_candidate",
+        "tokmd_presets": TOKMD_PACKET_PRESETS,
+        "title": candidate.title.as_str(),
+        "stable_byte_source_class": stable_byte_source_class(candidate),
+        "ledger_state": null,
+        "ledger_state_limitation": "ledger state is not present in manual-candidate/v1; use the stable-byte seed ledger or a future seed JSON export",
+        "target": {
+            "file": candidate.location.file.display().to_string(),
+            "line": candidate.location.line,
+            "location_text": manual_candidate_location_text(candidate),
+        },
+        "route": {
+            "safe_caller": candidate.safe_caller.as_str(),
+            "unsafe_operation": candidate.unsafe_operation.as_str(),
+            "operation_family": candidate.operation_family.as_str(),
+        },
+        "invariant_at_risk": candidate.invariant.as_str(),
+        "external_evidence": candidate.evidence.iter().map(|evidence| json!({
+            "kind": evidence.kind.as_str(),
+            "path": evidence.path.as_ref().map(|path| path.display().to_string()),
+            "summary": evidence.summary.as_deref(),
+            "command": evidence.command.as_deref(),
+            "limitation": evidence.limitation.as_deref(),
+        })).collect::<Vec<_>>(),
+        "fix_options": &candidate.fix_options,
+        "test_targets": &candidate.test_targets,
+        "do_not_touch": &candidate.do_not_touch,
+        "implementer_handoff": manual_candidate_implementer_handoff(candidate),
+        "commands": {
+            "explain": explain_command(root, &candidate.id),
+            "context_json": context_command(root, &candidate.id),
+            "witness_plan": candidate_witness_plan_command(root, &candidate.id),
+        },
+        "missing_inputs": [
+            "ReviewCard projection",
+            "receipt audit JSON",
+            "stable-byte ledger state"
+        ],
+        "trust_boundary": "Manual candidate tokmd packet input only; not analyzer-discovered, not tokmd output, not automatic repair, not witness execution, not source editing, not proof, and not policy gating.",
     });
     if let Some(object) = value.as_object_mut() {
         if let Some(proof_mode) = &candidate.proof_mode {
@@ -1118,6 +1281,7 @@ fn artifact_kind(path: &str) -> &'static str {
         "policy-report.md" => "policy_report_markdown",
         "manual-candidates.json" => "manual_candidates",
         "manual-repair-queue.json" => "manual_repair_queue",
+        "tokmd-packets.json" => "tokmd_packets",
         "lsp.json" => "saved_lsp",
         "repair-queue.json" => "repair_queue",
         _ => "unknown",
@@ -1142,6 +1306,7 @@ fn artifact_schema_version(path: &str) -> Option<&'static str> {
         | "repair-queue.json" | "policy-report.json" => Some("0.1"),
         "manual-candidates.json" => Some("manual-candidates/v1"),
         "manual-repair-queue.json" => Some("manual-repair-queue/v1"),
+        "tokmd-packets.json" => Some("tokmd-packets/v1"),
         "cards.sarif" => Some("2.1.0"),
         _ => None,
     }

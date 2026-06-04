@@ -320,6 +320,7 @@ target/unsafe-review/witness-plan.md
 target/unsafe-review/receipt-audit.md
 target/unsafe-review/manual-candidates.json
 target/unsafe-review/manual-repair-queue.json
+target/unsafe-review/tokmd-packets.json
 target/unsafe-review/lsp.json
 target/unsafe-review/repair-queue.json
 ```
@@ -702,6 +703,13 @@ manual-repair-queue.json queue entries preserve manual-candidate markers and
 copy-only guidance from manual-candidates.json
 manual-repair-queue.json does not claim analyzer discovery, automatic repair,
 agent execution, witness execution, source edits, comments, proof, or policy
+tokmd-packets.json exists and parses
+tokmd-packets.json schema_version is checked
+tokmd-packets.json stays source = first_pr and policy = advisory
+tokmd-packets.json packets preserve manual-candidate markers and copy-only
+formatting inputs from manual-candidates.json
+tokmd-packets.json records absent ledger, receipt, and ReviewCard packet inputs
+instead of rendering tokmd output
 gating
 repair-queue.json exists and parses
 policy-report.json exists and parses
@@ -1142,6 +1150,7 @@ jobs:
             target/unsafe-review/receipt-audit.md
             target/unsafe-review/manual-candidates.json
             target/unsafe-review/manual-repair-queue.json
+            target/unsafe-review/tokmd-packets.json
             target/unsafe-review/lsp.json
             target/unsafe-review/repair-queue.json
           if-no-files-found: error

@@ -1,12 +1,14 @@
 # tokmd Bun Packet Presets
 
-Status: future tooling-interface requirements
+Status: future renderer requirements plus current first-pr packet input
 
 This note records the Bun packet shapes that `tokmd` should eventually render
 from unsafe-review manual candidates, ReviewCards, witness plans, receipt
 audits, repair queues, and stable-byte seed ledgers. It is a requirements rail
-only. It does not add a live export, run witnesses, edit source, post comments,
-or claim a candidate is proved.
+only. The current `first-pr` lane writes `tokmd-packets.json` as formatting
+input for imported manual candidates. It does not run tokmd, render packet
+Markdown, run witnesses, edit source, post comments, or claim a candidate is
+proved.
 
 ## Purpose
 
@@ -114,6 +116,7 @@ claim calibrated recall.
 
 The preset renderer should accept a JSON bundle that can be composed from:
 
+- `tokmd-packets.json`;
 - `manual-candidates.json`;
 - `manual-repair-queue.json`;
 - `cards.json`;
@@ -123,8 +126,10 @@ The preset renderer should accept a JSON bundle that can be composed from:
 - `comment-plan.json`;
 - `docs/dogfood/stable-byte-follow-up-seeds.md` or a future seed JSON export.
 
-The future renderer should record which inputs were absent. Missing inputs must
-produce an explicit limitation, not an empty result or all-clear statement.
+The current `tokmd-packets.json` sidecar records which inputs were absent for
+the manual-candidate packet export. The future renderer should preserve those
+limitations and add any renderer-specific absent-input notes. Missing inputs
+must produce an explicit limitation, not an empty result or all-clear statement.
 
 ## Trust Boundary
 

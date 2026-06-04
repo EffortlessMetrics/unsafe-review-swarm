@@ -283,6 +283,7 @@ const BUN_MANUAL_CANDIDATE_SMOKE_ID: &str = "bun-manual-candidates-first-pr-smok
 const BUN_MANUAL_CANDIDATE_SMOKE_ARTIFACTS: &[&str] = &[
     "target/unsafe-review-manual-candidate-smoke/manual-candidates.json",
     "target/unsafe-review-manual-candidate-smoke/manual-repair-queue.json",
+    "target/unsafe-review-manual-candidate-smoke/tokmd-packets.json",
     "target/unsafe-review-manual-candidate-smoke/review-kit.json",
     "target/unsafe-review-manual-candidate-smoke/pr-summary.md",
     "target/unsafe-review-manual-candidate-smoke/github-summary.md",
@@ -10340,6 +10341,8 @@ command = "rtk cargo run --locked -p xtask -- check-manual-candidate-examples"
 artifact_status = "local_untracked"
 artifacts = [
   "target/unsafe-review-manual-candidate-smoke/manual-candidates.json",
+  "target/unsafe-review-manual-candidate-smoke/manual-repair-queue.json",
+  "target/unsafe-review-manual-candidate-smoke/tokmd-packets.json",
   "target/unsafe-review-manual-candidate-smoke/review-kit.json",
   "target/unsafe-review-manual-candidate-smoke/pr-summary.md",
   "target/unsafe-review-manual-candidate-smoke/github-summary.md",
@@ -15130,7 +15133,7 @@ Snapshot reports:
         fs::write(
             &path,
             summary.replace(
-                "## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Policy report: `policy-report.md`; ReviewCard-only; manual candidates are not policy inputs.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n",
+                "## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Policy report: `policy-report.md`; ReviewCard-only; manual candidates are not policy inputs.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Tokmd packets: `tokmd-packets.json`; tokmd not run.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n",
                 "",
             ),
         )
@@ -17582,6 +17585,7 @@ review_after = "2026-08-01"
                 {"path":"policy-report.md","kind":"policy_report_markdown","format":"markdown","schema_version":serde_json::Value::Null},
                 {"path":"manual-candidates.json","kind":"manual_candidates","format":"json","schema_version":"manual-candidates/v1"},
                 {"path":"manual-repair-queue.json","kind":"manual_repair_queue","format":"json","schema_version":"manual-repair-queue/v1"},
+                {"path":"tokmd-packets.json","kind":"tokmd_packets","format":"json","schema_version":"tokmd-packets/v1"},
                 {"path":"lsp.json","kind":"saved_lsp","format":"json","schema_version":"0.1"},
                 {"path":"repair-queue.json","kind":"repair_queue","format":"json","schema_version":"0.1"}
             ],
@@ -17641,6 +17645,78 @@ review_after = "2026-08-01"
         });
         fs::write(dir.join("manual-repair-queue.json"), value.to_string())
             .map_err(|err| format!("write manual repair queue failed: {err}"))
+    }
+
+    fn write_empty_tokmd_packets_artifact(dir: &Path) -> Result<(), String> {
+        let value = serde_json::json!({
+            "schema_version": "tokmd-packets/v1",
+            "tool": "unsafe-review",
+            "tool_version": "0.2.1-test",
+            "mode": "tokmd_packet_bundle",
+            "source": "first_pr",
+            "policy": "advisory",
+            "renderer": {
+                "tokmd_run": false,
+                "available_presets": [
+                    "bun-ub-handoff",
+                    "bun-ub-pr-body",
+                    "bun-ub-ledger-note",
+                    "bun-ub-review-map",
+                    "bun-ub-next-pick"
+                ],
+                "presets_status": "formatting requirements only; unsafe-review exported packet inputs but did not render tokmd output"
+            },
+            "summary": {
+                "manual_candidates": 0,
+                "packets": 0,
+                "analyzer_discovered": 0,
+                "external_evidence_refs": 0,
+                "operation_families": {},
+                "evidence_kinds": {},
+                "with_proof_mode": 0,
+                "with_fix_boundary": 0,
+                "with_pr_aperture": 0,
+                "with_stable_byte_source_class": 0
+            },
+            "inputs": {
+                "manual-candidates.json": {
+                    "included": true,
+                    "relationship": "primary manual/advisory candidate index projected into packets"
+                },
+                "manual-repair-queue.json": {
+                    "included": true,
+                    "relationship": "copy-only manual repair handoff fields are duplicated through implementer_handoff"
+                },
+                "cards.json": {
+                    "included": false,
+                    "limitation": "ReviewCard packet export is outside this manual-candidate slice"
+                },
+                "witness-plan.md": {
+                    "included": false,
+                    "limitation": "Markdown witness-plan content is not converted to packet JSON in this slice"
+                },
+                "receipt-audit.md": {
+                    "included": false,
+                    "limitation": "Saved receipt audit data is not converted to packet JSON in this slice"
+                },
+                "repair-queue.json": {
+                    "included": false,
+                    "limitation": "ReviewCard repair queue stays separate from manual candidate packets"
+                },
+                "comment-plan.json": {
+                    "included": false,
+                    "limitation": "Comment-plan review budget data is not converted to packet JSON in this slice"
+                },
+                "stable-byte seed ledger": {
+                    "included": false,
+                    "limitation": "Ledger state is not imported into tokmd-packets.json; use docs/dogfood/stable-byte-follow-up-seeds.md or a future seed JSON export"
+                }
+            },
+            "packets": [],
+            "trust_boundary": "Tokmd-friendly packet bundle for formatting inputs only; manual/advisory candidates are not analyzer-discovered ReviewCards, not policy inputs, not a proof of UB, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repair success, and not policy readiness. unsafe-review did not run tokmd, witnesses, Miri, Bun, Node, agents, post comments, edit source, or enforce blocking policy."
+        });
+        fs::write(dir.join("tokmd-packets.json"), value.to_string())
+            .map_err(|err| format!("write tokmd packets failed: {err}"))
     }
 
     fn manual_candidate_reviewcard_relationship_fixture() -> serde_json::Value {
@@ -17910,10 +17986,152 @@ review_after = "2026-08-01"
             .map_err(|err| format!("write manual repair queue failed: {err}"))
     }
 
+    fn write_one_tokmd_packets_artifact(dir: &Path) -> Result<(), String> {
+        let handoff = manual_candidate_handoff_fixture();
+        let value = serde_json::json!({
+            "schema_version": "tokmd-packets/v1",
+            "tool": "unsafe-review",
+            "tool_version": "0.2.1-test",
+            "mode": "tokmd_packet_bundle",
+            "source": "first_pr",
+            "policy": "advisory",
+            "renderer": {
+                "tokmd_run": false,
+                "available_presets": [
+                    "bun-ub-handoff",
+                    "bun-ub-pr-body",
+                    "bun-ub-ledger-note",
+                    "bun-ub-review-map",
+                    "bun-ub-next-pick"
+                ],
+                "presets_status": "formatting requirements only; unsafe-review exported packet inputs but did not render tokmd output"
+            },
+            "summary": {
+                "manual_candidates": 1,
+                "packets": 1,
+                "analyzer_discovered": 0,
+                "external_evidence_refs": 1,
+                "operation_families": {
+                    "raw_pointer_read": 1
+                },
+                "evidence_kinds": {
+                    "runtime_witness": 1
+                },
+                "with_proof_mode": 1,
+                "with_fix_boundary": 1,
+                "with_pr_aperture": 1,
+                "with_stable_byte_source_class": 0
+            },
+            "inputs": {
+                "manual-candidates.json": {
+                    "included": true,
+                    "relationship": "primary manual/advisory candidate index projected into packets"
+                },
+                "manual-repair-queue.json": {
+                    "included": true,
+                    "relationship": "copy-only manual repair handoff fields are duplicated through implementer_handoff"
+                },
+                "cards.json": {
+                    "included": false,
+                    "limitation": "ReviewCard packet export is outside this manual-candidate slice"
+                },
+                "witness-plan.md": {
+                    "included": false,
+                    "limitation": "Markdown witness-plan content is not converted to packet JSON in this slice"
+                },
+                "receipt-audit.md": {
+                    "included": false,
+                    "limitation": "Saved receipt audit data is not converted to packet JSON in this slice"
+                },
+                "repair-queue.json": {
+                    "included": false,
+                    "limitation": "ReviewCard repair queue stays separate from manual candidate packets"
+                },
+                "comment-plan.json": {
+                    "included": false,
+                    "limitation": "Comment-plan review budget data is not converted to packet JSON in this slice"
+                },
+                "stable-byte seed ledger": {
+                    "included": false,
+                    "limitation": "Ledger state is not imported into tokmd-packets.json; use docs/dogfood/stable-byte-follow-up-seeds.md or a future seed JSON export"
+                }
+            },
+            "packets": [{
+                "id": "R4R2-S001",
+                "source": "manual",
+                "manual_candidate": true,
+                "analyzer_discovered": false,
+                "packet_kind": "manual_candidate",
+                "tokmd_presets": [
+                    "bun-ub-handoff",
+                    "bun-ub-pr-body",
+                    "bun-ub-ledger-note",
+                    "bun-ub-review-map",
+                    "bun-ub-next-pick"
+                ],
+                "title": "TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes",
+                "stable_byte_source_class": serde_json::Value::Null,
+                "ledger_state": serde_json::Value::Null,
+                "ledger_state_limitation": "ledger state is not present in manual-candidate/v1; use the stable-byte seed ledger or a future seed JSON export",
+                "target": {
+                    "file": "src/runtime/webcore/TextDecoder.rs",
+                    "line": 237,
+                    "location_text": "src/runtime/webcore/TextDecoder.rs:237"
+                },
+                "route": {
+                    "safe_caller": "TextDecoder.decode SharedArrayBuffer route",
+                    "unsafe_operation": "core::slice::from_raw_parts",
+                    "operation_family": "raw_pointer_read"
+                },
+                "invariant_at_risk": "&[u8] memory must not be concurrently mutated",
+                "proof_mode": {
+                    "kind": "mutation-plus-miri",
+                    "system_bun_expected": "nondiscriminating",
+                    "mutation_required": true,
+                    "miri_required": true
+                },
+                "fix_boundary": "copy shared bytes before constructing the Rust slice",
+                "pr_aperture": "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings",
+                "external_evidence": [{
+                    "kind": "runtime_witness",
+                    "path": "target/unsafe-scout/textdecoder-shared-race-route.out",
+                    "summary": "Bun TextDecoder route reaches shared backing bytes through safe JS",
+                    "command": "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts",
+                    "limitation": "runtime route evidence only; not memory-safety proof and not analyzer-discovered"
+                }],
+                "fix_options": [
+                    "copy SharedArrayBuffer-backed bytes before constructing the slice"
+                ],
+                "test_targets": [
+                    "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+                ],
+                "do_not_touch": [
+                    "Do not rewrite TextDecoder unrelated encodings"
+                ],
+                "implementer_handoff": handoff,
+                "commands": {
+                    "explain": "unsafe-review explain R4R2-S001",
+                    "context_json": "unsafe-review context R4R2-S001 --json",
+                    "witness_plan": "unsafe-review candidate witness-plan R4R2-S001"
+                },
+                "missing_inputs": [
+                    "ReviewCard projection",
+                    "receipt audit JSON",
+                    "stable-byte ledger state"
+                ],
+                "trust_boundary": "Manual candidate tokmd packet input only; not analyzer-discovered, not tokmd output, not automatic repair, not witness execution, not source editing, not proof, and not policy gating."
+            }],
+            "trust_boundary": "Tokmd-friendly packet bundle for formatting inputs only; manual/advisory candidates are not analyzer-discovered ReviewCards, not policy inputs, not a proof of UB, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repair success, and not policy readiness. unsafe-review did not run tokmd, witnesses, Miri, Bun, Node, agents, post comments, edit source, or enforce blocking policy."
+        });
+        fs::write(dir.join("tokmd-packets.json"), value.to_string())
+            .map_err(|err| format!("write tokmd packets failed: {err}"))
+    }
+
     fn write_one_manual_candidate_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         write_valid_first_pr_artifacts(dir)?;
         write_one_manual_candidates_artifact(dir)?;
         write_one_manual_repair_queue_artifact(dir)?;
+        write_one_tokmd_packets_artifact(dir)?;
         insert_manual_candidate_front_panel_fixture(dir)?;
         insert_manual_candidate_witness_follow_up_fixture(dir)?;
         let path = dir.join("review-kit.json");
@@ -18147,7 +18365,7 @@ review_after = "2026-08-01"
         top_card: &str,
     ) -> String {
         format!(
-            "## unsafe-review advisory summary\n\n- Scope: `diff`\n- Review cards: {review_cards}\n- Open actionable gaps: {open_actionable_gaps}\n- Policy mode: `advisory`\n\n## Top card\n\n{top_card}\n\n## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Policy report: `policy-report.md`; ReviewCard-only; manual candidates are not policy inputs.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n---\n\nFull advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, policy-report.json, policy-report.md, manual-candidates.json, manual-repair-queue.json, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n"
+            "## unsafe-review advisory summary\n\n- Scope: `diff`\n- Review cards: {review_cards}\n- Open actionable gaps: {open_actionable_gaps}\n- Policy mode: `advisory`\n\n## Top card\n\n{top_card}\n\n## Open next\n\n- Review kit manifest: `review-kit.json`\n- Full reviewer cockpit: `pr-summary.md`\n- Machine-readable ReviewCards: `cards.json`\n- Witness routes: `witness-plan.md`\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Policy report: `policy-report.md`; ReviewCard-only; manual candidates are not policy inputs.\n- Manual candidate index: `manual-candidates.json` lists imported advisory candidates separately from ReviewCards.\n- Tokmd packets: `tokmd-packets.json`; tokmd not run.\n- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.\n- Comment budget: `comment-plan.json` is plan-only; no comments were posted.\n\n---\n\nFull advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, policy-report.json, policy-report.md, manual-candidates.json, manual-repair-queue.json, tokmd-packets.json, lsp.json, repair-queue.json) is attached as the workflow artifact.\n\n> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof.\n"
         )
     }
 
@@ -18227,6 +18445,7 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write github summary failed: {err}"))?;
         write_empty_manual_candidates_artifact(dir)?;
         write_empty_manual_repair_queue_artifact(dir)?;
+        write_empty_tokmd_packets_artifact(dir)?;
         write_review_kit_artifact(dir, 1, 1, Some("card-1"))?;
         Ok(())
     }
@@ -18350,6 +18569,7 @@ This artifact is static unsafe contract review. It routes reviewers to credible 
         write_policy_report_artifacts(dir, Vec::new(), 0)?;
         write_empty_manual_candidates_artifact(dir)?;
         write_empty_manual_repair_queue_artifact(dir)?;
+        write_empty_tokmd_packets_artifact(dir)?;
         write_review_kit_artifact(dir, 0, 0, None)?;
         Ok(())
     }

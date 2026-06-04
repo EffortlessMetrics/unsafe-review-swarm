@@ -1563,6 +1563,9 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("Review-kit candidate queue: first 2 of 2 manual candidate(s)"));
     assert!(stdout.contains("Manual repair queue:"));
     assert!(stdout.contains("manual-repair-queue.json"));
+    assert!(stdout.contains("Tokmd packet export:"));
+    assert!(stdout.contains("tokmd-packets.json"));
+    assert!(stdout.contains("formatting input only; tokmd was not run"));
     assert!(stdout.contains("manual candidates are advisory manual targets"));
     assert!(stdout.contains("not analyzer-discovered"));
     assert!(stdout.contains("not policy inputs"));
@@ -1587,6 +1590,8 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("witness-plan.md"));
     assert!(stdout.contains("receipt-audit.md"));
     assert!(stdout.contains("manual-candidates.json"));
+    assert!(stdout.contains("manual-repair-queue.json"));
+    assert!(stdout.contains("tokmd-packets.json"));
     assert!(stdout.contains("lsp.json"));
     assert!(stdout.contains("repair-queue.json"));
     assert!(stdout.contains("Trust boundary:"));
@@ -1983,6 +1988,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         "policy-report.md",
         "manual-candidates.json",
         "manual-repair-queue.json",
+        "tokmd-packets.json",
         "lsp.json",
         "repair-queue.json",
     ] {
@@ -2013,6 +2019,9 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             }
             "manual-repair-queue.json" => {
                 assert_eq!(entry["schema_version"], "manual-repair-queue/v1")
+            }
+            "tokmd-packets.json" => {
+                assert_eq!(entry["schema_version"], "tokmd-packets/v1")
             }
             "cards.sarif" => assert_eq!(entry["schema_version"], "2.1.0"),
             _ => assert!(entry["schema_version"].is_null()),
@@ -2062,6 +2071,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(github_summary.contains("Receipt audit: `receipt-audit.md`"));
     assert!(github_summary.contains("Policy report: `policy-report.md`"));
     assert!(github_summary.contains("Manual candidate index: `manual-candidates.json`"));
+    assert!(github_summary.contains("Tokmd packets: `tokmd-packets.json`; tokmd not run"));
     assert!(github_summary.contains("`comment-plan.json` is plan-only"));
     assert!(github_summary.contains("Full advisory bundle"));
     assert!(github_summary.contains("review-kit.json"));
@@ -2071,6 +2081,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(github_summary.contains("policy-report.md"));
     assert!(github_summary.contains("manual-candidates.json"));
     assert!(github_summary.contains("manual-repair-queue.json"));
+    assert!(github_summary.contains("tokmd-packets.json"));
     assert!(github_summary.contains("not memory-safety proof"));
     assert!(github_summary.contains("not site-execution proof"));
     assert!(github_summary.contains("unsafe-review did not run witnesses"));
@@ -2376,6 +2387,123 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             .as_str()
             .unwrap_or("")
             .contains("did not run agents")
+    );
+
+    let tokmd_packets = parse_json(&fs::read_to_string(out_dir.join("tokmd-packets.json"))?)?;
+    assert_eq!(tokmd_packets["schema_version"], "tokmd-packets/v1");
+    assert_eq!(tokmd_packets["mode"], "tokmd_packet_bundle");
+    assert_eq!(tokmd_packets["source"], "first_pr");
+    assert_eq!(tokmd_packets["policy"], "advisory");
+    assert_eq!(tokmd_packets["renderer"]["tokmd_run"], false);
+    assert_eq!(
+        tokmd_packets["renderer"]["available_presets"][0],
+        "bun-ub-handoff"
+    );
+    assert_eq!(
+        tokmd_packets["renderer"]["available_presets"][4],
+        "bun-ub-next-pick"
+    );
+    assert!(
+        tokmd_packets["renderer"]["presets_status"]
+            .as_str()
+            .unwrap_or("")
+            .contains("did not render tokmd output")
+    );
+    assert_eq!(tokmd_packets["summary"]["manual_candidates"], 2);
+    assert_eq!(tokmd_packets["summary"]["packets"], 2);
+    assert_eq!(tokmd_packets["summary"]["analyzer_discovered"], 0);
+    assert_eq!(tokmd_packets["summary"]["external_evidence_refs"], 5);
+    assert_eq!(tokmd_packets["summary"]["with_proof_mode"], 2);
+    assert_eq!(tokmd_packets["summary"]["with_fix_boundary"], 2);
+    assert_eq!(tokmd_packets["summary"]["with_pr_aperture"], 2);
+    assert_eq!(tokmd_packets["summary"]["with_stable_byte_source_class"], 0);
+    assert_eq!(
+        tokmd_packets["summary"]["operation_families"]["raw_pointer_read"],
+        1
+    );
+    assert_eq!(
+        tokmd_packets["inputs"]["manual-candidates.json"]["included"],
+        true
+    );
+    assert_eq!(tokmd_packets["inputs"]["cards.json"]["included"], false);
+    assert!(
+        tokmd_packets["inputs"]["stable-byte seed ledger"]["limitation"]
+            .as_str()
+            .unwrap_or("")
+            .contains("future seed JSON export")
+    );
+    assert_eq!(tokmd_packets["packets"][0]["id"], "R4R2-S001");
+    assert_eq!(tokmd_packets["packets"][0]["source"], "manual");
+    assert_eq!(tokmd_packets["packets"][0]["manual_candidate"], true);
+    assert_eq!(tokmd_packets["packets"][0]["analyzer_discovered"], false);
+    assert_eq!(
+        tokmd_packets["packets"][0]["packet_kind"],
+        "manual_candidate"
+    );
+    assert_eq!(
+        tokmd_packets["packets"][0]["tokmd_presets"][2],
+        "bun-ub-ledger-note"
+    );
+    assert!(tokmd_packets["packets"][0]["stable_byte_source_class"].is_null());
+    assert!(tokmd_packets["packets"][0]["ledger_state"].is_null());
+    assert!(
+        tokmd_packets["packets"][0]["ledger_state_limitation"]
+            .as_str()
+            .unwrap_or("")
+            .contains("future seed JSON export")
+    );
+    assert_eq!(
+        tokmd_packets["packets"][0]["target"]["location_text"],
+        manual_candidates["candidates"][0]["location_text"]
+    );
+    assert_eq!(
+        tokmd_packets["packets"][0]["route"]["safe_caller"],
+        manual_candidates["candidates"][0]["safe_caller"]
+    );
+    assert_eq!(
+        tokmd_packets["packets"][0]["invariant_at_risk"],
+        manual_candidates["candidates"][0]["invariant"]
+    );
+    assert_eq!(
+        tokmd_packets["packets"][0]["proof_mode"],
+        manual_candidates["candidates"][0]["proof_mode"]
+    );
+    assert_eq!(
+        tokmd_packets["packets"][0]["fix_boundary"],
+        manual_candidates["candidates"][0]["fix_boundary"]
+    );
+    assert_eq!(
+        tokmd_packets["packets"][0]["pr_aperture"],
+        manual_candidates["candidates"][0]["pr_aperture"]
+    );
+    assert_eq!(
+        tokmd_packets["packets"][0]["implementer_handoff"],
+        manual_candidates["candidates"][0]["implementer_handoff"]
+    );
+    assert_eq!(
+        tokmd_packets["packets"][1]["external_evidence"][2]["kind"],
+        manual_candidates["candidates"][1]["evidence"][2]["kind"]
+    );
+    assert!(
+        tokmd_packets["packets"][1]["commands"]["context_json"]
+            .as_str()
+            .unwrap_or("")
+            .contains("R4R2-S002")
+    );
+    let missing_inputs = json_array(
+        &tokmd_packets["packets"][0]["missing_inputs"],
+        "tokmd_packets.packets[0].missing_inputs",
+    )?;
+    assert!(
+        missing_inputs
+            .iter()
+            .any(|input| input == "stable-byte ledger state")
+    );
+    assert!(
+        tokmd_packets["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("did not run tokmd")
     );
 
     let receipt_audit = fs::read_to_string(out_dir.join("receipt-audit.md"))?;

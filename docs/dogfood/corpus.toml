@@ -24,12 +24,13 @@ status = "active"
 fixture = "fixtures/raw_pointer_alignment"
 root = "fixtures/raw_pointer_alignment"
 diff = "fixtures/raw_pointer_alignment/change.diff"
-purpose = "fixture-level first-pr smoke for committed Bun manual-candidate projection through manual-candidates.json, manual-repair-queue.json, and review-kit handoff surfaces"
+purpose = "fixture-level first-pr smoke for committed Bun manual-candidate projection through manual-candidates.json, manual-repair-queue.json, tokmd-packets.json, and review-kit handoff surfaces"
 command = "rtk cargo run --locked -p xtask -- check-manual-candidate-examples"
 artifact_status = "local_untracked"
 artifacts = [
   "target/unsafe-review-manual-candidate-smoke/manual-candidates.json",
   "target/unsafe-review-manual-candidate-smoke/manual-repair-queue.json",
+  "target/unsafe-review-manual-candidate-smoke/tokmd-packets.json",
   "target/unsafe-review-manual-candidate-smoke/review-kit.json",
   "target/unsafe-review-manual-candidate-smoke/pr-summary.md",
   "target/unsafe-review-manual-candidate-smoke/github-summary.md",

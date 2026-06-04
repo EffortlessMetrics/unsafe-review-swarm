@@ -105,6 +105,7 @@ jobs:
             receipt-audit.md \
             manual-candidates.json \
             manual-repair-queue.json \
+            tokmd-packets.json \
             lsp.json \
             repair-queue.json
           do

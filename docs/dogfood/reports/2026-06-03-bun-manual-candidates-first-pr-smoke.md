@@ -37,6 +37,7 @@ runs the first-pr artifact verifier.
 |---|---:|---|
 | `manual-candidates.json` | Verified | Preserves sorted manual IDs, manual/advisory markers, source route, invariant, evidence commands and limitations, fix options, test targets, do-not-touch notes, and trust boundary from the committed examples. |
 | `manual-repair-queue.json` | Verified | Preserves the same manual IDs, implementer handoff, fix/test/non-goal guidance, and copy-only commands as `manual-candidates.json`; it is not the ReviewCard repair queue and does not run an agent. |
+| `tokmd-packets.json` | Verified | Preserves manual IDs, proof mode, fix boundary, PR aperture, implementer handoff, and copy-only commands as formatting input only; tokmd is not run and missing ledger/receipt inputs stay explicit. |
 | `review-kit.json` | Verified | Includes a bounded manual-candidate queue with implementer handoff cues that match `manual-candidates.json`; candidates stay out of the ReviewCard repair queue. |
 | `pr-summary.md` | Verified | Shows a compact manual-candidate front door with count, first candidate, queue preview, commands, guidance, and advisory boundary. |
 | `github-summary.md` | Verified | Keeps the doorway bounded and points to the manual-candidate index instead of duplicating full packets. |

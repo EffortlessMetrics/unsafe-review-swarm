@@ -162,6 +162,21 @@ const KNOWN_PROOF_PATHS: &[&str] = &[
     "helper_gated",
     "human_review_only",
 ];
+const TOKMD_PACKET_PRESETS: &[&str] = &[
+    "bun-ub-handoff",
+    "bun-ub-pr-body",
+    "bun-ub-ledger-note",
+    "bun-ub-review-map",
+    "bun-ub-next-pick",
+];
+const STABLE_BYTE_SOURCE_CLASSES: &[&str] = &[
+    "stable-byte-source-rab-async",
+    "stable-byte-source-sab-race",
+    "stable-byte-source-getter-reentry",
+    "stable-byte-source-helper-dependent",
+    "stable-byte-source-pathlike-live-view",
+    "stable-byte-source-native-ffi-read",
+];
 const REPAIR_QUEUE_BUCKETS: [&str; 6] = [
     "repairable_by_guard",
     "repairable_by_safety_docs",
@@ -176,7 +191,7 @@ const REPAIR_QUEUE_READINESS_STATES: [&str; 4] = [
     "requires_witness_receipt",
     "unsupported",
 ];
-const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 14] = [
+const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 15] = [
     "review-kit.json",
     "cards.json",
     "pr-summary.md",
@@ -189,6 +204,7 @@ const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 14] = [
     "policy-report.md",
     "manual-candidates.json",
     "manual-repair-queue.json",
+    "tokmd-packets.json",
     "lsp.json",
     "repair-queue.json",
 ];
@@ -227,6 +243,7 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
     check_receipt_audit_artifact(dir)?;
     check_policy_report_artifacts(dir, &summary)?;
     check_manual_repair_queue_artifact(dir, &manual_candidates)?;
+    check_tokmd_packets_artifact(dir, &manual_candidates)?;
     check_manual_candidate_front_door_artifacts(dir, &manual_candidates)?;
     check_lsp_artifact(dir, &summary)?;
     check_github_summary_artifact(
@@ -546,6 +563,11 @@ fn check_github_summary_artifact(
     )?;
     super::require_text_contains(
         &text,
+        "- Tokmd packets: `tokmd-packets.json`; tokmd not run.",
+        &path,
+    )?;
+    super::require_text_contains(
+        &text,
         "- Agent repair queue: `repair-queue.json` is copy-only; no agent was run.",
         &path,
     )?;
@@ -561,7 +583,7 @@ fn check_github_summary_artifact(
     super::require_text_contains(&text, "not site-execution proof", &path)?;
     super::require_text_contains(
         &text,
-        "Full advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, policy-report.json, policy-report.md, manual-candidates.json, manual-repair-queue.json, lsp.json, repair-queue.json)",
+        "Full advisory bundle (review-kit.json, cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json, witness-plan.md, receipt-audit.md, policy-report.json, policy-report.md, manual-candidates.json, manual-repair-queue.json, tokmd-packets.json, lsp.json, repair-queue.json)",
         &path,
     )?;
 
@@ -1204,6 +1226,425 @@ fn check_manual_repair_queue_entry(
         }
     }
     Ok(())
+}
+
+fn check_tokmd_packets_artifact(
+    dir: &Path,
+    manual_candidates: &ManualCandidateIndexProjection,
+) -> Result<(), String> {
+    let path = dir.join("tokmd-packets.json");
+    let value = super::parse_json_file(&path)?;
+    super::require_json_str(
+        &value,
+        "schema_version",
+        "tokmd-packets/v1",
+        "tokmd-packets.json",
+    )?;
+    super::require_json_str(&value, "tool", "unsafe-review", "tokmd-packets.json")?;
+    super::require_json_str(&value, "mode", "tokmd_packet_bundle", "tokmd-packets.json")?;
+    super::require_json_str(&value, "source", "first_pr", "tokmd-packets.json")?;
+    super::require_json_str(&value, "policy", "advisory", "tokmd-packets.json")?;
+    super::require_non_empty_json_str(&value, "tool_version", "tokmd-packets.json")?;
+
+    let renderer = value
+        .get("renderer")
+        .ok_or_else(|| "tokmd-packets.json is missing renderer".to_string())?;
+    if renderer
+        .get("tokmd_run")
+        .and_then(serde_json::Value::as_bool)
+        != Some(false)
+    {
+        return Err("tokmd-packets.json renderer.tokmd_run must be false".to_string());
+    }
+    require_projected_static_string_array(
+        renderer,
+        "available_presets",
+        TOKMD_PACKET_PRESETS,
+        "tokmd-packets.json renderer",
+    )?;
+    let status =
+        super::require_non_empty_json_str(renderer, "presets_status", "tokmd-packets.json")?;
+    if !super::text_contains_ignore_ascii_case(status, "did not render tokmd output") {
+        return Err(
+            "tokmd-packets.json renderer.presets_status must say tokmd output was not rendered"
+                .to_string(),
+        );
+    }
+
+    require_tokmd_summary_count(
+        &value,
+        "manual_candidates",
+        manual_candidates.count,
+        "tokmd-packets.json",
+    )?;
+    require_tokmd_summary_count(
+        &value,
+        "packets",
+        manual_candidates.count,
+        "tokmd-packets.json",
+    )?;
+    require_tokmd_summary_count(&value, "analyzer_discovered", 0, "tokmd-packets.json")?;
+    let evidence_refs = manual_candidates
+        .candidates
+        .iter()
+        .map(|candidate| candidate.evidence_refs)
+        .sum::<usize>();
+    require_tokmd_summary_count(
+        &value,
+        "external_evidence_refs",
+        evidence_refs,
+        "tokmd-packets.json",
+    )?;
+    require_summary_count_map(
+        &value,
+        "/summary/operation_families",
+        &manual_candidates.operation_families,
+        "tokmd-packets.json summary.operation_families",
+    )?;
+    require_summary_count_map(
+        &value,
+        "/summary/evidence_kinds",
+        &manual_candidates.evidence_kinds,
+        "tokmd-packets.json summary.evidence_kinds",
+    )?;
+    require_tokmd_summary_count(
+        &value,
+        "with_proof_mode",
+        manual_candidates
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.proof_mode.is_some())
+            .count(),
+        "tokmd-packets.json",
+    )?;
+    require_tokmd_summary_count(
+        &value,
+        "with_fix_boundary",
+        manual_candidates
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.fix_boundary.is_some())
+            .count(),
+        "tokmd-packets.json",
+    )?;
+    require_tokmd_summary_count(
+        &value,
+        "with_pr_aperture",
+        manual_candidates
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.pr_aperture.is_some())
+            .count(),
+        "tokmd-packets.json",
+    )?;
+    require_tokmd_summary_count(
+        &value,
+        "with_stable_byte_source_class",
+        manual_candidates
+            .candidates
+            .iter()
+            .filter(|candidate| stable_byte_source_class_from_title(&candidate.title).is_some())
+            .count(),
+        "tokmd-packets.json",
+    )?;
+    check_tokmd_packet_inputs(&value)?;
+
+    let packets = super::json_array_at(&value, "/packets", "tokmd-packets.json")?;
+    if packets.len() != manual_candidates.count {
+        return Err(format!(
+            "tokmd-packets.json packets has {} entrie(s), expected {}",
+            packets.len(),
+            manual_candidates.count
+        ));
+    }
+    for (index, (entry, expected)) in packets
+        .iter()
+        .zip(&manual_candidates.candidates)
+        .enumerate()
+    {
+        check_tokmd_packet_entry(entry, expected, index)?;
+    }
+
+    let boundary =
+        super::require_non_empty_json_str(&value, "trust_boundary", "tokmd-packets.json")?;
+    for expected in [
+        "formatting inputs only",
+        "not analyzer-discovered ReviewCards",
+        "not policy inputs",
+        "not a proof of UB",
+        "not a proof of memory safety",
+        "not UB-free status",
+        "not a Miri result",
+        "not Miri-clean status",
+        "not site-execution proof",
+        "not repair success",
+        "not policy readiness",
+        "did not run tokmd",
+        "witnesses",
+        "post comments",
+        "edit source",
+        "enforce blocking policy",
+    ] {
+        if !super::text_contains_ignore_ascii_case(boundary, expected) {
+            return Err(format!(
+                "tokmd-packets.json trust_boundary must include `{expected}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn require_tokmd_summary_count(
+    value: &serde_json::Value,
+    field: &str,
+    expected: usize,
+    context: &str,
+) -> Result<(), String> {
+    let pointer = format!("/summary/{field}");
+    let actual = super::json_usize_at(value, &pointer, context)?;
+    if actual != expected {
+        return Err(format!(
+            "{context} summary.{field} is {actual}, expected {expected}"
+        ));
+    }
+    Ok(())
+}
+
+fn check_tokmd_packet_inputs(value: &serde_json::Value) -> Result<(), String> {
+    for field in ["manual-candidates.json", "manual-repair-queue.json"] {
+        let input = value
+            .pointer(&format!("/inputs/{field}"))
+            .ok_or_else(|| format!("tokmd-packets.json inputs is missing `{field}`"))?;
+        if input.get("included").and_then(serde_json::Value::as_bool) != Some(true) {
+            return Err(format!(
+                "tokmd-packets.json inputs.{field}.included must be true"
+            ));
+        }
+        super::require_non_empty_json_str(input, "relationship", "tokmd-packets.json inputs")?;
+    }
+    for field in [
+        "cards.json",
+        "witness-plan.md",
+        "receipt-audit.md",
+        "repair-queue.json",
+        "comment-plan.json",
+        "stable-byte seed ledger",
+    ] {
+        let input = value
+            .pointer(&format!("/inputs/{field}"))
+            .ok_or_else(|| format!("tokmd-packets.json inputs is missing `{field}`"))?;
+        if input.get("included").and_then(serde_json::Value::as_bool) != Some(false) {
+            return Err(format!(
+                "tokmd-packets.json inputs.{field}.included must be false"
+            ));
+        }
+        super::require_non_empty_json_str(input, "limitation", "tokmd-packets.json inputs")?;
+    }
+    Ok(())
+}
+
+fn check_tokmd_packet_entry(
+    entry: &serde_json::Value,
+    expected: &ManualCandidateProjection,
+    index: usize,
+) -> Result<(), String> {
+    let context = format!("tokmd-packets.json packets[{index}]");
+    require_projected_str(entry, "id", &expected.id, &context)?;
+    require_projected_str(entry, "title", &expected.title, &context)?;
+    super::require_json_str(entry, "source", "manual", &context)?;
+    super::require_json_str(entry, "packet_kind", "manual_candidate", &context)?;
+    if entry.get("manual_candidate") != Some(&serde_json::Value::Bool(true)) {
+        return Err(format!("{context} manual_candidate must be true"));
+    }
+    if entry.get("analyzer_discovered") != Some(&serde_json::Value::Bool(false)) {
+        return Err(format!("{context} analyzer_discovered must be false"));
+    }
+    require_projected_static_string_array(entry, "tokmd_presets", TOKMD_PACKET_PRESETS, &context)?;
+    require_projected_optional_str(
+        entry,
+        "stable_byte_source_class",
+        &stable_byte_source_class_from_title(&expected.title).map(str::to_string),
+        &context,
+    )?;
+    if !entry
+        .get("ledger_state")
+        .is_none_or(serde_json::Value::is_null)
+    {
+        return Err(format!("{context} ledger_state must be null"));
+    }
+    let ledger_limitation =
+        super::require_non_empty_json_str(entry, "ledger_state_limitation", &context)?;
+    if !super::text_contains_ignore_ascii_case(ledger_limitation, "future seed JSON export") {
+        return Err(format!(
+            "{context} ledger_state_limitation must name the future seed JSON export limit"
+        ));
+    }
+
+    let target = entry
+        .get("target")
+        .ok_or_else(|| format!("{context} is missing target"))?;
+    require_projected_str(target, "file", &expected.location_file, &context)?;
+    let line = super::json_usize_at(target, "/line", &context)?;
+    if line != expected.location_line {
+        return Err(format!(
+            "{context} target.line is {line}, expected {}",
+            expected.location_line
+        ));
+    }
+    require_projected_str(target, "location_text", &expected.location_text, &context)?;
+
+    let route = entry
+        .get("route")
+        .ok_or_else(|| format!("{context} is missing route"))?;
+    require_projected_str(route, "safe_caller", &expected.safe_caller, &context)?;
+    require_projected_str(
+        route,
+        "unsafe_operation",
+        &expected.unsafe_operation,
+        &context,
+    )?;
+    require_projected_str(
+        route,
+        "operation_family",
+        &expected.operation_family,
+        &context,
+    )?;
+    require_projected_str(entry, "invariant_at_risk", &expected.invariant, &context)?;
+
+    let evidence = super::json_array_at(entry, "/external_evidence", &context)?;
+    if evidence.len() != expected.evidence.len() {
+        return Err(format!(
+            "{context} external_evidence has {} entrie(s), expected {}",
+            evidence.len(),
+            expected.evidence.len()
+        ));
+    }
+    for (evidence_index, (actual, expected_evidence)) in
+        evidence.iter().zip(&expected.evidence).enumerate()
+    {
+        let evidence_context = format!("{context} external_evidence[{evidence_index}]");
+        require_projected_str(actual, "kind", &expected_evidence.kind, &evidence_context)?;
+        require_projected_optional_str(actual, "path", &expected_evidence.path, &evidence_context)?;
+        require_projected_optional_str(
+            actual,
+            "summary",
+            &expected_evidence.summary,
+            &evidence_context,
+        )?;
+        require_projected_optional_str(
+            actual,
+            "command",
+            &expected_evidence.command,
+            &evidence_context,
+        )?;
+        require_projected_optional_str(
+            actual,
+            "limitation",
+            &expected_evidence.limitation,
+            &evidence_context,
+        )?;
+    }
+
+    require_projected_optional_string_array(entry, "fix_options", &expected.fix_options, &context)?;
+    require_projected_optional_string_array(
+        entry,
+        "test_targets",
+        &expected.test_targets,
+        &context,
+    )?;
+    require_projected_optional_string_array(
+        entry,
+        "do_not_touch",
+        &expected.do_not_touch,
+        &context,
+    )?;
+    require_projected_optional_proof_mode(entry, "proof_mode", &expected.proof_mode, &context)?;
+    require_projected_optional_str(entry, "fix_boundary", &expected.fix_boundary, &context)?;
+    require_projected_optional_str(entry, "pr_aperture", &expected.pr_aperture, &context)?;
+    let handoff = entry
+        .get("implementer_handoff")
+        .ok_or_else(|| format!("{context} is missing implementer_handoff"))?;
+    if handoff != &expected.implementer_handoff {
+        return Err(format!(
+            "{context} implementer_handoff must match manual-candidates.json candidate `{}` implementer_handoff",
+            expected.id
+        ));
+    }
+    let commands = entry
+        .get("commands")
+        .ok_or_else(|| format!("{context} is missing commands"))?;
+    require_manual_command(
+        commands,
+        "explain",
+        "unsafe-review explain",
+        &expected.id,
+        &context,
+    )?;
+    require_manual_command(
+        commands,
+        "context_json",
+        "unsafe-review context",
+        &expected.id,
+        &context,
+    )?;
+    require_manual_command(
+        commands,
+        "witness_plan",
+        "unsafe-review candidate witness-plan",
+        &expected.id,
+        &context,
+    )?;
+    let missing_inputs = require_non_empty_string_array(entry, "missing_inputs", &context)?;
+    for expected_input in [
+        "ReviewCard projection",
+        "receipt audit JSON",
+        "stable-byte ledger state",
+    ] {
+        if !missing_inputs.iter().any(|input| input == expected_input) {
+            return Err(format!(
+                "{context} missing_inputs must include `{expected_input}`"
+            ));
+        }
+    }
+    let boundary = super::require_non_empty_json_str(entry, "trust_boundary", &context)?;
+    for expected_text in [
+        "not analyzer-discovered",
+        "not tokmd output",
+        "not automatic repair",
+        "not witness execution",
+        "not source editing",
+        "not proof",
+        "not policy gating",
+    ] {
+        if !super::text_contains_ignore_ascii_case(boundary, expected_text) {
+            return Err(format!(
+                "{context} trust_boundary must include `{expected_text}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn require_projected_static_string_array(
+    value: &serde_json::Value,
+    field: &str,
+    expected: &[&str],
+    context: &str,
+) -> Result<(), String> {
+    let actual = require_non_empty_string_array(value, field, context)?;
+    if actual != expected {
+        return Err(format!(
+            "{context} {field} is {actual:?}, expected {expected:?}"
+        ));
+    }
+    Ok(())
+}
+
+fn stable_byte_source_class_from_title(title: &str) -> Option<&'static str> {
+    STABLE_BYTE_SOURCE_CLASSES
+        .iter()
+        .copied()
+        .find(|class| title.contains(class))
 }
 
 fn require_manual_command(
@@ -2647,6 +3088,7 @@ fn expected_review_kit_artifact_kind(path: &str) -> &'static str {
         "policy-report.md" => "policy_report_markdown",
         "manual-candidates.json" => "manual_candidates",
         "manual-repair-queue.json" => "manual_repair_queue",
+        "tokmd-packets.json" => "tokmd_packets",
         "lsp.json" => "saved_lsp",
         "repair-queue.json" => "repair_queue",
         _ => "unknown",
@@ -2662,6 +3104,7 @@ fn expected_review_kit_artifact_format(path: &str) -> &'static str {
         | "repair-queue.json"
         | "manual-candidates.json"
         | "manual-repair-queue.json"
+        | "tokmd-packets.json"
         | "policy-report.json" => "json",
         "pr-summary.md" | "github-summary.md" | "witness-plan.md" | "receipt-audit.md"
         | "policy-report.md" => "markdown",
@@ -2684,6 +3127,7 @@ fn check_review_kit_artifact_schema_version(
         | "repair-queue.json" | "policy-report.json" => Some("0.1"),
         "manual-candidates.json" => Some("manual-candidates/v1"),
         "manual-repair-queue.json" => Some("manual-repair-queue/v1"),
+        "tokmd-packets.json" => Some("tokmd-packets/v1"),
         "cards.sarif" => Some("2.1.0"),
         "pr-summary.md" | "github-summary.md" | "witness-plan.md" | "receipt-audit.md"
         | "policy-report.md" => None,
@@ -6582,6 +7026,7 @@ fn check_advisory_artifact_overclaims(dir: &Path) -> Result<(), String> {
         "policy-report.md",
         "manual-candidates.json",
         "manual-repair-queue.json",
+        "tokmd-packets.json",
         "lsp.json",
         "repair-queue.json",
     ] {
@@ -6608,6 +7053,7 @@ fn is_machine_json_artifact(name: &str) -> bool {
             | "policy-report.json"
             | "manual-candidates.json"
             | "manual-repair-queue.json"
+            | "tokmd-packets.json"
             | "lsp.json"
             | "repair-queue.json"
     )

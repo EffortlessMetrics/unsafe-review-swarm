@@ -341,6 +341,18 @@ and cross-check summary counts and guidance against `manual-candidates.json`.
 It is not `repair-queue.json`, not analyzer-discovered ReviewCard output, not
 automatic repair, not proof, not witness execution, and not policy gating.
 
+`first-pr` may also write `tokmd-packets.json` as a formatting-input sidecar
+for future Bun packet presets. It must use
+`schema_version = tokmd-packets/v1`, `source = first_pr`, and
+`policy = advisory`. It must preserve sorted manual IDs, `source = manual`,
+`manual_candidate = true`, and `analyzer_discovered = false` per packet,
+project the same target, route, invariant, external evidence, optional
+`proof_mode`, `fix_boundary`, `pr_aperture`, implementer handoff, and
+copy-only commands as `manual-candidates.json`, and record absent ReviewCard,
+receipt, and stable-byte ledger inputs as explicit limitations. It is not
+rendered tokmd output, not analyzer-discovered ReviewCard output, not automatic
+repair, not proof, not witness execution, and not policy gating.
+
 When imported candidates are present in a `first-pr` run, `pr-summary.md` and
 `github-summary.md` must include a compact manual-candidate front-door cue with
 the manual count, advisory operation-family and evidence-kind count summaries,
@@ -454,6 +466,11 @@ into an analyzer ReviewCard.
   candidate repair handoff, preserving manual markers, guidance, and commands
   from `manual-candidates.json` while keeping ReviewCard `repair-queue.json`
   free of manual-candidate markers.
+- `first-pr` writes `tokmd-packets.json` as a formatting-input sidecar,
+  preserving manual markers, proof-mode/fix-boundary/PR-aperture guidance,
+  implementer handoff, and commands from `manual-candidates.json` while
+  recording absent ledger, receipt, and ReviewCard packet inputs as
+  limitations and not running tokmd.
 - The first-pr verifier rejects manual-candidate markers in ReviewCard-only
   artifacts instead of silently accepting leaked manual candidates as analyzer
   output.
