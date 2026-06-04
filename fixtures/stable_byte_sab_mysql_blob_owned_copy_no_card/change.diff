@@ -1,0 +1,33 @@
+diff --git a/src/lib.rs b/src/lib.rs
+index 0000000..1111111 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -0,0 +1,28 @@
++pub struct JSValue {
++    bytes: Vec<u8>,
++    shared: bool,
++}
++
++impl JSValue {
++    pub fn is_shared_array_buffer(&self) -> bool {
++        self.shared
++    }
++
++    pub fn copy_shared_bytes(&self) -> Vec<u8> {
++        self.bytes.clone()
++    }
++}
++
++pub enum Data {
++    Owned(Vec<u8>),
++    Empty,
++}
++
++pub fn mysql_blob_sab_bind(value: &JSValue) -> Data {
++    if value.is_shared_array_buffer() {
++        let owned = value.copy_shared_bytes();
++        return Data::Owned(owned);
++    }
++
++    Data::Empty
++}

@@ -2986,12 +2986,65 @@ pub fn zstd_sync(
     }
 
     #[test]
+    fn stable_byte_sab_fixture_pins_mysql_blob_rawslice_card() -> Result<(), String> {
+        let output = fixture_output("stable_byte_sab_mysql_blob_rawslice")?;
+        assert_eq!(output.cards.len(), 2);
+        let raw_parts_card = output
+            .cards
+            .iter()
+            .find(|card| card.operation.family == OperationFamily::SliceFromRawParts)
+            .ok_or_else(|| "fixture should retain the raw-parts operation card".to_string())?;
+        let stable_byte_card = output
+            .cards
+            .iter()
+            .find(|card| card.operation.family == OperationFamily::StableByteSourceSabRace)
+            .ok_or_else(|| "fixture should emit the SAB stable-byte card".to_string())?;
+
+        assert_eq!(
+            raw_parts_card.site.owner.as_deref(),
+            Some("mysql_blob_sab_bind")
+        );
+        assert_eq!(
+            stable_byte_card.site.owner.as_deref(),
+            Some("mysql_blob_sab_bind")
+        );
+        assert_eq!(raw_parts_card.site.location.line, 30);
+        assert_eq!(stable_byte_card.site.location.line, 30);
+        assert_eq!(stable_byte_card.class, ReviewClass::GuardMissing);
+        assert_eq!(stable_byte_card.proof_path, ProofPath::MutationMiriModel);
+        assert!(
+            stable_byte_card
+                .operation
+                .expression
+                .contains("stable-byte-source-sab-race")
+        );
+        assert!(
+            stable_byte_card
+                .next_action
+                .summary
+                .contains("mutation-plus-Miri/model proof path")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn stable_byte_sab_fixture_keeps_snapshot_no_card() -> Result<(), String> {
         let output = fixture_output("stable_byte_sab_snapshot_no_card")?;
 
         assert!(
             output.cards.is_empty(),
             "copying shared bytes into owned storage should stay a no-card control"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn stable_byte_sab_fixture_keeps_mysql_blob_owned_copy_no_card() -> Result<(), String> {
+        let output = fixture_output("stable_byte_sab_mysql_blob_owned_copy_no_card")?;
+
+        assert!(
+            output.cards.is_empty(),
+            "copying MySQL BLOB shared bytes into owned storage should stay a no-card control"
         );
         Ok(())
     }

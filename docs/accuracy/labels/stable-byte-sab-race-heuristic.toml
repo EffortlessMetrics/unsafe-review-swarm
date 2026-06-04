@@ -30,9 +30,34 @@ label_source = "fixture_golden"
 rationale = "A same-owner SharedArrayBuffer-style backing signal before borrowed raw-parts materialization should stay an advisory stable-byte SAB race ReviewCard with mutation-plus-Miri proof-path wording while retaining the raw-parts card."
 
 [[samples]]
+id = "stable-byte-sab-mysql-blob-rawslice-emits-advisory-card"
+fixture = "stable_byte_sab_mysql_blob_rawslice"
+kind = "positive"
+expected_cards = 2
+expected_class = "guard_missing"
+expected_operation_family = "stable_byte_source_sab_race"
+expected_hazard = "stable_byte_source"
+expected_owner = "mysql_blob_sab_bind"
+expected_site_kind = "operation"
+expected_obligation_key = "byte-stability"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A same-owner MySQL BLOB SharedArrayBuffer-style backing signal before temporary raw-slice materialization should stay an advisory stable-byte SAB race ReviewCard with mutation-plus-Miri proof-path wording while retaining the raw-parts card."
+
+[[samples]]
 id = "stable-byte-sab-snapshot-emits-no-card"
 fixture = "stable_byte_sab_snapshot_no_card"
 kind = "false_positive_control"
 expected_cards = 0
 label_source = "fixture_golden"
 rationale = "Copying shared bytes into owned storage before decode should not trigger the stable-byte SAB race heuristic or create a ReviewCard."
+
+[[samples]]
+id = "stable-byte-sab-mysql-blob-owned-copy-emits-no-card"
+fixture = "stable_byte_sab_mysql_blob_owned_copy_no_card"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "Copying MySQL BLOB shared bytes into owned storage before packet data storage should not trigger the stable-byte SAB race heuristic or create a ReviewCard."

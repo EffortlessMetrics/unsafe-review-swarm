@@ -1699,7 +1699,9 @@ operation_family = "stable_byte_source_sab_race"
 hazard = "stable_byte_source"
 fixtures = [
   "stable_byte_sab_borrowed_slice",
+  "stable_byte_sab_mysql_blob_rawslice",
   "stable_byte_sab_snapshot_no_card",
+  "stable_byte_sab_mysql_blob_owned_copy_no_card",
 ]
 dogfood_targets = []
 label_ledgers = [
@@ -1708,9 +1710,10 @@ label_ledgers = [
 labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned stable-byte SAB race heuristic behavior emits one advisory
-ReviewCard for the listed shared-backing borrowed-slice fixture while retaining
-the underlying raw-parts ReviewCard. The listed snapshot fixture remains a
-no-card control because shared bytes are copied into owned storage before decode.
+ReviewCard for the listed shared-backing borrowed-slice and MySQL BLOB raw-slice
+fixtures while retaining the underlying raw-parts ReviewCard. The listed
+snapshot and owned-copy fixtures remain no-card controls because shared bytes
+are copied into owned storage before the borrowed/native sink.
 """
 forbidden_claims = [
   "Bun vulnerability",

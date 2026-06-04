@@ -535,7 +535,9 @@ required_core_fixtures = [
   "js_buffer_reentry_async_recapture_after_reentry_no_card",
   "js_buffer_reentry_node_fs_rab_scalar_write_scheduled_before_capture_no_card",
   "stable_byte_sab_borrowed_slice",
+  "stable_byte_sab_mysql_blob_rawslice",
   "stable_byte_sab_snapshot_no_card",
+  "stable_byte_sab_mysql_blob_owned_copy_no_card",
   "panic_from_safe_js_direct_try_from_expect",
   "panic_from_safe_js_bound_try_from_unwrap",
   "panic_from_safe_js_observed_only_not_guard",
@@ -5836,9 +5838,26 @@ expected_operation_family = "stable_byte_source_sab_race"
 expected_hazard = "stable_byte_source"
 
 [[cases]]
+fixture = "stable_byte_sab_mysql_blob_rawslice"
+kind = "positive"
+claim = "MySQL BLOB SharedArrayBuffer bytes reaching temporary raw-slice storage emit one advisory SAB stable-byte ReviewCard while retaining the raw-parts operation card"
+support_tier = "Stable-byte SAB race heuristic"
+expected_cards = 2
+expected_class = "guard_missing"
+expected_operation_family = "stable_byte_source_sab_race"
+expected_hazard = "stable_byte_source"
+
+[[cases]]
 fixture = "stable_byte_sab_snapshot_no_card"
 kind = "false_positive_control"
 claim = "Stable-byte SAB race heuristic does not emit a ReviewCard when shared bytes are copied into owned storage before decode"
+support_tier = "Stable-byte SAB race heuristic"
+expected_cards = 0
+
+[[cases]]
+fixture = "stable_byte_sab_mysql_blob_owned_copy_no_card"
+kind = "false_positive_control"
+claim = "Stable-byte SAB race heuristic does not emit a ReviewCard when MySQL BLOB shared bytes are copied into owned storage before packet data storage"
 support_tier = "Stable-byte SAB race heuristic"
 expected_cards = 0
 
