@@ -4786,6 +4786,7 @@ fn require_markdown_top_card_projection(
     let mut top_card_operation_family = None;
     let mut top_card_proof_path = None;
     let mut top_card_hypothesis = None;
+    let mut top_card_build_this_first = None;
     let mut top_card_missing_evidence = None;
     let mut top_card_primary_route = None;
     let mut top_card_next_action = None;
@@ -4834,6 +4835,8 @@ fn require_markdown_top_card_projection(
             top_card_proof_path = Some(proof_path.to_string());
         } else if let Some(hypothesis) = trimmed.strip_prefix("- Hypothesis to confirm: ") {
             top_card_hypothesis = Some(hypothesis.to_string());
+        } else if let Some(build_this_first) = trimmed.strip_prefix("- Build/run this first: ") {
+            top_card_build_this_first = Some(build_this_first.to_string());
         } else if let Some(missing_evidence) = trimmed
             .strip_prefix("- Missing evidence: ")
             .or_else(|| trimmed.strip_prefix("- Missing/weak evidence: "))
@@ -4952,6 +4955,15 @@ fn require_markdown_top_card_projection(
     };
     require_top_card_hypothesis_text(&actual_hypothesis, path, &card_id, card)?;
 
+    let Some(actual_build_this_first) = top_card_build_this_first else {
+        return Err(format!(
+            "{} must include a top ReviewCard build/run-this-first line",
+            path.display()
+        ));
+    };
+    require_top_card_build_this_first_text(&actual_build_this_first, path, &card_id, card)?;
+    require_top_card_minimal_repro_text(top_card_text, path, &card_id, card)?;
+
     let Some(actual_missing_evidence) = top_card_missing_evidence else {
         return Err(format!(
             "{} must include a top ReviewCard missing evidence line",
@@ -5042,6 +5054,54 @@ fn require_markdown_top_card_projection(
             path.display()
         ),
     )
+}
+
+fn require_top_card_build_this_first_text(
+    actual: &str,
+    path: &Path,
+    card_id: &str,
+    card: &CardProjection,
+) -> Result<(), String> {
+    let expected = expected_comment_build_this_first(card);
+    require_expected_value(
+        actual,
+        &expected.summary,
+        &format!(
+            "{} top card `{card_id}` build/run-this-first",
+            path.display()
+        ),
+    )
+}
+
+fn require_top_card_minimal_repro_text(
+    text: &str,
+    path: &Path,
+    card_id: &str,
+    card: &CardProjection,
+) -> Result<(), String> {
+    let expected = expected_comment_minimal_repro(card);
+    if !text.contains("- Minimal repro cue:") {
+        return Err(format!(
+            "{} top card `{card_id}` must include a minimal repro cue",
+            path.display()
+        ));
+    }
+    for step in &expected.steps {
+        if !text.contains(step) {
+            return Err(format!(
+                "{} top card `{card_id}` minimal repro cue must include `{step}`",
+                path.display()
+            ));
+        }
+    }
+    if !text.contains(expected.limitation) {
+        return Err(format!(
+            "{} top card `{card_id}` minimal repro cue must include limitation `{}`",
+            path.display(),
+            expected.limitation
+        ));
+    }
+    Ok(())
 }
 
 fn require_top_card_hypothesis_text(
@@ -7983,6 +8043,18 @@ fn require_pr_summary_witness_plan_projection(
             "confirmation step",
             &expected_confirmation_step_fragment(card),
         )?;
+        let expected_build_this_first = format!(
+            "  - Build/run this first: {}",
+            expected_comment_build_this_first(card).summary
+        );
+        require_pr_summary_witness_line(
+            section,
+            path,
+            card_id,
+            "build/run-this-first",
+            &expected_build_this_first,
+        )?;
+        require_pr_summary_witness_minimal_repro(section, path, card_id, card)?;
         if let Some(route) = card.witness_routes.first() {
             let expected = format!("  - Route: `{}` because {}", route.kind, route.reason);
             require_pr_summary_witness_line(section, path, card_id, "primary route", &expected)?;
@@ -8010,6 +8082,32 @@ fn require_pr_summary_witness_plan_projection(
         }
     }
     Ok(())
+}
+
+fn require_pr_summary_witness_minimal_repro(
+    section: &str,
+    path: &Path,
+    card_id: &str,
+    card: &CardProjection,
+) -> Result<(), String> {
+    let expected = expected_comment_minimal_repro(card);
+    require_pr_summary_witness_line(
+        section,
+        path,
+        card_id,
+        "minimal repro cue heading",
+        "  - Minimal repro cue:",
+    )?;
+    for step in &expected.steps {
+        require_pr_summary_witness_line(section, path, card_id, "minimal repro step", step)?;
+    }
+    require_pr_summary_witness_line(
+        section,
+        path,
+        card_id,
+        "minimal repro limitation",
+        expected.limitation,
+    )
 }
 
 fn pr_summary_witness_plan_section(text: &str) -> Option<&str> {

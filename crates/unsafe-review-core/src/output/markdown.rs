@@ -2,6 +2,9 @@ use crate::api::AnalyzeOutput;
 use crate::api::Scope;
 use crate::domain::ReviewCard;
 use crate::output::agent;
+use crate::output::confirmation::{
+    build_this_first, confirmation_step, hypothesis_to_confirm, minimal_repro,
+};
 use crate::output::{
     NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE, REVIEWCARD_TRUST_BOUNDARY,
 };
@@ -476,6 +479,11 @@ fn render_pr_summary_reviewer_cockpit(out: &mut String, output: &AnalyzeOutput) 
             "- Hypothesis to confirm: {}\n",
             top_card_hypothesis(card)
         ));
+        out.push_str(&format!(
+            "- Build/run this first: {}\n",
+            top_card_build_this_first(card)
+        ));
+        render_minimal_repro_cue(out, card, "- Minimal repro cue:", "  ");
         out.push_str("- Evidence found:\n");
         out.push_str(&format!("  - Contract: {}\n", card.contract.summary));
         out.push_str(&format!(
@@ -552,6 +560,11 @@ fn render_pr_summary_top_card(out: &mut String, output: &AnalyzeOutput) {
             "- Hypothesis to confirm: {}\n",
             top_card_hypothesis(card)
         ));
+        out.push_str(&format!(
+            "- Build/run this first: {}\n",
+            top_card_build_this_first(card)
+        ));
+        render_minimal_repro_cue(out, card, "- Minimal repro cue:", "  ");
         out.push_str(&format!("- Missing evidence: {}\n", missing_summary(card)));
         if let Some(route) = card.routes.first() {
             out.push_str(&format!(
@@ -580,11 +593,11 @@ fn render_pr_summary_top_card(out: &mut String, output: &AnalyzeOutput) {
 }
 
 fn top_card_hypothesis(card: &ReviewCard) -> String {
-    format!(
-        "static `{}` ReviewCard for `{}`; confirm with external evidence before treating it as observed runtime behavior",
-        card.class.as_str(),
-        one_line(&card.operation.expression)
-    )
+    hypothesis_to_confirm(card)
+}
+
+fn top_card_build_this_first(card: &ReviewCard) -> String {
+    build_this_first(card).summary
 }
 
 fn top_card_confirmation_step(card: &ReviewCard) -> String {
@@ -594,13 +607,23 @@ fn top_card_confirmation_step(card: &ReviewCard) -> String {
             command
         );
     }
-    if let Some(route) = card.routes.first() {
-        return format!(
-            "use the `{}` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
-            route.kind.as_str()
-        );
+    confirmation_step(card)
+}
+
+fn render_minimal_repro_cue(out: &mut String, card: &ReviewCard, label: &str, indent: &str) {
+    let cue = minimal_repro(card);
+    out.push_str(label);
+    out.push('\n');
+    for step in cue.steps() {
+        out.push_str(indent);
+        out.push_str("- ");
+        out.push_str(step);
+        out.push('\n');
     }
-    "derive a focused confirmation from `unsafe-review explain` and human review before upgrading confidence".to_string()
+    out.push_str(indent);
+    out.push_str("- Limitation: ");
+    out.push_str(cue.limitation());
+    out.push('\n');
 }
 
 fn render_pr_summary_card_table(out: &mut String, output: &AnalyzeOutput) {
@@ -646,6 +669,11 @@ fn render_pr_summary_witness_plan(out: &mut String, output: &AnalyzeOutput) {
             "  - Confirmation step: {}\n",
             top_card_confirmation_step(card)
         ));
+        out.push_str(&format!(
+            "  - Build/run this first: {}\n",
+            top_card_build_this_first(card)
+        ));
+        render_minimal_repro_cue(out, card, "  - Minimal repro cue:", "    ");
         if let Some(route) = card.routes.first() {
             out.push_str(&format!(
                 "  - Route: `{}` because {}\n",
@@ -939,6 +967,17 @@ mod tests {
         assert!(rendered.contains(
             "confirm with external evidence before treating it as observed runtime behavior"
         ));
+        assert!(rendered.contains(
+            "- Build/run this first: Build/run `cargo +nightly miri test read_header` first for this card"
+        ));
+        assert!(rendered.contains("- Minimal repro cue:"));
+        assert!(rendered.contains(&format!(
+            "Confirm ReviewCard `{}` still maps to `unsafe {{ ptr.cast::<Header>().read() }}` at `src/lib.rs:8:5` before upgrading confidence.",
+            card.id
+        )));
+        assert!(
+            rendered.contains("Minimal repro cue only; unsafe-review did not run this command")
+        );
         assert!(rendered.contains("- Obligation:"));
         assert!(rendered.contains("- Evidence found:"));
         assert!(rendered.contains("  - Guard/discharge:"));
@@ -962,6 +1001,9 @@ mod tests {
         )));
         assert!(rendered.contains(
             "  - Confirmation step: build/run `cargo +nightly miri test read_header` first"
+        ));
+        assert!(rendered.contains(
+            "  - Build/run this first: Build/run `cargo +nightly miri test read_header` first for this card"
         ));
         assert!(rendered.contains("Open actionable gaps: 1"));
         assert!(rendered.contains("Missing visible local guard"));
@@ -1014,6 +1056,10 @@ mod tests {
         assert!(rendered.contains(&format!("- ID: `{}`", card.id)));
         assert!(rendered.contains("- Proof path: `source_route_only`"));
         assert!(rendered.contains("- Hypothesis to confirm: static `guard_missing` ReviewCard"));
+        assert!(rendered.contains(
+            "- Build/run this first: Build/run `cargo +nightly miri test read_header` first for this card"
+        ));
+        assert!(rendered.contains("- Minimal repro cue:"));
         assert!(rendered.contains(
             "- Confirmation step: build/run `cargo +nightly miri test read_header` first"
         ));

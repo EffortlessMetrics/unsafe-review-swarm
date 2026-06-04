@@ -101,6 +101,11 @@ may reclassify findings independently or invent a second analyzer truth.
 
 - acts as the reviewer front panel
 - names actionable cards and next evidence requests
+- frames the top card as a hypothesis, names the build/run-this-first cue, and
+  includes a minimal repro cue whose limitation states unsafe-review did not run
+  it or observe runtime behavior
+- repeats the build/run-this-first and minimal repro cues for each card in the
+  witness plan so every finding has a concrete first confirmation recipe
 - preserves no-proof/no-UB-free/no-Miri-clean wording
 
 `explain`:

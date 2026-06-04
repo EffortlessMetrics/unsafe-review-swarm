@@ -703,14 +703,14 @@ fn review_kit_stable_byte_seed_source(
     if !stable_byte_seed_ledger.present {
         return json!({
             "included": false,
-            "limitation": "Root-local stable-byte seed ledger was absent; manual candidate stable_byte metadata is still projected"
+            "limitation": "Root-local stable-byte seed ledger was absent; manual candidate stable_byte metadata is still projected as advisory workflow metadata only; not analyzer discovery, not witness execution, not proof, not policy readiness, and not a ReviewCard truth"
         });
     }
     if let Some(parse_error) = &stable_byte_seed_ledger.parse_error {
         return json!({
             "included": false,
             "path": stable_byte_seed_ledger.path,
-            "limitation": format!("Stable-byte seed ledger was present but not imported: {parse_error}; manual candidate stable_byte metadata is still projected")
+            "limitation": format!("Stable-byte seed ledger was present but not imported: {parse_error}; manual candidate stable_byte metadata is still projected as advisory workflow metadata only; not analyzer discovery, not witness execution, not proof, not policy readiness, and not a ReviewCard truth")
         });
     }
     json!({

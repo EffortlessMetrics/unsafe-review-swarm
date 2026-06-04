@@ -72,6 +72,14 @@ impl MinimalReproCue {
             limitation: "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety.",
         }
     }
+
+    pub(crate) fn steps(&self) -> &[String] {
+        &self.steps
+    }
+
+    pub(crate) fn limitation(&self) -> &'static str {
+        self.limitation
+    }
 }
 
 pub(crate) fn hypothesis_to_confirm(card: &ReviewCard) -> String {
