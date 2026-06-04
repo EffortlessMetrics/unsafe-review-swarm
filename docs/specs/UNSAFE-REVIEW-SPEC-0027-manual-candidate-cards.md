@@ -330,11 +330,16 @@ candidate handoff so reviewers and agents can see more than the first imported
 candidate. That queue must stay copy-only, preserve sorted manual IDs and
 manual/advisory markers, include file:line and implementer handoff cues, expose
 the queue limit and omitted count, and cross-check against
-`manual-candidates.json`. The verifier must also reject implementer handoff
-drift: target, route, invariant, external evidence commands, limitations, and
-candidate-specific fix options, test targets, non-goals, and stop lines must
-still project from the imported manual candidate. It is not the
-ReviewCard repair queue.
+`manual-candidates.json`. The handoff may also include candidate-mix summaries
+for proof modes, stable-byte-source classes, ledger states, and optional
+oracle-map/fix-boundary/PR-aperture/guidance presence counts so reviewers can
+see whether the imported Bun queue is observable, model-heavy, helper-gated, or
+handoff-ready without opening each packet. These summaries must derive only
+from imported manual-candidate fields and must not become a second source of
+truth. The verifier must also reject implementer handoff drift: target, route,
+invariant, external evidence commands, limitations, and candidate-specific fix
+options, test targets, non-goals, and stop lines must still project from the
+imported manual candidate. It is not the ReviewCard repair queue.
 
 `first-pr` may also write `manual-repair-queue.json` as a dedicated
 manual-candidate repair handoff sidecar. It must use
@@ -421,6 +426,10 @@ into an analyzer ReviewCard.
   maps are derived from imported manual candidates and stay aligned across
   candidate list, first-pr `manual-candidates.json`, `review-kit.json`, and
   Markdown front-door cues
+- projection tests proving review-kit manual-candidate proof-mode,
+  stable-byte-source-class, ledger-state, oracle-map, fix-boundary,
+  PR-aperture, and guidance summary cues stay derived from imported manual
+  candidates and are verifier-checked
 - projection tests proving `source = manual` and `manual_candidate = true` are
   preserved with `analyzer_discovered = false` in explain, context,
   witness-plan, saved JSON, first-pr `manual-candidates.json`, and outcome
@@ -499,7 +508,8 @@ into an analyzer ReviewCard.
 - `manual-candidates.json` and the `review-kit.json` manual candidate handoff
   carry structured ReviewCard-only applicability metadata for SARIF,
   comment-plan, saved-LSP, repair-queue, cards, and policy-report JSON/Markdown
-  artifacts, plus advisory candidate-mix summary maps.
+  artifacts, plus advisory candidate-mix summary maps including proof-mode,
+  stable-byte-source-class, ledger-state, oracle-map, and guidance counts.
 - `first-pr` terminal output and `review-kit.json` include a bounded,
   copy-only manual candidate handoff with `manual-candidates.json`,
   a sorted bounded candidate queue, `explain`, `context --json`, and

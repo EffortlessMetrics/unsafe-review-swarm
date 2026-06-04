@@ -1856,6 +1856,46 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         1
     );
     assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["proof_modes"]["mutation-plus-miri"],
+        2
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["stable_byte_source_classes"]["stable-byte-source-sab-race"],
+        2
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["ledger_states"]["handoff-ready"],
+        2
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["with_fix_options"],
+        2
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["with_test_targets"],
+        2
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["with_do_not_touch"],
+        2
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["with_oracle_map"],
+        2
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["with_proof_mode"],
+        2
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["with_fix_boundary"],
+        2
+    );
+    assert_eq!(
+        review_kit["handoff"]["manual_candidates"]["with_pr_aperture"],
+        2
+    );
+    assert_eq!(
         review_kit["handoff"]["manual_candidates"]["reviewcard_artifact_applicability"]["cards.sarif"]
             ["decision"],
         "reviewcard_only"

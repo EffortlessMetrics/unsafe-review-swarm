@@ -12957,6 +12957,69 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_manual_candidate_proof_mode_summary_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-manual-proof-mode-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit = parse_json_file(&path)?;
+        review_kit["handoff"]["manual_candidates"]["proof_modes"]["mutation-plus-miri"] =
+            serde_json::json!(2);
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "review-kit manual candidate proof-mode summary drift should fail verification"
+                        .to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("review-kit.json handoff manual_candidates.proof_modes"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_review_kit_manual_candidate_oracle_map_count_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-manual-oracle-map-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("review-kit.json");
+        let mut review_kit = parse_json_file(&path)?;
+        review_kit["handoff"]["manual_candidates"]["with_oracle_map"] = serde_json::json!(0);
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "review-kit manual candidate oracle-map count drift should fail verification"
+                        .to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("review-kit.json handoff manual_candidates.with_oracle_map"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_manual_repair_proof_mode_summary_drift()
     -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-manual-repair-proof-mode-drift")?;
@@ -18228,6 +18291,16 @@ review_after = "2026-08-01"
                     "analyzer_discovered": 0,
                     "operation_families": {},
                     "evidence_kinds": {},
+                    "proof_modes": {},
+                    "stable_byte_source_classes": {},
+                    "ledger_states": {},
+                    "with_fix_options": 0,
+                    "with_test_targets": 0,
+                    "with_do_not_touch": 0,
+                    "with_oracle_map": 0,
+                    "with_proof_mode": 0,
+                    "with_fix_boundary": 0,
+                    "with_pr_aperture": 0,
                     "reviewcard_artifact_applicability": manual_candidate_reviewcard_applicability_fixture(),
                     "first_candidate": serde_json::Value::Null,
                     "candidate_queue_limit": 5,
@@ -18859,6 +18932,18 @@ review_after = "2026-08-01"
             "evidence_kinds": {
                 "runtime_witness": 1
             },
+            "proof_modes": {
+                "mutation-plus-miri": 1
+            },
+            "stable_byte_source_classes": {},
+            "ledger_states": {},
+            "with_fix_options": 1,
+            "with_test_targets": 1,
+            "with_do_not_touch": 1,
+            "with_oracle_map": 1,
+            "with_proof_mode": 1,
+            "with_fix_boundary": 1,
+            "with_pr_aperture": 1,
             "reviewcard_artifact_applicability": manual_candidate_reviewcard_applicability_fixture(),
             "first_candidate": {
                 "id": "R4R2-S001",

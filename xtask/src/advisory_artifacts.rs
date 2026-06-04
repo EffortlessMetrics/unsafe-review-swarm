@@ -3038,6 +3038,87 @@ fn check_review_kit_manual_candidate_handoff(
         &manual_candidates.evidence_kinds,
         "review-kit.json handoff manual_candidates.evidence_kinds",
     )?;
+    require_summary_count_map(
+        manual,
+        "/proof_modes",
+        &manual_candidate_proof_mode_counts(manual_candidates),
+        "review-kit.json handoff manual_candidates.proof_modes",
+    )?;
+    require_summary_count_map(
+        manual,
+        "/stable_byte_source_classes",
+        &manual_candidate_stable_byte_class_counts(manual_candidates),
+        "review-kit.json handoff manual_candidates.stable_byte_source_classes",
+    )?;
+    require_summary_count_map(
+        manual,
+        "/ledger_states",
+        &manual_candidate_ledger_state_counts(manual_candidates),
+        "review-kit.json handoff manual_candidates.ledger_states",
+    )?;
+    require_review_kit_manual_guidance_count(
+        manual,
+        "with_fix_options",
+        manual_candidates
+            .candidates
+            .iter()
+            .filter(|candidate| !candidate.fix_options.is_empty())
+            .count(),
+    )?;
+    require_review_kit_manual_guidance_count(
+        manual,
+        "with_test_targets",
+        manual_candidates
+            .candidates
+            .iter()
+            .filter(|candidate| !candidate.test_targets.is_empty())
+            .count(),
+    )?;
+    require_review_kit_manual_guidance_count(
+        manual,
+        "with_do_not_touch",
+        manual_candidates
+            .candidates
+            .iter()
+            .filter(|candidate| !candidate.do_not_touch.is_empty())
+            .count(),
+    )?;
+    require_review_kit_manual_guidance_count(
+        manual,
+        "with_oracle_map",
+        manual_candidates
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.oracle_map.is_some())
+            .count(),
+    )?;
+    require_review_kit_manual_guidance_count(
+        manual,
+        "with_proof_mode",
+        manual_candidates
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.proof_mode.is_some())
+            .count(),
+    )?;
+    require_review_kit_manual_guidance_count(
+        manual,
+        "with_fix_boundary",
+        manual_candidates
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.fix_boundary.is_some())
+            .count(),
+    )?;
+    require_review_kit_manual_guidance_count(
+        manual,
+        "with_pr_aperture",
+        manual_candidates
+            .candidates
+            .iter()
+            .filter(|candidate| candidate.pr_aperture.is_some())
+            .count(),
+    )?;
     check_manual_candidate_reviewcard_applicability(
         manual,
         "review-kit.json handoff manual_candidates",
@@ -3061,6 +3142,25 @@ fn check_review_kit_manual_candidate_handoff(
                 "review-kit.json handoff manual_candidates trust_boundary must include `{expected}`"
             ));
         }
+    }
+    Ok(())
+}
+
+fn require_review_kit_manual_guidance_count(
+    manual: &serde_json::Value,
+    field: &str,
+    expected: usize,
+) -> Result<(), String> {
+    let pointer = format!("/{field}");
+    let actual = super::json_usize_at(
+        manual,
+        &pointer,
+        "review-kit.json handoff manual_candidates",
+    )?;
+    if actual != expected {
+        return Err(format!(
+            "review-kit.json handoff manual_candidates.{field} is {actual}, expected {expected}"
+        ));
     }
     Ok(())
 }
