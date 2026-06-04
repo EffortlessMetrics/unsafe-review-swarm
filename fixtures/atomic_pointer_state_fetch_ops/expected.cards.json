@@ -102,7 +102,29 @@
     "verify_commands": [
       "cargo test fetch_and_tag_loom -- --nocapture",
       "cargo test fetch_and_tag_shuttle -- --nocapture"
-    ]
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `requires_loom` ReviewCard for `unsafe { Shared::from_ptr(self.data.fetch_and(mask, order)) }`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo test fetch_and_tag_loom -- --nocapture",
+        "route_kind": "loom",
+        "summary": "Build/run `cargo test fetch_and_tag_loom -- --nocapture` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo test fetch_and_tag_loom -- --nocapture",
+        "route_kind": "loom",
+        "steps": [
+          "Confirm ReviewCard `UR-atomic-pointer-state-fetch-ops-fixture-src-lib-rs-fetch-and-tag-operation-atomic_pointer_state-from-ptr-53a51f075cac-atomic_ordering-c1` still maps to `unsafe { Shared::from_ptr(self.data.fetch_and(mask, order)) }` at `src/lib.rs:17:9` before upgrading confidence.",
+          "Build/run `cargo test fetch_and_tag_loom -- --nocapture` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo test fetch_and_tag_loom -- --nocapture` first, then attach a matching receipt if it confirms the route",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    }
   },
   {
     "id": "UR-atomic-pointer-state-fetch-ops-fixture-src-lib-rs-fetch-or-tag-operation-atomic_pointer_state-from-ptr-6c5b27e03741-atomic_ordering-c1",
@@ -207,7 +229,29 @@
     "verify_commands": [
       "cargo test fetch_or_tag_loom -- --nocapture",
       "cargo test fetch_or_tag_shuttle -- --nocapture"
-    ]
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `requires_loom` ReviewCard for `unsafe { Shared::from_ptr(self.data.fetch_or(mask, order)) }`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo test fetch_or_tag_loom -- --nocapture",
+        "route_kind": "loom",
+        "summary": "Build/run `cargo test fetch_or_tag_loom -- --nocapture` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo test fetch_or_tag_loom -- --nocapture",
+        "route_kind": "loom",
+        "steps": [
+          "Confirm ReviewCard `UR-atomic-pointer-state-fetch-ops-fixture-src-lib-rs-fetch-or-tag-operation-atomic_pointer_state-from-ptr-6c5b27e03741-atomic_ordering-c1` still maps to `unsafe { Shared::from_ptr(self.data.fetch_or(mask, order)) }` at `src/lib.rs:21:9` before upgrading confidence.",
+          "Build/run `cargo test fetch_or_tag_loom -- --nocapture` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo test fetch_or_tag_loom -- --nocapture` first, then attach a matching receipt if it confirms the route",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    }
   },
   {
     "id": "UR-atomic-pointer-state-fetch-ops-fixture-src-lib-rs-fetch-xor-tag-operation-atomic_pointer_state-from-ptr-4f274a720bbb-atomic_ordering-c1",
@@ -312,6 +356,28 @@
     "verify_commands": [
       "cargo test fetch_xor_tag_loom -- --nocapture",
       "cargo test fetch_xor_tag_shuttle -- --nocapture"
-    ]
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `requires_loom` ReviewCard for `unsafe { Shared::from_ptr(self.data.fetch_xor(mask, order) as *mut T) }`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo test fetch_xor_tag_loom -- --nocapture",
+        "route_kind": "loom",
+        "summary": "Build/run `cargo test fetch_xor_tag_loom -- --nocapture` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo test fetch_xor_tag_loom -- --nocapture",
+        "route_kind": "loom",
+        "steps": [
+          "Confirm ReviewCard `UR-atomic-pointer-state-fetch-ops-fixture-src-lib-rs-fetch-xor-tag-operation-atomic_pointer_state-from-ptr-4f274a720bbb-atomic_ordering-c1` still maps to `unsafe { Shared::from_ptr(self.data.fetch_xor(mask, order) as *mut T) }` at `src/lib.rs:25:9` before upgrading confidence.",
+          "Build/run `cargo test fetch_xor_tag_loom -- --nocapture` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo test fetch_xor_tag_loom -- --nocapture` first, then attach a matching receipt if it confirms the route",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    }
   }
 ]

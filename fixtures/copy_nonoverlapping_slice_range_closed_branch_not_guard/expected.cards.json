@@ -102,6 +102,28 @@
     "verify_commands": [
       "cargo +nightly miri test copy_checked",
       "cargo +nightly careful test copy_checked"
-    ]
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe { core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count) }`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test copy_checked",
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test copy_checked` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test copy_checked",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-copy-nonoverlapping-slice-range-closed-branch-not-guard-src-lib-rs-copy-checked-operation-copy_nonoverlapping-copy-nonoverlapping-3b394b24b2ef-pointer_validity-c1` still maps to `unsafe { core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count) }` at `src/lib.rs:9:5` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test copy_checked` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo +nightly miri test copy_checked` first, then attach a matching receipt if it confirms the route",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    }
   }
 ]

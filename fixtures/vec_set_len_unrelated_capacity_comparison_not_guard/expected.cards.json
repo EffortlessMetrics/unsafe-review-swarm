@@ -101,6 +101,28 @@
     "verify_commands": [
       "cargo +nightly miri test extend_len",
       "cargo +nightly careful test extend_len"
-    ]
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe { values.set_len(new_len) }`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test extend_len",
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test extend_len` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test extend_len",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-vec-set-len-unrelated-capacity-comparison-not-guard-fixture-src-lib-rs-extend-len-operation-vec_set_len-set-len-1b63c93d2803-initialized_memory-c1` still maps to `unsafe { values.set_len(new_len) }` at `src/lib.rs:7:5` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test extend_len` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo +nightly miri test extend_len` first, then attach a matching receipt if it confirms the route",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    }
   }
 ]

@@ -1,33 +1,42 @@
 [
   {
+    "id": "UR-get-unchecked-mut-return-comment-not-guard-src-lib-rs-pick-after-comment-return-operation-get_unchecked-get-unchecked-c7a7d2b051de-bounds-c1",
     "class": "guard_missing",
+    "priority": "high",
     "confidence": "medium",
     "proof_path": "source_route_only",
-    "contract": "Nearby `SAFETY:` comment was detected",
-    "discharge": "No visible local guard detected",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 6,
+      "column": 5,
+      "kind": "operation",
+      "owner": "pick_after_comment_return",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "Some(unsafe { values.get_unchecked_mut(index) })"
+    },
+    "operation": "Some(unsafe { values.get_unchecked_mut(index) })",
+    "operation_family": "get_unchecked",
     "hazards": [
       "bounds"
     ],
-    "id": "UR-get-unchecked-mut-return-comment-not-guard-src-lib-rs-pick-after-comment-return-operation-get_unchecked-get-unchecked-c7a7d2b051de-bounds-c1",
-    "missing": [
-      "Missing visible local guard for inferred safety obligations",
-      "No witness receipt imported for this card"
+    "obligations": [
+      "index is in bounds for the collection"
     ],
-    "next_action": "Add or expose the local guard that discharges the `get_unchecked` safety obligation.",
     "obligation_evidence": [
       {
+        "key": "bounds",
+        "description": "index is in bounds for the collection",
         "contract": {
           "present": true,
           "state": "present",
           "summary": "Nearby `SAFETY:` comment was detected"
         },
-        "description": "index is in bounds for the collection",
         "discharge": {
           "present": false,
           "state": "missing",
           "summary": "No length or bounds guard code was detected"
         },
-        "key": "bounds",
         "reach": {
           "present": true,
           "state": "present",
@@ -40,41 +49,54 @@
         }
       }
     ],
-    "obligations": [
-      "index is in bounds for the collection"
-    ],
-    "operation": "Some(unsafe { values.get_unchecked_mut(index) })",
-    "operation_family": "get_unchecked",
-    "priority": "high",
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "No visible local guard detected",
     "reach": "1 related test file(s) mention owner `pick_after_comment_return`",
-    "site": {
-      "column": 5,
-      "file": "src/lib.rs",
-      "kind": "operation",
-      "line": 6,
-      "owner": "pick_after_comment_return",
-      "public_api_surface": false,
-      "snippet": "Some(unsafe { values.get_unchecked_mut(index) })",
-      "visibility": "private"
-    },
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test pick_after_comment_return",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test pick_after_comment_return",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose the local guard that discharges the `get_unchecked` safety obligation.",
     "verify_commands": [
       "cargo +nightly miri test pick_after_comment_return",
       "cargo +nightly careful test pick_after_comment_return"
     ],
-    "witness": "No imported witness receipt was found",
-    "witness_routes": [
-      {
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `Some(unsafe { values.get_unchecked_mut(index) })`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
         "command": "cargo +nightly miri test pick_after_comment_return",
-        "kind": "miri",
-        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
-        "required": false
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test pick_after_comment_return` first for this card; attach a matching receipt only if it confirms the route"
       },
-      {
-        "command": "cargo +nightly careful test pick_after_comment_return",
-        "kind": "cargo-careful",
-        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
-        "required": false
-      }
-    ]
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test pick_after_comment_return",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-get-unchecked-mut-return-comment-not-guard-src-lib-rs-pick-after-comment-return-operation-get_unchecked-get-unchecked-c7a7d2b051de-bounds-c1` still maps to `Some(unsafe { values.get_unchecked_mut(index) })` at `src/lib.rs:6:5` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test pick_after_comment_return` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo +nightly miri test pick_after_comment_return` first, then attach a matching receipt if it confirms the route",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    }
   }
 ]

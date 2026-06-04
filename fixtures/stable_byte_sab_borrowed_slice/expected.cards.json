@@ -156,7 +156,29 @@
     "verify_commands": [
       "cargo +nightly miri test textdecoder_sab_decode",
       "cargo +nightly careful test textdecoder_sab_decode"
-    ]
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `let bytes = unsafe { core::slice::from_raw_parts(view.as_ptr(), view.len()) };`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test textdecoder_sab_decode",
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test textdecoder_sab_decode` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test textdecoder_sab_decode",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-stable-byte-sab-borrowed-slice-fixture-src-lib-rs-textdecoder-sab-decode-operation-slice_from_raw_parts-from-raw-parts-8adcf78ed27c-pointer_validity-c1` still maps to `let bytes = unsafe { core::slice::from_raw_parts(view.as_ptr(), view.len()) };` at `src/lib.rs:23:9` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test textdecoder_sab_decode` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo +nightly miri test textdecoder_sab_decode` first, then attach a matching receipt if it confirms the route",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    }
   },
   {
     "id": "UR-stable-byte-sab-borrowed-slice-fixture-src-lib-rs-textdecoder-sab-decode-operation-stable_byte_source_sab_race-is-shared-array-buffer-4ee9ff2124f6-stable_byte_source-c1",
@@ -226,6 +248,28 @@
       "No witness receipt imported for this card"
     ],
     "next_action": "Review this stable-byte-source-sab-race card through a mutation-plus-Miri/model proof path: add or expose byte-stability guard evidence, confirm the safe JS caller route, snapshot shared bytes before Rust/native borrowed-slice materialization, and keep the PR inside that SAB race aperture.",
-    "verify_commands": []
+    "verify_commands": [],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `stable-byte-source-sab-race candidate; proof required: mutation-plus-miri; shared JS backing reaches Rust/native borrowed-slice materialization before snapshot; source: if view.is_shared_array_buffer() {; materialize: let bytes = unsafe { core::slice::from_raw_parts(view.as_ptr(), view.len()) };`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+      },
+      "minimal_repro": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "steps": [
+          "Confirm ReviewCard `UR-stable-byte-sab-borrowed-slice-fixture-src-lib-rs-textdecoder-sab-decode-operation-stable_byte_source_sab_race-is-shared-array-buffer-4ee9ff2124f6-stable_byte_source-c1` still maps to `stable-byte-source-sab-race candidate; proof required: mutation-plus-miri; shared JS backing reaches Rust/native borrowed-slice materialization before snapshot; source: if view.is_shared_array_buffer() {; materialize: let bytes = unsafe { core::slice::from_raw_parts(view.as_ptr(), view.len()) };` at `src/lib.rs:23:9` before upgrading confidence.",
+          "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+          "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    }
   }
 ]

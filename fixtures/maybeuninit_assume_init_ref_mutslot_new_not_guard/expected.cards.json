@@ -76,6 +76,28 @@
     "verify_commands": [
       "cargo +nightly miri test borrow_after_prefixed_slot",
       "cargo +nightly careful test borrow_after_prefixed_slot"
-    ]
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `let _value = unsafe { slot.assume_init_ref() };`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test borrow_after_prefixed_slot",
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test borrow_after_prefixed_slot` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test borrow_after_prefixed_slot",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-maybeuninit-assume-init-ref-mutslot-new-not-guard-fixture-src-lib-rs-borrow-after-prefixed-slot-operation-maybe_uninit_assume_init-assume-init-ref-e9d700f47cad-initialized_memory-c1` still maps to `let _value = unsafe { slot.assume_init_ref() };` at `src/lib.rs:9:5` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test borrow_after_prefixed_slot` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo +nightly miri test borrow_after_prefixed_slot` first, then attach a matching receipt if it confirms the route",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    }
   }
 ]

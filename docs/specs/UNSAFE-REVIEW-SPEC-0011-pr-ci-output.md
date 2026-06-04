@@ -212,8 +212,15 @@ must include hazards
 must include obligation evidence
 must include missing evidence
 must include witness routes when available
+must include confirmation_cue with hypothesis_to_confirm, build_this_first,
+minimal_repro, confirmation_step, and trust_boundary
 witness routes must keep `required = false` in the default advisory PR packet
 ```
+
+`confirmation_cue` is a plan-only projection from each ReviewCard. It frames
+the card as a static hypothesis and names the first build/run or witness-route
+cue, but it must not imply that unsafe-review executed the cue, observed runtime
+behavior, proved site execution, proved UB, or proved repository safety.
 
 All other PR artifacts are projections from this card set.
 

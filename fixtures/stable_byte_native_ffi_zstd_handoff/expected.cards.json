@@ -107,10 +107,32 @@
     "verify_commands": [
       "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test zstd_overlap_handoff",
       "cargo +nightly careful test zstd_overlap_handoff"
-    ]
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `miri_unsupported` ReviewCard for `unsafe { zstd_compress_into(input.as_ptr(), input.len(), output.as_mut_ptr(), output.len()) }`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test zstd_overlap_handoff",
+        "route_kind": "asan",
+        "summary": "Build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test zstd_overlap_handoff` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test zstd_overlap_handoff",
+        "route_kind": "asan",
+        "steps": [
+          "Confirm ReviewCard `UR-stable-byte-native-ffi-zstd-handoff-src-lib-rs-zstd-overlap-handoff-ffi_call-ffi-ffi-94233876e270-ffi_abi-c1` still maps to `unsafe { zstd_compress_into(input.as_ptr(), input.len(), output.as_mut_ptr(), output.len()) }` at `src/lib.rs:43:5` before upgrading confidence.",
+          "Build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test zstd_overlap_handoff` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test zstd_overlap_handoff` first, then attach a matching receipt if it confirms the route",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    }
   },
   {
-    "id": "UR-stable-byte-native-ffi-zstd-handoff-src-lib-rs-zstd-overlap-handoff-operation-stable_byte_source_native_ffi_read-from-js-15e3de2d351c-stable_byte_source-c1",
+    "id": "UR-stable-byte-native-ffi-zstd-handoff-src-lib-rs-zstd-overlap-handoff-operation-stable_byte_source_native_ffi_read-from-js-6591dfb1effa-stable_byte_source-c1",
     "class": "guard_missing",
     "priority": "high",
     "confidence": "medium",
@@ -176,6 +198,28 @@
       "No witness receipt imported for this card"
     ],
     "next_action": "Review this stable-byte-source-native-ffi-read card through an observable-red-green proof path: add or expose byte-stability guard evidence, confirm the safe JS caller route, snapshot or otherwise stabilize JS-backed bytes before native FFI pointer/length reads, and keep the PR inside that native FFI aperture.",
-    "verify_commands": []
+    "verify_commands": [],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `stable-byte-source-native-ffi-read candidate; proof required: observable-red-green; JS-backed bytes reach native FFI pointer/length read before snapshot; source: let input = JSArrayBufferView::from_js(global, value);; native read: unsafe { zstd_compress_into(input.as_ptr(), input.len(), output.as_mut_ptr(), output.len()) }`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+      },
+      "minimal_repro": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "steps": [
+          "Confirm ReviewCard `UR-stable-byte-native-ffi-zstd-handoff-src-lib-rs-zstd-overlap-handoff-operation-stable_byte_source_native_ffi_read-from-js-6591dfb1effa-stable_byte_source-c1` still maps to `stable-byte-source-native-ffi-read candidate; proof required: observable-red-green; JS-backed bytes reach native FFI pointer/length read before snapshot; source: let input = JSArrayBufferView::from_js(global, value);; native read: unsafe { zstd_compress_into(input.as_ptr(), input.len(), output.as_mut_ptr(), output.len()) }` at `src/lib.rs:43:5` before upgrading confidence.",
+          "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+          "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    }
   }
 ]

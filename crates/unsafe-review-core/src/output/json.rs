@@ -1,6 +1,7 @@
 use crate::api::{AnalyzeOutput, Scope, Summary};
 use crate::domain::{EvidenceState, ObligationEvidence, ReviewCard, WitnessRoute};
 use crate::output::REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY;
+use crate::output::confirmation::ConfirmationCue;
 use crate::util::path_display;
 use serde::Serialize;
 
@@ -105,6 +106,7 @@ struct JsonCard<'a> {
     missing: Vec<&'a str>,
     next_action: &'a str,
     verify_commands: &'a [String],
+    confirmation_cue: ConfirmationCue,
 }
 
 impl<'a> From<&'a ReviewCard> for JsonCard<'a> {
@@ -141,6 +143,7 @@ impl<'a> From<&'a ReviewCard> for JsonCard<'a> {
                 .collect(),
             next_action: &card.next_action.summary,
             verify_commands: &card.next_action.verify_commands,
+            confirmation_cue: ConfirmationCue::from(card),
         }
     }
 }
@@ -827,6 +830,22 @@ mod tests {
                 .contains("Add or expose the local guard")
         );
         assert!(value["cards"][0]["verify_commands"].is_array());
+        assert_eq!(
+            value["cards"][0]["confirmation_cue"]["build_this_first"]["kind"],
+            "verify_command"
+        );
+        assert!(
+            value["cards"][0]["confirmation_cue"]["hypothesis_to_confirm"]
+                .as_str()
+                .unwrap_or("")
+                .contains("confirm with external evidence")
+        );
+        assert!(
+            value["cards"][0]["confirmation_cue"]["minimal_repro"]["limitation"]
+                .as_str()
+                .unwrap_or("")
+                .contains("unsafe-review did not run this command")
+        );
         Ok(())
     }
 

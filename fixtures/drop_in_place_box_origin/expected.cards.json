@@ -126,6 +126,28 @@
     "verify_commands": [
       "cargo +nightly miri test drop_owned_box",
       "cargo +nightly careful test drop_owned_box"
-    ]
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guarded_unwitnessed` ReviewCard for `core::ptr::drop_in_place(ptr);`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test drop_owned_box",
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test drop_owned_box` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test drop_owned_box",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-drop-in-place-box-origin-fixture-src-lib-rs-drop-owned-box-operation-drop_in_place-drop-in-place-c8a34da3b35a-pointer_validity-c1` still maps to `core::ptr::drop_in_place(ptr);` at `src/lib.rs:5:9` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test drop_owned_box` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo +nightly miri test drop_owned_box` first, then attach a matching receipt if it confirms the route",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    }
   }
 ]

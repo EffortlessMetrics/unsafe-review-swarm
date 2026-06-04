@@ -1,9 +1,22 @@
 [
   {
+    "id": "UR-stable-byte-sab-mysql-blob-rawslice-fixture-src-lib-rs-mysql-blob-sab-bind-operation-slice_from_raw_parts-from-raw-parts-daef7e0ba944-pointer_validity-c1",
     "class": "contract_missing",
+    "priority": "high",
     "confidence": "high",
-    "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
-    "discharge": "No visible local guard detected",
+    "proof_path": "source_route_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 30,
+      "column": 9,
+      "kind": "operation",
+      "owner": "mysql_blob_sab_bind",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "let bytes = unsafe { core::slice::from_raw_parts(ptr, len) };"
+    },
+    "operation": "let bytes = unsafe { core::slice::from_raw_parts(ptr, len) };",
+    "operation_family": "slice_from_raw_parts",
     "hazards": [
       "pointer_validity",
       "alignment",
@@ -11,7 +24,128 @@
       "bounds",
       "same_allocation"
     ],
-    "id": "UR-stable-byte-sab-mysql-blob-rawslice-fixture-src-lib-rs-mysql-blob-sab-bind-operation-slice_from_raw_parts-from-raw-parts-daef7e0ba944-pointer_validity-c1",
+    "obligations": [
+      "pointer is valid for `len` elements",
+      "pointer is aligned for the element type",
+      "memory range is initialized",
+      "range fits in one allocation"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "pointer-live",
+        "description": "pointer is valid for `len` elements",
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nullability guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `mysql_blob_sab_bind` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "alignment",
+        "description": "pointer is aligned for the element type",
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No alignment guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `mysql_blob_sab_bind` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "initialized",
+        "description": "memory range is initialized",
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `mysql_blob_sab_bind` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "allocation",
+        "description": "range fits in one allocation",
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `mysql_blob_sab_bind` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+    "discharge": "No visible local guard detected",
+    "reach": "No static test mention of owner `mysql_blob_sab_bind` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test mysql_blob_sab_bind",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test mysql_blob_sab_bind",
+        "required": false
+      }
+    ],
     "missing": [
       "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
       "Missing visible local guard for inferred safety obligations",
@@ -19,213 +153,123 @@
       "No witness receipt imported for this card"
     ],
     "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
-    "obligation_evidence": [
-      {
-        "contract": {
-          "present": false,
-          "state": "missing",
-          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-        },
-        "description": "pointer is valid for `len` elements",
-        "discharge": {
-          "present": false,
-          "state": "missing",
-          "summary": "No nullability guard code was detected"
-        },
-        "key": "pointer-live",
-        "reach": {
-          "present": false,
-          "state": "missing",
-          "summary": "No static test mention of owner `mysql_blob_sab_bind` was found"
-        },
-        "witness": {
-          "present": false,
-          "state": "missing",
-          "summary": "No imported witness receipt was found"
-        }
-      },
-      {
-        "contract": {
-          "present": false,
-          "state": "missing",
-          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-        },
-        "description": "pointer is aligned for the element type",
-        "discharge": {
-          "present": false,
-          "state": "missing",
-          "summary": "No alignment guard code was detected"
-        },
-        "key": "alignment",
-        "reach": {
-          "present": false,
-          "state": "missing",
-          "summary": "No static test mention of owner `mysql_blob_sab_bind` was found"
-        },
-        "witness": {
-          "present": false,
-          "state": "missing",
-          "summary": "No imported witness receipt was found"
-        }
-      },
-      {
-        "contract": {
-          "present": false,
-          "state": "missing",
-          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-        },
-        "description": "memory range is initialized",
-        "discharge": {
-          "present": false,
-          "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
-        },
-        "key": "initialized",
-        "reach": {
-          "present": false,
-          "state": "missing",
-          "summary": "No static test mention of owner `mysql_blob_sab_bind` was found"
-        },
-        "witness": {
-          "present": false,
-          "state": "missing",
-          "summary": "No imported witness receipt was found"
-        }
-      },
-      {
-        "contract": {
-          "present": false,
-          "state": "missing",
-          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-        },
-        "description": "range fits in one allocation",
-        "discharge": {
-          "present": false,
-          "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
-        },
-        "key": "allocation",
-        "reach": {
-          "present": false,
-          "state": "missing",
-          "summary": "No static test mention of owner `mysql_blob_sab_bind` was found"
-        },
-        "witness": {
-          "present": false,
-          "state": "missing",
-          "summary": "No imported witness receipt was found"
-        }
-      }
-    ],
-    "obligations": [
-      "pointer is valid for `len` elements",
-      "pointer is aligned for the element type",
-      "memory range is initialized",
-      "range fits in one allocation"
-    ],
-    "operation": "let bytes = unsafe { core::slice::from_raw_parts(ptr, len) };",
-    "operation_family": "slice_from_raw_parts",
-    "priority": "high",
-    "proof_path": "source_route_only",
-    "reach": "No static test mention of owner `mysql_blob_sab_bind` was found",
-    "site": {
-      "column": 9,
-      "file": "src/lib.rs",
-      "kind": "operation",
-      "line": 30,
-      "owner": "mysql_blob_sab_bind",
-      "public_api_surface": false,
-      "snippet": "let bytes = unsafe { core::slice::from_raw_parts(ptr, len) };",
-      "visibility": "private"
-    },
     "verify_commands": [
       "cargo +nightly miri test mysql_blob_sab_bind",
       "cargo +nightly careful test mysql_blob_sab_bind"
     ],
-    "witness": "No imported witness receipt was found",
-    "witness_routes": [
-      {
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `let bytes = unsafe { core::slice::from_raw_parts(ptr, len) };`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
         "command": "cargo +nightly miri test mysql_blob_sab_bind",
-        "kind": "miri",
-        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
-        "required": false
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test mysql_blob_sab_bind` first for this card; attach a matching receipt only if it confirms the route"
       },
-      {
-        "command": "cargo +nightly careful test mysql_blob_sab_bind",
-        "kind": "cargo-careful",
-        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
-        "required": false
-      }
-    ]
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test mysql_blob_sab_bind",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-stable-byte-sab-mysql-blob-rawslice-fixture-src-lib-rs-mysql-blob-sab-bind-operation-slice_from_raw_parts-from-raw-parts-daef7e0ba944-pointer_validity-c1` still maps to `let bytes = unsafe { core::slice::from_raw_parts(ptr, len) };` at `src/lib.rs:30:9` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test mysql_blob_sab_bind` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo +nightly miri test mysql_blob_sab_bind` first, then attach a matching receipt if it confirms the route",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    }
   },
   {
+    "id": "UR-stable-byte-sab-mysql-blob-rawslice-fixture-src-lib-rs-mysql-blob-sab-bind-operation-stable_byte_source_sab_race-is-shared-array-buffer-13d997c3e561-stable_byte_source-c1",
     "class": "guard_missing",
+    "priority": "high",
     "confidence": "medium",
-    "contract": "Stable-byte-source SAB race heuristic uses byte-stability evidence, not unsafe API safety docs",
-    "discharge": "No visible local guard detected",
+    "proof_path": "mutation_miri_model",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 30,
+      "column": 9,
+      "kind": "operation",
+      "owner": "mysql_blob_sab_bind",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "let bytes = unsafe { core::slice::from_raw_parts(ptr, len) };"
+    },
+    "operation": "stable-byte-source-sab-race candidate; proof required: mutation-plus-miri; shared JS backing reaches Rust/native borrowed-slice materialization before snapshot; source: if value.is_shared_array_buffer() {; materialize: let bytes = unsafe { core::slice::from_raw_parts(ptr, len) };",
+    "operation_family": "stable_byte_source_sab_race",
     "hazards": [
       "stable_byte_source"
     ],
-    "id": "UR-stable-byte-sab-mysql-blob-rawslice-fixture-src-lib-rs-mysql-blob-sab-bind-operation-stable_byte_source_sab_race-is-shared-array-buffer-13d997c3e561-stable_byte_source-c1",
+    "obligations": [
+      "shared JS bytes are snapshotted before Rust/native borrowed-slice materialization"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "byte-stability",
+        "description": "shared JS bytes are snapshotted before Rust/native borrowed-slice materialization",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Stable-byte-source SAB race heuristic uses byte-stability evidence, not unsafe API safety docs"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `mysql_blob_sab_bind` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Stable-byte-source SAB race heuristic uses byte-stability evidence, not unsafe API safety docs",
+    "discharge": "No visible local guard detected",
+    "reach": "No static test mention of owner `mysql_blob_sab_bind` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
     "next_action": "Review this stable-byte-source-sab-race card through a mutation-plus-Miri/model proof path: add or expose byte-stability guard evidence, confirm the safe JS caller route, snapshot shared bytes before Rust/native borrowed-slice materialization, and keep the PR inside that SAB race aperture.",
-    "obligation_evidence": [
-      {
-        "contract": {
-          "present": true,
-          "state": "present",
-          "summary": "Stable-byte-source SAB race heuristic uses byte-stability evidence, not unsafe API safety docs"
-        },
-        "description": "shared JS bytes are snapshotted before Rust/native borrowed-slice materialization",
-        "discharge": {
-          "present": false,
-          "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
-        },
-        "key": "byte-stability",
-        "reach": {
-          "present": false,
-          "state": "missing",
-          "summary": "No static test mention of owner `mysql_blob_sab_bind` was found"
-        },
-        "witness": {
-          "present": false,
-          "state": "missing",
-          "summary": "No imported witness receipt was found"
-        }
-      }
-    ],
-    "obligations": [
-      "shared JS bytes are snapshotted before Rust/native borrowed-slice materialization"
-    ],
-    "operation": "stable-byte-source-sab-race candidate; proof required: mutation-plus-miri; shared JS backing reaches Rust/native borrowed-slice materialization before snapshot; source: if value.is_shared_array_buffer() {; materialize: let bytes = unsafe { core::slice::from_raw_parts(ptr, len) };",
-    "operation_family": "stable_byte_source_sab_race",
-    "priority": "high",
-    "proof_path": "mutation_miri_model",
-    "reach": "No static test mention of owner `mysql_blob_sab_bind` was found",
-    "site": {
-      "column": 9,
-      "file": "src/lib.rs",
-      "kind": "operation",
-      "line": 30,
-      "owner": "mysql_blob_sab_bind",
-      "public_api_surface": false,
-      "snippet": "let bytes = unsafe { core::slice::from_raw_parts(ptr, len) };",
-      "visibility": "private"
-    },
     "verify_commands": [],
-    "witness": "No imported witness receipt was found",
-    "witness_routes": [
-      {
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `stable-byte-source-sab-race candidate; proof required: mutation-plus-miri; shared JS backing reaches Rust/native borrowed-slice materialization before snapshot; source: if value.is_shared_array_buffer() {; materialize: let bytes = unsafe { core::slice::from_raw_parts(ptr, len) };`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "witness_route",
         "command": null,
-        "kind": "human-deep-review",
-        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
-        "required": false
-      }
-    ]
+        "route_kind": "human-deep-review",
+        "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+      },
+      "minimal_repro": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "steps": [
+          "Confirm ReviewCard `UR-stable-byte-sab-mysql-blob-rawslice-fixture-src-lib-rs-mysql-blob-sab-bind-operation-stable_byte_source_sab_race-is-shared-array-buffer-13d997c3e561-stable_byte_source-c1` still maps to `stable-byte-source-sab-race candidate; proof required: mutation-plus-miri; shared JS backing reaches Rust/native borrowed-slice materialization before snapshot; source: if value.is_shared_array_buffer() {; materialize: let bytes = unsafe { core::slice::from_raw_parts(ptr, len) };` at `src/lib.rs:30:9` before upgrading confidence.",
+          "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+          "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    }
   }
 ]

@@ -75,6 +75,28 @@
     "verify_commands": [
       "cargo test GLOBAL_COUNT_loom -- --nocapture",
       "cargo test GLOBAL_COUNT_shuttle -- --nocapture"
-    ]
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `requires_loom` ReviewCard for `pub static mut GLOBAL_COUNT: usize = 0;`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo test GLOBAL_COUNT_loom -- --nocapture",
+        "route_kind": "loom",
+        "summary": "Build/run `cargo test GLOBAL_COUNT_loom -- --nocapture` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo test GLOBAL_COUNT_loom -- --nocapture",
+        "route_kind": "loom",
+        "steps": [
+          "Confirm ReviewCard `UR-static-mut-global-state-src-lib-rs-global-count-static_mut-static_mut-static-mut-aa5d7496604f-static_mut_global_state-c1` still maps to `pub static mut GLOBAL_COUNT: usize = 0;` at `src/lib.rs:2:1` before upgrading confidence.",
+          "Build/run `cargo test GLOBAL_COUNT_loom -- --nocapture` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo test GLOBAL_COUNT_loom -- --nocapture` first, then attach a matching receipt if it confirms the route",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    }
   }
 ]

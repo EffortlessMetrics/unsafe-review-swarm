@@ -12933,6 +12933,32 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_cards_json_missing_confirmation_cue() -> Result<(), String>
+    {
+        let dir = unique_temp_dir("unsafe-review-first-pr-cards-missing-confirmation-cue")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("cards.json");
+        let mut cards = parse_json_file(&path)?;
+        cards["cards"][0]
+            .as_object_mut()
+            .ok_or_else(|| "cards fixture card must be an object".to_string())?
+            .remove("confirmation_cue");
+        fs::write(&path, cards.to_string()).map_err(|err| format!("write cards failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("cards.json card confirmation_cue is missing")
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_comment_plan_missing_build_this_first()
     -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-comment-missing-build-first")?;
@@ -18023,6 +18049,7 @@ Snapshot reports:
             .push(second_card);
         fs::write(&cards_path, cards.to_string())
             .map_err(|err| format!("write cards failed: {err}"))?;
+        add_confirmation_cues_to_cards(&cards_path)?;
 
         let pr_summary_path = dir.join("pr-summary.md");
         let pr_summary = fs::read_to_string(&pr_summary_path)
@@ -19982,12 +20009,202 @@ review_after = "2026-08-01"
             .map_err(|err| format!("write comment plan failed: {err}"))
     }
 
+    fn add_confirmation_cues_to_cards(path: &Path) -> Result<(), String> {
+        let mut value = parse_json_file(path)?;
+        let cards = value
+            .get_mut("cards")
+            .and_then(serde_json::Value::as_array_mut)
+            .ok_or_else(|| "cards fixture cards must be an array".to_string())?;
+        for card in cards {
+            card["confirmation_cue"] = confirmation_cue_for_card(card)?;
+        }
+        fs::write(path, value.to_string()).map_err(|err| format!("write cards failed: {err}"))
+    }
+
+    fn confirmation_cue_for_card(card: &serde_json::Value) -> Result<serde_json::Value, String> {
+        let id = required_card_string(card, "id")?;
+        let class_name = required_card_string(card, "class")?;
+        let operation = required_card_string(card, "operation")?;
+        let operation = collapse_fixture_whitespace(operation);
+        let site = card
+            .get("site")
+            .ok_or_else(|| "cards fixture card is missing site".to_string())?;
+        let file = required_card_string(site, "file")?;
+        let line = site
+            .get("line")
+            .and_then(serde_json::Value::as_u64)
+            .ok_or_else(|| "cards fixture card site.line must be an integer".to_string())?;
+        let column = site
+            .get("column")
+            .and_then(serde_json::Value::as_u64)
+            .ok_or_else(|| "cards fixture card site.column must be an integer".to_string())?;
+        let command = first_card_verify_command(card)?;
+        let route_kind = first_card_route_kind(card)?;
+        let route_command = first_card_route_command(card)?;
+        let identity_step = format!(
+            "Confirm ReviewCard `{id}` still maps to `{operation}` at `{file}:{line}:{column}` before upgrading confidence."
+        );
+
+        let (kind, cue_command, cue_route_kind, summary, confirmation_step, steps) = match command {
+            Some(command) => (
+                "verify_command",
+                serde_json::json!(command),
+                route_kind
+                    .map(serde_json::Value::from)
+                    .unwrap_or(serde_json::Value::Null),
+                format!(
+                    "Build/run `{command}` first for this card; attach a matching receipt only if it confirms the route"
+                ),
+                format!(
+                    "build/run `{command}` first, then attach a matching receipt if it confirms the route"
+                ),
+                vec![
+                    identity_step,
+                    format!(
+                        "Build/run `{command}` as the smallest available command for this card."
+                    ),
+                    "Attach a matching receipt only if that run confirms the same route and ReviewCard identity.".to_string(),
+                ],
+            ),
+            None => match route_kind {
+                Some(route_kind) => {
+                    let route_step = if let Some(command) = route_command {
+                        format!(
+                            "Use the `{route_kind}` route from `witness-plan.md`; start with `{command}` if it still targets this card."
+                        )
+                    } else {
+                        format!(
+                            "Use the `{route_kind}` route from `witness-plan.md` to derive a focused repro or human review target for this card."
+                        )
+                    };
+                    (
+                        "witness_route",
+                        route_command
+                            .map(serde_json::Value::from)
+                            .unwrap_or(serde_json::Value::Null),
+                        serde_json::json!(route_kind),
+                        format!(
+                            "No automatic build/run command is available; use the `{route_kind}` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+                        ),
+                        format!(
+                            "use the `{route_kind}` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+                        ),
+                        vec![
+                            identity_step,
+                            route_step,
+                            "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review.".to_string(),
+                        ],
+                    )
+                }
+                None => (
+                    "human_review",
+                    serde_json::Value::Null,
+                    serde_json::Value::Null,
+                    "No automatic build/run command is available; derive the first confirmation from `unsafe-review explain` and human review before upgrading confidence".to_string(),
+                    "derive a focused confirmation from `unsafe-review explain` and human review before upgrading confidence".to_string(),
+                    vec![
+                        identity_step,
+                        format!(
+                            "Use `unsafe-review explain {id}` and human review to derive a focused repro before upgrading confidence."
+                        ),
+                        "Keep the finding advisory unless external evidence confirms the same route."
+                            .to_string(),
+                    ],
+                ),
+            },
+        };
+
+        Ok(serde_json::json!({
+            "hypothesis_to_confirm": format!(
+                "static `{class_name}` ReviewCard for `{operation}`; confirm with external evidence before treating it as observed runtime behavior"
+            ),
+            "build_this_first": {
+                "kind": kind,
+                "command": cue_command,
+                "route_kind": cue_route_kind,
+                "summary": summary
+            },
+            "minimal_repro": {
+                "kind": kind,
+                "command": cue_command,
+                "route_kind": cue_route_kind,
+                "steps": steps,
+                "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+            },
+            "confirmation_step": confirmation_step,
+            "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+        }))
+    }
+
+    fn required_card_string<'a>(
+        value: &'a serde_json::Value,
+        field: &str,
+    ) -> Result<&'a str, String> {
+        value
+            .get(field)
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| format!("cards fixture card is missing string field `{field}`"))
+    }
+
+    fn first_card_verify_command(card: &serde_json::Value) -> Result<Option<&str>, String> {
+        card.get("verify_commands")
+            .and_then(serde_json::Value::as_array)
+            .ok_or_else(|| "cards fixture verify_commands must be an array".to_string())?
+            .first()
+            .map(|value| {
+                value
+                    .as_str()
+                    .ok_or_else(|| "cards fixture verify command must be a string".to_string())
+            })
+            .transpose()
+    }
+
+    fn first_card_route_kind(card: &serde_json::Value) -> Result<Option<&str>, String> {
+        first_card_route(card)?
+            .map(|route| {
+                route
+                    .get("kind")
+                    .and_then(serde_json::Value::as_str)
+                    .ok_or_else(|| "cards fixture route kind must be a string".to_string())
+            })
+            .transpose()
+    }
+
+    fn first_card_route_command(card: &serde_json::Value) -> Result<Option<&str>, String> {
+        first_card_route(card)?
+            .and_then(|route| route.get("command"))
+            .map(|command| {
+                if command.is_null() {
+                    Ok(None)
+                } else {
+                    command.as_str().map(Some).ok_or_else(|| {
+                        "cards fixture route command must be a string or null".to_string()
+                    })
+                }
+            })
+            .transpose()
+            .map(Option::flatten)
+    }
+
+    fn first_card_route(card: &serde_json::Value) -> Result<Option<&serde_json::Value>, String> {
+        Ok(card
+            .get("witness_routes")
+            .and_then(serde_json::Value::as_array)
+            .ok_or_else(|| "cards fixture witness_routes must be an array".to_string())?
+            .first())
+    }
+
+    fn collapse_fixture_whitespace(value: &str) -> String {
+        value.split_whitespace().collect::<Vec<_>>().join(" ")
+    }
+
     fn write_valid_artifacts(dir: &Path) -> Result<(), String> {
         fs::write(
             dir.join("cards.json"),
             r#"{"schema_version":"0.1","tool":"unsafe-review","policy":"advisory","scope":"diff","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"changed_files":1,"changed_rust_files":1,"changed_non_rust_files":0,"cards":1,"open_actionable_gaps":1},"cards":[{"id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hazards":["alignment"],"site":{"file":"src/lib.rs","line":7,"column":5},"operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","obligation_evidence":[{"key":"alignment","description":"pointer aligned","contract":{"present":true,"state":"present","summary":"safety contract"},"discharge":{"present":false,"state":"missing","summary":"No visible local guard"},"reach":{"present":true,"state":"present","summary":"related test mention"},"witness":{"present":false,"state":"missing","summary":"No imported witness receipt"}}],"contract":"safety contract","discharge":"No visible local guard","reach":"related test mention","witness":"No imported witness receipt","verify_commands":["cargo +nightly miri test card"],"witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}]}]}"#,
         )
         .map_err(|err| format!("write cards failed: {err}"))?;
+        add_confirmation_cues_to_cards(&dir.join("cards.json"))?;
         fs::write(
             dir.join("pr-summary.md"),
             "- Scope: `diff`\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Top card\n\n- ID: `card-1`\n- Class: `guard_missing`\n- Proof path: `source_route_only`\n- Location: src/lib.rs:7\n- Operation: `unsafe { ptr.cast::<Header>().read() }`\n- Operation family: `raw_pointer_read`\n- Proof path: `source_route_only`\n- Hypothesis to confirm: static `guard_missing` ReviewCard for `unsafe { ptr.cast::<Header>().read() }`; confirm with external evidence before treating it as observed runtime behavior\n- Missing evidence: No missing evidence recorded\n- Primary route: `miri` because route\n\n```bash\ncargo +nightly miri test card\n```\n- Next action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n- Confirmation step: build/run `cargo +nightly miri test card` first for this card, then attach a matching receipt if it confirms the route\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Explain: `unsafe-review explain card-1`\n- Agent context: `unsafe-review context card-1 --json`\n- Agent handoff: `ready_for_agent`; buckets: `repairable_by_guard`, `requires_witness_receipt`; reasons: specific operation family\n\n## Card table\n\n| ID | Class | Proof path | Location | Operation family | Operation | Missing evidence | Route | Next action |\n|---|---|---|---|---|---|---|---|---|\n| `card-1` | `guard_missing` | `source_route_only` | src/lib.rs:7 | `raw_pointer_read` | `unsafe { ptr.cast::<Header>().read() }` | No missing evidence recorded | `miri` | Add or expose the local guard that discharges the `raw_pointer_read` safety obligation. |\n\n## Witness plan\n\n- `card-1` hypothesis: static `guard_missing` ReviewCard for `unsafe { ptr.cast::<Header>().read() }`; confirm with external evidence before treating it as observed runtime behavior\n  - Confirmation step: build/run `cargo +nightly miri test card` first for this card, then attach a matching receipt if it confirms the route\n  - Route: `miri` because route\n\n```bash\ncargo +nightly miri test card\n```\n\n## Trust boundary\n\nThis artifact is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
@@ -20104,6 +20321,7 @@ review_after = "2026-08-01"
             r#"{"schema_version":"0.1","tool":"unsafe-review","policy":"advisory","scope":"diff","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"changed_files":1,"changed_rust_files":1,"changed_non_rust_files":0,"cards":2,"open_actionable_gaps":2},"cards":[{"id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hazards":["alignment"],"site":{"file":"src/lib.rs","line":7,"column":5},"operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verify_commands":["cargo +nightly miri test card"],"witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}]},{"id":"card-2","class":"contract_missing","priority":"high","confidence":"high","proof_path":"human_review_only","hazards":["unknown"],"site":{"file":"src/lib.rs","line":7,"column":1},"operation":"unsafe fn read_header(ptr: *const u8)","operation_family":"unknown","next_action":"Add a precise public `# Safety` section that names the required caller obligations.","verify_commands":[],"witness_routes":[{"kind":"human-deep-review","reason":"route","command":null,"required":false}]}]}"#,
         )
         .map_err(|err| format!("write cards failed: {err}"))?;
+        add_confirmation_cues_to_cards(&dir.join("cards.json"))?;
         fs::write(
             dir.join("pr-summary.md"),
             "- Scope: `diff`\n- Review cards: 2\n- Open actionable gaps: 2\n- Policy mode: `advisory`\n\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n\nThis artifact is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",

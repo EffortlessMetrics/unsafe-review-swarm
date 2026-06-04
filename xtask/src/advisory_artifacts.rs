@@ -6569,34 +6569,79 @@ fn advisory_card_projections(
             })
             .transpose()?
             .unwrap_or_default();
-        projections.insert(
-            id.clone(),
-            CardProjection {
-                id,
-                class_name,
-                priority,
-                confidence,
-                proof_path,
-                hazards,
-                path,
-                line,
-                column,
-                operation,
-                operation_family,
-                next_action,
-                missing,
-                contract,
-                discharge,
-                reach,
-                witness,
-                required_safety_conditions,
-                obligation_evidence,
-                verify_commands,
-                witness_routes,
-            },
-        );
+        let projection = CardProjection {
+            id,
+            class_name,
+            priority,
+            confidence,
+            proof_path,
+            hazards,
+            path,
+            line,
+            column,
+            operation,
+            operation_family,
+            next_action,
+            missing,
+            contract,
+            discharge,
+            reach,
+            witness,
+            required_safety_conditions,
+            obligation_evidence,
+            verify_commands,
+            witness_routes,
+        };
+        require_card_confirmation_cue_projection(
+            card,
+            &projection,
+            "cards.json card confirmation_cue",
+        )?;
+        projections.insert(projection.id.clone(), projection);
     }
     Ok(projections)
+}
+
+fn require_card_confirmation_cue_projection(
+    card_json: &serde_json::Value,
+    card: &CardProjection,
+    context: &str,
+) -> Result<(), String> {
+    let Some(cue) = card_json.get("confirmation_cue") else {
+        return Err(format!("{context} is missing"));
+    };
+    if !cue.is_object() {
+        return Err(format!("{context} must be an object"));
+    }
+    require_projected_str(
+        cue,
+        "hypothesis_to_confirm",
+        &expected_comment_hypothesis(card),
+        context,
+    )?;
+    require_comment_build_this_first_projection(cue, card, context)?;
+    require_comment_minimal_repro_projection(cue, card, context)?;
+    require_projected_str(
+        cue,
+        "confirmation_step",
+        &expected_comment_confirmation_step(card),
+        context,
+    )?;
+    let boundary = super::require_non_empty_json_str(cue, "trust_boundary", context)?;
+    super::require_boundary_text(boundary, "cards.json card confirmation_cue")?;
+    for expected in [
+        "not memory-safety proof",
+        "not UB-free status",
+        "not Miri-clean status",
+        "not a site-execution claim",
+    ] {
+        if !super::text_contains_ignore_ascii_case(boundary, expected) {
+            return Err(format!(
+                "{context} trust_boundary must include `{expected}`"
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn advisory_card_order(cards: &serde_json::Value) -> Result<Vec<String>, String> {

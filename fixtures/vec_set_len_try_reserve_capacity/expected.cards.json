@@ -1,106 +1,128 @@
 [
   {
+    "id": "UR-vec-set-len-try-reserve-capacity-fixture-src-lib-rs-try-reserve-then-extend-operation-vec_set_len-set-len-1b63c93d2803-initialized_memory-c1",
     "class": "guard_missing",
+    "priority": "high",
     "confidence": "medium",
     "proof_path": "source_route_only",
-    "contract": "Nearby `SAFETY:` comment was detected",
-    "discharge": "Some inferred safety obligations are missing local guard evidence",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 8,
+      "column": 5,
+      "kind": "operation",
+      "owner": "try_reserve_then_extend",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { values.set_len(new_len) }"
+    },
+    "operation": "unsafe { values.set_len(new_len) }",
+    "operation_family": "vec_set_len",
     "hazards": [
       "initialized_memory",
       "bounds"
-    ],
-    "id": "UR-vec-set-len-try-reserve-capacity-fixture-src-lib-rs-try-reserve-then-extend-operation-vec_set_len-set-len-1b63c93d2803-initialized_memory-c1",
-    "missing": [
-      "Missing visible local guard for inferred safety obligations",
-      "No witness receipt imported for this card"
-    ],
-    "next_action": "Add or expose the local guard that discharges the `vec_set_len` safety obligation.",
-    "obligation_evidence": [
-      {
-        "contract": {
-          "present": true,
-          "state": "present",
-          "summary": "Nearby `SAFETY:` comment was detected"
-        },
-        "description": "new length is at most capacity",
-        "discharge": {
-          "present": true,
-          "state": "present",
-          "summary": "Capacity guard code was detected"
-        },
-        "key": "capacity",
-        "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `try_reserve_then_extend`"
-        },
-        "witness": {
-          "present": false,
-          "state": "missing",
-          "summary": "No imported witness receipt was found"
-        }
-      },
-      {
-        "contract": {
-          "present": true,
-          "state": "present",
-          "summary": "Nearby `SAFETY:` comment was detected"
-        },
-        "description": "elements in the extended range are initialized",
-        "discharge": {
-          "present": false,
-          "state": "missing",
-          "summary": "No initialization evidence was detected"
-        },
-        "key": "initialized",
-        "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `try_reserve_then_extend`"
-        },
-        "witness": {
-          "present": false,
-          "state": "missing",
-          "summary": "No imported witness receipt was found"
-        }
-      }
     ],
     "obligations": [
       "new length is at most capacity",
       "elements in the extended range are initialized"
     ],
-    "operation": "unsafe { values.set_len(new_len) }",
-    "operation_family": "vec_set_len",
-    "priority": "high",
+    "obligation_evidence": [
+      {
+        "key": "capacity",
+        "description": "new length is at most capacity",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Capacity guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `try_reserve_then_extend`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "initialized",
+        "description": "elements in the extended range are initialized",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No initialization evidence was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `try_reserve_then_extend`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "Some inferred safety obligations are missing local guard evidence",
     "reach": "1 related test file(s) mention owner `try_reserve_then_extend`",
-    "site": {
-      "column": 5,
-      "file": "src/lib.rs",
-      "kind": "operation",
-      "line": 8,
-      "owner": "try_reserve_then_extend",
-      "public_api_surface": false,
-      "snippet": "unsafe { values.set_len(new_len) }",
-      "visibility": "private"
-    },
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test try_reserve_then_extend",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test try_reserve_then_extend",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose the local guard that discharges the `vec_set_len` safety obligation.",
     "verify_commands": [
       "cargo +nightly miri test try_reserve_then_extend",
       "cargo +nightly careful test try_reserve_then_extend"
     ],
-    "witness": "No imported witness receipt was found",
-    "witness_routes": [
-      {
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe { values.set_len(new_len) }`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
         "command": "cargo +nightly miri test try_reserve_then_extend",
-        "kind": "miri",
-        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
-        "required": false
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test try_reserve_then_extend` first for this card; attach a matching receipt only if it confirms the route"
       },
-      {
-        "command": "cargo +nightly careful test try_reserve_then_extend",
-        "kind": "cargo-careful",
-        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
-        "required": false
-      }
-    ]
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test try_reserve_then_extend",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-vec-set-len-try-reserve-capacity-fixture-src-lib-rs-try-reserve-then-extend-operation-vec_set_len-set-len-1b63c93d2803-initialized_memory-c1` still maps to `unsafe { values.set_len(new_len) }` at `src/lib.rs:8:5` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test try_reserve_then_extend` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo +nightly miri test try_reserve_then_extend` first, then attach a matching receipt if it confirms the route",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    }
   }
 ]

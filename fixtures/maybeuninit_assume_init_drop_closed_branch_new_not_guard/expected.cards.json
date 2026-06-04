@@ -76,6 +76,28 @@
     "verify_commands": [
       "cargo +nightly miri test drop_after_closed_new_branch",
       "cargo +nightly careful test drop_after_closed_new_branch"
-    ]
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe { slot.assume_init_drop() }`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test drop_after_closed_new_branch",
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test drop_after_closed_new_branch` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test drop_after_closed_new_branch",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-maybeuninit-assume-init-drop-closed-branch-new-not-guard-fixture-src-lib-rs-drop-after-closed-new-branch-operation-maybe_uninit_assume_init-assume-init-drop-a80b216a212b-initialized_memory-c1` still maps to `unsafe { slot.assume_init_drop() }` at `src/lib.rs:11:5` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test drop_after_closed_new_branch` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo +nightly miri test drop_after_closed_new_branch` first, then attach a matching receipt if it confirms the route",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    }
   }
 ]
