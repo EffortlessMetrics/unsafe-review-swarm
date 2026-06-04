@@ -15414,11 +15414,10 @@ Snapshot reports:
         let dir = unique_temp_dir("unsafe-review-first-pr-overclaim")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
         write_valid_first_pr_artifacts(&dir)?;
-        fs::write(
-            dir.join("witness-plan.md"),
-            "# unsafe-review witness plan\n\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Route groups\n\n### Miri / cargo-careful\n\n- Limit: Concrete runtime evidence is path-specific.\n\n#### `card-1`\n\n- Class: `guard_missing`\n- Proof path: `source_route_only`\n- Location: src/lib.rs:7\n- Operation: `unsafe { ptr.cast::<Header>().read() }`\n- Next action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n- Hypothesis to confirm: static `guard_missing` ReviewCard for `unsafe { ptr.cast::<Header>().read() }`; confirm with external evidence before treating it as observed runtime behavior\n- Confirmation step: build/run `cargo +nightly miri test card` first for this card, then attach a matching receipt if it confirms the route\n- Route: `miri`\n  - Reason: route\n  - What it can show: a focused run\n  - What it cannot prove: arbitrary callers\n  - Command:\n\n```bash\ncargo +nightly miri test card\n```\n  - Receipt hint: unsafe-review receipt import-miri card-1\n\nAll clear.\n\n## Trust boundary\n\nThis artifact is static unsafe contract review. It routes reviewers to credible witnesses but does not run Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux. It is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
-        )
-        .map_err(|err| format!("write witness plan failed: {err}"))?;
+        let mut witness_plan = valid_witness_plan_fixture();
+        witness_plan.push_str("\nAll clear.\n");
+        fs::write(dir.join("witness-plan.md"), witness_plan)
+            .map_err(|err| format!("write witness plan failed: {err}"))?;
 
         let result = check_first_pr_artifacts(&dir);
 
@@ -18206,11 +18205,8 @@ review_after = "2026-08-01"
 
     fn write_valid_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         write_valid_artifacts(dir)?;
-        fs::write(
-            dir.join("witness-plan.md"),
-            "# unsafe-review witness plan\n\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Route groups\n\n### Miri / cargo-careful\n\n- Limit: Concrete runtime evidence is path-specific. It can support the exercised route, but it does not prove arbitrary callers, repo safety, UB-free status, or site execution unless a matching receipt records the run.\n\n#### `card-1`\n\n- Class: `guard_missing`\n- Proof path: `source_route_only`\n- Location: src/lib.rs:7\n- Operation: `unsafe { ptr.cast::<Header>().read() }`\n- Next action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n- Hypothesis to confirm: static `guard_missing` ReviewCard for `unsafe { ptr.cast::<Header>().read() }`; confirm with external evidence before treating it as observed runtime behavior\n- Confirmation step: build/run `cargo +nightly miri test card` first for this card, then attach a matching receipt if it confirms the route\n- Route: `miri`\n  - Reason: route\n  - What it can show: a focused run\n  - What it cannot prove: arbitrary callers\n  - Command:\n\n```bash\ncargo +nightly miri test card\n```\n  - Receipt hint: unsafe-review receipt import-miri card-1\n\n## Trust boundary\n\nThis artifact is static unsafe contract review. It routes reviewers to credible witnesses but does not run Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux. It is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
-        )
-        .map_err(|err| format!("write witness plan failed: {err}"))?;
+        fs::write(dir.join("witness-plan.md"), valid_witness_plan_fixture())
+            .map_err(|err| format!("write witness plan failed: {err}"))?;
         fs::write(
             dir.join("lsp.json"),
             valid_lsp_json(
@@ -18231,6 +18227,54 @@ review_after = "2026-08-01"
         write_empty_manual_repair_queue_artifact(dir)?;
         write_review_kit_artifact(dir, 1, 1, Some("card-1"))?;
         Ok(())
+    }
+
+    fn valid_witness_plan_fixture() -> String {
+        r#"# unsafe-review witness plan
+
+- Review cards: 1
+- Open actionable gaps: 1
+- Policy mode: `advisory`
+
+## Route groups
+
+### Miri / cargo-careful
+
+- Limit: Concrete runtime evidence is path-specific. It can support the exercised route, but it does not prove arbitrary callers, repo safety, UB-free status, or site execution unless a matching receipt records the run.
+
+#### `card-1`
+
+- Class: `guard_missing`
+- Proof path: `source_route_only`
+- Location: src/lib.rs:7
+- Operation family: `raw_pointer_read`
+- Operation: `unsafe { ptr.cast::<Header>().read() }`
+- Hazards: `alignment`
+- Missing evidence: No missing evidence recorded
+- Witness evidence: No imported witness receipt
+- Required safety conditions:
+  - `alignment`: pointer aligned
+- Obligation evidence:
+  - `alignment`: contract `present` (safety contract); discharge `missing` (No visible local guard); reach `present` (related test mention); witness `missing` (No imported witness receipt)
+- Next action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.
+- Hypothesis to confirm: static `guard_missing` ReviewCard for `unsafe { ptr.cast::<Header>().read() }`; confirm with external evidence before treating it as observed runtime behavior
+- Confirmation step: build/run `cargo +nightly miri test card` first for this card, then attach a matching receipt if it confirms the route
+- Route: `miri`
+  - Reason: route
+  - What it can show: a focused run
+  - What it cannot prove: arbitrary callers
+  - Command:
+
+```bash
+cargo +nightly miri test card
+```
+  - Receipt hint: unsafe-review receipt import-miri card-1
+
+## Trust boundary
+
+This artifact is static unsafe contract review. It routes reviewers to credible witnesses but does not run Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux. It is not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.
+"#
+        .to_string()
     }
 
     fn valid_lsp_json(code_actions: &str) -> Result<String, String> {

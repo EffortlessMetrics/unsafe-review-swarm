@@ -5288,6 +5288,46 @@ fn require_witness_plan_card_projections(
             section,
             path,
             card_id,
+            "operation family",
+            &format!("- Operation family: `{}`", card.operation_family),
+        )?;
+        require_witness_plan_card_line(
+            section,
+            path,
+            card_id,
+            "hazards",
+            &format!("- Hazards: {}", witness_plan_hazard_summary(&card.hazards)),
+        )?;
+        for (idx, condition) in card.required_safety_conditions.iter().enumerate() {
+            let expected = witness_plan_required_condition_line(
+                condition,
+                &format!("cards.json card `{card_id}` required_safety_conditions[{idx}]"),
+            )?;
+            require_witness_plan_card_line(
+                section,
+                path,
+                card_id,
+                "required safety condition",
+                &expected,
+            )?;
+        }
+        for (idx, evidence) in card.obligation_evidence.iter().enumerate() {
+            let expected = witness_plan_obligation_evidence_line(
+                evidence,
+                &format!("cards.json card `{card_id}` obligation_evidence[{idx}]"),
+            )?;
+            require_witness_plan_card_line(
+                section,
+                path,
+                card_id,
+                "obligation evidence",
+                &expected,
+            )?;
+        }
+        require_witness_plan_card_line(
+            section,
+            path,
+            card_id,
             "next action",
             &format!("- Next action: {}", card.next_action),
         )?;
@@ -5339,6 +5379,70 @@ fn expected_confirmation_step_fragment(card: &CardProjection) -> String {
         return format!("- Confirmation step: use the `{}` route", route.kind);
     }
     "- Confirmation step: derive a focused confirmation".to_string()
+}
+
+fn witness_plan_hazard_summary(hazards: &[String]) -> String {
+    if hazards.is_empty() {
+        return "none recorded".to_string();
+    }
+    hazards
+        .iter()
+        .map(|hazard| format!("`{hazard}`"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
+fn witness_plan_required_condition_line(
+    condition: &serde_json::Value,
+    context: &str,
+) -> Result<String, String> {
+    let key = super::require_non_empty_json_str(condition, "key", context)?;
+    let description = super::require_non_empty_json_str(condition, "description", context)?;
+    Ok(format!("  - `{}`: {}", key, one_line_text(description)))
+}
+
+fn witness_plan_obligation_evidence_line(
+    evidence: &serde_json::Value,
+    context: &str,
+) -> Result<String, String> {
+    let key = super::require_non_empty_json_str(evidence, "key", context)?;
+    let (contract_state, contract_summary) =
+        witness_plan_evidence_state_parts(evidence, "contract", context)?;
+    let (discharge_state, discharge_summary) =
+        witness_plan_evidence_state_parts(evidence, "discharge", context)?;
+    let (reach_state, reach_summary) =
+        witness_plan_evidence_state_parts(evidence, "reach", context)?;
+    let (witness_state, witness_summary) =
+        witness_plan_evidence_state_parts(evidence, "witness", context)?;
+    Ok(format!(
+        "  - `{}`: contract `{}` ({}); discharge `{}` ({}); reach `{}` ({}); witness `{}` ({})",
+        key,
+        contract_state,
+        one_line_text(contract_summary),
+        discharge_state,
+        one_line_text(discharge_summary),
+        reach_state,
+        one_line_text(reach_summary),
+        witness_state,
+        one_line_text(witness_summary)
+    ))
+}
+
+fn witness_plan_evidence_state_parts<'a>(
+    evidence: &'a serde_json::Value,
+    key: &str,
+    context: &str,
+) -> Result<(&'a str, &'a str), String> {
+    let Some(value) = evidence.get(key) else {
+        return Err(format!("{context} is missing {key}"));
+    };
+    let state = super::require_non_empty_json_str(value, "state", &format!("{context}.{key}"))?;
+    let summary = super::require_non_empty_json_str(value, "summary", &format!("{context}.{key}"))?;
+    Ok((state, summary))
+}
+
+fn one_line_text(value: &str) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn witness_route_command_projection(

@@ -111,16 +111,19 @@ fn routes_for_group<'a>(card: &'a ReviewCard, group: &RouteGroup) -> Vec<&'a Wit
 
 fn render_group_card(out: &mut String, card: &ReviewCard, routes: &[&WitnessRoute]) {
     out.push_str(&format!(
-        "#### `{}`\n\n- Class: `{}`\n- Proof path: `{}`\n- Location: {}:{}\n- Operation: `{}`\n- Missing evidence: {}\n- Witness evidence: {}\n",
+        "#### `{}`\n\n- Class: `{}`\n- Proof path: `{}`\n- Location: {}:{}\n- Operation family: `{}`\n- Operation: `{}`\n- Hazards: {}\n- Missing evidence: {}\n- Witness evidence: {}\n",
         card.id,
         card.class.as_str(),
         card.proof_path.as_str(),
         path_display(&card.site.location.file),
         card.site.location.line,
+        card.operation.family.as_str(),
         one_line(&card.operation.expression),
+        hazard_summary(card),
         missing_summary(card),
         card.witness.summary
     ));
+    render_obligation_evidence(out, card);
     out.push_str(&format!(
         "- Next action: {}\n",
         one_line(&card.next_action.summary)
@@ -184,6 +187,41 @@ fn render_group_card(out: &mut String, card: &ReviewCard, routes: &[&WitnessRout
         ));
     }
     out.push('\n');
+}
+
+fn render_obligation_evidence(out: &mut String, card: &ReviewCard) {
+    out.push_str("- Required safety conditions:\n");
+    if card.obligation_evidence.is_empty() {
+        out.push_str("  - none recorded\n");
+    } else {
+        for evidence in &card.obligation_evidence {
+            out.push_str(&format!(
+                "  - `{}`: {}\n",
+                evidence.obligation.key,
+                one_line(&evidence.obligation.description)
+            ));
+        }
+    }
+
+    out.push_str("- Obligation evidence:\n");
+    if card.obligation_evidence.is_empty() {
+        out.push_str("  - none recorded\n");
+    } else {
+        for evidence in &card.obligation_evidence {
+            out.push_str(&format!(
+                "  - `{}`: contract `{}` ({}); discharge `{}` ({}); reach `{}` ({}); witness `{}` ({})\n",
+                evidence.obligation.key,
+                evidence.contract.state,
+                one_line(&evidence.contract.summary),
+                evidence.discharge.state,
+                one_line(&evidence.discharge.summary),
+                evidence.reach.state,
+                one_line(&evidence.reach.summary),
+                evidence.witness.state,
+                one_line(&evidence.witness.summary)
+            ));
+        }
+    }
 }
 
 fn card_hypothesis(card: &ReviewCard) -> String {
@@ -306,6 +344,17 @@ fn missing_summary(card: &ReviewCard) -> String {
         .map(|missing| missing.message.as_str())
         .collect::<Vec<_>>()
         .join("; ")
+}
+
+fn hazard_summary(card: &ReviewCard) -> String {
+    if card.hazards.is_empty() {
+        return "none recorded".to_string();
+    }
+    card.hazards
+        .iter()
+        .map(|hazard| format!("`{}`", hazard.as_str()))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 fn one_line(value: &str) -> String {
