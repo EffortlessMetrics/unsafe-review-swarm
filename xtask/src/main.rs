@@ -12353,6 +12353,66 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_comment_plan_missing_build_this_first()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-comment-missing-build-first")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("comment-plan.json");
+        let mut comment_plan = parse_json_file(&path)?;
+        comment_plan["comments"][0]
+            .as_object_mut()
+            .ok_or_else(|| "comment plan fixture comment must be an object".to_string())?
+            .remove("build_this_first");
+        fs::write(&path, comment_plan.to_string())
+            .map_err(|err| format!("write comment plan failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("comment-plan.json comment is missing build_this_first")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_comment_plan_build_this_first_command_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-comment-build-first-command-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("comment-plan.json");
+        let mut comment_plan = parse_json_file(&path)?;
+        comment_plan["comments"][0]["build_this_first"]["command"] =
+            serde_json::json!("cargo +nightly miri test unrelated_card");
+        fs::write(&path, comment_plan.to_string())
+            .map_err(|err| format!("write comment plan failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err(
+                    "comment-plan build_this_first command drift should fail verification"
+                        .to_string(),
+                );
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("comment-plan.json comment build_this_first.command"),
+            "{err}"
+        );
+        assert!(err.contains("cargo +nightly miri test card"), "{err}");
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_lsp_status_count_drift() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-lsp-status-count-drift")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
