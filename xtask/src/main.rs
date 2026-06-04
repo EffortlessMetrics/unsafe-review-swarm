@@ -13547,6 +13547,36 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_tokmd_preset_proof_action_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-tokmd-preset-proof-action-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("tokmd-packets.json");
+        let mut tokmd_packets = parse_json_file(&path)?;
+        tokmd_packets["packets"][0]["preset_inputs"]["bun-ub-handoff"]["required_proof_action"] =
+            serde_json::json!("collect system-Bun red evidence and patched-green evidence");
+        fs::write(&path, tokmd_packets.to_string())
+            .map_err(|err| format!("write tokmd packets failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err("tokmd preset proof action drift should fail verification".to_string());
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains(
+                "tokmd-packets.json packets[0] preset_inputs.bun-ub-handoff required_proof_action"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_review_kit_manual_candidate_id_drift() -> Result<(), String>
     {
         let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-manual-candidate-id-drift")?;
@@ -19406,6 +19436,7 @@ review_after = "2026-08-01"
                 ],
                 "implementer_handoff": handoff,
                 "manual_repair_queue_item": manual_repair_queue_item_fixture(),
+                "preset_inputs": tokmd_preset_inputs_fixture(),
                 "commands": {
                     "explain": "unsafe-review explain R4R2-S001",
                     "context_json": "unsafe-review context R4R2-S001 --json",
@@ -19422,6 +19453,139 @@ review_after = "2026-08-01"
         });
         fs::write(dir.join("tokmd-packets.json"), value.to_string())
             .map_err(|err| format!("write tokmd packets failed: {err}"))
+    }
+
+    fn tokmd_preset_inputs_fixture() -> serde_json::Value {
+        serde_json::json!({
+            "bun-ub-handoff": {
+                "audience": "rust lane implementer",
+                "candidate_id": "R4R2-S001",
+                "title": "TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes",
+                "stable_byte_family": serde_json::Value::Null,
+                "invariant_at_risk": "&[u8] memory must not be concurrently mutated",
+                "safe_js_caller_route": "TextDecoder.decode SharedArrayBuffer route",
+                "rust_native_seam": "src/runtime/webcore/TextDecoder.rs:237",
+                "proof_mode": {
+                    "kind": "mutation-plus-miri",
+                    "system_bun_expected": "nondiscriminating",
+                    "mutation_required": true,
+                    "miri_required": true
+                },
+                "required_proof_action": "pair mutation pressure with a focused Miri/model proof of the byte-lifetime shape",
+                "current_evidence": [{
+                    "kind": "runtime_witness",
+                    "path": "target/unsafe-scout/textdecoder-shared-race-route.out",
+                    "summary": "Bun TextDecoder route reaches shared backing bytes through safe JS",
+                    "command": "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts",
+                    "limitation": "runtime route evidence only; not memory-safety proof and not analyzer-discovered"
+                }],
+                "fix_boundary": "copy shared bytes before constructing the Rust slice",
+                "pr_aperture": "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings",
+                "test_or_witness_targets": [
+                    "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+                ],
+                "do_not_touch": [
+                    "Do not rewrite TextDecoder unrelated encodings"
+                ],
+                "ledger_state": serde_json::Value::Null,
+                "seed": serde_json::Value::Null,
+                "next_action": "use `R4R2-S001` and pair mutation pressure with a focused Miri/model proof of the byte-lifetime shape; keep the change inside the candidate PR aperture",
+                "stop_line": "stop at PR aperture: TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings"
+            },
+            "bun-ub-pr-body": {
+                "audience": "upstream maintainer",
+                "candidate_id": "R4R2-S001",
+                "problem_statement": "TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes",
+                "risk_statement": "&[u8] memory must not be concurrently mutated",
+                "smallest_changed_surface": "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings",
+                "compatibility_oracle": manual_candidate_oracle_map_fixture(),
+                "tests": [
+                    "test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+                ],
+                "external_evidence": [{
+                    "kind": "runtime_witness",
+                    "path": "target/unsafe-scout/textdecoder-shared-race-route.out",
+                    "summary": "Bun TextDecoder route reaches shared backing bytes through safe JS",
+                    "command": "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts",
+                    "limitation": "runtime route evidence only; not memory-safety proof and not analyzer-discovered"
+                }],
+                "non_goals": [
+                    "Do not rewrite TextDecoder unrelated encodings"
+                ],
+                "claims_not_made": [
+                    "not proof of UB",
+                    "not proof of memory safety",
+                    "not UB-free status",
+                    "not Miri-clean status",
+                    "not site-execution proof",
+                    "not calibrated precision or recall",
+                    "not policy readiness",
+                    "not automatic repair"
+                ]
+            },
+            "bun-ub-ledger-note": {
+                "audience": "Bun burndown ledger maintainer",
+                "candidate_id": "R4R2-S001",
+                "current_ledger_state": serde_json::Value::Null,
+                "state_transition": "not requested by this packet export",
+                "evidence_or_receipt": [{
+                    "kind": "runtime_witness",
+                    "path": "target/unsafe-scout/textdecoder-shared-race-route.out",
+                    "summary": "Bun TextDecoder route reaches shared backing bytes through safe JS",
+                    "command": "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts",
+                    "limitation": "runtime route evidence only; not memory-safety proof and not analyzer-discovered"
+                }],
+                "seed": serde_json::Value::Null,
+                "missing_transition_inputs": [
+                    "old/new ledger-state decision",
+                    "upstream PR, fork branch, receipt, or exact parked-followup unblock"
+                ],
+                "remaining_outside_aperture": [
+                    "Do not rewrite TextDecoder unrelated encodings"
+                ],
+                "trust_boundary": "Ledger preset input only; ledger state is workflow metadata, not proof or policy readiness."
+            },
+            "bun-ub-review-map": {
+                "audience": "reviewer deciding what to inspect first",
+                "candidate_id": "R4R2-S001",
+                "candidate_ids": ["R4R2-S001"],
+                "changed_files_or_seams": [
+                    "src/runtime/webcore/TextDecoder.rs:237",
+                    "src/runtime/webcore/TextDecoder.rs:237"
+                ],
+                "safe_js_caller_route": "TextDecoder.decode SharedArrayBuffer route",
+                "oracle_map": manual_candidate_oracle_map_fixture(),
+                "comment_plan": {
+                    "source": "bundle inputs.comment-plan.json",
+                    "relationship": "ReviewCard-only review budget metadata; manual candidates are not selected for automatic comments"
+                },
+                "repair_queue": manual_repair_queue_item_fixture(),
+                "explicit_no_posting_boundary": "unsafe-review did not post comments and this preset input does not authorize posting"
+            },
+            "bun-ub-next-pick": {
+                "audience": "lane coordinator",
+                "candidate_id": "R4R2-S001",
+                "owner_lane": serde_json::Value::Null,
+                "proof_mode": {
+                    "kind": "mutation-plus-miri",
+                    "system_bun_expected": "nondiscriminating",
+                    "mutation_required": true,
+                    "miri_required": true
+                },
+                "required_proof_action": "pair mutation pressure with a focused Miri/model proof of the byte-lifetime shape",
+                "smallest_first_pr": "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings",
+                "dependencies_or_unblock": [
+                    "mutation pressure",
+                    "focused Miri/model proof"
+                ],
+                "non_goals": [
+                    "Do not rewrite TextDecoder unrelated encodings"
+                ],
+                "next_action": "use `R4R2-S001` and pair mutation pressure with a focused Miri/model proof of the byte-lifetime shape; keep the change inside the candidate PR aperture",
+                "trust_boundary": "Next-pick preset input is routing metadata only; it does not rank by calibrated recall or claim proof."
+            },
+            "trust_boundary": "Preset inputs are copy-only formatting inputs for future tokmd rendering; unsafe-review did not run tokmd, post comments, execute witnesses, edit source, prove UB, prove memory safety, or make policy decisions."
+        })
     }
 
     fn write_one_manual_candidate_first_pr_artifacts(dir: &Path) -> Result<(), String> {

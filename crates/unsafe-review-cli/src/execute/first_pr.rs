@@ -1821,6 +1821,7 @@ fn tokmd_packet_entry(
         "stable_byte_seed": stable_byte_seed.map(|seed| tokmd_stable_byte_seed(seed, candidate)),
         "implementer_handoff": manual_candidate_implementer_handoff(candidate),
         "manual_repair_queue_item": tokmd_manual_repair_queue_item(candidate),
+        "preset_inputs": tokmd_preset_inputs(candidate, stable_byte_seed),
         "commands": {
             "explain": explain_command(root, &candidate.id),
             "context_json": context_command(root, &candidate.id),
@@ -1854,6 +1855,232 @@ fn tokmd_packet_entry(
         }
     }
     value
+}
+
+fn tokmd_preset_inputs(
+    candidate: &ManualCandidate,
+    stable_byte_seed: Option<&StableByteSeed>,
+) -> serde_json::Value {
+    json!({
+        "bun-ub-handoff": tokmd_bun_ub_handoff_input(candidate, stable_byte_seed),
+        "bun-ub-pr-body": tokmd_bun_ub_pr_body_input(candidate),
+        "bun-ub-ledger-note": tokmd_bun_ub_ledger_note_input(candidate, stable_byte_seed),
+        "bun-ub-review-map": tokmd_bun_ub_review_map_input(candidate),
+        "bun-ub-next-pick": tokmd_bun_ub_next_pick_input(candidate, stable_byte_seed),
+        "trust_boundary": "Preset inputs are copy-only formatting inputs for future tokmd rendering; unsafe-review did not run tokmd, post comments, execute witnesses, edit source, prove UB, prove memory safety, or make policy decisions."
+    })
+}
+
+fn tokmd_bun_ub_handoff_input(
+    candidate: &ManualCandidate,
+    stable_byte_seed: Option<&StableByteSeed>,
+) -> serde_json::Value {
+    json!({
+        "audience": "rust lane implementer",
+        "candidate_id": candidate.id.as_str(),
+        "title": candidate.title.as_str(),
+        "stable_byte_family": stable_byte_source_class(candidate),
+        "invariant_at_risk": candidate.invariant.as_str(),
+        "safe_js_caller_route": candidate.safe_caller.as_str(),
+        "rust_native_seam": tokmd_rust_native_seam(candidate),
+        "proof_mode": candidate.proof_mode.as_ref(),
+        "required_proof_action": tokmd_required_proof_action(candidate),
+        "current_evidence": tokmd_evidence_summaries(candidate),
+        "fix_boundary": candidate.fix_boundary.as_deref(),
+        "pr_aperture": candidate.pr_aperture.as_deref(),
+        "test_or_witness_targets": &candidate.test_targets,
+        "do_not_touch": &candidate.do_not_touch,
+        "ledger_state": stable_byte_ledger_state(candidate),
+        "seed": stable_byte_seed.map(tokmd_seed_summary),
+        "next_action": tokmd_next_action(candidate, stable_byte_seed),
+        "stop_line": tokmd_stop_line(candidate),
+    })
+}
+
+fn tokmd_bun_ub_pr_body_input(candidate: &ManualCandidate) -> serde_json::Value {
+    json!({
+        "audience": "upstream maintainer",
+        "candidate_id": candidate.id.as_str(),
+        "problem_statement": candidate.title.as_str(),
+        "risk_statement": candidate.invariant.as_str(),
+        "smallest_changed_surface": candidate.pr_aperture.as_deref().or(candidate.fix_boundary.as_deref()),
+        "compatibility_oracle": candidate.oracle_map.as_ref(),
+        "tests": &candidate.test_targets,
+        "external_evidence": tokmd_evidence_summaries(candidate),
+        "non_goals": &candidate.do_not_touch,
+        "claims_not_made": tokmd_claims_not_made(),
+    })
+}
+
+fn tokmd_bun_ub_ledger_note_input(
+    candidate: &ManualCandidate,
+    stable_byte_seed: Option<&StableByteSeed>,
+) -> serde_json::Value {
+    json!({
+        "audience": "Bun burndown ledger maintainer",
+        "candidate_id": candidate.id.as_str(),
+        "current_ledger_state": stable_byte_ledger_state(candidate),
+        "state_transition": "not requested by this packet export",
+        "evidence_or_receipt": tokmd_evidence_summaries(candidate),
+        "seed": stable_byte_seed.map(tokmd_seed_summary),
+        "missing_transition_inputs": [
+            "old/new ledger-state decision",
+            "upstream PR, fork branch, receipt, or exact parked-followup unblock"
+        ],
+        "remaining_outside_aperture": &candidate.do_not_touch,
+        "trust_boundary": "Ledger preset input only; ledger state is workflow metadata, not proof or policy readiness."
+    })
+}
+
+fn tokmd_bun_ub_review_map_input(candidate: &ManualCandidate) -> serde_json::Value {
+    json!({
+        "audience": "reviewer deciding what to inspect first",
+        "candidate_id": candidate.id.as_str(),
+        "candidate_ids": [candidate.id.as_str()],
+        "changed_files_or_seams": [
+            manual_candidate_location_text(candidate),
+            tokmd_rust_native_seam(candidate),
+        ],
+        "safe_js_caller_route": candidate.safe_caller.as_str(),
+        "oracle_map": candidate.oracle_map.as_ref(),
+        "comment_plan": {
+            "source": "bundle inputs.comment-plan.json",
+            "relationship": "ReviewCard-only review budget metadata; manual candidates are not selected for automatic comments"
+        },
+        "repair_queue": tokmd_manual_repair_queue_item(candidate),
+        "explicit_no_posting_boundary": "unsafe-review did not post comments and this preset input does not authorize posting"
+    })
+}
+
+fn tokmd_bun_ub_next_pick_input(
+    candidate: &ManualCandidate,
+    stable_byte_seed: Option<&StableByteSeed>,
+) -> serde_json::Value {
+    json!({
+        "audience": "lane coordinator",
+        "candidate_id": candidate.id.as_str(),
+        "owner_lane": stable_byte_seed.map(|seed| seed.owner_lane.as_str()),
+        "proof_mode": candidate.proof_mode.as_ref(),
+        "required_proof_action": tokmd_required_proof_action(candidate),
+        "smallest_first_pr": stable_byte_seed
+            .map(|seed| seed.suggested_first_pr.as_str())
+            .or(candidate.pr_aperture.as_deref())
+            .or(candidate.fix_boundary.as_deref()),
+        "dependencies_or_unblock": tokmd_dependencies_or_unblock(candidate),
+        "non_goals": &candidate.do_not_touch,
+        "next_action": tokmd_next_action(candidate, stable_byte_seed),
+        "trust_boundary": "Next-pick preset input is routing metadata only; it does not rank by calibrated recall or claim proof."
+    })
+}
+
+fn tokmd_seed_summary(seed: &StableByteSeed) -> serde_json::Value {
+    json!({
+        "seed_id": seed.seed_id.as_str(),
+        "ledger_state": seed.ledger_state.as_str(),
+        "owner_lane": seed.owner_lane.as_str(),
+        "suggested_first_pr": seed.suggested_first_pr.as_str(),
+        "triage_labels": &seed.triage_labels,
+    })
+}
+
+fn tokmd_evidence_summaries(candidate: &ManualCandidate) -> Vec<serde_json::Value> {
+    candidate
+        .evidence
+        .iter()
+        .map(|evidence| {
+            json!({
+                "kind": evidence.kind.as_str(),
+                "path": evidence.path.as_ref().map(|path| path.display().to_string()),
+                "summary": evidence.summary.as_deref(),
+                "command": evidence.command.as_deref(),
+                "limitation": evidence.limitation.as_deref(),
+            })
+        })
+        .collect()
+}
+
+fn tokmd_rust_native_seam(candidate: &ManualCandidate) -> String {
+    candidate
+        .stable_byte
+        .as_ref()
+        .map(|stable_byte| stable_byte.sink.clone())
+        .unwrap_or_else(|| manual_candidate_location_text(candidate))
+}
+
+fn tokmd_required_proof_action(candidate: &ManualCandidate) -> &'static str {
+    match candidate
+        .proof_mode
+        .as_ref()
+        .map(|proof_mode| proof_mode.kind.as_str())
+    {
+        Some("observable-red-green") => {
+            "collect system-Bun red evidence and patched-green evidence for the smallest PR aperture"
+        }
+        Some("mutation-plus-miri") => {
+            "pair mutation pressure with a focused Miri/model proof of the byte-lifetime shape"
+        }
+        Some("source-route-only") => {
+            "preserve route evidence and do not call the candidate sure UB from source inspection alone"
+        }
+        Some("helper-gated") => {
+            "park as a verified follow-up until exact helper semantics or unblock command is recorded"
+        }
+        _ => "record an explicit proof mode before changing ledger state or implementation claims",
+    }
+}
+
+fn tokmd_dependencies_or_unblock(candidate: &ManualCandidate) -> Vec<&'static str> {
+    match candidate
+        .proof_mode
+        .as_ref()
+        .map(|proof_mode| proof_mode.kind.as_str())
+    {
+        Some("helper-gated") => vec!["exact helper semantics or unblock command"],
+        Some("mutation-plus-miri") => vec!["mutation pressure", "focused Miri/model proof"],
+        Some("observable-red-green") => vec!["system-Bun red", "patched-green"],
+        Some("source-route-only") => vec!["stronger proof before sure-UB wording"],
+        _ => vec!["proof mode"],
+    }
+}
+
+fn tokmd_next_action(
+    candidate: &ManualCandidate,
+    stable_byte_seed: Option<&StableByteSeed>,
+) -> String {
+    if let Some(seed) = stable_byte_seed {
+        return format!(
+            "start `{}` in `{}`; {}",
+            seed.suggested_first_pr,
+            seed.owner_lane,
+            tokmd_required_proof_action(candidate)
+        );
+    }
+    format!(
+        "use `{}` and {}; keep the change inside the candidate PR aperture",
+        candidate.id,
+        tokmd_required_proof_action(candidate)
+    )
+}
+
+fn tokmd_stop_line(candidate: &ManualCandidate) -> String {
+    candidate
+        .pr_aperture
+        .as_ref()
+        .map(|aperture| format!("stop at PR aperture: {aperture}"))
+        .unwrap_or_else(|| "stop before broadening into unrelated unsafe sites".to_string())
+}
+
+fn tokmd_claims_not_made() -> Vec<&'static str> {
+    vec![
+        "not proof of UB",
+        "not proof of memory safety",
+        "not UB-free status",
+        "not Miri-clean status",
+        "not site-execution proof",
+        "not calibrated precision or recall",
+        "not policy readiness",
+        "not automatic repair",
+    ]
 }
 
 fn tokmd_stable_byte_seed(seed: &StableByteSeed, candidate: &ManualCandidate) -> serde_json::Value {

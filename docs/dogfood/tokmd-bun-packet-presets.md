@@ -137,10 +137,17 @@ with owner lane, suggested first PR, and triage labels. When `comment-plan.json`
 is present, the sidecar may project its ReviewCard-only review-budget summary
 and selected/not-selected reason-code counts for future `bun-ub-review-map`
 rendering. That projection remains plan-only: manual candidates are not selected
-for comments, and unsafe-review does not post comments. The future renderer
-should preserve those limitations and add any renderer-specific absent-input
-notes. Missing inputs must produce an explicit limitation, not an empty result
-or all-clear statement.
+for comments, and unsafe-review does not post comments.
+
+Each manual-candidate packet may also include `preset_inputs` keyed by the
+presets above. These objects are ready-to-format sections derived from the same
+manual candidate, joined stable-byte seed row, manual repair queue item, and
+bundle-level comment-plan relationship. They should include the implementer
+handoff route, PR-body non-claims, ledger-note transition limits, review-map
+no-posting boundary, and next-pick proof action without becoming rendered tokmd
+output. The future renderer should preserve those limitations and add any
+renderer-specific absent-input notes. Missing inputs must produce an explicit
+limitation, not an empty result or all-clear statement.
 
 ## Trust Boundary
 

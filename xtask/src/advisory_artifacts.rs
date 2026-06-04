@@ -2050,6 +2050,7 @@ fn check_tokmd_packet_entry(
         .get("manual_repair_queue_item")
         .ok_or_else(|| format!("{context} is missing manual_repair_queue_item"))?;
     check_tokmd_manual_repair_queue_item(repair_item, expected_repair, &context)?;
+    check_tokmd_preset_inputs(entry, expected, expected_repair, &context)?;
     let commands = entry
         .get("commands")
         .ok_or_else(|| format!("{context} is missing commands"))?;
@@ -2116,6 +2117,354 @@ fn check_tokmd_packet_entry(
         if !super::text_contains_ignore_ascii_case(boundary, expected_text) {
             return Err(format!(
                 "{context} trust_boundary must include `{expected_text}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn check_tokmd_preset_inputs(
+    entry: &serde_json::Value,
+    expected: &ManualCandidateProjection,
+    expected_repair: &ManualRepairQueueEntryProjection,
+    context: &str,
+) -> Result<(), String> {
+    let inputs = entry
+        .get("preset_inputs")
+        .ok_or_else(|| format!("{context} is missing preset_inputs"))?;
+    for preset in TOKMD_PACKET_PRESETS {
+        let preset_value = inputs
+            .get(preset)
+            .ok_or_else(|| format!("{context} preset_inputs is missing `{preset}`"))?;
+        super::require_non_empty_json_str(
+            preset_value,
+            "audience",
+            &format!("{context} preset_inputs.{preset}"),
+        )?;
+        require_projected_str(
+            preset_value,
+            "candidate_id",
+            &expected.id,
+            &format!("{context} preset_inputs.{preset}"),
+        )?;
+    }
+
+    let handoff = &inputs["bun-ub-handoff"];
+    let handoff_context = format!("{context} preset_inputs.bun-ub-handoff");
+    require_projected_optional_str(
+        handoff,
+        "stable_byte_family",
+        &expected.stable_byte_source_class(),
+        &handoff_context,
+    )?;
+    require_projected_str(
+        handoff,
+        "invariant_at_risk",
+        &expected.invariant,
+        &handoff_context,
+    )?;
+    require_projected_str(
+        handoff,
+        "safe_js_caller_route",
+        &expected.safe_caller,
+        &handoff_context,
+    )?;
+    require_tokmd_rust_native_seam(handoff, expected, &handoff_context)?;
+    require_projected_optional_proof_mode(
+        handoff,
+        "proof_mode",
+        &expected.proof_mode,
+        &handoff_context,
+    )?;
+    require_tokmd_required_proof_action(handoff, expected, &handoff_context)?;
+    require_tokmd_evidence_projection(handoff, expected, &handoff_context)?;
+    require_projected_optional_str(
+        handoff,
+        "fix_boundary",
+        &expected.fix_boundary,
+        &handoff_context,
+    )?;
+    require_projected_optional_str(
+        handoff,
+        "pr_aperture",
+        &expected.pr_aperture,
+        &handoff_context,
+    )?;
+    require_projected_optional_string_array(
+        handoff,
+        "test_or_witness_targets",
+        &expected.test_targets,
+        &handoff_context,
+    )?;
+    require_projected_optional_string_array(
+        handoff,
+        "do_not_touch",
+        &expected.do_not_touch,
+        &handoff_context,
+    )?;
+    require_projected_optional_str(
+        handoff,
+        "ledger_state",
+        &expected.stable_byte_ledger_state,
+        &handoff_context,
+    )?;
+    super::require_non_empty_json_str(handoff, "next_action", &handoff_context)?;
+    super::require_non_empty_json_str(handoff, "stop_line", &handoff_context)?;
+
+    let pr_body = &inputs["bun-ub-pr-body"];
+    let pr_body_context = format!("{context} preset_inputs.bun-ub-pr-body");
+    require_projected_str(
+        pr_body,
+        "problem_statement",
+        &expected.title,
+        &pr_body_context,
+    )?;
+    require_projected_str(
+        pr_body,
+        "risk_statement",
+        &expected.invariant,
+        &pr_body_context,
+    )?;
+    require_projected_optional_json_value(
+        pr_body,
+        "compatibility_oracle",
+        &expected.oracle_map,
+        &pr_body_context,
+    )?;
+    require_projected_optional_string_array(
+        pr_body,
+        "tests",
+        &expected.test_targets,
+        &pr_body_context,
+    )?;
+    require_projected_optional_string_array(
+        pr_body,
+        "non_goals",
+        &expected.do_not_touch,
+        &pr_body_context,
+    )?;
+    require_tokmd_claims_not_made(pr_body, &pr_body_context)?;
+
+    let ledger = &inputs["bun-ub-ledger-note"];
+    let ledger_context = format!("{context} preset_inputs.bun-ub-ledger-note");
+    require_projected_optional_str(
+        ledger,
+        "current_ledger_state",
+        &expected.stable_byte_ledger_state,
+        &ledger_context,
+    )?;
+    let transition =
+        super::require_non_empty_json_str(ledger, "state_transition", &ledger_context)?;
+    if !super::text_contains_ignore_ascii_case(transition, "not requested") {
+        return Err(format!(
+            "{ledger_context} state_transition must say no transition was requested"
+        ));
+    }
+    require_tokmd_evidence_projection(ledger, expected, &ledger_context)?;
+    require_projected_optional_string_array(
+        ledger,
+        "remaining_outside_aperture",
+        &expected.do_not_touch,
+        &ledger_context,
+    )?;
+    let ledger_boundary =
+        super::require_non_empty_json_str(ledger, "trust_boundary", &ledger_context)?;
+    for expected_text in ["workflow metadata", "not proof", "policy readiness"] {
+        if !super::text_contains_ignore_ascii_case(ledger_boundary, expected_text) {
+            return Err(format!(
+                "{ledger_context} trust_boundary must include `{expected_text}`"
+            ));
+        }
+    }
+
+    let review_map = &inputs["bun-ub-review-map"];
+    let review_map_context = format!("{context} preset_inputs.bun-ub-review-map");
+    require_projected_str(
+        review_map,
+        "safe_js_caller_route",
+        &expected.safe_caller,
+        &review_map_context,
+    )?;
+    require_projected_optional_json_value(
+        review_map,
+        "oracle_map",
+        &expected.oracle_map,
+        &review_map_context,
+    )?;
+    let comment_plan = review_map
+        .get("comment_plan")
+        .ok_or_else(|| format!("{review_map_context} is missing comment_plan"))?;
+    let relationship =
+        super::require_non_empty_json_str(comment_plan, "relationship", &review_map_context)?;
+    for expected_text in ["ReviewCard-only", "manual candidates are not selected"] {
+        if !super::text_contains_ignore_ascii_case(relationship, expected_text) {
+            return Err(format!(
+                "{review_map_context} comment_plan.relationship must include `{expected_text}`"
+            ));
+        }
+    }
+    let repair_queue = review_map
+        .get("repair_queue")
+        .ok_or_else(|| format!("{review_map_context} is missing repair_queue"))?;
+    check_tokmd_manual_repair_queue_item(repair_queue, expected_repair, &review_map_context)?;
+    let no_posting = super::require_non_empty_json_str(
+        review_map,
+        "explicit_no_posting_boundary",
+        &review_map_context,
+    )?;
+    if !super::text_contains_ignore_ascii_case(no_posting, "did not post comments") {
+        return Err(format!(
+            "{review_map_context} explicit_no_posting_boundary must say comments were not posted"
+        ));
+    }
+
+    let next_pick = &inputs["bun-ub-next-pick"];
+    let next_pick_context = format!("{context} preset_inputs.bun-ub-next-pick");
+    require_projected_optional_proof_mode(
+        next_pick,
+        "proof_mode",
+        &expected.proof_mode,
+        &next_pick_context,
+    )?;
+    require_tokmd_required_proof_action(next_pick, expected, &next_pick_context)?;
+    require_projected_optional_string_array(
+        next_pick,
+        "non_goals",
+        &expected.do_not_touch,
+        &next_pick_context,
+    )?;
+    super::require_non_empty_json_str(next_pick, "next_action", &next_pick_context)?;
+    let next_boundary =
+        super::require_non_empty_json_str(next_pick, "trust_boundary", &next_pick_context)?;
+    for expected_text in ["routing metadata", "does not rank", "claim proof"] {
+        if !super::text_contains_ignore_ascii_case(next_boundary, expected_text) {
+            return Err(format!(
+                "{next_pick_context} trust_boundary must include `{expected_text}`"
+            ));
+        }
+    }
+
+    let boundary = super::require_non_empty_json_str(inputs, "trust_boundary", context)?;
+    for expected_text in [
+        "copy-only formatting inputs",
+        "did not run tokmd",
+        "post comments",
+        "execute witnesses",
+        "edit source",
+        "prove UB",
+        "policy decisions",
+    ] {
+        if !super::text_contains_ignore_ascii_case(boundary, expected_text) {
+            return Err(format!(
+                "{context} preset_inputs.trust_boundary must include `{expected_text}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn require_tokmd_rust_native_seam(
+    value: &serde_json::Value,
+    expected: &ManualCandidateProjection,
+    context: &str,
+) -> Result<(), String> {
+    let actual = super::require_non_empty_json_str(value, "rust_native_seam", context)?;
+    if actual == expected.location_text {
+        return Ok(());
+    }
+    if let Some(stable_byte) = &expected.stable_byte {
+        if let Some(sink) = stable_byte.get("sink").and_then(serde_json::Value::as_str) {
+            if actual == sink {
+                return Ok(());
+            }
+        }
+    }
+    Err(format!(
+        "{context} rust_native_seam must match stable_byte.sink or location_text"
+    ))
+}
+
+fn require_tokmd_required_proof_action(
+    value: &serde_json::Value,
+    expected: &ManualCandidateProjection,
+    context: &str,
+) -> Result<(), String> {
+    let action = super::require_non_empty_json_str(value, "required_proof_action", context)?;
+    let expected_text = match expected
+        .proof_mode
+        .as_ref()
+        .map(|proof_mode| proof_mode.kind.as_str())
+    {
+        Some("observable-red-green") => "system-Bun red",
+        Some("mutation-plus-miri") => "Miri/model",
+        Some("source-route-only") => "source inspection alone",
+        Some("helper-gated") => "helper semantics",
+        _ => "proof mode",
+    };
+    if !super::text_contains_ignore_ascii_case(action, expected_text) {
+        return Err(format!(
+            "{context} required_proof_action must include `{expected_text}`"
+        ));
+    }
+    Ok(())
+}
+
+fn require_tokmd_evidence_projection(
+    value: &serde_json::Value,
+    expected: &ManualCandidateProjection,
+    context: &str,
+) -> Result<(), String> {
+    let evidence = super::json_array_at(value, "/current_evidence", context)
+        .or_else(|_| super::json_array_at(value, "/evidence_or_receipt", context))?;
+    if evidence.len() != expected.evidence.len() {
+        return Err(format!(
+            "{context} evidence projection has {} entrie(s), expected {}",
+            evidence.len(),
+            expected.evidence.len()
+        ));
+    }
+    for (index, (actual, expected_evidence)) in evidence.iter().zip(&expected.evidence).enumerate()
+    {
+        let evidence_context = format!("{context} evidence[{index}]");
+        require_projected_str(actual, "kind", &expected_evidence.kind, &evidence_context)?;
+        require_projected_optional_str(actual, "path", &expected_evidence.path, &evidence_context)?;
+        require_projected_optional_str(
+            actual,
+            "summary",
+            &expected_evidence.summary,
+            &evidence_context,
+        )?;
+        require_projected_optional_str(
+            actual,
+            "command",
+            &expected_evidence.command,
+            &evidence_context,
+        )?;
+        require_projected_optional_str(
+            actual,
+            "limitation",
+            &expected_evidence.limitation,
+            &evidence_context,
+        )?;
+    }
+    Ok(())
+}
+
+fn require_tokmd_claims_not_made(value: &serde_json::Value, context: &str) -> Result<(), String> {
+    let claims = require_non_empty_string_array(value, "claims_not_made", context)?;
+    for expected_claim in [
+        "not proof of UB",
+        "not proof of memory safety",
+        "not UB-free status",
+        "not Miri-clean status",
+        "not site-execution proof",
+        "not calibrated precision or recall",
+        "not policy readiness",
+        "not automatic repair",
+    ] {
+        if !claims.iter().any(|claim| claim == expected_claim) {
+            return Err(format!(
+                "{context} claims_not_made must include `{expected_claim}`"
             ));
         }
     }

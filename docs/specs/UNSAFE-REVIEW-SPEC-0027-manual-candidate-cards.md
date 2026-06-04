@@ -380,12 +380,21 @@ project the same target, route, invariant, external evidence, optional
 handoff, and copy-only commands as `manual-candidates.json`, include a
 `manual_repair_queue_item` projection from `manual-repair-queue.json` with the
 candidate ID, bucket, bucket reason, copy-only agent handoff, and trust
-boundary, may project the ReviewCard-only `comment-plan.json` review-budget
-summary plus selected/not-selected reason-code counts for future
-`bun-ub-review-map` formatting, and record absent ReviewCard, receipt, and
-stable-byte seed-ledger inputs as explicit limitations. The comment-plan
-projection must remain plan-only and must not select manual candidates for
-comments or imply posting. When a root-local
+boundary, and may include `preset_inputs` keyed by the future Bun packet
+presets (`bun-ub-handoff`, `bun-ub-pr-body`, `bun-ub-ledger-note`,
+`bun-ub-review-map`, and `bun-ub-next-pick`). `preset_inputs` must be derived
+from the same manual candidate, joined stable-byte seed row, manual repair
+queue item, and bundle-level comment-plan relationship; it is a copy-only
+formatting input, not rendered tokmd output and not a second source of truth.
+The preset input must preserve implementer route/proof/fix/non-goal fields,
+PR-body non-claim fields, ledger transition limits, review-map no-posting
+boundaries, and next-pick proof action without running tokmd or selecting
+comments. `tokmd-packets.json` may project the ReviewCard-only
+`comment-plan.json` review-budget summary plus selected/not-selected
+reason-code counts for future `bun-ub-review-map` formatting, and must record
+absent ReviewCard, receipt, and stable-byte seed-ledger inputs as explicit
+limitations. The comment-plan projection must remain plan-only and must not
+select manual candidates for comments or imply posting. When a root-local
 `docs/dogfood/stable-byte-follow-up-seeds.md` exists and its referenced manual
 candidate JSON can be read, `tokmd-packets.json` may join a matching seed row
 by manual candidate ID and project `stable_byte_seed` with seed ID, surface,
@@ -533,11 +542,11 @@ into an analyzer ReviewCard.
   preserving manual markers, optional oracle-map,
   proof-mode/fix-boundary/PR-aperture guidance, implementer handoff, commands
   from `manual-candidates.json`, and
-  `manual_repair_queue_item` data from `manual-repair-queue.json`, optional
-  ReviewCard-only comment-plan review-budget metadata, and optional root-local
-  stable-byte seed-row metadata while recording absent seed-ledger, receipt, and
-  ReviewCard packet inputs as limitations and not running tokmd or posting
-  comments.
+  `manual_repair_queue_item` data from `manual-repair-queue.json`, plus
+  per-preset Bun packet `preset_inputs`, optional ReviewCard-only comment-plan
+  review-budget metadata, and optional root-local stable-byte seed-row metadata
+  while recording absent seed-ledger, receipt, and ReviewCard packet inputs as
+  limitations and not running tokmd or posting comments.
 - The first-pr verifier rejects manual-candidate markers in ReviewCard-only
   artifacts instead of silently accepting leaked manual candidates as analyzer
   output.

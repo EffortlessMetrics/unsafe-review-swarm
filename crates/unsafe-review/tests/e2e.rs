@@ -2806,6 +2806,51 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             .contains("not automatic repair")
     );
     assert_eq!(
+        tokmd_packets["packets"][0]["preset_inputs"]["bun-ub-handoff"]["stable_byte_family"],
+        manual_candidates["candidates"][0]["stable_byte"]["class"]
+    );
+    assert_eq!(
+        tokmd_packets["packets"][0]["preset_inputs"]["bun-ub-handoff"]["safe_js_caller_route"],
+        manual_candidates["candidates"][0]["safe_caller"]
+    );
+    assert!(
+        tokmd_packets["packets"][0]["preset_inputs"]["bun-ub-handoff"]["required_proof_action"]
+            .as_str()
+            .unwrap_or("")
+            .contains("Miri/model")
+    );
+    assert_eq!(
+        tokmd_packets["packets"][0]["preset_inputs"]["bun-ub-pr-body"]["compatibility_oracle"],
+        manual_candidates["candidates"][0]["oracle_map"]
+    );
+    assert!(
+        tokmd_packets["packets"][0]["preset_inputs"]["bun-ub-pr-body"]["claims_not_made"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|claim| claim.as_str() == Some("not Miri-clean status"))
+    );
+    assert!(
+        tokmd_packets["packets"][0]["preset_inputs"]["bun-ub-review-map"]["comment_plan"]["relationship"]
+            .as_str()
+            .unwrap_or("")
+            .contains("manual candidates are not selected")
+    );
+    assert_eq!(
+        tokmd_packets["packets"][0]["preset_inputs"]["bun-ub-review-map"]["repair_queue"]["bucket"],
+        manual_repair_queue["queue"][0]["bucket"]
+    );
+    assert_eq!(
+        tokmd_packets["packets"][0]["preset_inputs"]["bun-ub-next-pick"]["non_goals"],
+        manual_candidates["candidates"][0]["do_not_touch"]
+    );
+    assert!(
+        tokmd_packets["packets"][0]["preset_inputs"]["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("did not run tokmd")
+    );
+    assert_eq!(
         tokmd_packets["packets"][1]["external_evidence"][2]["kind"],
         manual_candidates["candidates"][1]["evidence"][2]["kind"]
     );
