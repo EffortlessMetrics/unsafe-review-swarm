@@ -467,6 +467,10 @@ fn render_pr_summary_reviewer_cockpit(out: &mut String, output: &AnalyzeOutput) 
             primary_obligation_summary(card)
         ));
         out.push_str(&format!("- Proof path: `{}`\n", card.proof_path.as_str()));
+        out.push_str(&format!(
+            "- Hypothesis to confirm: {}\n",
+            top_card_hypothesis(card)
+        ));
         out.push_str("- Evidence found:\n");
         out.push_str(&format!("  - Contract: {}\n", card.contract.summary));
         out.push_str(&format!(
@@ -482,6 +486,10 @@ fn render_pr_summary_reviewer_cockpit(out: &mut String, output: &AnalyzeOutput) 
         out.push_str(&format!(
             "- Next reviewer action: {}\n",
             card.next_action.summary
+        ));
+        out.push_str(&format!(
+            "- Confirmation step: {}\n",
+            top_card_confirmation_step(card)
         ));
         if let Some(route) = card.routes.first() {
             out.push_str(&format!(
@@ -533,6 +541,10 @@ fn render_pr_summary_top_card(out: &mut String, output: &AnalyzeOutput) {
             card.operation.family.as_str()
         ));
         out.push_str(&format!("- Proof path: `{}`\n", card.proof_path.as_str()));
+        out.push_str(&format!(
+            "- Hypothesis to confirm: {}\n",
+            top_card_hypothesis(card)
+        ));
         out.push_str(&format!("- Missing evidence: {}\n", missing_summary(card)));
         if let Some(route) = card.routes.first() {
             out.push_str(&format!(
@@ -546,6 +558,10 @@ fn render_pr_summary_top_card(out: &mut String, output: &AnalyzeOutput) {
             }
         }
         out.push_str(&format!("- Next action: {}\n", card.next_action.summary));
+        out.push_str(&format!(
+            "- Confirmation step: {}\n",
+            top_card_confirmation_step(card)
+        ));
         out.push_str(&format!("- Explain: `unsafe-review explain {}`\n", card.id));
         out.push_str(&format!(
             "- Agent context: `unsafe-review context {} --json`\n\n",
@@ -554,6 +570,30 @@ fn render_pr_summary_top_card(out: &mut String, output: &AnalyzeOutput) {
     } else {
         render_no_changed_gaps(out);
     }
+}
+
+fn top_card_hypothesis(card: &ReviewCard) -> String {
+    format!(
+        "static `{}` ReviewCard for `{}`; confirm with external evidence before treating it as observed runtime behavior",
+        card.class.as_str(),
+        one_line(&card.operation.expression)
+    )
+}
+
+fn top_card_confirmation_step(card: &ReviewCard) -> String {
+    if let Some(command) = card.next_action.verify_commands.first() {
+        return format!(
+            "build/run `{}` first for this card, then attach a matching receipt if it confirms the route",
+            command
+        );
+    }
+    if let Some(route) = card.routes.first() {
+        return format!(
+            "use the `{}` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+            route.kind.as_str()
+        );
+    }
+    "derive a focused confirmation from `unsafe-review explain` and human review before upgrading confidence".to_string()
 }
 
 fn render_pr_summary_card_table(out: &mut String, output: &AnalyzeOutput) {
@@ -590,10 +630,18 @@ fn render_pr_summary_witness_plan(out: &mut String, output: &AnalyzeOutput) {
         return;
     }
     for card in &output.cards {
+        out.push_str(&format!(
+            "- `{}` hypothesis: {}\n",
+            card.id,
+            top_card_hypothesis(card)
+        ));
+        out.push_str(&format!(
+            "  - Confirmation step: {}\n",
+            top_card_confirmation_step(card)
+        ));
         if let Some(route) = card.routes.first() {
             out.push_str(&format!(
-                "- `{}`: `{}` because {}\n",
-                card.id,
+                "  - Route: `{}` because {}\n",
                 route.kind.as_str(),
                 route.reason
             ));
@@ -608,8 +656,7 @@ fn render_pr_summary_witness_plan(out: &mut String, output: &AnalyzeOutput) {
             }
         } else {
             out.push_str(&format!(
-                "- `{}`: no witness route was selected; route this to human review.\n",
-                card.id
+                "  - Route: no witness route was selected; route this to human review.\n"
             ));
         }
     }
@@ -873,11 +920,18 @@ mod tests {
         assert!(rendered.contains("- Operation: `unsafe { ptr.cast::<Header>().read() }`"));
         assert!(rendered.contains("- Operation family: `raw_pointer_read`"));
         assert!(rendered.contains("- Proof path: `source_route_only`"));
+        assert!(rendered.contains("- Hypothesis to confirm: static `guard_missing` ReviewCard"));
+        assert!(rendered.contains(
+            "confirm with external evidence before treating it as observed runtime behavior"
+        ));
         assert!(rendered.contains("- Obligation:"));
         assert!(rendered.contains("- Evidence found:"));
         assert!(rendered.contains("  - Guard/discharge:"));
         assert!(rendered.contains("- Missing/weak evidence: Missing visible local guard"));
         assert!(rendered.contains("- Next reviewer action: Add or expose the local guard"));
+        assert!(rendered.contains(
+            "- Confirmation step: build/run `cargo +nightly miri test read_header` first"
+        ));
         assert!(rendered.contains("- Witness route: `miri` because Pure-Rust UB-adjacent hazard"));
         assert!(
             rendered
@@ -887,6 +941,13 @@ mod tests {
         assert!(rendered.contains("unsafe { ptr.cast::<Header>().read() }"));
         assert!(rendered.contains("| `raw_pointer_read` |"));
         assert!(rendered.contains("## Witness plan"));
+        assert!(rendered.contains(&format!(
+            "- `{}` hypothesis: static `guard_missing` ReviewCard",
+            card.id
+        )));
+        assert!(rendered.contains(
+            "  - Confirmation step: build/run `cargo +nightly miri test read_header` first"
+        ));
         assert!(rendered.contains("Open actionable gaps: 1"));
         assert!(rendered.contains("Missing visible local guard"));
         assert!(rendered.contains("cargo +nightly miri test read_header"));
@@ -938,6 +999,10 @@ mod tests {
         assert!(rendered.contains("## Top card"));
         assert!(rendered.contains(&format!("- ID: `{}`", card.id)));
         assert!(rendered.contains("- Proof path: `source_route_only`"));
+        assert!(rendered.contains("- Hypothesis to confirm: static `guard_missing` ReviewCard"));
+        assert!(rendered.contains(
+            "- Confirmation step: build/run `cargo +nightly miri test read_header` first"
+        ));
         assert!(rendered.contains(&format!("- Explain: `unsafe-review explain {}`", card.id)));
         assert!(rendered.contains(&format!(
             "- Agent context: `unsafe-review context {} --json`",

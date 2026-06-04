@@ -125,6 +125,14 @@ fn render_group_card(out: &mut String, card: &ReviewCard, routes: &[&WitnessRout
         "- Next action: {}\n",
         one_line(&card.next_action.summary)
     ));
+    out.push_str(&format!(
+        "- Hypothesis to confirm: {}\n",
+        card_hypothesis(card)
+    ));
+    out.push_str(&format!(
+        "- Confirmation step: {}\n",
+        card_confirmation_step(card)
+    ));
     if !card.next_action.verify_commands.is_empty() {
         out.push_str("- Verify command");
         if card.next_action.verify_commands.len() > 1 {
@@ -176,6 +184,30 @@ fn render_group_card(out: &mut String, card: &ReviewCard, routes: &[&WitnessRout
         ));
     }
     out.push('\n');
+}
+
+fn card_hypothesis(card: &ReviewCard) -> String {
+    format!(
+        "static `{}` ReviewCard for `{}`; confirm with external evidence before treating it as observed runtime behavior",
+        card.class.as_str(),
+        one_line(&card.operation.expression)
+    )
+}
+
+fn card_confirmation_step(card: &ReviewCard) -> String {
+    if let Some(command) = card.next_action.verify_commands.first() {
+        return format!(
+            "build/run `{}` first for this card, then attach a matching receipt if it confirms the route",
+            command
+        );
+    }
+    if let Some(route) = card.routes.first() {
+        return format!(
+            "use the `{}` route in this witness plan to derive a focused repro or human review before upgrading confidence",
+            route.kind.as_str()
+        );
+    }
+    "derive a focused confirmation from `unsafe-review explain` and human review before upgrading confidence".to_string()
 }
 
 fn route_can_show(kind: WitnessKind) -> &'static str {
@@ -303,6 +335,10 @@ mod tests {
         assert!(rendered.contains("unsafe-review receipt import-miri"));
         assert!(rendered.contains("unsafe-review receipt import-careful"));
         assert!(rendered.contains("Next action: Add or expose"));
+        assert!(rendered.contains("- Hypothesis to confirm: static `guard_missing` ReviewCard"));
+        assert!(rendered.contains(
+            "- Confirmation step: build/run `cargo +nightly miri test read_header` first"
+        ));
         assert!(rendered.contains("Verify command"));
         assert!(rendered.contains("Missing visible local guard"));
         assert!(rendered.contains("does not run Miri"));

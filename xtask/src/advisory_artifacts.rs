@@ -2819,9 +2819,11 @@ fn require_markdown_top_card_projection(
     let mut top_card_operation = None;
     let mut top_card_operation_family = None;
     let mut top_card_proof_path = None;
+    let mut top_card_hypothesis = None;
     let mut top_card_missing_evidence = None;
     let mut top_card_primary_route = None;
     let mut top_card_next_action = None;
+    let mut top_card_confirmation_step = None;
     let mut top_card_explain_command = None;
     let mut top_card_agent_context_command = None;
 
@@ -2864,6 +2866,8 @@ fn require_markdown_top_card_projection(
                 continue;
             };
             top_card_proof_path = Some(proof_path.to_string());
+        } else if let Some(hypothesis) = trimmed.strip_prefix("- Hypothesis to confirm: ") {
+            top_card_hypothesis = Some(hypothesis.to_string());
         } else if let Some(missing_evidence) = trimmed
             .strip_prefix("- Missing evidence: ")
             .or_else(|| trimmed.strip_prefix("- Missing/weak evidence: "))
@@ -2885,6 +2889,8 @@ fn require_markdown_top_card_projection(
             .or_else(|| trimmed.strip_prefix("- Next reviewer action: "))
         {
             top_card_next_action = Some(next_action.to_string());
+        } else if let Some(confirmation_step) = trimmed.strip_prefix("- Confirmation step: ") {
+            top_card_confirmation_step = Some(confirmation_step.to_string());
         } else if let Some(rest) = trimmed.strip_prefix("- Explain: `") {
             let Some((command, _)) = rest.split_once('`') else {
                 continue;
@@ -2972,6 +2978,14 @@ fn require_markdown_top_card_projection(
         &format!("{} top card `{card_id}` proof path", path.display()),
     )?;
 
+    let Some(actual_hypothesis) = top_card_hypothesis else {
+        return Err(format!(
+            "{} must include a top ReviewCard hypothesis-to-confirm line",
+            path.display()
+        ));
+    };
+    require_top_card_hypothesis_text(&actual_hypothesis, path, &card_id, card)?;
+
     let Some(actual_missing_evidence) = top_card_missing_evidence else {
         return Err(format!(
             "{} must include a top ReviewCard missing evidence line",
@@ -3028,6 +3042,14 @@ fn require_markdown_top_card_projection(
         &format!("{} top card `{card_id}` next action", path.display()),
     )?;
 
+    let Some(actual_confirmation_step) = top_card_confirmation_step else {
+        return Err(format!(
+            "{} must include a top ReviewCard confirmation step line",
+            path.display()
+        ));
+    };
+    require_top_card_confirmation_step_text(&actual_confirmation_step, path, &card_id, card)?;
+
     let Some(actual_explain_command) = top_card_explain_command else {
         return Err(format!(
             "{} must include a top ReviewCard explain command line",
@@ -3054,6 +3076,73 @@ fn require_markdown_top_card_projection(
             path.display()
         ),
     )
+}
+
+fn require_top_card_hypothesis_text(
+    actual: &str,
+    path: &Path,
+    card_id: &str,
+    card: &CardProjection,
+) -> Result<(), String> {
+    for expected in [
+        "static",
+        "ReviewCard",
+        "confirm with external evidence",
+        "observed runtime behavior",
+    ] {
+        if !actual.contains(expected) {
+            return Err(format!(
+                "{} top card `{card_id}` hypothesis must include `{expected}`",
+                path.display()
+            ));
+        }
+    }
+    if !actual.contains(&format!("`{}`", card.class_name)) {
+        return Err(format!(
+            "{} top card `{card_id}` hypothesis must include class `{}`",
+            path.display(),
+            card.class_name
+        ));
+    }
+    if !actual.contains(&collapse_whitespace(&card.operation)) {
+        return Err(format!(
+            "{} top card `{card_id}` hypothesis must include operation `{}`",
+            path.display(),
+            card.operation
+        ));
+    }
+    Ok(())
+}
+
+fn require_top_card_confirmation_step_text(
+    actual: &str,
+    path: &Path,
+    card_id: &str,
+    card: &CardProjection,
+) -> Result<(), String> {
+    if !actual.contains("matching receipt") && !actual.contains("before upgrading confidence") {
+        return Err(format!(
+            "{} top card `{card_id}` confirmation step must name receipt or confidence-upgrade limits",
+            path.display()
+        ));
+    }
+    if let Some(command) = card.verify_commands.first() {
+        for expected in ["build/run", "first", "matching receipt"] {
+            if !actual.contains(expected) {
+                return Err(format!(
+                    "{} top card `{card_id}` confirmation step must include `{expected}`",
+                    path.display()
+                ));
+            }
+        }
+        if !actual.contains(command) {
+            return Err(format!(
+                "{} top card `{card_id}` confirmation step must include verify command `{command}`",
+                path.display()
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn markdown_top_card_section(text: &str) -> &str {
@@ -4255,11 +4344,31 @@ fn require_comment_body_card_projection(
             format!("Missing evidence: {}", expected_missing_summary(card)),
         ),
         ("proof_path", format!("Proof path: `{}`.", card.proof_path)),
+        (
+            "hypothesis",
+            format!(
+                "Hypothesis to confirm: static `{}` ReviewCard",
+                card.class_name
+            ),
+        ),
         ("next_action", format!("Next action: {}", card.next_action)),
     ] {
         if !body.contains(&expected) {
             return Err(format!(
                 "{context} body must project ReviewCard {field} `{expected}`"
+            ));
+        }
+    }
+    if !body.contains("Confirmation step: ") {
+        return Err(format!(
+            "{context} body must project ReviewCard confirmation step"
+        ));
+    }
+    if let Some(command) = card.verify_commands.first() {
+        let expected = format!("Confirmation step: build/run `{command}` first");
+        if !body.contains(&expected) {
+            return Err(format!(
+                "{context} body must project ReviewCard confirmation step `{expected}`"
             ));
         }
     }
@@ -5182,6 +5291,23 @@ fn require_witness_plan_card_projections(
             "next action",
             &format!("- Next action: {}", card.next_action),
         )?;
+        require_witness_plan_card_line(
+            section,
+            path,
+            card_id,
+            "hypothesis",
+            &format!(
+                "- Hypothesis to confirm: static `{}` ReviewCard",
+                card.class_name
+            ),
+        )?;
+        require_witness_plan_card_line(
+            section,
+            path,
+            card_id,
+            "confirmation step",
+            &expected_confirmation_step_fragment(card),
+        )?;
         for route in &card.witness_routes {
             require_witness_plan_card_line(
                 section,
@@ -5203,6 +5329,16 @@ fn require_witness_plan_card_projections(
         }
     }
     Ok(())
+}
+
+fn expected_confirmation_step_fragment(card: &CardProjection) -> String {
+    if let Some(command) = card.verify_commands.first() {
+        return format!("- Confirmation step: build/run `{command}` first");
+    }
+    if let Some(route) = card.witness_routes.first() {
+        return format!("- Confirmation step: use the `{}` route", route.kind);
+    }
+    "- Confirmation step: derive a focused confirmation".to_string()
 }
 
 fn witness_route_command_projection(
@@ -5450,8 +5586,20 @@ fn require_pr_summary_witness_plan_projection(
         )
     })?;
     for (card_id, card) in card_projections {
+        let expected = format!(
+            "- `{card_id}` hypothesis: static `{}` ReviewCard",
+            card.class_name
+        );
+        require_pr_summary_witness_line(section, path, card_id, "hypothesis", &expected)?;
+        require_pr_summary_witness_line(
+            section,
+            path,
+            card_id,
+            "confirmation step",
+            &expected_confirmation_step_fragment(card),
+        )?;
         if let Some(route) = card.witness_routes.first() {
-            let expected = format!("- `{card_id}`: `{}` because {}", route.kind, route.reason);
+            let expected = format!("  - Route: `{}` because {}", route.kind, route.reason);
             require_pr_summary_witness_line(section, path, card_id, "primary route", &expected)?;
             if let Some(command) = &route.command {
                 let expected = format!("```bash\n{command}\n```");
@@ -5472,9 +5620,7 @@ fn require_pr_summary_witness_plan_projection(
                 )?;
             }
         } else {
-            let expected = format!(
-                "- `{card_id}`: no witness route was selected; route this to human review."
-            );
+            let expected = "  - Route: no witness route was selected; route this to human review.";
             require_pr_summary_witness_line(section, path, card_id, "manual route", &expected)?;
         }
     }

@@ -59,6 +59,11 @@ When cards are present, `pr-summary.md` and `github-summary.md` MUST include
 top-card handoff commands for human explanation and bounded agent context:
 `unsafe-review explain <card-id>` and
 `unsafe-review context <card-id> --json`.
+They MUST also label the top card as a static ReviewCard hypothesis that needs
+external confirmation before being treated as observed runtime behavior, and
+MUST name the first confirmation step from the selected verify command or
+witness route. This wording is an advisory posture guard; it is not a claim
+that unsafe-review ran the command, observed the route, or proved the card.
 
 ## 5. First-pr terminal summary contract
 
@@ -147,6 +152,8 @@ Missing optional witness tools MUST be informational (non-fatal) with explicit â
 `witness-plan.md` MUST group cards by witness route and, per card, present:
 
 - Card identity.
+- Hypothesis to confirm.
+- First confirmation step.
 - Why this route.
 - Suggested command.
 - What route can show.

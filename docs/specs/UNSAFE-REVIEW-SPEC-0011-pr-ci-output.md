@@ -214,6 +214,9 @@ Must include:
 ```text
 card count
 top actionable card, when present
+  static hypothesis to confirm, with no observed-runtime-behavior claim until
+  external evidence confirms the route
+  first confirmation step from the selected verify command or witness route
   explain handoff command
   bounded agent context handoff command
   agent handoff readiness, repair buckets, and readiness reasons projected from
@@ -258,10 +261,12 @@ top actionable card, when present:
   location
   operation
   operation family
+  static hypothesis to confirm
   missing evidence
   primary witness route, when present
   primary witness route command, when available
   next action
+  first confirmation step
   explain handoff command
   bounded agent context handoff command
 full bundle artifact list

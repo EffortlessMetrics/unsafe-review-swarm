@@ -75,6 +75,20 @@ mod tests {
             value["comments"][0]["body"]
                 .as_str()
                 .unwrap_or("")
+                .contains("Hypothesis to confirm: static `guard_missing` ReviewCard")
+        );
+        assert!(
+            value["comments"][0]["body"]
+                .as_str()
+                .unwrap_or("")
+                .contains(
+                    "Confirmation step: build/run `cargo +nightly miri test read_header` first"
+                )
+        );
+        assert!(
+            value["comments"][0]["body"]
+                .as_str()
+                .unwrap_or("")
                 .contains("unsafe-review did not post this comment")
         );
         assert!(

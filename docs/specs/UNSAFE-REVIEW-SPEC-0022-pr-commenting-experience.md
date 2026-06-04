@@ -170,7 +170,9 @@ Required sections:
 - heading
 - why this matters
 - missing evidence
+- hypothesis to confirm before treating the card as observed behavior
 - what resolves this
+- first confirmation step
 - witness route (if useful)
 - trust boundary
 
@@ -178,6 +180,10 @@ The body must project the same ReviewCard class, operation, operation family,
 missing-evidence summary, next action, first witness route, and first verify
 command as the structured comment entry. The structured fields remain the
 machine contract; the body is the reviewer-facing rendering of that same card.
+The first confirmation step must come from the first verify command when one is
+present, otherwise from the selected witness route or human review path. It
+must not imply that unsafe-review ran the command, observed the route, or proved
+the finding.
 
 Length budget: recommended <=140 words, hard max 220 words.
 

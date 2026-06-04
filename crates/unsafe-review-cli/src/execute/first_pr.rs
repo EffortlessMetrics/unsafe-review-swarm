@@ -231,11 +231,28 @@ fn print_top_card_summary(
     if let Some(route) = card.routes.first() {
         println!("  Route: `{}`", route.kind.as_str());
     }
+    println!("  Posture: hypothesis pending runtime or receipt confirmation");
+    println!("  Confirm: {}", terminal_confirmation_step(card));
     println!("  Next: {}", card.next_action.summary);
     println!("Explain top card:");
     println!("  {}", explain_command(root, &card.id));
     println!("Agent packet:");
     println!("  {}", context_command(root, &card.id));
+}
+
+fn terminal_confirmation_step(card: &ReviewCard) -> String {
+    if let Some(command) = card.next_action.verify_commands.first() {
+        return format!(
+            "build/run `{command}` first, then attach a matching receipt if it confirms the route"
+        );
+    }
+    if let Some(route) = card.routes.first() {
+        return format!(
+            "use the `{}` route in witness-plan.md to derive a focused confirmation before upgrading confidence",
+            route.kind.as_str()
+        );
+    }
+    "derive a focused confirmation from unsafe-review explain and human review before upgrading confidence".to_string()
 }
 
 fn explain_command(root: &Path, card_id: &impl fmt::Display) -> String {
