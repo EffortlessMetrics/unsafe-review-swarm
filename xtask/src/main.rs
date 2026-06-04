@@ -64,6 +64,32 @@ const FRONT_DOOR_MARKDOWN_DOCS: &[&str] = &[
     "crates/unsafe-review-cli/README.md",
     "crates/unsafe-review-core/README.md",
 ];
+const FIX_RECIPE_DOC: &str = "docs/explanation/fix-recipes.md";
+const FIX_RECIPE_WORKFLOW_DOC: &str = "docs/FIND_AND_FIX_UB.md";
+const FIX_RECIPE_REQUIRED_GLOBAL_TEXT: &[&str] = &[
+    "`unsafe-review` does not prove UB",
+    "A suggested witness route is not evidence",
+    "`agent_readiness.state`",
+];
+const FIX_RECIPE_REQUIRED_SECTIONS: &[&str] = &[
+    "## `get_unchecked` / `get_unchecked_mut`",
+    "## `MaybeUninit::assume_init*`",
+    "## `Vec::set_len`",
+    "## `str::from_utf8_unchecked`",
+    "## `copy_nonoverlapping` / `ptr::copy`",
+    "## `NonNull::new_unchecked`",
+    "## Raw Pointer Read / Write",
+    "## `transmute` / `transmute_copy`",
+    "## FFI / Unsafe Function Calls",
+    "## `target_feature` / Inline Assembly",
+];
+const FIX_RECIPE_REQUIRED_SUBHEADINGS: &[&str] = &[
+    "What `unsafe-review` is looking for:",
+    "Good repairs:",
+    "Bad repairs:",
+    "Witness route:",
+    "What this does not prove:",
+];
 
 const POLICY_FILES: &[&str] = &[
     "policy/unsafe-review.toml",
@@ -321,6 +347,7 @@ fn check_docs() -> Result<(), String> {
     public_badges::check_endpoints()?;
     spec_status::check_dashboard_impl()?;
     check_docs_map_paths("docs/README.md")?;
+    check_fix_recipes_doc()?;
     public_surfaces::check_first_pr_artifact_list_surfaces()?;
     check_index(
         Path::new("docs/specs"),
@@ -6223,6 +6250,48 @@ fn check_markdown_local_links(path: &str) -> Result<(), String> {
     Ok(())
 }
 
+fn check_fix_recipes_doc() -> Result<(), String> {
+    let path = Path::new(FIX_RECIPE_DOC);
+    let text = read_to_string(path)?;
+    check_fix_recipes_text(&text, path)?;
+
+    let workflow_path = Path::new(FIX_RECIPE_WORKFLOW_DOC);
+    let workflow_text = read_to_string(workflow_path)?;
+    require_text_contains(
+        &workflow_text,
+        "(explanation/fix-recipes.md)",
+        workflow_path,
+    )?;
+    Ok(())
+}
+
+fn check_fix_recipes_text(text: &str, path: &Path) -> Result<(), String> {
+    let normalized = text.replace("\r\n", "\n");
+    require_text_contains_all(&normalized, path, FIX_RECIPE_REQUIRED_GLOBAL_TEXT)?;
+
+    for heading in FIX_RECIPE_REQUIRED_SECTIONS {
+        let section = markdown_heading_section(&normalized, heading)
+            .ok_or_else(|| format!("{} is missing required section `{heading}`", path.display()))?;
+        for subheading in FIX_RECIPE_REQUIRED_SUBHEADINGS {
+            require_text_contains(section, subheading, path).map_err(|err| {
+                format!(
+                    "{} section `{heading}` is missing `{subheading}`: {err}",
+                    path.display()
+                )
+            })?;
+        }
+    }
+    Ok(())
+}
+
+fn markdown_heading_section<'a>(text: &'a str, heading: &str) -> Option<&'a str> {
+    let marker = format!("{heading}\n");
+    let start = text.find(&marker)? + marker.len();
+    let rest = &text[start..];
+    let end = rest.find("\n## ").unwrap_or(rest.len());
+    Some(&rest[..end])
+}
+
 fn looks_like_repo_path(value: &str) -> bool {
     value.contains('/') || value.ends_with(".md")
 }
@@ -9410,6 +9479,41 @@ OperationFamily::RawPointerRead => vec![
     }
 
     #[test]
+    fn fix_recipe_doc_checker_accepts_required_recipe_shape() -> Result<(), String> {
+        check_fix_recipes_text(
+            &fix_recipe_doc_fixture(),
+            Path::new("docs/explanation/fix-recipes.md"),
+        )
+    }
+
+    #[test]
+    fn fix_recipe_doc_checker_rejects_missing_required_recipe_section() -> Result<(), String> {
+        let text =
+            fix_recipe_doc_fixture().replace("## `Vec::set_len`", "## Vec set len incomplete");
+
+        let err = err_text(check_fix_recipes_text(
+            &text,
+            Path::new("docs/explanation/fix-recipes.md"),
+        ))?;
+
+        assert!(err.contains("missing required section `## `Vec::set_len``"));
+        Ok(())
+    }
+
+    #[test]
+    fn fix_recipe_doc_checker_rejects_missing_required_recipe_subheading() -> Result<(), String> {
+        let text = fix_recipe_doc_fixture().replace("Bad repairs:", "Bad choices:");
+
+        let err = err_text(check_fix_recipes_text(
+            &text,
+            Path::new("docs/explanation/fix-recipes.md"),
+        ))?;
+
+        assert!(err.contains("is missing `Bad repairs:`"));
+        Ok(())
+    }
+
+    #[test]
     fn markdown_link_target_parser_finds_plain_local_links() {
         let targets = markdown::link_targets(
             "[First use](docs/FIRST_USE.md) [external](https://example.com) [anchor](#trust)",
@@ -9424,6 +9528,29 @@ OperationFamily::RawPointerRead => vec![
         );
         assert_eq!(markdown::local_link_target("https://example.com"), None);
         assert_eq!(markdown::local_link_target("#trust"), None);
+    }
+
+    fn fix_recipe_doc_fixture() -> String {
+        let mut text = "# ReviewCard Fix Recipes\n\n".to_string();
+        text.push_str("`unsafe-review` does not prove UB.\n");
+        text.push_str("A suggested witness route is not evidence until it is run externally.\n");
+        text.push_str("Only `agent_readiness.state` `ready_for_agent` packets are edit tasks.\n");
+        for heading in FIX_RECIPE_REQUIRED_SECTIONS {
+            text.push_str("\n");
+            text.push_str(heading);
+            text.push_str("\n\n");
+            text.push_str("What `unsafe-review` is looking for:\n\n");
+            text.push_str("- Same ReviewCard evidence target.\n\n");
+            text.push_str("Good repairs:\n\n");
+            text.push_str("- Add bounded evidence.\n\n");
+            text.push_str("Bad repairs:\n\n");
+            text.push_str("- Add unrelated evidence.\n\n");
+            text.push_str("Witness route:\n\n");
+            text.push_str("- Run witnesses outside unsafe-review.\n\n");
+            text.push_str("What this does not prove:\n\n");
+            text.push_str("- UB-free or safety status.\n");
+        }
+        text
     }
 
     #[test]
