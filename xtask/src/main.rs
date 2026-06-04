@@ -66,11 +66,38 @@ const FRONT_DOOR_MARKDOWN_DOCS: &[&str] = &[
 ];
 const FIX_RECIPE_DOC: &str = "docs/explanation/fix-recipes.md";
 const FIX_RECIPE_WORKFLOW_DOC: &str = "docs/FIND_AND_FIX_UB.md";
+const AGENT_PACKET_SPEC_DOC: &str = "docs/specs/UNSAFE-REVIEW-SPEC-0013-agent-packets.md";
 const UB_RISK_REVIEW_CI_DOC: &str = "docs/ci/UB_RISK_REVIEW_CI.md";
 const FIX_RECIPE_REQUIRED_GLOBAL_TEXT: &[&str] = &[
     "`unsafe-review` does not prove UB",
     "A suggested witness route is not evidence",
     "`agent_readiness.state`",
+];
+const AGENT_PACKET_SPEC_REQUIRED_GLOBAL_TEXT: &[&str] = &[
+    "`proof_path`",
+    "`card.proof_path`",
+    "`context.proof_path`",
+    "canonical ReviewCard proof-path vocabulary",
+    "reviewer routing hint",
+    "does not prove witness execution, UB-free status, safety, or repair success",
+];
+const AGENT_PACKET_SPEC_REQUIRED_SECTIONS: &[(&str, &[&str])] = &[
+    (
+        "## Behavior",
+        &[
+            "top-level `proof_path`, `card.proof_path`, and `context.proof_path`",
+            "reviewer routing hint",
+            "does not prove witness execution",
+        ],
+    ),
+    (
+        "## Projection contract",
+        &[
+            "`proof_path` is projected from the ReviewCard",
+            "must not reclassify",
+            "does not promote a packet into proof",
+        ],
+    ),
 ];
 const UB_RISK_REVIEW_CI_REQUIRED_GLOBAL_TEXT: &[&str] = &[
     "unsafe-review does not prove UB",
@@ -625,6 +652,7 @@ fn check_docs() -> Result<(), String> {
     spec_status::check_dashboard_impl()?;
     check_docs_map_paths("docs/README.md")?;
     check_fix_recipes_doc()?;
+    check_agent_packet_spec_doc()?;
     check_agent_repair_workflow_doc()?;
     check_ub_risk_review_ci_doc()?;
     check_pr_disposition_policy_docs()?;
@@ -7285,6 +7313,29 @@ fn check_fix_recipes_text(text: &str, path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn check_agent_packet_spec_doc() -> Result<(), String> {
+    let path = Path::new(AGENT_PACKET_SPEC_DOC);
+    let text = read_to_string(path)?;
+    check_agent_packet_spec_text(&text, path)
+}
+
+fn check_agent_packet_spec_text(text: &str, path: &Path) -> Result<(), String> {
+    let normalized = text.replace("\r\n", "\n");
+    require_text_contains_all(&normalized, path, AGENT_PACKET_SPEC_REQUIRED_GLOBAL_TEXT)?;
+
+    for (heading, required_text) in AGENT_PACKET_SPEC_REQUIRED_SECTIONS {
+        let section = markdown_heading_section(&normalized, heading)
+            .ok_or_else(|| format!("{} is missing required section `{heading}`", path.display()))?;
+        require_text_contains_all(section, path, required_text).map_err(|err| {
+            format!(
+                "{} section `{heading}` is incomplete: {err}",
+                path.display()
+            )
+        })?;
+    }
+    Ok(())
+}
+
 fn check_agent_repair_workflow_doc() -> Result<(), String> {
     let path = Path::new(AGENT_REPAIR_WORKFLOW_DOC);
     let text = read_to_string(path)?;
@@ -10710,6 +10761,46 @@ OperationFamily::RawPointerRead => vec![
     }
 
     #[test]
+    fn agent_packet_spec_doc_checker_accepts_required_shape() -> Result<(), String> {
+        check_agent_packet_spec_text(
+            &agent_packet_spec_doc_fixture(),
+            Path::new("docs/specs/UNSAFE-REVIEW-SPEC-0013-agent-packets.md"),
+        )
+    }
+
+    #[test]
+    fn agent_packet_spec_doc_checker_rejects_missing_context_proof_path() -> Result<(), String> {
+        let text = agent_packet_spec_doc_fixture().replace(
+            "top-level `proof_path`, `card.proof_path`, and `context.proof_path`",
+            "top-level `proof_path`",
+        );
+
+        let err = err_text(check_agent_packet_spec_text(
+            &text,
+            Path::new("docs/specs/UNSAFE-REVIEW-SPEC-0013-agent-packets.md"),
+        ))?;
+
+        assert!(err.contains("`context.proof_path`"));
+        Ok(())
+    }
+
+    #[test]
+    fn agent_packet_spec_doc_checker_rejects_missing_no_proof_boundary() -> Result<(), String> {
+        let text = agent_packet_spec_doc_fixture().replace(
+            "does not prove witness execution, UB-free status, safety, or repair success",
+            "is proof-ready after routing",
+        );
+
+        let err = err_text(check_agent_packet_spec_text(
+            &text,
+            Path::new("docs/specs/UNSAFE-REVIEW-SPEC-0013-agent-packets.md"),
+        ))?;
+
+        assert!(err.contains("does not prove witness execution"));
+        Ok(())
+    }
+
+    #[test]
     fn agent_repair_workflow_doc_checker_rejects_missing_readiness_consistency()
     -> Result<(), String> {
         let text = agent_repair_workflow_doc_fixture()
@@ -10861,6 +10952,26 @@ OperationFamily::RawPointerRead => vec![
             text.push_str("What this does not prove:\n\n");
             text.push_str("- UB-free or safety status.\n");
         }
+        text
+    }
+
+    fn agent_packet_spec_doc_fixture() -> String {
+        let mut text = "# UNSAFE-REVIEW-SPEC-0013: Agent packets\n\n".to_string();
+        text.push_str("`proof_path`\n");
+        text.push_str("`card.proof_path`\n");
+        text.push_str("`context.proof_path`\n");
+        text.push_str("canonical ReviewCard proof-path vocabulary\n");
+        text.push_str("reviewer routing hint\n");
+        text.push_str(
+            "does not prove witness execution, UB-free status, safety, or repair success\n",
+        );
+        text.push_str("\n## Behavior\n\n");
+        text.push_str("Agent packets carry top-level `proof_path`, `card.proof_path`, and `context.proof_path` as a reviewer routing hint.\n");
+        text.push_str("The packet does not prove witness execution.\n");
+        text.push_str("\n## Projection contract\n\n");
+        text.push_str("`proof_path` is projected from the ReviewCard.\n");
+        text.push_str("It must not reclassify the card.\n");
+        text.push_str("It does not promote a packet into proof.\n");
         text
     }
 

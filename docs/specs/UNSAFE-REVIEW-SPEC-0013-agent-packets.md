@@ -25,7 +25,9 @@ source of analyzer truth. It carries:
 - `mode = bounded_repair_packet`
 - `source = review_card`
 - `policy = advisory`
-- the card identity, class, priority, and confidence
+- the card identity, class, priority, confidence, and ReviewCard `proof_path`
+- top-level `proof_path`, `card.proof_path`, and `context.proof_path`, copied
+  as a reviewer routing hint from the canonical ReviewCard proof-path vocabulary
 - `confirmation_cue`, an advisory first-confirmation projection with the
   static hypothesis to confirm, `build_this_first` cue, minimal repro cue,
   confirmation step, and trust boundary
@@ -57,6 +59,11 @@ snippet, ReviewCard-derived summaries for nearby contract and guard evidence,
 and a few related test mentions. It must not dump whole files by default, and a
 related test mention remains reach evidence only; it is not a claim that the
 unsafe site executed.
+
+`proof_path` is advisory routing metadata copied from the ReviewCard. It helps
+the reviewer choose the next proof action.
+This reviewer routing hint does not prove witness execution, UB-free status, safety, or repair success.
+It must not reclassify the finding outside the ReviewCard.
 
 `agent_readiness` is additive metadata, not analyzer truth. Its state vocabulary
 is closed:
@@ -93,8 +100,12 @@ the packet as an automatic safety repair.
 ## Projection contract
 
 Agent packets are card-scoped handoffs, not autonomous repair authority. Each
-packet must name one ReviewCard, the exact missing obligation evidence, allowed
-repair shapes, do-not-do rules, verify commands, and stop conditions.
+packet must name one ReviewCard, its `proof_path`, the exact missing obligation
+evidence, allowed repair shapes, do-not-do rules, verify commands, and stop
+conditions. `proof_path` is projected from the ReviewCard into the top-level,
+`card.proof_path`, and `context.proof_path` fields so packet consumers can
+route work without scraping prose. It must not reclassify the card.
+It does not promote a packet into proof.
 
 The packet may classify whether the card is ready for bounded repair delegation,
 but that classification is advisory metadata. It must not hide the ReviewCard,
