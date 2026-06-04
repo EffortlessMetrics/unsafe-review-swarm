@@ -11,7 +11,7 @@ use unsafe_review_core::{
 };
 
 const MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
-const MANUAL_CANDIDATE_GITHUB_QUEUE_LIMIT: usize = 2;
+const MANUAL_CANDIDATE_GITHUB_QUEUE_LIMIT: usize = 1;
 const REVIEW_CARD_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
 const REVIEW_CARD_REPAIR_QUEUE_BUCKETS: [&str; 6] = [
     "repairable_by_guard",
