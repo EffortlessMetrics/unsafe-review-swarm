@@ -9,12 +9,15 @@ This audit maps the current product objective to concrete repo evidence. It is a
 status artifact, not a support-tier promotion. `docs/status/SUPPORT_TIERS.md`
 remains the authority for public claim wording.
 
-Latest evidence-hardening notes include `get_unchecked` same-receiver
-`get(index)` probe guards, including if-let, let-else, and match Some-arm forms, plus
-false-positive controls for bare predicate observations, closed positive
-branches, comment-only early-return text, and checked indexes or checked
-receivers reassigned before the unchecked access. `NonNull::new_unchecked`
-nullability evidence now also
+Latest evidence-hardening notes include the `get_unchecked` applicability
+closeout: same-receiver and same-index len guards plus `get(index)` probes are
+fixture-pinned across direct, early-return, if-let, let-else, and match forms,
+while wrong receiver/slice/path, bare observations, closed branches, comments,
+post-checks, and reassigned, compound-mutated, or shadowed checked targets
+remain review gaps. This maps to the public fix recipe as a fixture evidence
+rail only; it is not a machine-applicable repair, arbitrary `get_unchecked`
+soundness, dogfood-outcome, support-promotion, proof, or policy-readiness claim.
+`NonNull::new_unchecked` nullability evidence now also
 recognizes same-pointer if-let and let-else `NonNull::new` guards while
 rejecting stale reassigned pointers.
 Raw pointer alignment evidence now also has fixture-backed controls for
