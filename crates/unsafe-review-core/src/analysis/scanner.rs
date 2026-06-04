@@ -25,6 +25,7 @@ mod file_scan;
 mod item_names;
 mod js_buffer_reentry;
 mod owner_context;
+mod panic_from_safe_js;
 mod scan_site;
 mod syntax_scan;
 mod text_detection;

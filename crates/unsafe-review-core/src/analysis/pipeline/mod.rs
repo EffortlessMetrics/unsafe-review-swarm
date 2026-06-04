@@ -2885,6 +2885,180 @@ pub fn zstd_sync(
     }
 
     #[test]
+    fn panic_from_safe_js_direct_try_from_expect_emits_guard_missing_card() -> Result<(), String> {
+        let output = temp_source_output(
+            "unsafe-review-panic-from-safe-js-direct",
+            r#"
+pub struct JSValue;
+
+impl JSValue {
+    pub fn to_int32(&self) -> i32 {
+        0
+    }
+}
+
+pub fn read_at(arguments: &[JSValue]) -> Result<usize, ()> {
+    let offset = usize::try_from(arguments[0].to_int32()).expect("offset");
+    Ok(offset)
+}
+"#,
+        )?;
+        let card = single_card("panic_from_safe_js_direct", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::PanicFromSafeJs);
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert_eq!(card.site.owner.as_deref(), Some("read_at"));
+        assert!(card.hazards.contains(&HazardKind::PanicSafety));
+        assert!(!obligation_discharge_present(card, "panic-guard"));
+        assert!(
+            card.missing
+                .iter()
+                .all(|missing| missing.kind != "contract"),
+            "panic-from-safe-JS cards should ask for guards, not unsafe API safety docs"
+        );
+        assert_eq!(card.proof_path, crate::domain::ProofPath::HumanReviewOnly);
+        assert!(
+            card.next_action.summary.contains("sign/range guard"),
+            "next action should steer toward a safe JS boundary"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn panic_from_safe_js_bound_try_from_unwrap_emits_guard_missing_card() -> Result<(), String> {
+        let output = temp_source_output(
+            "unsafe-review-panic-from-safe-js-bound",
+            r#"
+pub struct JSValue;
+
+impl JSValue {
+    pub fn to_int32(&self) -> i32 {
+        0
+    }
+}
+
+pub fn resize(arguments: &[JSValue]) -> Result<usize, ()> {
+    let new_len = arguments[0].to_int32();
+    let new_len = usize::try_from(new_len).unwrap();
+    Ok(new_len)
+}
+"#,
+        )?;
+        let card = single_card("panic_from_safe_js_bound", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::PanicFromSafeJs);
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert_eq!(card.site.owner.as_deref(), Some("resize"));
+        assert!(card.operation.expression.contains("new_len"));
+        Ok(())
+    }
+
+    #[test]
+    fn panic_from_safe_js_return_guard_emits_no_card() -> Result<(), String> {
+        let output = temp_source_output(
+            "unsafe-review-panic-from-safe-js-return-guard",
+            r#"
+pub struct JSValue;
+
+impl JSValue {
+    pub fn to_int32(&self) -> i32 {
+        0
+    }
+}
+
+pub fn read_at(arguments: &[JSValue]) -> Result<usize, ()> {
+    let offset = arguments[0].to_int32();
+    if offset < 0 { return Err(()); }
+    let offset = usize::try_from(offset).expect("offset");
+    Ok(offset)
+}
+"#,
+        )?;
+
+        assert!(
+            output.cards.is_empty(),
+            "an explicit negative-value error return should satisfy the local panic guard"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn panic_from_safe_js_inline_max_guard_emits_no_card() -> Result<(), String> {
+        let output = temp_source_output(
+            "unsafe-review-panic-from-safe-js-inline-max",
+            r#"
+pub struct JSValue;
+
+impl JSValue {
+    pub fn to_int32(&self) -> i32 {
+        0
+    }
+}
+
+pub fn read_at(arguments: &[JSValue]) -> Result<usize, ()> {
+    let offset = usize::try_from(arguments[0].to_int32().max(0)).expect("offset");
+    Ok(offset)
+}
+"#,
+        )?;
+
+        assert!(
+            output.cards.is_empty(),
+            "inline nonnegative clamping should stay a no-card control"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn panic_from_safe_js_observed_negative_branch_still_emits_card() -> Result<(), String> {
+        let output = temp_source_output(
+            "unsafe-review-panic-from-safe-js-observed-only",
+            r#"
+pub struct JSValue;
+
+impl JSValue {
+    pub fn to_int32(&self) -> i32 {
+        0
+    }
+}
+
+pub fn read_at(arguments: &[JSValue]) -> Result<usize, ()> {
+    let offset = arguments[0].to_int32();
+    if offset < 0 { record_negative(offset); }
+    let offset = usize::try_from(offset).expect("offset");
+    Ok(offset)
+}
+
+fn record_negative(_offset: i32) {}
+"#,
+        )?;
+        let card = single_card("panic_from_safe_js_observed_only", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::PanicFromSafeJs);
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        Ok(())
+    }
+
+    #[test]
+    fn panic_from_safe_js_non_js_signed_local_emits_no_card() -> Result<(), String> {
+        let output = temp_source_output(
+            "unsafe-review-panic-from-safe-js-non-js",
+            r#"
+pub fn read_at(offset: i32) -> Result<usize, ()> {
+    let offset = usize::try_from(offset).expect("offset");
+    Ok(offset)
+}
+"#,
+        )?;
+
+        assert!(
+            output.cards.is_empty(),
+            "ordinary signed Rust locals are outside the JS-derived safe-caller heuristic"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn vec_from_raw_parts_uses_vec_operation_family() -> Result<(), String> {
         let output = fixture_output("vec_from_raw_parts")?;
         let card = single_card("vec_from_raw_parts", &output)?;

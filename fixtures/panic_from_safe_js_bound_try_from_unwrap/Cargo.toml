@@ -1,0 +1,4 @@
+[package]
+name = "panic-from-safe-js-bound-try-from-unwrap-fixture"
+version = "0.1.0"
+edition = "2024"

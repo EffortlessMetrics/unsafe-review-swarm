@@ -1,0 +1,72 @@
+[
+  {
+    "id": "UR-panic-from-safe-js-direct-try-from-expect-fixture-src-lib-rs-read-at-operation-panic_from_safe_js-try-from-dd663b19261c-panic_safety-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "proof_path": "human_review_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 10,
+      "column": 5,
+      "kind": "operation",
+      "owner": "read_at",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "let offset = usize::try_from(arguments[0].to_int32()).expect(\"\");"
+    },
+    "operation": "JS-derived signed value reaches panicking unsigned conversion without a visible sign/range guard; source: inline JS-derived signed value; sink: let offset = usize::try_from(arguments[0].to_int32()).expect(\"\");",
+    "operation_family": "panic_from_safe_js",
+    "hazards": [
+      "panic_safety"
+    ],
+    "obligations": [
+      "JS-derived signed values are range-checked before panicking conversions"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "panic-guard",
+        "description": "JS-derived signed values are range-checked before panicking conversions",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Panic-safety heuristic uses local guard evidence, not unsafe API safety docs"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_at` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Panic-safety heuristic uses local guard evidence, not unsafe API safety docs",
+    "discharge": "No visible local guard detected",
+    "reach": "No static test mention of owner `read_at` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add an explicit sign/range guard or fallible error return before converting the JS-derived signed value to an unsigned type, then attach a focused Bun runtime receipt showing safe JS throws/returns instead of aborting.",
+    "verify_commands": []
+  }
+]

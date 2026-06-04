@@ -532,6 +532,12 @@ required_core_fixtures = [
   "js_buffer_reentry_recapture_after_reentry_no_card",
   "js_buffer_reentry_async_options_before_capture_no_card",
   "js_buffer_reentry_async_recapture_after_reentry_no_card",
+  "panic_from_safe_js_direct_try_from_expect",
+  "panic_from_safe_js_bound_try_from_unwrap",
+  "panic_from_safe_js_observed_only_not_guard",
+  "panic_from_safe_js_inline_max_no_card",
+  "panic_from_safe_js_return_guard_no_card",
+  "panic_from_safe_js_non_js_signed_no_card",
   "comment_alignment_not_guard",
 ]
 
@@ -5796,6 +5802,57 @@ fixture = "js_buffer_reentry_async_recapture_after_reentry_no_card"
 kind = "false_positive_control"
 claim = "JS-backed buffer reentry heuristic does not emit a ReviewCard when an async descriptor is recaptured and materialized after reentry"
 support_tier = "JS-backed buffer reentry heuristic"
+expected_cards = 0
+
+[[cases]]
+fixture = "panic_from_safe_js_direct_try_from_expect"
+kind = "positive"
+claim = "JS-derived signed value converted directly through panicking unsigned try_from emits a panic-safety guard-missing ReviewCard"
+support_tier = "Panic-from-safe-JS heuristic"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "panic_from_safe_js"
+expected_hazard = "panic_safety"
+
+[[cases]]
+fixture = "panic_from_safe_js_bound_try_from_unwrap"
+kind = "positive"
+claim = "JS-derived signed binding converted through panicking unsigned try_from emits a panic-safety guard-missing ReviewCard"
+support_tier = "Panic-from-safe-JS heuristic"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "panic_from_safe_js"
+expected_hazard = "panic_safety"
+
+[[cases]]
+fixture = "panic_from_safe_js_observed_only_not_guard"
+kind = "false_positive_control"
+claim = "JS-derived signed binding with an observed-only negative branch still emits a panic-safety guard-missing ReviewCard"
+support_tier = "Panic-from-safe-JS heuristic"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "panic_from_safe_js"
+expected_hazard = "panic_safety"
+
+[[cases]]
+fixture = "panic_from_safe_js_inline_max_no_card"
+kind = "false_positive_control"
+claim = "JS-derived signed value clamped inline before unsigned try_from stays a no-card control"
+support_tier = "Panic-from-safe-JS heuristic"
+expected_cards = 0
+
+[[cases]]
+fixture = "panic_from_safe_js_return_guard_no_card"
+kind = "false_positive_control"
+claim = "JS-derived signed binding with an explicit negative-value error return stays a no-card control"
+support_tier = "Panic-from-safe-JS heuristic"
+expected_cards = 0
+
+[[cases]]
+fixture = "panic_from_safe_js_non_js_signed_no_card"
+kind = "false_positive_control"
+claim = "Non-JS signed Rust locals converted through panicking unsigned try_from stay outside the panic-from-safe-JS heuristic"
+support_tier = "Panic-from-safe-JS heuristic"
 expected_cards = 0
 
 [[cases]]

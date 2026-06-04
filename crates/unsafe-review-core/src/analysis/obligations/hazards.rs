@@ -90,6 +90,7 @@ pub(crate) fn hazards_for(family: &OperationFamily) -> Vec<HazardKind> {
         OperationFamily::StaticMut => vec![HazardKind::StaticMutGlobalState],
         OperationFamily::InlineAsm => vec![HazardKind::InlineAsm, HazardKind::TargetFeature],
         OperationFamily::TargetFeature => vec![HazardKind::TargetFeature],
+        OperationFamily::PanicFromSafeJs => vec![HazardKind::PanicSafety],
         OperationFamily::Unknown => vec![HazardKind::Unknown],
     }
 }

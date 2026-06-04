@@ -1653,3 +1653,38 @@ forbidden_claims = [
   "global recall",
   "memory-safety proof",
 ]
+
+[[claim]]
+id = "panic-from-safe-js-heuristic"
+status = "fixture_pinned"
+kind = "operation_family"
+owner = "calibration"
+support_tier = "Panic-from-safe-JS heuristic"
+fixtures = [
+  "panic_from_safe_js_direct_try_from_expect",
+  "panic_from_safe_js_bound_try_from_unwrap",
+  "panic_from_safe_js_observed_only_not_guard",
+  "panic_from_safe_js_inline_max_no_card",
+  "panic_from_safe_js_return_guard_no_card",
+  "panic_from_safe_js_non_js_signed_no_card",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/panic-from-safe-js-heuristic.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned panic-from-safe-JS heuristic behavior emits advisory
+panic-safety ReviewCards for the listed JS-derived signed values converted
+through panicking unsigned try_from expect or unwrap forms without a visible
+sign/range guard. It emits zero ReviewCards for the listed inline clamp,
+negative-value error return, and non-JS signed local controls.
+"""
+forbidden_claims = [
+  "Bun crash proof",
+  "site-execution proof",
+  "witness execution proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]

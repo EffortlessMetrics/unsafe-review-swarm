@@ -74,6 +74,10 @@ pub(crate) fn obligations_for(family: &OperationFamily) -> Vec<SafetyObligation>
             "target-feature",
             "callers only execute this path on supported hardware",
         )),
+        OperationFamily::PanicFromSafeJs => single(SafetyObligation::new(
+            "panic-guard",
+            "JS-derived signed values are range-checked before panicking conversions",
+        )),
         OperationFamily::StrFromUtf8Unchecked => {
             single(SafetyObligation::new("utf8", "bytes are valid UTF-8"))
         }

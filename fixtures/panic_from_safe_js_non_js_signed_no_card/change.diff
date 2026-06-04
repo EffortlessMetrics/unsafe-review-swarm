@@ -1,0 +1,8 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,4 @@
++pub fn read_at(offset: i32) -> Result<usize, ()> {
++    let offset = usize::try_from(offset).expect("offset");
++    Ok(offset)
++}

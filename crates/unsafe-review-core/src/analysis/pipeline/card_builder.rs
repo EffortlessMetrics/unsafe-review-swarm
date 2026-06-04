@@ -1,7 +1,7 @@
 use crate::analysis::{classify, evidence, obligations, receipts, witness};
 use crate::domain::{
-    MissingEvidence, NextAction, Priority, ProofPath, ReviewCard, ReviewClass, WitnessKind,
-    WitnessRoute,
+    ContractEvidence, MissingEvidence, NextAction, OperationFamily, Priority, ProofPath,
+    ReviewCard, ReviewClass, WitnessKind, WitnessRoute,
 };
 
 pub(super) struct CardBuildContext<'a> {
@@ -19,20 +19,32 @@ pub(super) fn build_card(
     let hazards = obligations::hazards_for(&scanned_site.operation.family);
     let obligations = obligations::obligations_for(&scanned_site.operation.family);
     let contract = evidence::contract_evidence(&scanned_site);
+    let contract_for_classification =
+        if operation_skips_safety_contract(&scanned_site.operation.family) {
+            ContractEvidence::present(
+                "Panic-safety heuristic uses local guard evidence, not unsafe API safety docs",
+            )
+        } else {
+            contract.clone()
+        };
     let (reach, related_tests) =
         evidence::reach_evidence(ctx.root, scanned_site.site.owner.as_ref());
     let id =
         super::card_identity::card_id(ctx.package, &scanned_site, &hazards, ctx.identity_counts);
     let reach = ctx.receipt_index.reach_evidence_for(&id, reach);
-    let mut obligation_evidence =
-        evidence::obligation_evidence(&scanned_site, &obligations, &contract, &reach);
+    let mut obligation_evidence = evidence::obligation_evidence(
+        &scanned_site,
+        &obligations,
+        &contract_for_classification,
+        &reach,
+    );
     let discharge = evidence::summarize_discharge(&obligation_evidence);
     let routes = witness::routes_for(&hazards, scanned_site.site.owner.as_ref());
     let (mut class, mut priority, confidence) =
-        classify::classify(&hazards, &contract, &discharge, &reach);
+        classify::classify(&hazards, &contract_for_classification, &discharge, &reach);
     let mut missing = Vec::new();
 
-    if !contract.present {
+    if !operation_skips_safety_contract(&scanned_site.operation.family) && !contract.present {
         let contract_missing_message = if scanned_site.site.public_api_surface {
             "Missing public `# Safety` documentation for unsafe API"
         } else {
@@ -81,6 +93,8 @@ pub(super) fn build_card(
     let next_action_summary = if is_js_buffer_reentry_heuristic(&scanned_site.operation.expression)
     {
         "Review the JS-backed buffer descriptor captured before a possible JS reentry point and materialized afterward; parse options before capture or re-fetch/copy bytes after reentry, then attach a focused sanitizer/runtime receipt if available.".to_string()
+    } else if scanned_site.operation.family == OperationFamily::PanicFromSafeJs {
+        "Add an explicit sign/range guard or fallible error return before converting the JS-derived signed value to an unsigned type, then attach a focused Bun runtime receipt showing safe JS throws/returns instead of aborting.".to_string()
     } else {
         super::next_action_summary(
             &class,
@@ -113,7 +127,7 @@ pub(super) fn build_card(
         hazards,
         obligations,
         obligation_evidence,
-        contract,
+        contract: contract_for_classification,
         discharge,
         reach,
         witness: witness_evidence,
@@ -155,4 +169,8 @@ fn proof_path_for(class: &ReviewClass, routes: &[WitnessRoute]) -> ProofPath {
 
 fn is_js_buffer_reentry_heuristic(expression: &str) -> bool {
     expression.contains("JS-backed buffer descriptor captured before possible JS reentry")
+}
+
+fn operation_skips_safety_contract(family: &OperationFamily) -> bool {
+    matches!(family, OperationFamily::PanicFromSafeJs)
 }

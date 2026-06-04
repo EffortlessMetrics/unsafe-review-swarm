@@ -1,0 +1,4 @@
+[package]
+name = "panic-from-safe-js-inline-max-no-card-fixture"
+version = "0.1.0"
+edition = "2024"

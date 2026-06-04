@@ -1,0 +1,89 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "panic-from-safe-js-heuristic"
+operation_family = "panic_from_safe_js"
+hazard = "panic_safety"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+panic-from-safe-JS heuristic behavior; they are not a proof of a Bun crash,
+not a proof of memory safety, not UB-free status, not a Miri result,
+not Miri-clean status, not site execution evidence, not calibrated precision or recall,
+not witness adequacy, and not policy readiness.
+"""
+
+[[samples]]
+id = "panic-from-safe-js-direct-try-from-expect-emits-card"
+fixture = "panic_from_safe_js_direct_try_from_expect"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "panic_from_safe_js"
+expected_hazard = "panic_safety"
+expected_owner = "read_at"
+expected_site_kind = "operation"
+expected_obligation_key = "panic-guard"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A direct JS-derived signed to_int32 value converted through usize::try_from(...).expect(...) should stay an advisory panic-safety ReviewCard that asks for a local sign/range guard."
+
+[[samples]]
+id = "panic-from-safe-js-bound-try-from-unwrap-emits-card"
+fixture = "panic_from_safe_js_bound_try_from_unwrap"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "panic_from_safe_js"
+expected_hazard = "panic_safety"
+expected_owner = "resize"
+expected_site_kind = "operation"
+expected_obligation_key = "panic-guard"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A JS-derived signed binding converted through usize::try_from(...).unwrap() should stay an advisory panic-safety ReviewCard that asks for a local sign/range guard."
+
+[[samples]]
+id = "panic-from-safe-js-observed-negative-branch-emits-card"
+fixture = "panic_from_safe_js_observed_only_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "panic_from_safe_js"
+expected_hazard = "panic_safety"
+expected_owner = "read_at"
+expected_site_kind = "operation"
+expected_obligation_key = "panic-guard"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "Observing a negative JS-derived value without returning or producing a fallible JS boundary result should not discharge the panic guard."
+
+[[samples]]
+id = "panic-from-safe-js-inline-max-emits-no-card"
+fixture = "panic_from_safe_js_inline_max_no_card"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "Inline nonnegative clamping before the unsigned try_from conversion should stay a no-card control."
+
+[[samples]]
+id = "panic-from-safe-js-return-guard-emits-no-card"
+fixture = "panic_from_safe_js_return_guard_no_card"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "An explicit negative-value error return before the unsigned try_from conversion should stay a no-card control."
+
+[[samples]]
+id = "panic-from-safe-js-non-js-signed-local-emits-no-card"
+fixture = "panic_from_safe_js_non_js_signed_no_card"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "Ordinary signed Rust locals without a JS-derived source should stay outside this Bun/JSC-oriented heuristic."

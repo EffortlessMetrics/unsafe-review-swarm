@@ -1,0 +1,4 @@
+[package]
+name = "panic-from-safe-js-observed-only-not-guard-fixture"
+version = "0.1.0"
+edition = "2024"

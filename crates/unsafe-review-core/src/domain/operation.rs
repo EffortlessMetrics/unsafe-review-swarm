@@ -63,6 +63,7 @@ pub enum OperationFamily {
     StaticMut,
     InlineAsm,
     TargetFeature,
+    PanicFromSafeJs,
     Unknown,
 }
 
@@ -99,6 +100,7 @@ impl OperationFamily {
             Self::StaticMut => "static_mut",
             Self::InlineAsm => "inline_asm",
             Self::TargetFeature => "target_feature",
+            Self::PanicFromSafeJs => "panic_from_safe_js",
             Self::Unknown => "unknown",
         }
     }
@@ -193,6 +195,7 @@ mod tests {
             (OperationFamily::StaticMut, "static_mut"),
             (OperationFamily::InlineAsm, "inline_asm"),
             (OperationFamily::TargetFeature, "target_feature"),
+            (OperationFamily::PanicFromSafeJs, "panic_from_safe_js"),
             (OperationFamily::Unknown, "unknown"),
         ];
 
