@@ -1,6 +1,6 @@
 # Dogfood outcome index
 
-Date: 2026-06-03
+Date: 2026-06-05
 Status: experimental selected-corpus evidence
 Source manifest: [`corpus.toml`](corpus.toml)
 Machine-readable index: [`index.json`](index.json)
@@ -47,9 +47,9 @@ local artifact is needed.
 
 ## Recorded Outcome Movement
 
-| Target | Before | After | New | Resolved | Improved | Regressed | Unchanged | Notes |
-|---|---|---|---:|---:|---:|---:|---:|---|
-| `memchr-capped` target-feature contract evidence | `target/dogfood-work/memchr.unsafe-review.after-slice-end-pointer-evidence.json` | `target/dogfood-work/memchr.unsafe-review.after-target-feature-contract-evidence.json` | 0 | 0 | 10 | 0 | 40 | Documented `#[target_feature]` declarations moved from `guard_missing` to `guarded_unwitnessed`; no target-feature availability, site execution, or soundness claim. |
+| Target | Judgment | Before | After | New | Resolved | Improved | Regressed | Unchanged | Proof action | Witness route state | Claim boundary | Notes |
+|---|---|---|---|---:|---:|---:|---:|---:|---|---|---|---|
+| `memchr-capped` target-feature contract evidence | `actionable` | `target/dogfood-work/memchr.unsafe-review.after-slice-end-pointer-evidence.json` | `target/dogfood-work/memchr.unsafe-review.after-target-feature-contract-evidence.json` | 0 | 0 | 10 | 0 | 40 | Keep the `target_feature` contract evidence as reviewability movement; attach an exact external witness receipt before treating the route as witnessed evidence. | `external-receipt-missing` | Static unsafe contract review saved-outcome movement only; not calibrated precision or recall, not witness execution, not site execution evidence, not policy readiness, not a proof of memory safety, not UB-free status, and not a Miri result. | Documented `#[target_feature]` declarations moved from `guard_missing` to `guarded_unwitnessed`; no target-feature availability, site execution, or soundness claim. |
 
 ## Target Groups
 

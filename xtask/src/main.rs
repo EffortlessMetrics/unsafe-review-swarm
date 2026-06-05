@@ -533,6 +533,13 @@ const DOGFOOD_JUDGMENT_LABELS: &[&str] = &[
     "good-agent-task",
     "bad-agent-task",
 ];
+const DOGFOOD_OUTCOME_WITNESS_ROUTE_STATES: &[&str] = &[
+    "not-evaluated",
+    "external-receipt-missing",
+    "external-receipt-attached",
+    "human-review-only",
+    "not-applicable",
+];
 const DOGFOOD_MISSED_JUDGMENT_STATUSES: &[&str] = &["open", "converted", "deferred", "superseded"];
 const DOGFOOD_FOLLOW_UP_HEADER: &[&str] = &[
     "Seed ID",
@@ -2714,6 +2721,7 @@ fn check_dogfood() -> Result<(), String> {
         &repositories,
         &fixture_control_ids,
         &artifact_status_counts,
+        &ids,
     )?;
     check_dogfood_report_triage_labels()?;
     check_dogfood_reports_indexed()?;
@@ -4344,6 +4352,7 @@ fn check_dogfood_index(
     repositories: &BTreeSet<String>,
     fixture_control_ids: &BTreeSet<String>,
     artifact_status_counts: &BTreeMap<String, usize>,
+    known_targets: &BTreeSet<String>,
 ) -> Result<(), String> {
     let index = parse_json_file(&workspace_path(DOGFOOD_INDEX))?;
     require_json_str(&index, "schema_version", "0.1", DOGFOOD_INDEX)?;
@@ -4487,17 +4496,106 @@ fn check_dogfood_index(
         }
     }
 
-    if json_array_at(&index, "/recorded_outcomes", DOGFOOD_INDEX)?.is_empty() {
-        return Err(format!(
-            "{DOGFOOD_INDEX} recorded_outcomes must document at least one saved outcome"
-        ));
-    }
+    check_dogfood_recorded_outcomes(&index, known_targets)?;
     if json_array_at(&index, "/limitations", DOGFOOD_INDEX)?.is_empty() {
         return Err(format!(
             "{DOGFOOD_INDEX} limitations must document current dogfood limits"
         ));
     }
 
+    Ok(())
+}
+
+fn check_dogfood_recorded_outcomes(
+    index: &serde_json::Value,
+    known_targets: &BTreeSet<String>,
+) -> Result<(), String> {
+    let outcomes = json_array_at(index, "/recorded_outcomes", DOGFOOD_INDEX)?;
+    if outcomes.is_empty() {
+        return Err(format!(
+            "{DOGFOOD_INDEX} recorded_outcomes must document at least one saved outcome"
+        ));
+    }
+
+    let mut seen = BTreeSet::new();
+    for (idx, outcome) in outcomes.iter().enumerate() {
+        let context = format!("{DOGFOOD_INDEX} recorded_outcomes[{idx}]");
+        let id = require_non_empty_json_str(outcome, "id", &context)?;
+        if !seen.insert(id.to_string()) {
+            return Err(format!(
+                "{DOGFOOD_INDEX} recorded_outcomes contains duplicate id `{id}`"
+            ));
+        }
+        let target = require_non_empty_json_str(outcome, "target", &context)?;
+        if !known_targets.contains(target) {
+            return Err(format!(
+                "{context} target `{target}` is not present in {DOGFOOD_MANIFEST}"
+            ));
+        }
+
+        for key in ["before", "after"] {
+            let path = require_non_empty_json_str(outcome, key, &context)?;
+            check_dogfood_outcome_path(path, &context, key)?;
+        }
+
+        let summary = outcome
+            .get("summary")
+            .ok_or_else(|| format!("{context} is missing summary"))?;
+        for key in ["new", "resolved", "improved", "regressed", "unchanged"] {
+            json_usize_at(summary, &format!("/{key}"), &context)?;
+        }
+
+        let judgment = require_non_empty_json_str(outcome, "judgment", &context)?;
+        if !DOGFOOD_JUDGMENT_LABELS.contains(&judgment) {
+            return Err(format!("{context} uses unknown judgment `{judgment}`"));
+        }
+        let proof_action = require_non_empty_json_str(outcome, "proof_action", &context)?;
+        let witness_route_state =
+            require_non_empty_json_str(outcome, "witness_route_state", &context)?;
+        require_known(
+            witness_route_state,
+            DOGFOOD_OUTCOME_WITNESS_ROUTE_STATES,
+            &context,
+            "witness_route_state",
+        )?;
+        let claim_boundary = require_non_empty_json_str(outcome, "claim_boundary", &context)?;
+        check_dogfood_outcome_claim_boundary(&context, claim_boundary)?;
+        let notes = require_non_empty_json_str(outcome, "notes", &context)?;
+
+        let claim_text = format!(
+            "{id}\n{target}\n{proof_action}\n{witness_route_state}\n{claim_boundary}\n{notes}"
+        );
+        reject_positive_overclaims(Path::new(DOGFOOD_INDEX), &claim_text)?;
+    }
+    Ok(())
+}
+
+fn check_dogfood_outcome_path(path: &str, context: &str, key: &str) -> Result<(), String> {
+    if path.starts_with('/') || has_windows_path(path) || path.contains("..") {
+        return Err(format!(
+            "{context} {key} path must be relative, forward-slash only, and stay inside the workspace: {path}"
+        ));
+    }
+    if !path.starts_with("target/dogfood-work/") {
+        return Err(format!(
+            "{context} {key} path must stay under target/dogfood-work/: {path}"
+        ));
+    }
+    Ok(())
+}
+
+fn check_dogfood_outcome_claim_boundary(context: &str, text: &str) -> Result<(), String> {
+    require_boundary_text(text, context)?;
+    for needle in [
+        "not calibrated precision or recall",
+        "not witness execution",
+        "not site execution",
+        "not policy readiness",
+    ] {
+        if !text_contains_ignore_ascii_case(text, needle) {
+            return Err(format!("{context} claim_boundary is missing `{needle}`"));
+        }
+    }
     Ok(())
 }
 
@@ -11490,6 +11588,89 @@ artifacts = [
 
     fn dogfood_judgment_boundary_for_tests() -> &'static str {
         "Static unsafe contract review measurement input; not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not site execution evidence, not witness adequacy, and not policy readiness."
+    }
+
+    fn dogfood_outcome_targets_for_tests() -> BTreeSet<String> {
+        BTreeSet::from(["memchr-capped".to_string()])
+    }
+
+    fn dogfood_outcome_index_for_tests() -> serde_json::Value {
+        serde_json::json!({
+            "recorded_outcomes": [
+                {
+                    "id": "memchr-target-feature-contract-evidence",
+                    "target": "memchr-capped",
+                    "before": "target/dogfood-work/memchr.before.json",
+                    "after": "target/dogfood-work/memchr.after.json",
+                    "summary": {
+                        "new": 0,
+                        "resolved": 0,
+                        "improved": 10,
+                        "regressed": 0,
+                        "unchanged": 40
+                    },
+                    "judgment": "actionable",
+                    "proof_action": "Attach an exact external witness receipt before treating the route as witnessed evidence.",
+                    "witness_route_state": "external-receipt-missing",
+                    "claim_boundary": "Static unsafe contract review saved-outcome movement only; not calibrated precision or recall, not witness execution, not site execution evidence, not policy readiness, not a proof of memory safety, not UB-free status, and not a Miri result.",
+                    "notes": "Reviewability improved without claiming site execution or soundness."
+                }
+            ]
+        })
+    }
+
+    #[test]
+    fn dogfood_recorded_outcome_accepts_required_judgment_shape() -> Result<(), String> {
+        check_dogfood_recorded_outcomes(
+            &dogfood_outcome_index_for_tests(),
+            &dogfood_outcome_targets_for_tests(),
+        )
+    }
+
+    #[test]
+    fn dogfood_recorded_outcome_rejects_missing_judgment() -> Result<(), String> {
+        let mut value = dogfood_outcome_index_for_tests();
+        value["recorded_outcomes"][0]
+            .as_object_mut()
+            .ok_or_else(|| "test outcome must be an object".to_string())?
+            .remove("judgment");
+
+        let err = err_text(check_dogfood_recorded_outcomes(
+            &value,
+            &dogfood_outcome_targets_for_tests(),
+        ))?;
+
+        assert!(err.contains("missing string key `judgment`"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_recorded_outcome_rejects_unknown_witness_route_state() -> Result<(), String> {
+        let mut value = dogfood_outcome_index_for_tests();
+        value["recorded_outcomes"][0]["witness_route_state"] = serde_json::json!("miri-clean");
+
+        let err = err_text(check_dogfood_recorded_outcomes(
+            &value,
+            &dogfood_outcome_targets_for_tests(),
+        ))?;
+
+        assert!(err.contains("unsupported witness_route_state"));
+        assert!(err.contains("miri-clean"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_recorded_outcome_rejects_overclaiming_notes() -> Result<(), String> {
+        let mut value = dogfood_outcome_index_for_tests();
+        value["recorded_outcomes"][0]["notes"] = serde_json::json!("This is safe to merge.");
+
+        let err = err_text(check_dogfood_recorded_outcomes(
+            &value,
+            &dogfood_outcome_targets_for_tests(),
+        ))?;
+
+        assert!(err.contains("safe to merge"));
+        Ok(())
     }
 
     #[test]

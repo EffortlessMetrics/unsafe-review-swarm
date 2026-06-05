@@ -1,7 +1,7 @@
 {
   "schema_version": "0.1",
   "status": "experimental",
-  "updated": "2026-06-03",
+  "updated": "2026-06-05",
   "manifest": "docs/dogfood/corpus.toml",
   "trust_boundary": "Dogfood corpus records are static unsafe contract review evidence, not a proof of memory safety, not UB-free status, and not a Miri result unless an exact witness receipt is attached.",
   "summary": {
@@ -72,6 +72,10 @@
         "regressed": 0,
         "unchanged": 40
       },
+      "judgment": "actionable",
+      "proof_action": "Keep the target_feature contract evidence as reviewability movement; attach an exact external witness receipt before treating the route as witnessed evidence.",
+      "witness_route_state": "external-receipt-missing",
+      "claim_boundary": "Static unsafe contract review saved-outcome movement only; not calibrated precision or recall, not witness execution, not site execution evidence, not policy readiness, not a proof of memory safety, not UB-free status, and not a Miri result.",
       "notes": "Documented target_feature declarations moved from guard_missing to guarded_unwitnessed without claiming target-feature availability, site execution, or soundness."
     }
   ],
