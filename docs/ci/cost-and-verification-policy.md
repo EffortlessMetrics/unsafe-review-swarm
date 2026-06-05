@@ -49,10 +49,10 @@ artifacts, cost posture, and claim boundary.
 
 ## Default vs deep validation
 
-Default PR validation should answer whether the changed seam is reviewable and
-safe to merge under the current advisory contract. It should not silently expand
-into full coverage, full mutation, Miri, macOS, Windows, Docker, GPU, or release
-readiness for every routine PR.
+Default PR validation should answer whether the changed seam is reviewable under
+the current advisory contract and whether the PR's stated claim is supported. It
+should not silently expand into full coverage, full mutation, Miri, macOS,
+Windows, Docker, GPU, or release readiness for every routine PR.
 
 Deep validation belongs in one of these routes:
 

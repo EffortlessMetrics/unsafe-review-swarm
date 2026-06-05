@@ -4,8 +4,9 @@
 unsafe seams have reviewable evidence: a safety contract, local guard, test
 reach, and witness route.
 
-It does not prove memory safety or UB-free status unless a matching witness
-receipt is attached.
+It does not prove memory safety, UB-free status, Miri-clean status, or site
+execution. A matching witness receipt records external evidence for that
+specific route only.
 
 ## Tool split
 
@@ -46,7 +47,7 @@ target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
 target/unsafe-review/lsp.json
-target/unsafe-review/receipt-audit.json
+target/unsafe-review/receipt-audit.md
 ```
 
 All projections must come from ReviewCards. CLI output, JSON, Markdown summaries,
