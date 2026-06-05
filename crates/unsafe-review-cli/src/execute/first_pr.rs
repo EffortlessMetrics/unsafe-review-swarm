@@ -970,30 +970,10 @@ fn append_manual_candidate_compact_lines(
     candidate: &ManualCandidate,
     stable_byte_seed: Option<&StableByteSeed>,
 ) {
-    if let Some(stable_byte) = &candidate.stable_byte {
-        let _ = writeln!(
-            out,
-            "- Stable-byte: `{}`; proof `{}`; ledger `{}`",
-            stable_byte.class, stable_byte.proof_required, stable_byte.ledger_state
-        );
-    } else if let Some(proof_mode) = &candidate.proof_mode {
-        let _ = writeln!(out, "- Proof mode: `{}`", proof_mode.kind);
-    }
-    if let Some(seed) = stable_byte_seed {
-        let _ = writeln!(
-            out,
-            "- Stable-byte seed: `{}` (owner lane: `{}`; suggested first PR: `{}`; triage: `{}`)",
-            seed.seed_id,
-            seed.owner_lane,
-            seed.suggested_first_pr,
-            seed.triage_labels.join("`, `")
-        );
-    } else if let Some(aperture) = &candidate.pr_aperture {
-        let _ = writeln!(out, "- PR aperture: {aperture}");
-    }
+    append_manual_candidate_guidance_lines(out, candidate, stable_byte_seed, false);
     let _ = writeln!(
         out,
-        "- Evidence refs: {}; stop line and guidance in sidecars.",
+        "- Evidence refs: {}; full route and evidence packet in sidecars.",
         candidate.evidence.len()
     );
 }
@@ -1092,11 +1072,7 @@ fn append_manual_candidate_guidance_lines(
         }
     }
     if let Some(seed) = stable_byte_seed {
-        let _ = writeln!(
-            out,
-            "- {}",
-            stable_byte_seed_markdown_summary(seed, include_details)
-        );
+        let _ = writeln!(out, "- {}", stable_byte_seed_markdown_summary(seed));
     }
     if let Some(proof_mode) = &candidate.proof_mode {
         let _ = writeln!(
@@ -1145,9 +1121,10 @@ fn append_manual_candidate_guidance_lines(
     if let Some(summary) = manual_candidate_guidance_summary(candidate) {
         let _ = writeln!(out, "- Guidance: {summary}");
     }
-    if !include_details {
-        return;
-    }
+    append_manual_candidate_first_guidance_cues(out, candidate);
+}
+
+fn append_manual_candidate_first_guidance_cues(out: &mut String, candidate: &ManualCandidate) {
     if let Some(option) = candidate.fix_options.first() {
         let _ = writeln!(out, "- First fix option: {option}");
     }
@@ -1159,19 +1136,13 @@ fn append_manual_candidate_guidance_lines(
     }
 }
 
-fn stable_byte_seed_markdown_summary(seed: &StableByteSeed, include_details: bool) -> String {
-    if include_details {
-        return format!(
-            "Stable-byte seed: `{}` (owner lane: `{}`; suggested first PR: `{}`; triage: `{}`)",
-            seed.seed_id,
-            seed.owner_lane,
-            seed.suggested_first_pr,
-            seed.triage_labels.join("`, `")
-        );
-    }
+fn stable_byte_seed_markdown_summary(seed: &StableByteSeed) -> String {
     format!(
-        "Stable-byte seed: `{}` (owner lane: `{}`; suggested first PR: `{}`)",
-        seed.seed_id, seed.owner_lane, seed.suggested_first_pr
+        "Stable-byte seed: `{}` (owner lane: `{}`; suggested first PR: `{}`; triage: `{}`)",
+        seed.seed_id,
+        seed.owner_lane,
+        seed.suggested_first_pr,
+        seed.triage_labels.join("`, `")
     )
 }
 
@@ -2647,15 +2618,32 @@ mod tests {
         assert!(github_summary.contains(
             "- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)"
         ));
-        assert!(github_summary.contains("- Evidence refs: 1; stop line and guidance in sidecars."));
+        assert!(
+            github_summary
+                .contains("- Evidence refs: 1; full route and evidence packet in sidecars.")
+        );
         assert!(!github_summary.contains("- Safe caller route:"));
         assert!(!github_summary.contains("- Invariant at risk:"));
-        assert!(!github_summary.contains("- Proof mode:"));
-        assert!(!github_summary.contains("- PR aperture:"));
-        assert!(!github_summary.contains("- Guidance:"));
-        assert!(!github_summary.contains("- First fix option:"));
-        assert!(!github_summary.contains("- First test target:"));
-        assert!(!github_summary.contains("- First do-not-touch note:"));
+        assert!(github_summary.contains("- Proof mode: `mutation-plus-miri`"));
+        assert!(github_summary.contains(
+            "- Fix boundary: Snapshot SharedArrayBuffer-backed bytes before constructing the slice"
+        ));
+        assert!(github_summary.contains("- PR aperture: TextDecoder shared-byte snapshot only"));
+        assert!(github_summary.contains("- Stop line: keep the PR inside this aperture."));
+        assert!(
+            github_summary
+                .contains("- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)")
+        );
+        assert!(github_summary.contains(
+            "- First fix option: Copy SharedArrayBuffer-backed bytes before constructing the slice"
+        ));
+        assert!(github_summary.contains(
+            "- First test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`"
+        ));
+        assert!(
+            github_summary
+                .contains("- First do-not-touch note: Do not rewrite unrelated TextDecoder paths")
+        );
         assert!(!github_summary.contains("- Manual candidate queue preview:"));
         assert!(
             !github_summary
@@ -2992,6 +2980,14 @@ mod tests {
               "unsafe_operation": "core::slice::from_raw_parts",
               "invariant": "&[u8] memory must not be concurrently mutated",
               "safe_caller": "TextDecoder.decode SharedArrayBuffer route",
+              "proof_mode": {
+                "kind": "mutation-plus-miri",
+                "system_bun_expected": "nondiscriminating",
+                "mutation_required": true,
+                "miri_required": true
+              },
+              "fix_boundary": "Snapshot SharedArrayBuffer-backed bytes before constructing the slice",
+              "pr_aperture": "TextDecoder shared-byte snapshot only",
               "fix_options": [
                 "Copy SharedArrayBuffer-backed bytes before constructing the slice"
               ],

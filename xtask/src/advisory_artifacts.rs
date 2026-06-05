@@ -324,7 +324,7 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
-const GITHUB_SUMMARY_WORD_LIMIT: usize = 600;
+const GITHUB_SUMMARY_WORD_LIMIT: usize = 750;
 
 fn check_manual_candidate_front_door_artifacts(
     dir: &Path,
@@ -549,6 +549,7 @@ fn check_manual_candidate_front_door_text(
     )?;
     if compact {
         check_manual_candidate_front_door_compact_text(text, path, first)?;
+        check_manual_candidate_front_door_guidance_text(text, path, first, compact)?;
     } else {
         super::require_text_contains(
             text,
@@ -602,23 +603,13 @@ fn check_manual_candidate_front_door_compact_text(
     path: &Path,
     candidate: &ManualCandidateProjection,
 ) -> Result<(), String> {
-    if let Some(stable_byte) = &candidate.stable_byte {
-        let class = stable_byte_projection_str(stable_byte, "class", &candidate.id)?;
-        let proof_required =
-            stable_byte_projection_str(stable_byte, "proof_required", &candidate.id)?;
-        let ledger_state = stable_byte_projection_str(stable_byte, "ledger_state", &candidate.id)?;
-        super::require_text_contains(
-            text,
-            &format!("- Stable-byte: `{class}`; proof `{proof_required}`; ledger `{ledger_state}`"),
-            path,
-        )?;
-    } else if let Some(proof_mode) = &candidate.proof_mode {
+    if let Some(proof_mode) = &candidate.proof_mode {
         super::require_text_contains(text, &format!("- Proof mode: `{}`", proof_mode.kind), path)?;
     }
     super::require_text_contains(
         text,
         &format!(
-            "- Evidence refs: {}; stop line and guidance in sidecars.",
+            "- Evidence refs: {}; full route and evidence packet in sidecars.",
             candidate.evidence_refs
         ),
         path,
@@ -717,23 +708,13 @@ fn check_manual_candidate_front_door_guidance_text(
         path,
     )?;
     if let Some(option) = candidate.fix_options.first() {
-        if !compact {
-            super::require_text_contains(text, &format!("- First fix option: {option}"), path)?;
-        }
+        super::require_text_contains(text, &format!("- First fix option: {option}"), path)?;
     }
     if let Some(target) = candidate.test_targets.first() {
-        if !compact {
-            super::require_text_contains(text, &format!("- First test target: `{target}`"), path)?;
-        }
+        super::require_text_contains(text, &format!("- First test target: `{target}`"), path)?;
     }
     if let Some(note) = candidate.do_not_touch.first() {
-        if !compact {
-            super::require_text_contains(
-                text,
-                &format!("- First do-not-touch note: {note}"),
-                path,
-            )?;
-        }
+        super::require_text_contains(text, &format!("- First do-not-touch note: {note}"), path)?;
     }
     Ok(())
 }
