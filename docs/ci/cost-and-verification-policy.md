@@ -4,16 +4,21 @@ unsafe-review CI optimizes for proof per Linux-equivalent minute (LEM), not for
 fewer checks. The default PR path should be deterministic, cheap, and high
 signal; expensive proof is preserved by routing it to the lane where it pays.
 
-## CI jobs
+## CI lane posture
 
-CI has four distinct jobs:
+The authoritative lane list lives in
+[`policy/ci-lane-whitelist.toml`](../../policy/ci-lane-whitelist.toml), with the
+design contract in
+[`UNSAFE-REVIEW-SPEC-0024`](../specs/UNSAFE-REVIEW-SPEC-0024-ci-design.md).
+This document groups lanes by cost and claim posture; it is not a separate lane
+registry.
 
-| Job | Purpose | Default PR posture |
+| Posture family | Purpose | Default PR posture |
 | --- | --- | --- |
 | Workspace correctness | Build, lint, test, document, and run repo policy checks | May block |
 | Artifact integrity | Ensure unsafe-review artifacts are parseable, internally consistent, and honest | May block |
-| Advisory evidence | Surface ReviewCards, witness routes, and posture changes for reviewer attention | Advisory by default |
-| Release readiness | Prove package, install, semver, and publication readiness | Release/manual lanes |
+| Advisory evidence | Surface ReviewCards, witness routes, source-divergence, coverage, editor/review-bot signals, and posture changes for reviewer attention | Advisory by default |
+| Release or trusted actions | Prove package, install, semver, publication readiness, or split-token comment posting when explicitly routed | Release/manual/deferred lanes |
 
 Malformed or dishonest unsafe-review artifacts may fail CI. Unsafe-review
 findings do not fail CI by default.
