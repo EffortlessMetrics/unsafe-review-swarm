@@ -51,6 +51,13 @@
   ],
   "evidence": [
     {
+      "kind": "source_trace",
+      "path": "src/runtime/webcore/TextDecoder.rs",
+      "summary": "Manual route pins the TextDecoder shared-byte decode seam at line 237, where JS-backed bytes are materialized with core::slice::from_raw_parts before decoding",
+      "command": "rg -n \"TextDecoder|decode|from_raw_parts|as_ptr|SharedArrayBuffer|is_shared_array_buffer\" src/runtime/webcore/TextDecoder.rs",
+      "limitation": "source trace only; does not prove the safe JS route reaches this site or that backing storage is shared"
+    },
+    {
       "kind": "runtime_witness",
       "path": "target/unsafe-scout/textdecoder-shared-race-route.out",
       "summary": "Bun TextDecoder route reaches shared backing bytes through safe JS",
