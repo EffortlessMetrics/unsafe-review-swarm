@@ -15639,6 +15639,32 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_tokmd_handoff_target_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-tokmd-handoff-target-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_one_manual_candidate_first_pr_artifacts(&dir)?;
+        let path = dir.join("tokmd-packets.json");
+        let mut tokmd_packets = parse_json_file(&path)?;
+        tokmd_packets["packets"][0]["preset_inputs"]["bun-ub-handoff"]["target"]["line"] =
+            serde_json::json!(999);
+        fs::write(&path, tokmd_packets.to_string())
+            .map_err(|err| format!("write tokmd packets failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => return Err("tokmd handoff target drift should fail verification".to_string()),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("tokmd-packets.json packets[0] preset_inputs.bun-ub-handoff target.line"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_review_kit_manual_candidate_id_drift() -> Result<(), String>
     {
         let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-manual-candidate-id-drift")?;
@@ -21660,6 +21686,11 @@ review_after = "2026-08-01"
                 "invariant_at_risk": "&[u8] memory must not be concurrently mutated",
                 "safe_js_caller_route": "TextDecoder.decode SharedArrayBuffer route",
                 "rust_native_seam": "src/runtime/webcore/TextDecoder.rs:237",
+                "target": {
+                    "file": "src/runtime/webcore/TextDecoder.rs",
+                    "line": 237,
+                    "location_text": "src/runtime/webcore/TextDecoder.rs:237"
+                },
                 "proof_mode": {
                     "kind": "mutation-plus-miri",
                     "system_bun_expected": "nondiscriminating",

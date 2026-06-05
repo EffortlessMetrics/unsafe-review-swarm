@@ -1904,11 +1904,7 @@ fn tokmd_packet_entry(
             ledger_state.is_some(),
             stable_byte_seed.is_some(),
         ),
-        "target": {
-            "file": candidate.location.file.display().to_string(),
-            "line": candidate.location.line,
-            "location_text": manual_candidate_location_text(candidate),
-        },
+        "target": tokmd_manual_candidate_target(candidate),
         "route": {
             "safe_caller": candidate.safe_caller.as_str(),
             "unsafe_operation": candidate.unsafe_operation.as_str(),
@@ -2011,6 +2007,7 @@ fn tokmd_bun_ub_handoff_input(
         "invariant_at_risk": candidate.invariant.as_str(),
         "safe_js_caller_route": candidate.safe_caller.as_str(),
         "rust_native_seam": tokmd_rust_native_seam(candidate),
+        "target": tokmd_manual_candidate_target(candidate),
         "proof_mode": candidate.proof_mode.as_ref(),
         "required_proof_action": tokmd_required_proof_action(candidate),
         "current_evidence": tokmd_evidence_summaries(candidate),
@@ -2022,6 +2019,14 @@ fn tokmd_bun_ub_handoff_input(
         "seed": stable_byte_seed.map(tokmd_seed_summary),
         "next_action": tokmd_next_action(candidate, stable_byte_seed),
         "stop_line": tokmd_stop_line(candidate),
+    })
+}
+
+fn tokmd_manual_candidate_target(candidate: &ManualCandidate) -> serde_json::Value {
+    json!({
+        "file": candidate.location.file.display().to_string(),
+        "line": candidate.location.line,
+        "location_text": manual_candidate_location_text(candidate),
     })
 }
 
@@ -2800,6 +2805,13 @@ mod tests {
         assert_eq!(
             seed["candidate_consistency"]["suggested_first_pr_has_manual_candidate_pr_aperture"],
             true
+        );
+        let handoff_target = &value["packets"][0]["preset_inputs"]["bun-ub-handoff"]["target"];
+        assert_eq!(handoff_target["file"], "src/runtime/webcore/TextDecoder.rs");
+        assert_eq!(handoff_target["line"], 237);
+        assert_eq!(
+            handoff_target["location_text"],
+            "src/runtime/webcore/TextDecoder.rs:237"
         );
         let ledger_limitation = value["packets"][0]["ledger_state_limitation"]
             .as_str()
