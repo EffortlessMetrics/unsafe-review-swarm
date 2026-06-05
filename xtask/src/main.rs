@@ -492,6 +492,7 @@ const DOGFOOD_README: &str = "docs/dogfood/README.md";
 const DOGFOOD_FOLLOW_UP_SEEDS: &str = "docs/dogfood/follow-up-seeds.md";
 const DOGFOOD_STABLE_BYTE_SEEDS: &str = "docs/dogfood/stable-byte-follow-up-seeds.md";
 const DOGFOOD_STABLE_BYTE_TRIAGE: &str = "docs/dogfood/stable-byte-triage-taxonomy.md";
+const DOGFOOD_AGENT_REPAIR_EXPERIMENTS: &str = "docs/dogfood/agent-repair-experiments.md";
 const DOGFOOD_RIPR_BUN_REQUIREMENTS: &str = "docs/dogfood/ripr-bun-diff-first-requirements.md";
 const DOGFOOD_TOKMD_BUN_PRESETS: &str = "docs/dogfood/tokmd-bun-packet-presets.md";
 const DOGFOOD_JUDGMENT_DIR: &str = "docs/dogfood/judgments";
@@ -617,6 +618,122 @@ const DOGFOOD_JUDGMENT_LABELS: &[&str] = &[
     "human-only",
     "good-agent-task",
     "bad-agent-task",
+];
+const DOGFOOD_AGENT_REPAIR_REPAIR_QUEUE_BUCKETS: &[&str] = &[
+    "repairable_by_guard",
+    "repairable_by_safety_docs",
+    "repairable_by_test",
+    "requires_witness_receipt",
+    "requires_human_review",
+    "do_not_auto_repair",
+];
+const DOGFOOD_AGENT_REPAIR_BUCKET_REASONS: &[&str] = &[
+    "guard_evidence_missing",
+    "safety_docs_evidence_missing",
+    "reach_evidence_missing",
+    "witness_receipt_missing",
+    "human_review_required",
+    "not_ready_for_automatic_repair",
+];
+const DOGFOOD_AGENT_REPAIR_CARD_DELTAS: &[&str] =
+    &["improved", "unchanged", "regressed", "not_checked"];
+const DOGFOOD_AGENT_REPAIR_SCOPE_DELTAS: &[&str] = &[
+    "inside_allowed_scope",
+    "outside_allowed_scope",
+    "not_checked",
+];
+const DOGFOOD_AGENT_REPAIR_NEW_CARDS: &[&str] = &["none_observed", "introduced", "not_checked"];
+const DOGFOOD_AGENT_REPAIR_REVIEWER_JUDGMENTS: &[&str] = &[
+    "good-agent-task",
+    "bad-agent-task",
+    "human-only",
+    "uncertain",
+];
+const DOGFOOD_AGENT_REPAIR_REQUIRED_GLOBAL_TEXT: &[&str] = &[
+    "Status: experimental dogfood protocol",
+    "`unsafe-review context <card-id> --json`",
+    "`repair-queue.json`",
+    "human-run experiment",
+    "does not add automation",
+    "does not make a product claim",
+    "target/dogfood-work/agent-repair-experiments/<experiment_id>.toml",
+    "Use checked-in fixtures for the first experiments",
+    "one ReviewCard packet",
+    "one repair-queue item",
+    "explicit file scope",
+    "Do not suppress this card as the repair",
+    "Do not replace executable guard or discharge evidence with a comment",
+    "Do not claim proof, UB-free status, Miri-clean status, site execution",
+    "Stop if the packet points to human deep review",
+    "`unsafe-review` does not run agents",
+    "execute witnesses, post comments, edit source",
+];
+const DOGFOOD_AGENT_REPAIR_REQUIRED_SECTIONS: &[(&str, &[&str])] = &[
+    (
+        "## Inputs",
+        &[
+            "`experiment_id`",
+            "`record`",
+            "`target`",
+            "`report`",
+            "`card_id`",
+            "`operation_family`",
+            "`context_command`",
+            "`repair_queue_bucket`",
+            "`repair_queue_bucket_reason`",
+            "`allowed_scope`",
+            "`baseline_artifacts`",
+        ],
+    ),
+    (
+        "## Agent Instruction",
+        &[
+            "Address this one ReviewCard only",
+            "Stay inside the listed file scope",
+            "Do not suppress this card as the repair",
+            "Do not replace executable guard or discharge evidence with a comment",
+            "Stop if the packet points to human deep review",
+        ],
+    ),
+    (
+        "## Human Review Record",
+        &[
+            "`patch_summary`",
+            "`validation`",
+            "`card_delta`",
+            "`scope_delta`",
+            "`new_cards`",
+            "`reviewer_judgment`",
+            "`reason`",
+            "`follow_up`",
+        ],
+    ),
+    (
+        "## Minimal Template",
+        &[
+            "schema_version = \"0.1\"",
+            "record = \"target/dogfood-work/agent-repair-experiments/",
+            "context_command = \"unsafe-review context UR-... --json\"",
+            "repair_queue_bucket = \"repairable_by_guard\"",
+            "repair_queue_bucket_reason = \"guard_evidence_missing\"",
+            "reviewer_judgment = \"good-agent-task\"",
+            "trust_boundary = \"Static unsafe contract review experiment",
+        ],
+    ),
+    (
+        "## Trust Boundary",
+        &[
+            "manual dogfood measurements of handoff usefulness",
+            "not calibrated precision or recall",
+            "not a proof of memory safety",
+            "not UB-free status",
+            "not Miri-clean status",
+            "not site execution evidence",
+            "not witness adequacy",
+            "not policy readiness",
+            "does not run agents",
+        ],
+    ),
 ];
 const DOGFOOD_OUTCOME_WITNESS_ROUTE_STATES: &[&str] = &[
     "not-evaluated",
@@ -3138,6 +3255,7 @@ fn check_dogfood() -> Result<(), String> {
     check_dogfood_report_overclaims()?;
     check_dogfood_follow_up_seeds(&ids)?;
     check_dogfood_stable_byte_seeds()?;
+    check_dogfood_agent_repair_experiment_protocol_doc()?;
     check_dogfood_judgment_schema_docs()?;
     check_dogfood_judgments(&ids)?;
 
@@ -3777,6 +3895,75 @@ fn check_dogfood_stable_byte_seeds() -> Result<(), String> {
     let seed_text = read_to_string(&workspace_path(DOGFOOD_STABLE_BYTE_SEEDS))?;
     check_dogfood_report_trust_boundary_text(DOGFOOD_STABLE_BYTE_SEEDS, &seed_text)?;
     check_dogfood_stable_byte_seed_text(DOGFOOD_STABLE_BYTE_SEEDS, &seed_text, &examples_by_path)?;
+    Ok(())
+}
+
+fn check_dogfood_agent_repair_experiment_protocol_doc() -> Result<(), String> {
+    let readme = read_to_string(&workspace_path(DOGFOOD_README))?;
+    if !readme.contains("agent-repair-experiments.md") {
+        return Err(format!(
+            "{DOGFOOD_README} must link `{DOGFOOD_AGENT_REPAIR_EXPERIMENTS}`"
+        ));
+    }
+    let text = read_to_string(&workspace_path(DOGFOOD_AGENT_REPAIR_EXPERIMENTS))?;
+    check_dogfood_agent_repair_experiment_protocol_text(DOGFOOD_AGENT_REPAIR_EXPERIMENTS, &text)
+}
+
+fn check_dogfood_agent_repair_experiment_protocol_text(
+    path: &str,
+    text: &str,
+) -> Result<(), String> {
+    let path_obj = Path::new(path);
+    let normalized = text.replace("\r\n", "\n");
+    require_boundary_text(&normalized, path)?;
+    reject_positive_overclaims(path_obj, &normalized)?;
+    require_text_contains_all(
+        &normalized,
+        path_obj,
+        DOGFOOD_AGENT_REPAIR_REQUIRED_GLOBAL_TEXT,
+    )?;
+
+    for (heading, required_text) in DOGFOOD_AGENT_REPAIR_REQUIRED_SECTIONS {
+        let section = markdown_heading_section(&normalized, heading)
+            .ok_or_else(|| format!("{path} is missing required section `{heading}`"))?;
+        require_text_contains_all(section, path_obj, required_text)
+            .map_err(|err| format!("{path} section `{heading}` is incomplete: {err}"))?;
+    }
+
+    for (label, values) in [
+        (
+            "repair_queue_bucket",
+            DOGFOOD_AGENT_REPAIR_REPAIR_QUEUE_BUCKETS,
+        ),
+        (
+            "repair_queue_bucket_reason",
+            DOGFOOD_AGENT_REPAIR_BUCKET_REASONS,
+        ),
+        ("card_delta", DOGFOOD_AGENT_REPAIR_CARD_DELTAS),
+        ("scope_delta", DOGFOOD_AGENT_REPAIR_SCOPE_DELTAS),
+        ("new_cards", DOGFOOD_AGENT_REPAIR_NEW_CARDS),
+        ("reviewer_judgment", DOGFOOD_AGENT_REPAIR_REVIEWER_JUDGMENTS),
+    ] {
+        require_dogfood_agent_repair_code_values(path, &normalized, label, values)?;
+    }
+
+    Ok(())
+}
+
+fn require_dogfood_agent_repair_code_values(
+    path: &str,
+    text: &str,
+    label: &str,
+    values: &[&str],
+) -> Result<(), String> {
+    for value in values {
+        let needle = format!("`{value}`");
+        if !text.contains(&needle) {
+            return Err(format!(
+                "{path} must document agent-repair {label} value `{value}`"
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -12399,6 +12586,77 @@ artifacts = [
         })
     }
 
+    fn dogfood_agent_repair_protocol_doc_fixture() -> String {
+        let mut text = "# Agent Repair Experiment Protocol\n\n".to_string();
+        text.push_str("Status: experimental dogfood protocol\n\n");
+        text.push_str("This is a human-run experiment for `unsafe-review context <card-id> --json` and `repair-queue.json`.\n");
+        text.push_str("It does not add automation and does not make a product claim.\n");
+        text.push_str("Record saved experiment TOML under `target/dogfood-work/agent-repair-experiments/<experiment_id>.toml`.\n");
+        text.push_str("Use checked-in fixtures for the first experiments.\n");
+        text.push_str("Can an agent use only one ReviewCard packet, one repair-queue item, and an explicit file scope?\n");
+        text.push_str("Do not suppress this card as the repair. Do not replace executable guard or discharge evidence with a comment.\n");
+        text.push_str("Do not claim proof, UB-free status, Miri-clean status, site execution, witness execution, witness adequacy, calibrated precision/recall, or policy readiness.\n");
+        text.push_str("Stop if the packet points to human deep review.\n");
+        text.push_str("`unsafe-review` does not run agents and does not run an agent, execute witnesses, post comments, edit source, suppress cards, resolve cards, or enforce blocking policy.\n");
+        text.push_str("\n## Inputs\n\n");
+        for field in [
+            "`experiment_id`",
+            "`record`",
+            "`target`",
+            "`report`",
+            "`card_id`",
+            "`operation_family`",
+            "`context_command`",
+            "`repair_queue_bucket`",
+            "`repair_queue_bucket_reason`",
+            "`allowed_scope`",
+            "`baseline_artifacts`",
+        ] {
+            text.push_str(field);
+            text.push('\n');
+        }
+        text.push_str("\n## Agent Instruction\n\n");
+        text.push_str("Address this one ReviewCard only. Stay inside the listed file scope. Do not suppress this card as the repair. Do not replace executable guard or discharge evidence with a comment. Stop if the packet points to human deep review.\n");
+        text.push_str("\n## Human Review Record\n\n");
+        for field in [
+            "`patch_summary`",
+            "`validation`",
+            "`card_delta`",
+            "`scope_delta`",
+            "`new_cards`",
+            "`reviewer_judgment`",
+            "`reason`",
+            "`follow_up`",
+        ] {
+            text.push_str(field);
+            text.push('\n');
+        }
+        text.push_str("\n## Closed Vocabulary\n\n");
+        for values in [
+            DOGFOOD_AGENT_REPAIR_REPAIR_QUEUE_BUCKETS,
+            DOGFOOD_AGENT_REPAIR_BUCKET_REASONS,
+            DOGFOOD_AGENT_REPAIR_CARD_DELTAS,
+            DOGFOOD_AGENT_REPAIR_SCOPE_DELTAS,
+            DOGFOOD_AGENT_REPAIR_NEW_CARDS,
+            DOGFOOD_AGENT_REPAIR_REVIEWER_JUDGMENTS,
+        ] {
+            for value in values {
+                text.push_str(&format!("`{value}`\n"));
+            }
+        }
+        text.push_str("\n## Minimal Template\n\n");
+        text.push_str("schema_version = \"0.1\"\n");
+        text.push_str("record = \"target/dogfood-work/agent-repair-experiments/fixture.toml\"\n");
+        text.push_str("context_command = \"unsafe-review context UR-... --json\"\n");
+        text.push_str("repair_queue_bucket = \"repairable_by_guard\"\n");
+        text.push_str("repair_queue_bucket_reason = \"guard_evidence_missing\"\n");
+        text.push_str("reviewer_judgment = \"good-agent-task\"\n");
+        text.push_str("trust_boundary = \"Static unsafe contract review experiment; not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not witness adequacy, and not policy readiness.\"\n");
+        text.push_str("\n## Trust Boundary\n\n");
+        text.push_str("Agent repair experiments are manual dogfood measurements of handoff usefulness; not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not witness adequacy, and not policy readiness. `unsafe-review` does not run agents.\n");
+        text
+    }
+
     #[test]
     fn dogfood_recorded_outcome_accepts_required_judgment_shape() -> Result<(), String> {
         check_dogfood_recorded_outcomes(
@@ -12450,6 +12708,45 @@ artifacts = [
         ))?;
 
         assert!(err.contains("safe to merge"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_agent_repair_protocol_doc_accepts_required_shape() -> Result<(), String> {
+        check_dogfood_agent_repair_experiment_protocol_text(
+            "docs/dogfood/agent-repair-experiments.md",
+            &dogfood_agent_repair_protocol_doc_fixture(),
+        )
+    }
+
+    #[test]
+    fn dogfood_agent_repair_protocol_doc_rejects_missing_bucket_reason_vocabulary()
+    -> Result<(), String> {
+        let text = dogfood_agent_repair_protocol_doc_fixture()
+            .replace("`reach_evidence_missing`", "`unknown_reason`");
+
+        let err = err_text(check_dogfood_agent_repair_experiment_protocol_text(
+            "docs/dogfood/agent-repair-experiments.md",
+            &text,
+        ))?;
+
+        assert!(err.contains("repair_queue_bucket_reason value `reach_evidence_missing`"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_agent_repair_protocol_doc_rejects_automation_boundary_drift() -> Result<(), String> {
+        let text = dogfood_agent_repair_protocol_doc_fixture().replace(
+            "execute witnesses, post comments, edit source",
+            "execute witness automation",
+        );
+
+        let err = err_text(check_dogfood_agent_repair_experiment_protocol_text(
+            "docs/dogfood/agent-repair-experiments.md",
+            &text,
+        ))?;
+
+        assert!(err.contains("execute witnesses, post comments, edit source"));
         Ok(())
     }
 
