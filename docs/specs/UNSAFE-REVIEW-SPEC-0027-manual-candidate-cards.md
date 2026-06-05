@@ -347,7 +347,9 @@ When a root-local `docs/dogfood/stable-byte-follow-up-seeds.md` ledger exists
 and joins by manual candidate ID, the review-kit manual candidate handoff may
 also project `with_stable_byte_seed`, `stable_byte_seed_source`, and
 per-candidate `stable_byte_seed` entries with seed ID, owner lane, suggested
-first PR, and triage labels. Seed rows are advisory workflow metadata only:
+first PR, safe JS caller route, Rust/native sink, triage labels, and
+`candidate_consistency` flags for class, proof mode, ledger state, safe JS
+caller route, and Rust/native sink. Seed rows are advisory workflow metadata only:
 they are not analyzer discovery, not witness execution, not proof, not policy
 readiness, and not a ReviewCard truth.
 
@@ -401,7 +403,8 @@ select manual candidates for comments or imply posting. When a root-local
 `docs/dogfood/stable-byte-follow-up-seeds.md` exists and its referenced manual
 candidate JSON can be read, `tokmd-packets.json` may join a matching seed row
 by manual candidate ID and project `stable_byte_seed` with seed ID, surface,
-owner lane, suggested first PR, and triage labels as advisory workflow metadata.
+owner lane, suggested first PR, safe JS caller route, Rust/native sink, triage
+labels, and `candidate_consistency` flags as advisory workflow metadata.
 Packet-local `stable_byte.ledger_state` must be preserved when supplied and
 must not be reported as a missing stable-byte ledger input. Seed rows are not a
 second ReviewCard truth. They are not rendered tokmd output, not

@@ -777,6 +777,10 @@ fn review_kit_stable_byte_seed(
                 == Some(seed.proof_mode.as_str()),
             "ledger_state_matches_manual_candidate": stable_byte_ledger_state(candidate)
                 == Some(seed.ledger_state.as_str()),
+            "safe_js_caller_matches_manual_candidate": stable_byte_source(candidate)
+                == Some(seed.safe_js_caller.as_str()),
+            "rust_native_sink_matches_manual_candidate": stable_byte_sink(candidate)
+                == Some(seed.rust_native_sink.as_str()),
         },
         "trust_boundary": "Stable-byte seed row is advisory workflow metadata only; not analyzer discovery, not witness execution, not proof, not policy readiness, and not a ReviewCard truth."
     })
@@ -1339,6 +1343,20 @@ fn stable_byte_ledger_state(candidate: &ManualCandidate) -> Option<&str> {
         .map(|stable_byte| stable_byte.ledger_state.as_str())
 }
 
+fn stable_byte_source(candidate: &ManualCandidate) -> Option<&str> {
+    candidate
+        .stable_byte
+        .as_ref()
+        .map(|stable_byte| stable_byte.source.as_str())
+}
+
+fn stable_byte_sink(candidate: &ManualCandidate) -> Option<&str> {
+    candidate
+        .stable_byte
+        .as_ref()
+        .map(|stable_byte| stable_byte.sink.as_str())
+}
+
 fn load_stable_byte_seed_ledger(root: &Path) -> StableByteSeedLedger {
     let path = root.join(STABLE_BYTE_SEED_LEDGER_PATH);
     if !path.is_file() {
@@ -1414,8 +1432,8 @@ fn parse_stable_byte_seed_ledger(
             candidate_family: markdown_code_cell_value(columns[2]),
             surface: markdown_code_cell_value(columns[3]),
             manual_candidate: markdown_code_cell_value(columns[4]),
-            safe_js_caller: markdown_code_cell_value(columns[5]),
-            rust_native_sink: markdown_code_cell_value(columns[6]),
+            safe_js_caller: stable_byte_seed_text_cell_value(columns[5]),
+            rust_native_sink: stable_byte_seed_text_cell_value(columns[6]),
             proof_mode: markdown_code_cell_value(columns[7]),
             suggested_first_pr: markdown_code_cell_value(columns[8]),
             owner_lane: markdown_code_cell_value(columns[9]),
@@ -1460,6 +1478,10 @@ fn markdown_code_cell_value(cell: &str) -> String {
         return cell.to_string();
     };
     cell[start + 1..start + 1 + end].to_string()
+}
+
+fn stable_byte_seed_text_cell_value(cell: &str) -> String {
+    cell.trim().replace('`', "").trim().to_string()
 }
 
 fn markdown_code_spans(cell: &str) -> Vec<String> {
@@ -2142,6 +2164,10 @@ fn tokmd_stable_byte_seed(seed: &StableByteSeed, candidate: &ManualCandidate) ->
                 == Some(seed.proof_mode.as_str()),
             "ledger_state_matches_manual_candidate": stable_byte_ledger_state(candidate)
                 == Some(seed.ledger_state.as_str()),
+            "safe_js_caller_matches_manual_candidate": stable_byte_source(candidate)
+                == Some(seed.safe_js_caller.as_str()),
+            "rust_native_sink_matches_manual_candidate": stable_byte_sink(candidate)
+                == Some(seed.rust_native_sink.as_str()),
         },
         "trust_boundary": "Stable-byte seed row is advisory workflow metadata only; not analyzer discovery, not witness execution, not proof, not policy readiness, and not rendered tokmd output."
     })
@@ -2668,6 +2694,14 @@ mod tests {
         );
         assert_eq!(
             seed["candidate_consistency"]["ledger_state_matches_manual_candidate"],
+            true
+        );
+        assert_eq!(
+            seed["candidate_consistency"]["safe_js_caller_matches_manual_candidate"],
+            true
+        );
+        assert_eq!(
+            seed["candidate_consistency"]["rust_native_sink_matches_manual_candidate"],
             true
         );
         assert!(

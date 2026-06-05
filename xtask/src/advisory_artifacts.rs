@@ -2554,6 +2554,8 @@ fn check_tokmd_stable_byte_seed(
         "stable_byte_class_matches_manual_candidate",
         "proof_mode_matches_manual_candidate",
         "ledger_state_matches_manual_candidate",
+        "safe_js_caller_matches_manual_candidate",
+        "rust_native_sink_matches_manual_candidate",
     ] {
         if consistency.get(field).and_then(serde_json::Value::as_bool) != Some(true) {
             return Err(format!(
@@ -4425,6 +4427,8 @@ fn check_review_kit_stable_byte_seed(
         "stable_byte_class_matches_manual_candidate",
         "proof_mode_matches_manual_candidate",
         "ledger_state_matches_manual_candidate",
+        "safe_js_caller_matches_manual_candidate",
+        "rust_native_sink_matches_manual_candidate",
     ] {
         if consistency.get(field).and_then(serde_json::Value::as_bool) != Some(true) {
             return Err(format!(
