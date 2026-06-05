@@ -2544,6 +2544,8 @@ fn check_tokmd_stable_byte_seed(
         &expected.stable_byte_ledger_state,
         &context,
     )?;
+    require_stable_byte_seed_projection(seed, "safe_js_caller", expected, "source", &context)?;
+    require_stable_byte_seed_projection(seed, "rust_native_sink", expected, "sink", &context)?;
     if let Some(proof_mode) = &expected.proof_mode {
         require_projected_str(seed, "proof_mode", &proof_mode.kind, &context)?;
     }
@@ -2617,6 +2619,46 @@ fn require_projected_static_string_array(
         ));
     }
     Ok(())
+}
+
+fn require_stable_byte_seed_projection(
+    seed: &serde_json::Value,
+    seed_field: &str,
+    expected: &ManualCandidateProjection,
+    stable_byte_field: &str,
+    context: &str,
+) -> Result<(), String> {
+    let actual = super::require_non_empty_json_str(seed, seed_field, context)?;
+    let expected_value = expected_stable_byte_field(expected, stable_byte_field, context)?;
+    if actual != expected_value {
+        return Err(format!(
+            "{context} {seed_field} `{actual}` must match manual-candidates.json candidate stable_byte.{stable_byte_field} `{expected_value}`"
+        ));
+    }
+    Ok(())
+}
+
+fn expected_stable_byte_field<'a>(
+    expected: &'a ManualCandidateProjection,
+    field: &str,
+    context: &str,
+) -> Result<&'a str, String> {
+    let stable_byte = expected.stable_byte.as_ref().ok_or_else(|| {
+        format!(
+            "{context} stable_byte_seed requires manual-candidates.json candidate `{}` stable_byte.{field}",
+            expected.id
+        )
+    })?;
+    stable_byte
+        .get(field)
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| {
+            format!(
+                "{context} stable_byte_seed requires manual-candidates.json candidate `{}` stable_byte.{field}",
+                expected.id
+            )
+        })
 }
 
 fn stable_byte_source_class_from_title(title: &str) -> Option<&'static str> {
@@ -4417,6 +4459,8 @@ fn check_review_kit_stable_byte_seed(
         &expected.stable_byte_ledger_state,
         &context,
     )?;
+    require_stable_byte_seed_projection(seed, "safe_js_caller", expected, "source", &context)?;
+    require_stable_byte_seed_projection(seed, "rust_native_sink", expected, "sink", &context)?;
     if let Some(proof_mode) = &expected.proof_mode {
         require_projected_str(seed, "proof_mode", &proof_mode.kind, &context)?;
     }
@@ -9054,5 +9098,114 @@ fn reject_json_positive_overclaims(path: &Path, value: &serde_json::Value) -> Re
             Ok(())
         }
         _ => Ok(()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn stable_byte_candidate_projection() -> ManualCandidateProjection {
+        ManualCandidateProjection {
+            id: "R4R2-S001".to_string(),
+            title: "TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes"
+                .to_string(),
+            location_text: "src/runtime/webcore/TextDecoder.rs:237".to_string(),
+            location_file: "src/runtime/webcore/TextDecoder.rs".to_string(),
+            location_line: 237,
+            operation_family: "raw_pointer_read".to_string(),
+            unsafe_operation: "core::slice::from_raw_parts".to_string(),
+            invariant: "&[u8] memory must not be concurrently mutated".to_string(),
+            safe_caller: "TextDecoder.decode SharedArrayBuffer route".to_string(),
+            proof_mode: Some(ManualCandidateProofModeProjection {
+                kind: "mutation-plus-miri".to_string(),
+                system_bun_expected: "nondiscriminating".to_string(),
+                mutation_required: true,
+                miri_required: true,
+            }),
+            fix_boundary: Some("copy shared bytes before constructing the Rust slice".to_string()),
+            pr_aperture: Some(
+                "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings"
+                    .to_string(),
+            ),
+            oracle_map: None,
+            stable_byte: Some(serde_json::json!({
+                "class": "stable-byte-source-sab-race",
+                "source": "SharedArrayBuffer-backed typed array decode",
+                "sink": "src/runtime/webcore/TextDecoder.rs slice materialization",
+                "hazard": "Rust slice materialization can treat shared JS bytes as stable while JS can mutate the backing storage concurrently",
+                "observable": "no",
+                "proof_required": "mutation-plus-miri",
+                "suggested_fix_boundary": "copy shared bytes before constructing the Rust slice",
+                "pr_aperture": "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings",
+                "ledger_state": "handoff-ready"
+            })),
+            stable_byte_source_class: Some("stable-byte-source-sab-race".to_string()),
+            stable_byte_ledger_state: Some("handoff-ready".to_string()),
+            evidence: Vec::new(),
+            fix_options: Vec::new(),
+            test_targets: Vec::new(),
+            do_not_touch: Vec::new(),
+            evidence_refs: 0,
+            implementer_handoff: serde_json::json!({}),
+        }
+    }
+
+    fn stable_byte_seed_projection() -> serde_json::Value {
+        serde_json::json!({
+            "source": "docs/dogfood/stable-byte-follow-up-seeds.md",
+            "seed_id": "bun-stable-byte-textdecoder-sab",
+            "ledger_state": "handoff-ready",
+            "candidate_family": "stable-byte-source-sab-race",
+            "surface": "TextDecoder.decode",
+            "manual_candidate": "docs/examples/manual-candidates/textdecoder-sab.json",
+            "safe_js_caller": "SharedArrayBuffer-backed typed array decode",
+            "rust_native_sink": "src/runtime/webcore/TextDecoder.rs slice materialization",
+            "proof_mode": "mutation-plus-miri",
+            "suggested_first_pr": "TextDecoder shared-byte snapshot only",
+            "owner_lane": "rust2",
+            "triage_labels": ["non-observable", "needs-miri-model"],
+            "candidate_consistency": {
+                "stable_byte_class_matches_manual_candidate": true,
+                "proof_mode_matches_manual_candidate": true,
+                "ledger_state_matches_manual_candidate": true,
+                "safe_js_caller_matches_manual_candidate": true,
+                "rust_native_sink_matches_manual_candidate": true
+            },
+            "trust_boundary": "Stable-byte seed row is advisory workflow metadata only; not analyzer discovery, not witness execution, not proof, not policy readiness, not rendered tokmd output, and not a ReviewCard truth."
+        })
+    }
+
+    #[test]
+    fn tokmd_stable_byte_seed_rejects_safe_js_caller_projection_drift() {
+        let expected = stable_byte_candidate_projection();
+        let mut seed = stable_byte_seed_projection();
+        seed["safe_js_caller"] = serde_json::json!("Wrong safe JS caller route");
+
+        let err = check_tokmd_stable_byte_seed(&seed, &expected, "tokmd-packets.json packets[0]")
+            .expect_err("safe_js_caller drift should fail tokmd stable-byte seed verification");
+
+        assert!(err.contains("safe_js_caller"), "{err}");
+        assert!(err.contains("stable_byte.source"), "{err}");
+        assert!(err.contains("Wrong safe JS caller route"), "{err}");
+    }
+
+    #[test]
+    fn review_kit_stable_byte_seed_rejects_rust_native_sink_projection_drift() {
+        let expected = stable_byte_candidate_projection();
+        let mut seed = stable_byte_seed_projection();
+        seed["rust_native_sink"] =
+            serde_json::json!("src/runtime/webcore/Wrong.rs slice materialization");
+
+        let err = check_review_kit_stable_byte_seed(
+            &seed,
+            &expected,
+            "review-kit.json handoff manual_candidates candidate_queue[0]",
+        )
+        .expect_err("rust_native_sink drift should fail review-kit stable-byte seed verification");
+
+        assert!(err.contains("rust_native_sink"), "{err}");
+        assert!(err.contains("stable_byte.sink"), "{err}");
+        assert!(err.contains("Wrong.rs"), "{err}");
     }
 }

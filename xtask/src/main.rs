@@ -1207,6 +1207,20 @@ fn check_manual_candidate_smoke_tokmd_seed_projection(
         let seed = packet
             .get("stable_byte_seed")
             .ok_or_else(|| format!("{context} is missing stable_byte_seed"))?;
+        require_stable_byte_seed_field_matches_example(
+            seed,
+            "safe_js_caller",
+            example,
+            "source",
+            &context,
+        )?;
+        require_stable_byte_seed_field_matches_example(
+            seed,
+            "rust_native_sink",
+            example,
+            "sink",
+            &context,
+        )?;
         require_non_empty_json_str(seed, "seed_id", &context)?;
         require_non_empty_json_str(seed, "owner_lane", &context)?;
         require_non_empty_json_str(seed, "suggested_first_pr", &context)?;
@@ -1298,6 +1312,20 @@ fn check_manual_candidate_smoke_review_kit_seed_projection(
         let seed = entry
             .get("stable_byte_seed")
             .ok_or_else(|| format!("{context} is missing stable_byte_seed"))?;
+        require_stable_byte_seed_field_matches_example(
+            seed,
+            "safe_js_caller",
+            example,
+            "source",
+            &context,
+        )?;
+        require_stable_byte_seed_field_matches_example(
+            seed,
+            "rust_native_sink",
+            example,
+            "sink",
+            &context,
+        )?;
         let seed_id = require_non_empty_json_str(seed, "seed_id", &context)?;
         let owner_lane = require_non_empty_json_str(seed, "owner_lane", &context)?;
         let suggested_first_pr = require_non_empty_json_str(seed, "suggested_first_pr", &context)?;
@@ -1404,6 +1432,46 @@ fn check_manual_candidate_smoke_review_kit_seed_projection(
         }
     }
     Ok(())
+}
+
+fn require_stable_byte_seed_field_matches_example(
+    seed: &serde_json::Value,
+    seed_field: &str,
+    example: &ManualCandidateExample,
+    stable_byte_field: &str,
+    context: &str,
+) -> Result<(), String> {
+    let actual = require_non_empty_json_str(seed, seed_field, context)?;
+    let expected = manual_candidate_example_stable_byte_field(example, stable_byte_field, context)?;
+    if actual != expected {
+        return Err(format!(
+            "{context} stable_byte_seed.{seed_field} `{actual}` must match committed example stable_byte.{stable_byte_field} `{expected}`"
+        ));
+    }
+    Ok(())
+}
+
+fn manual_candidate_example_stable_byte_field<'a>(
+    example: &'a ManualCandidateExample,
+    field: &str,
+    context: &str,
+) -> Result<&'a str, String> {
+    let stable_byte = example.expected.get("stable_byte").ok_or_else(|| {
+        format!(
+            "{context} committed example `{}` is missing stable_byte.{field}",
+            example.path.display()
+        )
+    })?;
+    stable_byte
+        .get(field)
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| {
+            format!(
+                "{context} committed example `{}` stable_byte.{field} must be a non-empty string",
+                example.path.display()
+            )
+        })
 }
 
 fn check_manual_candidate_smoke_entry_matches_example(
