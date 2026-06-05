@@ -238,8 +238,8 @@ top actionable card, when present
   first confirmation step from the selected verify command or witness route
   explain handoff command
   bounded agent context handoff command
-  agent handoff readiness, repair buckets, and readiness reasons projected from
-  `repair-queue.json`
+  agent handoff readiness, repair buckets, bucket reasons, and readiness reasons
+  projected from `repair-queue.json`
 compact card table
   rows project ReviewCard id, class, location, operation family, operation,
   missing evidence, primary route, and next action

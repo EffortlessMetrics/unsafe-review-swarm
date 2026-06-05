@@ -161,6 +161,9 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     assert!(github_summary_text.contains(&format!(
         "- Agent context: `unsafe-review context {card_id} --json`"
     )));
+    assert!(github_summary_text.contains("- Agent handoff: `ready_for_agent`"));
+    assert!(github_summary_text.contains("bucket reasons: `guard_evidence_missing`"));
+    assert!(github_summary_text.contains("readiness reasons: specific operation family"));
     assert!(github_summary_text.contains("## Open next"));
     assert!(github_summary_text.contains("Full reviewer cockpit: `pr-summary.md`"));
     assert!(github_summary_text.contains("not a site-execution claim"));
@@ -2268,6 +2271,9 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(github_summary.contains(&format!(
         "- Agent context: `unsafe-review context {card_id} --json`"
     )));
+    assert!(github_summary.contains("- Agent handoff: `ready_for_agent`"));
+    assert!(github_summary.contains("bucket reasons: `guard_evidence_missing`"));
+    assert!(github_summary.contains("readiness reasons: specific operation family"));
     assert!(github_summary.contains("## Open next"));
     assert!(github_summary.contains("Review kit manifest: `review-kit.json`"));
     assert!(github_summary.contains("Full reviewer cockpit: `pr-summary.md`"));

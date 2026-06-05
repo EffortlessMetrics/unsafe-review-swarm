@@ -151,10 +151,11 @@ The aggregate summary must also project the canonical input diff file counts
 from `cards.json`, so mixed-language scope remains visible without creating
 non-Rust repair tasks.
 
-`pr-summary.md` may repeat the top card's agent-readiness state, queue buckets,
-and readiness reasons as a reviewer cockpit cue. That summary is not a separate
-classification path; it must project the checked aggregate `repair-queue.json`
-state for the same ReviewCard.
+`pr-summary.md` and `github-summary.md` may repeat the top card's
+agent-readiness state, queue buckets, bucket reasons, and readiness reasons as
+a reviewer cockpit cue. That summary is not a separate classification path; it
+must project the checked aggregate `repair-queue.json` state for the same
+ReviewCard.
 
 The aggregate artifact is still copy-only. It must not run an agent, edit
 source, post comments, execute witnesses, suppress cards, resolve cards, or

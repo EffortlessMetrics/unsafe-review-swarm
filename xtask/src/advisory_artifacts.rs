@@ -295,6 +295,7 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         summary.open_actionable_gaps,
         &summary.card_ids,
         &summary.card_projections,
+        &summary.repair_queue_projections,
     )?;
     check_first_pr_markdown_card_identity(
         dir,
@@ -840,6 +841,7 @@ fn check_github_summary_artifact(
     open_actionable_gaps: usize,
     card_ids: &BTreeSet<String>,
     card_projections: &BTreeMap<String, CardProjection>,
+    repair_queue_projections: &BTreeMap<String, RepairQueueProjection>,
 ) -> Result<(), String> {
     let path = dir.join("github-summary.md");
     let text = super::read_to_string(&path)?;
@@ -938,6 +940,12 @@ fn check_github_summary_artifact(
         super::require_text_contains(&text, "unsafe site executed", &path)?;
     } else {
         require_markdown_top_card_projection(&text, &path, card_projections)?;
+        require_pr_summary_top_card_repair_queue_projection(
+            &text,
+            &path,
+            card_ids,
+            repair_queue_projections,
+        )?;
     }
 
     Ok(())
@@ -8386,10 +8394,16 @@ fn markdown_top_card_id(
 }
 
 fn expected_agent_handoff_summary(projection: &RepairQueueProjection) -> String {
+    let bucket_reasons = projection
+        .buckets
+        .iter()
+        .map(|bucket| expected_repair_queue_bucket_reason(bucket).to_string())
+        .collect::<Vec<_>>();
     format!(
-        "- Agent handoff: `{}`; buckets: {}; reasons: {}",
+        "- Agent handoff: `{}`; buckets: {}; bucket reasons: {}; readiness reasons: {}",
         projection.readiness_state,
         render_backtick_list(&projection.buckets),
+        render_backtick_list(&bucket_reasons),
         projection.readiness_reasons.join("; ")
     )
 }

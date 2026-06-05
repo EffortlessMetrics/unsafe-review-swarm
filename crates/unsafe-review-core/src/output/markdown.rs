@@ -1,13 +1,13 @@
 use crate::api::AnalyzeOutput;
 use crate::api::Scope;
 use crate::domain::ReviewCard;
-use crate::output::agent;
 use crate::output::confirmation::{
     build_this_first, confirmation_step, hypothesis_to_confirm, minimal_repro,
 };
 use crate::output::{
     NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE, REVIEWCARD_TRUST_BOUNDARY,
 };
+use crate::output::{agent, repair_queue};
 use crate::util::path_display;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -311,10 +311,15 @@ fn repo_primary_route(card: &ReviewCard) -> &str {
 fn agent_handoff_summary(card: &ReviewCard) -> String {
     let projection = agent::repair_queue_projection(card);
     let buckets = repair_queue_buckets(&projection.repair_queue.buckets);
+    let bucket_reasons = buckets
+        .iter()
+        .map(|bucket| repair_queue::bucket_reason(bucket))
+        .collect::<Vec<_>>();
     format!(
-        "Agent handoff: `{}`; buckets: {}; reasons: {}",
+        "Agent handoff: `{}`; buckets: {}; bucket reasons: {}; readiness reasons: {}",
         projection.agent_readiness.state,
         render_backtick_list(&buckets),
+        render_backtick_list(&bucket_reasons),
         projection.agent_readiness.reasons.join("; ")
     )
 }
@@ -584,9 +589,10 @@ fn render_pr_summary_top_card(out: &mut String, output: &AnalyzeOutput) {
         ));
         out.push_str(&format!("- Explain: `unsafe-review explain {}`\n", card.id));
         out.push_str(&format!(
-            "- Agent context: `unsafe-review context {} --json`\n\n",
+            "- Agent context: `unsafe-review context {} --json`\n",
             card.id
         ));
+        out.push_str(&format!("- {}\n\n", agent_handoff_summary(card)));
     } else {
         render_no_changed_gaps(out);
     }
@@ -1014,7 +1020,7 @@ mod tests {
             card.id
         )));
         assert!(rendered.contains(
-            "- Agent handoff: `ready_for_agent`; buckets: `repairable_by_guard`, `requires_witness_receipt`; reasons: specific operation family"
+            "- Agent handoff: `ready_for_agent`; buckets: `repairable_by_guard`, `requires_witness_receipt`; bucket reasons: `guard_evidence_missing`, `witness_receipt_missing`; readiness reasons: specific operation family"
         ));
         assert!(rendered.contains("- Receipt audit: `receipt-audit.md`"));
         assert!(rendered.contains("no witness was run"));

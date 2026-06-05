@@ -59,6 +59,9 @@ When cards are present, `pr-summary.md` and `github-summary.md` MUST include
 top-card handoff commands for human explanation and bounded agent context:
 `unsafe-review explain <card-id>` and
 `unsafe-review context <card-id> --json`.
+They MUST also project the top card's checked repair-queue agent-readiness
+state, buckets, bucket reasons, and readiness reasons as advisory handoff
+metadata.
 They MUST also label the top card as a static ReviewCard hypothesis that needs
 external confirmation before being treated as observed runtime behavior, and
 MUST name the first confirmation step from the selected verify command or
