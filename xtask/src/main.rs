@@ -5034,6 +5034,13 @@ fn reject_positive_overclaims(path: &Path, text: &str) -> Result<(), String> {
                 line_no + 1
             ));
         }
+        if source_inspection_ub_overclaim(&lower) && !has_negative_claim_context(&context) {
+            return Err(format!(
+                "{}:{} must not call UB sure from source inspection alone",
+                path.display(),
+                line_no + 1
+            ));
+        }
         previous = lower;
     }
     Ok(())
@@ -8227,6 +8234,22 @@ fn has_negative_claim_context(text: &str) -> bool {
         || text.contains("cannot prove")
         || text.contains("no ")
         || text.contains("without")
+}
+
+fn source_inspection_ub_overclaim(line: &str) -> bool {
+    let line = line.replace('-', " ");
+    let source_only_context = line.contains("source inspection")
+        || line.contains("source only")
+        || line.contains("source route only");
+    let ub_certainty_claim = line.contains("sure ub")
+        || line.contains("confirmed ub")
+        || line.contains("proves ub")
+        || line.contains("proved ub")
+        || line.contains("proven ub")
+        || line.contains("proof of ub")
+        || line.contains("ub proof");
+
+    source_only_context && ub_certainty_claim
 }
 
 pub(crate) fn require_file(path: &str) -> Result<(), String> {
@@ -13661,6 +13684,33 @@ Snapshot reports:
         reject_positive_overclaims(
             Path::new("artifact.md"),
             "This is not a calibrated precision claim.\nThis is not blocking-ready.",
+        )
+    }
+
+    #[test]
+    fn positive_overclaim_rejects_sure_ub_from_source_inspection() {
+        for forbidden in [
+            "source inspection proves UB",
+            "source-only UB proof",
+            "sure UB from source inspection alone",
+        ] {
+            let text = format!("This manual candidate has {forbidden}.");
+            let err = reject_positive_overclaims(Path::new("artifact.md"), &text)
+                .err()
+                .unwrap_or_default();
+            assert!(
+                err.contains("source inspection alone"),
+                "expected source-inspection UB overclaim rejection for `{forbidden}`, got `{err}`"
+            );
+        }
+    }
+
+    #[test]
+    fn positive_overclaim_allows_negative_sure_ub_source_inspection_boundary() -> Result<(), String>
+    {
+        reject_positive_overclaims(
+            Path::new("artifact.md"),
+            "Do not call the candidate sure UB from source inspection alone.\nsource-route-only evidence is not UB proof.",
         )
     }
 
