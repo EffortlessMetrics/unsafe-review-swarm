@@ -215,10 +215,11 @@ the current `unsafe-review badges` repo projection.
   from the same outcome cards.
 - Each outcome card includes a reason that explains the snapshot movement, such
   as a class change, missing-evidence count change, witness receipt strength
-  movement, new card, or resolved card.
+  movement, proof-path route movement, new card, or resolved card.
 - Outcome card states include saved ReviewCard operation expression, operation
-  family, and next action when present in the input snapshots, without changing
-  outcome classification.
+  family, proof path, and next action when present in the input snapshots.
+  Proof-path route movement may affect saved-snapshot outcome classification,
+  but remains reviewability posture only.
 - If evidence is not knowable statically, repo output and badges count the
   card state instead of overclaiming.
 

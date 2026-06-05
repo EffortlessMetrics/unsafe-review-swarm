@@ -455,12 +455,13 @@ unsafe-review outcome \
 ```
 
 Outcome comparison is read-only. It compares existing `ReviewCard` identities,
-classes, operation expressions and families, missing-evidence counts, next
-actions, and saved witness receipt strength from the supplied snapshots. The
-report includes a compact reviewer delta with new, resolved, improved,
-regressed, receipt-movement, and top-remaining-gap context. It does not rerun
-analysis, run witnesses, post policy decisions, or claim repository safety. It
-is not memory-safety proof, not UB-free status, not Miri-clean status, not
+classes, operation expressions and families, proof paths, missing-evidence
+counts, next actions, and saved witness receipt strength from the supplied
+snapshots. The report includes a compact reviewer delta with new, resolved,
+improved, regressed, receipt-movement, and top-remaining-gap context.
+Proof-path movement is reviewability posture only. It does not rerun analysis,
+run witnesses, post policy decisions, or claim repository safety. It is not
+memory-safety proof, not UB-free status, not Miri-clean status, not
 site-execution evidence, not calibrated precision/recall, and not policy-ready
 status.
 

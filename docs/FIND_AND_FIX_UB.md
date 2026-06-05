@@ -328,6 +328,7 @@ policy decision. Use it to answer:
 - did the card resolve?
 - did missing evidence shrink?
 - did witness receipt strength improve?
+- did proof-path routing move toward a more concrete review route?
 - did a different card appear?
 - did the top remaining card become clearer or noisier?
 

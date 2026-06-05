@@ -609,6 +609,13 @@ fn changed_reason(status: &str, before: &SnapshotCard, after: &SnapshotCard) -> 
             after.evidence_count.unwrap_or(0)
         ));
     }
+    if before.proof_path != after.proof_path {
+        reasons.push(format!(
+            "proof path changed from `{}` to `{}`",
+            proof_path_label(before),
+            proof_path_label(after)
+        ));
+    }
     if manual_handoff_changed(before, after) {
         reasons.push("manual handoff guidance changed".to_string());
     }
@@ -647,9 +654,34 @@ fn changed_status(before: &SnapshotCard, after: &SnapshotCard) -> &'static str {
         "improved"
     } else if witness::witness_state(after).rank < witness::witness_state(before).rank {
         "regressed"
+    } else if let (Some(before_rank), Some(after_rank)) =
+        (proof_path_rank(before), proof_path_rank(after))
+    {
+        if after_rank > before_rank {
+            "improved"
+        } else if after_rank < before_rank {
+            "regressed"
+        } else {
+            "unchanged"
+        }
     } else {
         "unchanged"
     }
+}
+
+fn proof_path_rank(card: &SnapshotCard) -> Option<u8> {
+    match card.proof_path.as_deref()?.trim() {
+        "human_review_only" | "human-review-only" => Some(0),
+        "source_route_only" | "source-route-only" => Some(1),
+        "helper_gated" | "helper-gated" => Some(2),
+        "mutation_miri_model" | "mutation-plus-miri" => Some(3),
+        "observable_red_green" | "observable-red-green" => Some(4),
+        _ => None,
+    }
+}
+
+fn proof_path_label(card: &SnapshotCard) -> &str {
+    card.proof_path.as_deref().unwrap_or("unknown")
 }
 
 fn is_manual_card(card: &SnapshotCard) -> bool {
@@ -706,6 +738,7 @@ fn snapshot_id(snapshot: &Snapshot) -> String {
         }
         feed_hash(&mut hash, card.operation.as_deref().unwrap_or(""));
         feed_hash(&mut hash, card.operation_family.as_deref().unwrap_or(""));
+        feed_hash(&mut hash, card.proof_path.as_deref().unwrap_or(""));
         feed_hash(&mut hash, &card.priority);
         feed_hash(&mut hash, &card.witness);
         feed_hash(
@@ -1578,6 +1611,93 @@ mod tests {
     }
 
     #[test]
+    fn outcome_reports_proof_path_reviewability_improvement() -> Result<(), String> {
+        let before = snapshot_json(&[card_with_proof_path(
+            "UR-proof-c1",
+            "guard_missing",
+            "high",
+            &["guard"],
+            "source_route_only",
+        )]);
+        let after = snapshot_json(&[card_with_proof_path(
+            "UR-proof-c1",
+            "guard_missing",
+            "high",
+            &["guard"],
+            "observable_red_green",
+        )]);
+
+        let report = compare_json(&before, &after)?;
+
+        assert_eq!(report.summary.improved, 1);
+        assert_eq!(report.summary.regressed, 0);
+        assert_eq!(report.reviewer_delta.receipt_movement.improved, 0);
+        assert_ne!(report.before_id, report.after_id);
+        assert!(
+            report.cards.improved[0]
+                .reason
+                .contains("proof path changed from `source_route_only` to `observable_red_green`")
+        );
+        let after_state = report.cards.improved[0]
+            .after
+            .as_ref()
+            .ok_or("improved card should include after state")?;
+        assert_eq!(
+            after_state.proof_path.as_deref(),
+            Some("observable_red_green")
+        );
+        let markdown = render_markdown(&report);
+        assert!(
+            markdown
+                .contains("proof path changed from `source_route_only` to `observable_red_green`")
+        );
+        assert!(markdown.contains("proof path `observable_red_green`"));
+        Ok(())
+    }
+
+    #[test]
+    fn outcome_reports_proof_path_reviewability_regression() -> Result<(), String> {
+        let before = snapshot_json(&[card_with_proof_path(
+            "UR-proof-c1",
+            "guard_missing",
+            "high",
+            &["guard"],
+            "observable_red_green",
+        )]);
+        let after = snapshot_json(&[card_with_proof_path(
+            "UR-proof-c1",
+            "guard_missing",
+            "high",
+            &["guard"],
+            "source_route_only",
+        )]);
+
+        let report = compare_json(&before, &after)?;
+
+        assert_eq!(report.summary.improved, 0);
+        assert_eq!(report.summary.regressed, 1);
+        assert!(
+            report.cards.regressed[0]
+                .reason
+                .contains("proof path changed from `observable_red_green` to `source_route_only`")
+        );
+        let before_state = report.cards.regressed[0]
+            .before
+            .as_ref()
+            .ok_or("regressed card should include before state")?;
+        let after_state = report.cards.regressed[0]
+            .after
+            .as_ref()
+            .ok_or("regressed card should include after state")?;
+        assert_eq!(
+            before_state.proof_path.as_deref(),
+            Some("observable_red_green")
+        );
+        assert_eq!(after_state.proof_path.as_deref(), Some("source_route_only"));
+        Ok(())
+    }
+
+    #[test]
     fn outcome_rejects_duplicate_card_identity() {
         let before = snapshot_json(&[
             card("UR-dup-c1", "guard_missing", "high", &["guard"]),
@@ -1635,6 +1755,16 @@ mod tests {
         card_with_witness(id, class_name, priority, missing, "")
     }
 
+    fn card_with_proof_path(
+        id: &str,
+        class_name: &str,
+        priority: &str,
+        missing: &[&str],
+        proof_path: &str,
+    ) -> String {
+        card_with_witness_and_proof_path(id, class_name, priority, missing, "", Some(proof_path))
+    }
+
     fn card_with_witness(
         id: &str,
         class_name: &str,
@@ -1642,17 +1772,36 @@ mod tests {
         missing: &[&str],
         witness: &str,
     ) -> String {
+        card_with_witness_and_proof_path(id, class_name, priority, missing, witness, None)
+    }
+
+    fn card_with_witness_and_proof_path(
+        id: &str,
+        class_name: &str,
+        priority: &str,
+        missing: &[&str],
+        witness: &str,
+        proof_path: Option<&str>,
+    ) -> String {
         let missing = missing
             .iter()
             .map(|item| format!(r#""{item}""#))
             .collect::<Vec<_>>()
             .join(", ");
+        let proof_path = proof_path
+            .map(|value| {
+                format!(
+                    r#",
+      "proof_path": "{value}""#
+                )
+            })
+            .unwrap_or_default();
         format!(
             r#"{{
       "id": "{id}",
       "class": "{class_name}",
       "operation": "unsafe {{ ptr.cast::<Header>().read() }}",
-      "operation_family": "raw_pointer_read",
+      "operation_family": "raw_pointer_read"{proof_path},
       "priority": "{priority}",
       "witness": "{witness}",
       "next_action": "Add or expose a safety contract, guard, test, or witness for raw_pointer_read.",
