@@ -19981,20 +19981,20 @@ Snapshot reports:
         let dir = unique_temp_dir("unsafe-review-artifacts-comment-not-selected-repeat")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
         write_valid_artifacts(&dir)?;
-        fs::write(
-            dir.join("comment-plan.json"),
-            r#"{"schema_version":"0.1","mode":"plan_only","policy":"advisory","comments":[{"card_id":"card-1","path":"src/lib.rs","line":7,"changed_line":true,"class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hypothesis_to_confirm":"static `guard_missing` ReviewCard for `unsafe { ptr.cast::<Header>().read() }`; confirm with external evidence before treating it as observed runtime behavior","operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verify_commands":["cargo +nightly miri test card"],"build_this_first":{"kind":"verify_command","command":"cargo +nightly miri test card","route_kind":"miri","summary":"Build/run `cargo +nightly miri test card` first for this card; attach a matching receipt only if it confirms the route"},"confirmation_step":"build/run `cargo +nightly miri test card` first, then attach a matching receipt if it confirms the route","selection_reason":"actionable high-priority review card","selection_reason_code":"top_actionable_card","actionability":"specific_guard_missing","relevance":"medium","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","body":"Next action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n\nPlan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision."}],"not_selected":[{"card_id":"card-1","path":"src/lib.rs","line":7,"changed_line":true,"class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hypothesis_to_confirm":"static `guard_missing` ReviewCard for `unsafe { ptr.cast::<Header>().read() }`; confirm with external evidence before treating it as observed runtime behavior","operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","actionability":"specific_guard_missing","relevance":"medium","reason":"comment-plan max of three candidates reached","reason_code":"budget_exhausted"}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
-        )
-        .map_err(|err| format!("write comment plan failed: {err}"))?;
+        let path = dir.join("comment-plan.json");
+        let mut comment_plan = parse_json_file(&path)?;
+        comment_plan["not_selected"] = serde_json::json!([{"card_id": "card-1"}]);
+        comment_plan["summary"]["not_selected_count"] = serde_json::json!(1);
+        fs::write(&path, comment_plan.to_string())
+            .map_err(|err| format!("write comment plan failed: {err}"))?;
 
         let result = check_advisory_artifacts(&dir);
 
         fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = result.err().unwrap_or_default();
         assert!(
-            result
-                .err()
-                .unwrap_or_default()
-                .contains("not_selected repeats planned comment card id")
+            err.contains("not_selected repeats planned comment card id"),
+            "{err}"
         );
         Ok(())
     }
@@ -20004,16 +20004,22 @@ Snapshot reports:
         let dir = unique_temp_dir("unsafe-review-artifacts-comment-duplicate-card")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
         write_valid_artifacts(&dir)?;
-        fs::write(
-            dir.join("comment-plan.json"),
-            r#"{"schema_version":"0.1","mode":"plan_only","policy":"advisory","comments":[{"card_id":"card-1","path":"src/lib.rs","line":7,"changed_line":true,"class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hypothesis_to_confirm":"static `guard_missing` ReviewCard for `unsafe { ptr.cast::<Header>().read() }`; confirm with external evidence before treating it as observed runtime behavior","operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verify_commands":["cargo +nightly miri test card"],"build_this_first":{"kind":"verify_command","command":"cargo +nightly miri test card","route_kind":"miri","summary":"Build/run `cargo +nightly miri test card` first for this card; attach a matching receipt only if it confirms the route"},"confirmation_step":"build/run `cargo +nightly miri test card` first, then attach a matching receipt if it confirms the route","selection_reason":"actionable high-priority review card","selection_reason_code":"top_actionable_card","actionability":"specific_guard_missing","relevance":"medium","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","body":"Next action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n\nPlan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision."},{"card_id":"card-1","path":"src/lib.rs","line":8,"changed_line":true,"class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hypothesis_to_confirm":"static `guard_missing` ReviewCard for `unsafe { ptr.cast::<Header>().read() }`; confirm with external evidence before treating it as observed runtime behavior","operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verify_commands":["cargo +nightly miri test card"],"build_this_first":{"kind":"verify_command","command":"cargo +nightly miri test card","route_kind":"miri","summary":"Build/run `cargo +nightly miri test card` first for this card; attach a matching receipt only if it confirms the route"},"confirmation_step":"build/run `cargo +nightly miri test card` first, then attach a matching receipt if it confirms the route","selection_reason":"actionable high-priority review card","selection_reason_code":"top_actionable_card","actionability":"specific_guard_missing","relevance":"medium","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","body":"Next action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n\nPlan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision."}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
-        )
-        .map_err(|err| format!("write comment plan failed: {err}"))?;
+        let path = dir.join("comment-plan.json");
+        let mut comment_plan = parse_json_file(&path)?;
+        let duplicate = comment_plan["comments"][0].clone();
+        comment_plan["comments"]
+            .as_array_mut()
+            .ok_or_else(|| "comment plan fixture must have comments array".to_string())?
+            .push(duplicate);
+        comment_plan["summary"]["selected_count"] = serde_json::json!(2);
+        fs::write(&path, comment_plan.to_string())
+            .map_err(|err| format!("write comment plan failed: {err}"))?;
 
         let result = check_advisory_artifacts(&dir);
 
         fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
-        assert!(result.err().unwrap_or_default().contains("repeats card id"));
+        let err = result.err().unwrap_or_default();
+        assert!(err.contains("repeats card id"), "{err}");
         Ok(())
     }
 
@@ -20065,6 +20071,24 @@ Snapshot reports:
         fs::write(&sarif_path, sarif.to_string())
             .map_err(|err| format!("write sarif failed: {err}"))?;
 
+        let repair_queue_path = dir.join("repair-queue.json");
+        let mut repair_queue = parse_json_file(&repair_queue_path)?;
+        for bucket in ["repairable_by_guard", "requires_witness_receipt"] {
+            let mut second_entry = repair_queue["buckets"][bucket][0].clone();
+            second_entry["card_id"] = serde_json::json!("card-2");
+            second_entry["line"] = serde_json::json!(8);
+            second_entry["context_command"] =
+                serde_json::json!("unsafe-review context card-2 --json");
+            repair_queue["buckets"][bucket]
+                .as_array_mut()
+                .ok_or_else(|| format!("repair queue fixture must have {bucket} bucket"))?
+                .push(second_entry);
+            repair_queue["summary"][bucket] = serde_json::json!(2);
+        }
+        repair_queue["summary"]["cards"] = serde_json::json!(2);
+        fs::write(&repair_queue_path, repair_queue.to_string())
+            .map_err(|err| format!("write repair queue failed: {err}"))?;
+
         let comment_path = dir.join("comment-plan.json");
         let mut comment_plan: serde_json::Value = serde_json::from_str(
             &fs::read_to_string(&comment_path)
@@ -20084,11 +20108,10 @@ Snapshot reports:
         let result = check_advisory_artifacts(&dir);
 
         fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = result.err().unwrap_or_default();
         assert!(
-            result
-                .err()
-                .unwrap_or_default()
-                .contains("repeats operation family and obligation budget key")
+            err.contains("repeats operation family and obligation budget key"),
+            "{err}"
         );
         Ok(())
     }
@@ -20098,21 +20121,49 @@ Snapshot reports:
         let dir = unique_temp_dir("unsafe-review-artifacts-comment-duplicate-location")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
         write_two_card_artifacts(&dir)?;
-        fs::write(
-            dir.join("comment-plan.json"),
-            r#"{"schema_version":"0.1","mode":"plan_only","policy":"advisory","comments":[{"card_id":"card-1","path":"src/lib.rs","line":7,"changed_line":true,"class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hypothesis_to_confirm":"static `guard_missing` ReviewCard for `unsafe { ptr.cast::<Header>().read() }`; confirm with external evidence before treating it as observed runtime behavior","operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verify_commands":["cargo +nightly miri test card"],"build_this_first":{"kind":"verify_command","command":"cargo +nightly miri test card","route_kind":"miri","summary":"Build/run `cargo +nightly miri test card` first for this card; attach a matching receipt only if it confirms the route"},"confirmation_step":"build/run `cargo +nightly miri test card` first, then attach a matching receipt if it confirms the route","selection_reason":"actionable high-priority review card","selection_reason_code":"top_actionable_card","actionability":"specific_guard_missing","relevance":"medium","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","body":"Next action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n\nPlan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision."},{"card_id":"card-2","path":"src/lib.rs","line":7,"changed_line":true,"class":"contract_missing","priority":"high","confidence":"high","proof_path":"human_review_only","hypothesis_to_confirm":"static `contract_missing` ReviewCard for `unsafe fn read_header(ptr: *const u8)`; confirm with external evidence before treating it as observed runtime behavior","operation":"unsafe fn read_header(ptr: *const u8)","operation_family":"unknown","witness_routes":[{"kind":"human-deep-review","reason":"route","command":null,"required":false}],"next_action":"Add a precise public `# Safety` section that names the required caller obligations.","verify_commands":[],"build_this_first":{"kind":"witness_route","command":null,"route_kind":"human-deep-review","summary":"No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"},"confirmation_step":"use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence","selection_reason":"actionable high-confidence review card","selection_reason_code":"top_actionable_card","actionability":"specific_contract_missing","relevance":"high","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","body":"Next action: Add a precise public `# Safety` section that names the required caller obligations.\n\nPlan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision."}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
-        )
-        .map_err(|err| format!("write comment plan failed: {err}"))?;
+        let path = dir.join("comment-plan.json");
+        let mut comment_plan = parse_json_file(&path)?;
+        let mut second_comment = comment_plan["not_selected"][0].clone();
+        second_comment["witness_routes"] = serde_json::json!([{
+            "kind": "human-deep-review",
+            "reason": "route",
+            "command": null,
+            "required": false
+        }]);
+        second_comment["verify_commands"] = serde_json::json!([]);
+        second_comment["build_this_first"] = serde_json::json!({
+            "kind": "witness_route",
+            "command": null,
+            "route_kind": "human-deep-review",
+            "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+        });
+        second_comment["confirmation_step"] = serde_json::json!(
+            "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+        );
+        second_comment["selection_reason"] =
+            serde_json::json!("actionable high-confidence review card");
+        second_comment["selection_reason_code"] = serde_json::json!("top_actionable_card");
+        second_comment["body"] = serde_json::json!(
+            "Next action: Add a precise public `# Safety` section that names the required caller obligations.\n\nPlan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision."
+        );
+        second_comment["trust_boundary"] = serde_json::json!(
+            "static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"
+        );
+        comment_plan["comments"]
+            .as_array_mut()
+            .ok_or_else(|| "comment plan fixture must have comments array".to_string())?
+            .push(second_comment);
+        comment_plan["not_selected"] = serde_json::json!([]);
+        comment_plan["summary"]["selected_count"] = serde_json::json!(2);
+        comment_plan["summary"]["not_selected_count"] = serde_json::json!(0);
+        fs::write(&path, comment_plan.to_string())
+            .map_err(|err| format!("write comment plan failed: {err}"))?;
 
         let result = check_advisory_artifacts(&dir);
 
         fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
-        assert!(
-            result
-                .err()
-                .unwrap_or_default()
-                .contains("repeats inline location")
-        );
+        let err = result.err().unwrap_or_default();
+        assert!(err.contains("repeats inline location"), "{err}");
         Ok(())
     }
 
