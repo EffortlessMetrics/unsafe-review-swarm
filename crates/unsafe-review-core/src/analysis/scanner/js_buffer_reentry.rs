@@ -53,7 +53,7 @@ pub(super) fn detect_js_buffer_reentry_sites(
         else {
             continue;
         };
-        let capture_binding = js_buffer_capture_binding(&owner_lines[capture_idx].text);
+        let capture_binding = js_buffer_capture_binding(&owner_lines, capture_idx);
         let Some(materialize_idx) = js_buffer_materialization_after_reentry(
             &owner,
             &owner_lines,
@@ -203,12 +203,38 @@ fn is_js_buffer_async_descriptor_helper(line: &str) -> bool {
         || contains_call_name(line, "from_js_with_encoding_maybe_async_into")
 }
 
-fn js_buffer_capture_binding(line: &str) -> Option<String> {
+fn js_buffer_capture_binding(lines: &[JsBufferLine], capture_idx: usize) -> Option<String> {
+    let line = lines.get(capture_idx)?.text.as_str();
+    js_buffer_let_binding(line).or_else(|| js_buffer_struct_initializer_binding(lines, capture_idx))
+}
+
+fn js_buffer_let_binding(line: &str) -> Option<String> {
     let (before_assignment, _) = line.split_once('=')?;
     let mut binding = before_assignment.trim().strip_prefix("let ")?.trim();
     binding = binding.strip_prefix("mut ").unwrap_or(binding).trim();
     let binding = binding.split(':').next().unwrap_or(binding).trim();
     is_simple_identifier(binding).then(|| binding.to_string())
+}
+
+fn js_buffer_struct_initializer_binding(
+    lines: &[JsBufferLine],
+    capture_idx: usize,
+) -> Option<String> {
+    let capture = lines.get(capture_idx)?.text.trim();
+    let (field, _) = capture.split_once(':')?;
+    if !is_simple_identifier(field.trim()) {
+        return None;
+    }
+    for line in lines[..capture_idx].iter().rev() {
+        let text = line.text.trim();
+        if text.contains('{') {
+            return js_buffer_let_binding(text);
+        }
+        if text.ends_with(';') || text == "}" || text == "}," {
+            break;
+        }
+    }
+    None
 }
 
 fn line_mentions_identifier(line: &str, identifier: &str) -> bool {

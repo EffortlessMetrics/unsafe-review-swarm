@@ -544,6 +544,7 @@ required_core_fixtures = [
   "js_buffer_reentry_async_recapture_after_reentry_no_card",
   "js_buffer_reentry_node_fs_rab_scalar_write_scheduled_before_capture_no_card",
   "js_buffer_reentry_node_fs_rab_encoded_write_scheduled_before_capture_no_card",
+  "js_buffer_reentry_node_fs_rab_encoded_write_recapture_after_dispatch_no_card",
   "stable_byte_sab_borrowed_slice",
   "stable_byte_sab_mysql_blob_rawslice",
   "stable_byte_sab_snapshot_no_card",
@@ -5922,6 +5923,13 @@ expected_cards = 0
 fixture = "js_buffer_reentry_node_fs_rab_encoded_write_scheduled_before_capture_no_card"
 kind = "false_positive_control"
 claim = "Stable-byte RAB async heuristic does not emit a ReviewCard when async scheduling occurs before encoded write input capture through the encoding-aware helper"
+support_tier = "Stable-byte RAB async heuristic"
+expected_cards = 0
+
+[[cases]]
+fixture = "js_buffer_reentry_node_fs_rab_encoded_write_recapture_after_dispatch_no_card"
+kind = "false_positive_control"
+claim = "Stable-byte RAB async heuristic does not emit a ReviewCard when encoded write input is recaptured into a fresh container after async dispatch"
 support_tier = "Stable-byte RAB async heuristic"
 expected_cards = 0
 

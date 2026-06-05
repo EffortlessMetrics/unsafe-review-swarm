@@ -78,3 +78,11 @@ kind = "false_positive_control"
 expected_cards = 0
 label_source = "fixture_golden"
 rationale = "Scheduling the async worker before encoded write input capture through the encoding-aware helper should not trigger the stable-byte RAB async heuristic or create a ReviewCard."
+
+[[samples]]
+id = "stable-byte-rab-async-node-fs-encoded-write-recapture-after-dispatch-emits-no-card"
+fixture = "js_buffer_reentry_node_fs_rab_encoded_write_recapture_after_dispatch_no_card"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "Recapturing encoded write input into a fresh container after async dispatch should not trigger the stable-byte RAB async heuristic when worker-side materialization uses the refreshed container rather than the dispatched stale one."
