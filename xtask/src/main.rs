@@ -945,6 +945,7 @@ fn check_manual_candidate_example_handoff_fields(
         fix_boundary,
         pr_aperture,
     )?;
+    check_manual_candidate_example_source_trace(value, path)?;
 
     let trust_boundary = require_non_empty_json_str(value, "trust_boundary", path)?;
     for needle in [
@@ -965,6 +966,50 @@ fn check_manual_candidate_example_handoff_fields(
                 "{path} trust_boundary must include `{needle}` for committed manual examples"
             ));
         }
+    }
+    Ok(())
+}
+
+fn check_manual_candidate_example_source_trace(
+    value: &serde_json::Value,
+    path: &str,
+) -> Result<(), String> {
+    let location_file = value
+        .pointer("/location/file")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| format!("{path} location.file must be a string"))?;
+    let evidence = json_array_at(value, "/evidence", path)?;
+    let mut saw_source_trace = false;
+    for (idx, item) in evidence.iter().enumerate() {
+        if item.get("kind").and_then(serde_json::Value::as_str) != Some("source_trace") {
+            continue;
+        }
+        saw_source_trace = true;
+        let context = format!("{path} evidence[{idx}] source_trace");
+        let trace_path = require_non_empty_json_str(item, "path", &context)?;
+        if trace_path != location_file {
+            return Err(format!(
+                "{context} path `{trace_path}` must match location.file `{location_file}`"
+            ));
+        }
+        let command = require_non_empty_json_str(item, "command", &context)?;
+        if !command.contains("rg -n") {
+            return Err(format!(
+                "{context} command must include `rg -n` so implementers can re-find the file:line route"
+            ));
+        }
+        let limitation = require_non_empty_json_str(item, "limitation", &context)?;
+        let limitation = limitation.to_ascii_lowercase();
+        for needle in ["source trace only", "not prove"] {
+            if !limitation.contains(needle) {
+                return Err(format!("{context} limitation must include `{needle}`"));
+            }
+        }
+    }
+    if !saw_source_trace {
+        return Err(format!(
+            "{path} committed Bun manual candidate example must include source_trace evidence for the primary file:line route"
+        ));
     }
     Ok(())
 }
@@ -11540,6 +11585,25 @@ artifacts = [
         assert!(err.contains("safe_caller"), "{err}");
         assert!(err.contains("must match committed example"), "{err}");
         assert!(err.contains("unrelated JS route"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn manual_candidate_examples_require_source_trace_routes() -> Result<(), String> {
+        let path = "docs/examples/manual-candidates/textdecoder-sab.json";
+        let mut value = parse_json_file(&workspace_path(path))?;
+        let evidence = value
+            .get_mut("evidence")
+            .and_then(serde_json::Value::as_array_mut)
+            .ok_or_else(|| "textdecoder example should have evidence".to_string())?;
+        evidence.retain(|item| {
+            item.get("kind").and_then(serde_json::Value::as_str) != Some("source_trace")
+        });
+
+        let err = err_text(check_manual_candidate_example_handoff_fields(&value, path))?;
+
+        assert!(err.contains("source_trace evidence"), "{err}");
+        assert!(err.contains("primary file:line route"), "{err}");
         Ok(())
     }
 

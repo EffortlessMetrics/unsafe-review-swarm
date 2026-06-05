@@ -178,6 +178,12 @@ Each `evidence[]` item must include:
 - `command`: optional exact external command that produced the evidence.
 - `limitation`: optional concise statement of what the evidence does not prove.
 
+Committed Bun manual-candidate examples must include at least one
+`source_trace` evidence item for the primary `location.file`, with an `rg -n`
+command that can re-find the file:line route. The limitation must keep the
+source trace advisory and must not treat it as proof that the safe JS route
+executed or that the candidate is fixed.
+
 When present, `proof_mode` must include:
 
 - `kind`: one of `observable-red-green`, `mutation-plus-miri`,
@@ -508,6 +514,9 @@ into an analyzer ReviewCard.
   with the same ID, source marker, location, operation family, unsafe operation,
   invariant, safe caller, evidence references, optional fix/test/non-goal
   guidance, and trust boundary.
+- Committed Bun manual-candidate examples include source-route evidence with an
+  `rg -n` command for the primary file:line seam, while preserving source-trace
+  limitations and not claiming execution or proof.
 - `explain` and `context` for a manual candidate state that it is manual and
   advisory, and they include the external evidence packet without claiming that
   unsafe-review found the issue.
