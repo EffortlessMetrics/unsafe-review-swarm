@@ -200,6 +200,7 @@ fn is_js_buffer_descriptor_capture(line: &str) -> bool {
 
 fn is_js_buffer_async_descriptor_helper(line: &str) -> bool {
     contains_call_name(line, "from_js_maybe_async_into")
+        || contains_call_name(line, "from_js_with_encoding_maybe_async_into")
 }
 
 fn js_buffer_capture_binding(line: &str) -> Option<String> {
@@ -281,6 +282,11 @@ fn is_js_buffer_materialization(line: &str) -> bool {
         || contains_call_name(line, "from_raw_parts_mut")
         || contains_call_name(line, "vector")
         || contains_call_name(line, "as_ptr")
+        || is_js_buffer_async_args_slice_materialization(line)
+}
+
+fn is_js_buffer_async_args_slice_materialization(line: &str) -> bool {
+    line.contains("args.data.slice") || line.contains("args.buffer.slice")
 }
 
 fn js_buffer_stable_byte_family(capture: &JsBufferLine) -> OperationFamily {

@@ -1673,7 +1673,9 @@ hazard = "stable_byte_source"
 fixtures = [
   "js_buffer_reentry_async_helper_capture",
   "js_buffer_reentry_node_fs_rab_scalar_write",
+  "js_buffer_reentry_node_fs_rab_encoded_write_file",
   "js_buffer_reentry_node_fs_rab_scalar_write_scheduled_before_capture_no_card",
+  "js_buffer_reentry_node_fs_rab_encoded_write_scheduled_before_capture_no_card",
 ]
 dogfood_targets = []
 label_ledgers = [
@@ -1683,10 +1685,11 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned stable-byte RAB async heuristic behavior emits one advisory
 ReviewCard for the listed async StringOrBuffer helper capture before callback
-reentry or async worker dispatch and later helper or worker byte materialization.
-The listed scheduling-before-capture fixture remains a no-card control. These
-fixtures are advisory static review pressure for Bun RAB async seeds only and do
-not execute witnesses.
+reentry or async worker dispatch and later helper or worker byte materialization,
+including the listed node:fs scalar write and encoding-aware writeFile/appendFile
+fixture shapes. The listed scheduling-before-capture fixtures remain no-card
+controls. These fixtures are advisory static review pressure for Bun RAB async
+seeds only and do not execute witnesses.
 """
 forbidden_claims = [
   "Bun vulnerability",

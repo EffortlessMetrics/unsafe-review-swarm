@@ -1,0 +1,7 @@
+[package]
+name = "js-buffer-reentry-node-fs-rab-encoded-write-file-fixture"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+path = "src/lib.rs"

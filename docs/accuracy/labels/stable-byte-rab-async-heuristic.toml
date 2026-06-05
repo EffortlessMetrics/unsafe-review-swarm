@@ -47,9 +47,34 @@ label_source = "fixture_golden"
 rationale = "A same-owner node:fs-style scalar write input capture before async worker dispatch and worker-side byte materialization should stay an advisory stable-byte RAB async ReviewCard with observable-red-green proof-path wording and manual-review routing."
 
 [[samples]]
+id = "stable-byte-rab-async-node-fs-encoded-write-emits-advisory-card"
+fixture = "js_buffer_reentry_node_fs_rab_encoded_write_file"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "stable_byte_source_rab_async"
+expected_hazard = "stable_byte_source"
+expected_owner = "node_fs_rab_encoded_write_file"
+expected_site_kind = "operation"
+expected_obligation_key = "byte-stability"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A same-owner node:fs-style encoded writeFile/appendFile input capture through the encoding-aware async helper before async worker dispatch and worker-side slice materialization should stay an advisory stable-byte RAB async ReviewCard with observable-red-green proof-path wording and manual-review routing."
+
+[[samples]]
 id = "stable-byte-rab-async-node-fs-schedule-before-capture-emits-no-card"
 fixture = "js_buffer_reentry_node_fs_rab_scalar_write_scheduled_before_capture_no_card"
 kind = "false_positive_control"
 expected_cards = 0
 label_source = "fixture_golden"
 rationale = "Scheduling the async worker before scalar write input capture should not trigger the stable-byte RAB async heuristic or create a ReviewCard."
+
+[[samples]]
+id = "stable-byte-rab-async-node-fs-encoded-write-schedule-before-capture-emits-no-card"
+fixture = "js_buffer_reentry_node_fs_rab_encoded_write_scheduled_before_capture_no_card"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "Scheduling the async worker before encoded write input capture through the encoding-aware helper should not trigger the stable-byte RAB async heuristic or create a ReviewCard."
