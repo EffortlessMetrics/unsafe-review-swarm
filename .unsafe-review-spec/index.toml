@@ -59,6 +59,13 @@ status = "proposed"
 owner = "calibration"
 
 [[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0027"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0027-manual-candidate-cards.md"
+status = "proposed"
+owner = "product / cli"
+
+[[artifact]]
 id = "UNSAFE-REVIEW-SPEC-0021"
 kind = "spec"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-0021-vscode-openvsx-extension.md"
@@ -107,6 +114,13 @@ name = "accuracy calibration rail"
 path = ".unsafe-review-spec/goals/active.toml"
 status = "active"
 owner = "calibration"
+
+[[lane]]
+id = "manual-candidate-bun-cockpit"
+name = "manual candidate Bun cockpit"
+path = ".unsafe-review-spec/goals/active.toml"
+status = "active"
+owner = "product / cli"
 
 [[lane]]
 id = "editor-extension"

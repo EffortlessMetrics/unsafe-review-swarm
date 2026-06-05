@@ -80,3 +80,22 @@ commands = [
   "cargo run --locked -p xtask -- source-divergence",
   "git diff --check",
 ]
+
+[[work_item]]
+id = "manual-candidate-bun-cockpit"
+status = "active"
+proposal = "UNSAFE-REVIEW-PROP-0002"
+spec = "UNSAFE-REVIEW-SPEC-0027"
+plan = ".unsafe-review-spec/lanes/bun-stable-byte-cockpit/implementation-plan.md"
+commands = [
+  "cargo test -p unsafe-review-core manual_candidate",
+  "cargo test -p unsafe-review-core receipt",
+  "cargo test -p unsafe-review-cli candidate",
+  "cargo test -p unsafe-review first_pr",
+  "cargo test -p xtask manual_candidate",
+  "cargo run --locked -p xtask -- check-manual-candidate-examples",
+  "cargo run --locked -p xtask -- check-dogfood",
+  "cargo run --locked -p xtask -- check-pr",
+  "cargo run --locked -p xtask -- source-divergence",
+  "git diff --check",
+]
