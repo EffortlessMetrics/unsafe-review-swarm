@@ -358,6 +358,9 @@ first PR, safe JS caller route, Rust/native sink, triage labels, and
 caller route, and Rust/native sink. Seed rows are advisory workflow metadata only:
 they are not analyzer discovery, not witness execution, not proof, not policy
 readiness, and not a ReviewCard truth.
+The root-local seed ledger must resolve to at most one seed row per manual
+candidate ID; multi-seed semantics require an explicit future schema instead of
+silent overwrite or duplicate workflow state.
 
 `first-pr` may also write `manual-repair-queue.json` as a dedicated
 manual-candidate repair handoff sidecar. It must use

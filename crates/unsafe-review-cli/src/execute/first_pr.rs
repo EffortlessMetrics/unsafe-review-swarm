@@ -1406,7 +1406,7 @@ fn parse_stable_byte_seed_ledger(
 ) -> Result<(usize, BTreeMap<String, StableByteSeed>), String> {
     let mut in_table = false;
     let mut rows = 0usize;
-    let mut by_candidate_id = BTreeMap::new();
+    let mut by_candidate_id = BTreeMap::<String, StableByteSeed>::new();
     for line in text.lines() {
         if !in_table {
             if line.contains("| Seed ID |") {
@@ -1445,6 +1445,12 @@ fn parse_stable_byte_seed_ledger(
             return Err("stable-byte seed row is missing seed id or manual candidate".to_string());
         }
         if let Some(candidate_id) = stable_byte_seed_manual_candidate_id(root, &seed) {
+            if let Some(previous_seed) = by_candidate_id.get(&candidate_id) {
+                return Err(format!(
+                    "stable-byte seed rows `{}` and `{}` both resolve to manual candidate `{candidate_id}`; each manual candidate must have at most one stable-byte seed row",
+                    previous_seed.seed_id, seed.seed_id
+                ));
+            }
             by_candidate_id.insert(candidate_id, seed);
         }
         rows += 1;
@@ -2712,6 +2718,38 @@ mod tests {
                 .unwrap_or("")
                 .contains("not rendered tokmd output")
         );
+        let _ = fs::remove_dir_all(&root);
+        Ok(())
+    }
+
+    #[test]
+    fn stable_byte_seed_ledger_rejects_duplicate_manual_candidate_ids() -> Result<(), String> {
+        let root = unique_test_root("unsafe-review-duplicate-seed-ledger")?;
+        let candidate_dir = root.join("docs/examples/manual-candidates");
+        fs::create_dir_all(&candidate_dir)
+            .map_err(|err| format!("create {} failed: {err}", candidate_dir.display()))?;
+        fs::write(
+            candidate_dir.join("textdecoder-sab.json"),
+            manual_candidate_fixture_with_stable_byte_json(),
+        )
+        .map_err(|err| format!("write candidate fixture failed: {err}"))?;
+        let text = r#"# Bun stable-byte follow-up seed index
+
+## Seeds
+
+| Seed ID | Ledger state | Candidate family | Surface | Manual candidate | Safe JS caller | Rust/native sink | Proof mode | Suggested first PR | Owner lane | Triage labels |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `bun-stable-byte-textdecoder-sab` | `handoff-ready` | `stable-byte-source-sab-race` | `TextDecoder.decode` | `docs/examples/manual-candidates/textdecoder-sab.json` | SharedArrayBuffer-backed typed array decode | `src/runtime/webcore/TextDecoder.rs` slice materialization | `mutation-plus-miri` | `TextDecoder shared-byte snapshot only` | `rust2` | `non-observable`, `needs-miri-model` |
+| `bun-stable-byte-textdecoder-sab-follow-up` | `handoff-ready` | `stable-byte-source-sab-race` | `TextDecoder.decode` | `docs/examples/manual-candidates/textdecoder-sab.json` | SharedArrayBuffer-backed typed array decode | `src/runtime/webcore/TextDecoder.rs` slice materialization | `mutation-plus-miri` | `TextDecoder shared-byte snapshot only` | `rust2` | `non-observable`, `needs-miri-model` |
+"#;
+
+        let err = match parse_stable_byte_seed_ledger(&root, text) {
+            Ok(_) => return Err("duplicate stable-byte seed rows should fail".to_string()),
+            Err(err) => err,
+        };
+
+        assert!(err.contains("both resolve to manual candidate `R4R2-S001`"));
+        assert!(err.contains("at most one stable-byte seed row"));
         let _ = fs::remove_dir_all(&root);
         Ok(())
     }

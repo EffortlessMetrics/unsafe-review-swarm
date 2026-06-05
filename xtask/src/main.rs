@@ -3572,7 +3572,8 @@ fn check_dogfood_stable_byte_seed_text(
     let mut in_table = false;
     let mut rows = 0usize;
     let mut seed_ids = BTreeSet::new();
-    let mut manual_candidate_paths = BTreeSet::new();
+    let mut manual_candidate_paths = BTreeMap::new();
+    let mut manual_candidate_ids = BTreeMap::new();
     let mut labels_by_seed = BTreeMap::<String, BTreeSet<String>>::new();
     for (line_idx, line) in text.lines().enumerate() {
         if !in_table {
@@ -3644,7 +3645,32 @@ fn check_dogfood_stable_byte_seed_text(
                     line_idx + 1
                 )
             })?;
-        manual_candidate_paths.insert(manual_candidate_path.clone());
+        if let Some(previous_seed) =
+            manual_candidate_paths.insert(manual_candidate_path.clone(), seed_id.clone())
+        {
+            return Err(format!(
+                "{path}:{} stable-byte seed `{seed_id}` references manual candidate `{manual_candidate_path}` already used by seed `{previous_seed}`; each manual candidate must have at most one stable-byte seed row",
+                line_idx + 1
+            ));
+        }
+        let manual_candidate_id = candidate
+            .get("id")
+            .and_then(serde_json::Value::as_str)
+            .filter(|value| !value.trim().is_empty())
+            .ok_or_else(|| {
+                format!(
+                    "{path}:{} manual candidate `{manual_candidate_path}` is missing id",
+                    line_idx + 1
+                )
+            })?;
+        if let Some(previous_seed) =
+            manual_candidate_ids.insert(manual_candidate_id.to_string(), seed_id.clone())
+        {
+            return Err(format!(
+                "{path}:{} stable-byte seed `{seed_id}` resolves to manual candidate id `{manual_candidate_id}` already used by seed `{previous_seed}`; each manual candidate must have at most one stable-byte seed row",
+                line_idx + 1
+            ));
+        }
 
         check_stable_byte_seed_candidate_field(
             path,
@@ -3746,7 +3772,7 @@ fn check_dogfood_stable_byte_seed_text(
         return Err(format!("{path} has a stable-byte seed table with no rows"));
     }
     for manual_candidate_path in manual_candidates_by_path.keys() {
-        if !manual_candidate_paths.contains(manual_candidate_path) {
+        if !manual_candidate_paths.contains_key(manual_candidate_path) {
             return Err(format!(
                 "{path} must include a stable-byte seed for `{manual_candidate_path}`"
             ));
@@ -12343,6 +12369,7 @@ policy readiness.
         sink: &str,
     ) -> serde_json::Value {
         serde_json::json!({
+            "id": "R4R2-S001",
             "proof_mode": {
                 "kind": proof_mode
             },
@@ -12464,6 +12491,43 @@ Triage labels come from [taxonomy](stable-byte-triage-taxonomy.md).
 
         assert!(err.contains("proof mode `observable-red-green`"));
         assert!(err.contains("must match `mutation-plus-miri`"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_stable_byte_seed_index_rejects_duplicate_manual_candidate_rows() -> Result<(), String>
+    {
+        let text = r#"
+# Bun stable-byte follow-up seed index
+
+Triage labels come from [taxonomy](stable-byte-triage-taxonomy.md).
+
+## Seeds
+
+| Seed ID | Ledger state | Candidate family | Surface | Manual candidate | Safe JS caller | Rust/native sink | Proof mode | Suggested first PR | Owner lane | Triage labels |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `bun-stable-byte-textdecoder-sab` | `handoff-ready` | `stable-byte-source-sab-race` | `TextDecoder.decode` | `docs/examples/manual-candidates/textdecoder-sab.json` | SharedArrayBuffer-backed typed array decode | `src/runtime/webcore/TextDecoder.rs` slice materialization | `mutation-plus-miri` | `TextDecoder shared-byte snapshot only` | `rust2` | `non-observable`, `needs-miri-model` |
+| `bun-stable-byte-textdecoder-sab-follow-up` | `handoff-ready` | `stable-byte-source-sab-race` | `TextDecoder.decode` | `docs/examples/manual-candidates/textdecoder-sab.json` | SharedArrayBuffer-backed typed array decode | `src/runtime/webcore/TextDecoder.rs` slice materialization | `mutation-plus-miri` | `TextDecoder shared-byte snapshot only` | `rust2` | `non-observable`, `needs-miri-model` |
+"#;
+        let manual_candidates = BTreeMap::from([(
+            "docs/examples/manual-candidates/textdecoder-sab.json".to_string(),
+            stable_byte_seed_candidate_for_tests(
+                "mutation-plus-miri",
+                "stable-byte-source-sab-race",
+                "handoff-ready",
+                "SharedArrayBuffer-backed typed array decode",
+                "src/runtime/webcore/TextDecoder.rs slice materialization",
+            ),
+        )]);
+
+        let err = err_text(check_dogfood_stable_byte_seed_text(
+            "docs/dogfood/stable-byte-follow-up-seeds.md",
+            text,
+            &manual_candidates,
+        ))?;
+
+        assert!(err.contains("already used by seed `bun-stable-byte-textdecoder-sab`"));
+        assert!(err.contains("at most one stable-byte seed row"));
         Ok(())
     }
 
