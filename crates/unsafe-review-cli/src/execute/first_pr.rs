@@ -1406,8 +1406,9 @@ fn parse_stable_byte_seed_ledger(
 ) -> Result<(usize, BTreeMap<String, StableByteSeed>), String> {
     let mut in_table = false;
     let mut rows = 0usize;
+    let mut seed_ids = BTreeMap::<String, usize>::new();
     let mut by_candidate_id = BTreeMap::<String, StableByteSeed>::new();
-    for line in text.lines() {
+    for (line_idx, line) in text.lines().enumerate() {
         if !in_table {
             if line.contains("| Seed ID |") {
                 let columns = markdown_table_columns(line);
@@ -1443,6 +1444,12 @@ fn parse_stable_byte_seed_ledger(
         };
         if seed.seed_id.is_empty() || seed.manual_candidate.is_empty() {
             return Err("stable-byte seed row is missing seed id or manual candidate".to_string());
+        }
+        if let Some(previous_line) = seed_ids.insert(seed.seed_id.clone(), line_idx + 1) {
+            return Err(format!(
+                "stable-byte seed row `{}` repeats seed id first seen on line {previous_line}; each stable-byte seed row must have a unique seed id",
+                seed.seed_id
+            ));
         }
         if let Some(candidate_id) = stable_byte_seed_manual_candidate_id(root, &seed) {
             if let Some(previous_seed) = by_candidate_id.get(&candidate_id) {
@@ -2750,6 +2757,30 @@ mod tests {
 
         assert!(err.contains("both resolve to manual candidate `R4R2-S001`"));
         assert!(err.contains("at most one stable-byte seed row"));
+        let _ = fs::remove_dir_all(&root);
+        Ok(())
+    }
+
+    #[test]
+    fn stable_byte_seed_ledger_rejects_duplicate_seed_ids() -> Result<(), String> {
+        let root = unique_test_root("unsafe-review-duplicate-seed-id-ledger")?;
+        let text = r#"# Bun stable-byte follow-up seed index
+
+## Seeds
+
+| Seed ID | Ledger state | Candidate family | Surface | Manual candidate | Safe JS caller | Rust/native sink | Proof mode | Suggested first PR | Owner lane | Triage labels |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `bun-stable-byte-textdecoder-sab` | `handoff-ready` | `stable-byte-source-sab-race` | `TextDecoder.decode` | `docs/examples/manual-candidates/textdecoder-sab.json` | SharedArrayBuffer-backed typed array decode | `src/runtime/webcore/TextDecoder.rs` slice materialization | `mutation-plus-miri` | `TextDecoder shared-byte snapshot only` | `rust2` | `non-observable`, `needs-miri-model` |
+| `bun-stable-byte-textdecoder-sab` | `handoff-ready` | `stable-byte-source-rab-async` | `node:fs write` | `docs/examples/manual-candidates/node-fs-rab-scalar-write.json` | RAB-backed BufferSource resized before async filesystem completion | `src/runtime/node/node_fs.rs` worker-side write input read | `observable-red-green` | `node:fs scalar write input snapshot only` | `rust3` | `observable` |
+"#;
+
+        let err = match parse_stable_byte_seed_ledger(&root, text) {
+            Ok(_) => return Err("duplicate stable-byte seed ids should fail".to_string()),
+            Err(err) => err,
+        };
+
+        assert!(err.contains("repeats seed id first seen on line"));
+        assert!(err.contains("unique seed id"));
         let _ = fs::remove_dir_all(&root);
         Ok(())
     }
