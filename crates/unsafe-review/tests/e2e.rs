@@ -5338,9 +5338,9 @@ fn assert_manual_candidate_front_panel(
     ));
     if compact {
         assert!(text.contains(
-            "- Stable-byte: `stable-byte-source-sab-race`; proof `mutation-plus-miri`; ledger `handoff-ready`"
+            "- Stable-byte class: `stable-byte-source-sab-race`; proof `mutation-plus-miri`; ledger `handoff-ready`; route `SharedArrayBuffer-backed typed array decode` -> `src/runtime/webcore/TextDecoder.rs slice materialization`; hazard in sidecars"
         ));
-        assert!(text.contains("- Evidence refs: 3; stop line and guidance in sidecars."));
+        assert!(text.contains("- Evidence refs: 3; full route and evidence packet in sidecars."));
         assert!(!text.contains("- Safe caller route:"));
         assert!(!text.contains("- Invariant at risk:"));
         assert!(!text.contains("- External evidence refs:"));
@@ -5363,8 +5363,12 @@ fn assert_manual_candidate_front_panel(
         ));
     }
     if compact {
-        assert!(!text.contains("- Proof mode:"));
-        assert!(!text.contains("- Oracle map:"));
+        assert!(text.contains(
+            "- Proof mode: `mutation-plus-miri` (system Bun expected: `nondiscriminating`; mutation required: `true`; Miri/model required: `true`)"
+        ));
+        assert!(text.contains(
+            "- Oracle map: `src/runtime/webcore/TextDecoder.rs::decode` -> `test/js/webcore/textdecoder-sharedarraybuffer.test.ts` (`typescript`; `shared-byte-mutation-model`; limitation in sidecars)"
+        ));
     } else {
         assert!(text.contains(
             "- Proof mode: `mutation-plus-miri` (system Bun expected: `nondiscriminating`; mutation required: `true`; Miri/model required: `true`)"
@@ -5377,12 +5381,25 @@ fn assert_manual_candidate_front_panel(
         );
     }
     if compact {
-        assert!(!text.contains("- Fix boundary:"));
-        assert!(!text.contains("- Stop line:"));
-        assert!(!text.contains("- Guidance:"));
-        assert!(!text.contains("- First fix option:"));
-        assert!(!text.contains("- First test target:"));
-        assert!(!text.contains("- First do-not-touch note:"));
+        assert!(text.contains(
+            "- Fix boundary: Snapshot shared/growable/resizable bytes before Rust receives &[u8]"
+        ));
+        assert!(text.contains(
+            "- PR aperture: TextDecoder shared-byte snapshot only; do not patch S3, fs, writev, or unrelated encodings"
+        ));
+        assert!(text.contains("- Stop line: keep the PR inside this aperture."));
+        assert!(
+            text.contains("- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)")
+        );
+        assert!(text.contains(
+            "- First fix option: Copy SharedArrayBuffer-backed bytes into stable owned storage before creating a Rust slice"
+        ));
+        assert!(text.contains(
+            "- First test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`"
+        ));
+        assert!(text.contains(
+            "- First do-not-touch note: Do not rewrite unrelated TextDecoder encoding paths"
+        ));
     } else {
         assert!(text.contains(
             "- Fix boundary: Snapshot shared/growable/resizable bytes before Rust receives &[u8]"
