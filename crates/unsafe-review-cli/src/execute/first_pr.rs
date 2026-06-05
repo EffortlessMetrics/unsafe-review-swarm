@@ -950,12 +950,11 @@ fn append_manual_candidate_compact_lines(
     if let Some(seed) = stable_byte_seed {
         let _ = writeln!(
             out,
-            "- Stable-byte seed: `{}` (owner lane: `{}`; suggested first PR: `{}`; seed owner: `{}`; next PR: `{}`)",
+            "- Stable-byte seed: `{}` (owner lane: `{}`; suggested first PR: `{}`; triage: `{}`)",
             seed.seed_id,
             seed.owner_lane,
             seed.suggested_first_pr,
-            seed.owner_lane,
-            seed.suggested_first_pr
+            seed.triage_labels.join("`, `")
         );
     } else if let Some(aperture) = &candidate.pr_aperture {
         let _ = writeln!(out, "- PR aperture: {aperture}");
@@ -1183,8 +1182,11 @@ fn append_manual_candidate_queue_preview(
         if let Some(seed) = stable_byte_seed_ledger.by_candidate_id.get(&candidate.id) {
             let _ = write!(
                 out,
-                "; seed owner: `{}`; next PR: `{}`",
-                seed.owner_lane, seed.suggested_first_pr
+                "; seed: `{}`; seed owner: `{}`; next PR: `{}`; triage: `{}`",
+                seed.seed_id,
+                seed.owner_lane,
+                seed.suggested_first_pr,
+                seed.triage_labels.join("`, `")
             );
         }
         out.push('\n');

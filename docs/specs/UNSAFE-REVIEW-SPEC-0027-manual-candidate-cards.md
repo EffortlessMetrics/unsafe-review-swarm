@@ -431,8 +431,8 @@ raw JSON. The compact GitHub summary may collapse this to class, proof mode,
 ledger state, source-to-sink route, and a sidecar pointer to keep the hosted
 summary within its word budget.
 When a joined stable-byte seed row is present, the front-door cue and bounded
-queue preview may also render the seed ID, owner lane, suggested first PR, and
-triage labels as next-lane workflow metadata. This must not replace the
+queue preview render the seed ID, owner lane, suggested first PR, and triage
+labels as next-lane workflow metadata. This must not replace the
 candidate-local `stable_byte` packet fields or upgrade the candidate into a
 ReviewCard finding.
 
@@ -443,7 +443,7 @@ guidance, proof mode, fix boundary, PR aperture, stop line, plus the bounded
 manual-candidate queue preview, must preserve the manual/advisory markers, and
 must not add manual candidates to ReviewCard witness route groups or import
 ReviewCard witness evidence.
-If a joined stable-byte seed row is present, the follow-up cue may render the
+If a joined stable-byte seed row is present, the follow-up cue renders the
 same seed ID, owner lane, suggested first PR, and triage labels as advisory
 workflow metadata only.
 
