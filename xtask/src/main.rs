@@ -1173,6 +1173,8 @@ fn check_manual_candidate_smoke_tokmd_seed_projection(
             "stable_byte_class_matches_manual_candidate",
             "proof_mode_matches_manual_candidate",
             "ledger_state_matches_manual_candidate",
+            "safe_js_caller_matches_manual_candidate",
+            "rust_native_sink_matches_manual_candidate",
         ] {
             if consistency.get(field).and_then(serde_json::Value::as_bool) != Some(true) {
                 return Err(format!(
@@ -1244,7 +1246,7 @@ fn check_manual_candidate_smoke_review_kit_seed_projection(
             queue.len()
         ));
     }
-    let mut first_seed_identity = None;
+    let mut seed_previews = Vec::new();
     for (entry, example) in queue.iter().zip(examples) {
         let context = format!("{path_display} candidate_queue `{}`", example.id);
         require_json_str(entry, "id", &example.id, &context)?;
@@ -1254,7 +1256,19 @@ fn check_manual_candidate_smoke_review_kit_seed_projection(
         let seed_id = require_non_empty_json_str(seed, "seed_id", &context)?;
         let owner_lane = require_non_empty_json_str(seed, "owner_lane", &context)?;
         let suggested_first_pr = require_non_empty_json_str(seed, "suggested_first_pr", &context)?;
-        json_array_at(seed, "/triage_labels", &context)?;
+        let triage_labels = json_array_at(seed, "/triage_labels", &context)?
+            .iter()
+            .map(|label| {
+                label.as_str().map(str::to_string).ok_or_else(|| {
+                    format!("{context} stable_byte_seed.triage_labels must contain strings")
+                })
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        if triage_labels.is_empty() {
+            return Err(format!(
+                "{context} stable_byte_seed.triage_labels must not be empty"
+            ));
+        }
         let consistency = seed.get("candidate_consistency").ok_or_else(|| {
             format!("{context} stable_byte_seed is missing candidate_consistency")
         })?;
@@ -1262,6 +1276,8 @@ fn check_manual_candidate_smoke_review_kit_seed_projection(
             "stable_byte_class_matches_manual_candidate",
             "proof_mode_matches_manual_candidate",
             "ledger_state_matches_manual_candidate",
+            "safe_js_caller_matches_manual_candidate",
+            "rust_native_sink_matches_manual_candidate",
         ] {
             if consistency.get(field).and_then(serde_json::Value::as_bool) != Some(true) {
                 return Err(format!(
@@ -1269,20 +1285,20 @@ fn check_manual_candidate_smoke_review_kit_seed_projection(
                 ));
             }
         }
-        if first_seed_identity.is_none() {
-            first_seed_identity = Some((
-                seed_id.to_string(),
-                owner_lane.to_string(),
-                suggested_first_pr.to_string(),
-            ));
-        }
+        seed_previews.push((
+            seed_id.to_string(),
+            owner_lane.to_string(),
+            suggested_first_pr.to_string(),
+            triage_labels,
+        ));
     }
-    let Some((seed_id, owner_lane, suggested_first_pr)) = first_seed_identity else {
+    let Some((seed_id, owner_lane, suggested_first_pr, triage_labels)) = seed_previews.first()
+    else {
         return Err(format!(
             "{path_display} handoff.manual_candidates.candidate_queue must include a stable-byte seed"
         ));
     };
-    for artifact in ["pr-summary.md", "github-summary.md", "witness-plan.md"] {
+    for artifact in ["github-summary.md"] {
         let artifact_path = out_dir.join(artifact);
         let text = fs::read_to_string(&artifact_path)
             .map_err(|err| format!("read {} failed: {err}", artifact_path.display()))?;
@@ -1293,14 +1309,52 @@ fn check_manual_candidate_smoke_review_kit_seed_projection(
             &format!("`{owner_lane}`"),
             "suggested first PR:",
             &format!("`{suggested_first_pr}`"),
-            "seed owner:",
-            "next PR:",
+            "triage:",
         ] {
             if !text.contains(needle) {
                 return Err(format!(
                     "{} must include stable-byte seed cockpit marker `{needle}`",
                     artifact_path.display()
                 ));
+            }
+        }
+        for label in triage_labels {
+            if !text.contains(label) {
+                return Err(format!(
+                    "{} must include stable-byte seed triage label `{label}`",
+                    artifact_path.display()
+                ));
+            }
+        }
+    }
+    for artifact in ["pr-summary.md", "witness-plan.md"] {
+        let artifact_path = out_dir.join(artifact);
+        let text = fs::read_to_string(&artifact_path)
+            .map_err(|err| format!("read {} failed: {err}", artifact_path.display()))?;
+        for (seed_id, owner_lane, suggested_first_pr, triage_labels) in &seed_previews {
+            for needle in [
+                "seed:",
+                &format!("`{seed_id}`"),
+                "seed owner:",
+                &format!("`{owner_lane}`"),
+                "next PR:",
+                &format!("`{suggested_first_pr}`"),
+                "triage:",
+            ] {
+                if !text.contains(needle) {
+                    return Err(format!(
+                        "{} must include stable-byte queue marker `{needle}`",
+                        artifact_path.display()
+                    ));
+                }
+            }
+            for label in triage_labels {
+                if !text.contains(label) {
+                    return Err(format!(
+                        "{} must include stable-byte queue triage label `{label}`",
+                        artifact_path.display()
+                    ));
+                }
             }
         }
     }
@@ -3479,6 +3533,47 @@ fn check_dogfood_stable_byte_seed_text(
             })?;
         manual_candidate_paths.insert(manual_candidate_path.clone());
 
+        check_stable_byte_seed_candidate_field(
+            path,
+            line_idx + 1,
+            &seed_id,
+            &manual_candidate_path,
+            "ledger state",
+            &ledger_state,
+            candidate,
+            "/stable_byte/ledger_state",
+        )?;
+        check_stable_byte_seed_candidate_field(
+            path,
+            line_idx + 1,
+            &seed_id,
+            &manual_candidate_path,
+            "candidate family",
+            &candidate_family,
+            candidate,
+            "/stable_byte/class",
+        )?;
+        check_stable_byte_seed_candidate_field(
+            path,
+            line_idx + 1,
+            &seed_id,
+            &manual_candidate_path,
+            "Safe JS caller",
+            &stable_byte_seed_text_cell_value(columns[5]),
+            candidate,
+            "/stable_byte/source",
+        )?;
+        check_stable_byte_seed_candidate_field(
+            path,
+            line_idx + 1,
+            &seed_id,
+            &manual_candidate_path,
+            "Rust/native sink",
+            &stable_byte_seed_text_cell_value(columns[6]),
+            candidate,
+            "/stable_byte/sink",
+        )?;
+
         let proof_mode = markdown_code_cell_value(columns[7]);
         if !matches!(
             proof_mode.as_str(),
@@ -3547,6 +3642,41 @@ fn check_dogfood_stable_byte_seed_text(
     let calibrated_fixtures = calibrated_fixture_names()?;
     check_dogfood_stable_byte_coverage_labels(path, text, &labels_by_seed, &calibrated_fixtures)?;
     Ok(rows)
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "stable-byte seed diagnostics include ledger row and candidate packet context"
+)]
+fn check_stable_byte_seed_candidate_field(
+    path: &str,
+    line: usize,
+    seed_id: &str,
+    manual_candidate_path: &str,
+    field: &str,
+    seed_value: &str,
+    candidate: &serde_json::Value,
+    candidate_pointer: &str,
+) -> Result<(), String> {
+    let expected = candidate
+        .pointer(candidate_pointer)
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| {
+            format!(
+                "{path}:{line} manual candidate `{manual_candidate_path}` is missing `{candidate_pointer}`"
+            )
+        })?;
+    if seed_value != expected {
+        return Err(format!(
+            "{path}:{line} stable-byte seed `{seed_id}` {field} `{seed_value}` must match `{expected}` from `{manual_candidate_path}`"
+        ));
+    }
+    Ok(())
+}
+
+fn stable_byte_seed_text_cell_value(cell: &str) -> String {
+    cell.trim().replace('`', "").trim().to_string()
 }
 
 fn check_dogfood_stable_byte_coverage_labels(
@@ -12050,6 +12180,26 @@ policy readiness.
         Ok(())
     }
 
+    fn stable_byte_seed_candidate_for_tests(
+        proof_mode: &str,
+        class: &str,
+        ledger_state: &str,
+        source: &str,
+        sink: &str,
+    ) -> serde_json::Value {
+        serde_json::json!({
+            "proof_mode": {
+                "kind": proof_mode
+            },
+            "stable_byte": {
+                "class": class,
+                "source": source,
+                "sink": sink,
+                "ledger_state": ledger_state
+            }
+        })
+    }
+
     #[test]
     fn dogfood_stable_byte_seed_index_accepts_manual_candidate_rows() -> Result<(), String> {
         let text = r#"
@@ -12071,11 +12221,13 @@ Triage labels come from [taxonomy](stable-byte-triage-taxonomy.md).
 "#;
         let manual_candidates = BTreeMap::from([(
             "docs/examples/manual-candidates/textdecoder-sab.json".to_string(),
-            serde_json::json!({
-                "proof_mode": {
-                    "kind": "mutation-plus-miri"
-                }
-            }),
+            stable_byte_seed_candidate_for_tests(
+                "mutation-plus-miri",
+                "stable-byte-source-sab-race",
+                "handoff-ready",
+                "SharedArrayBuffer-backed typed array decode",
+                "src/runtime/webcore/TextDecoder.rs slice materialization",
+            ),
         )]);
 
         let rows = check_dogfood_stable_byte_seed_text(
@@ -12104,11 +12256,13 @@ Triage labels come from [taxonomy](stable-byte-triage-taxonomy.md).
 "#;
         let manual_candidates = BTreeMap::from([(
             "docs/examples/manual-candidates/zstd-overlap.json".to_string(),
-            serde_json::json!({
-                "proof_mode": {
-                    "kind": "observable-red-green"
-                }
-            }),
+            stable_byte_seed_candidate_for_tests(
+                "observable-red-green",
+                "stable-byte-source-native-ffi-read",
+                "handoff-ready",
+                "Overlapping caller-controlled ArrayBuffer input and output",
+                "src/runtime/node/node_zlib_binding.rs native Zstd buffer handoff",
+            ),
         )]);
 
         let err = err_text(check_dogfood_stable_byte_seed_text(
@@ -12138,11 +12292,13 @@ Triage labels come from [taxonomy](stable-byte-triage-taxonomy.md).
 "#;
         let manual_candidates = BTreeMap::from([(
             "docs/examples/manual-candidates/textdecoder-sab.json".to_string(),
-            serde_json::json!({
-                "proof_mode": {
-                    "kind": "mutation-plus-miri"
-                }
-            }),
+            stable_byte_seed_candidate_for_tests(
+                "mutation-plus-miri",
+                "stable-byte-source-sab-race",
+                "handoff-ready",
+                "SharedArrayBuffer-backed typed array decode",
+                "src/runtime/webcore/TextDecoder.rs slice materialization",
+            ),
         )]);
 
         let err = err_text(check_dogfood_stable_byte_seed_text(
@@ -12153,6 +12309,148 @@ Triage labels come from [taxonomy](stable-byte-triage-taxonomy.md).
 
         assert!(err.contains("proof mode `observable-red-green`"));
         assert!(err.contains("must match `mutation-plus-miri`"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_stable_byte_seed_index_rejects_candidate_family_drift() -> Result<(), String> {
+        let text = r#"
+# Bun stable-byte follow-up seed index
+
+Triage labels come from [taxonomy](stable-byte-triage-taxonomy.md).
+
+## Seeds
+
+| Seed ID | Ledger state | Candidate family | Surface | Manual candidate | Safe JS caller | Rust/native sink | Proof mode | Suggested first PR | Owner lane | Triage labels |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `bun-stable-byte-textdecoder-sab` | `handoff-ready` | `stable-byte-source-getter-reentry` | `TextDecoder.decode` | `docs/examples/manual-candidates/textdecoder-sab.json` | SharedArrayBuffer-backed typed array decode | `src/runtime/webcore/TextDecoder.rs` slice materialization | `mutation-plus-miri` | `TextDecoder shared-byte snapshot only` | `rust2` | `non-observable`, `needs-miri-model` |
+"#;
+        let manual_candidates = BTreeMap::from([(
+            "docs/examples/manual-candidates/textdecoder-sab.json".to_string(),
+            stable_byte_seed_candidate_for_tests(
+                "mutation-plus-miri",
+                "stable-byte-source-sab-race",
+                "handoff-ready",
+                "SharedArrayBuffer-backed typed array decode",
+                "src/runtime/webcore/TextDecoder.rs slice materialization",
+            ),
+        )]);
+
+        let err = err_text(check_dogfood_stable_byte_seed_text(
+            "docs/dogfood/stable-byte-follow-up-seeds.md",
+            text,
+            &manual_candidates,
+        ))?;
+
+        assert!(err.contains("candidate family `stable-byte-source-getter-reentry`"));
+        assert!(err.contains("must match `stable-byte-source-sab-race`"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_stable_byte_seed_index_rejects_ledger_state_drift() -> Result<(), String> {
+        let text = r#"
+# Bun stable-byte follow-up seed index
+
+Triage labels come from [taxonomy](stable-byte-triage-taxonomy.md).
+
+## Seeds
+
+| Seed ID | Ledger state | Candidate family | Surface | Manual candidate | Safe JS caller | Rust/native sink | Proof mode | Suggested first PR | Owner lane | Triage labels |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `bun-stable-byte-textdecoder-sab` | `needs-refresh` | `stable-byte-source-sab-race` | `TextDecoder.decode` | `docs/examples/manual-candidates/textdecoder-sab.json` | SharedArrayBuffer-backed typed array decode | `src/runtime/webcore/TextDecoder.rs` slice materialization | `mutation-plus-miri` | `TextDecoder shared-byte snapshot only` | `rust2` | `non-observable`, `needs-miri-model` |
+"#;
+        let manual_candidates = BTreeMap::from([(
+            "docs/examples/manual-candidates/textdecoder-sab.json".to_string(),
+            stable_byte_seed_candidate_for_tests(
+                "mutation-plus-miri",
+                "stable-byte-source-sab-race",
+                "handoff-ready",
+                "SharedArrayBuffer-backed typed array decode",
+                "src/runtime/webcore/TextDecoder.rs slice materialization",
+            ),
+        )]);
+
+        let err = err_text(check_dogfood_stable_byte_seed_text(
+            "docs/dogfood/stable-byte-follow-up-seeds.md",
+            text,
+            &manual_candidates,
+        ))?;
+
+        assert!(err.contains("ledger state `needs-refresh`"));
+        assert!(err.contains("must match `handoff-ready`"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_stable_byte_seed_index_rejects_source_route_drift() -> Result<(), String> {
+        let text = r#"
+# Bun stable-byte follow-up seed index
+
+Triage labels come from [taxonomy](stable-byte-triage-taxonomy.md).
+
+## Seeds
+
+| Seed ID | Ledger state | Candidate family | Surface | Manual candidate | Safe JS caller | Rust/native sink | Proof mode | Suggested first PR | Owner lane | Triage labels |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `bun-stable-byte-textdecoder-sab` | `handoff-ready` | `stable-byte-source-sab-race` | `TextDecoder.decode` | `docs/examples/manual-candidates/textdecoder-sab.json` | Wrong safe JS caller route | `src/runtime/webcore/TextDecoder.rs` slice materialization | `mutation-plus-miri` | `TextDecoder shared-byte snapshot only` | `rust2` | `non-observable`, `needs-miri-model` |
+"#;
+        let manual_candidates = BTreeMap::from([(
+            "docs/examples/manual-candidates/textdecoder-sab.json".to_string(),
+            stable_byte_seed_candidate_for_tests(
+                "mutation-plus-miri",
+                "stable-byte-source-sab-race",
+                "handoff-ready",
+                "SharedArrayBuffer-backed typed array decode",
+                "src/runtime/webcore/TextDecoder.rs slice materialization",
+            ),
+        )]);
+
+        let err = err_text(check_dogfood_stable_byte_seed_text(
+            "docs/dogfood/stable-byte-follow-up-seeds.md",
+            text,
+            &manual_candidates,
+        ))?;
+
+        assert!(err.contains("Safe JS caller `Wrong safe JS caller route`"));
+        assert!(err.contains("must match `SharedArrayBuffer-backed typed array decode`"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_stable_byte_seed_index_rejects_sink_drift() -> Result<(), String> {
+        let text = r#"
+# Bun stable-byte follow-up seed index
+
+Triage labels come from [taxonomy](stable-byte-triage-taxonomy.md).
+
+## Seeds
+
+| Seed ID | Ledger state | Candidate family | Surface | Manual candidate | Safe JS caller | Rust/native sink | Proof mode | Suggested first PR | Owner lane | Triage labels |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `bun-stable-byte-textdecoder-sab` | `handoff-ready` | `stable-byte-source-sab-race` | `TextDecoder.decode` | `docs/examples/manual-candidates/textdecoder-sab.json` | SharedArrayBuffer-backed typed array decode | `src/runtime/webcore/Wrong.rs` slice materialization | `mutation-plus-miri` | `TextDecoder shared-byte snapshot only` | `rust2` | `non-observable`, `needs-miri-model` |
+"#;
+        let manual_candidates = BTreeMap::from([(
+            "docs/examples/manual-candidates/textdecoder-sab.json".to_string(),
+            stable_byte_seed_candidate_for_tests(
+                "mutation-plus-miri",
+                "stable-byte-source-sab-race",
+                "handoff-ready",
+                "SharedArrayBuffer-backed typed array decode",
+                "src/runtime/webcore/TextDecoder.rs slice materialization",
+            ),
+        )]);
+
+        let err = err_text(check_dogfood_stable_byte_seed_text(
+            "docs/dogfood/stable-byte-follow-up-seeds.md",
+            text,
+            &manual_candidates,
+        ))?;
+
+        assert!(
+            err.contains("Rust/native sink `src/runtime/webcore/Wrong.rs slice materialization`")
+        );
+        assert!(err.contains("must match `src/runtime/webcore/TextDecoder.rs"));
         Ok(())
     }
 
@@ -12178,11 +12476,13 @@ Triage labels come from [taxonomy](stable-byte-triage-taxonomy.md).
 "#;
         let manual_candidates = BTreeMap::from([(
             "docs/examples/manual-candidates/textdecoder-sab.json".to_string(),
-            serde_json::json!({
-                "proof_mode": {
-                    "kind": "mutation-plus-miri"
-                }
-            }),
+            stable_byte_seed_candidate_for_tests(
+                "mutation-plus-miri",
+                "stable-byte-source-sab-race",
+                "handoff-ready",
+                "SharedArrayBuffer-backed typed array decode",
+                "src/runtime/webcore/TextDecoder.rs slice materialization",
+            ),
         )]);
 
         let err = err_text(check_dogfood_stable_byte_seed_text(
@@ -12219,11 +12519,13 @@ Triage labels come from [taxonomy](stable-byte-triage-taxonomy.md).
 "#;
         let manual_candidates = BTreeMap::from([(
             "docs/examples/manual-candidates/stringorbuffer-rab-stale-input.json".to_string(),
-            serde_json::json!({
-                "proof_mode": {
-                    "kind": "observable-red-green"
-                }
-            }),
+            stable_byte_seed_candidate_for_tests(
+                "observable-red-green",
+                "stable-byte-source-rab-async",
+                "handoff-ready",
+                "RAB-backed BufferSource resized before async completion",
+                "src/runtime/node/types.rs async StringOrBuffer worker read",
+            ),
         )]);
 
         let err = err_text(check_dogfood_stable_byte_seed_text(
