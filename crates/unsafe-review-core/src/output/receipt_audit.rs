@@ -561,7 +561,7 @@ mod tests {
                         "Review the manual candidate and preserve receipts as external evidence"
                             .to_string(),
                     trust_boundary:
-                        "manual candidate; not analyzer-discovered; not proof of repository safety"
+                        "manual candidate; not analyzer-discovered; not witness execution; not proof of memory safety; not UB-free status; not Miri-clean status; not site-execution proof; not policy readiness"
                             .to_string(),
                     source: "manual".to_string(),
                     manual_candidate: true,

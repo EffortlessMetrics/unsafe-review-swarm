@@ -870,19 +870,25 @@ fn render_manual_candidate_front_panel(
             manual_candidate_location_text(candidate),
             candidate.operation_family
         ));
-        out.push_str(&format!("- Safe caller route: {}\n", candidate.safe_caller));
-        out.push_str(&format!("- Invariant at risk: {}\n", candidate.invariant));
-        out.push_str(&format!(
-            "- External evidence refs: {}\n",
-            candidate.evidence.len()
-        ));
-        append_manual_candidate_guidance_lines(
-            &mut out,
-            candidate,
-            stable_byte_seed_ledger.by_candidate_id.get(&candidate.id),
-            !compact,
-        );
-        if !compact {
+        if compact {
+            append_manual_candidate_compact_lines(
+                &mut out,
+                candidate,
+                stable_byte_seed_ledger.by_candidate_id.get(&candidate.id),
+            );
+        } else {
+            out.push_str(&format!("- Safe caller route: {}\n", candidate.safe_caller));
+            out.push_str(&format!("- Invariant at risk: {}\n", candidate.invariant));
+            out.push_str(&format!(
+                "- External evidence refs: {}\n",
+                candidate.evidence.len()
+            ));
+            append_manual_candidate_guidance_lines(
+                &mut out,
+                candidate,
+                stable_byte_seed_ledger.by_candidate_id.get(&candidate.id),
+                true,
+            );
             out.push_str(&format!(
                 "- Explain: `{}`\n",
                 explain_command(root, &candidate.id)
@@ -897,14 +903,16 @@ fn render_manual_candidate_front_panel(
             candidate_witness_plan_command(root, &candidate.id)
         ));
     }
-    append_manual_candidate_queue_preview(
-        &mut out,
-        root,
-        manual_candidates,
-        stable_byte_seed_ledger,
-        queue_limit,
-        !compact,
-    );
+    if !compact {
+        append_manual_candidate_queue_preview(
+            &mut out,
+            root,
+            manual_candidates,
+            stable_byte_seed_ledger,
+            queue_limit,
+            true,
+        );
+    }
     if compact {
         out.push_str(
             "- Manual candidate index: `manual-candidates.json`; ReviewCard-only outputs clean.\n",
@@ -919,6 +927,40 @@ fn render_manual_candidate_front_panel(
         out.push_str("- Boundary: copy-only manual handoff; unsafe-review did not discover these candidates, did not run witnesses, did not edit source, or make them policy inputs.\n\n");
     }
     out
+}
+
+fn append_manual_candidate_compact_lines(
+    out: &mut String,
+    candidate: &ManualCandidate,
+    stable_byte_seed: Option<&StableByteSeed>,
+) {
+    if let Some(stable_byte) = &candidate.stable_byte {
+        let _ = writeln!(
+            out,
+            "- Stable-byte: `{}`; proof `{}`; ledger `{}`",
+            stable_byte.class, stable_byte.proof_required, stable_byte.ledger_state
+        );
+    } else if let Some(proof_mode) = &candidate.proof_mode {
+        let _ = writeln!(out, "- Proof mode: `{}`", proof_mode.kind);
+    }
+    if let Some(seed) = stable_byte_seed {
+        let _ = writeln!(
+            out,
+            "- Stable-byte seed: `{}` (owner lane: `{}`; suggested first PR: `{}`; seed owner: `{}`; next PR: `{}`)",
+            seed.seed_id,
+            seed.owner_lane,
+            seed.suggested_first_pr,
+            seed.owner_lane,
+            seed.suggested_first_pr
+        );
+    } else if let Some(aperture) = &candidate.pr_aperture {
+        let _ = writeln!(out, "- PR aperture: {aperture}");
+    }
+    let _ = writeln!(
+        out,
+        "- Evidence refs: {}; stop line and guidance in sidecars.",
+        candidate.evidence.len()
+    );
 }
 
 fn render_manual_candidate_witness_follow_up(
@@ -2478,29 +2520,16 @@ mod tests {
         assert!(github_summary.contains(
             "- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)"
         ));
-        assert!(
-            github_summary
-                .contains("- Safe caller route: TextDecoder.decode SharedArrayBuffer route")
-        );
-        assert!(
-            github_summary
-                .contains("- Invariant at risk: &[u8] memory must not be concurrently mutated")
-        );
-        assert!(github_summary.contains("- External evidence refs: 1"));
-        assert!(
-            github_summary
-                .contains("- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)")
-        );
+        assert!(github_summary.contains("- Evidence refs: 1; stop line and guidance in sidecars."));
+        assert!(!github_summary.contains("- Safe caller route:"));
+        assert!(!github_summary.contains("- Invariant at risk:"));
+        assert!(!github_summary.contains("- Proof mode:"));
+        assert!(!github_summary.contains("- PR aperture:"));
+        assert!(!github_summary.contains("- Guidance:"));
         assert!(!github_summary.contains("- First fix option:"));
         assert!(!github_summary.contains("- First test target:"));
         assert!(!github_summary.contains("- First do-not-touch note:"));
-        assert!(
-            github_summary
-                .contains("- Manual candidate queue preview: first 1 of 1 manual candidate(s)")
-        );
-        assert!(github_summary.contains(
-            "`R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 1; first test target: `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`"
-        ));
+        assert!(!github_summary.contains("- Manual candidate queue preview:"));
         assert!(
             !github_summary
                 .contains("unsafe-review explain --root \"fixtures/bun fork\" R4R2-S001")
@@ -2681,7 +2710,7 @@ mod tests {
                 "command": "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts",
                 "limitation": "runtime route evidence only; not memory-safety proof and not analyzer-discovered"
               }],
-              "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
+              "trust_boundary": "manual candidate; not analyzer-discovered; not witness execution; not proof of memory safety; not UB-free status; not Miri-clean status; not site-execution proof; not policy readiness"
             }"#,
         )
     }
@@ -2732,7 +2761,7 @@ mod tests {
             "command": "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts",
             "limitation": "runtime route evidence only; not memory-safety proof and not analyzer-discovered"
           }],
-          "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
+          "trust_boundary": "manual candidate; not analyzer-discovered; not witness execution; not proof of memory safety; not UB-free status; not Miri-clean status; not site-execution proof; not policy readiness"
         }"#
     }
 

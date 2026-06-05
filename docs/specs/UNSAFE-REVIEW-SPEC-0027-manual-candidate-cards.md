@@ -80,6 +80,9 @@ Field rules:
   validate the candidate-local change.
 - `do_not_touch[]`: optional copy-only non-goals that must stay out of the
   candidate-local change.
+- `trust_boundary` must name the manual boundary and say the packet is not
+  analyzer-discovered, not witness execution, not proof, not UB-free status,
+  not Miri-clean status, not site-execution proof, and not policy readiness.
 
 ## Stable-Byte-Source Vocabulary
 
@@ -283,7 +286,7 @@ links to the same manual ID through a reviewed linkage field.
       "limitation": "model evidence only; does not prove the Bun site executed under Miri"
     }
   ],
-  "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
+  "trust_boundary": "manual candidate; not analyzer-discovered; not witness execution; not proof of memory safety; not UB-free status; not Miri-clean status; not site-execution proof; not policy readiness"
 }
 ```
 

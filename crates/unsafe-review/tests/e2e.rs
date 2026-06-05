@@ -5249,16 +5249,22 @@ fn assert_manual_candidate_front_panel(
     assert!(text.contains(
         "- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)"
     ));
-    assert!(text.contains(
-        "- Safe caller route: new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))"
-    ));
-    assert!(text.contains("- Invariant at risk: &[u8] memory must not be concurrently mutated"));
-    assert!(text.contains("- External evidence refs: 2"));
     if compact {
         assert!(text.contains(
-            "- Stable-byte class: `stable-byte-source-sab-race`; proof `mutation-plus-miri`; ledger `handoff-ready`; route `SharedArrayBuffer-backed typed array decode` -> `src/runtime/webcore/TextDecoder.rs slice materialization`; hazard in sidecars"
+            "- Stable-byte: `stable-byte-source-sab-race`; proof `mutation-plus-miri`; ledger `handoff-ready`"
         ));
+        assert!(text.contains("- Evidence refs: 2; stop line and guidance in sidecars."));
+        assert!(!text.contains("- Safe caller route:"));
+        assert!(!text.contains("- Invariant at risk:"));
+        assert!(!text.contains("- External evidence refs:"));
     } else {
+        assert!(text.contains(
+            "- Safe caller route: new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))"
+        ));
+        assert!(
+            text.contains("- Invariant at risk: &[u8] memory must not be concurrently mutated")
+        );
+        assert!(text.contains("- External evidence refs: 2"));
         assert!(text.contains(
             "- Stable-byte class: `stable-byte-source-sab-race` (observable: `no`; proof required: `mutation-plus-miri`; ledger state: `handoff-ready`)"
         ));
@@ -5269,14 +5275,13 @@ fn assert_manual_candidate_front_panel(
             "- Stable-byte hazard: Rust slice materialization can treat shared JS bytes as stable while JS can mutate the backing storage concurrently"
         ));
     }
-    assert!(text.contains(
-        "- Proof mode: `mutation-plus-miri` (system Bun expected: `nondiscriminating`; mutation required: `true`; Miri/model required: `true`)"
-    ));
     if compact {
-        assert!(text.contains(
-            "- Oracle map: `src/runtime/webcore/TextDecoder.rs::decode` -> `test/js/webcore/textdecoder-sharedarraybuffer.test.ts` (`typescript`; `shared-byte-mutation-model`; limitation in sidecars)"
-        ));
+        assert!(!text.contains("- Proof mode:"));
+        assert!(!text.contains("- Oracle map:"));
     } else {
+        assert!(text.contains(
+            "- Proof mode: `mutation-plus-miri` (system Bun expected: `nondiscriminating`; mutation required: `true`; Miri/model required: `true`)"
+        ));
         assert!(text.contains(
             "- Oracle map: Rust seam `src/runtime/webcore/TextDecoder.rs::decode` -> `typescript` oracle `test/js/webcore/textdecoder-sharedarraybuffer.test.ts`"
         ));
@@ -5284,19 +5289,24 @@ fn assert_manual_candidate_front_panel(
             text.contains("not witness execution, site-execution proof, or memory-safety proof")
         );
     }
-    assert!(text.contains(
-        "- Fix boundary: Snapshot shared/growable/resizable bytes before Rust receives &[u8]"
-    ));
-    assert!(text.contains(
-        "- PR aperture: TextDecoder shared-byte snapshot only; do not patch S3, fs, writev, or unrelated encodings"
-    ));
-    assert!(text.contains("- Stop line: keep the PR inside this aperture"));
-    assert!(text.contains("- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)"));
     if compact {
+        assert!(!text.contains("- Fix boundary:"));
+        assert!(!text.contains("- Stop line:"));
+        assert!(!text.contains("- Guidance:"));
         assert!(!text.contains("- First fix option:"));
         assert!(!text.contains("- First test target:"));
         assert!(!text.contains("- First do-not-touch note:"));
     } else {
+        assert!(text.contains(
+            "- Fix boundary: Snapshot shared/growable/resizable bytes before Rust receives &[u8]"
+        ));
+        assert!(text.contains(
+            "- PR aperture: TextDecoder shared-byte snapshot only; do not patch S3, fs, writev, or unrelated encodings"
+        ));
+        assert!(text.contains("- Stop line: keep the PR inside this aperture"));
+        assert!(
+            text.contains("- Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)")
+        );
         assert!(text.contains(
             "- First fix option: Copy SharedArrayBuffer-backed bytes into stable owned storage before creating a Rust slice"
         ));
@@ -5307,20 +5317,24 @@ fn assert_manual_candidate_front_panel(
             "- First do-not-touch note: Do not rewrite unrelated TextDecoder encoding paths"
         ));
     }
-    assert!(text.contains(&format!(
-        "- Manual candidate queue preview: first {expected_queue_len} of 2 manual candidate(s)"
-    )));
-    assert!(text.contains(
-        "`R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 2; proof mode: `mutation-plus-miri`"
-    ));
-    if expected_queue_len >= 2 {
-        assert!(text.contains(
-            "`R4R2-S002` at `src/sql_jsc/mysql/MySQLValue.rs:411` (`slice_from_raw_parts`); evidence refs: 3; proof mode: `mutation-plus-miri`"
-        ));
+    if compact {
+        assert!(!text.contains("- Manual candidate queue preview:"));
     } else {
-        assert!(!text.contains(
-            "`R4R2-S002` at `src/sql_jsc/mysql/MySQLValue.rs:411` (`slice_from_raw_parts`); evidence refs: 3; proof mode: `mutation-plus-miri`"
+        assert!(text.contains(&format!(
+            "- Manual candidate queue preview: first {expected_queue_len} of 2 manual candidate(s)"
+        )));
+        assert!(text.contains(
+            "`R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 2; proof mode: `mutation-plus-miri`"
         ));
+        if expected_queue_len >= 2 {
+            assert!(text.contains(
+                "`R4R2-S002` at `src/sql_jsc/mysql/MySQLValue.rs:411` (`slice_from_raw_parts`); evidence refs: 3; proof mode: `mutation-plus-miri`"
+            ));
+        } else {
+            assert!(!text.contains(
+                "`R4R2-S002` at `src/sql_jsc/mysql/MySQLValue.rs:411` (`slice_from_raw_parts`); evidence refs: 3; proof mode: `mutation-plus-miri`"
+            ));
+        }
     }
     if !compact {
         assert!(text.contains("unsafe-review explain --root"));

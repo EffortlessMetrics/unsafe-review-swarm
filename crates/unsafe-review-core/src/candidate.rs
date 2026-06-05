@@ -4,8 +4,17 @@ use std::path::{Path, PathBuf};
 
 pub const MANUAL_CANDIDATE_SCHEMA_VERSION: &str = "manual-candidate/v1";
 pub const MANUAL_CANDIDATE_INDEX_SCHEMA_VERSION: &str = "manual-candidates/v1";
-const MANUAL_CANDIDATE_TRUST_BOUNDARY: &str =
-    "manual candidate; not analyzer-discovered; not proof of repository safety";
+const MANUAL_CANDIDATE_TRUST_BOUNDARY: &str = "manual candidate; not analyzer-discovered; not witness execution; not proof of memory safety; not UB-free status; not Miri-clean status; not site-execution proof; not policy readiness";
+const MANUAL_CANDIDATE_TRUST_BOUNDARY_PHRASES: [&str; 8] = [
+    "manual candidate",
+    "not analyzer-discovered",
+    "not witness execution",
+    "not proof",
+    "not UB-free",
+    "not Miri-clean",
+    "not site-execution",
+    "not policy",
+];
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ManualCandidate {
@@ -152,7 +161,7 @@ impl ManualCandidate {
         }
         require_optional_nonempty("fix_boundary", self.fix_boundary.as_deref())?;
         require_optional_nonempty("pr_aperture", self.pr_aperture.as_deref())?;
-        require_nonempty("trust_boundary", &self.trust_boundary)?;
+        validate_manual_candidate_trust_boundary(&self.trust_boundary)?;
         require_nonempty_items("fix_options", &self.fix_options)?;
         require_nonempty_items("test_targets", &self.test_targets)?;
         require_nonempty_items("do_not_touch", &self.do_not_touch)?;
@@ -712,6 +721,19 @@ fn require_optional_nonempty(field: &str, value: Option<&str>) -> Result<(), Str
     }
 }
 
+fn validate_manual_candidate_trust_boundary(value: &str) -> Result<(), String> {
+    require_nonempty("trust_boundary", value)?;
+    let value = value.to_ascii_lowercase();
+    for required in MANUAL_CANDIDATE_TRUST_BOUNDARY_PHRASES {
+        if !value.contains(&required.to_ascii_lowercase()) {
+            return Err(format!(
+                "manual candidate trust_boundary must include `{required}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn validate_candidate_id(id: &str) -> Result<(), String> {
     require_nonempty("id", id)?;
     if id != id.trim()
@@ -994,6 +1016,19 @@ mod tests {
     }
 
     #[test]
+    fn manual_candidate_rejects_weak_trust_boundary() {
+        let err = ManualCandidate::from_json_str(&example_json().replace(
+            "\"trust_boundary\": \"manual candidate; not analyzer-discovered; not witness execution; not proof of memory safety; not UB-free status; not Miri-clean status; not site-execution proof; not policy readiness\"",
+            "\"trust_boundary\": \"manual candidate; not analyzer-discovered; not proof of repository safety\"",
+        ))
+        .err()
+        .unwrap_or_default();
+
+        assert!(err.contains("trust_boundary"), "{err}");
+        assert!(err.contains("not witness execution"), "{err}");
+    }
+
+    #[test]
     fn manual_candidate_rejects_empty_oracle_map_limitation() {
         let err = ManualCandidate::from_json_str(&example_json().replace(
             "\"limitation\": \"oracle map only; not witness execution, site-execution proof, or memory-safety proof\"",
@@ -1133,7 +1168,7 @@ mod tests {
               "limitation": "model evidence only; does not prove the Bun site executed under Miri"
             }
           ],
-          "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
+          "trust_boundary": "manual candidate; not analyzer-discovered; not witness execution; not proof of memory safety; not UB-free status; not Miri-clean status; not site-execution proof; not policy readiness"
         }"#
     }
 

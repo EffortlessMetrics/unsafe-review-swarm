@@ -65,5 +65,5 @@
       "limitation": "model evidence only; does not prove the Bun site executed under Miri"
     }
   ],
-  "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
+  "trust_boundary": "manual candidate; not analyzer-discovered; not witness execution; not proof of memory safety; not UB-free status; not Miri-clean status; not site-execution proof; not policy readiness"
 }

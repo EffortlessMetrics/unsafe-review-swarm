@@ -391,23 +391,33 @@ fn check_manual_candidate_front_door_text(
         ),
         path,
     )?;
-    super::require_text_contains(
-        text,
-        &format!("- Safe caller route: {}", first.safe_caller),
-        path,
-    )?;
-    super::require_text_contains(
-        text,
-        &format!("- Invariant at risk: {}", first.invariant),
-        path,
-    )?;
-    super::require_text_contains(
-        text,
-        &format!("- External evidence refs: {}", first.evidence_refs),
-        path,
-    )?;
-    check_manual_candidate_front_door_guidance_text(text, path, first, compact)?;
-    check_manual_candidate_queue_preview_text(text, path, manual_candidates, queue_limit, compact)?;
+    if compact {
+        check_manual_candidate_front_door_compact_text(text, path, first)?;
+    } else {
+        super::require_text_contains(
+            text,
+            &format!("- Safe caller route: {}", first.safe_caller),
+            path,
+        )?;
+        super::require_text_contains(
+            text,
+            &format!("- Invariant at risk: {}", first.invariant),
+            path,
+        )?;
+        super::require_text_contains(
+            text,
+            &format!("- External evidence refs: {}", first.evidence_refs),
+            path,
+        )?;
+        check_manual_candidate_front_door_guidance_text(text, path, first, compact)?;
+        check_manual_candidate_queue_preview_text(
+            text,
+            path,
+            manual_candidates,
+            queue_limit,
+            compact,
+        )?;
+    }
     if !compact {
         super::require_text_contains(text, "unsafe-review explain", path)?;
     }
@@ -428,6 +438,35 @@ fn check_manual_candidate_front_door_text(
     ] {
         super::require_text_contains(text, expected, path)?;
     }
+    Ok(())
+}
+
+fn check_manual_candidate_front_door_compact_text(
+    text: &str,
+    path: &Path,
+    candidate: &ManualCandidateProjection,
+) -> Result<(), String> {
+    if let Some(stable_byte) = &candidate.stable_byte {
+        let class = stable_byte_projection_str(stable_byte, "class", &candidate.id)?;
+        let proof_required =
+            stable_byte_projection_str(stable_byte, "proof_required", &candidate.id)?;
+        let ledger_state = stable_byte_projection_str(stable_byte, "ledger_state", &candidate.id)?;
+        super::require_text_contains(
+            text,
+            &format!("- Stable-byte: `{class}`; proof `{proof_required}`; ledger `{ledger_state}`"),
+            path,
+        )?;
+    } else if let Some(proof_mode) = &candidate.proof_mode {
+        super::require_text_contains(text, &format!("- Proof mode: `{}`", proof_mode.kind), path)?;
+    }
+    super::require_text_contains(
+        text,
+        &format!(
+            "- Evidence refs: {}; stop line and guidance in sidecars.",
+            candidate.evidence_refs
+        ),
+        path,
+    )?;
     Ok(())
 }
 

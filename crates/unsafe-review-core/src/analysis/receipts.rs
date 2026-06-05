@@ -1922,7 +1922,7 @@ mod tests {
   "do_not_touch": [
     "Do not rewrite unrelated TextDecoder encoding paths"
   ],
-  "trust_boundary": "manual candidate; not analyzer-discovered; not proof of repository safety"
+  "trust_boundary": "manual candidate; not analyzer-discovered; not witness execution; not proof of memory safety; not UB-free status; not Miri-clean status; not site-execution proof; not policy readiness"
 }"#
     }
 
