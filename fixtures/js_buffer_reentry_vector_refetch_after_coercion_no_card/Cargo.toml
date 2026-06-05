@@ -1,0 +1,4 @@
+[package]
+name = "js-buffer-reentry-vector-refetch-after-coercion-no-card-fixture"
+version = "0.1.0"
+edition = "2024"

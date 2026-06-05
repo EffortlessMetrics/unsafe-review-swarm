@@ -64,6 +64,40 @@ label_source = "fixture_golden"
 rationale = "A same-owner JS ArrayBuffer descriptor captured with as_array_buffer before user-JS coercion and materialized afterward through byte_slice should stay an advisory stable-byte ReviewCard with observable-red-green proof-path wording."
 
 [[samples]]
+id = "js-buffer-reentry-vector-materialization-emits-advisory-card"
+fixture = "js_buffer_reentry_vector_materialization"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "stable_byte_source_getter_reentry"
+expected_hazard = "stable_byte_source"
+expected_owner = "vector_route"
+expected_site_kind = "operation"
+expected_obligation_key = "byte-stability"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A same-owner JS ArrayBuffer descriptor captured with as_array_buffer before user-JS coercion and materialized afterward through vector should stay an advisory stable-byte ReviewCard with observable-red-green proof-path wording."
+
+[[samples]]
+id = "js-buffer-reentry-as-ptr-materialization-emits-advisory-card"
+fixture = "js_buffer_reentry_as_ptr_materialization"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "stable_byte_source_getter_reentry"
+expected_hazard = "stable_byte_source"
+expected_owner = "pointer_route"
+expected_site_kind = "operation"
+expected_obligation_key = "byte-stability"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A same-owner JS ArrayBuffer descriptor captured with as_array_buffer before user-JS coercion and materialized afterward through as_ptr should stay an advisory stable-byte ReviewCard with observable-red-green proof-path wording."
+
+[[samples]]
 id = "js-buffer-options-before-capture-emits-no-card"
 fixture = "js_buffer_reentry_options_before_capture_no_card"
 kind = "false_positive_control"
@@ -86,6 +120,22 @@ kind = "false_positive_control"
 expected_cards = 0
 label_source = "fixture_golden"
 rationale = "Re-fetching an ArrayBuffer descriptor after user-JS coercion and materializing that refreshed descriptor should not trigger the reentry heuristic for the stale pre-coercion capture."
+
+[[samples]]
+id = "js-buffer-vector-refetch-after-coercion-emits-no-card"
+fixture = "js_buffer_reentry_vector_refetch_after_coercion_no_card"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "Re-fetching an ArrayBuffer descriptor after user-JS coercion and materializing that refreshed descriptor through vector should not trigger the reentry heuristic for the stale pre-coercion capture."
+
+[[samples]]
+id = "js-buffer-as-ptr-refetch-after-coercion-emits-no-card"
+fixture = "js_buffer_reentry_as_ptr_refetch_after_coercion_no_card"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "Re-fetching an ArrayBuffer descriptor after user-JS coercion and materializing that refreshed descriptor through as_ptr should not trigger the reentry heuristic for the stale pre-coercion capture."
 
 [[samples]]
 id = "js-buffer-async-options-before-capture-emits-no-card"
