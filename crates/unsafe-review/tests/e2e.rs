@@ -735,6 +735,7 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
             .unwrap_or("")
             .contains("not analyzer-discovered")
     );
+    write_textdecoder_stable_byte_seed_ledger(temp.path())?;
 
     let empty_snapshot = temp.path().join("empty-snapshot.json");
     fs::write(&empty_snapshot, empty_review_card_snapshot_json())?;
@@ -936,6 +937,40 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
     assert_eq!(
         context_packet["evidence"][1]["command"],
         "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
+    );
+    assert_eq!(context_packet["stable_byte_seed_source"]["included"], true);
+    assert_eq!(
+        context_packet["stable_byte_seed_source"]["matched_manual_candidates"],
+        1
+    );
+    assert!(
+        context_packet["stable_byte_seed_source"]["relationship"]
+            .as_str()
+            .unwrap_or("")
+            .contains("manual candidate context packets")
+    );
+    assert_eq!(
+        context_packet["stable_byte_seed"]["seed_id"],
+        "bun-stable-byte-textdecoder-sab"
+    );
+    assert_eq!(context_packet["stable_byte_seed"]["owner_lane"], "rust2");
+    assert_eq!(
+        context_packet["stable_byte_seed"]["suggested_first_pr"],
+        "TextDecoder shared-byte snapshot only"
+    );
+    assert_eq!(
+        context_packet["stable_byte_seed"]["triage_labels"][1],
+        "needs-miri-model"
+    );
+    assert_eq!(
+        context_packet["stable_byte_seed"]["candidate_consistency"]["proof_mode_matches_manual_candidate"],
+        true
+    );
+    assert!(
+        context_packet["stable_byte_seed"]["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not Miri-clean status")
     );
 
     let witness_plan = run_success([
@@ -5613,6 +5648,23 @@ fn write_e2e_file(root: &Path, rel: &str) -> Result<(), Box<dyn Error>> {
 
 fn manual_candidate_json() -> &'static str {
     include_str!("../../../docs/examples/manual-candidates/textdecoder-sab.json")
+}
+
+fn write_textdecoder_stable_byte_seed_ledger(root: &Path) -> Result<(), Box<dyn Error>> {
+    let docs_dir = root.join("docs/dogfood");
+    fs::create_dir_all(&docs_dir)?;
+    fs::write(
+        docs_dir.join("stable-byte-follow-up-seeds.md"),
+        r#"# Bun stable-byte follow-up seed index
+
+## Seeds
+
+| Seed ID | Ledger state | Candidate family | Surface | Manual candidate | Safe JS caller | Rust/native sink | Proof mode | Suggested first PR | Owner lane | Triage labels |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `bun-stable-byte-textdecoder-sab` | `handoff-ready` | `stable-byte-source-sab-race` | `TextDecoder.decode` | `.unsafe-review/candidates/R4R2-S001.json` | SharedArrayBuffer-backed typed array decode | `src/runtime/webcore/TextDecoder.rs` slice materialization | `mutation-plus-miri` | `TextDecoder shared-byte snapshot only` | `rust2` | `non-observable`, `needs-miri-model` |
+"#,
+    )?;
+    Ok(())
 }
 
 fn mysql_manual_candidate_json() -> &'static str {

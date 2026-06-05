@@ -797,8 +797,25 @@ fn review_kit_stable_byte_seed(
             "suggested_first_pr_has_manual_candidate_pr_aperture": !seed.suggested_first_pr.trim().is_empty()
                 && candidate.pr_aperture.as_ref().is_some_and(|value| !value.trim().is_empty()),
         },
-        "trust_boundary": "Stable-byte seed row is advisory workflow metadata only; not analyzer discovery, not witness execution, not proof, not policy readiness, and not a ReviewCard truth."
+        "trust_boundary": "Stable-byte seed row is advisory workflow metadata only; not analyzer discovery, not witness execution, not proof, not UB-free status, not Miri-clean status, not site-execution proof, not policy readiness, and not a ReviewCard truth."
     })
+}
+
+pub(super) fn manual_candidate_context_seed_projection(
+    root: &Path,
+    candidate: &ManualCandidate,
+) -> (serde_json::Value, Option<serde_json::Value>) {
+    let stable_byte_seed_ledger = load_stable_byte_seed_ledger(root);
+    let seed = stable_byte_seed_ledger.by_candidate_id.get(&candidate.id);
+    let matched_stable_byte_seeds = usize::from(seed.is_some());
+    (
+        stable_byte_seed_source_projection(
+            &stable_byte_seed_ledger,
+            matched_stable_byte_seeds,
+            "root-local stable-byte seed ledger rows are joined to manual candidate context packets by manual candidate ID",
+        ),
+        seed.map(|seed| review_kit_stable_byte_seed(seed, candidate)),
+    )
 }
 
 pub(super) fn render_first_pr_front_door_artifact(
