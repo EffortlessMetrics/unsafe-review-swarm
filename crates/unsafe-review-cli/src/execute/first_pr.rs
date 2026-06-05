@@ -1854,6 +1854,7 @@ fn tokmd_packet_entry(
     stable_byte_seed: Option<&StableByteSeed>,
     stable_byte_seed_ledger: &StableByteSeedLedger,
 ) -> serde_json::Value {
+    let ledger_state = stable_byte_ledger_state(candidate);
     let mut value = json!({
         "id": candidate.id.as_str(),
         "source": "manual",
@@ -1864,12 +1865,11 @@ fn tokmd_packet_entry(
         "title": candidate.title.as_str(),
         "stable_byte_source_class": stable_byte_source_class(candidate),
         "stable_byte": candidate.stable_byte.as_ref(),
-        "ledger_state": stable_byte_ledger_state(candidate),
-        "ledger_state_limitation": if stable_byte_ledger_state(candidate).is_some() {
-            "ledger state is packet-local manual candidate metadata; external seed ledger rows are not imported"
-        } else {
-            "ledger state is not present in this manual candidate; use the stable-byte seed ledger or a future seed JSON export"
-        },
+        "ledger_state": ledger_state,
+        "ledger_state_limitation": tokmd_ledger_state_limitation(
+            ledger_state.is_some(),
+            stable_byte_seed.is_some(),
+        ),
         "target": {
             "file": candidate.location.file.display().to_string(),
             "line": candidate.location.line,
@@ -1929,6 +1929,26 @@ fn tokmd_packet_entry(
         }
     }
     value
+}
+
+fn tokmd_ledger_state_limitation(
+    has_packet_ledger_state: bool,
+    has_stable_byte_seed: bool,
+) -> &'static str {
+    match (has_packet_ledger_state, has_stable_byte_seed) {
+        (true, true) => {
+            "packet-local manual candidate metadata is copied into ledger_state; stable_byte_seed projects the joined seed row separately as advisory workflow metadata"
+        }
+        (false, true) => {
+            "packet-local ledger state is absent from manual candidate metadata; stable_byte_seed projects the joined seed row separately as advisory workflow metadata"
+        }
+        (true, false) => {
+            "ledger state is packet-local manual candidate metadata; no joined stable-byte seed row is projected for this packet"
+        }
+        (false, false) => {
+            "ledger state is not present in this manual candidate; use the stable-byte seed ledger or a future seed JSON export"
+        }
+    }
 }
 
 fn tokmd_preset_inputs(
@@ -2719,6 +2739,12 @@ mod tests {
             seed["candidate_consistency"]["rust_native_sink_matches_manual_candidate"],
             true
         );
+        let ledger_limitation = value["packets"][0]["ledger_state_limitation"]
+            .as_str()
+            .unwrap_or("");
+        assert!(ledger_limitation.contains("packet-local manual candidate metadata"));
+        assert!(ledger_limitation.contains("joined seed row"));
+        assert!(!ledger_limitation.contains("external seed ledger rows are not imported"));
         assert!(
             seed["trust_boundary"]
                 .as_str()

@@ -2135,18 +2135,7 @@ fn check_tokmd_packet_entry(
         &expected.stable_byte_ledger_state,
         &context,
     )?;
-    let ledger_limitation =
-        super::require_non_empty_json_str(entry, "ledger_state_limitation", &context)?;
-    let expected_ledger_limitation = if expected.stable_byte_ledger_state.is_some() {
-        "packet-local manual candidate metadata"
-    } else {
-        "future seed JSON export"
-    };
-    if !super::text_contains_ignore_ascii_case(ledger_limitation, expected_ledger_limitation) {
-        return Err(format!(
-            "{context} ledger_state_limitation must mention `{expected_ledger_limitation}`"
-        ));
-    }
+    check_tokmd_ledger_state_limitation(entry, expected, &context)?;
     require_projected_optional_json_value(entry, "stable_byte", &expected.stable_byte, &context)?;
 
     let target = entry
@@ -2313,6 +2302,50 @@ fn check_tokmd_packet_entry(
                 "{context} trust_boundary must include `{expected_text}`"
             ));
         }
+    }
+    Ok(())
+}
+
+fn check_tokmd_ledger_state_limitation(
+    entry: &serde_json::Value,
+    expected: &ManualCandidateProjection,
+    context: &str,
+) -> Result<(), String> {
+    let ledger_limitation =
+        super::require_non_empty_json_str(entry, "ledger_state_limitation", context)?;
+    let has_stable_byte_seed = entry.get("stable_byte_seed").is_some();
+    if has_stable_byte_seed
+        && super::text_contains_ignore_ascii_case(
+            ledger_limitation,
+            "external seed ledger rows are not imported",
+        )
+    {
+        return Err(format!(
+            "{context} ledger_state_limitation must not say external seed ledger rows are not imported when stable_byte_seed is projected"
+        ));
+    }
+    let expected_ledger_limitation = if has_stable_byte_seed {
+        "joined seed row"
+    } else if expected.stable_byte_ledger_state.is_some() {
+        "packet-local manual candidate metadata"
+    } else {
+        "future seed JSON export"
+    };
+    if !super::text_contains_ignore_ascii_case(ledger_limitation, expected_ledger_limitation) {
+        return Err(format!(
+            "{context} ledger_state_limitation must mention `{expected_ledger_limitation}`"
+        ));
+    }
+    if has_stable_byte_seed
+        && expected.stable_byte_ledger_state.is_some()
+        && !super::text_contains_ignore_ascii_case(
+            ledger_limitation,
+            "packet-local manual candidate metadata",
+        )
+    {
+        return Err(format!(
+            "{context} ledger_state_limitation must mention `packet-local manual candidate metadata` when packet-local ledger_state is present"
+        ));
     }
     Ok(())
 }
@@ -9421,6 +9454,25 @@ mod tests {
         assert!(err.contains("safe_js_caller"), "{err}");
         assert!(err.contains("stable_byte.source"), "{err}");
         assert!(err.contains("Wrong safe JS caller route"), "{err}");
+    }
+
+    #[test]
+    fn tokmd_packet_rejects_not_imported_limitation_when_seed_is_projected() {
+        let expected = stable_byte_candidate_projection();
+        let entry = serde_json::json!({
+            "ledger_state_limitation": "ledger state is packet-local manual candidate metadata; external seed ledger rows are not imported",
+            "stable_byte_seed": stable_byte_seed_projection(),
+        });
+
+        let err =
+            check_tokmd_ledger_state_limitation(&entry, &expected, "tokmd-packets.json packets[0]")
+                .expect_err("joined seed packets must not say seed rows are not imported");
+
+        assert!(
+            err.contains("external seed ledger rows are not imported"),
+            "{err}"
+        );
+        assert!(err.contains("stable_byte_seed is projected"), "{err}");
     }
 
     #[test]
