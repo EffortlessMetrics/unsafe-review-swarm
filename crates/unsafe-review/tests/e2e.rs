@@ -712,7 +712,7 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
     assert_eq!(canonical["analyzer_discovered"], false);
     assert_eq!(canonical["id"], "R4R2-S001");
     assert_eq!(
-        canonical["evidence"][0]["command"],
+        canonical["evidence"][1]["command"],
         "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
     );
     assert_eq!(canonical["oracle_map"]["oracle_language"], "typescript");
@@ -727,7 +727,7 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
             .contains("not witness execution")
     );
     assert!(
-        canonical["evidence"][0]["limitation"]
+        canonical["evidence"][1]["limitation"]
             .as_str()
             .unwrap_or("")
             .contains("not analyzer-discovered")
@@ -766,7 +766,7 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
         outcome["cards"]["new"][0]["after"]["operation"],
         "core::slice::from_raw_parts"
     );
-    assert_eq!(outcome["cards"]["new"][0]["after"]["evidence_count"], 2);
+    assert_eq!(outcome["cards"]["new"][0]["after"]["evidence_count"], 3);
     assert_eq!(
         outcome["cards"]["new"][0]["after"]["safe_caller"],
         "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))"
@@ -786,11 +786,11 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
             .contains("memory-safety proof")
     );
     assert_eq!(
-        outcome["cards"]["new"][0]["after"]["evidence"][0]["command"],
+        outcome["cards"]["new"][0]["after"]["evidence"][1]["command"],
         "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
     );
     assert!(
-        outcome["cards"]["new"][0]["after"]["evidence"][0]["limitation"]
+        outcome["cards"]["new"][0]["after"]["evidence"][1]["limitation"]
             .as_str()
             .unwrap_or("")
             .contains("not memory-safety proof")
@@ -843,11 +843,9 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
     assert!(outcome_markdown.contains("analyzer-discovered `false`"));
     assert!(outcome_markdown.contains("route `new TextDecoder().decode"));
     assert!(outcome_markdown.contains("invariant &[u8] memory must not be concurrently mutated"));
-    assert!(
-        outcome_markdown
-            .contains("command `bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts`")
-    );
-    assert!(outcome_markdown.contains("limitation runtime route evidence only"));
+    assert!(outcome_markdown.contains("first evidence `source_trace`"));
+    assert!(outcome_markdown.contains("command `rg -n"));
+    assert!(outcome_markdown.contains("limitation source trace only"));
     assert!(outcome_markdown.contains("first fix: Copy SharedArrayBuffer-backed bytes"));
     assert!(
         outcome_markdown
@@ -895,15 +893,15 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
         "&[u8] memory must not be concurrently mutated"
     );
     assert_eq!(
-        explain_packet["implementer_handoff"]["external_evidence"][0]["kind"],
+        explain_packet["implementer_handoff"]["external_evidence"][1]["kind"],
         "runtime_witness"
     );
     assert_eq!(
-        explain_packet["implementer_handoff"]["external_evidence"][0]["command"],
+        explain_packet["implementer_handoff"]["external_evidence"][1]["command"],
         "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
     );
     assert!(
-        explain_packet["implementer_handoff"]["external_evidence"][0]["limitation"]
+        explain_packet["implementer_handoff"]["external_evidence"][1]["limitation"]
             .as_str()
             .unwrap_or("")
             .contains("runtime route evidence only")
@@ -933,7 +931,7 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
             .contains("do not treat this as analyzer-discovered")
     );
     assert_eq!(
-        context_packet["evidence"][0]["command"],
+        context_packet["evidence"][1]["command"],
         "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
     );
 
@@ -986,7 +984,7 @@ fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dy
     assert_eq!(ledger["source"], "candidate_list");
     assert_eq!(ledger["root"], temp.path().display().to_string());
     assert_eq!(ledger["summary"]["manual_candidates"], 2);
-    assert_eq!(ledger["summary"]["external_evidence_refs"], 5);
+    assert_eq!(ledger["summary"]["external_evidence_refs"], 6);
     assert_eq!(
         ledger["summary"]["operation_families"]["raw_pointer_read"],
         1
@@ -997,7 +995,7 @@ fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dy
     );
     assert_eq!(ledger["summary"]["evidence_kinds"]["model"], 2);
     assert_eq!(ledger["summary"]["evidence_kinds"]["runtime_witness"], 2);
-    assert_eq!(ledger["summary"]["evidence_kinds"]["source_trace"], 1);
+    assert_eq!(ledger["summary"]["evidence_kinds"]["source_trace"], 2);
     assert_eq!(ledger["summary"]["analyzer_discovered"], 0);
     assert_eq!(ledger["candidates"][0]["id"], "R4R2-S001");
     assert_eq!(ledger["candidates"][1]["id"], "R4R2-S002");
@@ -1208,14 +1206,14 @@ fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dy
     assert!(
         markdown.contains("Operation families: `raw_pointer_read: 1, slice_from_raw_parts: 1`")
     );
-    assert!(markdown.contains("Evidence kinds: `model: 2, runtime_witness: 2, source_trace: 1`"));
+    assert!(markdown.contains("Evidence kinds: `model: 2, runtime_witness: 2, source_trace: 2`"));
     assert!(markdown.contains("Analyzer-discovered: `0`"));
     assert!(markdown.contains("### `R4R2-S001`"));
     assert!(markdown.contains("Location: `src/runtime/webcore/TextDecoder.rs:237`"));
     assert!(markdown.contains("#### Implementer Handoff"));
     assert!(markdown.contains("Route: `new TextDecoder().decode"));
     assert!(markdown.contains("Invariant at risk: &[u8] memory must not be concurrently mutated"));
-    assert!(markdown.contains("Evidence packet: `2` external reference(s)"));
+    assert!(markdown.contains("Evidence packet: `3` external reference(s)"));
     assert!(
         markdown.contains(
             "`runtime_witness` at `target/unsafe-scout/textdecoder-shared-race-route.out`"
@@ -1323,7 +1321,7 @@ fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dy
         "&[u8] memory must not be concurrently mutated"
     );
     assert_eq!(
-        outcome["cards"]["new"][0]["after"]["evidence"][0]["command"],
+        outcome["cards"]["new"][0]["after"]["evidence"][1]["command"],
         "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
     );
     assert!(
@@ -1505,11 +1503,11 @@ fn manual_candidate_receipts_audit_as_manual_advisory_targets() -> Result<(), Bo
             .contains("site-execution proof")
     );
     assert_eq!(
-        receipt["matched_manual_candidate"]["evidence"][0]["command"],
+        receipt["matched_manual_candidate"]["evidence"][1]["command"],
         "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
     );
     assert!(
-        receipt["matched_manual_candidate"]["evidence"][0]["limitation"]
+        receipt["matched_manual_candidate"]["evidence"][1]["limitation"]
             .as_str()
             .unwrap_or("")
             .contains("not memory-safety proof")
@@ -1556,7 +1554,10 @@ fn manual_candidate_receipts_audit_as_manual_advisory_targets() -> Result<(), Bo
         audit_markdown
             .contains("first do-not-touch: Do not rewrite unrelated TextDecoder encoding paths")
     );
-    assert!(audit_markdown.contains("runtime route evidence only; not memory-safety proof"));
+    assert!(
+        audit_markdown
+            .contains("source trace only; does not prove the safe JS route reaches this site")
+    );
     assert!(!audit_markdown.contains("imports_witness_evidence"));
 
     Ok(())
@@ -1605,7 +1606,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("manual-candidates.json"));
     assert!(stdout.contains("Count: 2"));
     assert!(stdout.contains("Operation families: raw_pointer_read: 1, slice_from_raw_parts: 1"));
-    assert!(stdout.contains("Evidence kinds: model: 2, runtime_witness: 2, source_trace: 1"));
+    assert!(stdout.contains("Evidence kinds: model: 2, runtime_witness: 2, source_trace: 2"));
     assert!(stdout.contains("First manual candidate: R4R2-S001"));
     assert!(stdout.contains("Guidance: 1 fix option(s), 1 test target(s), 1 do-not-touch note(s)"));
     assert!(
@@ -1957,7 +1958,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     );
     assert_eq!(
         review_kit["handoff"]["manual_candidates"]["evidence_kinds"]["source_trace"],
-        1
+        2
     );
     assert_eq!(
         review_kit["handoff"]["manual_candidates"]["proof_modes"]["mutation-plus-miri"],
@@ -2107,7 +2108,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         "src/runtime/webcore/TextDecoder.rs:237"
     );
     assert_eq!(candidate_queue[0]["operation_family"], "raw_pointer_read");
-    assert_eq!(candidate_queue[0]["evidence_refs"], 2);
+    assert_eq!(candidate_queue[0]["evidence_refs"], 3);
     assert_eq!(
         candidate_queue[0]["implementer_handoff"]["route"]["safe_caller"],
         "new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))"
@@ -2316,7 +2317,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     );
     assert_eq!(
         manual_candidates["summary"]["evidence_kinds"]["source_trace"],
-        1
+        2
     );
     assert_eq!(manual_candidates["summary"]["analyzer_discovered"], 0);
     assert_eq!(manual_candidates["candidates"][0]["id"], "R4R2-S001");
@@ -2336,11 +2337,11 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         "src/runtime/webcore/TextDecoder.rs:237"
     );
     assert_eq!(
-        manual_candidates["candidates"][0]["evidence"][0]["command"],
+        manual_candidates["candidates"][0]["evidence"][1]["command"],
         "bun test test/js/webcore/textdecoder-sharedarraybuffer.test.ts"
     );
     assert!(
-        manual_candidates["candidates"][0]["evidence"][0]["limitation"]
+        manual_candidates["candidates"][0]["evidence"][1]["limitation"]
             .as_str()
             .unwrap_or("")
             .contains("runtime route evidence only")
@@ -2529,7 +2530,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(manual_repair_queue["summary"]["manual_candidates"], 2);
     assert_eq!(manual_repair_queue["summary"]["queued_candidates"], 2);
     assert_eq!(manual_repair_queue["summary"]["analyzer_discovered"], 0);
-    assert_eq!(manual_repair_queue["summary"]["external_evidence_refs"], 5);
+    assert_eq!(manual_repair_queue["summary"]["external_evidence_refs"], 6);
     assert_eq!(
         manual_repair_queue["summary"]["operation_families"]["raw_pointer_read"],
         1
@@ -2670,7 +2671,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(tokmd_packets["summary"]["manual_candidates"], 2);
     assert_eq!(tokmd_packets["summary"]["packets"], 2);
     assert_eq!(tokmd_packets["summary"]["analyzer_discovered"], 0);
-    assert_eq!(tokmd_packets["summary"]["external_evidence_refs"], 5);
+    assert_eq!(tokmd_packets["summary"]["external_evidence_refs"], 6);
     assert_eq!(tokmd_packets["summary"]["with_proof_mode"], 2);
     assert_eq!(tokmd_packets["summary"]["with_fix_boundary"], 2);
     assert_eq!(tokmd_packets["summary"]["with_pr_aperture"], 2);
@@ -5245,7 +5246,7 @@ fn assert_manual_candidate_front_panel(
         "- Imported manual candidates: 2 (manual/advisory; not analyzer-discovered ReviewCards)"
     ));
     assert!(text.contains("- Operation families: `raw_pointer_read: 1, slice_from_raw_parts: 1`"));
-    assert!(text.contains("- Evidence kinds: `model: 2, runtime_witness: 2, source_trace: 1`"));
+    assert!(text.contains("- Evidence kinds: `model: 2, runtime_witness: 2, source_trace: 2`"));
     assert!(text.contains(
         "- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)"
     ));
@@ -5253,7 +5254,7 @@ fn assert_manual_candidate_front_panel(
         assert!(text.contains(
             "- Stable-byte: `stable-byte-source-sab-race`; proof `mutation-plus-miri`; ledger `handoff-ready`"
         ));
-        assert!(text.contains("- Evidence refs: 2; stop line and guidance in sidecars."));
+        assert!(text.contains("- Evidence refs: 3; stop line and guidance in sidecars."));
         assert!(!text.contains("- Safe caller route:"));
         assert!(!text.contains("- Invariant at risk:"));
         assert!(!text.contains("- External evidence refs:"));
@@ -5264,7 +5265,7 @@ fn assert_manual_candidate_front_panel(
         assert!(
             text.contains("- Invariant at risk: &[u8] memory must not be concurrently mutated")
         );
-        assert!(text.contains("- External evidence refs: 2"));
+        assert!(text.contains("- External evidence refs: 3"));
         assert!(text.contains(
             "- Stable-byte class: `stable-byte-source-sab-race` (observable: `no`; proof required: `mutation-plus-miri`; ledger state: `handoff-ready`)"
         ));
@@ -5324,7 +5325,7 @@ fn assert_manual_candidate_front_panel(
             "- Manual candidate queue preview: first {expected_queue_len} of 2 manual candidate(s)"
         )));
         assert!(text.contains(
-            "`R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 2; proof mode: `mutation-plus-miri`"
+            "`R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 3; proof mode: `mutation-plus-miri`"
         ));
         if expected_queue_len >= 2 {
             assert!(text.contains(
@@ -5365,7 +5366,7 @@ fn assert_manual_candidate_witness_follow_up(text: &str) {
         "- Imported manual candidates: 2 (manual/advisory; not analyzer-discovered ReviewCards)"
     ));
     assert!(text.contains("- Operation families: `raw_pointer_read: 1, slice_from_raw_parts: 1`"));
-    assert!(text.contains("- Evidence kinds: `model: 2, runtime_witness: 2, source_trace: 1`"));
+    assert!(text.contains("- Evidence kinds: `model: 2, runtime_witness: 2, source_trace: 2`"));
     assert!(text.contains(
         "- First manual candidate: `R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`)"
     ));
@@ -5373,7 +5374,7 @@ fn assert_manual_candidate_witness_follow_up(text: &str) {
         "- Safe caller route: new TextDecoder().decode(new Uint8Array(new SharedArrayBuffer(...)))"
     ));
     assert!(text.contains("- Invariant at risk: &[u8] memory must not be concurrently mutated"));
-    assert!(text.contains("- External evidence refs: 2"));
+    assert!(text.contains("- External evidence refs: 3"));
     assert!(text.contains(
         "- Stable-byte class: `stable-byte-source-sab-race` (observable: `no`; proof required: `mutation-plus-miri`; ledger state: `handoff-ready`)"
     ));
@@ -5411,7 +5412,7 @@ fn assert_manual_candidate_witness_follow_up(text: &str) {
     ));
     assert!(text.contains("- Manual candidate queue preview: first 2 of 2 manual candidate(s)"));
     assert!(text.contains(
-        "`R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 2; proof mode: `mutation-plus-miri`"
+        "`R4R2-S001` at `src/runtime/webcore/TextDecoder.rs:237` (`raw_pointer_read`); evidence refs: 3; proof mode: `mutation-plus-miri`"
     ));
     assert!(text.contains(
         "`R4R2-S002` at `src/sql_jsc/mysql/MySQLValue.rs:411` (`slice_from_raw_parts`); evidence refs: 3; proof mode: `mutation-plus-miri`"

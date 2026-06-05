@@ -148,6 +148,14 @@ struct ManualCandidateProofModeProjection {
     miri_required: bool,
 }
 
+struct StableByteSeedPreview {
+    candidate_id: String,
+    seed_id: String,
+    owner_lane: String,
+    suggested_first_pr: String,
+    triage_labels: Vec<String>,
+}
+
 struct ManualCandidateEvidenceProjection {
     kind: String,
     path: Option<String>,
@@ -324,6 +332,7 @@ fn check_manual_candidate_front_door_artifacts(
     if manual_candidates.count == 0 {
         return Ok(());
     }
+    let stable_byte_seed_previews = review_kit_stable_byte_seed_previews(dir, manual_candidates)?;
 
     for artifact in ["pr-summary.md", "github-summary.md"] {
         let path = dir.join(artifact);
@@ -341,6 +350,152 @@ fn check_manual_candidate_front_door_artifacts(
             queue_limit,
             compact,
         )?;
+    }
+    check_stable_byte_seed_front_door_artifacts(
+        dir,
+        manual_candidates.first_id.as_deref(),
+        &stable_byte_seed_previews,
+    )?;
+    Ok(())
+}
+
+fn review_kit_stable_byte_seed_previews(
+    dir: &Path,
+    manual_candidates: &ManualCandidateIndexProjection,
+) -> Result<Vec<StableByteSeedPreview>, String> {
+    let path = dir.join("review-kit.json");
+    let review_kit = super::parse_json_file(&path)?;
+    let Ok(queue) = super::json_array_at(
+        &review_kit,
+        "/handoff/manual_candidates/candidate_queue",
+        "review-kit.json handoff manual_candidates",
+    ) else {
+        return Ok(Vec::new());
+    };
+    let mut previews = Vec::new();
+    for (index, entry) in queue.iter().enumerate() {
+        let Some(seed) = entry.get("stable_byte_seed") else {
+            continue;
+        };
+        let context = format!("review-kit.json handoff manual_candidates candidate_queue[{index}]");
+        let id = super::require_non_empty_json_str(entry, "id", &context)?;
+        if !manual_candidates.ids.contains(id) {
+            return Err(format!(
+                "{context} id `{id}` is not present in manual-candidates.json"
+            ));
+        }
+        let context = format!("{context} stable_byte_seed");
+        previews.push(StableByteSeedPreview {
+            candidate_id: id.to_string(),
+            seed_id: super::require_non_empty_json_str(seed, "seed_id", &context)?.to_string(),
+            owner_lane: super::require_non_empty_json_str(seed, "owner_lane", &context)?
+                .to_string(),
+            suggested_first_pr: super::require_non_empty_json_str(
+                seed,
+                "suggested_first_pr",
+                &context,
+            )?
+            .to_string(),
+            triage_labels: require_non_empty_string_array(seed, "triage_labels", &context)?,
+        });
+    }
+    Ok(previews)
+}
+
+fn check_stable_byte_seed_front_door_artifacts(
+    dir: &Path,
+    first_candidate_id: Option<&str>,
+    seed_previews: &[StableByteSeedPreview],
+) -> Result<(), String> {
+    if seed_previews.is_empty() {
+        return Ok(());
+    }
+
+    if let Some(first_candidate_id) = first_candidate_id {
+        let github_path = dir.join("github-summary.md");
+        let github_text = super::read_to_string(&github_path)?;
+        for seed in seed_previews
+            .iter()
+            .filter(|seed| seed.candidate_id == first_candidate_id)
+            .take(MANUAL_CANDIDATE_GITHUB_QUEUE_LIMIT)
+        {
+            check_stable_byte_seed_github_summary_text(&github_text, &github_path, seed)?;
+        }
+    }
+
+    for artifact in ["pr-summary.md", "witness-plan.md"] {
+        let path = dir.join(artifact);
+        let text = super::read_to_string(&path)?;
+        for seed in seed_previews
+            .iter()
+            .take(MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT)
+        {
+            check_stable_byte_seed_queue_preview_text(&text, &path, seed)?;
+        }
+    }
+    Ok(())
+}
+
+fn check_stable_byte_seed_github_summary_text(
+    text: &str,
+    path: &Path,
+    seed: &StableByteSeedPreview,
+) -> Result<(), String> {
+    for needle in [
+        "Stable-byte seed:",
+        &format!("`{}`", seed.seed_id),
+        "owner lane:",
+        &format!("`{}`", seed.owner_lane),
+        "suggested first PR:",
+        &format!("`{}`", seed.suggested_first_pr),
+        "triage:",
+    ] {
+        if !super::text_contains_ignore_ascii_case(text, needle) {
+            return Err(format!(
+                "{} must include stable-byte seed cockpit marker `{needle}`",
+                path.display()
+            ));
+        }
+    }
+    for label in &seed.triage_labels {
+        if !super::text_contains_ignore_ascii_case(text, label) {
+            return Err(format!(
+                "{} must include stable-byte seed triage label `{label}`",
+                path.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn check_stable_byte_seed_queue_preview_text(
+    text: &str,
+    path: &Path,
+    seed: &StableByteSeedPreview,
+) -> Result<(), String> {
+    for needle in [
+        "seed:",
+        &format!("`{}`", seed.seed_id),
+        "seed owner:",
+        &format!("`{}`", seed.owner_lane),
+        "next PR:",
+        &format!("`{}`", seed.suggested_first_pr),
+        "triage:",
+    ] {
+        if !super::text_contains_ignore_ascii_case(text, needle) {
+            return Err(format!(
+                "{} must include stable-byte queue marker `{needle}`",
+                path.display()
+            ));
+        }
+    }
+    for label in &seed.triage_labels {
+        if !super::text_contains_ignore_ascii_case(text, label) {
+            return Err(format!(
+                "{} must include stable-byte queue triage label `{label}`",
+                path.display()
+            ));
+        }
     }
     Ok(())
 }

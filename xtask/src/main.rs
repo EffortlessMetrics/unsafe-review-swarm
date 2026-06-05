@@ -14878,6 +14878,49 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_stable_byte_seed_front_door_drift() -> Result<(), String> {
+        for artifact in ["github-summary.md", "pr-summary.md", "witness-plan.md"] {
+            let dir = unique_temp_dir(&format!(
+                "unsafe-review-first-pr-stable-byte-seed-front-door-drift-{artifact}"
+            ))?;
+            fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+            write_one_manual_candidate_first_pr_artifacts(&dir)?;
+            insert_stable_byte_seed_review_kit_fixture(&dir)?;
+            insert_stable_byte_seed_markdown_fixture(&dir)?;
+            let path = dir.join(artifact);
+            let text = fs::read_to_string(&path)
+                .map_err(|err| format!("read {artifact} failed: {err}"))?;
+            if !text.contains(stable_byte_seed_id_fixture()) {
+                return Err(format!("{artifact} fixture is missing stable-byte seed id"));
+            }
+            fs::write(
+                &path,
+                text.replacen(stable_byte_seed_id_fixture(), "bun-stable-byte-wrong", 1),
+            )
+            .map_err(|err| format!("write {artifact} failed: {err}"))?;
+
+            let result = check_first_pr_artifacts(&dir);
+
+            fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+            let err = match result {
+                Ok(()) => {
+                    return Err(format!(
+                        "{artifact} stable-byte seed marker should fail verification"
+                    ));
+                }
+                Err(err) => err,
+            };
+            assert!(err.contains(artifact), "{artifact}: {err}");
+            assert!(err.contains("stable-byte"), "{artifact}: {err}");
+            assert!(
+                err.contains(stable_byte_seed_id_fixture()),
+                "{artifact}: {err}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_review_kit_missing_artifact() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-missing-artifact")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
@@ -20753,6 +20796,78 @@ review_after = "2026-08-01"
             ),
         )
         .map_err(|err| format!("write {artifact} failed: {err}"))
+    }
+
+    fn insert_stable_byte_seed_review_kit_fixture(dir: &Path) -> Result<(), String> {
+        let path = dir.join("review-kit.json");
+        let mut review_kit = parse_json_file(&path)?;
+        let queue = review_kit
+            .pointer_mut("/handoff/manual_candidates/candidate_queue")
+            .and_then(serde_json::Value::as_array_mut)
+            .ok_or_else(|| "review-kit fixture candidate_queue must be an array".to_string())?;
+        let Some(first) = queue.first_mut() else {
+            return Err("review-kit fixture candidate_queue must have an entry".to_string());
+        };
+        first["stable_byte_seed"] = serde_json::json!({
+            "seed_id": stable_byte_seed_id_fixture(),
+            "owner_lane": "rust2",
+            "suggested_first_pr": "TextDecoder shared-byte snapshot only",
+            "triage_labels": ["non-observable", "needs-miri-model"]
+        });
+        fs::write(&path, review_kit.to_string())
+            .map_err(|err| format!("write review kit failed: {err}"))
+    }
+
+    fn insert_stable_byte_seed_markdown_fixture(dir: &Path) -> Result<(), String> {
+        let github_path = dir.join("github-summary.md");
+        let github_text = fs::read_to_string(&github_path)
+            .map_err(|err| format!("read github summary failed: {err}"))?;
+        let github_marker = "- Proof mode: `mutation-plus-miri`\n";
+        if !github_text.contains(github_marker) {
+            return Err("github-summary fixture is missing proof mode marker".to_string());
+        }
+        fs::write(
+            &github_path,
+            github_text.replace(
+                github_marker,
+                &format!(
+                    "{github_marker}{}\n",
+                    stable_byte_seed_github_line_fixture()
+                ),
+            ),
+        )
+        .map_err(|err| format!("write github summary failed: {err}"))?;
+
+        for artifact in ["pr-summary.md", "witness-plan.md"] {
+            let path = dir.join(artifact);
+            let text = fs::read_to_string(&path)
+                .map_err(|err| format!("read {artifact} failed: {err}"))?;
+            let marker = "evidence refs: 1; proof mode: `mutation-plus-miri`";
+            if !text.contains(marker) {
+                return Err(format!("{artifact} fixture is missing queue proof marker"));
+            }
+            fs::write(
+                &path,
+                text.replace(
+                    marker,
+                    &format!("{marker}{}", stable_byte_seed_queue_suffix_fixture()),
+                ),
+            )
+            .map_err(|err| format!("write {artifact} failed: {err}"))?;
+        }
+        Ok(())
+    }
+
+    fn stable_byte_seed_id_fixture() -> &'static str {
+        "bun-stable-byte-textdecoder-sab"
+    }
+
+    fn stable_byte_seed_github_line_fixture() -> &'static str {
+        "- Stable-byte seed: `bun-stable-byte-textdecoder-sab` (owner lane: `rust2`; suggested first PR: `TextDecoder shared-byte snapshot only`; triage: `non-observable`, `needs-miri-model`)"
+    }
+
+    fn stable_byte_seed_queue_suffix_fixture() -> &'static str {
+        "; seed: `bun-stable-byte-textdecoder-sab`; seed owner: `rust2`; next PR: `TextDecoder shared-byte snapshot only`; triage: `non-observable`, `needs-miri-model`"
     }
 
     fn manual_candidate_front_panel_fixture(compact: bool) -> &'static str {
