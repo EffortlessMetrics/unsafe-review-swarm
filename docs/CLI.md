@@ -371,11 +371,14 @@ When `repo` writes a report with `--out`, it renders to `<out>.partial` and
 renames that file to `<out>` only after a successful render. It also updates
 `<out>.status.json` while analysis runs. The status sidecar records the scan
 scope, phase, elapsed time, discovered files, scanned files, remaining files,
-cards found, last path, completion, normal errors, and Unix interruption
-signals. The scan scope records the root, include/exclude filters,
-gitignore/default-ignore posture, and `--max-files` value so interrupted scans
-can be replayed from the sidecar. Add `--progress` to print a small stderr
-heartbeat from the same status stream, including remaining files. Add
+cards found, last path, completion, normal errors, Unix interruption signals,
+and operator next-step diagnostics. The operator block tells whether a retained
+partial report is usable as a completed-file snapshot, what it does not prove,
+and how to rerun from the recorded scan scope. The scan scope records the root,
+include/exclude filters, gitignore/default-ignore posture, and `--max-files`
+value so interrupted scans can be replayed from the sidecar. Add `--progress`
+to print a small stderr heartbeat from the same status stream, including
+remaining files. Add
 `--timeout-seconds <n>` to stop analysis cooperatively after roughly `n`
 seconds at repo event boundaries; with `--out`, a timeout is recorded like other
 incomplete scans. If a normal analysis, timeout, write, or rename error occurs

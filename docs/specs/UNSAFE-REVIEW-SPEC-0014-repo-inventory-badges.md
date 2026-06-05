@@ -48,11 +48,16 @@ It also updates a `<out>.status.json` sidecar while discovery and scanning run.
 The sidecar is operational scan status, not a second ReviewCard truth. It
 records `schema_version`, `phase`, `scan_scope`, `elapsed_ms`,
 `files_discovered`, `files_scanned`, `files_remaining`, `cards_found`,
-`last_path`, `completed`, `error`, `signal`, and `partial_path`. `scan_scope`
-records the root, include/exclude filters, gitignore/default-ignore posture,
-and `--max-files` value so an interrupted large-repo scan can be replayed from
-the sidecar. `--progress` prints stderr heartbeats from the same status stream,
-including `files_remaining`. On normal analysis, write, or rename errors, the command
+`last_path`, `completed`, `error`, `signal`, `partial_path`, and `operator`.
+The `operator` block records state, whether a partial report is available, the
+partial-report limitation, a next action, and the claim boundary. Partial
+reports are completed-file snapshots only; they are not complete repo posture,
+witness execution, proof, UB-free status, Miri-clean status, site-execution
+proof, or policy gating. `scan_scope` records the root, include/exclude
+filters, gitignore/default-ignore posture, and `--max-files` value so an
+interrupted large-repo scan can be replayed from the sidecar. `--progress`
+prints stderr heartbeats from the same status stream, including
+`files_remaining`. On normal analysis, write, or rename errors, the command
 marks status incomplete. A `--timeout-seconds` expiration is a normal incomplete
 scan with `phase = failed`, an explicit timeout `error`, and `signal = null`.
 If at least one file completed before the error or timeout, the command keeps

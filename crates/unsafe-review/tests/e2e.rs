@@ -3739,6 +3739,7 @@ fn repo_progress_writes_status_sidecar_for_out_reports() -> Result<(), Box<dyn E
     assert!(status["elapsed_ms"].as_u64().is_some());
     assert!(status["error"].is_null());
     assert!(status["partial_path"].is_null());
+    assert_repo_status_operator(&status, "complete", false, "promoted final report")?;
 
     Ok(())
 }
@@ -3798,6 +3799,7 @@ fn repo_output_failure_keeps_partial_and_marks_status_incomplete() -> Result<(),
             .unwrap_or("")
             .ends_with("repo.json.partial")
     );
+    assert_repo_status_operator(&status, "failed", true, "fixing the error")?;
 
     Ok(())
 }
@@ -3865,6 +3867,7 @@ fn repo_analysis_failure_keeps_completed_file_partial_snapshot() -> Result<(), B
             .unwrap_or("")
             .ends_with("repo.json.partial")
     );
+    assert_repo_status_operator(&status, "failed", true, "fixing the error")?;
 
     Ok(())
 }
@@ -3959,6 +3962,7 @@ fn repo_timeout_keeps_completed_file_partial_snapshot() -> Result<(), Box<dyn Er
             .unwrap_or("")
             .ends_with("repo.json.partial")
     );
+    assert_repo_status_operator(&status, "failed", true, "increasing timeout")?;
 
     Ok(())
 }
@@ -4028,6 +4032,7 @@ fn repo_sigterm_writes_interrupted_status_sidecar() -> Result<(), Box<dyn Error>
             .contains("interrupted by SIGTERM")
     );
     assert!(status["partial_path"].is_null());
+    assert_repo_status_operator(&status, "terminated", false, "rerun repo with --out")?;
 
     Ok(())
 }
@@ -4114,6 +4119,7 @@ fn repo_sigterm_keeps_completed_file_partial_report() -> Result<(), Box<dyn Erro
             .unwrap_or("")
             .ends_with("repo.json.partial")
     );
+    assert_repo_status_operator(&status, "terminated", true, "restarting or narrowing")?;
 
     Ok(())
 }
@@ -5470,6 +5476,65 @@ fn assert_default_repo_status_scope(
     assert_eq!(status["scan_scope"]["large_repo_ignores"], true);
     assert!(status["scan_scope"]["max_files"].is_null());
     assert_eq!(status["files_remaining"], files_remaining);
+    Ok(())
+}
+
+fn assert_repo_status_operator(
+    status: &Value,
+    state: &str,
+    partial_report_available: bool,
+    next_action_contains: &str,
+) -> Result<(), Box<dyn Error>> {
+    let operator = status
+        .get("operator")
+        .ok_or("repo status is missing operator diagnostics")?;
+    assert_eq!(operator["state"], state);
+    assert_eq!(
+        operator["partial_report_available"],
+        partial_report_available
+    );
+    let limitation = operator["partial_report_limitation"].as_str().unwrap_or("");
+    assert!(
+        !limitation.is_empty(),
+        "operator should explain partial report limitations"
+    );
+    if partial_report_available {
+        assert!(
+            limitation.contains("Completed-file snapshot only"),
+            "operator limitation should describe partial snapshot scope: {limitation}"
+        );
+    } else {
+        assert!(
+            limitation.contains("No partial report")
+                || limitation.contains("No completed-file partial report"),
+            "operator limitation should explain absence of partial report: {limitation}"
+        );
+    }
+    let next_action = operator["next_action"].as_str().unwrap_or("");
+    assert!(
+        next_action.contains(next_action_contains),
+        "operator next_action `{next_action}` should include `{next_action_contains}`"
+    );
+    assert!(
+        next_action.contains("scan_scope"),
+        "operator next_action should point back to replayable scan_scope: {next_action}"
+    );
+    let boundary = operator["claim_boundary"].as_str().unwrap_or("");
+    for expected in [
+        "Operational scan status only",
+        "not complete repo posture",
+        "witness execution",
+        "proof",
+        "UB-free status",
+        "Miri-clean status",
+        "site-execution proof",
+        "policy gating",
+    ] {
+        assert!(
+            boundary.contains(expected),
+            "operator claim_boundary `{boundary}` should include `{expected}`"
+        );
+    }
     Ok(())
 }
 

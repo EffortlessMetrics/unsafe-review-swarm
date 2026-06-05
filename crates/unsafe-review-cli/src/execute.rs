@@ -791,6 +791,7 @@ fn render_repo_scan_status(
         "error": null,
         "signal": null,
         "partial_path": null,
+        "operator": repo_status_operator_json("complete", None),
     });
     let mut rendered = serde_json::to_string_pretty(&value)
         .map_err(|err| format!("render repo status JSON failed: {err}"))?;
@@ -822,6 +823,7 @@ fn render_repo_scan_incomplete_status(
         "error": error,
         "signal": null,
         "partial_path": partial_path.map(|path| path.display().to_string()),
+        "operator": repo_status_operator_json("failed", partial_path),
     });
     let mut rendered = serde_json::to_string_pretty(&value)
         .map_err(|err| format!("render repo status JSON failed: {err}"))?;
@@ -854,11 +856,53 @@ fn render_repo_scan_interrupted_status(
         "error": format!("repo scan interrupted by {signal_name}"),
         "signal": signal_name,
         "partial_path": partial_path.map(|path| path.display().to_string()),
+        "operator": repo_status_operator_json("terminated", partial_path),
     });
     let mut rendered = serde_json::to_string_pretty(&value)
         .map_err(|err| format!("render repo status JSON failed: {err}"))?;
     rendered.push('\n');
     Ok(rendered)
+}
+
+fn repo_status_operator_json(
+    state: &'static str,
+    partial_path: Option<&Path>,
+) -> serde_json::Value {
+    let partial_report_available = partial_path.is_some();
+    let partial_report_limitation = match (state, partial_report_available) {
+        ("complete", _) => {
+            "No partial report is retained after a successful scan; use the final report for the recorded scan scope."
+        }
+        (_, true) => "Completed-file snapshot only; not complete repo posture.",
+        _ => {
+            "No completed-file partial report was retained; the status sidecar is the durable incomplete-scan artifact."
+        }
+    };
+    let next_action = match (state, partial_report_available) {
+        ("complete", _) => {
+            "Use the promoted final report for the recorded scan_scope; rerun with adjusted include/exclude filters if the scope is not the intended review lane."
+        }
+        ("failed", true) => {
+            "Inspect partial_path for completed-file findings, then rerun repo with the recorded scan_scope after fixing the error, narrowing scope, or increasing timeout."
+        }
+        ("failed", false) => {
+            "Inspect error and scan_scope, then rerun repo after fixing the error, narrowing scope, or increasing timeout."
+        }
+        ("terminated", true) => {
+            "Inspect partial_path for completed-file findings, then rerun repo with the recorded scan_scope after restarting or narrowing the scan."
+        }
+        ("terminated", false) => {
+            "Inspect signal and scan_scope, then rerun repo with --out after restarting or narrowing the scan."
+        }
+        _ => "Inspect scan_scope and status fields, then rerun repo with the intended scope.",
+    };
+    serde_json::json!({
+        "state": state,
+        "partial_report_available": partial_report_available,
+        "partial_report_limitation": partial_report_limitation,
+        "next_action": next_action,
+        "claim_boundary": "Operational scan status only; partial reports are completed-file snapshots and are not complete repo posture, witness execution, proof, UB-free status, Miri-clean status, site-execution proof, or policy gating.",
+    })
 }
 
 fn repo_scan_scope_json(scan_scope: &RepoScanScopeMetadata) -> serde_json::Value {
@@ -2160,7 +2204,7 @@ fn print_repo_help() {
         "- --out renders to <out>.partial, then renames it to <out> only after a successful render."
     );
     println!(
-        "- <out>.status.json records scan scope, phase, elapsed time, discovered/scanned/remaining files, cards found, last path, completion, normal errors, and Unix interruption signals."
+        "- <out>.status.json records scan scope, phase, elapsed time, discovered/scanned/remaining files, cards found, last path, completion, normal errors, Unix interruption signals, and operator next-step diagnostics."
     );
     println!(
         "- On normal errors, incomplete status is kept; if a rendered partial report exists, it is left at <out>.partial."
