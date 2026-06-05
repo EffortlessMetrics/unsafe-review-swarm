@@ -584,6 +584,32 @@ const DOGFOOD_STABLE_BYTE_LEDGER_STATES: &[&str] = &[
     "merged-upstream",
     "needs-refresh",
 ];
+const DOGFOOD_STABLE_BYTE_PRIMARY_FIXTURES: &[(&str, &str)] = &[
+    (
+        "bun-stable-byte-candidate7-sync-compression",
+        "js_buffer_reentry_sync_compression",
+    ),
+    (
+        "bun-stable-byte-textdecoder-sab",
+        "stable_byte_sab_borrowed_slice",
+    ),
+    (
+        "bun-stable-byte-stringorbuffer-rab-async",
+        "js_buffer_reentry_async_helper_capture",
+    ),
+    (
+        "bun-stable-byte-node-fs-rab-scalar-write",
+        "js_buffer_reentry_node_fs_rab_scalar_write",
+    ),
+    (
+        "bun-stable-byte-mysql-blob-sab",
+        "stable_byte_sab_mysql_blob_rawslice",
+    ),
+    (
+        "bun-stable-byte-zstd-overlap-native-ffi",
+        "stable_byte_native_ffi_zstd_handoff",
+    ),
+];
 const DOGFOOD_TRIAGE_HEADER: &[&str] = &[
     "Target",
     "Card or family",
@@ -4451,7 +4477,22 @@ fn check_stable_byte_coverage_fixture_path(
             "{path}:{line} stable-byte coverage row for `{seed_id}` positive fixture `{fixture_path}` is not registered in fixtures/calibration.toml"
         ));
     }
+    if let Some(expected_fixture) = dogfood_stable_byte_primary_fixture(seed_id) {
+        if fixture_name != expected_fixture {
+            return Err(format!(
+                "{path}:{line} stable-byte coverage row for `{seed_id}` positive fixture `{fixture_path}` must match primary fixture `fixtures/{expected_fixture}`"
+            ));
+        }
+    }
     Ok(())
+}
+
+fn dogfood_stable_byte_primary_fixture(seed_id: &str) -> Option<&'static str> {
+    DOGFOOD_STABLE_BYTE_PRIMARY_FIXTURES
+        .iter()
+        .find_map(|(candidate_seed_id, fixture)| {
+            (*candidate_seed_id == seed_id).then_some(*fixture)
+        })
 }
 
 fn calibrated_fixture_names() -> Result<BTreeSet<String>, String> {
@@ -13393,6 +13434,49 @@ Triage labels come from [taxonomy](stable-byte-triage-taxonomy.md).
         assert!(err.contains("no longer has triage label `needs-fixture`"));
         assert!(err.contains("no fixture/control coverage row"));
         assert!(err.contains("bun-stable-byte-zstd-overlap-native-ffi"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_stable_byte_seed_index_rejects_mismatched_primary_fixture() -> Result<(), String> {
+        let text = r#"
+# Bun stable-byte follow-up seed index
+
+Triage labels come from [taxonomy](stable-byte-triage-taxonomy.md).
+
+## Seeds
+
+| Seed ID | Ledger state | Candidate family | Surface | Manual candidate | Safe JS caller | Rust/native sink | Proof mode | Suggested first PR | Owner lane | Triage labels |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `bun-stable-byte-textdecoder-sab` | `handoff-ready` | `stable-byte-source-sab-race` | `TextDecoder.decode` | `docs/examples/manual-candidates/textdecoder-sab.json` | SharedArrayBuffer-backed typed array decode | `src/runtime/webcore/TextDecoder.rs` slice materialization | `mutation-plus-miri` | `TextDecoder shared-byte snapshot only` | `rust2` | `non-observable`, `needs-miri-model` |
+
+## Fixture And Control Coverage
+
+| Seed ID | Positive fixture | Controls | Analyzer/support tier | Boundary |
+|---|---|---|---|---|
+| `bun-stable-byte-textdecoder-sab` | `fixtures/stable_byte_sab_mysql_blob_rawslice` | `fixtures/stable_byte_sab_snapshot_no_card` | `Stable-byte SAB race heuristic` | Static pressure only. |
+"#;
+        let manual_candidates = BTreeMap::from([(
+            "docs/examples/manual-candidates/textdecoder-sab.json".to_string(),
+            stable_byte_seed_candidate_for_tests(
+                "mutation-plus-miri",
+                "stable-byte-source-sab-race",
+                "handoff-ready",
+                "SharedArrayBuffer-backed typed array decode",
+                "src/runtime/webcore/TextDecoder.rs slice materialization",
+            ),
+        )]);
+
+        let err = err_text(check_dogfood_stable_byte_seed_text(
+            "docs/dogfood/stable-byte-follow-up-seeds.md",
+            text,
+            &manual_candidates,
+        ))?;
+
+        assert!(err.contains("positive fixture `fixtures/stable_byte_sab_mysql_blob_rawslice`"));
+        assert!(
+            err.contains("must match primary fixture `fixtures/stable_byte_sab_borrowed_slice`")
+        );
         Ok(())
     }
 
