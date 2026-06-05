@@ -49,6 +49,12 @@ remain report evidence, not CI-readable source-of-truth files. `card_id` is
 optional unless `cards_artifact` is present. Missed-card observations do not
 have a ReviewCard yet.
 
+[`index.json`](../index.json) publishes the selected real-crate judgment sample
+counts derived from committed judgment files. Those counts are a repeatability
+denominator for manual usefulness rows only; they are not an accuracy
+denominator, calibration report, precision/recall claim, witness result, or
+policy gate.
+
 ## Checked References
 
 `cargo run --locked -p xtask -- check-dogfood` verifies committed judgment
@@ -64,6 +70,8 @@ files:
   policy limits.
 - if `cards_artifact` is present, every card judgment must name a `card_id`
   that exists in that checked-in snapshot.
+- `index.json` and [`index.md`](../index.md) match the committed real-crate
+  judgment-file target, row, and label counts.
 
 ## Judgment Labels
 

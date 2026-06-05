@@ -1,0 +1,20 @@
+schema_version = "1.0"
+target = "arrayvec-pr138"
+report = "reports/2026-05-27-arrayvec-pr138-utf8-follow-up.md"
+reviewer = "manual"
+date = "2026-06-05"
+scope = "PR diff reviewer usefulness sample"
+artifact_set = "target/dogfood-work/arrayvec-pr138.after-utf8-applicability.json"
+trust_boundary = "Static unsafe contract review measurement input; not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not witness adequacy, and not policy readiness."
+
+[[cards]]
+family = "unsafe_fn_call"
+judgment = "actionable"
+reason = "The focused report says the target remains useful for unsafe-function wording plus raw-pointer, pointer-arithmetic, and Vec::set_len review pressure."
+next_step = "Use this target for unsafe-function and raw-pointer wording checks without broadening UTF-8 unchecked applicability claims."
+
+[[cards]]
+family = "str_from_utf8_unchecked"
+judgment = "noise"
+reason = "The report found no str_from_utf8_unchecked card, so citing this target as UTF-8 unchecked validation dogfood would be wrong-target evidence."
+next_step = "Keep UTF-8 unchecked applicability fixture-backed until a real dogfood target exercises that family."

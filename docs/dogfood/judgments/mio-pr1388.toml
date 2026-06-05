@@ -1,0 +1,14 @@
+schema_version = "1.0"
+target = "mio-pr1388"
+report = "reports/2026-05-26-mio-ffi-route-wording.md"
+reviewer = "manual"
+date = "2026-06-05"
+scope = "PR diff FFI route wording usefulness sample"
+artifact_set = "target/dogfood-work/mio-pr1388.after-local-safety-colon.json"
+trust_boundary = "Static unsafe contract review measurement input; not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not witness adequacy, and not policy readiness."
+
+[[cards]]
+family = "ffi"
+judgment = "human-only"
+reason = "The report records an appropriate miri_unsupported FFI card and says the useful work is human-review-heavy route wording for platform layout boundaries."
+next_step = "Preserve the route as human review guidance and do not imply Miri coverage without a separate matching receipt."

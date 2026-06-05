@@ -1,0 +1,20 @@
+schema_version = "1.0"
+target = "memchr-capped"
+report = "reports/2026-05-26-post-burst.md"
+reviewer = "manual"
+date = "2026-06-05"
+scope = "capped repo reviewer usefulness sample"
+artifact_set = "target/dogfood-work/memchr.unsafe-review.after-target-feature-contract-evidence.json"
+trust_boundary = "Static unsafe contract review measurement input; not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not witness adequacy, and not policy readiness."
+
+[[cards]]
+family = "target_feature"
+judgment = "actionable"
+reason = "The post-burst report records target_feature cards as useful because they preserve contract evidence while keeping witness evidence absent."
+next_step = "Keep target_feature cards contract-backed and unwitnessed until an exact external receipt is imported and audited."
+
+[[cards]]
+family = "comment_plan"
+judgment = "noise"
+reason = "The capped run had many unknown-family owner cards, making the snapshot inventory-like rather than a focused PR review packet."
+next_step = "Keep unknown-family cards visible in artifacts but out of default inline comment candidates unless a later reviewer narrows the family."

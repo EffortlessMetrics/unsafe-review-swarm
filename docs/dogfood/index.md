@@ -34,6 +34,40 @@ local artifact is needed.
 | Fixture control targets | 2 |
 | Checked-in scan outputs | 0 |
 
+## Selected Judgment Sample
+
+This sample counts committed real-crate reviewer judgment files only. It is a
+repeatability denominator for manual usefulness rows, not a calibration
+denominator, precision/recall claim, witness result, or policy gate. Fixture
+controls, including manual-candidate smoke controls, stay outside this
+real-crate sample.
+
+| Measure | Count |
+|---|---:|
+| Real-crate targets | 6 |
+| Judgment files | 6 |
+| Card or surface judgments | 14 |
+| Missed-obligation rows | 0 |
+
+| Judgment label | Count |
+|---|---:|
+| `actionable` | 9 |
+| `noise` | 2 |
+| `missed` | 0 |
+| `uncertain` | 1 |
+| `human-only` | 2 |
+| `good-agent-task` | 0 |
+| `bad-agent-task` | 0 |
+
+Selected real-crate targets:
+
+- `arrayvec-pr138`
+- `arrayvec-pr288`
+- `crossbeam-pr1226`
+- `hashbrown-pr667`
+- `memchr-capped`
+- `mio-pr1388`
+
 ## Repository Coverage
 
 | Repository | Snapshot targets | PR diff targets | Primary exercise |

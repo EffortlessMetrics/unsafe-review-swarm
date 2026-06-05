@@ -79,6 +79,31 @@
       "notes": "Documented target_feature declarations moved from guard_missing to guarded_unwitnessed without claiming target-feature availability, site execution, or soundness."
     }
   ],
+  "real_crate_judgment_sample": {
+    "status": "manual_selected_sample",
+    "targets": 6,
+    "target_ids": [
+      "arrayvec-pr138",
+      "arrayvec-pr288",
+      "crossbeam-pr1226",
+      "hashbrown-pr667",
+      "memchr-capped",
+      "mio-pr1388"
+    ],
+    "judgment_files": 6,
+    "card_or_surface_judgments": 14,
+    "missed_obligations": 0,
+    "labels": {
+      "actionable": 9,
+      "noise": 2,
+      "missed": 0,
+      "uncertain": 1,
+      "human-only": 2,
+      "good-agent-task": 0,
+      "bad-agent-task": 0
+    },
+    "claim_boundary": "Selected real-crate manual usefulness samples only from static unsafe contract review; not calibrated precision or recall, not witness execution, not site execution evidence, not policy readiness, not a proof of memory safety, not UB-free status, and not a Miri result."
+  },
   "control_targets": [
     {
       "id": "safe-code-no-cards-control",

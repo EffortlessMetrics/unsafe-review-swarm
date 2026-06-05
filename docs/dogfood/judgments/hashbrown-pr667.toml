@@ -1,0 +1,14 @@
+schema_version = "1.0"
+target = "hashbrown-pr667"
+report = "reports/2026-05-27-hashbrown-nonnull-follow-up.md"
+reviewer = "manual"
+date = "2026-06-05"
+scope = "PR diff NonNull reviewer usefulness sample"
+artifact_set = "target/dogfood-work/hashbrown-pr667.after-nonnull-applicability.json"
+trust_boundary = "Static unsafe contract review measurement input; not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not witness adequacy, and not policy readiness."
+
+[[cards]]
+family = "nonnull_unchecked"
+judgment = "actionable"
+reason = "The report records two concrete NonNull::new_unchecked cards with missing contract and nullability guard evidence."
+next_step = "Keep this as regression pressure for concrete NonNull operation detection; add controls only when future dogfood exposes macro, cast, or provenance pressure."
