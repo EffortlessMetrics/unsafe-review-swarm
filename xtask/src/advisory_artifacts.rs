@@ -1059,7 +1059,11 @@ fn check_policy_report_artifacts(
     super::require_text_contains(&markdown, "static unsafe contract review", &markdown_path)?;
     super::require_text_contains(&markdown, "not a proof of memory safety", &markdown_path)?;
     super::require_text_contains(&markdown, "not UB-free status", &markdown_path)?;
-    super::require_text_contains(&markdown, "not a Miri result", &markdown_path)?;
+    super::require_text_contains_any(
+        &markdown,
+        &markdown_path,
+        &["not a Miri result", "not Miri-clean status"],
+    )?;
     super::require_text_contains(
         &markdown,
         "does not enforce blocking policy",
@@ -1146,7 +1150,6 @@ fn check_manual_candidates_artifact(dir: &Path) -> Result<ManualCandidateIndexPr
     for expected in [
         "manual/advisory",
         "not analyzer-discovered",
-        "not site-execution proof",
         "not policy gating",
         "did not run witnesses",
         "post comments",
@@ -1160,6 +1163,7 @@ fn check_manual_candidates_artifact(dir: &Path) -> Result<ManualCandidateIndexPr
             ));
         }
     }
+    require_site_execution_boundary_text(boundary, "manual-candidates.json trust_boundary")?;
 
     let mut candidate_ids = BTreeSet::new();
     let mut candidate_projections = Vec::new();
@@ -1249,9 +1253,7 @@ fn check_manual_repair_queue_artifact(
         "not an automatic repair queue",
         "not proof of memory safety",
         "not UB-free status",
-        "not a Miri result",
         "not Miri-clean status",
-        "not site-execution proof",
         "not policy gating",
         "not repair success",
         "did not run agents",
@@ -1266,6 +1268,7 @@ fn check_manual_repair_queue_artifact(
             ));
         }
     }
+    require_site_execution_boundary_text(boundary, "manual-repair-queue.json trust_boundary")?;
 
     let summary_count = super::json_usize_at(
         &value,
@@ -1870,9 +1873,7 @@ fn check_tokmd_packets_artifact(
         "not a proof of UB",
         "not a proof of memory safety",
         "not UB-free status",
-        "not a Miri result",
         "not Miri-clean status",
-        "not site-execution proof",
         "not repair success",
         "not policy readiness",
         "did not run tokmd",
@@ -1887,6 +1888,7 @@ fn check_tokmd_packets_artifact(
             ));
         }
     }
+    require_site_execution_boundary_text(boundary, "tokmd-packets.json trust_boundary")?;
     Ok(())
 }
 
@@ -2208,15 +2210,7 @@ fn check_tokmd_packet_entry(
     let target = entry
         .get("target")
         .ok_or_else(|| format!("{context} is missing target"))?;
-    require_projected_str(target, "file", &expected.location_file, &context)?;
-    let line = super::json_usize_at(target, "/line", &context)?;
-    if line != expected.location_line {
-        return Err(format!(
-            "{context} target.line is {line}, expected {}",
-            expected.location_line
-        ));
-    }
-    require_projected_str(target, "location_text", &expected.location_text, &context)?;
+    require_manual_candidate_target_projection(target, expected, &context)?;
 
     let route = entry
         .get("route")
@@ -2464,6 +2458,10 @@ fn check_tokmd_preset_inputs(
         &handoff_context,
     )?;
     require_tokmd_rust_native_seam(handoff, expected, &handoff_context)?;
+    let handoff_target = handoff
+        .get("target")
+        .ok_or_else(|| format!("{handoff_context} is missing target"))?;
+    require_manual_candidate_target_projection(handoff_target, expected, &handoff_context)?;
     require_projected_optional_proof_mode(
         handoff,
         "proof_mode",
@@ -2655,6 +2653,18 @@ fn check_tokmd_preset_inputs(
         }
     }
     Ok(())
+}
+
+fn require_site_execution_boundary_text(text: &str, context: &str) -> Result<(), String> {
+    if ["not site-execution proof", "not a site-execution claim"]
+        .iter()
+        .any(|expected| super::text_contains_ignore_ascii_case(text, expected))
+    {
+        return Ok(());
+    }
+    Err(format!(
+        "{context} must include site-execution boundary wording"
+    ))
 }
 
 fn require_tokmd_rust_native_seam(
@@ -3238,15 +3248,7 @@ fn check_manual_candidate_implementer_handoff(
     let target = handoff
         .get("target")
         .ok_or_else(|| format!("{context} is missing target"))?;
-    require_projected_str(target, "file", &expected.location_file, context)?;
-    let line = super::json_usize_at(target, "/line", context)?;
-    if line != expected.location_line {
-        return Err(format!(
-            "{context} target.line is {line}, expected {}",
-            expected.location_line
-        ));
-    }
-    require_projected_str(target, "location_text", &expected.location_text, context)?;
+    require_manual_candidate_target_projection(target, expected, context)?;
 
     let route = handoff
         .get("route")
@@ -3342,6 +3344,23 @@ fn check_manual_candidate_implementer_handoff(
             ));
         }
     }
+    Ok(())
+}
+
+fn require_manual_candidate_target_projection(
+    target: &serde_json::Value,
+    expected: &ManualCandidateProjection,
+    context: &str,
+) -> Result<(), String> {
+    require_projected_str(target, "file", &expected.location_file, context)?;
+    let line = super::json_usize_at(target, "/line", context)?;
+    if line != expected.location_line {
+        return Err(format!(
+            "{context} target.line is {line}, expected {}",
+            expected.location_line
+        ));
+    }
+    require_projected_str(target, "location_text", &expected.location_text, context)?;
     Ok(())
 }
 
@@ -3633,7 +3652,6 @@ fn check_review_kit_manifest(
     super::require_boundary_text(boundary, "review-kit.json")?;
     for expected in [
         "not Miri-clean status",
-        "not site-execution proof",
         "did not run witnesses",
         "post comments",
         "edit source",
@@ -3646,6 +3664,7 @@ fn check_review_kit_manifest(
             ));
         }
     }
+    require_site_execution_boundary_text(boundary, "review-kit.json trust_boundary")?;
 
     check_review_kit_handoff(
         &review_kit,

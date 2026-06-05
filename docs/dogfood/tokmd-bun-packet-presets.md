@@ -35,7 +35,8 @@ Required sections:
 - candidate or ReviewCard identity;
 - stable-byte family and invariant at risk;
 - safe JS caller route;
-- Rust/native seam and file:line;
+- Rust/native seam plus machine-checkable `target.file`, `target.line`, and
+  `target.location_text`;
 - proof mode and missing proof;
 - current evidence with limitations;
 - suggested fix boundary;

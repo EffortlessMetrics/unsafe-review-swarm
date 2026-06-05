@@ -409,7 +409,9 @@ presets (`bun-ub-handoff`, `bun-ub-pr-body`, `bun-ub-ledger-note`,
 from the same manual candidate, joined stable-byte seed row, manual repair
 queue item, and bundle-level comment-plan relationship; it is a copy-only
 formatting input, not rendered tokmd output and not a second source of truth.
-The preset input must preserve implementer route/proof/fix/non-goal fields,
+The `bun-ub-handoff` preset input must preserve the same machine-checkable
+`target.file`, `target.line`, and `target.location_text` as the packet-level
+target. The preset input must preserve implementer route/proof/fix/non-goal fields,
 PR-body non-claim fields, ledger transition limits, review-map no-posting
 boundaries, and next-pick proof action without running tokmd or selecting
 comments. `tokmd-packets.json` may project the ReviewCard-only
@@ -567,7 +569,8 @@ into an analyzer ReviewCard.
   and source/count metadata while keeping ReviewCard `repair-queue.json` free
   of manual-candidate markers.
 - `first-pr` writes `tokmd-packets.json` as a formatting-input sidecar,
-  preserving manual markers, optional oracle-map,
+  preserving manual markers, packet and per-preset handoff target file/line,
+  optional oracle-map,
   proof-mode/fix-boundary/PR-aperture guidance, implementer handoff, commands
   from `manual-candidates.json`, and
   `manual_repair_queue_item` data from `manual-repair-queue.json`, plus
