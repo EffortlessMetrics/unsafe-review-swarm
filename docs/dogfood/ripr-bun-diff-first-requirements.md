@@ -86,15 +86,15 @@ Any future `ripr` receipt is external evidence for inventory or mutation
 exposure only. It must say what was scanned, what was skipped, what cache was
 used, and what command or tool version produced the output.
 
-A `ripr` receipt must not become:
+A `ripr` receipt remains external evidence only. It is:
 
-- witness execution;
-- Miri-clean evidence;
-- site-execution proof;
-- proof of UB;
-- proof of memory safety;
-- a calibrated precision/recall claim;
-- a default blocking policy.
+- not witness execution;
+- not Miri-clean evidence;
+- not site-execution proof;
+- not proof of UB;
+- not proof of memory safety;
+- not a calibrated precision/recall claim;
+- not a default blocking policy.
 
 For manual candidates, `ripr` evidence may help preserve a route, seam map, or
 oracle map, but it must keep `source = manual`, `manual_candidate = true`, and

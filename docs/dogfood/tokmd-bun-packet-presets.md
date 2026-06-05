@@ -2,13 +2,12 @@
 
 Status: future renderer requirements plus current first-pr packet input
 
-This note records the Bun packet shapes that `tokmd` should eventually render
-from unsafe-review manual candidates, ReviewCards, witness plans, receipt
-audits, repair queues, and stable-byte seed ledgers. It is a requirements rail
-only. The current `first-pr` lane writes `tokmd-packets.json` as formatting
-input for imported manual candidates. It does not run tokmd, render packet
-Markdown, run witnesses, edit source, post comments, or claim a candidate is
-proved.
+This requirements rail only records the Bun packet shapes that `tokmd` should
+eventually render from unsafe-review manual candidates, ReviewCards, witness
+plans, receipt audits, repair queues, and stable-byte seed ledgers. The current
+`first-pr` lane writes `tokmd-packets.json` as formatting input for imported
+manual candidates. It does not run tokmd, render packet Markdown, run witnesses,
+edit source, post comments, or claim a candidate is proved.
 
 ## Purpose
 
@@ -152,6 +151,7 @@ limitation, not an empty result or all-clear statement.
 ## Trust Boundary
 
 These presets are formatting contracts only. They do not run witnesses, execute
-Miri, execute Bun or Node, edit source, post comments, prove site execution,
-prove UB, prove memory safety, claim UB-free or Miri-clean status, provide
-calibrated precision or recall, or create a default blocking policy.
+Miri, execute Bun or Node, edit source, or post comments. They do not prove
+site-execution, do not prove UB, do not prove memory safety, do not claim
+UB-free status, do not claim Miri-clean status, do not provide calibrated
+precision or recall, and do not create a default blocking policy.

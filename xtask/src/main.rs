@@ -492,6 +492,8 @@ const DOGFOOD_README: &str = "docs/dogfood/README.md";
 const DOGFOOD_FOLLOW_UP_SEEDS: &str = "docs/dogfood/follow-up-seeds.md";
 const DOGFOOD_STABLE_BYTE_SEEDS: &str = "docs/dogfood/stable-byte-follow-up-seeds.md";
 const DOGFOOD_STABLE_BYTE_TRIAGE: &str = "docs/dogfood/stable-byte-triage-taxonomy.md";
+const DOGFOOD_RIPR_BUN_REQUIREMENTS: &str = "docs/dogfood/ripr-bun-diff-first-requirements.md";
+const DOGFOOD_TOKMD_BUN_PRESETS: &str = "docs/dogfood/tokmd-bun-packet-presets.md";
 const DOGFOOD_JUDGMENT_DIR: &str = "docs/dogfood/judgments";
 const DOGFOOD_JUDGMENTS_README: &str = "docs/dogfood/judgments/README.md";
 const DOGFOOD_REPORT_DIR: &str = "docs/dogfood/reports";
@@ -3723,6 +3725,7 @@ fn check_dogfood_stable_byte_seeds() -> Result<(), String> {
     let triage_text = read_to_string(&workspace_path(DOGFOOD_STABLE_BYTE_TRIAGE))?;
     check_dogfood_report_trust_boundary_text(DOGFOOD_STABLE_BYTE_TRIAGE, &triage_text)?;
     check_dogfood_stable_byte_triage_text(DOGFOOD_STABLE_BYTE_TRIAGE, &triage_text)?;
+    check_dogfood_bun_tooling_interface_docs(&readme, &triage_text)?;
 
     let mut examples_by_path = BTreeMap::new();
     for example in manual_candidate_examples()? {
@@ -3747,6 +3750,106 @@ fn check_dogfood_stable_byte_triage_text(path: &str, text: &str) -> Result<(), S
         }
     }
     Ok(())
+}
+
+fn check_dogfood_bun_tooling_interface_docs(
+    readme_text: &str,
+    triage_text: &str,
+) -> Result<(), String> {
+    let ripr_text = read_to_string(&workspace_path(DOGFOOD_RIPR_BUN_REQUIREMENTS))?;
+    let tokmd_text = read_to_string(&workspace_path(DOGFOOD_TOKMD_BUN_PRESETS))?;
+    check_dogfood_bun_tooling_interface_docs_text(readme_text, triage_text, &ripr_text, &tokmd_text)
+}
+
+fn check_dogfood_bun_tooling_interface_docs_text(
+    readme_text: &str,
+    triage_text: &str,
+    ripr_text: &str,
+    tokmd_text: &str,
+) -> Result<(), String> {
+    for linked in [DOGFOOD_RIPR_BUN_REQUIREMENTS, DOGFOOD_TOKMD_BUN_PRESETS] {
+        let relative = linked.strip_prefix("docs/dogfood/").ok_or_else(|| {
+            format!("dogfood tooling doc path `{linked}` must stay in docs/dogfood")
+        })?;
+        if !readme_text.contains(&format!("]({relative})")) {
+            return Err(format!("{DOGFOOD_README} must link `{relative}`"));
+        }
+    }
+
+    check_stable_byte_tooling_label_link(
+        DOGFOOD_STABLE_BYTE_TRIAGE,
+        triage_text,
+        "needs-ripr",
+        "ripr-bun-diff-first-requirements.md",
+    )?;
+    check_stable_byte_tooling_label_link(
+        DOGFOOD_STABLE_BYTE_TRIAGE,
+        triage_text,
+        "needs-tokmd",
+        "tokmd-bun-packet-presets.md",
+    )?;
+
+    check_dogfood_bun_tooling_doc_text(
+        DOGFOOD_RIPR_BUN_REQUIREMENTS,
+        ripr_text,
+        "Status: future tooling-interface requirements",
+        &[
+            "requirements rail only",
+            "does not add a live integration",
+            "diff-first",
+        ],
+    )?;
+    check_dogfood_bun_tooling_doc_text(
+        DOGFOOD_TOKMD_BUN_PRESETS,
+        tokmd_text,
+        "Status: future renderer requirements plus current first-pr packet input",
+        &[
+            "requirements rail only",
+            "tokmd-packets.json",
+            "formatting input",
+            "does not run tokmd",
+        ],
+    )?;
+    Ok(())
+}
+
+fn check_stable_byte_tooling_label_link(
+    path: &str,
+    text: &str,
+    label: &str,
+    target: &str,
+) -> Result<(), String> {
+    let label_token = format!("`{label}`");
+    let Some(row) = text.lines().find(|line| line.contains(&label_token)) else {
+        return Err(format!(
+            "{path} must document stable-byte triage label `{label}`"
+        ));
+    };
+    if !row.contains(&format!("]({target})")) {
+        return Err(format!(
+            "{path} stable-byte triage label `{label}` must link `{target}`"
+        ));
+    }
+    Ok(())
+}
+
+fn check_dogfood_bun_tooling_doc_text(
+    path: &str,
+    text: &str,
+    status: &str,
+    required_phrases: &[&str],
+) -> Result<(), String> {
+    if !text.contains(status) {
+        return Err(format!("{path} must declare `{status}`"));
+    }
+    let lower = text.to_ascii_lowercase();
+    for phrase in required_phrases {
+        if !lower.contains(&phrase.to_ascii_lowercase()) {
+            return Err(format!("{path} must mention `{phrase}`"));
+        }
+    }
+    check_dogfood_report_trust_boundary_text(path, text)?;
+    reject_positive_overclaims(Path::new(path), text)
 }
 
 fn check_dogfood_stable_byte_seed_text(
@@ -12695,6 +12798,157 @@ policy readiness.
                 "ledger_state": ledger_state
             }
         })
+    }
+
+    fn bun_tooling_readme_for_tests() -> String {
+        r#"
+# Dogfood Corpus
+
+Bun diff-first inventory requirements for `ripr` are tracked in
+[`ripr-bun-diff-first-requirements.md`](ripr-bun-diff-first-requirements.md).
+Bun packet preset requirements for `tokmd` are tracked in
+[`tokmd-bun-packet-presets.md`](tokmd-bun-packet-presets.md).
+"#
+        .to_string()
+    }
+
+    fn bun_tooling_triage_for_tests() -> String {
+        r#"
+# Bun stable-byte triage taxonomy
+
+| Label | Use when | Typical next step | Do not infer |
+|---|---|---|---|
+| `needs-ripr` | The seed is blocked on diff-first repository inventory. | Record the exact ripr requirement in [`ripr-bun-diff-first-requirements.md`](ripr-bun-diff-first-requirements.md). | Complete inventory is already available. |
+| `needs-tokmd` | The seed needs a packet preset or export shape. | Add the preset contract in [`tokmd-bun-packet-presets.md`](tokmd-bun-packet-presets.md). | The packet was executed, repaired, or posted. |
+"#
+        .to_string()
+    }
+
+    fn bun_tooling_ripr_doc_for_tests() -> String {
+        r#"
+# ripr Bun Diff-First Requirements
+
+Status: future tooling-interface requirements
+
+This note is a requirements rail only. It does not add a live integration,
+run mutation tooling, execute witnesses, edit source, post comments, or turn
+findings into a policy gate.
+
+`ripr` support should stay diff-first and preserve partial output before broad
+inventory work.
+
+## Trust Boundary
+
+This document is not witness execution, not a proof of memory-safety, not
+UB-free status, not Miri-clean status, not site-execution proof, not calibrated
+precision or recall, and not policy readiness.
+"#
+        .to_string()
+    }
+
+    fn bun_tooling_tokmd_doc_for_tests() -> String {
+        r#"
+# tokmd Bun Packet Presets
+
+Status: future renderer requirements plus current first-pr packet input
+
+This note is a requirements rail only. The current first-pr lane writes
+`tokmd-packets.json` as formatting input. It does not run tokmd, render packet
+Markdown, execute witnesses, edit source, post comments, or enforce policy.
+
+## Trust Boundary
+
+These presets are formatting contracts only. They are not witness execution,
+not a proof of memory-safety, not UB-free status, not Miri-clean status, not
+site-execution proof, not calibrated precision or recall, and not policy
+readiness.
+"#
+        .to_string()
+    }
+
+    #[test]
+    fn dogfood_bun_tooling_interface_docs_accept_current_contract() -> Result<(), String> {
+        check_dogfood_bun_tooling_interface_docs_text(
+            &bun_tooling_readme_for_tests(),
+            &bun_tooling_triage_for_tests(),
+            &bun_tooling_ripr_doc_for_tests(),
+            &bun_tooling_tokmd_doc_for_tests(),
+        )
+    }
+
+    #[test]
+    fn dogfood_bun_tooling_interface_docs_reject_missing_readme_link() -> Result<(), String> {
+        let readme = bun_tooling_readme_for_tests().replace(
+            "](ripr-bun-diff-first-requirements.md)",
+            "](missing-ripr.md)",
+        );
+
+        let err = err_text(check_dogfood_bun_tooling_interface_docs_text(
+            &readme,
+            &bun_tooling_triage_for_tests(),
+            &bun_tooling_ripr_doc_for_tests(),
+            &bun_tooling_tokmd_doc_for_tests(),
+        ))?;
+
+        assert!(err.contains("must link `ripr-bun-diff-first-requirements.md`"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_bun_tooling_interface_docs_reject_missing_taxonomy_link() -> Result<(), String> {
+        let triage = bun_tooling_triage_for_tests()
+            .replace("](tokmd-bun-packet-presets.md)", "](missing-tokmd.md)");
+
+        let err = err_text(check_dogfood_bun_tooling_interface_docs_text(
+            &bun_tooling_readme_for_tests(),
+            &triage,
+            &bun_tooling_ripr_doc_for_tests(),
+            &bun_tooling_tokmd_doc_for_tests(),
+        ))?;
+
+        assert!(err.contains("triage label `needs-tokmd`"));
+        assert!(err.contains("must link `tokmd-bun-packet-presets.md`"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_bun_tooling_interface_docs_reject_missing_future_renderer_status()
+    -> Result<(), String> {
+        let tokmd = bun_tooling_tokmd_doc_for_tests().replace(
+            "Status: future renderer requirements plus current first-pr packet input",
+            "Status: active renderer integration",
+        );
+
+        let err = err_text(check_dogfood_bun_tooling_interface_docs_text(
+            &bun_tooling_readme_for_tests(),
+            &bun_tooling_triage_for_tests(),
+            &bun_tooling_ripr_doc_for_tests(),
+            &tokmd,
+        ))?;
+
+        assert!(err.contains("tokmd-bun-packet-presets.md must declare"));
+        assert!(err.contains("future renderer requirements"));
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_bun_tooling_interface_docs_reject_missing_ripr_no_integration_boundary()
+    -> Result<(), String> {
+        let ripr = bun_tooling_ripr_doc_for_tests().replace(
+            "It does not add a live integration",
+            "It may add a live integration",
+        );
+
+        let err = err_text(check_dogfood_bun_tooling_interface_docs_text(
+            &bun_tooling_readme_for_tests(),
+            &bun_tooling_triage_for_tests(),
+            &ripr,
+            &bun_tooling_tokmd_doc_for_tests(),
+        ))?;
+
+        assert!(err.contains("ripr-bun-diff-first-requirements.md must mention"));
+        assert!(err.contains("does not add a live integration"));
+        Ok(())
     }
 
     #[test]
