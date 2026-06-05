@@ -1713,6 +1713,8 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("not memory-safety proof"));
     assert!(stdout.contains("not UB-free status"));
     assert!(stdout.contains("not Miri-clean status"));
+    assert!(stdout.contains("not a site-execution claim"));
+    assert!(stdout.contains("matching witness receipt"));
     assert!(stdout.contains("did not run witnesses"));
     assert!(stdout.contains("post comments"));
     assert!(stdout.contains("enforce blocking policy"));
@@ -3073,6 +3075,18 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             .unwrap_or("")
             .contains("does not enforce blocking policy")
     );
+    assert!(
+        policy_report["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not a site-execution claim")
+    );
+    assert!(
+        policy_report["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("matching witness receipt")
+    );
     let policy_report_raw = fs::read_to_string(out_dir.join("policy-report.json"))?;
     assert!(!policy_report_raw.contains("R4R2-S001"));
     assert!(!policy_report_raw.contains("manual_candidate"));
@@ -3306,6 +3320,8 @@ fn help_reports_first_run_trust_boundary_without_overclaims() -> Result<(), Box<
     assert!(text.contains("not memory-safety proof"));
     assert!(text.contains("not UB-free status"));
     assert!(text.contains("not Miri-clean status"));
+    assert!(text.contains("not a site-execution claim"));
+    assert!(text.contains("matching witness receipt"));
     assert!(!text.contains("soundness proof"));
     assert!(!text.contains("All clear"));
 
@@ -3546,6 +3562,9 @@ fn doctor_reports_first_install_signals_without_running_witnesses() -> Result<()
     assert!(text.contains("trust boundary: static unsafe contract review only"));
     assert!(text.contains("not memory-safety proof"));
     assert!(text.contains("not UB-free status"));
+    assert!(text.contains("not Miri-clean status"));
+    assert!(text.contains("not a site-execution claim"));
+    assert!(text.contains("matching witness receipt"));
 
     Ok(())
 }
@@ -5090,6 +5109,10 @@ fn policy_report_is_advisory_and_counts_baseline_state() -> Result<(), Box<dyn E
     assert!(
         json_str(&report["trust_boundary"], "trust_boundary")?
             .contains("does not enforce blocking policy")
+    );
+    assert!(
+        json_str(&report["trust_boundary"], "trust_boundary")?
+            .contains("not a site-execution claim")
     );
 
     let temp = TempDir::new("unsafe-review-policy-report-e2e")?;

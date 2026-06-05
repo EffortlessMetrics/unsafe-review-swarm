@@ -15,9 +15,9 @@ reports, and receipt-aware output should project from those cards rather than
 reclassifying findings independently.
 
 Current status: experimental static unsafe contract review evidence. The engine
-is source-based, stable-first, and intentionally conservative. It is not a
-memory-safety proof, not a UB-free claim, and not a Miri result unless a scoped
-witness receipt is attached.
+is source-based, stable-first, and intentionally conservative. It is not
+memory-safety proof, not UB-free status, not Miri-clean status, and not a
+site-execution claim unless a scoped witness receipt is attached.
 
 Repository documentation:
 https://github.com/EffortlessMetrics/unsafe-review

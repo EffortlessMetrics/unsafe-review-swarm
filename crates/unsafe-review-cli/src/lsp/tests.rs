@@ -139,6 +139,15 @@ fn diagnostic_for_card_carries_card_id_and_trust_boundary() -> Result<(), Box<dy
             .unwrap_or("")
             .contains("not UB-free status")
     );
+    let trust_boundary = diagnostic
+        .data
+        .as_ref()
+        .and_then(|data| data.get("trust_boundary"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    assert!(trust_boundary.contains("not Miri-clean status"));
+    assert!(trust_boundary.contains("not a site-execution claim"));
+    assert!(trust_boundary.contains("matching witness receipt"));
     let data = diagnostic
         .data
         .as_ref()

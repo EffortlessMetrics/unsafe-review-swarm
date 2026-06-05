@@ -17,7 +17,7 @@ pub(super) const CMD_PACKET: &str = "unsafe-review.collectAgentPacket";
 pub(super) const CMD_WITNESS_ROUTE: &str = "unsafe-review.explainWitnessRoute";
 pub(super) const CMD_WITNESS_COMMAND: &str = "unsafe-review.collectWitnessCommand";
 pub(super) const CMD_OPEN_TEST: &str = "unsafe-review.openRelatedTest";
-pub(super) const TRUST_BOUNDARY: &str = "Static unsafe-contract review only. This is not memory-safety proof, not UB-free status, and not a Miri result unless a matching witness receipt is attached.";
+pub(super) const TRUST_BOUNDARY: &str = "Static unsafe-contract review only. This is not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.";
 
 pub(crate) fn serve() -> Result<(), String> {
     let runtime = tokio::runtime::Builder::new_multi_thread()

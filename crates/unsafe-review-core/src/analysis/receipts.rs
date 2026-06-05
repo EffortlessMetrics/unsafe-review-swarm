@@ -13,7 +13,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const AUDIT_TRUST_BOUNDARY: &str = "Static receipt audit only; this checks saved receipt metadata against current ReviewCards and manual candidates, does not execute witnesses or external tests, does not independently prove site reach, and does not make policy decisions.";
+const AUDIT_TRUST_BOUNDARY: &str = "Static receipt audit only; this checks saved receipt metadata against current ReviewCards and manual candidates, does not execute witnesses or external tests, does not independently prove site reach, is not memory-safety proof, not UB-free status, not Miri-clean status, and does not make policy decisions.";
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct ReceiptIndex {

@@ -66,9 +66,9 @@ and witness route needed to make review credible?
 
 ## Trust boundary
 
-`unsafe-review` reports static review evidence. It is not a proof of memory
-safety, not a UB-free claim, and not a Miri result unless a matching witness
-receipt is attached.
+`unsafe-review` reports static review evidence. It is not memory-safety proof,
+not UB-free status, not Miri-clean status, and not a site-execution claim unless
+a matching witness receipt is attached.
 
 It is advisory by default: no witness execution, no automatic comments, no source
 edits, and no default blocking policy.

@@ -36,6 +36,7 @@ mod first_pr;
 const NO_CHANGED_GAPS_MESSAGE: &str = "No changed unsafe-review gaps were found.";
 const NO_CHANGED_GAPS_LIMITATION: &str =
     "This does not prove the repo safe, UB-free, Miri-clean, or that any unsafe site executed.";
+const FIRST_RUN_TRUST_BOUNDARY: &str = "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.";
 type FirstPrRenderer = fn(&AnalyzeOutput) -> String;
 
 const REVIEW_KIT_ARTIFACT: &str = "review-kit.json";
@@ -152,7 +153,7 @@ fn print_support() {
     println!("- not memory-safety proof.");
     println!("- not UB-free status.");
     println!("- not Miri-clean status.");
-    println!("- not a site-execution claim unless a matching receipt says so.");
+    println!("- not a site-execution claim unless a matching witness receipt says so.");
     println!();
     println!("Docs:");
     println!("- docs/status/SUPPORT_SUMMARY.md");
@@ -1286,9 +1287,7 @@ fn doctor(root: &Path) -> Result<(), String> {
     println!();
     println!("policy: advisory by default");
     println!("witness execution: not run by doctor or by default");
-    println!(
-        "trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and no witness execution"
-    );
+    println!("trust boundary: {FIRST_RUN_TRUST_BOUNDARY}");
     Ok(())
 }
 
@@ -1772,7 +1771,7 @@ fn manual_candidate_reviewcard_applicability_entry(
 }
 
 fn manual_candidate_list_trust_boundary() -> &'static str {
-    "Manual/advisory static unsafe contract review candidate ledger only; candidates are not analyzer-discovered ReviewCards, not a proof of UB, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repository safety, and not policy gating. unsafe-review did not run witnesses, post comments, edit source, run an agent, or enforce blocking policy."
+    "Manual/advisory static unsafe contract review candidate ledger only; candidates are not analyzer-discovered ReviewCards, not a proof of UB, not a proof of memory safety, not UB-free status, not Miri-clean status, not a site-execution claim unless a matching witness receipt says so, not repository safety, and not policy gating. unsafe-review did not run witnesses, post comments, edit source, run an agent, or enforce blocking policy."
 }
 
 fn manual_candidate_location_text(candidate: &unsafe_review_core::ManualCandidate) -> String {
@@ -2144,9 +2143,7 @@ fn print_help() {
     println!();
     println!("Flags may be passed as `--flag value` or `--flag=value`.");
     println!();
-    println!(
-        "Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, and not Miri-clean status."
-    );
+    println!("Trust boundary: {FIRST_RUN_TRUST_BOUNDARY}");
 }
 
 fn print_repo_help() {
@@ -2215,9 +2212,7 @@ fn print_repo_help() {
     println!("- Without --out, Unix SIGTERM/SIGINT prints an interruption diagnostic to stderr.");
     println!();
     println!("Trust boundary:");
-    println!(
-        "- ReviewCards are advisory static findings, not memory-safety proof, not UB-free status, and not Miri-clean status."
-    );
+    println!("- ReviewCards are advisory static findings: {FIRST_RUN_TRUST_BOUNDARY}");
     println!(
         "- unsafe-review does not execute witnesses, post comments, edit source, or enforce blocking policy by default."
     );
@@ -2268,7 +2263,7 @@ fn print_candidate_help() {
     println!();
     println!("Trust boundary:");
     println!(
-        "- Manual candidates are not analyzer-discovered findings, not proof of memory safety, not UB-free status, not Miri-clean status, not site-execution proof, and not policy gating."
+        "- Manual candidates are not analyzer-discovered findings, not proof of memory safety, not UB-free status, not Miri-clean status, not a site-execution claim unless a matching witness receipt says so, and not policy gating."
     );
     println!(
         "- unsafe-review does not execute witnesses, post comments, edit source, run an agent, or enforce blocking policy by default."

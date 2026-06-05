@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const TRUST_BOUNDARY: &str = "Advisory no-new-debt policy report only; this is static unsafe contract review over existing ReviewCards and policy ledgers. It does not execute witnesses, is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, and does not enforce blocking policy.";
+const TRUST_BOUNDARY: &str = "Advisory no-new-debt policy report only; this is static unsafe contract review over existing ReviewCards and policy ledgers. It does not execute witnesses, is not a proof of memory safety, not UB-free status, not Miri-clean status, not a site-execution claim unless a matching witness receipt says so, and does not enforce blocking policy.";
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct PolicyReport {
@@ -550,8 +550,9 @@ mod tests {
         assert!(markdown.contains("Add or expose"));
         assert!(markdown.contains("## Limitations"));
         assert!(report.trust_boundary.contains("does not enforce blocking"));
-        assert!(report.trust_boundary.contains("not a Miri result"));
         assert!(report.trust_boundary.contains("not Miri-clean status"));
+        assert!(report.trust_boundary.contains("not a site-execution claim"));
+        assert!(report.trust_boundary.contains("matching witness receipt"));
         Ok(())
     }
 

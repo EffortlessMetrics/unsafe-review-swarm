@@ -1,7 +1,7 @@
 schema_version = "0.1"
 status = "experimental"
 artifact_root = "target/dogfood-work"
-trust_boundary = "Dogfood corpus records are static unsafe contract review evidence, not a proof of memory safety, not UB-free status, and not a Miri result unless an exact witness receipt is attached."
+trust_boundary = "Dogfood corpus records are static unsafe contract review evidence, not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless an exact witness receipt is attached."
 
 [[targets]]
 id = "safe-code-no-cards-control"

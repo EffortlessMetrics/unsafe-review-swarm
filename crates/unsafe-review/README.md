@@ -125,8 +125,9 @@ what unsafe-review is not claiming
 ## Trust boundary
 
 `unsafe-review` reports static review evidence. It is not a proof of memory safety,
-not a UB-free claim, not a Miri result, not soundness evidence, and not evidence
-that any unsafe site executed.
+not a UB-free claim or status, not a Miri result or Miri-clean status, not
+soundness evidence, and not a site-execution claim unless a matching witness
+receipt is attached.
 
 By default it does not run witnesses, post comments, edit source, enforce
 blocking policy, or claim calibrated precision or recall.

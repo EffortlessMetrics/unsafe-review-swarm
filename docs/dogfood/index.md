@@ -15,8 +15,9 @@ currently recorded.
 ## Trust Boundary
 
 Dogfood corpus records are static unsafe contract review evidence. They are not
-a proof of memory safety, not UB-free status, not a Miri result unless an exact
-witness receipt is attached, and not calibrated precision or recall.
+memory-safety proof, not UB-free status, not Miri-clean status, not a
+site-execution claim unless an exact witness receipt is attached, and not
+calibrated precision or recall.
 
 Generated scan outputs are intentionally recorded as `local_untracked` artifacts
 under `target/dogfood-work/`. Re-run the command in `corpus.toml` when a fresh
@@ -49,7 +50,7 @@ local artifact is needed.
 
 | Target | Judgment | Before | After | New | Resolved | Improved | Regressed | Unchanged | Proof action | Witness route state | Claim boundary | Notes |
 |---|---|---|---|---:|---:|---:|---:|---:|---|---|---|---|
-| `memchr-capped` target-feature contract evidence | `actionable` | `target/dogfood-work/memchr.unsafe-review.after-slice-end-pointer-evidence.json` | `target/dogfood-work/memchr.unsafe-review.after-target-feature-contract-evidence.json` | 0 | 0 | 10 | 0 | 40 | Keep the `target_feature` contract evidence as reviewability movement; attach an exact external witness receipt before treating the route as witnessed evidence. | `external-receipt-missing` | Static unsafe contract review saved-outcome movement only; not calibrated precision or recall, not witness execution, not site execution evidence, not policy readiness, not a proof of memory safety, not UB-free status, and not a Miri result. | Documented `#[target_feature]` declarations moved from `guard_missing` to `guarded_unwitnessed`; no target-feature availability, site execution, or soundness claim. |
+| `memchr-capped` target-feature contract evidence | `actionable` | `target/dogfood-work/memchr.unsafe-review.after-slice-end-pointer-evidence.json` | `target/dogfood-work/memchr.unsafe-review.after-target-feature-contract-evidence.json` | 0 | 0 | 10 | 0 | 40 | Keep the `target_feature` contract evidence as reviewability movement; attach an exact external witness receipt before treating the route as witnessed evidence. | `external-receipt-missing` | Static unsafe contract review saved-outcome movement only; not calibrated precision or recall, not witness execution, not site execution evidence, not policy readiness, not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so. | Documented `#[target_feature]` declarations moved from `guard_missing` to `guarded_unwitnessed`; no target-feature availability, site execution, or soundness claim. |
 
 ## Target Groups
 

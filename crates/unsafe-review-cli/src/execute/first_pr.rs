@@ -381,7 +381,7 @@ pub(super) fn render_review_kit_manifest(
             .iter()
             .map(|path| artifact_entry(path))
             .collect::<Vec<_>>(),
-        "trust_boundary": "Static unsafe contract review kit manifest only; this indexes first-pr artifacts and does not reclassify ReviewCards. It is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, and not site-execution proof. unsafe-review did not run witnesses, post comments, edit source, run an agent, or enforce blocking policy.",
+        "trust_boundary": "Static unsafe contract review kit manifest only; this indexes first-pr artifacts and does not reclassify ReviewCards. It is not a proof of memory safety, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so. unsafe-review did not run witnesses, post comments, edit source, run an agent, or enforce blocking policy.",
     });
     serde_json::to_string_pretty(&value).unwrap_or_else(|err| {
         format!("{{\n  \"error\": \"review kit serialization failed: {err}\"\n}}")
@@ -486,7 +486,7 @@ fn review_kit_review_card_handoff(output: &AnalyzeOutput, root: &Path) -> serde_
         "card_queue_limit": REVIEW_CARD_REVIEW_KIT_QUEUE_LIMIT,
         "card_queue": card_queue,
         "omitted_cards": omitted_cards,
-        "trust_boundary": "Static unsafe contract review only; copy-only ReviewCard queue preview projected from cards.json and repair-queue.json. It does not run agents, run witnesses, edit source, post comments, suppress cards, resolve cards, or enforce blocking policy. It is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repair success, and not policy readiness.",
+        "trust_boundary": "Static unsafe contract review only; copy-only ReviewCard queue preview projected from cards.json and repair-queue.json. It does not run agents, run witnesses, edit source, post comments, suppress cards, resolve cards, or enforce blocking policy. It is not a proof of memory safety, not UB-free status, not Miri-clean status, not a site-execution claim unless a matching witness receipt says so, not repair success, and not policy readiness.",
     })
 }
 
@@ -537,7 +537,7 @@ fn review_kit_review_card_queue_entry(
         "agent_readiness": agent_readiness,
         "explain": explain_command(root, &card.id),
         "context_json": context_command(root, &card.id),
-        "trust_boundary": "Static unsafe contract review only; copy-only ReviewCard queue entry projected from cards.json and repair-queue.json; it is not a proof of memory safety, not UB-free status, not a Miri result, and not site-execution proof. unsafe-review did not run agents, run witnesses, edit source, post comments, suppress cards, resolve cards, or enforce blocking policy.",
+        "trust_boundary": "Static unsafe contract review only; copy-only ReviewCard queue entry projected from cards.json and repair-queue.json; it is not a proof of memory safety, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so. unsafe-review did not run agents, run witnesses, edit source, post comments, suppress cards, resolve cards, or enforce blocking policy.",
     })
 }
 
@@ -1587,7 +1587,7 @@ pub(super) fn render_manual_candidates_artifact(
             "policy-report.md": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs."
         },
         "reviewcard_artifact_applicability": manual_candidate_reviewcard_applicability(),
-        "trust_boundary": "Manual/advisory static unsafe contract review candidate index only; candidates are not analyzer-discovered ReviewCards, not a proof of UB, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repository safety, and not policy gating. unsafe-review did not run witnesses, post comments, edit source, run an agent, or enforce blocking policy.",
+        "trust_boundary": "Manual/advisory static unsafe contract review candidate index only; candidates are not analyzer-discovered ReviewCards, not a proof of UB, not a proof of memory safety, not UB-free status, not Miri-clean status, not a site-execution claim unless a matching witness receipt says so, not repository safety, and not policy gating. unsafe-review did not run witnesses, post comments, edit source, run an agent, or enforce blocking policy.",
     });
     let mut rendered = serde_json::to_string_pretty(&value).unwrap_or_else(|err| {
         format!("{{\n  \"error\": \"manual candidate artifact serialization failed: {err}\"\n}}")
@@ -1651,7 +1651,7 @@ pub(super) fn render_manual_repair_queue_artifact(
             ),
         },
         "queue": queue,
-        "trust_boundary": "Copy-only manual candidate repair queue; entries come from imported manual candidates, not analyzer-discovered ReviewCards. This is not an automatic repair queue, not proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not policy gating, and not repair success. unsafe-review did not run agents, did not run witnesses, did not edit source, did not post comments, and did not enforce blocking policy.",
+        "trust_boundary": "Copy-only manual candidate repair queue; entries come from imported manual candidates, not analyzer-discovered ReviewCards. This is not an automatic repair queue, not proof of memory safety, not UB-free status, not Miri-clean status, not a site-execution claim unless a matching witness receipt says so, not policy gating, and not repair success. unsafe-review did not run agents, did not run witnesses, did not edit source, did not post comments, and did not enforce blocking policy.",
     });
     let mut rendered = serde_json::to_string_pretty(&value).unwrap_or_else(|err| {
         format!("{{\n  \"error\": \"manual repair queue serialization failed: {err}\"\n}}")
@@ -1718,7 +1718,7 @@ pub(super) fn render_tokmd_packets_artifact(
             comment_plan_input,
         ),
         "packets": packets,
-        "trust_boundary": "Tokmd-friendly packet bundle for formatting inputs only; manual/advisory candidates are not analyzer-discovered ReviewCards, not policy inputs, not a proof of UB, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not repair success, and not policy readiness. unsafe-review did not run tokmd, witnesses, Miri, Bun, Node, agents, post comments, edit source, or enforce blocking policy.",
+        "trust_boundary": "Tokmd-friendly packet bundle for formatting inputs only; manual/advisory candidates are not analyzer-discovered ReviewCards, not policy inputs, not a proof of UB, not a proof of memory safety, not UB-free status, not Miri-clean status, not a site-execution claim unless a matching witness receipt says so, not repair success, and not policy readiness. unsafe-review did not run tokmd, witnesses, Miri, Bun, Node, agents, post comments, edit source, or enforce blocking policy.",
     });
     let mut rendered = serde_json::to_string_pretty(&value).unwrap_or_else(|err| {
         format!("{{\n  \"error\": \"tokmd packet serialization failed: {err}\"\n}}")
@@ -2467,7 +2467,7 @@ fn print_artifact_paths(out_dir: &Path, artifacts: &[&str]) {
 fn print_trust_boundary() {
     println!("Trust boundary:");
     println!(
-        "  static unsafe contract review only; not memory-safety proof, not UB-free status, and not Miri-clean status."
+        "  static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
     );
     println!(
         "  unsafe-review did not run witnesses, post comments, edit source, or enforce blocking policy."
