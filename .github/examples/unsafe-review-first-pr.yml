@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      UNSAFE_REVIEW_VERSION: "0.2.1"
+      UNSAFE_REVIEW_VERSION: "0.3.1"
       BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
       BUNDLE_DIR: target/unsafe-review
     steps:
@@ -67,12 +67,14 @@ jobs:
         run: |
           set -euo pipefail
           for required in \
+            review-kit.json \
             cards.json \
             pr-summary.md \
             github-summary.md \
             cards.sarif \
             comment-plan.json \
             witness-plan.md \
+            receipt-audit.md \
             manual-candidates.json \
             manual-repair-queue.json \
             tokmd-packets.json \

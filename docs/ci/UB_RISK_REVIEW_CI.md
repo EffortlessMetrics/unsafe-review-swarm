@@ -67,7 +67,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      UNSAFE_REVIEW_VERSION: "0.3.2"
+      UNSAFE_REVIEW_VERSION: "0.3.1"
       BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
       BUNDLE_DIR: target/unsafe-review
     steps:

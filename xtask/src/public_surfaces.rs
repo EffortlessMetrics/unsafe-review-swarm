@@ -37,6 +37,7 @@ pub(crate) const FIRST_PR_BUNDLE_ARTIFACT_PATHS: &[&str] = &[
     "target/unsafe-review/cards.sarif",
     "target/unsafe-review/comment-plan.json",
     "target/unsafe-review/witness-plan.md",
+    "target/unsafe-review/receipt-audit.md",
     "target/unsafe-review/lsp.json",
     "target/unsafe-review/manual-repair-queue.json",
     "target/unsafe-review/tokmd-packets.json",
@@ -81,6 +82,16 @@ pub(crate) fn check_first_pr_artifact_list_surfaces() -> Result<(), String> {
         let text = read_to_string(&source)?;
         require_first_pr_artifact_paths(path, &text)?;
     }
+    let example = read_to_string(&workspace_path(
+        ".github/examples/unsafe-review-first-pr.yml",
+    ))?;
+    let cookbook = read_to_string(&workspace_path("docs/ci/UB_RISK_REVIEW_CI.md"))?;
+    require_matching_downstream_workflow_version(
+        ".github/examples/unsafe-review-first-pr.yml",
+        &example,
+        "docs/ci/UB_RISK_REVIEW_CI.md",
+        &cookbook,
+    )?;
     Ok(())
 }
 
@@ -129,6 +140,36 @@ pub(crate) fn require_first_pr_artifact_paths(path: &str, text: &str) -> Result<
         }
     }
     Ok(())
+}
+
+pub(crate) fn require_matching_downstream_workflow_version(
+    left_path: &str,
+    left_text: &str,
+    right_path: &str,
+    right_text: &str,
+) -> Result<String, String> {
+    let left = extract_unsafe_review_version(left_path, left_text)?;
+    let right = extract_unsafe_review_version(right_path, right_text)?;
+    if left != right {
+        return Err(format!(
+            "{left_path} UNSAFE_REVIEW_VERSION `{left}` must match {right_path} `{right}`"
+        ));
+    }
+    Ok(left)
+}
+
+fn extract_unsafe_review_version(path: &str, text: &str) -> Result<String, String> {
+    for line in text.lines() {
+        let trimmed = line.trim_start();
+        if let Some(rest) = trimmed.strip_prefix("UNSAFE_REVIEW_VERSION:") {
+            let version = rest.trim().trim_matches('"').trim_matches('\'');
+            if version.is_empty() {
+                return Err(format!("{path} UNSAFE_REVIEW_VERSION must not be empty"));
+            }
+            return Ok(version.to_string());
+        }
+    }
+    Err(format!("{path} must set UNSAFE_REVIEW_VERSION"))
 }
 
 fn check_front_door(path: &str) -> Result<(), String> {

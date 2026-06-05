@@ -13471,6 +13471,39 @@ Snapshot reports:
     }
 
     #[test]
+    fn downstream_workflow_version_pin_must_match_cookbook() -> Result<(), String> {
+        let version = public_surfaces::require_matching_downstream_workflow_version(
+            ".github/examples/unsafe-review-first-pr.yml",
+            r#"env:
+  UNSAFE_REVIEW_VERSION: "0.3.1"
+"#,
+            "docs/ci/UB_RISK_REVIEW_CI.md",
+            r#"env:
+      UNSAFE_REVIEW_VERSION: "0.3.1"
+"#,
+        )?;
+
+        assert_eq!(version, "0.3.1");
+        Ok(())
+    }
+
+    #[test]
+    fn downstream_workflow_version_pin_rejects_drift() -> Result<(), String> {
+        let err = err_text(
+            public_surfaces::require_matching_downstream_workflow_version(
+                ".github/examples/unsafe-review-first-pr.yml",
+                r#"UNSAFE_REVIEW_VERSION: "0.2.1""#,
+                "docs/ci/UB_RISK_REVIEW_CI.md",
+                r#"UNSAFE_REVIEW_VERSION: "0.3.1""#,
+            ),
+        )?;
+
+        assert!(err.contains("UNSAFE_REVIEW_VERSION `0.2.1`"));
+        assert!(err.contains("docs/ci/UB_RISK_REVIEW_CI.md `0.3.1`"));
+        Ok(())
+    }
+
+    #[test]
     fn positive_overclaim_rejects_policy_and_calibration_claims() {
         for forbidden in [
             "verified safe",
