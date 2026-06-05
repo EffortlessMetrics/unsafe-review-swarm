@@ -73,6 +73,89 @@ const FIX_RECIPE_REQUIRED_GLOBAL_TEXT: &[&str] = &[
     "A suggested witness route is not evidence",
     "`agent_readiness.state`",
 ];
+const UB_RISK_WORKFLOW_REQUIRED_GLOBAL_TEXT: &[&str] = &[
+    "`unsafe-review` does not prove UB",
+    "It finds unsafe seams where UB is worth",
+    "first-pr -> pr-summary -> explain -> context -> witness-plan -> receipt audit -> outcome",
+    "Call findings UB-risk review seams, unsafe-review gaps, or review gaps",
+    "Do not say:",
+    "unsafe-review found UB.",
+    "A safe caller can reach this unsafe operation without satisfying its invariant",
+];
+const UB_RISK_WORKFLOW_REQUIRED_SECTIONS: &[(&str, &[&str])] = &[
+    (
+        "## Public Workflow Contract",
+        &[
+            "first-pr -> pr-summary -> explain -> context -> witness-plan -> receipt audit -> outcome",
+            "`first-pr` renders the advisory review kit",
+            "`pr-summary.md` is the maintainer cockpit",
+            "`explain <card-id>` names the unsafe operation, invariant, evidence, and one",
+            "`context <card-id> --json` is a bounded handoff packet",
+            "`witness-plan.md` tells the reviewer which external route would add signal",
+            "`receipt audit` checks saved receipt metadata",
+            "`outcome` compares before/after snapshots",
+            "Do not say `unsafe-review` found UB",
+        ],
+    ),
+    (
+        "## Minimal Command Path",
+        &[
+            "unsafe-review first-pr --base origin/main",
+            "open target/unsafe-review/pr-summary.md",
+            "unsafe-review explain <card-id>",
+            "unsafe-review context <card-id> --json",
+            "open target/unsafe-review/witness-plan.md",
+            "unsafe-review receipt audit",
+            "unsafe-review outcome",
+        ],
+    ),
+    (
+        "## 3. Read The PR Summary",
+        &[
+            "Start with the top card",
+            "the changed unsafe operation",
+            "the safety obligation or invariant at risk",
+            "the `explain` and `context --json` commands",
+            "the witness-plan and receipt-audit paths",
+        ],
+    ),
+    (
+        "## 4. Explain One Card",
+        &[
+            "unsafe operation:",
+            "invariant:",
+            "evidence found:",
+            "evidence missing:",
+            "next action:",
+        ],
+    ),
+    (
+        "## 7. Use The Witness Plan",
+        &[
+            "Run those tools outside `unsafe-review`",
+            "A suggested route is not evidence",
+            "saved receipt is evidence metadata",
+        ],
+    ),
+    (
+        "## 8. Audit Receipts",
+        &[
+            "Receipt audit checks whether saved receipt metadata still matches",
+            "It does not run the witness command",
+        ],
+    ),
+    (
+        "## 9. Rerun And Compare Outcome",
+        &[
+            "unsafe-review first-pr --base origin/main",
+            "unsafe-review outcome",
+            "did the card resolve?",
+            "did missing evidence shrink?",
+            "did witness receipt strength improve?",
+            "evidence movement, not a safety verdict",
+        ],
+    ),
+];
 const AGENT_PACKET_SPEC_REQUIRED_GLOBAL_TEXT: &[&str] = &[
     "`proof_path`",
     "`card.proof_path`",
@@ -658,6 +741,7 @@ fn check_docs() -> Result<(), String> {
     public_badges::check_endpoints()?;
     spec_status::check_dashboard_impl()?;
     check_docs_map_paths("docs/README.md")?;
+    check_ub_risk_workflow_doc()?;
     check_fix_recipes_doc()?;
     check_agent_packet_spec_doc()?;
     check_agent_repair_workflow_doc()?;
@@ -7654,6 +7738,29 @@ fn check_fix_recipes_doc() -> Result<(), String> {
     Ok(())
 }
 
+fn check_ub_risk_workflow_doc() -> Result<(), String> {
+    let path = Path::new(FIX_RECIPE_WORKFLOW_DOC);
+    let text = read_to_string(path)?;
+    check_ub_risk_workflow_text(&text, path)
+}
+
+fn check_ub_risk_workflow_text(text: &str, path: &Path) -> Result<(), String> {
+    let normalized = text.replace("\r\n", "\n");
+    require_text_contains_all(&normalized, path, UB_RISK_WORKFLOW_REQUIRED_GLOBAL_TEXT)?;
+
+    for (heading, required_text) in UB_RISK_WORKFLOW_REQUIRED_SECTIONS {
+        let section = markdown_heading_section(&normalized, heading)
+            .ok_or_else(|| format!("{} is missing required section `{heading}`", path.display()))?;
+        require_text_contains_all(section, path, required_text).map_err(|err| {
+            format!(
+                "{} section `{heading}` is incomplete: {err}",
+                path.display()
+            )
+        })?;
+    }
+    Ok(())
+}
+
 fn check_fix_recipes_text(text: &str, path: &Path) -> Result<(), String> {
     let normalized = text.replace("\r\n", "\n");
     require_text_contains_all(&normalized, path, FIX_RECIPE_REQUIRED_GLOBAL_TEXT)?;
@@ -11292,6 +11399,46 @@ OperationFamily::RawPointerRead => vec![
     }
 
     #[test]
+    fn ub_risk_workflow_doc_checker_accepts_required_shape() -> Result<(), String> {
+        check_ub_risk_workflow_text(
+            &ub_risk_workflow_doc_fixture(),
+            Path::new("docs/FIND_AND_FIX_UB.md"),
+        )
+    }
+
+    #[test]
+    fn ub_risk_workflow_doc_checker_rejects_missing_workflow_order() -> Result<(), String> {
+        let text = ub_risk_workflow_doc_fixture().replace(
+            "first-pr -> pr-summary -> explain -> context -> witness-plan -> receipt audit -> outcome",
+            "first-pr -> outcome",
+        );
+
+        let err = err_text(check_ub_risk_workflow_text(
+            &text,
+            Path::new("docs/FIND_AND_FIX_UB.md"),
+        ))?;
+
+        assert!(err.contains("first-pr -> pr-summary -> explain"));
+        Ok(())
+    }
+
+    #[test]
+    fn ub_risk_workflow_doc_checker_rejects_missing_review_gap_wording() -> Result<(), String> {
+        let text = ub_risk_workflow_doc_fixture().replace(
+            "Call findings UB-risk review seams, unsafe-review gaps, or review gaps",
+            "Call findings unsafe bugs",
+        );
+
+        let err = err_text(check_ub_risk_workflow_text(
+            &text,
+            Path::new("docs/FIND_AND_FIX_UB.md"),
+        ))?;
+
+        assert!(err.contains("Call findings UB-risk review seams"));
+        Ok(())
+    }
+
+    #[test]
     fn markdown_link_target_parser_finds_plain_local_links() {
         let targets = markdown::link_targets(
             "[First use](docs/FIRST_USE.md) [external](https://example.com) [anchor](#trust)",
@@ -11306,6 +11453,69 @@ OperationFamily::RawPointerRead => vec![
         );
         assert_eq!(markdown::local_link_target("https://example.com"), None);
         assert_eq!(markdown::local_link_target("#trust"), None);
+    }
+
+    fn ub_risk_workflow_doc_fixture() -> String {
+        let mut text = "# Find And Fix UB-Risk Review Seams\n\n".to_string();
+        text.push_str("`unsafe-review` does not prove UB.\n");
+        text.push_str(
+            "It finds unsafe seams where UB is worth investigating and tells reviewers what evidence would make the seam reviewable.\n",
+        );
+        text.push_str("Do not say:\nunsafe-review found UB.\n");
+        text.push_str(
+            "A safe caller can reach this unsafe operation without satisfying its invariant.\n",
+        );
+        text.push_str("\n## Public Workflow Contract\n\n");
+        text.push_str(
+            "first-pr -> pr-summary -> explain -> context -> witness-plan -> receipt audit -> outcome\n",
+        );
+        text.push_str("`first-pr` renders the advisory review kit.\n");
+        text.push_str("`pr-summary.md` is the maintainer cockpit.\n");
+        text.push_str(
+            "`explain <card-id>` names the unsafe operation, invariant, evidence, and one next action.\n",
+        );
+        text.push_str("`context <card-id> --json` is a bounded handoff packet.\n");
+        text.push_str(
+            "`witness-plan.md` tells the reviewer which external route would add signal.\n",
+        );
+        text.push_str("`receipt audit` checks saved receipt metadata.\n");
+        text.push_str("`outcome` compares before/after snapshots.\n");
+        text.push_str("Call findings UB-risk review seams, unsafe-review gaps, or review gaps. Do not say `unsafe-review` found UB.\n");
+        text.push_str("\n## Minimal Command Path\n\n");
+        text.push_str("unsafe-review first-pr --base origin/main\n");
+        text.push_str("open target/unsafe-review/pr-summary.md\n");
+        text.push_str("unsafe-review explain <card-id>\n");
+        text.push_str("unsafe-review context <card-id> --json\n");
+        text.push_str("open target/unsafe-review/witness-plan.md\n");
+        text.push_str("unsafe-review receipt audit\n");
+        text.push_str("unsafe-review outcome\n");
+        text.push_str("\n## 3. Read The PR Summary\n\n");
+        text.push_str("Start with the top card.\n");
+        text.push_str("the changed unsafe operation\n");
+        text.push_str("the safety obligation or invariant at risk\n");
+        text.push_str("the `explain` and `context --json` commands\n");
+        text.push_str("the witness-plan and receipt-audit paths\n");
+        text.push_str("\n## 4. Explain One Card\n\n");
+        text.push_str("unsafe operation:\n");
+        text.push_str("invariant:\n");
+        text.push_str("evidence found:\n");
+        text.push_str("evidence missing:\n");
+        text.push_str("next action:\n");
+        text.push_str("\n## 7. Use The Witness Plan\n\n");
+        text.push_str("Run those tools outside `unsafe-review`.\n");
+        text.push_str("A suggested route is not evidence.\n");
+        text.push_str("A saved receipt is evidence metadata.\n");
+        text.push_str("\n## 8. Audit Receipts\n\n");
+        text.push_str("Receipt audit checks whether saved receipt metadata still matches.\n");
+        text.push_str("It does not run the witness command.\n");
+        text.push_str("\n## 9. Rerun And Compare Outcome\n\n");
+        text.push_str("unsafe-review first-pr --base origin/main\n");
+        text.push_str("unsafe-review outcome\n");
+        text.push_str("did the card resolve?\n");
+        text.push_str("did missing evidence shrink?\n");
+        text.push_str("did witness receipt strength improve?\n");
+        text.push_str("evidence movement, not a safety verdict\n");
+        text
     }
 
     fn fix_recipe_doc_fixture() -> String {

@@ -14,6 +14,7 @@ Linked specs:
 Linked docs:
 - [docs/FIRST_USE.md](../FIRST_USE.md)
 - [docs/CLI.md](../CLI.md)
+- [docs/FIND_AND_FIX_UB.md](../FIND_AND_FIX_UB.md)
 - [docs/editor/saved-lsp-json.md](../editor/saved-lsp-json.md)
 - [docs/explanation/explain-examples.md](../explanation/explain-examples.md)
 - [docs/explanation/agent-packet-examples.md](../explanation/agent-packet-examples.md)
@@ -50,6 +51,7 @@ Optional next steps:
 ```bash
 unsafe-review context <card-id> --json
 unsafe-review receipt template <card-id> --tool miri
+unsafe-review receipt audit --base origin/main --format markdown --out target/unsafe-review/receipt-audit.md
 unsafe-review outcome --before before.json --after after.json
 ```
 
@@ -68,6 +70,12 @@ what evidence is missing
 what to ask the author to add
 which witness route is worth running
 what unsafe-review is not claiming
+```
+
+The public repair loop is:
+
+```text
+first-pr -> pr-summary -> explain -> context -> witness-plan -> receipt audit -> outcome
 ```
 
 Every first-hour surface must project from `ReviewCard`. No first-hour surface

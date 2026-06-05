@@ -38,6 +38,31 @@ changed unsafe seam
 The goal is not to make `unsafe-review` decide the PR. The goal is to make the
 next review step obvious and bounded.
 
+## Public Workflow Contract
+
+Use this workflow order when describing the maintainer path:
+
+```text
+first-pr -> pr-summary -> explain -> context -> witness-plan -> receipt audit -> outcome
+```
+
+That means:
+
+- `first-pr` renders the advisory review kit.
+- `pr-summary.md` is the maintainer cockpit for the top ReviewCard.
+- `explain <card-id>` names the unsafe operation, invariant, evidence, and one
+  next action.
+- `context <card-id> --json` is a bounded handoff packet when the card is ready
+  for agent work.
+- `witness-plan.md` tells the reviewer which external route would add signal.
+- `receipt audit` checks saved receipt metadata after a witness or human review
+  happened outside `unsafe-review`.
+- `outcome` compares before/after snapshots so the reviewer can see whether
+  the review posture improved.
+
+Call findings UB-risk review seams, unsafe-review gaps, or review gaps.
+Do not say `unsafe-review` found UB.
+
 ## Minimal Command Path
 
 From the branch you want to review:
@@ -50,6 +75,10 @@ open target/unsafe-review/pr-summary.md
 unsafe-review explain <card-id>
 unsafe-review context <card-id> --json
 open target/unsafe-review/witness-plan.md
+unsafe-review receipt audit \
+  --base origin/main \
+  --format markdown \
+  --out target/unsafe-review/receipt-audit.md
 # After repair or receipt work:
 unsafe-review first-pr --base origin/main
 cp target/unsafe-review/cards.json target/unsafe-review/after.json
@@ -265,8 +294,8 @@ unsafe-review receipt audit \
 ```
 
 Receipt audit checks whether saved receipt metadata still matches current card
-identities, routed tools, strengths, expiry, and command hashes. It does not run
-the witness command.
+identities, routed tools, strengths, expiry, and command hashes.
+It does not run the witness command.
 
 Open the audit before claiming evidence improved:
 
@@ -301,6 +330,8 @@ policy decision. Use it to answer:
 - did witness receipt strength improve?
 - did a different card appear?
 - did the top remaining card become clearer or noisier?
+
+Treat the result as evidence movement, not a safety verdict.
 
 Good outcome language:
 
