@@ -1236,6 +1236,7 @@ fn check_manual_candidate_smoke_matches_examples(
         check_manual_candidate_smoke_entry_matches_example(actual, example)?;
     }
     check_manual_candidate_smoke_tokmd_seed_projection(out_dir, examples)?;
+    check_manual_candidate_smoke_manual_repair_seed_projection(out_dir, examples)?;
     check_manual_candidate_smoke_review_kit_seed_projection(out_dir, examples)?;
     Ok(())
 }
@@ -1333,6 +1334,110 @@ fn check_manual_candidate_smoke_tokmd_seed_projection(
             return Err(format!(
                 "{context} missing_inputs must not include stable-byte seed row"
             ));
+        }
+    }
+    Ok(())
+}
+
+fn check_manual_candidate_smoke_manual_repair_seed_projection(
+    out_dir: &Path,
+    examples: &[ManualCandidateExample],
+) -> Result<(), String> {
+    let path = out_dir.join("manual-repair-queue.json");
+    let value = parse_json_file(&path)?;
+    let path_display = path.display().to_string();
+    let with_seed = json_usize_at(&value, "/summary/with_stable_byte_seed", &path_display)?;
+    if with_seed != examples.len() {
+        return Err(format!(
+            "{path_display} summary.with_stable_byte_seed is {with_seed}, expected {} committed examples",
+            examples.len()
+        ));
+    }
+    let seed_source = value
+        .pointer("/summary/stable_byte_seed_source")
+        .ok_or_else(|| format!("{path_display} summary is missing stable_byte_seed_source"))?;
+    if seed_source
+        .get("included")
+        .and_then(serde_json::Value::as_bool)
+        != Some(true)
+    {
+        return Err(format!(
+            "{path_display} summary.stable_byte_seed_source.included must be true for the Bun manual-candidate smoke"
+        ));
+    }
+    let matched = json_usize_at(
+        seed_source,
+        "/matched_manual_candidates",
+        &format!("{path_display} summary.stable_byte_seed_source"),
+    )?;
+    if matched != examples.len() {
+        return Err(format!(
+            "{path_display} summary.stable_byte_seed_source matched {matched}, expected {} committed examples",
+            examples.len()
+        ));
+    }
+    let relationship = require_non_empty_json_str(
+        seed_source,
+        "relationship",
+        &format!("{path_display} summary.stable_byte_seed_source"),
+    )?;
+    if !relationship.contains("manual-repair-queue entries") {
+        return Err(format!(
+            "{path_display} summary.stable_byte_seed_source.relationship must mention manual-repair-queue entries"
+        ));
+    }
+    let queue = json_array_at(&value, "/queue", &path_display)?;
+    if queue.len() != examples.len() {
+        return Err(format!(
+            "{path_display} queue has {} entries, expected {} committed examples",
+            queue.len(),
+            examples.len()
+        ));
+    }
+    for (entry, example) in queue.iter().zip(examples) {
+        let context = format!("{path_display} queue `{}`", example.id);
+        require_json_str(entry, "id", &example.id, &context)?;
+        let seed = entry
+            .get("stable_byte_seed")
+            .ok_or_else(|| format!("{context} is missing stable_byte_seed"))?;
+        require_stable_byte_seed_field_matches_example(
+            seed,
+            "safe_js_caller",
+            example,
+            "source",
+            &context,
+        )?;
+        require_stable_byte_seed_field_matches_example(
+            seed,
+            "rust_native_sink",
+            example,
+            "sink",
+            &context,
+        )?;
+        require_non_empty_json_str(seed, "seed_id", &context)?;
+        require_non_empty_json_str(seed, "owner_lane", &context)?;
+        require_non_empty_json_str(seed, "suggested_first_pr", &context)?;
+        let triage_labels = json_array_at(seed, "/triage_labels", &context)?;
+        if triage_labels.is_empty() {
+            return Err(format!(
+                "{context} stable_byte_seed.triage_labels must not be empty"
+            ));
+        }
+        let consistency = seed.get("candidate_consistency").ok_or_else(|| {
+            format!("{context} stable_byte_seed is missing candidate_consistency")
+        })?;
+        for field in [
+            "stable_byte_class_matches_manual_candidate",
+            "proof_mode_matches_manual_candidate",
+            "ledger_state_matches_manual_candidate",
+            "safe_js_caller_matches_manual_candidate",
+            "rust_native_sink_matches_manual_candidate",
+        ] {
+            if consistency.get(field).and_then(serde_json::Value::as_bool) != Some(true) {
+                return Err(format!(
+                    "{context} stable_byte_seed candidate_consistency.{field} must be true"
+                ));
+            }
         }
     }
     Ok(())
@@ -20305,7 +20410,12 @@ review_after = "2026-08-01"
                 "with_oracle_map": 0,
                 "with_proof_mode": 0,
                 "with_fix_boundary": 0,
-                "with_pr_aperture": 0
+                "with_pr_aperture": 0,
+                "with_stable_byte_seed": 0,
+                "stable_byte_seed_source": {
+                    "included": false,
+                    "limitation": "Root-local stable-byte seed ledger was absent; manual candidate stable_byte metadata is still projected as advisory workflow metadata only; not analyzer discovery, not witness execution, not proof, not policy readiness, and not a ReviewCard truth"
+                }
             },
             "queue": [],
             "trust_boundary": "Copy-only manual candidate repair queue; entries come from imported manual candidates, not analyzer-discovered ReviewCards. This is not an automatic repair queue, not proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not policy gating, and not repair success. unsafe-review did not run agents, did not run witnesses, did not edit source, did not post comments, and did not enforce blocking policy."
@@ -20686,7 +20796,12 @@ review_after = "2026-08-01"
                 "with_oracle_map": 1,
                 "with_proof_mode": 1,
                 "with_fix_boundary": 1,
-                "with_pr_aperture": 1
+                "with_pr_aperture": 1,
+                "with_stable_byte_seed": 0,
+                "stable_byte_seed_source": {
+                    "included": false,
+                    "limitation": "Root-local stable-byte seed ledger was absent; manual candidate stable_byte metadata is still projected as advisory workflow metadata only; not analyzer discovery, not witness execution, not proof, not policy readiness, and not a ReviewCard truth"
+                }
             },
             "queue": [{
                 "id": "R4R2-S001",

@@ -2558,6 +2558,17 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(manual_repair_queue["summary"]["with_proof_mode"], 2);
     assert_eq!(manual_repair_queue["summary"]["with_fix_boundary"], 2);
     assert_eq!(manual_repair_queue["summary"]["with_pr_aperture"], 2);
+    assert_eq!(manual_repair_queue["summary"]["with_stable_byte_seed"], 0);
+    assert_eq!(
+        manual_repair_queue["summary"]["stable_byte_seed_source"]["included"],
+        false
+    );
+    assert!(
+        manual_repair_queue["summary"]["stable_byte_seed_source"]["limitation"]
+            .as_str()
+            .unwrap_or("")
+            .contains("Root-local stable-byte seed ledger was absent")
+    );
     assert_eq!(manual_repair_queue["queue"][0]["id"], "R4R2-S001");
     assert_eq!(manual_repair_queue["queue"][0]["source"], "manual");
     assert_eq!(manual_repair_queue["queue"][0]["manual_candidate"], true);
@@ -2600,6 +2611,11 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(
         manual_repair_queue["queue"][0]["implementer_handoff"],
         manual_candidates["candidates"][0]["implementer_handoff"]
+    );
+    assert!(
+        manual_repair_queue["queue"][0]
+            .get("stable_byte_seed")
+            .is_none()
     );
     assert_eq!(
         manual_repair_queue["queue"][1]["id"],

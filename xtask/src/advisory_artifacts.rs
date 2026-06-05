@@ -1425,6 +1425,7 @@ fn check_manual_repair_queue_artifact(
             manual_candidates.count
         ));
     }
+    check_manual_repair_queue_stable_byte_seed_summary(&value, queue)?;
     let mut entries = Vec::new();
     for (index, (entry, expected)) in queue.iter().zip(&manual_candidates.candidates).enumerate() {
         entries.push(check_manual_repair_queue_entry(entry, expected, index)?);
@@ -1484,6 +1485,80 @@ fn require_manual_repair_guidance_count(
     Ok(())
 }
 
+fn check_manual_repair_queue_stable_byte_seed_summary(
+    value: &serde_json::Value,
+    queue: &[serde_json::Value],
+) -> Result<(), String> {
+    let context = "manual-repair-queue.json summary.stable_byte_seed_source";
+    let with_seed = super::json_usize_at(
+        value,
+        "/summary/with_stable_byte_seed",
+        "manual-repair-queue.json",
+    )?;
+    let queue_seed_count = queue
+        .iter()
+        .filter(|entry| entry.get("stable_byte_seed").is_some())
+        .count();
+    if with_seed != queue_seed_count {
+        return Err(format!(
+            "manual-repair-queue.json summary.with_stable_byte_seed is {with_seed}, but queue contains {queue_seed_count} stable_byte_seed entrie(s)"
+        ));
+    }
+    let seed_source = value
+        .pointer("/summary/stable_byte_seed_source")
+        .ok_or_else(|| {
+            "manual-repair-queue.json summary is missing stable_byte_seed_source".to_string()
+        })?;
+    if !seed_source.is_object() {
+        return Err(format!("{context} must be an object"));
+    }
+    let included = seed_source
+        .get("included")
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| format!("{context}.included must be a boolean"))?;
+    let limitation = super::require_non_empty_json_str(seed_source, "limitation", context)?;
+    for expected in [
+        "advisory workflow metadata",
+        "not analyzer discovery",
+        "not witness execution",
+        "not proof",
+        "not policy readiness",
+        "not a ReviewCard truth",
+    ] {
+        if !super::text_contains_ignore_ascii_case(limitation, expected) {
+            return Err(format!("{context}.limitation must include `{expected}`"));
+        }
+    }
+    if !included {
+        if with_seed > 0 {
+            return Err(format!(
+                "manual-repair-queue.json summary.with_stable_byte_seed is {with_seed}, but stable_byte_seed_source is not included"
+            ));
+        }
+        return Ok(());
+    }
+    super::require_non_empty_json_str(seed_source, "path", context)?;
+    let rows = super::json_usize_at(seed_source, "/rows", context)?;
+    let matched = super::json_usize_at(seed_source, "/matched_manual_candidates", context)?;
+    if matched != with_seed {
+        return Err(format!(
+            "{context} matched_manual_candidates is {matched}, but summary.with_stable_byte_seed is {with_seed}"
+        ));
+    }
+    if rows < matched {
+        return Err(format!(
+            "{context} rows {rows} must be >= matched_manual_candidates {matched}"
+        ));
+    }
+    let relationship = super::require_non_empty_json_str(seed_source, "relationship", context)?;
+    for expected in ["manual-repair-queue entries", "manual candidate ID"] {
+        if !relationship.contains(expected) {
+            return Err(format!("{context}.relationship must include `{expected}`"));
+        }
+    }
+    Ok(())
+}
+
 fn check_manual_repair_queue_entry(
     entry: &serde_json::Value,
     expected: &ManualCandidateProjection,
@@ -1539,7 +1614,7 @@ fn check_manual_repair_queue_entry(
     require_projected_optional_str(entry, "pr_aperture", &expected.pr_aperture, &context)?;
     require_projected_optional_json_value(entry, "oracle_map", &expected.oracle_map, &context)?;
     if let Some(seed) = entry.get("stable_byte_seed") {
-        check_tokmd_stable_byte_seed(seed, expected, &context)?;
+        check_review_kit_stable_byte_seed(seed, expected, &context)?;
     }
     let handoff = entry
         .get("implementer_handoff")
@@ -2137,6 +2212,9 @@ fn check_tokmd_packet_entry(
     )?;
     check_tokmd_ledger_state_limitation(entry, expected, &context)?;
     require_projected_optional_json_value(entry, "stable_byte", &expected.stable_byte, &context)?;
+    if let Some(seed) = entry.get("stable_byte_seed") {
+        check_tokmd_stable_byte_seed(seed, expected, &context)?;
+    }
 
     let target = entry
         .get("target")

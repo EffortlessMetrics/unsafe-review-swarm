@@ -375,6 +375,14 @@ Its summary must expose proof-mode, stable-byte-source class, and ledger-state
 count maps derived only from the imported manual candidate fields so a reviewer
 can see observable, Miri/model, helper-gated, handoff-ready, or parked-followup
 work at queue level without treating the sidecar as a second source of truth.
+When a root-local stable-byte seed ledger joins by manual candidate ID,
+`manual-repair-queue.json` may also project summary-level
+`with_stable_byte_seed` and `stable_byte_seed_source` metadata plus
+per-entry `stable_byte_seed` rows with the same seed ID, owner lane, suggested
+first PR, triage labels, safe JS caller route, Rust/native sink, and
+candidate-consistency flags used by the review-kit manual-candidate handoff.
+Those seed rows are advisory workflow metadata only; they are not analyzer
+discovery, witness execution, proof, policy readiness, or ReviewCard truth.
 It is not `repair-queue.json`, not analyzer-discovered ReviewCard output, not
 automatic repair, not proof, not witness execution, and not policy gating.
 `review-kit.json` may include a `handoff.repair_queues` front panel that places
@@ -555,8 +563,9 @@ into an analyzer ReviewCard.
   ReviewCard-only.
 - `first-pr` writes `manual-repair-queue.json` as a separate copy-only manual
   candidate repair handoff, preserving manual markers, guidance, and commands
-  from `manual-candidates.json` while keeping ReviewCard `repair-queue.json`
-  free of manual-candidate markers.
+  from `manual-candidates.json`, optional joined stable-byte seed-row metadata,
+  and source/count metadata while keeping ReviewCard `repair-queue.json` free
+  of manual-candidate markers.
 - `first-pr` writes `tokmd-packets.json` as a formatting-input sidecar,
   preserving manual markers, optional oracle-map,
   proof-mode/fix-boundary/PR-aperture guidance, implementer handoff, commands

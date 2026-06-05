@@ -695,6 +695,18 @@ fn review_kit_stable_byte_seed_source(
     stable_byte_seed_ledger: &StableByteSeedLedger,
     matched_stable_byte_seeds: usize,
 ) -> serde_json::Value {
+    stable_byte_seed_source_projection(
+        stable_byte_seed_ledger,
+        matched_stable_byte_seeds,
+        "root-local stable-byte seed ledger rows are joined to review-kit manual candidate entries by manual candidate ID",
+    )
+}
+
+fn stable_byte_seed_source_projection(
+    stable_byte_seed_ledger: &StableByteSeedLedger,
+    matched_stable_byte_seeds: usize,
+    relationship: &'static str,
+) -> serde_json::Value {
     if !stable_byte_seed_ledger.present {
         return json!({
             "included": false,
@@ -713,7 +725,7 @@ fn review_kit_stable_byte_seed_source(
         "path": stable_byte_seed_ledger.path,
         "rows": stable_byte_seed_ledger.rows,
         "matched_manual_candidates": matched_stable_byte_seeds,
-        "relationship": "root-local stable-byte seed ledger rows are joined to review-kit manual candidate entries by manual candidate ID",
+        "relationship": relationship,
         "limitation": "Stable-byte seed rows are advisory workflow metadata only; not analyzer discovery, not witness execution, not proof, not policy readiness, and not a ReviewCard truth"
     })
 }
@@ -1568,10 +1580,25 @@ pub(super) fn render_manual_repair_queue_artifact(
     root: &Path,
     candidates: &[ManualCandidate],
 ) -> String {
+    let stable_byte_seed_ledger = load_stable_byte_seed_ledger(root);
     let queue = candidates
         .iter()
-        .map(|candidate| manual_repair_queue_entry(root, candidate))
+        .map(|candidate| {
+            manual_repair_queue_entry(
+                root,
+                candidate,
+                stable_byte_seed_ledger.by_candidate_id.get(&candidate.id),
+            )
+        })
         .collect::<Vec<_>>();
+    let matched_stable_byte_seeds = candidates
+        .iter()
+        .filter(|candidate| {
+            stable_byte_seed_ledger
+                .by_candidate_id
+                .contains_key(&candidate.id)
+        })
+        .count();
     let value = json!({
         "schema_version": "manual-repair-queue/v1",
         "tool": "unsafe-review",
@@ -1596,6 +1623,12 @@ pub(super) fn render_manual_repair_queue_artifact(
             "with_proof_mode": candidates.iter().filter(|candidate| candidate.proof_mode.is_some()).count(),
             "with_fix_boundary": candidates.iter().filter(|candidate| candidate.fix_boundary.is_some()).count(),
             "with_pr_aperture": candidates.iter().filter(|candidate| candidate.pr_aperture.is_some()).count(),
+            "with_stable_byte_seed": matched_stable_byte_seeds,
+            "stable_byte_seed_source": stable_byte_seed_source_projection(
+                &stable_byte_seed_ledger,
+                matched_stable_byte_seeds,
+                "root-local stable-byte seed ledger rows are joined to manual-repair-queue entries by manual candidate ID",
+            ),
         },
         "queue": queue,
         "trust_boundary": "Copy-only manual candidate repair queue; entries come from imported manual candidates, not analyzer-discovered ReviewCards. This is not an automatic repair queue, not proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution proof, not policy gating, and not repair success. unsafe-review did not run agents, did not run witnesses, did not edit source, did not post comments, and did not enforce blocking policy.",
@@ -1674,7 +1707,11 @@ pub(super) fn render_tokmd_packets_artifact(
     rendered
 }
 
-fn manual_repair_queue_entry(root: &Path, candidate: &ManualCandidate) -> serde_json::Value {
+fn manual_repair_queue_entry(
+    root: &Path,
+    candidate: &ManualCandidate,
+    stable_byte_seed: Option<&StableByteSeed>,
+) -> serde_json::Value {
     let mut value = json!({
         "id": candidate.id.as_str(),
         "source": "manual",
@@ -1712,6 +1749,12 @@ fn manual_repair_queue_entry(root: &Path, candidate: &ManualCandidate) -> serde_
         }
         if let Some(stable_byte) = &candidate.stable_byte {
             object.insert("stable_byte".to_string(), json!(stable_byte));
+        }
+        if let Some(seed) = stable_byte_seed {
+            object.insert(
+                "stable_byte_seed".to_string(),
+                review_kit_stable_byte_seed(seed, candidate),
+            );
         }
         if candidate.oracle_map.is_none() {
             object.remove("oracle_map");
@@ -2750,6 +2793,91 @@ mod tests {
                 .as_str()
                 .unwrap_or("")
                 .contains("not rendered tokmd output")
+        );
+        let _ = fs::remove_dir_all(&root);
+        Ok(())
+    }
+
+    #[test]
+    fn manual_repair_queue_joins_root_local_stable_byte_seed_rows() -> Result<(), String> {
+        let root = unique_test_root("unsafe-review-manual-repair-seed-ledger")?;
+        let docs_dir = root.join("docs/dogfood");
+        fs::create_dir_all(&docs_dir)
+            .map_err(|err| format!("create {} failed: {err}", docs_dir.display()))?;
+        let candidate_dir = root.join("docs/examples/manual-candidates");
+        fs::create_dir_all(&candidate_dir)
+            .map_err(|err| format!("create {} failed: {err}", candidate_dir.display()))?;
+        let candidate = manual_candidate_fixture_with_stable_byte()?;
+        fs::write(
+            candidate_dir.join("textdecoder-sab.json"),
+            manual_candidate_fixture_with_stable_byte_json(),
+        )
+        .map_err(|err| format!("write candidate fixture failed: {err}"))?;
+        fs::write(
+            docs_dir.join("stable-byte-follow-up-seeds.md"),
+            r#"# Bun stable-byte follow-up seed index
+
+## Seeds
+
+| Seed ID | Ledger state | Candidate family | Surface | Manual candidate | Safe JS caller | Rust/native sink | Proof mode | Suggested first PR | Owner lane | Triage labels |
+|---|---|---|---|---|---|---|---|---|---|---|
+| `bun-stable-byte-textdecoder-sab` | `handoff-ready` | `stable-byte-source-sab-race` | `TextDecoder.decode` | `docs/examples/manual-candidates/textdecoder-sab.json` | SharedArrayBuffer-backed typed array decode | `src/runtime/webcore/TextDecoder.rs` slice materialization | `mutation-plus-miri` | `TextDecoder shared-byte snapshot only` | `rust2` | `non-observable`, `needs-miri-model` |
+"#,
+        )
+        .map_err(|err| format!("write seed ledger failed: {err}"))?;
+
+        let rendered = render_manual_repair_queue_artifact(&root, std::slice::from_ref(&candidate));
+        let value: serde_json::Value = serde_json::from_str(&rendered)
+            .map_err(|err| format!("manual repair queue should render JSON: {err}"))?;
+
+        assert_eq!(value["summary"]["with_stable_byte_seed"], 1);
+        assert_eq!(
+            value["summary"]["stable_byte_seed_source"]["included"],
+            true
+        );
+        assert_eq!(
+            value["summary"]["stable_byte_seed_source"]["matched_manual_candidates"],
+            1
+        );
+        assert!(
+            value["summary"]["stable_byte_seed_source"]["relationship"]
+                .as_str()
+                .unwrap_or("")
+                .contains("manual-repair-queue entries")
+        );
+        let seed = &value["queue"][0]["stable_byte_seed"];
+        assert_eq!(seed["seed_id"], "bun-stable-byte-textdecoder-sab");
+        assert_eq!(seed["owner_lane"], "rust2");
+        assert_eq!(
+            seed["suggested_first_pr"],
+            "TextDecoder shared-byte snapshot only"
+        );
+        assert_eq!(seed["triage_labels"][1], "needs-miri-model");
+        assert_eq!(
+            seed["candidate_consistency"]["stable_byte_class_matches_manual_candidate"],
+            true
+        );
+        assert_eq!(
+            seed["candidate_consistency"]["proof_mode_matches_manual_candidate"],
+            true
+        );
+        assert_eq!(
+            seed["candidate_consistency"]["ledger_state_matches_manual_candidate"],
+            true
+        );
+        assert_eq!(
+            seed["candidate_consistency"]["safe_js_caller_matches_manual_candidate"],
+            true
+        );
+        assert_eq!(
+            seed["candidate_consistency"]["rust_native_sink_matches_manual_candidate"],
+            true
+        );
+        assert!(
+            seed["trust_boundary"]
+                .as_str()
+                .unwrap_or("")
+                .contains("not a ReviewCard truth")
         );
         let _ = fs::remove_dir_all(&root);
         Ok(())

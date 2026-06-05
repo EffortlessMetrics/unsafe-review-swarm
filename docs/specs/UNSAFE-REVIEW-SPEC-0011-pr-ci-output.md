@@ -646,6 +646,8 @@ mode = manual_candidate_repair_queue
 source = manual_candidate
 policy = advisory
 summary counts aligned with manual-candidates.json
+optional stable-byte seed source/count metadata and per-entry seed rows joined
+  by manual candidate ID only
 queue entries preserving source = manual, manual_candidate = true, and
   analyzer_discovered = false
 copy-only explain/context/witness-plan commands

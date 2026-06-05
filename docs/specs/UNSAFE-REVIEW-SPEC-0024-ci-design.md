@@ -701,6 +701,8 @@ manual-repair-queue.json schema_version is checked
 manual-repair-queue.json stays source = manual_candidate and policy = advisory
 manual-repair-queue.json queue entries preserve manual-candidate markers and
 copy-only guidance from manual-candidates.json
+manual-repair-queue.json optional stable-byte seed source/count metadata and
+per-entry seed rows are checked against manual candidate IDs when present
 manual-repair-queue.json does not claim analyzer discovery, automatic repair,
 agent execution, witness execution, source edits, comments, proof, or policy
 tokmd-packets.json exists and parses
