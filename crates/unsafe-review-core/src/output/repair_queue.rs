@@ -167,7 +167,7 @@ impl From<&agent::AgentReadiness> for RepairQueueReadiness {
     }
 }
 
-fn aggregate_buckets(projection: &agent::AgentQueueProjection) -> Vec<&'static str> {
+pub(crate) fn aggregate_buckets(projection: &agent::AgentQueueProjection) -> Vec<&'static str> {
     let mut buckets = Vec::new();
     for bucket in &projection.repair_queue.buckets {
         let mapped = match *bucket {
@@ -194,7 +194,7 @@ fn push_unique(values: &mut Vec<&'static str>, value: &'static str) {
     }
 }
 
-fn bucket_reason(bucket: &str) -> &'static str {
+pub(crate) fn bucket_reason(bucket: &str) -> &'static str {
     match bucket {
         "repairable_by_guard" => "guard_evidence_missing",
         "repairable_by_safety_docs" => "safety_docs_evidence_missing",

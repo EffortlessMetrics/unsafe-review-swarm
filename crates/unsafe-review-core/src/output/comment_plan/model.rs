@@ -6,7 +6,7 @@ use crate::output::confirmation::{
 };
 use crate::output::{
     NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE,
-    REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY,
+    REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY, agent, repair_queue,
 };
 use crate::util::path_display;
 use serde::Serialize;
@@ -155,6 +155,10 @@ pub(super) struct PlannedComment {
     selection_reason_code: &'static str,
     actionability: &'static str,
     relevance: &'static str,
+    agent_readiness: CommentPlanAgentReadiness,
+    repair_queue_buckets: Vec<&'static str>,
+    repair_queue_bucket_reasons: Vec<&'static str>,
+    context_command: String,
     trust_boundary: &'static str,
     body: String,
 }
@@ -162,6 +166,7 @@ pub(super) struct PlannedComment {
 impl From<&ReviewCard> for PlannedComment {
     fn from(card: &ReviewCard) -> Self {
         let selection_reason = selection_reason(card);
+        let repair = CommentPlanRepairMetadata::from(card);
         Self {
             card_id: card.id.0.clone(),
             path: path_display(&card.site.location.file),
@@ -184,6 +189,10 @@ impl From<&ReviewCard> for PlannedComment {
             selection_reason_code: selection_reason.code,
             actionability: actionability(card),
             relevance: relevance(card),
+            agent_readiness: repair.agent_readiness,
+            repair_queue_buckets: repair.repair_queue_buckets,
+            repair_queue_bucket_reasons: repair.repair_queue_bucket_reasons,
+            context_command: repair.context_command,
             trust_boundary: TRUST_BOUNDARY,
             body: comment_body(card),
         }
@@ -205,12 +214,17 @@ pub(super) struct NotSelectedCard {
     next_action: String,
     actionability: &'static str,
     relevance: &'static str,
+    agent_readiness: CommentPlanAgentReadiness,
+    repair_queue_buckets: Vec<&'static str>,
+    repair_queue_bucket_reasons: Vec<&'static str>,
+    context_command: String,
     reason: &'static str,
     reason_code: &'static str,
 }
 
 impl NotSelectedCard {
     fn from_reason(card: &ReviewCard, reason: ReviewBudgetReason) -> Self {
+        let repair = CommentPlanRepairMetadata::from(card);
         Self {
             card_id: card.id.0.clone(),
             path: path_display(&card.site.location.file),
@@ -225,8 +239,53 @@ impl NotSelectedCard {
             next_action: card.next_action.summary.clone(),
             actionability: actionability(card),
             relevance: relevance(card),
+            agent_readiness: repair.agent_readiness,
+            repair_queue_buckets: repair.repair_queue_buckets,
+            repair_queue_bucket_reasons: repair.repair_queue_bucket_reasons,
+            context_command: repair.context_command,
             reason: reason.message,
             reason_code: reason.code,
+        }
+    }
+}
+
+struct CommentPlanRepairMetadata {
+    agent_readiness: CommentPlanAgentReadiness,
+    repair_queue_buckets: Vec<&'static str>,
+    repair_queue_bucket_reasons: Vec<&'static str>,
+    context_command: String,
+}
+
+impl From<&ReviewCard> for CommentPlanRepairMetadata {
+    fn from(card: &ReviewCard) -> Self {
+        let projection = agent::repair_queue_projection(card);
+        let repair_queue_buckets = repair_queue::aggregate_buckets(&projection);
+        let repair_queue_bucket_reasons = repair_queue_buckets
+            .iter()
+            .map(|bucket| repair_queue::bucket_reason(bucket))
+            .collect();
+        Self {
+            agent_readiness: CommentPlanAgentReadiness::from(&projection.agent_readiness),
+            repair_queue_buckets,
+            repair_queue_bucket_reasons,
+            context_command: format!("unsafe-review context {} --json", card.id),
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct CommentPlanAgentReadiness {
+    ready: bool,
+    state: &'static str,
+    reasons: Vec<String>,
+}
+
+impl From<&agent::AgentReadiness> for CommentPlanAgentReadiness {
+    fn from(readiness: &agent::AgentReadiness) -> Self {
+        Self {
+            ready: readiness.ready,
+            state: readiness.state,
+            reasons: readiness.reasons.clone(),
         }
     }
 }

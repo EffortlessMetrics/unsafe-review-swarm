@@ -93,6 +93,28 @@ mod tests {
             value["comments"][0]["actionability"],
             "specific_guard_missing"
         );
+        assert_eq!(value["comments"][0]["agent_readiness"]["ready"], true);
+        assert_eq!(
+            value["comments"][0]["agent_readiness"]["state"],
+            "ready_for_agent"
+        );
+        assert!(
+            serde_json::to_string(&value["comments"][0]["agent_readiness"]["reasons"])
+                .map_err(|err| format!("render readiness reasons failed: {err}"))?
+                .contains("card-scoped allowed repairs")
+        );
+        assert_eq!(
+            value["comments"][0]["repair_queue_buckets"],
+            serde_json::json!(["repairable_by_guard", "requires_witness_receipt"])
+        );
+        assert_eq!(
+            value["comments"][0]["repair_queue_bucket_reasons"],
+            serde_json::json!(["guard_evidence_missing", "witness_receipt_missing"])
+        );
+        assert_eq!(
+            value["comments"][0]["context_command"],
+            format!("unsafe-review context {} --json", output.cards[0].id)
+        );
         assert!(
             value["comments"][0]["trust_boundary"]
                 .as_str()
@@ -500,6 +522,40 @@ mod tests {
         assert_eq!(
             value["not_selected"][0]["reason_code"],
             "human_deep_review_only"
+        );
+        assert_eq!(value["not_selected"][0]["agent_readiness"]["ready"], false);
+        assert_eq!(
+            value["not_selected"][0]["agent_readiness"]["state"],
+            "requires_human_review"
+        );
+        assert!(
+            serde_json::to_string(&value["not_selected"][0]["agent_readiness"]["reasons"])
+                .map_err(|err| format!("render readiness reasons failed: {err}"))?
+                .contains("operation family `unknown`")
+        );
+        assert_eq!(
+            value["not_selected"][0]["repair_queue_buckets"],
+            serde_json::json!([
+                "repairable_by_safety_docs",
+                "repairable_by_test",
+                "requires_witness_receipt",
+                "requires_human_review",
+                "do_not_auto_repair"
+            ])
+        );
+        assert_eq!(
+            value["not_selected"][0]["repair_queue_bucket_reasons"],
+            serde_json::json!([
+                "safety_docs_evidence_missing",
+                "reach_evidence_missing",
+                "witness_receipt_missing",
+                "human_review_required",
+                "not_ready_for_automatic_repair"
+            ])
+        );
+        assert_eq!(
+            value["not_selected"][0]["context_command"],
+            format!("unsafe-review context {} --json", output.cards[0].id)
         );
         Ok(())
     }

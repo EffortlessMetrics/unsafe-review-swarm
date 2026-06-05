@@ -5341,7 +5341,6 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
     let manifest = check_cards_json_artifact(dir)?;
     check_pr_summary_artifact(dir, &manifest)?;
     check_sarif_artifact(dir, &manifest)?;
-    check_comment_plan_artifact(dir, &manifest)?;
     let repair_queue_projections = check_repair_queue_artifact(
         dir,
         manifest.changed_files,
@@ -5351,6 +5350,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         &manifest.card_ids,
         &manifest.card_projections,
     )?;
+    check_comment_plan_artifact(dir, &manifest, &repair_queue_projections)?;
 
     Ok(AdvisoryArtifactSummary {
         card_ids: manifest.card_ids,
@@ -5665,6 +5665,7 @@ fn check_sarif_result_projection<'a>(
 fn check_comment_plan_artifact(
     dir: &Path,
     manifest: &AdvisoryArtifactManifest,
+    repair_queue_projections: &BTreeMap<String, RepairQueueProjection>,
 ) -> Result<(), String> {
     let card_ids = &manifest.card_ids;
     let card_projections = &manifest.card_projections;
@@ -5823,6 +5824,12 @@ fn check_comment_plan_artifact(
             expected_relevance(card_projection),
             "comment-plan.json comment relevance",
         )?;
+        require_comment_plan_repair_projection(
+            comment,
+            card_id,
+            repair_queue_projections,
+            "comment-plan.json comment",
+        )?;
         let comment_boundary = comment
             .get("trust_boundary")
             .and_then(serde_json::Value::as_str)
@@ -5946,6 +5953,12 @@ fn check_comment_plan_artifact(
                 ),
                 "comment-plan.json not_selected reason_code",
             )?;
+            require_comment_plan_repair_projection(
+                card,
+                card_id,
+                repair_queue_projections,
+                "comment-plan.json not_selected",
+            )?;
         }
     }
     for card_id in card_ids {
@@ -5992,6 +6005,71 @@ fn check_comment_plan_artifact(
     }
     require_comment_plan_summary(&comment_plan, comments.len(), not_selected_card_ids.len())?;
     Ok(())
+}
+
+fn require_comment_plan_repair_projection(
+    entry: &serde_json::Value,
+    card_id: &str,
+    repair_queue_projections: &BTreeMap<String, RepairQueueProjection>,
+    context: &str,
+) -> Result<(), String> {
+    let repair = repair_queue_projections.get(card_id).ok_or_else(|| {
+        format!("comment-plan.json references card `{card_id}` missing from repair-queue.json")
+    })?;
+    require_projected_string_array(entry, "repair_queue_buckets", &repair.buckets, context)?;
+    let expected_bucket_reasons = repair
+        .buckets
+        .iter()
+        .map(|bucket| expected_repair_queue_bucket_reason(bucket).to_string())
+        .collect::<Vec<_>>();
+    require_projected_string_array(
+        entry,
+        "repair_queue_bucket_reasons",
+        &expected_bucket_reasons,
+        context,
+    )?;
+    let context_command = super::require_non_empty_json_str(entry, "context_command", context)?;
+    require_expected_value(
+        context_command,
+        &format!("unsafe-review context {card_id} --json"),
+        &format!("{context} context_command"),
+    )?;
+    let readiness = entry
+        .get("agent_readiness")
+        .ok_or_else(|| format!("{context} is missing agent_readiness"))?;
+    check_comment_plan_agent_readiness(readiness, repair, context)
+}
+
+fn check_comment_plan_agent_readiness(
+    readiness: &serde_json::Value,
+    repair: &RepairQueueProjection,
+    context: &str,
+) -> Result<(), String> {
+    let Some(ready) = readiness.get("ready").and_then(serde_json::Value::as_bool) else {
+        return Err(format!("{context} agent_readiness.ready must be a boolean"));
+    };
+    if ready != repair.readiness_ready {
+        return Err(format!(
+            "{context} agent_readiness.ready must project repair-queue.json value `{}`; got `{ready}`",
+            repair.readiness_ready
+        ));
+    }
+    let state = super::require_non_empty_json_str(
+        readiness,
+        "state",
+        &format!("{context} agent_readiness"),
+    )?;
+    require_expected_value(
+        state,
+        &repair.readiness_state,
+        &format!("{context} agent_readiness.state"),
+    )?;
+    require_projected_string_array(
+        readiness,
+        "reasons",
+        &repair.readiness_reasons,
+        &format!("{context} agent_readiness"),
+    )
 }
 
 fn require_comment_plan_summary(

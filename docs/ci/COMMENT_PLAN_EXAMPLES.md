@@ -69,6 +69,25 @@ Representative fields:
       "selection_reason": "actionable high-priority review card",
       "selection_reason_code": "top_actionable_card",
       "next_action": "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.",
+      "agent_readiness": {
+        "ready": true,
+        "state": "ready_for_agent",
+        "reasons": [
+          "specific operation family",
+          "card-scoped allowed repairs",
+          "verify commands available",
+          "medium-or-high confidence"
+        ]
+      },
+      "repair_queue_buckets": [
+        "repairable_by_guard",
+        "requires_witness_receipt"
+      ],
+      "repair_queue_bucket_reasons": [
+        "guard_evidence_missing",
+        "witness_receipt_missing"
+      ],
+      "context_command": "unsafe-review context UR-... --json",
       "verify_commands": [
         "cargo +nightly miri test read_header",
         "cargo +nightly careful test read_header"
@@ -163,6 +182,16 @@ changed unsafe operation. The card remains visible in the bundle.
       "next_action": "Add a precise public `# Safety` section that names the required caller obligations.",
       "actionability": "specific_contract_missing",
       "relevance": "high",
+      "agent_readiness": {
+        "ready": false,
+        "state": "requires_human_review"
+      },
+      "repair_queue_buckets": [
+        "repairable_by_safety_docs",
+        "requires_human_review",
+        "do_not_auto_repair"
+      ],
+      "context_command": "unsafe-review context UR-... --json",
       "reason": "operation family unknown",
       "reason_code": "human_deep_review_only"
     }
@@ -251,6 +280,9 @@ The verifier treats these as artifact contract rules:
   comment cards;
 - every selected and not-selected entry carries `actionability` and
   `relevance` (`high` / `medium` / `low`);
+- every selected and not-selected entry carries `agent_readiness`,
+  `repair_queue_buckets`, `repair_queue_bucket_reasons`, and
+  `context_command` projected from `repair-queue.json`;
 - every selected entry carries a closed-vocabulary `selection_reason_code`;
 - every not-selected entry carries a closed-vocabulary `reason_code`;
 - trust-boundary text remains present.

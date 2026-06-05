@@ -82,6 +82,8 @@ Each selected candidate includes required fields:
 - `next_action`, `witness_routes`, `verify_commands`, `build_this_first`,
   `minimal_repro`, `confirmation_step`
 - `selection_reason`, `selection_reason_code`, `actionability`, `relevance`
+- `agent_readiness`, `repair_queue_buckets`,
+  `repair_queue_bucket_reasons`, `context_command`
 - `body`, `trust_boundary`
 
 Each `not_selected` entry includes:
@@ -91,7 +93,14 @@ Each `not_selected` entry includes:
 - `operation`, `operation_family`, `class`, `priority`, `confidence`
 - `next_action`
 - `actionability`, `relevance`
+- `agent_readiness`, `repair_queue_buckets`,
+  `repair_queue_bucket_reasons`, `context_command`
 - `reason`, `reason_code`
+
+`agent_readiness`, `repair_queue_buckets`, `repair_queue_bucket_reasons`, and
+`context_command` are additive handoff metadata projected from the same
+ReviewCard repair-queue contract as `repair-queue.json`. They do not mean
+unsafe-review ran an agent or selected a repair automatically.
 
 ## 5. Selection rules
 
@@ -239,6 +248,8 @@ document is a future-lane contract, not a live workflow.
   `outside changed hunk`
 - missing, unknown, or drifted `not_selected[].reason_code`
 - drift between `not_selected` review context and the referenced ReviewCard
+- drift between selected or not-selected repair handoff metadata and
+  `repair-queue.json`
 - `relevance` outside the documented set (`high`, `medium`, `low`)
 - selected comment `hypothesis_to_confirm`, `build_this_first`,
   `minimal_repro`, or `confirmation_step` that drifts from the referenced
