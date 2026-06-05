@@ -31,6 +31,9 @@ Issue:
 ## Scope
 
 -
+- [ ] One behavior / one seam / one policy slice
+- [ ] No unrelated cleanup
+- [ ] Generated receipts updated if needed
 
 ## Non-goals
 
@@ -43,6 +46,14 @@ Issue:
 - [ ] claim remains at the existing support level
 
 ## Policy impact
+
+- [ ] No new panic-family calls without a receipt
+- [ ] No bare `#[allow(clippy::...)]`
+- [ ] Any `#[expect(...)]` has a policy-backed reason
+- [ ] Non-Rust/source exceptions are receipted through policy TOML or future cargo-allow integration
+- [ ] Unsafe changes have unsafe-review evidence or follow-up
+
+Policy area:
 
 - [ ] none
 - [ ] accuracy calibration
@@ -71,13 +82,33 @@ For analyzer behavior changes only:
 - [ ] support-tier wording stays within current proof
 - [ ] public wording reviewed for overclaim
 
+## CI economics
+
+- Estimated default PR LEM:
+- New default PR lanes:
+- New label/main/nightly lanes:
+- Expensive runners:
+- Cache behavior:
+- Branch-protection impact:
+
 ## Validation
 
 -
+- [ ] Local `cargo run --locked -p xtask -- check-pr`
+- [ ] Relevant targeted tests
+- [ ] ripr/unsafe-review/source-exception artifacts checked if applicable
 
 ## Rollback
 
 -
+
+## Claim boundary
+
+What this PR proves:
+
+What this PR does not prove:
+
+Follow-ups:
 
 ## Boundaries
 
