@@ -10,7 +10,7 @@ trust_boundary = "Static unsafe contract review measurement input; not calibrate
 [[cards]]
 family = "manual_candidate_projection"
 judgment = "actionable"
-reason = "The first-pr bundle keeps the Bun TextDecoder, MySQL SAB, zstd overlap, async StringOrBuffer RAB, and node:fs scalar write RAB examples manual/advisory while preserving file:line, safe caller route, invariant, evidence commands, limitations, implementer guidance, and manual repair queue sidecar entries."
+reason = "The first-pr bundle keeps the Bun TextDecoder, MySQL SAB, zstd overlap, async StringOrBuffer RAB, node:fs scalar write RAB, and Candidate 7 sync compression getter-reentry examples manual/advisory while preserving file:line, safe caller route, invariant, evidence commands, limitations, implementer guidance, and manual repair queue sidecar entries."
 next_step = "Keep this as projection regression pressure for manual-candidate import, manual repair queue sidecar, review-kit handoff, PR summaries, and witness-plan follow-up wording."
 
 [[cards]]

@@ -56,6 +56,8 @@ runs the first-pr artifact verifier.
   `src/runtime/node/types.rs:402`.
 - `R4R2-S005`: node:fs async scalar write resizable-ArrayBuffer stale-input
   route at `src/runtime/node/node_fs.rs:3795`.
+- `R4R2-S007`: Candidate 7 sync compression getter-reentry stale-byte route
+  at `src/runtime/api/BunObject.rs:2345`.
 
 The useful cockpit behavior is that all entries remain manual candidates,
 carry file:line and safe-caller route context, preserve external evidence

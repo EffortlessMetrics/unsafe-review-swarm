@@ -499,6 +499,8 @@ const DOGFOOD_JUDGMENT_DIR: &str = "docs/dogfood/judgments";
 const DOGFOOD_JUDGMENTS_README: &str = "docs/dogfood/judgments/README.md";
 const DOGFOOD_REPORT_DIR: &str = "docs/dogfood/reports";
 const BUN_MANUAL_CANDIDATE_SMOKE_ID: &str = "bun-manual-candidates-first-pr-smoke";
+const BUN_MANUAL_CANDIDATE_SMOKE_REPORT: &str =
+    "docs/dogfood/reports/2026-06-03-bun-manual-candidates-first-pr-smoke.md";
 const BUN_MANUAL_CANDIDATE_SMOKE_ARTIFACTS: &[&str] = &[
     "target/unsafe-review-manual-candidate-smoke/manual-candidates.json",
     "target/unsafe-review-manual-candidate-smoke/manual-repair-queue.json",
@@ -3339,6 +3341,7 @@ fn check_dogfood() -> Result<(), String> {
     check_dogfood_report_overclaims()?;
     check_dogfood_follow_up_seeds(&ids)?;
     check_dogfood_stable_byte_seeds()?;
+    check_dogfood_bun_manual_candidate_smoke_report()?;
     check_dogfood_agent_repair_experiment_protocol_doc()?;
     check_dogfood_judgment_schema_docs()?;
     check_dogfood_judgments(&ids)?;
@@ -3979,6 +3982,63 @@ fn check_dogfood_stable_byte_seeds() -> Result<(), String> {
     let seed_text = read_to_string(&workspace_path(DOGFOOD_STABLE_BYTE_SEEDS))?;
     check_dogfood_report_trust_boundary_text(DOGFOOD_STABLE_BYTE_SEEDS, &seed_text)?;
     check_dogfood_stable_byte_seed_text(DOGFOOD_STABLE_BYTE_SEEDS, &seed_text, &examples_by_path)?;
+    Ok(())
+}
+
+fn check_dogfood_bun_manual_candidate_smoke_report() -> Result<(), String> {
+    let text = read_to_string(&workspace_path(BUN_MANUAL_CANDIDATE_SMOKE_REPORT))?;
+    let examples = manual_candidate_examples()?;
+    check_dogfood_bun_manual_candidate_smoke_report_text(
+        BUN_MANUAL_CANDIDATE_SMOKE_REPORT,
+        &text,
+        &examples,
+    )
+}
+
+fn check_dogfood_bun_manual_candidate_smoke_report_text(
+    path: &str,
+    text: &str,
+    examples: &[ManualCandidateExample],
+) -> Result<(), String> {
+    let section = markdown_heading_section(text, "Bun candidates")
+        .ok_or_else(|| format!("{path} must include a `## Bun candidates` section"))?;
+    for example in examples {
+        let id_marker = format!("`{}`", example.id);
+        if !section.contains(&id_marker) {
+            return Err(format!(
+                "{path} Bun candidates section must list committed manual candidate `{}`",
+                example.id
+            ));
+        }
+
+        let file = example
+            .expected
+            .pointer("/location/file")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| {
+                format!(
+                    "{} location.file must be present for dogfood smoke report check",
+                    example.path.display()
+                )
+            })?;
+        let line = example
+            .expected
+            .pointer("/location/line")
+            .and_then(serde_json::Value::as_u64)
+            .ok_or_else(|| {
+                format!(
+                    "{} location.line must be present for dogfood smoke report check",
+                    example.path.display()
+                )
+            })?;
+        let location = format!("{file}:{line}");
+        if !section.contains(&location) {
+            return Err(format!(
+                "{path} Bun candidates section must list committed manual candidate `{}` primary location `{location}`",
+                example.id
+            ));
+        }
+    }
     Ok(())
 }
 
@@ -12522,6 +12582,44 @@ artifacts = [
 
         assert!(err.contains("oracle_map.oracle_path"), "{err}");
         assert!(err.contains("test_targets"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_bun_manual_smoke_report_requires_all_candidate_ids() -> Result<(), String> {
+        let examples = manual_candidate_examples()?;
+        let text = read_to_string(&workspace_path(BUN_MANUAL_CANDIDATE_SMOKE_REPORT))?;
+        let text = text.replace("`R4R2-S007`", "`R4R2-S999`");
+
+        let err = err_text(check_dogfood_bun_manual_candidate_smoke_report_text(
+            BUN_MANUAL_CANDIDATE_SMOKE_REPORT,
+            &text,
+            &examples,
+        ))?;
+
+        assert!(err.contains("Bun candidates section"), "{err}");
+        assert!(err.contains("R4R2-S007"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_bun_manual_smoke_report_requires_primary_locations() -> Result<(), String> {
+        let examples = manual_candidate_examples()?;
+        let text = read_to_string(&workspace_path(BUN_MANUAL_CANDIDATE_SMOKE_REPORT))?;
+        let text = text.replace(
+            "src/runtime/api/BunObject.rs:2345",
+            "src/runtime/api/BunObject.rs:9999",
+        );
+
+        let err = err_text(check_dogfood_bun_manual_candidate_smoke_report_text(
+            BUN_MANUAL_CANDIDATE_SMOKE_REPORT,
+            &text,
+            &examples,
+        ))?;
+
+        assert!(err.contains("primary location"), "{err}");
+        assert!(err.contains("R4R2-S007"), "{err}");
+        assert!(err.contains("src/runtime/api/BunObject.rs:2345"), "{err}");
         Ok(())
     }
 
