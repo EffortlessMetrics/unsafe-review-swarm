@@ -1201,6 +1201,11 @@ fn check_manual_candidate_example_source_trace(
                 "{context} command must include `rg -n` so implementers can re-find the file:line route"
             ));
         }
+        if !command.contains(location_file) {
+            return Err(format!(
+                "{context} command must include location.file `{location_file}` so the source_trace route points at the primary file"
+            ));
+        }
         let limitation = require_non_empty_json_str(item, "limitation", &context)?;
         let limitation = limitation.to_ascii_lowercase();
         for needle in ["source trace only", "not prove"] {
@@ -12365,6 +12370,33 @@ artifacts = [
 
         assert!(err.contains("source_trace evidence"), "{err}");
         assert!(err.contains("primary file:line route"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn manual_candidate_examples_require_source_trace_command_to_name_primary_file()
+    -> Result<(), String> {
+        let path = "docs/examples/manual-candidates/textdecoder-sab.json";
+        let mut value = parse_json_file(&workspace_path(path))?;
+        let evidence = value
+            .get_mut("evidence")
+            .and_then(serde_json::Value::as_array_mut)
+            .ok_or_else(|| "textdecoder example should have evidence".to_string())?;
+        let source_trace = evidence
+            .iter_mut()
+            .find(|item| {
+                item.get("kind").and_then(serde_json::Value::as_str) == Some("source_trace")
+            })
+            .ok_or_else(|| "textdecoder example should have source_trace evidence".to_string())?;
+        source_trace["command"] =
+            serde_json::json!("rg -n \"TextDecoder|decode\" src/runtime/webcore/OtherFile.rs");
+
+        let err = err_text(check_manual_candidate_example_handoff_fields(&value, path))?;
+
+        assert!(err.contains("source_trace"), "{err}");
+        assert!(err.contains("command"), "{err}");
+        assert!(err.contains("location.file"), "{err}");
+        assert!(err.contains("src/runtime/webcore/TextDecoder.rs"), "{err}");
         Ok(())
     }
 
