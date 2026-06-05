@@ -13,6 +13,14 @@
   "unsafe_operation": "parse_compress_buffer_and_options captures StringOrBuffer input, sync compression option getters can reenter JS, then gzip_or_deflate_sync or JSZstd::compress_sync materializes buffer.slice() for native compression",
   "invariant": "Sync compression must not read bytes from caller-controlled JS backing storage after options getter reentry can mutate, resize, detach, or replace that storage",
   "safe_caller": "Bun.gzipSync, Bun.deflateSync, or Bun.zstdCompressSync with a BufferSource input and an options getter that mutates or replaces the backing storage after input capture",
+  "oracle_map": {
+    "rust_seam": "src/runtime/api/BunObject.rs::parse_compress_buffer_and_options -> gzip_or_deflate_sync / JSZstd::compress_sync",
+    "oracle_language": "typescript",
+    "oracle_path": "test/js/bun/util/compression-getter-reentry.test.ts",
+    "oracle_kind": "node-post-getter-empty-input-parity",
+    "coverage_confidence": "candidate-local",
+    "limitation": "oracle map only; not witness execution, site-execution proof, or memory-safety proof"
+  },
   "stable_byte": {
     "class": "stable-byte-source-getter-reentry",
     "source": "BufferSource input plus sync compression options getter reentry",

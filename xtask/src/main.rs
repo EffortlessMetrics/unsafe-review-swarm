@@ -1175,6 +1175,7 @@ fn check_manual_candidate_example_handoff_fields(
         pr_aperture,
     )?;
     check_manual_candidate_example_source_trace(value, path)?;
+    check_manual_candidate_example_node_parity_oracle_map(value, path)?;
 
     let trust_boundary = require_non_empty_json_str(value, "trust_boundary", path)?;
     for needle in [
@@ -1195,6 +1196,58 @@ fn check_manual_candidate_example_handoff_fields(
                 "{path} trust_boundary must include `{needle}` for committed manual examples"
             ));
         }
+    }
+    Ok(())
+}
+
+fn check_manual_candidate_example_node_parity_oracle_map(
+    value: &serde_json::Value,
+    path: &str,
+) -> Result<(), String> {
+    let evidence = json_array_at(value, "/evidence", path)?;
+    let has_node_parity = evidence
+        .iter()
+        .any(|item| item.get("kind").and_then(serde_json::Value::as_str) == Some("node_parity"));
+    if !has_node_parity {
+        return Ok(());
+    }
+    let Some(oracle_map) = value
+        .get("oracle_map")
+        .and_then(serde_json::Value::as_object)
+    else {
+        return Err(format!(
+            "{path} committed manual candidate example with node_parity evidence must include oracle_map"
+        ));
+    };
+    require_object_str(oracle_map, "rust_seam", path, "oracle_map")?;
+    require_object_str(oracle_map, "oracle_language", path, "oracle_map")?;
+    let oracle_path = require_object_str(oracle_map, "oracle_path", path, "oracle_map")?;
+    require_object_str(oracle_map, "oracle_kind", path, "oracle_map")?;
+    require_object_str(oracle_map, "coverage_confidence", path, "oracle_map")?;
+    let limitation = require_object_str(oracle_map, "limitation", path, "oracle_map")?;
+    let limitation = limitation.to_ascii_lowercase();
+    for needle in [
+        "oracle map only",
+        "not witness execution",
+        "site-execution proof",
+        "memory-safety proof",
+    ] {
+        if !limitation.contains(needle) {
+            return Err(format!(
+                "{path} oracle_map.limitation must include `{needle}`"
+            ));
+        }
+    }
+    let test_targets = json_array_at(value, "/test_targets", path)?;
+    let oracle_in_tests = test_targets.iter().any(|target| {
+        target
+            .as_str()
+            .is_some_and(|target| target.contains(oracle_path))
+    });
+    if !oracle_in_tests {
+        return Err(format!(
+            "{path} oracle_map.oracle_path `{oracle_path}` must also appear in test_targets"
+        ));
     }
     Ok(())
 }
@@ -12438,6 +12491,37 @@ artifacts = [
         assert!(err.contains("command"), "{err}");
         assert!(err.contains("location.file"), "{err}");
         assert!(err.contains("src/runtime/webcore/TextDecoder.rs"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn manual_candidate_examples_require_node_parity_oracle_map() -> Result<(), String> {
+        let path =
+            "docs/examples/manual-candidates/candidate7-sync-compression-getter-reentry.json";
+        let mut value = parse_json_file(&workspace_path(path))?;
+        value
+            .as_object_mut()
+            .ok_or_else(|| "candidate7 example should be an object".to_string())?
+            .remove("oracle_map");
+
+        let err = err_text(check_manual_candidate_example_handoff_fields(&value, path))?;
+
+        assert!(err.contains("node_parity"), "{err}");
+        assert!(err.contains("oracle_map"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn manual_candidate_examples_require_oracle_path_as_test_target() -> Result<(), String> {
+        let path =
+            "docs/examples/manual-candidates/candidate7-sync-compression-getter-reentry.json";
+        let mut value = parse_json_file(&workspace_path(path))?;
+        value["oracle_map"]["oracle_path"] = serde_json::json!("test/js/bun/util/missing.ts");
+
+        let err = err_text(check_manual_candidate_example_handoff_fields(&value, path))?;
+
+        assert!(err.contains("oracle_map.oracle_path"), "{err}");
+        assert!(err.contains("test_targets"), "{err}");
         Ok(())
     }
 

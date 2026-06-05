@@ -13,6 +13,14 @@
   "unsafe_operation": "byte_slice / byte_slice_mut -> CompressionContext::set_buffers(Option<&[u8]>, Option<&mut [u8]>) -> NativeZstd FFI buffer handoff",
   "invariant": "Compression input &[u8] and output &mut [u8] must not alias the same caller-controlled JS backing storage",
   "safe_caller": "zlib Zstd _processChunk / _handle.writeSync with caller-controlled overlapping ArrayBuffer input and output",
+  "oracle_map": {
+    "rust_seam": "src/runtime/node/node_zlib_binding.rs::CompressionContext::set_buffers -> NativeZstd FFI buffer handoff",
+    "oracle_language": "javascript",
+    "oracle_path": "target/unsafe-scout/zstd-overlap-node-control.js",
+    "oracle_kind": "node-overlap-output-parity",
+    "coverage_confidence": "candidate-local",
+    "limitation": "oracle map only; not witness execution, site-execution proof, or memory-safety proof"
+  },
   "stable_byte": {
     "class": "stable-byte-source-native-ffi-read",
     "source": "Overlapping caller-controlled ArrayBuffer input and output",
