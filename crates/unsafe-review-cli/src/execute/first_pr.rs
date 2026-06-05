@@ -779,6 +779,7 @@ fn review_kit_stable_byte_seed(
         "rust_native_sink": seed.rust_native_sink.as_str(),
         "proof_mode": seed.proof_mode.as_str(),
         "suggested_first_pr": seed.suggested_first_pr.as_str(),
+        "manual_candidate_pr_aperture": candidate.pr_aperture.as_deref(),
         "owner_lane": seed.owner_lane.as_str(),
         "triage_labels": &seed.triage_labels,
         "candidate_consistency": {
@@ -793,6 +794,8 @@ fn review_kit_stable_byte_seed(
                 == Some(seed.safe_js_caller.as_str()),
             "rust_native_sink_matches_manual_candidate": stable_byte_sink(candidate)
                 == Some(seed.rust_native_sink.as_str()),
+            "suggested_first_pr_has_manual_candidate_pr_aperture": !seed.suggested_first_pr.trim().is_empty()
+                && candidate.pr_aperture.as_ref().is_some_and(|value| !value.trim().is_empty()),
         },
         "trust_boundary": "Stable-byte seed row is advisory workflow metadata only; not analyzer discovery, not witness execution, not proof, not policy readiness, and not a ReviewCard truth."
     })
@@ -2232,6 +2235,7 @@ fn tokmd_stable_byte_seed(seed: &StableByteSeed, candidate: &ManualCandidate) ->
         "rust_native_sink": seed.rust_native_sink.as_str(),
         "proof_mode": seed.proof_mode.as_str(),
         "suggested_first_pr": seed.suggested_first_pr.as_str(),
+        "manual_candidate_pr_aperture": candidate.pr_aperture.as_deref(),
         "owner_lane": seed.owner_lane.as_str(),
         "triage_labels": &seed.triage_labels,
         "candidate_consistency": {
@@ -2246,6 +2250,8 @@ fn tokmd_stable_byte_seed(seed: &StableByteSeed, candidate: &ManualCandidate) ->
                 == Some(seed.safe_js_caller.as_str()),
             "rust_native_sink_matches_manual_candidate": stable_byte_sink(candidate)
                 == Some(seed.rust_native_sink.as_str()),
+            "suggested_first_pr_has_manual_candidate_pr_aperture": !seed.suggested_first_pr.trim().is_empty()
+                && candidate.pr_aperture.as_ref().is_some_and(|value| !value.trim().is_empty()),
         },
         "trust_boundary": "Stable-byte seed row is advisory workflow metadata only; not analyzer discovery, not witness execution, not proof, not policy readiness, and not rendered tokmd output."
     })
@@ -2761,6 +2767,10 @@ mod tests {
             seed["suggested_first_pr"],
             "TextDecoder shared-byte snapshot only"
         );
+        assert_eq!(
+            seed["manual_candidate_pr_aperture"],
+            "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings"
+        );
         assert_eq!(seed["triage_labels"][1], "needs-miri-model");
         assert_eq!(
             seed["candidate_consistency"]["stable_byte_class_matches_manual_candidate"],
@@ -2780,6 +2790,10 @@ mod tests {
         );
         assert_eq!(
             seed["candidate_consistency"]["rust_native_sink_matches_manual_candidate"],
+            true
+        );
+        assert_eq!(
+            seed["candidate_consistency"]["suggested_first_pr_has_manual_candidate_pr_aperture"],
             true
         );
         let ledger_limitation = value["packets"][0]["ledger_state_limitation"]
@@ -2852,6 +2866,10 @@ mod tests {
             seed["suggested_first_pr"],
             "TextDecoder shared-byte snapshot only"
         );
+        assert_eq!(
+            seed["manual_candidate_pr_aperture"],
+            "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings"
+        );
         assert_eq!(seed["triage_labels"][1], "needs-miri-model");
         assert_eq!(
             seed["candidate_consistency"]["stable_byte_class_matches_manual_candidate"],
@@ -2871,6 +2889,10 @@ mod tests {
         );
         assert_eq!(
             seed["candidate_consistency"]["rust_native_sink_matches_manual_candidate"],
+            true
+        );
+        assert_eq!(
+            seed["candidate_consistency"]["suggested_first_pr_has_manual_candidate_pr_aperture"],
             true
         );
         assert!(

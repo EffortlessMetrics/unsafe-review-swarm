@@ -1311,6 +1311,7 @@ fn check_manual_candidate_smoke_tokmd_seed_projection(
         require_non_empty_json_str(seed, "seed_id", &context)?;
         require_non_empty_json_str(seed, "owner_lane", &context)?;
         require_non_empty_json_str(seed, "suggested_first_pr", &context)?;
+        require_stable_byte_seed_pr_aperture_matches_example(seed, example, &context)?;
         json_array_at(seed, "/triage_labels", &context)?;
         let consistency = seed.get("candidate_consistency").ok_or_else(|| {
             format!("{context} stable_byte_seed is missing candidate_consistency")
@@ -1321,6 +1322,7 @@ fn check_manual_candidate_smoke_tokmd_seed_projection(
             "ledger_state_matches_manual_candidate",
             "safe_js_caller_matches_manual_candidate",
             "rust_native_sink_matches_manual_candidate",
+            "suggested_first_pr_has_manual_candidate_pr_aperture",
         ] {
             if consistency.get(field).and_then(serde_json::Value::as_bool) != Some(true) {
                 return Err(format!(
@@ -1419,6 +1421,7 @@ fn check_manual_candidate_smoke_manual_repair_seed_projection(
         require_non_empty_json_str(seed, "seed_id", &context)?;
         require_non_empty_json_str(seed, "owner_lane", &context)?;
         require_non_empty_json_str(seed, "suggested_first_pr", &context)?;
+        require_stable_byte_seed_pr_aperture_matches_example(seed, example, &context)?;
         let triage_labels = json_array_at(seed, "/triage_labels", &context)?;
         if triage_labels.is_empty() {
             return Err(format!(
@@ -1434,6 +1437,7 @@ fn check_manual_candidate_smoke_manual_repair_seed_projection(
             "ledger_state_matches_manual_candidate",
             "safe_js_caller_matches_manual_candidate",
             "rust_native_sink_matches_manual_candidate",
+            "suggested_first_pr_has_manual_candidate_pr_aperture",
         ] {
             if consistency.get(field).and_then(serde_json::Value::as_bool) != Some(true) {
                 return Err(format!(
@@ -1520,6 +1524,7 @@ fn check_manual_candidate_smoke_review_kit_seed_projection(
         let seed_id = require_non_empty_json_str(seed, "seed_id", &context)?;
         let owner_lane = require_non_empty_json_str(seed, "owner_lane", &context)?;
         let suggested_first_pr = require_non_empty_json_str(seed, "suggested_first_pr", &context)?;
+        require_stable_byte_seed_pr_aperture_matches_example(seed, example, &context)?;
         let triage_labels = json_array_at(seed, "/triage_labels", &context)?
             .iter()
             .map(|label| {
@@ -1542,6 +1547,7 @@ fn check_manual_candidate_smoke_review_kit_seed_projection(
             "ledger_state_matches_manual_candidate",
             "safe_js_caller_matches_manual_candidate",
             "rust_native_sink_matches_manual_candidate",
+            "suggested_first_pr_has_manual_candidate_pr_aperture",
         ] {
             if consistency.get(field).and_then(serde_json::Value::as_bool) != Some(true) {
                 return Err(format!(
@@ -1642,6 +1648,21 @@ fn require_stable_byte_seed_field_matches_example(
     Ok(())
 }
 
+fn require_stable_byte_seed_pr_aperture_matches_example(
+    seed: &serde_json::Value,
+    example: &ManualCandidateExample,
+    context: &str,
+) -> Result<(), String> {
+    let actual = require_non_empty_json_str(seed, "manual_candidate_pr_aperture", context)?;
+    let expected = manual_candidate_example_field(example, "pr_aperture", context)?;
+    if actual != expected {
+        return Err(format!(
+            "{context} stable_byte_seed.manual_candidate_pr_aperture `{actual}` must match committed example pr_aperture `{expected}`"
+        ));
+    }
+    Ok(())
+}
+
 fn manual_candidate_example_stable_byte_field<'a>(
     example: &'a ManualCandidateExample,
     field: &str,
@@ -1660,6 +1681,24 @@ fn manual_candidate_example_stable_byte_field<'a>(
         .ok_or_else(|| {
             format!(
                 "{context} committed example `{}` stable_byte.{field} must be a non-empty string",
+                example.path.display()
+            )
+        })
+}
+
+fn manual_candidate_example_field<'a>(
+    example: &'a ManualCandidateExample,
+    field: &str,
+    context: &str,
+) -> Result<&'a str, String> {
+    example
+        .expected
+        .get(field)
+        .and_then(serde_json::Value::as_str)
+        .filter(|value| !value.trim().is_empty())
+        .ok_or_else(|| {
+            format!(
+                "{context} committed example `{}` {field} must be a non-empty string",
                 example.path.display()
             )
         })
@@ -21503,10 +21542,28 @@ review_after = "2026-08-01"
             return Err("review-kit fixture candidate_queue must have an entry".to_string());
         };
         first["stable_byte_seed"] = serde_json::json!({
+            "source": "docs/dogfood/stable-byte-follow-up-seeds.md",
             "seed_id": stable_byte_seed_id_fixture(),
+            "ledger_state": "handoff-ready",
+            "candidate_family": "stable-byte-source-sab-race",
+            "surface": "TextDecoder.decode",
+            "manual_candidate": "docs/examples/manual-candidates/textdecoder-sab.json",
+            "safe_js_caller": "SharedArrayBuffer-backed typed array decode",
+            "rust_native_sink": "src/runtime/webcore/TextDecoder.rs slice materialization",
+            "proof_mode": "mutation-plus-miri",
+            "manual_candidate_pr_aperture": "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings",
             "owner_lane": "rust2",
             "suggested_first_pr": "TextDecoder shared-byte snapshot only",
-            "triage_labels": ["non-observable", "needs-miri-model"]
+            "triage_labels": ["non-observable", "needs-miri-model"],
+            "candidate_consistency": {
+                "stable_byte_class_matches_manual_candidate": true,
+                "proof_mode_matches_manual_candidate": true,
+                "ledger_state_matches_manual_candidate": true,
+                "safe_js_caller_matches_manual_candidate": true,
+                "rust_native_sink_matches_manual_candidate": true,
+                "suggested_first_pr_has_manual_candidate_pr_aperture": true
+            },
+            "trust_boundary": "Stable-byte seed row is advisory workflow metadata only; not analyzer discovery, not witness execution, not proof, not policy readiness, and not a ReviewCard truth."
         });
         fs::write(&path, review_kit.to_string())
             .map_err(|err| format!("write review kit failed: {err}"))

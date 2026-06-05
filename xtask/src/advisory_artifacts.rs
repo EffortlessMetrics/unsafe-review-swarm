@@ -2793,6 +2793,7 @@ fn check_tokmd_stable_byte_seed(
         "rust_native_sink",
         "proof_mode",
         "suggested_first_pr",
+        "manual_candidate_pr_aperture",
         "owner_lane",
     ] {
         super::require_non_empty_json_str(seed, field, &context)?;
@@ -2812,6 +2813,12 @@ fn check_tokmd_stable_byte_seed(
     )?;
     require_stable_byte_seed_projection(seed, "safe_js_caller", expected, "source", &context)?;
     require_stable_byte_seed_projection(seed, "rust_native_sink", expected, "sink", &context)?;
+    require_projected_optional_str(
+        seed,
+        "manual_candidate_pr_aperture",
+        &expected.pr_aperture,
+        &context,
+    )?;
     if let Some(proof_mode) = &expected.proof_mode {
         require_projected_str(seed, "proof_mode", &proof_mode.kind, &context)?;
     }
@@ -2824,6 +2831,7 @@ fn check_tokmd_stable_byte_seed(
         "ledger_state_matches_manual_candidate",
         "safe_js_caller_matches_manual_candidate",
         "rust_native_sink_matches_manual_candidate",
+        "suggested_first_pr_has_manual_candidate_pr_aperture",
     ] {
         if consistency.get(field).and_then(serde_json::Value::as_bool) != Some(true) {
             return Err(format!(
@@ -4708,6 +4716,7 @@ fn check_review_kit_stable_byte_seed(
         "rust_native_sink",
         "proof_mode",
         "suggested_first_pr",
+        "manual_candidate_pr_aperture",
         "owner_lane",
     ] {
         super::require_non_empty_json_str(seed, field, &context)?;
@@ -4727,6 +4736,12 @@ fn check_review_kit_stable_byte_seed(
     )?;
     require_stable_byte_seed_projection(seed, "safe_js_caller", expected, "source", &context)?;
     require_stable_byte_seed_projection(seed, "rust_native_sink", expected, "sink", &context)?;
+    require_projected_optional_str(
+        seed,
+        "manual_candidate_pr_aperture",
+        &expected.pr_aperture,
+        &context,
+    )?;
     if let Some(proof_mode) = &expected.proof_mode {
         require_projected_str(seed, "proof_mode", &proof_mode.kind, &context)?;
     }
@@ -4739,6 +4754,7 @@ fn check_review_kit_stable_byte_seed(
         "ledger_state_matches_manual_candidate",
         "safe_js_caller_matches_manual_candidate",
         "rust_native_sink_matches_manual_candidate",
+        "suggested_first_pr_has_manual_candidate_pr_aperture",
     ] {
         if consistency.get(field).and_then(serde_json::Value::as_bool) != Some(true) {
             return Err(format!(
@@ -9507,6 +9523,7 @@ mod tests {
             "rust_native_sink": "src/runtime/webcore/TextDecoder.rs slice materialization",
             "proof_mode": "mutation-plus-miri",
             "suggested_first_pr": "TextDecoder shared-byte snapshot only",
+            "manual_candidate_pr_aperture": "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings",
             "owner_lane": "rust2",
             "triage_labels": ["non-observable", "needs-miri-model"],
             "candidate_consistency": {
@@ -9514,7 +9531,8 @@ mod tests {
                 "proof_mode_matches_manual_candidate": true,
                 "ledger_state_matches_manual_candidate": true,
                 "safe_js_caller_matches_manual_candidate": true,
-                "rust_native_sink_matches_manual_candidate": true
+                "rust_native_sink_matches_manual_candidate": true,
+                "suggested_first_pr_has_manual_candidate_pr_aperture": true
             },
             "trust_boundary": "Stable-byte seed row is advisory workflow metadata only; not analyzer discovery, not witness execution, not proof, not policy readiness, not rendered tokmd output, and not a ReviewCard truth."
         })
@@ -9532,6 +9550,21 @@ mod tests {
         assert!(err.contains("safe_js_caller"), "{err}");
         assert!(err.contains("stable_byte.source"), "{err}");
         assert!(err.contains("Wrong safe JS caller route"), "{err}");
+    }
+
+    #[test]
+    fn tokmd_stable_byte_seed_rejects_manual_candidate_pr_aperture_projection_drift() {
+        let expected = stable_byte_candidate_projection();
+        let mut seed = stable_byte_seed_projection();
+        seed["manual_candidate_pr_aperture"] =
+            serde_json::json!("Wrong broad TextDecoder and S3 bundle");
+
+        let err = check_tokmd_stable_byte_seed(&seed, &expected, "tokmd-packets.json packets[0]")
+            .expect_err("manual_candidate_pr_aperture drift should fail tokmd stable-byte seed verification");
+
+        assert!(err.contains("manual_candidate_pr_aperture"), "{err}");
+        assert!(err.contains("pr_aperture"), "{err}");
+        assert!(err.contains("Wrong broad"), "{err}");
     }
 
     #[test]
@@ -9570,5 +9603,27 @@ mod tests {
         assert!(err.contains("rust_native_sink"), "{err}");
         assert!(err.contains("stable_byte.sink"), "{err}");
         assert!(err.contains("Wrong.rs"), "{err}");
+    }
+
+    #[test]
+    fn review_kit_stable_byte_seed_rejects_pr_aperture_consistency_drift() {
+        let expected = stable_byte_candidate_projection();
+        let mut seed = stable_byte_seed_projection();
+        seed["candidate_consistency"]["suggested_first_pr_has_manual_candidate_pr_aperture"] =
+            serde_json::json!(false);
+
+        let err = check_review_kit_stable_byte_seed(
+            &seed,
+            &expected,
+            "review-kit.json handoff manual_candidates candidate_queue[0]",
+        )
+        .expect_err(
+            "false PR aperture consistency should fail review-kit stable-byte seed verification",
+        );
+
+        assert!(
+            err.contains("suggested_first_pr_has_manual_candidate_pr_aperture"),
+            "{err}"
+        );
     }
 }
