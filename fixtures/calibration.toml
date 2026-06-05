@@ -532,9 +532,13 @@ required_core_fixtures = [
   "js_buffer_reentry_node_fs_rab_scalar_write",
   "js_buffer_reentry_raw_parts_materialization",
   "js_buffer_reentry_coerce_after_as_array_buffer",
+  "js_buffer_reentry_vector_materialization",
+  "js_buffer_reentry_as_ptr_materialization",
   "js_buffer_reentry_options_before_capture_no_card",
   "js_buffer_reentry_recapture_after_reentry_no_card",
   "js_buffer_reentry_refetch_after_coercion_no_card",
+  "js_buffer_reentry_vector_refetch_after_coercion_no_card",
+  "js_buffer_reentry_as_ptr_refetch_after_coercion_no_card",
   "js_buffer_reentry_async_options_before_capture_no_card",
   "js_buffer_reentry_async_recapture_after_reentry_no_card",
   "js_buffer_reentry_node_fs_rab_scalar_write_scheduled_before_capture_no_card",
@@ -5827,6 +5831,26 @@ expected_operation_family = "stable_byte_source_getter_reentry"
 expected_hazard = "stable_byte_source"
 
 [[cases]]
+fixture = "js_buffer_reentry_vector_materialization"
+kind = "positive"
+claim = "JS ArrayBuffer descriptor capture before user-JS coercion and later vector pointer materialization emits one advisory getter-reentry ReviewCard"
+support_tier = "JS-backed buffer reentry heuristic"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "stable_byte_source_getter_reentry"
+expected_hazard = "stable_byte_source"
+
+[[cases]]
+fixture = "js_buffer_reentry_as_ptr_materialization"
+kind = "positive"
+claim = "JS ArrayBuffer descriptor capture before user-JS coercion and later as_ptr materialization emits one advisory getter-reentry ReviewCard"
+support_tier = "JS-backed buffer reentry heuristic"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "stable_byte_source_getter_reentry"
+expected_hazard = "stable_byte_source"
+
+[[cases]]
 fixture = "js_buffer_reentry_options_before_capture_no_card"
 kind = "false_positive_control"
 claim = "JS-backed buffer reentry heuristic does not emit a ReviewCard when options are parsed before descriptor capture"
@@ -5844,6 +5868,20 @@ expected_cards = 0
 fixture = "js_buffer_reentry_refetch_after_coercion_no_card"
 kind = "false_positive_control"
 claim = "JS-backed buffer reentry heuristic does not emit a ReviewCard when an ArrayBuffer descriptor is re-fetched and materialized after coercion"
+support_tier = "JS-backed buffer reentry heuristic"
+expected_cards = 0
+
+[[cases]]
+fixture = "js_buffer_reentry_vector_refetch_after_coercion_no_card"
+kind = "false_positive_control"
+claim = "JS-backed buffer reentry heuristic does not emit a ReviewCard when an ArrayBuffer descriptor is re-fetched after coercion and then materialized through vector"
+support_tier = "JS-backed buffer reentry heuristic"
+expected_cards = 0
+
+[[cases]]
+fixture = "js_buffer_reentry_as_ptr_refetch_after_coercion_no_card"
+kind = "false_positive_control"
+claim = "JS-backed buffer reentry heuristic does not emit a ReviewCard when an ArrayBuffer descriptor is re-fetched after coercion and then materialized through as_ptr"
 support_tier = "JS-backed buffer reentry heuristic"
 expected_cards = 0
 
