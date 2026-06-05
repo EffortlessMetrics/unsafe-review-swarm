@@ -2896,6 +2896,15 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             .contains("Miri/model")
     );
     assert_eq!(
+        tokmd_packets["packets"][0]["preset_inputs"]["bun-ub-handoff"]["stop_line"],
+        format!(
+            "stop at PR aperture: {}",
+            manual_candidates["candidates"][0]["pr_aperture"]
+                .as_str()
+                .unwrap()
+        )
+    );
+    assert_eq!(
         tokmd_packets["packets"][0]["preset_inputs"]["bun-ub-pr-body"]["compatibility_oracle"],
         manual_candidates["candidates"][0]["oracle_map"]
     );

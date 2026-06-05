@@ -2501,7 +2501,7 @@ fn check_tokmd_preset_inputs(
         &handoff_context,
     )?;
     super::require_non_empty_json_str(handoff, "next_action", &handoff_context)?;
-    super::require_non_empty_json_str(handoff, "stop_line", &handoff_context)?;
+    require_tokmd_stop_line_projection(handoff, expected, &handoff_context)?;
 
     let pr_body = &inputs["bun-ub-pr-body"];
     let pr_body_context = format!("{context} preset_inputs.bun-ub-pr-body");
@@ -2711,6 +2711,19 @@ fn require_tokmd_required_proof_action(
         ));
     }
     Ok(())
+}
+
+fn require_tokmd_stop_line_projection(
+    handoff: &serde_json::Value,
+    expected: &ManualCandidateProjection,
+    context: &str,
+) -> Result<(), String> {
+    let expected_stop_line = expected
+        .pr_aperture
+        .as_ref()
+        .map(|aperture| format!("stop at PR aperture: {aperture}"))
+        .unwrap_or_else(|| "stop before broadening into unrelated unsafe sites".to_string());
+    require_projected_str(handoff, "stop_line", &expected_stop_line, context)
 }
 
 fn require_tokmd_evidence_projection(
@@ -9550,6 +9563,91 @@ mod tests {
             },
             "trust_boundary": "Stable-byte seed row is advisory workflow metadata only; not analyzer discovery, not witness execution, not proof, not policy readiness, not rendered tokmd output, and not a ReviewCard truth."
         })
+    }
+
+    fn manual_repair_queue_entry_projection() -> ManualRepairQueueEntryProjection {
+        ManualRepairQueueEntryProjection {
+            id: "R4R2-S001".to_string(),
+            bucket: "requires_witness_receipt".to_string(),
+            bucket_reason: "witness_receipt_missing".to_string(),
+            agent_handoff: serde_json::json!({
+                "state": "copy_ready",
+                "automatic": false,
+                "reasons": ["copy-only manual candidate handoff"]
+            }),
+            trust_boundary: "Copy-only manual candidate repair queue item; not automatic repair"
+                .to_string(),
+        }
+    }
+
+    #[test]
+    fn tokmd_handoff_rejects_stop_line_pr_aperture_drift() {
+        let expected = stable_byte_candidate_projection();
+        let entry = serde_json::json!({
+            "preset_inputs": {
+                "bun-ub-handoff": {
+                    "audience": "rust lane implementer",
+                    "candidate_id": "R4R2-S001",
+                    "stable_byte_family": "stable-byte-source-sab-race",
+                    "invariant_at_risk": "&[u8] memory must not be concurrently mutated",
+                    "safe_js_caller_route": "TextDecoder.decode SharedArrayBuffer route",
+                    "rust_native_seam": "src/runtime/webcore/TextDecoder.rs slice materialization",
+                    "target": {
+                        "file": "src/runtime/webcore/TextDecoder.rs",
+                        "line": 237,
+                        "location_text": "src/runtime/webcore/TextDecoder.rs:237"
+                    },
+                    "proof_mode": {
+                        "kind": "mutation-plus-miri",
+                        "system_bun_expected": "nondiscriminating",
+                        "mutation_required": true,
+                        "miri_required": true
+                    },
+                    "required_proof_action": "pair mutation pressure with a focused Miri/model proof of the byte-lifetime shape",
+                    "current_evidence": [],
+                    "fix_boundary": "copy shared bytes before constructing the Rust slice",
+                    "pr_aperture": "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings",
+                    "test_or_witness_targets": [],
+                    "do_not_touch": [],
+                    "ledger_state": "handoff-ready",
+                    "next_action": "start `TextDecoder shared-byte snapshot only` in `rust2`; pair mutation pressure with a focused Miri/model proof of the byte-lifetime shape",
+                    "stop_line": "stop before broadening into unrelated unsafe sites"
+                },
+                "bun-ub-pr-body": {
+                    "audience": "upstream maintainer",
+                    "candidate_id": "R4R2-S001"
+                },
+                "bun-ub-ledger-note": {
+                    "audience": "Bun burndown ledger maintainer",
+                    "candidate_id": "R4R2-S001"
+                },
+                "bun-ub-review-map": {
+                    "audience": "reviewer deciding what to inspect first",
+                    "candidate_id": "R4R2-S001"
+                },
+                "bun-ub-next-pick": {
+                    "audience": "lane coordinator",
+                    "candidate_id": "R4R2-S001"
+                }
+            }
+        });
+
+        let err = check_tokmd_preset_inputs(
+            &entry,
+            &expected,
+            &manual_repair_queue_entry_projection(),
+            "tokmd-packets.json packets[0]",
+        )
+        .expect_err("stale generic stop line should fail tokmd handoff verification");
+
+        assert!(err.contains("stop_line"), "{err}");
+        assert!(err.contains("stop at PR aperture"), "{err}");
+        assert!(
+            err.contains(
+                "TextDecoder shared-byte snapshot only; do not rewrite unrelated encodings"
+            ),
+            "{err}"
+        );
     }
 
     #[test]
