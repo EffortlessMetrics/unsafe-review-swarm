@@ -1635,6 +1635,11 @@ fixtures = [
   "js_buffer_reentry_as_ptr_refetch_after_coercion_no_card",
   "js_buffer_reentry_async_options_before_capture_no_card",
   "js_buffer_reentry_async_recapture_after_reentry_no_card",
+  "js_buffer_stale_span_slice_index_after_reentry",
+  "js_buffer_stale_span_stale_detached_check",
+  "js_buffer_stale_span_refetch_before_use_no_card",
+  "js_buffer_stale_span_pinned_before_use_no_card",
+  "js_buffer_stale_span_use_before_reentry_no_card",
 ]
 dogfood_targets = []
 label_ledgers = [
@@ -1647,9 +1652,13 @@ ReviewCard for the listed sync compression getter or callback reentry, helper
 materialization, direct raw-parts materialization, and as_array_buffer before
 coerce_to_* materialization fixtures, including byte_slice, vector, and as_ptr
 materializers. The direct raw-parts fixture also retains the underlying
-raw-parts operation ReviewCard. The heuristic emits zero
-ReviewCards for the listed options-before-capture, post-reentry recapture, and
-post-coercion re-fetch controls, including vector and as_ptr refreshed-descriptor
+raw-parts operation ReviewCard. It also emits one advisory ReviewCard for the
+listed stale-span fixtures where a span is materialized before possible JS
+reentry and used afterward without re-fetch, re-validation, or pinning,
+including the stale pre-reentry is_detached check variant. The heuristic emits
+zero ReviewCards for the listed options-before-capture, post-reentry recapture,
+post-coercion re-fetch, stale-span re-fetch/pinning-before-use, and
+use-before-reentry controls, including vector and as_ptr refreshed-descriptor
 materialization controls.
 """
 forbidden_claims = [

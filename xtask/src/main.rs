@@ -6267,6 +6267,9 @@ fn is_fixture_operation_snippet_exception(path: &str, operation: &str) -> bool {
         || (normalized.contains("fixtures/js_buffer_reentry_")
             && operation
                 .starts_with("stable-byte-source-rab-async candidate; proof required: observable-red-green; RAB-backed JS buffer descriptor captured through async helper before possible JS reentry"))
+        || (normalized.contains("fixtures/js_buffer_stale_span_")
+            && operation
+                .starts_with("stable-byte-source-getter-reentry candidate; proof required: observable-red-green; JS-backed buffer span materialized before possible JS reentry"))
         || (normalized.contains("fixtures/stable_byte_sab_")
             && operation
                 .starts_with("stable-byte-source-sab-race candidate; proof required: mutation-plus-miri; shared JS backing reaches Rust/native borrowed-slice materialization before snapshot"))
