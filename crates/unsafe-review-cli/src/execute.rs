@@ -1,7 +1,8 @@
 use crate::command::{
-    CandidateCommand, CandidateImportOptions, CandidateListOptions, CandidateWitnessPlanOptions,
-    CheckOptions, Command, DiffInput, FirstPrOptions, Format, OutcomeOptions,
-    ReceiptTemplateOptions, RepoOptions, SavedOutputReceiptOptions,
+    CandidateCommand, CandidateImportOptions, CandidateLintOptions, CandidateListOptions,
+    CandidateNewOptions, CandidateWitnessPlanOptions, CheckOptions, Command, DiffInput,
+    FirstPrOptions, Format, OutcomeOptions, ReceiptTemplateOptions, RepoOptions,
+    SavedOutputReceiptOptions,
 };
 #[cfg(unix)]
 use signal_hook::consts::signal::{SIGINT, SIGTERM};
@@ -22,9 +23,10 @@ use unsafe_review_core::{
     WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze, analyze_with_discovery,
     analyze_with_discovery_and_repo_events, audit_witness_receipts, compare_outcome_json,
     discover_repo_files, evaluate_policy_report, evaluate_policy_report_from_output,
-    load_manual_candidates, manual_candidate_implementer_handoff, read_manual_candidate,
-    render_badge_jsons, render_comment_plan, render_github_summary, render_human, render_json,
-    render_lsp, render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
+    lint_manual_candidate_text, load_manual_candidates, manual_candidate_implementer_handoff,
+    new_manual_candidate_skeleton, read_manual_candidate, render_badge_jsons, render_comment_plan,
+    render_github_summary, render_human, render_json, render_lsp,
+    render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
     render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
     render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,
     render_repair_queue, render_sarif, render_witness_plan, validate_witness_receipts,
@@ -1447,10 +1449,74 @@ fn context(root: &Path, id: &str) -> Result<(), String> {
 
 fn candidate(command: CandidateCommand) -> Result<(), String> {
     match command {
+        CandidateCommand::New(options) => candidate_new(options),
         CandidateCommand::Import(options) => candidate_import(options),
+        CandidateCommand::Lint(options) => candidate_lint(options),
         CandidateCommand::List(options) => candidate_list(options),
         CandidateCommand::WitnessPlan(options) => candidate_witness_plan(options),
     }
+}
+
+fn candidate_new(options: CandidateNewOptions) -> Result<(), String> {
+    let candidate = new_manual_candidate_skeleton(&options.class, &options.id)?;
+    let rendered = candidate.to_pretty_json()?;
+    if let Some(out) = options.out {
+        ensure_parent_dir(&out)?;
+        fs::write(&out, rendered).map_err(|err| {
+            format!(
+                "write manual candidate skeleton {} failed: {err}",
+                out.display()
+            )
+        })?;
+        println!("wrote manual candidate skeleton: {}", out.display());
+        println!("id: {}", candidate.id);
+        println!("stable-byte class: {}", options.class);
+        println!("source: manual");
+        println!("manual_candidate: true");
+        println!(
+            "next: replace the TODO placeholders, then run `unsafe-review candidate lint {}` before `candidate import`.",
+            out.display()
+        );
+        println!(
+            "boundary: this skeleton is an authoring aid only; it is not analyzer discovery, not witness execution, not proof, and not policy gating."
+        );
+        println!("trust boundary: {}", candidate.trust_boundary);
+    } else {
+        print!("{rendered}");
+    }
+    Ok(())
+}
+
+fn candidate_lint(options: CandidateLintOptions) -> Result<(), String> {
+    let text = fs::read_to_string(&options.input).map_err(|err| {
+        format!(
+            "read manual candidate {} failed: {err}",
+            options.input.display()
+        )
+    })?;
+    let problems = lint_manual_candidate_text(&text);
+    if problems.is_empty() {
+        println!("candidate lint: ok");
+        println!(
+            "checked: manual-candidate/v1 schema, cross-field consistency, and TODO markers; nothing was imported or written."
+        );
+        println!(
+            "boundary: lint is advisory authoring validation only; it is not analyzer discovery, not witness execution, not proof of memory safety, not UB-free status, not Miri-clean status, not a site-execution claim, and not policy gating."
+        );
+        return Ok(());
+    }
+    let mut message = format!(
+        "candidate lint: {} problem(s) in {}",
+        problems.len(),
+        options.input.display()
+    );
+    for problem in &problems {
+        message.push_str(&format!("\n- {problem}"));
+    }
+    message.push_str(
+        "\nlint reports the first schema or cross-field error plus all TODO markers; nothing was imported or written.",
+    );
+    Err(message)
 }
 
 fn candidate_import(options: CandidateImportOptions) -> Result<(), String> {
@@ -2107,9 +2173,11 @@ fn print_help() {
     println!("  badges  [--root .] [--out badges]");
     println!("  explain [--root .] [--json|--format json] <card-id>");
     println!("  context [--root .] [--json|--format json] <card-id>");
+    println!("  candidate new --class <stable-byte-class> [--id R4R2-S000-TODO] [--out file]");
     println!(
         "  candidate import <manual-candidate.json> [--out .unsafe-review/candidates/<id>.json]"
     );
+    println!("  candidate lint <manual-candidate.json>");
     println!("  candidate list [--root .] [--format json|markdown] [--out file]");
     println!("  candidate witness-plan [--root .] <candidate-id> [--out file]");
     println!(
@@ -2228,8 +2296,12 @@ fn print_candidate_help() {
     println!();
     println!("Usage:");
     println!(
+        "  unsafe-review candidate new --class <stable-byte-class> [--id R4R2-S000-TODO] [--out file]"
+    );
+    println!(
         "  unsafe-review candidate import <manual-candidate.json> [--out .unsafe-review/candidates/<id>.json]"
     );
+    println!("  unsafe-review candidate lint <manual-candidate.json>");
     println!("  unsafe-review candidate list [--root .] [--format json|markdown] [--out file]");
     println!("  unsafe-review candidate witness-plan [--root .] <candidate-id> [--out file]");
     println!();
@@ -2246,13 +2318,35 @@ fn print_candidate_help() {
     println!();
     println!("Commands:");
     println!(
+        "- new emits a schema-correct manual-candidate skeleton for one stable-byte class with TODO placeholder text in free-text fields; cross-field consistency (class, proof mode, fix boundary, PR aperture) is pre-filled so only authoring content remains."
+    );
+    println!(
+        "- new accepts --class with one of: stable-byte-source-getter-reentry, stable-byte-source-rab-async, stable-byte-source-sab-race, stable-byte-source-helper-dependent, stable-byte-source-pathlike-live-view, stable-byte-source-native-ffi-read."
+    );
+    println!(
         "- import reads a manual candidate JSON file, validates it, and writes a canonical artifact."
+    );
+    println!(
+        "- lint validates a manual candidate file with the same schema and cross-field checks as import, without importing or writing anything, and also flags remaining TODO placeholder markers; it reports the first schema error plus all TODO markers."
+    );
+    println!(
+        "- lint exits 0 with `candidate lint: ok` when clean and exits nonzero listing the problems otherwise."
     );
     println!(
         "- list reports imported manual candidates from .unsafe-review/candidates without adding them to ReviewCard-only outputs."
     );
     println!(
         "- witness-plan renders the candidate's advisory witness-plan projection by candidate ID."
+    );
+    println!();
+    println!("Authoring flow:");
+    println!(
+        "  unsafe-review candidate new --class stable-byte-source-getter-reentry > draft.json"
+    );
+    println!("  # edit draft.json and replace every TODO placeholder");
+    println!("  unsafe-review candidate lint draft.json");
+    println!(
+        "  unsafe-review candidate import draft.json --out .unsafe-review/candidates/<id>.json"
     );
     println!();
     println!("After import:");
@@ -2269,6 +2363,9 @@ fn print_candidate_help() {
     println!("Trust boundary:");
     println!(
         "- Manual candidates are not analyzer-discovered findings, not proof of memory safety, not UB-free status, not Miri-clean status, not a site-execution claim unless a matching witness receipt says so, and not policy gating."
+    );
+    println!(
+        "- candidate new and candidate lint are authoring aids only: manual candidates remain manual/advisory with source `manual`, manual_candidate `true`, and analyzer_discovered `false`; a passing lint is not analyzer discovery, not witness execution, and not proof."
     );
     println!(
         "- unsafe-review does not execute witnesses, post comments, edit source, run an agent, or enforce blocking policy by default."

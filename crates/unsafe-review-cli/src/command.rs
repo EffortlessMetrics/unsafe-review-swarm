@@ -149,15 +149,29 @@ pub(crate) struct OutcomeOptions {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum CandidateCommand {
+    New(CandidateNewOptions),
     Import(CandidateImportOptions),
+    Lint(CandidateLintOptions),
     List(CandidateListOptions),
     WitnessPlan(CandidateWitnessPlanOptions),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct CandidateNewOptions {
+    pub class: String,
+    pub id: String,
+    pub out: Option<PathBuf>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct CandidateImportOptions {
     pub input: PathBuf,
     pub out: Option<PathBuf>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct CandidateLintOptions {
+    pub input: PathBuf,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

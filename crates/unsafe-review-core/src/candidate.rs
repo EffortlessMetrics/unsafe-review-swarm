@@ -4,7 +4,15 @@ use std::path::{Path, PathBuf};
 
 pub const MANUAL_CANDIDATE_SCHEMA_VERSION: &str = "manual-candidate/v1";
 pub const MANUAL_CANDIDATE_INDEX_SCHEMA_VERSION: &str = "manual-candidates/v1";
-const MANUAL_CANDIDATE_TRUST_BOUNDARY: &str = "manual candidate; not analyzer-discovered; not witness execution; not proof of memory safety; not UB-free status; not Miri-clean status; not site-execution proof; not policy readiness";
+pub const MANUAL_CANDIDATE_TRUST_BOUNDARY: &str = "manual candidate; not analyzer-discovered; not witness execution; not proof of memory safety; not UB-free status; not Miri-clean status; not site-execution proof; not policy readiness";
+pub const MANUAL_CANDIDATE_STABLE_BYTE_CLASSES: [&str; 6] = [
+    "stable-byte-source-getter-reentry",
+    "stable-byte-source-rab-async",
+    "stable-byte-source-sab-race",
+    "stable-byte-source-helper-dependent",
+    "stable-byte-source-pathlike-live-view",
+    "stable-byte-source-native-ffi-read",
+];
 const MANUAL_CANDIDATE_TRUST_BOUNDARY_PHRASES: [&str; 8] = [
     "manual candidate",
     "not analyzer-discovered",
@@ -291,6 +299,185 @@ pub fn read_manual_candidate(path: &Path) -> Result<ManualCandidate, String> {
     let text = fs::read_to_string(path)
         .map_err(|err| format!("read manual candidate {} failed: {err}", path.display()))?;
     ManualCandidate::from_json_str(&text)
+}
+
+/// Builds a schema-correct `manual-candidate/v1` authoring skeleton for one
+/// stable-byte class. Free-text fields carry `TODO` placeholder text for the
+/// author to replace, while every cross-field consistency rule the validator
+/// enforces (class vocabulary, `stable_byte.proof_required` ==
+/// `proof_mode.kind`, `fix_boundary` == `stable_byte.suggested_fix_boundary`,
+/// `pr_aperture` == `stable_byte.pr_aperture`, trust boundary phrases) is
+/// already satisfied. The skeleton is an authoring aid only: it is not
+/// analyzer discovery, not witness execution, not proof of memory safety,
+/// not UB-free status, not Miri-clean status, not a site-execution claim,
+/// and not policy gating.
+pub fn new_manual_candidate_skeleton(class: &str, id: &str) -> Result<ManualCandidate, String> {
+    if !is_known_stable_byte_class(class) {
+        return Err(format!(
+            "unknown stable-byte class `{class}`; valid classes: {}",
+            MANUAL_CANDIDATE_STABLE_BYTE_CLASSES.join(", ")
+        ));
+    }
+    validate_candidate_id(id)?;
+    let proof = canonical_stable_byte_proof(class);
+    let fix_boundary =
+        "TODO: state the smallest byte-stability fix boundary to try first".to_string();
+    let pr_aperture =
+        "TODO: state the intended upstream PR scope and explicit stop line".to_string();
+    let candidate = ManualCandidate {
+        schema_version: MANUAL_CANDIDATE_SCHEMA_VERSION.to_string(),
+        id: id.to_string(),
+        title: "TODO: one-line title for this manual candidate".to_string(),
+        location: ManualCandidateLocation {
+            file: PathBuf::from("TODO/replace/with/source/file.rs"),
+            line: 1,
+        },
+        operation_family: "TODO: operation family, e.g. raw_pointer_read".to_string(),
+        unsafe_operation: "TODO: name the unsafe operation at the sink".to_string(),
+        invariant: "TODO: describe the invariant at risk".to_string(),
+        safe_caller: "TODO: describe the safe caller route that reaches the sink".to_string(),
+        oracle_map: Some(ManualCandidateOracleMap {
+            rust_seam: "TODO: name the Rust seam, e.g. src/file.rs::function".to_string(),
+            oracle_language: "TODO: oracle language, e.g. typescript".to_string(),
+            oracle_path: PathBuf::from("TODO/replace/with/oracle/test/path"),
+            oracle_kind: "TODO: describe the oracle kind".to_string(),
+            coverage_confidence: "candidate-local".to_string(),
+            limitation:
+                "oracle map only; not witness execution, site-execution proof, or memory-safety proof"
+                    .to_string(),
+        }),
+        stable_byte: Some(ManualCandidateStableByte {
+            class: class.to_string(),
+            source: "TODO: describe the concrete caller-visible byte source".to_string(),
+            sink: "TODO: describe the Rust/native seam that reads or retains the bytes"
+                .to_string(),
+            hazard: "TODO: describe the candidate-specific stable-byte invariant at risk"
+                .to_string(),
+            observable: proof.observable.to_string(),
+            proof_required: proof.kind.to_string(),
+            suggested_fix_boundary: fix_boundary.clone(),
+            pr_aperture: pr_aperture.clone(),
+            ledger_state: "handoff-ready".to_string(),
+        }),
+        proof_mode: Some(ManualCandidateProofMode {
+            kind: proof.kind.to_string(),
+            system_bun_expected: proof.system_bun_expected.to_string(),
+            mutation_required: proof.mutation_required,
+            miri_required: proof.miri_required,
+        }),
+        fix_boundary: Some(fix_boundary),
+        pr_aperture: Some(pr_aperture),
+        evidence: vec![ManualCandidateEvidence {
+            kind: "source_trace".to_string(),
+            path: Some(PathBuf::from("TODO/replace/with/source/file.rs")),
+            summary: Some(
+                "TODO: summarize the manual route trace for the primary file:line".to_string(),
+            ),
+            command: Some(
+                "rg -n \"TODO: route pattern\" TODO/replace/with/source/file.rs".to_string(),
+            ),
+            limitation: Some(
+                "source trace only; does not prove the safe caller route executed or that the candidate is fixed"
+                    .to_string(),
+            ),
+        }],
+        fix_options: vec!["TODO: describe the smallest candidate-local fix option".to_string()],
+        test_targets: vec![
+            "TODO: list a test or witness target that validates the candidate-local change"
+                .to_string(),
+        ],
+        do_not_touch: vec![
+            "TODO: name a non-goal that stays out of the candidate-local change".to_string(),
+        ],
+        trust_boundary: MANUAL_CANDIDATE_TRUST_BOUNDARY.to_string(),
+        source: manual_source(),
+        manual_candidate: true,
+        analyzer_discovered: false,
+    };
+    candidate.validate()?;
+    Ok(candidate)
+}
+
+struct CanonicalStableByteProof {
+    kind: &'static str,
+    system_bun_expected: &'static str,
+    mutation_required: bool,
+    miri_required: bool,
+    observable: &'static str,
+}
+
+fn canonical_stable_byte_proof(class: &str) -> CanonicalStableByteProof {
+    match class {
+        "stable-byte-source-sab-race" => CanonicalStableByteProof {
+            kind: "mutation-plus-miri",
+            system_bun_expected: "nondiscriminating",
+            mutation_required: true,
+            miri_required: true,
+            observable: "no",
+        },
+        "stable-byte-source-helper-dependent" => CanonicalStableByteProof {
+            kind: "helper-gated",
+            system_bun_expected: "nondiscriminating",
+            mutation_required: false,
+            miri_required: false,
+            observable: "helper-gated",
+        },
+        _ => CanonicalStableByteProof {
+            kind: "observable-red-green",
+            system_bun_expected: "fail",
+            mutation_required: true,
+            miri_required: false,
+            observable: "yes",
+        },
+    }
+}
+
+/// Lints manual candidate JSON text without importing or writing anything.
+/// It reports the first schema or cross-field error from the same validation
+/// path `candidate import` uses, plus every remaining `TODO` placeholder
+/// marker found in string fields. An empty result means the text would import
+/// cleanly. Lint is advisory authoring validation only: it is not analyzer
+/// discovery, not witness execution, not proof of memory safety, not UB-free
+/// status, not Miri-clean status, not a site-execution claim, and not policy
+/// gating.
+pub fn lint_manual_candidate_text(text: &str) -> Vec<String> {
+    let mut problems = Vec::new();
+    if let Err(err) = ManualCandidate::from_json_str(text) {
+        problems.push(format!(
+            "schema: {err} (first schema or cross-field error only; fix it and lint again)"
+        ));
+    }
+    if let Ok(value) = serde_json::from_str::<serde_json::Value>(text) {
+        collect_todo_findings(&value, "", &mut problems);
+    }
+    problems
+}
+
+fn collect_todo_findings(value: &serde_json::Value, path: &str, problems: &mut Vec<String>) {
+    match value {
+        serde_json::Value::String(text) if text.contains("TODO") => {
+            let field = if path.is_empty() { "<document>" } else { path };
+            problems.push(format!(
+                "todo: `{field}` still contains TODO placeholder text"
+            ));
+        }
+        serde_json::Value::Array(items) => {
+            for (idx, item) in items.iter().enumerate() {
+                collect_todo_findings(item, &format!("{path}[{idx}]"), problems);
+            }
+        }
+        serde_json::Value::Object(object) => {
+            for (key, item) in object {
+                let child = if path.is_empty() {
+                    key.clone()
+                } else {
+                    format!("{path}.{key}")
+                };
+                collect_todo_findings(item, &child, problems);
+            }
+        }
+        _ => {}
+    }
 }
 
 pub fn load_manual_candidate(root: &Path, id: &str) -> Result<Option<ManualCandidate>, String> {
@@ -768,15 +955,7 @@ fn is_known_system_bun_expected(value: &str) -> bool {
 }
 
 fn is_known_stable_byte_class(value: &str) -> bool {
-    matches!(
-        value,
-        "stable-byte-source-rab-async"
-            | "stable-byte-source-sab-race"
-            | "stable-byte-source-getter-reentry"
-            | "stable-byte-source-helper-dependent"
-            | "stable-byte-source-pathlike-live-view"
-            | "stable-byte-source-native-ffi-read"
-    )
+    MANUAL_CANDIDATE_STABLE_BYTE_CLASSES.contains(&value)
 }
 
 fn is_known_stable_byte_observable(value: &str) -> bool {
@@ -1098,6 +1277,102 @@ mod tests {
         assert!(witness_plan.contains("Do not touch"));
         assert!(witness_plan.contains("command `bun test"));
         Ok(())
+    }
+
+    #[test]
+    fn manual_candidate_skeleton_is_structurally_valid_for_every_stable_byte_class()
+    -> Result<(), String> {
+        for class in MANUAL_CANDIDATE_STABLE_BYTE_CLASSES {
+            let skeleton = new_manual_candidate_skeleton(class, "R4R2-S000-TODO")?;
+            let rendered = skeleton.to_pretty_json()?;
+            let reparsed = ManualCandidate::from_json_str(&rendered)
+                .map_err(|err| format!("skeleton for `{class}` failed validation: {err}"))?;
+
+            assert_eq!(reparsed.source, "manual");
+            assert!(reparsed.manual_candidate);
+            assert!(!reparsed.analyzer_discovered);
+            let stable_byte = reparsed.stable_byte.as_ref().ok_or("missing stable_byte")?;
+            assert_eq!(stable_byte.class, class);
+            let proof_mode = reparsed.proof_mode.as_ref().ok_or("missing proof_mode")?;
+            assert_eq!(stable_byte.proof_required, proof_mode.kind);
+            assert_eq!(
+                Some(stable_byte.suggested_fix_boundary.as_str()),
+                reparsed.fix_boundary.as_deref()
+            );
+            assert_eq!(
+                Some(stable_byte.pr_aperture.as_str()),
+                reparsed.pr_aperture.as_deref()
+            );
+
+            let problems = lint_manual_candidate_text(&rendered);
+            assert!(
+                !problems.is_empty(),
+                "skeleton for `{class}` should keep TODO lint findings"
+            );
+            for problem in &problems {
+                assert!(
+                    problem.starts_with("todo:"),
+                    "skeleton for `{class}` should only have TODO findings, got `{problem}`"
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn manual_candidate_skeleton_rejects_unknown_class_listing_valid_classes() {
+        let err = match new_manual_candidate_skeleton("stable-byte-source-unknown", "R4R2-S000") {
+            Ok(_) => "skeleton unexpectedly accepted unknown class".to_string(),
+            Err(err) => err,
+        };
+
+        assert!(err.contains("unknown stable-byte class"), "{err}");
+        for class in MANUAL_CANDIDATE_STABLE_BYTE_CLASSES {
+            assert!(err.contains(class), "{err} missing {class}");
+        }
+    }
+
+    #[test]
+    fn lint_manual_candidate_text_is_clean_for_valid_candidate() {
+        let problems = lint_manual_candidate_text(example_json());
+
+        assert!(problems.is_empty(), "{problems:?}");
+    }
+
+    #[test]
+    fn lint_manual_candidate_text_reports_schema_error_and_all_todo_markers() {
+        let dirty = example_json()
+            .replace(
+                "\"proof_required\": \"mutation-plus-miri\"",
+                "\"proof_required\": \"observable-red-green\"",
+            )
+            .replace(
+                "\"invariant\": \"&[u8] memory must not be concurrently mutated\"",
+                "\"invariant\": \"TODO: describe the invariant at risk\"",
+            )
+            .replace(
+                "\"title\": \"TextDecoder SharedArrayBuffer decode creates &[u8] over shared bytes\"",
+                "\"title\": \"TODO: one-line title\"",
+            );
+
+        let problems = lint_manual_candidate_text(&dirty);
+
+        let rendered = problems.join("\n");
+        assert!(
+            rendered.contains("schema: ") && rendered.contains("stable_byte.proof_required"),
+            "{rendered}"
+        );
+        assert!(rendered.contains("todo: `invariant`"), "{rendered}");
+        assert!(rendered.contains("todo: `title`"), "{rendered}");
+        assert_eq!(problems.len(), 3, "{rendered}");
+    }
+
+    #[test]
+    fn lint_manual_candidate_text_reports_unparseable_json_once() {
+        let problems = lint_manual_candidate_text("{ not json");
+
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].starts_with("schema: "), "{problems:?}");
     }
 
     fn example_json() -> &'static str {

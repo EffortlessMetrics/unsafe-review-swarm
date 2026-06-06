@@ -28,10 +28,12 @@ pub use api::{
     validate_witness_receipts,
 };
 pub use candidate::{
-    MANUAL_CANDIDATE_SCHEMA_VERSION, ManualCandidate, ManualCandidateEvidence,
-    ManualCandidateLocation, ManualCandidateProofMode, ManualCandidateStableByte,
-    load_manual_candidate, load_manual_candidates, manual_candidate_implementer_handoff,
-    manual_candidate_path, read_manual_candidate, render_manual_candidate_context,
+    MANUAL_CANDIDATE_SCHEMA_VERSION, MANUAL_CANDIDATE_STABLE_BYTE_CLASSES,
+    MANUAL_CANDIDATE_TRUST_BOUNDARY, ManualCandidate, ManualCandidateEvidence,
+    ManualCandidateLocation, ManualCandidateOracleMap, ManualCandidateProofMode,
+    ManualCandidateStableByte, lint_manual_candidate_text, load_manual_candidate,
+    load_manual_candidates, manual_candidate_implementer_handoff, manual_candidate_path,
+    new_manual_candidate_skeleton, read_manual_candidate, render_manual_candidate_context,
     render_manual_candidate_explain, render_manual_candidate_witness_plan,
 };
 pub use domain::{

@@ -994,6 +994,164 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
 }
 
 #[test]
+fn candidate_new_skeleton_is_schema_correct_but_fails_lint_on_todos() -> Result<(), Box<dyn Error>>
+{
+    let temp = TempDir::new("unsafe-review-candidate-new-e2e")?;
+    let draft = temp.path().join("draft-candidate.json");
+
+    let new = run_success([
+        os("candidate"),
+        os("new"),
+        os("--class"),
+        os("stable-byte-source-getter-reentry"),
+        os("--out"),
+        draft.as_os_str().to_os_string(),
+    ])?;
+    let new_stdout = stdout_text(&new)?;
+    assert!(new_stdout.contains("wrote manual candidate skeleton"));
+    assert!(new_stdout.contains("id: R4R2-S000-TODO"));
+    assert!(new_stdout.contains("stable-byte class: stable-byte-source-getter-reentry"));
+    assert!(new_stdout.contains("source: manual"));
+    assert!(new_stdout.contains("not analyzer discovery"));
+
+    let skeleton = parse_json(&fs::read_to_string(&draft)?)?;
+    assert_eq!(skeleton["schema_version"], "manual-candidate/v1");
+    assert_eq!(skeleton["source"], "manual");
+    assert_eq!(skeleton["manual_candidate"], true);
+    assert_eq!(skeleton["analyzer_discovered"], false);
+    assert_eq!(
+        skeleton["stable_byte"]["class"],
+        "stable-byte-source-getter-reentry"
+    );
+    assert_eq!(
+        skeleton["stable_byte"]["proof_required"],
+        skeleton["proof_mode"]["kind"]
+    );
+    assert_eq!(
+        skeleton["stable_byte"]["suggested_fix_boundary"],
+        skeleton["fix_boundary"]
+    );
+    assert_eq!(
+        skeleton["stable_byte"]["pr_aperture"],
+        skeleton["pr_aperture"]
+    );
+    assert!(
+        skeleton["invariant"]
+            .as_str()
+            .unwrap_or("")
+            .contains("TODO")
+    );
+
+    // The skeleton passes the structural import validation; only the TODO
+    // markers keep it from being a finished authoring packet.
+    let imported = temp.path().join("imported-skeleton.json");
+    run_success([
+        os("candidate"),
+        os("import"),
+        draft.as_os_str().to_os_string(),
+        os("--out"),
+        imported.as_os_str().to_os_string(),
+    ])?;
+
+    let lint = run_failure([
+        os("candidate"),
+        os("lint"),
+        draft.as_os_str().to_os_string(),
+    ])?;
+    assert_eq!(lint.status.code(), Some(2));
+    let lint_stderr = String::from_utf8_lossy(&lint.stderr).to_string();
+    assert!(
+        lint_stderr.contains("candidate lint:"),
+        "stderr should name candidate lint: {lint_stderr}"
+    );
+    assert!(
+        lint_stderr.contains("todo: `title` still contains TODO placeholder text"),
+        "stderr should flag the title TODO: {lint_stderr}"
+    );
+    assert!(
+        lint_stderr.contains("todo: `invariant`"),
+        "stderr should flag the invariant TODO: {lint_stderr}"
+    );
+    assert!(
+        !lint_stderr.contains("schema: "),
+        "skeleton should have no schema problems: {lint_stderr}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn candidate_lint_accepts_all_committed_manual_candidate_examples() -> Result<(), Box<dyn Error>> {
+    let dir = manual_candidate_examples_dir();
+    let mut linted = 0usize;
+    for entry in fs::read_dir(&dir)? {
+        let path = entry?.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+            continue;
+        }
+        let lint = run_success([os("candidate"), os("lint"), path.as_os_str().to_os_string()])?;
+        let stdout = stdout_text(&lint)?;
+        assert!(
+            stdout.contains("candidate lint: ok"),
+            "{} should lint clean: {stdout}",
+            path.display()
+        );
+        assert!(
+            stdout.contains("not analyzer discovery"),
+            "{} lint output should keep the advisory boundary: {stdout}",
+            path.display()
+        );
+        linted += 1;
+    }
+    assert!(linted > 0, "no committed manual candidate examples found");
+
+    Ok(())
+}
+
+#[test]
+fn candidate_lint_reports_cross_field_and_todo_problems() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-candidate-lint-e2e")?;
+    let example =
+        manual_candidate_examples_dir().join("candidate7-sync-compression-getter-reentry.json");
+    let dirty = fs::read_to_string(&example)?
+        .replacen(
+            "\"proof_required\": \"observable-red-green\"",
+            "\"proof_required\": \"mutation-plus-miri\"",
+            1,
+        )
+        .replacen(
+            "\"invariant\": \"Sync compression must not read bytes",
+            "\"invariant\": \"TODO: describe the invariant at risk",
+            1,
+        );
+    let dirty_path = temp.path().join("dirty-candidate.json");
+    fs::write(&dirty_path, dirty)?;
+
+    let lint = run_failure([
+        os("candidate"),
+        os("lint"),
+        dirty_path.as_os_str().to_os_string(),
+    ])?;
+
+    assert_eq!(lint.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&lint.stderr).to_string();
+    assert!(
+        stderr.contains("schema: ") && stderr.contains("stable_byte.proof_required"),
+        "stderr should report the cross-field drift: {stderr}"
+    );
+    assert!(
+        stderr.contains("todo: `invariant` still contains TODO placeholder text"),
+        "stderr should report the TODO marker: {stderr}"
+    );
+    assert!(
+        stderr.contains("nothing was imported or written"),
+        "stderr should state lint imports nothing: {stderr}"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn manual_candidate_list_reports_imported_advisory_ledger() -> Result<(), Box<dyn Error>> {
     let temp = TempDir::new("unsafe-review-manual-candidate-list-e2e")?;
     let candidate_dir = temp.path().join(".unsafe-review/candidates");
@@ -5784,8 +5942,11 @@ fn fixture_root(name: &str) -> PathBuf {
 }
 
 fn manual_candidate_example_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../docs/examples/manual-candidates/textdecoder-sab.json")
+    manual_candidate_examples_dir().join("textdecoder-sab.json")
+}
+
+fn manual_candidate_examples_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../docs/examples/manual-candidates")
 }
 
 fn os(value: &str) -> OsString {

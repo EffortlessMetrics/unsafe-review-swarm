@@ -275,6 +275,42 @@ fixture-backed examples of repair-ready and human-review-only packets.
 
 ## Manual Candidates
 
+Author a new manual candidate skeleton and lint it before import:
+
+```bash
+unsafe-review candidate new --class stable-byte-source-getter-reentry > draft.json
+# edit draft.json and replace every TODO placeholder with real route content
+unsafe-review candidate lint draft.json
+unsafe-review candidate import draft.json --out .unsafe-review/candidates/<id>.json
+```
+
+`candidate new` emits a schema-correct `manual-candidate/v1` skeleton for one
+stable-byte class (`stable-byte-source-getter-reentry`,
+`stable-byte-source-rab-async`, `stable-byte-source-sab-race`,
+`stable-byte-source-helper-dependent`, `stable-byte-source-pathlike-live-view`,
+or `stable-byte-source-native-ffi-read`). Free-text fields carry clearly marked
+`TODO` placeholder text, while the cross-field consistency the importer
+validates is already correct for the chosen class: `stable_byte.class` matches
+`--class`, `stable_byte.proof_required` matches the class-canonical
+`proof_mode.kind`, `fix_boundary` matches `stable_byte.suggested_fix_boundary`,
+and `pr_aperture` matches `stable_byte.pr_aperture`. `--id` defaults to
+`R4R2-S000-TODO` and `--out` writes the skeleton instead of printing it.
+
+`candidate lint` runs the same schema and cross-field validation as
+`candidate import` without importing or writing anything, and additionally
+flags any remaining `TODO` markers in string fields. It reports the first
+schema or cross-field error plus all TODO markers, exits `0` with
+`candidate lint: ok` when clean, and exits `2` listing the problems otherwise.
+A fresh skeleton passes the structural import validation but fails lint until
+its TODO placeholders are replaced.
+
+`candidate new` and `candidate lint` are authoring aids only. The skeleton and
+a passing lint keep `source = "manual"`, `manual_candidate = true`, and
+`analyzer_discovered = false`; they are not analyzer discovery, not witness
+execution, not proof of memory safety, not UB-free status, not Miri-clean
+status, not a site-execution claim, not calibrated precision/recall, and not
+policy gating.
+
 Import a manually discovered advisory candidate:
 
 ```bash

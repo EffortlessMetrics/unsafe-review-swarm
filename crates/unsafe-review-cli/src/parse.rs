@@ -1,9 +1,12 @@
 use crate::command::{
-    CandidateCommand, CandidateImportOptions, CandidateListOptions, CandidateWitnessPlanOptions,
-    CheckOptions, Command, DiffInput, FirstPrOptions, Format, OutcomeOptions, RepoOptions,
+    CandidateCommand, CandidateImportOptions, CandidateLintOptions, CandidateListOptions,
+    CandidateNewOptions, CandidateWitnessPlanOptions, CheckOptions, Command, DiffInput,
+    FirstPrOptions, Format, OutcomeOptions, RepoOptions,
 };
 use std::path::PathBuf;
-use unsafe_review_core::PolicyMode;
+use unsafe_review_core::{MANUAL_CANDIDATE_STABLE_BYTE_CLASSES, PolicyMode};
+
+const DEFAULT_CANDIDATE_SKELETON_ID: &str = "R4R2-S000-TODO";
 
 mod check_parse;
 mod confirm;
@@ -66,11 +69,77 @@ fn parse_candidate(args: Vec<String>) -> Result<CandidateCommand, String> {
     };
     let rest = rest.collect::<Vec<_>>();
     match subcommand.as_str() {
+        "new" => parse_candidate_new(rest).map(CandidateCommand::New),
         "import" => parse_candidate_import(rest).map(CandidateCommand::Import),
+        "lint" => parse_candidate_lint(rest).map(CandidateCommand::Lint),
         "list" => parse_candidate_list(rest).map(CandidateCommand::List),
         "witness-plan" => parse_candidate_witness_plan(rest).map(CandidateCommand::WitnessPlan),
         other => Err(format!("unknown candidate subcommand `{other}`")),
     }
+}
+
+fn parse_candidate_new(args: Vec<String>) -> Result<CandidateNewOptions, String> {
+    let mut class: Option<String> = None;
+    let mut id = DEFAULT_CANDIDATE_SKELETON_ID.to_string();
+    let mut out = None;
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--class" => {
+                idx += 1;
+                class = Some(value(&args, idx, "--class")?.to_string());
+            }
+            arg if arg.starts_with("--class=") => {
+                class = Some(inline_value(arg, "--class")?.to_string());
+            }
+            "--id" => {
+                idx += 1;
+                id = value(&args, idx, "--id")?.to_string();
+            }
+            arg if arg.starts_with("--id=") => {
+                id = inline_value(arg, "--id")?.to_string();
+            }
+            "--out" => {
+                idx += 1;
+                out = Some(parse_path_value(&args, idx, "--out")?);
+            }
+            arg if arg.starts_with("--out=") => {
+                out = Some(parse_inline_path_value(arg, "--out")?);
+            }
+            other => return Err(format!("unknown candidate new argument `{other}`")),
+        }
+        idx += 1;
+    }
+    let class = class.ok_or_else(|| {
+        format!(
+            "missing --class; valid stable-byte classes: {}",
+            MANUAL_CANDIDATE_STABLE_BYTE_CLASSES.join(", ")
+        )
+    })?;
+    if !MANUAL_CANDIDATE_STABLE_BYTE_CLASSES.contains(&class.as_str()) {
+        return Err(format!(
+            "unknown stable-byte class `{class}`; valid classes: {}",
+            MANUAL_CANDIDATE_STABLE_BYTE_CLASSES.join(", ")
+        ));
+    }
+    Ok(CandidateNewOptions { class, id, out })
+}
+
+fn parse_candidate_lint(args: Vec<String>) -> Result<CandidateLintOptions, String> {
+    let mut input: Option<PathBuf> = None;
+    for arg in &args {
+        match arg.as_str() {
+            value if value.starts_with('-') => {
+                return Err(format!("unknown candidate lint argument `{value}`"));
+            }
+            value => {
+                set_single_path(&mut input, value, "manual candidate input")?;
+            }
+        }
+    }
+    Ok(CandidateLintOptions {
+        input: input.ok_or_else(|| "missing manual candidate input".to_string())?,
+    })
 }
 
 fn parse_candidate_import(args: Vec<String>) -> Result<CandidateImportOptions, String> {
@@ -769,6 +838,141 @@ mod tests {
         };
         assert_eq!(options.format, Format::GithubSummary);
         Ok(())
+    }
+
+    #[test]
+    fn parses_candidate_new_command() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "candidate",
+            "new",
+            "--class",
+            "stable-byte-source-getter-reentry",
+            "--id=R4R2-S010",
+            "--out",
+            "target/draft-candidate.json",
+        ]))?;
+
+        let Command::Candidate(CandidateCommand::New(options)) = command else {
+            return Err("expected candidate new command".to_string());
+        };
+        assert_eq!(options.class, "stable-byte-source-getter-reentry");
+        assert_eq!(options.id, "R4R2-S010");
+        assert_eq!(
+            options.out,
+            Some(PathBuf::from("target/draft-candidate.json"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn candidate_new_defaults_skeleton_id() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "candidate",
+            "new",
+            "--class=stable-byte-source-sab-race",
+        ]))?;
+
+        let Command::Candidate(CandidateCommand::New(options)) = command else {
+            return Err("expected candidate new command".to_string());
+        };
+        assert_eq!(options.class, "stable-byte-source-sab-race");
+        assert_eq!(options.id, "R4R2-S000-TODO");
+        assert_eq!(options.out, None);
+        Ok(())
+    }
+
+    #[test]
+    fn candidate_new_rejects_unknown_class_listing_valid_classes() {
+        let command = parse(args([
+            "unsafe-review",
+            "candidate",
+            "new",
+            "--class",
+            "stable-byte-source-unknown",
+        ]));
+
+        let err = command.err().unwrap_or_default();
+        assert!(
+            err.contains("unknown stable-byte class `stable-byte-source-unknown`"),
+            "{err}"
+        );
+        for class in MANUAL_CANDIDATE_STABLE_BYTE_CLASSES {
+            assert!(err.contains(class), "{err} missing {class}");
+        }
+    }
+
+    #[test]
+    fn candidate_new_requires_class() {
+        let command = parse(args(["unsafe-review", "candidate", "new"]));
+
+        let err = command.err().unwrap_or_default();
+        assert!(err.contains("missing --class"), "{err}");
+        assert!(err.contains("stable-byte-source-getter-reentry"), "{err}");
+    }
+
+    #[test]
+    fn candidate_new_rejects_unknown_arguments() {
+        let command = parse(args([
+            "unsafe-review",
+            "candidate",
+            "new",
+            "--class=stable-byte-source-sab-race",
+            "--format=json",
+        ]));
+
+        assert_eq!(
+            command,
+            Err("unknown candidate new argument `--format=json`".to_string())
+        );
+    }
+
+    #[test]
+    fn parses_candidate_lint_command() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "candidate", "lint", "draft.json"]))?;
+
+        assert_eq!(
+            command,
+            Command::Candidate(CandidateCommand::Lint(CandidateLintOptions {
+                input: PathBuf::from("draft.json"),
+            }))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn candidate_lint_requires_input_file() {
+        let command = parse(args(["unsafe-review", "candidate", "lint"]));
+
+        assert_eq!(command, Err("missing manual candidate input".to_string()));
+    }
+
+    #[test]
+    fn candidate_lint_rejects_extra_inputs_and_flags() {
+        let extra = parse(args([
+            "unsafe-review",
+            "candidate",
+            "lint",
+            "draft.json",
+            "other.json",
+        ]));
+        let flag = parse(args([
+            "unsafe-review",
+            "candidate",
+            "lint",
+            "--out",
+            "draft.json",
+        ]));
+
+        assert_eq!(
+            extra,
+            Err("expected exactly one manual candidate input".to_string())
+        );
+        assert_eq!(
+            flag,
+            Err("unknown candidate lint argument `--out`".to_string())
+        );
     }
 
     #[test]
