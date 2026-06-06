@@ -1,0 +1,42 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,38 @@
++pub struct JSValue;
++pub struct GlobalObject;
++pub struct Options;
++pub struct ArrayBuffer;
++
++impl ArrayBuffer {
++    pub fn as_array_buffer(_global: &mut GlobalObject, _value: JSValue) -> Result<Self, ()> {
++        Ok(Self)
++    }
++
++    pub fn byte_slice(&self) -> &[u8] {
++        &[]
++    }
++
++    pub fn is_detached(&self) -> bool {
++        false
++    }
++}
++
++impl Options {
++    pub fn get(&self, _global: &mut GlobalObject, _name: &str) -> Result<i32, ()> {
++        Ok(1)
++    }
++}
++
++pub fn read_after_options(
++    global: &mut GlobalObject,
++    arg0: JSValue,
++    options: Options,
++) -> Result<usize, ()> {
++    let buffer = ArrayBuffer::as_array_buffer(global, arg0)?;
++    let bytes = buffer.byte_slice();
++    let offset = options.get(global, "offset")?;
++    if buffer.is_detached() {
++        return Err(());
++    }
++    Ok(bytes[offset as usize] as usize)
++}

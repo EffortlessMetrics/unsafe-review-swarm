@@ -45,16 +45,17 @@ jobs:
             echo "router_reason=fork_pr" >> "$GITHUB_OUTPUT"
             echo "router_error=false" >> "$GITHUB_OUTPUT"
             echo "fallback_allowed=true" >> "$GITHUB_OUTPUT"
-            echo "fallback_mode=tiny" >> "$GITHUB_OUTPUT"
+            echo "fallback_mode=full" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           LABELS='${{ toJson(github.event.pull_request.labels.*.name) }}'
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            FALLBACK_ALLOWED=true
-          elif jq -e 'index("allow-github-hosted") or index("ci-budget-ack") or index("full-ci")' <<<"$LABELS" >/dev/null 2>&1; then
-            FALLBACK_ALLOWED=true
-          else
+          # GitHub-hosted full fallback is the default when self-hosted capacity
+          # or the runner token is unavailable. The no-github-fallback label is
+          # the explicit budget opt-out that routes to blocked instead.
+          if jq -e 'index("no-github-fallback")' <<<"$LABELS" >/dev/null 2>&1; then
             FALLBACK_ALLOWED=false
+          else
+            FALLBACK_ALLOWED=true
           fi
           if [[ -z "${GH_TOKEN:-}" ]]; then
             echo "router_reason=runner_token_missing" >> "$GITHUB_OUTPUT"
@@ -62,7 +63,7 @@ jobs:
             if [[ "$FALLBACK_ALLOWED" == "true" ]]; then
               echo "router_target=github" >> "$GITHUB_OUTPUT"
               echo "fallback_allowed=true" >> "$GITHUB_OUTPUT"
-              echo "fallback_mode=tiny" >> "$GITHUB_OUTPUT"
+              echo "fallback_mode=full" >> "$GITHUB_OUTPUT"
             else
               echo "router_target=blocked" >> "$GITHUB_OUTPUT"
               echo "fallback_allowed=false" >> "$GITHUB_OUTPUT"
@@ -84,7 +85,7 @@ jobs:
             if [[ "$FALLBACK_ALLOWED" == "true" ]]; then
               echo "router_target=github" >> "$GITHUB_OUTPUT"
               echo "fallback_allowed=true" >> "$GITHUB_OUTPUT"
-              echo "fallback_mode=tiny" >> "$GITHUB_OUTPUT"
+              echo "fallback_mode=full" >> "$GITHUB_OUTPUT"
             else
               echo "router_target=blocked" >> "$GITHUB_OUTPUT"
               echo "fallback_allowed=false" >> "$GITHUB_OUTPUT"
@@ -121,7 +122,7 @@ jobs:
             if [[ "$FALLBACK_ALLOWED" == "true" ]]; then
               echo "router_target=github" >> "$GITHUB_OUTPUT"
               echo "fallback_allowed=true" >> "$GITHUB_OUTPUT"
-              echo "fallback_mode=tiny" >> "$GITHUB_OUTPUT"
+              echo "fallback_mode=full" >> "$GITHUB_OUTPUT"
             else
               echo "router_target=blocked" >> "$GITHUB_OUTPUT"
               echo "fallback_allowed=false" >> "$GITHUB_OUTPUT"
@@ -213,18 +214,21 @@ jobs:
         run: cargo run --locked -p xtask -- check-pr
 
   rust-small-github:
-    name: Rust Tiny Fallback on GitHub Hosted
+    name: Rust Small Fallback on GitHub Hosted
     needs: route-rust-small
     if: needs.route-rust-small.outputs.router_target == 'github' && needs.route-rust-small.outputs.fallback_allowed == 'true'
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      - name: Run tiny fallback gate
-        run: cargo check --workspace --locked --all-targets
+      - name: Run full fallback gate
+        run: cargo run --locked -p xtask -- check-pr
 
   rust-small-blocked:
     name: Rust Small Blocked (capacity/config)
@@ -235,8 +239,10 @@ jobs:
       - name: Explain blocked route
         run: |
           echo "Route blocked with reason: ${{ needs.route-rust-small.outputs.router_reason }}"
-          echo "No GitHub-hosted full fallback is allowed by default."
-          echo "Add label allow-github-hosted, ci-budget-ack, or full-ci to permit tiny fallback."
+          echo "The no-github-fallback label is set, so the default full"
+          echo "GitHub-hosted fallback was suppressed for this pull request."
+          echo "Remove the no-github-fallback label to run the full gate on"
+          echo "GitHub-hosted runners, or restore self-hosted capacity."
           exit 1
 
   rust-small-result:

@@ -98,6 +98,64 @@ label_source = "fixture_golden"
 rationale = "A same-owner JS ArrayBuffer descriptor captured with as_array_buffer before user-JS coercion and materialized afterward through as_ptr should stay an advisory stable-byte ReviewCard with observable-red-green proof-path wording."
 
 [[samples]]
+id = "js-buffer-stale-span-slice-index-after-reentry-emits-advisory-card"
+fixture = "js_buffer_stale_span_slice_index_after_reentry"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "stable_byte_source_getter_reentry"
+expected_hazard = "stable_byte_source"
+expected_owner = "index_of_line"
+expected_site_kind = "operation"
+expected_obligation_key = "byte-stability"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A same-owner JS-backed buffer span materialized before options getter reentry and indexed afterward without re-fetch, re-validation, or pinning should stay an advisory stable-byte ReviewCard at the stale use site."
+
+[[samples]]
+id = "js-buffer-stale-span-stale-detached-check-emits-advisory-card"
+fixture = "js_buffer_stale_span_stale_detached_check"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "stable_byte_source_getter_reentry"
+expected_hazard = "stable_byte_source"
+expected_owner = "read_after_options"
+expected_site_kind = "operation"
+expected_obligation_key = "byte-stability"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "An is_detached check against the pre-reentry snapshot does not re-validate the span; the stale use should stay an advisory stable-byte ReviewCard that names the stale guard in the operation expression."
+
+[[samples]]
+id = "js-buffer-stale-span-refetch-before-use-emits-no-card"
+fixture = "js_buffer_stale_span_refetch_before_use_no_card"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "Re-fetching the descriptor after reentry before any span use routes the function to the safe form and should not trigger the stale-span heuristic."
+
+[[samples]]
+id = "js-buffer-stale-span-pinned-before-use-emits-no-card"
+fixture = "js_buffer_stale_span_pinned_before_use_no_card"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "Pinning the buffer after reentry before any span use routes the function to the pinned safe form and should not trigger the stale-span heuristic."
+
+[[samples]]
+id = "js-buffer-stale-span-use-before-reentry-emits-no-card"
+fixture = "js_buffer_stale_span_use_before_reentry_no_card"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "A span used only before any possible JS reentry has no stale window and should not trigger the stale-span heuristic."
+
+[[samples]]
 id = "js-buffer-options-before-capture-emits-no-card"
 fixture = "js_buffer_reentry_options_before_capture_no_card"
 kind = "false_positive_control"

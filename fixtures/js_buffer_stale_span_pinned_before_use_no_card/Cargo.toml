@@ -1,0 +1,4 @@
+[package]
+name = "js-buffer-stale-span-pinned-before-use-no-card-fixture"
+version = "0.1.0"
+edition = "2024"
