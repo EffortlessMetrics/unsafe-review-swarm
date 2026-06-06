@@ -1,21 +1,28 @@
 schema_version = "1.0"
 
 id = "unsafe-review-source-of-truth-stack"
-title = "unsafe-review source-of-truth stack rollout"
+title = "unsafe-review coverage-instrument ease-of-use build-out"
 status = "active"
 owner = "repo-infra"
 created = "2026-05-20"
 
 objective = """
-Establish linked proposal/spec/ADR/plan/goal/support-tier/policy artifacts with
-machine-checkable references and clear proof boundaries.
+Ship the ease-of-use / coverage-instrument lane (UNSAFE-REVIEW-SPEC-0028 through
+0035): unsafe-review is the deterministic coverage instrument behind an
+LLM-orchestrated single CI gate (ub-review), with baseline-aware coverage
+movement and the projection surfaces (badge, comment-plan, LLM context packet,
+gate manifest) that make the five delivery surfaces adoptable. Deterministic
+decides the merge; the LLM layer is advisory. Releases run history-preserving
+through shipper. North star: docs/interop/north-star.md.
 """
 
 end_state = [
-  "Document artifacts are tracked in policy/doc-artifacts.toml.",
-  "Active unsafe-review goal state is present and linked.",
-  "Support tiers map claims to proof commands.",
-  "Plan and spec layers are linked through stable IDs.",
+  "Coverage-slot model (SPEC-0029) is the single source every surface projects.",
+  "Baseline coverage movement (SPEC-0030: new/worsened/resolved/inherited) replaces the zero-debt gate so brownfield repos are adoptable.",
+  "Projection surfaces shipped: baseline-aware badge (0031), comment-plan coverage hardening (0032), LLM context packet (0033), and the unsafe-review-gate.json manifest (0034).",
+  "Repo-scan diagnosability (0035) is codified and acceptance-smoked.",
+  "The single tight CI gate (deterministic floor + advisory ub-review) is the gate; the release ceremony runs through shipper.",
+  "Every surface stays advisory: no proof, UB-free, Miri-clean, site-execution, calibrated-precision, or policy-ready claim.",
 ]
 
 [[work_item]]
