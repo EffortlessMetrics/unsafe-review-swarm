@@ -198,37 +198,73 @@ Every live or planned CI lane must have a named purpose. High-cost or
 write-token lanes must not be folded into the default workspace gate by
 convenience.
 
-### 4.1 `ci.yml` - default workspace gate
+### 4.1 `ci.yml` - single tight CI gate
 
 Purpose:
 
 ```text
-protect the Rust workspace and repo policy checks
+protect the Rust workspace and repo policy checks with one tight gate, and
+layer advisory LLM review on top without expanding the hard gate
 ```
 
-Runs:
+The live swarm `ci.yml` is one tight CI gate, not a pile of parallel required
+checks. It is a single job on a single zero-config `ubuntu-latest` runner. That
+job has exactly two layers:
 
 ```text
-fmt
-check
-clippy
-tests
-docs
-xtask check-pr
+mandatory deterministic core floor (the hard gate)
+  cargo run --locked -p xtask -- check-pr
+
+advisory LLM layer (rides along in the same job)
+  EffortlessMetrics/ub-review intelligent-ci review
+```
+
+The deterministic core floor is the only hard blocker and the only required
+status check. ub-review wraps it as an additive layer: it does not replace the
+deterministic tools, it reviews on top of their evidence. It selects the
+PR-relevant extra sensors and runs bounded LLM lanes so heavy checks do not run
+on every PR. The value is strong gating from a tight central set plus only what
+the LLM picks as relevant.
+
+Single required check:
+
+```text
+The job is named "Unsafe Review Rust Result" for branch-protection continuity.
+Its conclusion reflects ONLY the deterministic core verdict (the final assert
+step fails iff `xtask check-pr` exited non-zero). ub-review is advisory and can
+never flip that result.
+```
+
+Step shape inside the one job (launch the LLM lanes off fast context, do not
+gate them on the slower deterministic build):
+
+```text
+1. shared setup once: checkout (fetch-depth 0), dtolnay/rust-toolchain@1.95.0
+   with rustfmt + clippy, Swatinem/rust-cache@v2
+2. fast precontext: cargo fmt --check plus repo/PR facts written to
+   target/ci-core/precontext.md, and the core gate launched in the background on
+   an isolated CARGO_TARGET_DIR (so it overlaps the lanes without cargo
+   target-lock contention)
+3. advisory ub-review: reuses the warmed toolchain/cache (setup-rust:false),
+   fed the precontext via pr-thread-context, posting review, fail-on-gate:false,
+   continue-on-error
+4. final assert: wait for the background core gate, surface it in the job
+   summary, and fail the job iff its exit code != 0
 ```
 
 May fail on:
 
 ```text
-formatting drift
-build failure
-lint failure
-test failure
-rustdoc warning
-repo policy failure
+repo policy failure surfaced by xtask check-pr
 ```
 
-Must not run:
+The deterministic core gate (`xtask check-pr`) is the merge-blocking floor.
+`cargo fmt --check` runs as advisory precontext only; full clippy, test, and
+rustdoc proof stay in the local validation loop and release lanes, as in section
+3. ub-review findings, ub-review gate manifest conclusions, and ub-review/model
+availability never fail the merge.
+
+Must not run as part of the hard gate:
 
 ```text
 Miri
@@ -237,10 +273,13 @@ sanitizers
 Loom
 Kani
 mutation testing
-comment posting
 source edits
 publish
 ```
+
+The advisory ub-review layer may post one grouped PR review (posting:review),
+but it must not edit source, run witnesses, publish, or make blocking
+unsafe-correctness claims.
 
 Default permissions:
 
@@ -248,6 +287,9 @@ Default permissions:
 permissions:
   contents: read
 ```
+
+The single job adds `pull-requests: write` for one reason only: so the advisory
+ub-review step can post its grouped PR review. No other write token is granted.
 
 ### 4.2 `policy-contracts.yml` - source-of-truth gate
 
@@ -667,13 +709,21 @@ no default witness execution
 no publish or release side effects
 ```
 
-Runner fallback posture: the routed workspace lane prefers trusted self-hosted
-runners, but when self-hosted capacity or the runner read token is unavailable
-the lane falls back to the full `check-pr` gate on GitHub-hosted runners by
-default. The fallback must run the same proof set as the self-hosted lane, not
-a reduced subset, so a capacity outage never weakens the merge gate silently.
-The `no-github-fallback` label is the explicit budget opt-out; it routes the
-lane to a visible blocked failure instead of consuming hosted minutes.
+Runner posture: the single tight gate runs on zero-config `ubuntu-latest` for
+both the deterministic core floor and the advisory ub-review layer, on whatever
+hosted runner catches it. There is no self-hosted size routing, no runner-token
+discovery, and no separate GitHub-hosted fallback lane: one job, one runner, one
+required check. ub-review's `gh-runner` profile matches this posture. Fork PRs,
+which cannot read org secrets, skip only the advisory ub-review step; the
+deterministic core gate still runs for forks.
+
+Advisory LLM layer cost posture: ub-review runs intelligent-ci review with
+MiniMax-M3 as the primary provider and OpenCode `deepseek-v4-flash` as the
+fallback under `provider-policy: primary-with-fallback`. It is bounded by the
+job timeout, reuses the warmed toolchain and cargo cache (`setup-rust: false`),
+installs only the `core` sensor bundle, and lets its planner pick the
+PR-relevant extras. It is advisory (`fail-on-gate: false`, `continue-on-error`)
+and never blocks the merge.
 
 Swarm may carry experimental, scheduled, or workflow-dispatch lanes while they
 are being proven, but a lane must be listed in
@@ -1064,7 +1114,7 @@ Runtime/session state is a handoff fact, not a repository fact.
 
 ## 16. Example default workflow
 
-The default workflow shape is:
+A drop-in default workflow can run the full deterministic proof set directly:
 
 ```yaml
 name: CI
@@ -1101,6 +1151,57 @@ jobs:
         env:
           RUSTDOCFLAGS: -D warnings
       - run: cargo run --locked -p xtask -- check-pr
+```
+
+The live swarm `ci.yml` instead uses the single tight gate of section 4.1: one
+`ubuntu-latest` job whose mandatory deterministic floor is
+`cargo run --locked -p xtask -- check-pr` (the only required check, named
+"Unsafe Review Rust Result"), with advisory ub-review riding along in the same
+job. Its shape is:
+
+```yaml
+jobs:
+  unsafe-review-rust-result:
+    name: Unsafe Review Rust Result
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Fast precontext and launch core gate
+        run: |
+          # cargo fmt --check + repo/PR facts -> target/ci-core/precontext.md,
+          # then launch `cargo run --locked -p xtask -- check-pr` in the
+          # background on an isolated CARGO_TARGET_DIR.
+          ...
+      - name: UB Review (advisory)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false }}
+        continue-on-error: true
+        uses: EffortlessMetrics/ub-review@v0.1
+        with:
+          mode: intelligent-ci
+          posting: review
+          fail-on-gate: false
+          setup-rust: false
+          provider-policy: primary-with-fallback
+          minimax-model: MiniMax-M3
+          opencode-model: deepseek-v4-flash
+          pr-thread-context: target/ci-core/precontext.md
+          # ... secrets and remaining inputs ...
+      - name: Assert core gate verdict
+        if: ${{ always() }}
+        run: |
+          # fail iff the background core gate exited non-zero
+          ...
 ```
 
 ## 17. Example advisory first-pr workflow

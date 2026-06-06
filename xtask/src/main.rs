@@ -958,42 +958,72 @@ fn check_ci_routing_contract() -> Result<(), String> {
     let path = ".github/workflows/ci.yml";
     let text =
         std::fs::read_to_string(path).map_err(|err| format!("failed to read {path}: {err}"))?;
-    if text.contains("repos/${") && text.contains("/actions/runners") {
-        return Err(format!(
-            "{path} must use organization runner discovery, not repository runner discovery"
-        ));
-    }
+    // Single tight CI gate: one job on one ubuntu-latest runner whose mandatory
+    // deterministic core floor (`xtask check-pr`) is the only hard blocker and the
+    // only required status check, with ub-review riding along as an advisory LLM
+    // layer that consumes the core results as grounding context.
     for needle in [
-        "gh api \"orgs/${ORG}/actions/runners?per_page=100\"",
-        "EM_RUNNER_READ_TOKEN",
-        "router_target=",
-        "router_reason=",
-        "Rust Small on CPX42",
-        "labels: [self-hosted, linux, x64, em-ci, cpx42, rust-16gb, rust-medium, trusted-pr]",
-        "Prepare CPX42 scratch",
-        "dtolnay/rust-toolchain@v1",
-        "toolchain: 1.95.0",
-        "Rust Small on CX43",
-        "Rust Small on CX53",
+        // One required check, stable name for branch protection.
+        "name: Unsafe Review Rust Result",
+        // Shared warmed setup on the zero-config hosted runner.
+        "runs-on: ubuntu-latest",
         "dtolnay/rust-toolchain@1.95.0",
-        "Rust Small Fallback on GitHub Hosted",
-        "Run full fallback gate",
-        "Rust Small Blocked (capacity/config)",
-        "fallback_allowed=",
-        "fallback_mode=full",
-        "no-github-fallback",
-        "Unsafe Review Rust Small Result",
+        "Swatinem/rust-cache@v2",
+        // Fast precontext launches the LLM lanes off cheap signal, the deterministic
+        // core gate runs concurrently in the background (guarded by a disk-headroom
+        // check), and the final assert decides the merge on the core verdict.
+        "Fast precontext and launch core gate",
+        "cargo run --locked -p xtask -- check-pr",
+        "df -h",
+        "core_exit",
+        "Assert core gate verdict",
+        // Advisory ub-review layer in the same job, fed the fast precontext, with a
+        // concise advisory-failure status note.
+        "UB Review (advisory)",
+        "UB Review advisory status",
+        "EffortlessMetrics/ub-review@",
+        "mode: intelligent-ci",
+        "posting: review",
+        "fail-on-gate: false",
+        "setup-rust: false",
+        "provider-policy: primary-with-fallback",
+        "minimax-model: MiniMax-M3",
+        "opencode-model: deepseek-v4-flash",
+        "pr-thread-context: target/ci-core/precontext.md",
+        // Advisory layer must stay non-blocking and fork-safe.
+        "continue-on-error: true",
+        "github.event.pull_request.head.repo.fork == false",
     ] {
         if !text.contains(needle) {
             return Err(format!(
-                "{path} missing required routed CI contract marker: {needle}"
+                "{path} missing required single-gate CI contract marker: {needle}"
             ));
         }
     }
-    for forbidden in ["em-ci-rust:1.95", "docker run --rm"] {
+    // The old self-hosted size-routed gate is retired. None of its routing markers
+    // may reappear: the gate must not depend on runner discovery, self-hosted size
+    // routing, a GitHub-hosted fallback lane, or the broken Docker Rust Small image.
+    if text.contains("repos/${") && text.contains("/actions/runners") {
+        return Err(format!(
+            "{path} must not reintroduce repository runner discovery"
+        ));
+    }
+    for forbidden in [
+        "route-rust-small",
+        "router_target=",
+        "EM_RUNNER_READ_TOKEN",
+        "actions/runners",
+        "self-hosted",
+        "Rust Small Fallback on GitHub Hosted",
+        "fallback_mode=full",
+        "no-github-fallback",
+        "Unsafe Review Rust Small Result",
+        "em-ci-rust:1.95",
+        "docker run --rm",
+    ] {
         if text.contains(forbidden) {
             return Err(format!(
-                "{path} must not depend on broken Docker Rust Small marker: {forbidden}"
+                "{path} must not reintroduce retired routed-gate marker: {forbidden}"
             ));
         }
     }

@@ -3,12 +3,22 @@ schema_version = "1.0"
 [[lane]]
 id = "default-workspace"
 owner = "repo-infra"
-intent = "Protect the Rust workspace with deterministic fmt, build, lint, test, rustdoc, and repo policy checks"
-proof_obligation = "workspace commands and xtask check-pr pass without witnesses, publishing, source edits, or comment posting; when self-hosted capacity or the runner token is unavailable, the same full check-pr gate runs on GitHub-hosted runners by default, with the no-github-fallback label as the explicit budget opt-out"
+intent = "Protect the Rust workspace with one tight CI gate: the deterministic xtask check-pr core floor as the only hard blocker, with advisory ub-review LLM review riding along in the same job"
+proof_obligation = "the deterministic core gate cargo run --locked -p xtask -- check-pr passes without witnesses, publishing, source edits, or comment posting, and its verdict is the only thing that gates the merge through the single required Unsafe Review Rust Result check; the gate runs on zero-config ubuntu-latest with no self-hosted size routing or GitHub-hosted fallback lane"
 cost_estimate = "medium"
-trigger_policy = "pull_request, push(main), workflow_dispatch"
+trigger_policy = "pull_request, push(main), merge_group, workflow_dispatch"
 status = "required"
-review_after = "2026-07-01"
+review_after = "2026-07-18"
+
+[[lane]]
+id = "ub-review-advisory"
+owner = "repo-infra / ci"
+intent = "Run advisory ub-review intelligent-ci LLM review on top of the deterministic core gate, in the same single CI job"
+proof_obligation = "the EffortlessMetrics/ub-review action posts a grouped advisory PR review and emits its gate manifest while staying advisory (continue-on-error, fail-on-gate false, posting review) so it never fails the merge; it reuses the warmed toolchain and cache (setup-rust false), consumes the deterministic core precontext via pr-thread-context, uses MiniMax-M3 as primary with OpenCode deepseek-v4-flash as fallback under provider-policy primary-with-fallback, is skipped on fork PRs that cannot read org secrets, and runs no witnesses, source edits, or publishing"
+cost_estimate = "medium"
+trigger_policy = "pull_request (non-fork), in the same job as the default-workspace core gate"
+status = "advisory"
+review_after = "2026-07-18"
 
 [[lane]]
 id = "policy-contracts"
