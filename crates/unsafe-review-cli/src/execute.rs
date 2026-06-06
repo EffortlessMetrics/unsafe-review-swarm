@@ -240,6 +240,11 @@ fn run_repo_check(options: RepoOptions) -> Result<(), String> {
             ));
         }
     };
+    if reporter.files_discovered() == 0 {
+        eprintln!(
+            "unsafe-review repo: no Rust files selected after include/exclude/ignores; check --root, --include, --exclude, --[no-]large-repo-ignores, and --[no-]respect-gitignore"
+        );
+    }
     let rendered = render_with_format(&output, &check.format);
     if let Some(path) = report_path {
         let partial = repo_partial_path(&path);
@@ -596,6 +601,14 @@ impl RepoStatusReporter {
         format!(
             "repo scan timed out after {seconds}s; use --include/--exclude/--max-files or a scoped --root to reduce scan scope"
         )
+    }
+
+    fn files_discovered(&self) -> usize {
+        self.last_status
+            .lock()
+            .ok()
+            .and_then(|guard| guard.as_ref().map(|s| s.files_discovered))
+            .unwrap_or(0)
     }
 }
 
@@ -2097,7 +2110,7 @@ fn print_help() {
         "  check   [--root .] [--base origin/main | --diff file|-] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file]"
     );
     println!(
-        "  repo    [--root .] [--include glob] [--exclude glob] [--list-files] [--progress] [--timeout-seconds N] [--respect-gitignore|--no-respect-gitignore] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
+        "  repo    [--root .] [--include glob] [--exclude glob] [--list-files|--dry-run] [--progress] [--timeout-seconds N] [--respect-gitignore|--no-respect-gitignore] [--large-repo-ignores|--no-large-repo-ignores] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
     );
     println!(
         "  first-pr [--root .] [--base origin/main|--diff file|-] [--out-dir target/unsafe-review] [--max-cards N]"
@@ -2156,13 +2169,16 @@ fn print_repo_help() {
     println!();
     println!("Usage:");
     println!(
-        "  unsafe-review repo [--root .] [--include glob] [--exclude glob] [--list-files] [--progress] [--timeout-seconds N] [--respect-gitignore|--no-respect-gitignore] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
+        "  unsafe-review repo [--root .] [--include glob] [--exclude glob] [--list-files|--dry-run] [--progress] [--timeout-seconds N] [--respect-gitignore|--no-respect-gitignore] [--large-repo-ignores|--no-large-repo-ignores] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
     );
     println!();
     println!("What repo scans today:");
     println!("- Discovers *.rs files under --root, defaulting to the current directory.");
     println!(
         "- Discovery respects gitignore files by default and skips .git, .github, .unsafe-review*, target, node_modules, vendor, build, dist, and generated directories."
+    );
+    println!(
+        "- Discovery also skips large-repo directories (node_modules, vendor, build, dist, generated) by default; use --no-large-repo-ignores to include them."
     );
     println!(
         "- Repo mode scans the selected Rust files; --base and --diff are accepted by the shared parser but do not make repo a diff-only scan."
@@ -2176,7 +2192,12 @@ fn print_repo_help() {
     println!(
         "- --respect-gitignore is the default; --no-respect-gitignore includes ignored Rust files."
     );
-    println!("- --list-files prints selected Rust files and exits without analysis.");
+    println!(
+        "- --large-repo-ignores is the default; --no-large-repo-ignores disables the large-repo directory skip set."
+    );
+    println!(
+        "- --list-files prints selected Rust files and exits without analysis; --dry-run is an alias."
+    );
     println!("- With --list-files, --format supports human, json, or markdown output.");
     println!("- --progress prints scan-status heartbeats to stderr during analysis.");
     println!(
@@ -2196,7 +2217,9 @@ fn print_repo_help() {
     println!(
         "- Prefer scoped roots or include/exclude filters such as --include 'src/**/*.rs' and --exclude '**/generated/**'."
     );
-    println!("- Use --list-files before a large scan to confirm the selected Rust files.");
+    println!(
+        "- Use --list-files or --dry-run before a large scan to confirm the selected Rust files."
+    );
     println!(
         "- Use --timeout-seconds with --out on long scans to keep an incomplete status sidecar and any completed-file partial report."
     );

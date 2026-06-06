@@ -291,7 +291,7 @@ fn parse_repo(args: Vec<String>) -> Result<RepoOptions, String> {
                     .exclude
                     .push(inline_value(arg, "--exclude")?.to_string());
             }
-            "--list-files" => {
+            "--list-files" | "--dry-run" => {
                 options.list_files = true;
             }
             "--progress" => {
@@ -316,6 +316,12 @@ fn parse_repo(args: Vec<String>) -> Result<RepoOptions, String> {
             }
             "--no-respect-gitignore" | "--no-gitignore" => {
                 options.discovery.respect_gitignore = false;
+            }
+            "--large-repo-ignores" => {
+                options.discovery.large_repo_ignores = true;
+            }
+            "--no-large-repo-ignores" => {
+                options.discovery.large_repo_ignores = false;
             }
             "--max-files" => {
                 idx += 1;
@@ -889,6 +895,72 @@ mod tests {
             return Err("expected repo command".to_string());
         };
         assert!(options.progress);
+        Ok(())
+    }
+
+    #[test]
+    fn repo_dry_run_is_alias_for_list_files() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "repo", "--dry-run"]))?;
+
+        let Command::Repo(options) = command else {
+            return Err("expected repo command".to_string());
+        };
+        assert!(options.list_files);
+        Ok(())
+    }
+
+    #[test]
+    fn repo_dry_run_combined_with_other_flags() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "repo",
+            "--dry-run",
+            "--include=src/**/*.rs",
+            "--max-files=100",
+        ]))?;
+
+        let Command::Repo(options) = command else {
+            return Err("expected repo command".to_string());
+        };
+        assert!(options.list_files);
+        assert_eq!(options.discovery.include, vec!["src/**/*.rs".to_string()]);
+        assert_eq!(options.discovery.max_files, Some(100));
+        Ok(())
+    }
+
+    #[test]
+    fn repo_large_repo_ignores_flag() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "repo", "--large-repo-ignores"]))?;
+
+        let Command::Repo(options) = command else {
+            return Err("expected repo command".to_string());
+        };
+        assert!(options.discovery.large_repo_ignores);
+        Ok(())
+    }
+
+    #[test]
+    fn repo_no_large_repo_ignores_flag() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "repo", "--no-large-repo-ignores"]))?;
+
+        let Command::Repo(options) = command else {
+            return Err("expected repo command".to_string());
+        };
+        assert!(!options.discovery.large_repo_ignores);
+        Ok(())
+    }
+
+    #[test]
+    fn repo_large_repo_ignores_default_is_true() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "repo"]))?;
+
+        let Command::Repo(options) = command else {
+            return Err("expected repo command".to_string());
+        };
+        assert!(
+            options.discovery.large_repo_ignores,
+            "large_repo_ignores must default to true to preserve existing behavior"
+        );
         Ok(())
     }
 
