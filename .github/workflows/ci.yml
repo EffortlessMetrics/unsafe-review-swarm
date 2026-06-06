@@ -1,19 +1,33 @@
 name: CI
 
-# One tight CI gate on one runner. The deterministic core floor
-# (`xtask check-pr`) is the only hard blocker and the only required status check;
-# ub-review rides along in the SAME job as an advisory LLM layer. The LLM
-# investigation window (lanes analysing the diff, model calls) is the long pole
-# and leaves the runner CPU idle, so the full deterministic core gate runs
-# concurrently and tucks under that latency for free:
+# One tight CI gate, single required check, self-hosted-primary with
+# GitHub-hosted overflow. A minimal `route` job (NOT a required check) decides
+# the gate runner: if a trusted idle self-hosted runner from the EM `em-ci`
+# fleet is available it absorbs the run; otherwise (no idle capacity, missing
+# runner-read token, org-runner API failure, or a fork PR) the gate overflows to
+# zero-config `ubuntu-latest`. The owned fleet handles the bulk; gh-hosted is the
+# burst/capacity-gap/fork fallback. There is exactly ONE required status check
+# (`Unsafe Review Rust Result`); the router never blocks the merge and there is
+# no per-size routing (whatever idle trusted self-hosted runner catches it).
 #
+# The gate job itself is unchanged in shape: the deterministic core floor
+# (`xtask check-pr` plus the full suite) is the only hard blocker; ub-review
+# rides along in the SAME job as an advisory LLM layer. The LLM investigation
+# window (lanes analysing the diff, model calls) is the long pole and leaves the
+# runner CPU idle, so the full deterministic core gate runs concurrently and
+# tucks under that latency for free:
+#
+#   0. route (advisory, ubuntu-latest): pick self-hosted (idle trusted em-ci
+#      runner) else ubuntu-latest overflow; emit a runs-on value + runner_kind.
 #   1. Shared setup once (checkout fetch-depth 0, toolchain 1.95.0, rust-cache).
-#   2. Fast precontext (~seconds, no full build): a disk-headroom guard, then
-#      cargo fmt --check plus repo/PR facts written to target/ci-core/precontext.md,
-#      AND the deterministic core gate (`xtask check-pr`) launched in the BACKGROUND
-#      sharing the workspace target dir. cargo's target-dir lock serialises any
-#      concurrent cargo invocation safely (no corruption; worst case a little extra
-#      wall-clock), so this avoids doubling disk with a second target dir.
+#   2. Fast precontext (~seconds, no full build): a runner-kind-aware disk/scratch
+#      check, then cargo fmt --check plus repo/PR facts written to
+#      target/ci-core/precontext.md, AND the deterministic core gate
+#      (`xtask check-pr`) launched in the BACKGROUND sharing the workspace target
+#      dir. cargo's target-dir lock serialises any concurrent cargo invocation
+#      safely (no corruption; worst case a little extra wall-clock), so this
+#      avoids doubling disk with a second target dir and works on both runner
+#      kinds.
 #   3. ub-review (advisory) runs next, concurrent with the backgrounded core gate.
 #      It reuses the warmed toolchain/cache (setup-rust:false) and is fed the fast
 #      precontext via pr-thread-context.
@@ -47,13 +61,84 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Minimal capacity router (NOT a required check). It decides where the single
+  # gate runs: self-hosted primary when the owned fleet has idle trusted capacity,
+  # gh-hosted overflow otherwise. It only reads org runner state and emits a
+  # runs-on value; it never gates the merge and never runs the suite.
+  route:
+    name: Route CI runner
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      # `runner` is a JSON value the gate consumes via fromJSON: either a JSON
+      # string ("ubuntu-latest") or a JSON array of self-hosted labels. Both are
+      # valid `runs-on` shapes. `runner_kind` lets the gate branch disk/scratch
+      # handling (github vs self-hosted).
+      runner: ${{ steps.route.outputs.runner }}
+      runner_kind: ${{ steps.route.outputs.runner_kind }}
+    steps:
+      - name: Decide gate runner (self-hosted primary, gh-hosted overflow)
+        id: route
+        env:
+          GH_TOKEN: ${{ secrets.EM_RUNNER_READ_TOKEN }}
+        run: |
+          set -uo pipefail
+          # gh-hosted overflow is emitted as a JSON string; self-hosted as a JSON
+          # array of the shared em-ci trust labels. We match the shared group label
+          # set only (NOT any per-size label) so whatever idle trusted runner is
+          # free catches it.
+          GH='"ubuntu-latest"'
+          SELF_HOSTED='["self-hosted","linux","x64","em-ci","trusted-pr"]'
+          emit() {
+            echo "runner=$1" >> "$GITHUB_OUTPUT"
+            echo "runner_kind=$2" >> "$GITHUB_OUTPUT"
+            echo "route -> $2 ($3)"
+          }
+          # Fork PRs can never use trusted self-hosted runners (untrusted code, no
+          # org secrets): always overflow to gh-hosted.
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.fork }}" == "true" ]]; then
+            emit "$GH" github "fork PR -> gh-hosted overflow"
+            exit 0
+          fi
+          # No runner-read token configured: overflow to gh-hosted.
+          if [[ -z "${GH_TOKEN:-}" ]]; then
+            emit "$GH" github "EM_RUNNER_READ_TOKEN missing -> gh-hosted overflow"
+            exit 0
+          fi
+          set +e
+          RESP="$(gh api "orgs/EffortlessMetrics/actions/runners?per_page=100" 2>route.err)"
+          CODE=$?
+          set -e
+          if [[ $CODE -ne 0 ]]; then
+            emit "$GH" github "org runner API failed ($(tr -d '\n' <route.err | head -c 120)) -> gh-hosted overflow"
+            exit 0
+          fi
+          # A trusted idle self-hosted runner is online, not busy, and carries the
+          # shared em-ci trusted-pr label set. Any idle size qualifies.
+          if jq -e '
+            [.runners[]
+              | select(.status == "online" and .busy == false)
+              | [.labels[].name] as $ls
+              | select(($ls | index("self-hosted")) and ($ls | index("linux")) and ($ls | index("x64")) and ($ls | index("em-ci")) and ($ls | index("trusted-pr")))]
+            | length > 0' <<<"$RESP" >/dev/null 2>&1; then
+            emit "$SELF_HOSTED" self-hosted "idle trusted self-hosted runner available"
+          else
+            emit "$GH" github "no idle trusted self-hosted capacity -> gh-hosted overflow"
+          fi
+
   unsafe-review-rust-result:
     # Single required check. The job conclusion reflects ONLY the mandatory
     # deterministic core gate (final assert step); the advisory ub-review step is
     # continue-on-error and fail-on-gate:false so it can never flip this result.
     # The job name is kept stable for branch protection.
+    #
+    # runs-on is decided by the router: a self-hosted label array when the owned
+    # fleet has idle trusted capacity, else "ubuntu-latest" overflow. fromJSON
+    # turns the router's JSON value into either a runs-on string or label array
+    # (both valid). The router never blocks the merge; only this gate does.
     name: Unsafe Review Rust Result
-    runs-on: ubuntu-latest
+    needs: route
+    runs-on: ${{ fromJSON(needs.route.outputs.runner) }}
     timeout-minutes: 60
     permissions:
       contents: read
@@ -69,22 +154,38 @@ jobs:
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
-      # Fast precontext + background launch of the deterministic core gate. A disk
-      # guard keeps concurrent builds from filling the hosted runner; the cheap
-      # repo/PR facts are written immediately so the LLM lanes start off them; the
-      # full deterministic core gate (fmt + clippy + test + check-pr) is launched in
-      # the background sharing the workspace target dir (cargo's lock serialises any
-      # overlap safely) and its verdict is the only thing that gates the merge.
+      # Fast precontext + background launch of the deterministic core gate. The
+      # disk/scratch handling is runner-kind aware: on gh-hosted overflow we free
+      # the big preinstalled SDKs when headroom is low; on self-hosted we leave the
+      # gh-only paths alone (they are not present) and instead report headroom and
+      # reuse the shared workspace target dir. The cheap repo/PR facts are written
+      # immediately so the LLM lanes start off them; the full deterministic core
+      # gate (fmt + clippy + test + check-pr) is launched in the background sharing
+      # the workspace target dir (cargo's lock serialises any overlap safely) and
+      # its verdict is the only thing that gates the merge.
       - name: Fast precontext and launch core gate
+        env:
+          RUNNER_KIND: ${{ needs.route.outputs.runner_kind }}
         run: |
           set +e
           mkdir -p target/ci-core
-          # Disk-headroom guard: concurrent builds should extend time, not crash disk.
-          df -h /
-          avail_gb="$(df --output=avail -BG / | tail -1 | tr -dc '0-9')"
-          if [ "${avail_gb:-0}" -lt 12 ]; then
-            echo "disk guard: low headroom (${avail_gb}G < 12G); freeing. Safe-to-remove on ubuntu-latest: /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL. Reclaim with: sudo rm -rf <those paths>."
-            sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL 2>/dev/null || true
+          if [ "${RUNNER_KIND}" = "self-hosted" ]; then
+            # Self-hosted primary: do NOT run the gh disk-free (android/dotnet/ghc/
+            # CodeQL are not on the fleet). Shared-fleet scratch hygiene is tracked
+            # in unsafe-review-swarm #1519; keep this conservative and idempotent —
+            # report headroom and reuse the shared workspace target dir (cargo's
+            # target-lock serialises overlap), without destructive GC of shared dirs.
+            echo "self-hosted runner: reporting headroom; shared workspace target dir reused (cargo lock serialises overlap). Fleet scratch hygiene tracked in unsafe-review-swarm #1519."
+            df -h . || true
+            df -h / || true
+          else
+            # gh-hosted overflow: concurrent builds should extend time, not crash disk.
+            df -h /
+            avail_gb="$(df --output=avail -BG / | tail -1 | tr -dc '0-9')"
+            if [ "${avail_gb:-0}" -lt 12 ]; then
+              echo "disk guard: low headroom (${avail_gb}G < 12G); freeing. Safe-to-remove on ubuntu-latest: /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL. Reclaim with: sudo rm -rf <those paths>."
+              sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL 2>/dev/null || true
+            fi
           fi
           {
             echo "# Deterministic precontext for ub-review"
@@ -98,7 +199,7 @@ jobs:
             echo "- check-pr covers the repo contract: docs, public badges, policy"
             echo "  bundle, support tiers, fixtures, calibration, dogfood manifest,"
             echo "  manual fuzz harness, and tracked generated artifacts."
-            echo "- event: ${GITHUB_EVENT_NAME}  base: ${GITHUB_BASE_REF:-n/a}  sha: ${GITHUB_SHA}"
+            echo "- runner: ${RUNNER_KIND:-github}  event: ${GITHUB_EVENT_NAME}  base: ${GITHUB_BASE_REF:-n/a}  sha: ${GITHUB_SHA}"
           } > target/ci-core/precontext.md
           # Launch the full deterministic core gate in the background, sharing the
           # workspace target dir (cargo's lock serialises any overlap with

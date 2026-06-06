@@ -208,8 +208,11 @@ layer advisory LLM review on top without expanding the hard gate
 ```
 
 The live swarm `ci.yml` is one tight CI gate, not a pile of parallel required
-checks. It is a single job on a single zero-config `ubuntu-latest` runner. That
-job has exactly two layers:
+checks. It is a single gate job whose runner is chosen by a minimal capacity
+router (self-hosted primary, `ubuntu-latest` overflow — see section 7); the
+router is advisory and not a required check, so there is still exactly one job
+that gates the merge and one required status check. That gate job has exactly
+two layers:
 
 ```text
 mandatory deterministic core floor (the hard gate)
@@ -239,12 +242,16 @@ Step shape inside the one job (launch the LLM lanes off fast context, do not
 gate them on the slower deterministic build):
 
 ```text
+0. route (advisory, ubuntu-latest, not a required check): pick the gate runner —
+   idle trusted self-hosted em-ci runner else ubuntu-latest overflow — and emit a
+   runs-on value plus runner_kind (see section 7)
 1. shared setup once: checkout (fetch-depth 0), dtolnay/rust-toolchain@1.95.0
    with rustfmt + clippy, Swatinem/rust-cache@v2
-2. fast precontext: cargo fmt --check plus repo/PR facts written to
-   target/ci-core/precontext.md, and the core gate launched in the background on
-   an isolated CARGO_TARGET_DIR (so it overlaps the lanes without cargo
-   target-lock contention)
+2. fast precontext: runner-kind-aware disk/scratch handling, then cargo fmt
+   --check plus repo/PR facts written to target/ci-core/precontext.md, and the
+   core gate launched in the background sharing the workspace target dir (cargo's
+   target-lock serialises overlap with ub-review's cargo work safely, so it
+   overlaps the lanes without doubling disk on either runner kind)
 3. advisory ub-review: reuses the warmed toolchain/cache (setup-rust:false),
    fed the precontext via pr-thread-context, posting review, fail-on-gate:false,
    continue-on-error
@@ -709,13 +716,37 @@ no default witness execution
 no publish or release side effects
 ```
 
-Runner posture: the single tight gate runs on zero-config `ubuntu-latest` for
-both the deterministic core floor and the advisory ub-review layer, on whatever
-hosted runner catches it. There is no self-hosted size routing, no runner-token
-discovery, and no separate GitHub-hosted fallback lane: one job, one runner, one
-required check. ub-review's `gh-runner` profile matches this posture. Fork PRs,
-which cannot read org secrets, skip only the advisory ub-review step; the
-deterministic core gate still runs for forks.
+Runner posture: self-hosted primary with GitHub-hosted overflow. A minimal
+`route` job (NOT a required check) decides where the single tight gate runs. It
+reads org runner state via `gh api orgs/EffortlessMetrics/actions/runners` using
+the `EM_RUNNER_READ_TOKEN` secret (a secret on a `run:` step, not a new external
+action) and emits a `runs-on` value plus a `runner_kind`:
+
+```text
+self-hosted (primary): an idle trusted runner exists in the owned em-ci fleet —
+  online, !busy, carrying the shared self-hosted/linux/x64/em-ci/trusted-pr
+  label set. The router matches the shared group labels only (any idle size
+  catches it); it never size-routes to cpx42/cx43/cx53. The gate consumes a JSON
+  label array via fromJSON(needs.route.outputs.runner).
+
+github (overflow): no idle trusted self-hosted capacity, missing runner-read
+  token, org-runner API failure, or a fork PR. The router emits the JSON string
+  "ubuntu-latest"; the gate consumes it via the same fromJSON wiring (a JSON
+  string and a JSON array are both valid runs-on shapes).
+```
+
+The owned fleet absorbs the bulk; gh-hosted only handles bursts, capacity gaps,
+and forks. Fork PRs always overflow to gh-hosted (untrusted code can never run
+on trusted self-hosted runners) and additionally skip the advisory ub-review
+step (no org secrets); the deterministic core gate still runs for forks. There
+is still exactly ONE job that gates the merge and ONE required check
+(`Unsafe Review Rust Result`); the router is advisory and never blocks. The gate
+branches disk/scratch handling on `runner_kind`: on gh-hosted overflow it frees
+the big preinstalled SDKs (android/dotnet/ghc/CodeQL) when headroom is low; on
+self-hosted it leaves those gh-only paths alone, reports `df -h` headroom, and
+reuses the shared workspace target dir (cargo's target-lock serialises overlap),
+with shared-fleet scratch hygiene tracked in unsafe-review-swarm #1519.
+ub-review's runner profile rides whichever runner the gate lands on.
 
 Advisory LLM layer cost posture: ub-review runs intelligent-ci review with
 MiniMax-M3 as the primary provider and OpenCode `deepseek-v4-flash` as the

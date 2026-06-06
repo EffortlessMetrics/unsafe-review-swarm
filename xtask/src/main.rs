@@ -958,15 +958,30 @@ fn check_ci_routing_contract() -> Result<(), String> {
     let path = ".github/workflows/ci.yml";
     let text =
         std::fs::read_to_string(path).map_err(|err| format!("failed to read {path}: {err}"))?;
-    // Single tight CI gate: one job on one ubuntu-latest runner whose mandatory
-    // deterministic core floor (`xtask check-pr`) is the only hard blocker and the
-    // only required status check, with ub-review riding along as an advisory LLM
-    // layer that consumes the core results as grounding context.
+    // Single tight CI gate, self-hosted-primary with gh-hosted overflow: a minimal
+    // `route` job (not a required check) picks the gate runner — an idle trusted
+    // self-hosted em-ci runner when the owned fleet has capacity, else
+    // `ubuntu-latest` overflow (bursts, capacity gaps, fork PRs). The gate stays a
+    // SINGLE job whose mandatory deterministic core floor (`xtask check-pr` plus the
+    // full suite) is the only hard blocker and the only required status check, with
+    // ub-review riding along as an advisory LLM layer that consumes the core results
+    // as grounding context. The router never blocks the merge and never size-routes.
     for needle in [
         // One required check, stable name for branch protection.
         "name: Unsafe Review Rust Result",
-        // Shared warmed setup on the zero-config hosted runner.
+        // Capacity router: self-hosted primary, gh-hosted overflow.
+        "Route CI runner",
+        "EM_RUNNER_READ_TOKEN",
+        "gh api \"orgs/EffortlessMetrics/actions/runners",
+        "runner_kind",
+        // Trusted self-hosted label set (shared em-ci group, any idle size).
+        "self-hosted",
+        "em-ci",
+        "trusted-pr",
+        // The gate consumes the router's runs-on value; gh-hosted is the overflow.
+        "fromJSON(needs.route.outputs.runner)",
         "runs-on: ubuntu-latest",
+        // Shared warmed setup, runner-kind agnostic.
         "dtolnay/rust-toolchain@1.95.0",
         "Swatinem/rust-cache@v2",
         // Fast precontext launches the LLM lanes off cheap signal, the deterministic
@@ -1000,20 +1015,22 @@ fn check_ci_routing_contract() -> Result<(), String> {
             ));
         }
     }
-    // The old self-hosted size-routed gate is retired. None of its routing markers
-    // may reappear: the gate must not depend on runner discovery, self-hosted size
-    // routing, a GitHub-hosted fallback lane, or the broken Docker Rust Small image.
+    // The capacity router is back, but ONLY in its minimal self-hosted-primary /
+    // gh-overflow shape. The OLD size-routed multi-lane pile-of-checks must not
+    // reappear: no per-size lanes (cpx42/cx43/cx53), no separate normalized "Rust
+    // Small Result" required check, no budget opt-out fallback modes, and no
+    // repository-level runner discovery or the broken Docker Rust Small image.
     if text.contains("repos/${") && text.contains("/actions/runners") {
         return Err(format!(
-            "{path} must not reintroduce repository runner discovery"
+            "{path} must not reintroduce repository runner discovery (org-level only)"
         ));
     }
     for forbidden in [
         "route-rust-small",
         "router_target=",
-        "EM_RUNNER_READ_TOKEN",
-        "actions/runners",
-        "self-hosted",
+        "cpx42",
+        "cx43",
+        "cx53",
         "Rust Small Fallback on GitHub Hosted",
         "fallback_mode=full",
         "no-github-fallback",
@@ -1023,7 +1040,7 @@ fn check_ci_routing_contract() -> Result<(), String> {
     ] {
         if text.contains(forbidden) {
             return Err(format!(
-                "{path} must not reintroduce retired routed-gate marker: {forbidden}"
+                "{path} must not reintroduce retired size-routed multi-lane marker: {forbidden}"
             ));
         }
     }
