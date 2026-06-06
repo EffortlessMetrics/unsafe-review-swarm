@@ -667,6 +667,14 @@ no default witness execution
 no publish or release side effects
 ```
 
+Runner fallback posture: the routed workspace lane prefers trusted self-hosted
+runners, but when self-hosted capacity or the runner read token is unavailable
+the lane falls back to the full `check-pr` gate on GitHub-hosted runners by
+default. The fallback must run the same proof set as the self-hosted lane, not
+a reduced subset, so a capacity outage never weakens the merge gate silently.
+The `no-github-fallback` label is the explicit budget opt-out; it routes the
+lane to a visible blocked failure instead of consuming hosted minutes.
+
 Swarm may carry experimental, scheduled, or workflow-dispatch lanes while they
 are being proven, but a lane must be listed in
 `policy/ci-lane-whitelist.toml` with its cost estimate and trigger policy
