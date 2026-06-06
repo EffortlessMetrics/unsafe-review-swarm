@@ -696,9 +696,7 @@ fn render_pr_summary_witness_plan(out: &mut String, output: &AnalyzeOutput) {
                 );
             }
         } else {
-            out.push_str(&format!(
-                "  - Route: no witness route was selected; route this to human review.\n"
-            ));
+            out.push_str("  - Route: no witness route was selected; route this to human review.\n");
         }
     }
     out.push('\n');

@@ -2676,12 +2676,11 @@ fn require_tokmd_rust_native_seam(
     if actual == expected.location_text {
         return Ok(());
     }
-    if let Some(stable_byte) = &expected.stable_byte {
-        if let Some(sink) = stable_byte.get("sink").and_then(serde_json::Value::as_str) {
-            if actual == sink {
-                return Ok(());
-            }
-        }
+    if let Some(stable_byte) = &expected.stable_byte
+        && let Some(sink) = stable_byte.get("sink").and_then(serde_json::Value::as_str)
+        && actual == sink
+    {
+        return Ok(());
     }
     Err(format!(
         "{context} rust_native_seam must match stable_byte.sink or location_text"
@@ -3576,6 +3575,10 @@ fn require_projected_optional_string_array(
     Ok(())
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "verifier mirrors the review-kit.json manifest surface; a parameter struct would only restate the artifact schema"
+)]
 fn check_review_kit_manifest(
     dir: &Path,
     scope: &str,
@@ -3748,6 +3751,10 @@ fn require_review_kit_summary_count(
     Ok(())
 }
 
+#[expect(
+    clippy::too_many_arguments,
+    reason = "verifier mirrors the review-kit.json handoff surface; a parameter struct would only restate the artifact schema"
+)]
 fn check_review_kit_handoff(
     review_kit: &serde_json::Value,
     top_card_id: Option<&str>,
@@ -8552,7 +8559,7 @@ fn require_pr_summary_witness_plan_projection(
             }
         } else {
             let expected = "  - Route: no witness route was selected; route this to human review.";
-            require_pr_summary_witness_line(section, path, card_id, "manual route", &expected)?;
+            require_pr_summary_witness_line(section, path, card_id, "manual route", expected)?;
         }
     }
     Ok(())
@@ -9492,6 +9499,13 @@ fn reject_json_positive_overclaims(path: &Path, value: &serde_json::Value) -> Re
 mod tests {
     use super::*;
 
+    fn err_text<T>(result: Result<T, String>) -> Result<String, String> {
+        match result {
+            Ok(_) => Err("expected error".to_string()),
+            Err(err) => Ok(err),
+        }
+    }
+
     fn stable_byte_candidate_projection() -> ManualCandidateProjection {
         ManualCandidateProjection {
             id: "R4R2-S001".to_string(),
@@ -9581,7 +9595,7 @@ mod tests {
     }
 
     #[test]
-    fn tokmd_handoff_rejects_stop_line_pr_aperture_drift() {
+    fn tokmd_handoff_rejects_stop_line_pr_aperture_drift() -> Result<(), String> {
         let expected = stable_byte_candidate_projection();
         let entry = serde_json::json!({
             "preset_inputs": {
@@ -9632,13 +9646,12 @@ mod tests {
             }
         });
 
-        let err = check_tokmd_preset_inputs(
+        let err = err_text(check_tokmd_preset_inputs(
             &entry,
             &expected,
             &manual_repair_queue_entry_projection(),
             "tokmd-packets.json packets[0]",
-        )
-        .expect_err("stale generic stop line should fail tokmd handoff verification");
+        ))?;
 
         assert!(err.contains("stop_line"), "{err}");
         assert!(err.contains("stop at PR aperture"), "{err}");
@@ -9648,94 +9661,106 @@ mod tests {
             ),
             "{err}"
         );
+        Ok(())
     }
 
     #[test]
-    fn tokmd_stable_byte_seed_rejects_safe_js_caller_projection_drift() {
+    fn tokmd_stable_byte_seed_rejects_safe_js_caller_projection_drift() -> Result<(), String> {
         let expected = stable_byte_candidate_projection();
         let mut seed = stable_byte_seed_projection();
         seed["safe_js_caller"] = serde_json::json!("Wrong safe JS caller route");
 
-        let err = check_tokmd_stable_byte_seed(&seed, &expected, "tokmd-packets.json packets[0]")
-            .expect_err("safe_js_caller drift should fail tokmd stable-byte seed verification");
+        let err = err_text(check_tokmd_stable_byte_seed(
+            &seed,
+            &expected,
+            "tokmd-packets.json packets[0]",
+        ))?;
 
         assert!(err.contains("safe_js_caller"), "{err}");
         assert!(err.contains("stable_byte.source"), "{err}");
         assert!(err.contains("Wrong safe JS caller route"), "{err}");
+        Ok(())
     }
 
     #[test]
-    fn tokmd_stable_byte_seed_rejects_manual_candidate_pr_aperture_projection_drift() {
+    fn tokmd_stable_byte_seed_rejects_manual_candidate_pr_aperture_projection_drift()
+    -> Result<(), String> {
         let expected = stable_byte_candidate_projection();
         let mut seed = stable_byte_seed_projection();
         seed["manual_candidate_pr_aperture"] =
             serde_json::json!("Wrong broad TextDecoder and S3 bundle");
 
-        let err = check_tokmd_stable_byte_seed(&seed, &expected, "tokmd-packets.json packets[0]")
-            .expect_err("manual_candidate_pr_aperture drift should fail tokmd stable-byte seed verification");
+        let err = err_text(check_tokmd_stable_byte_seed(
+            &seed,
+            &expected,
+            "tokmd-packets.json packets[0]",
+        ))?;
 
         assert!(err.contains("manual_candidate_pr_aperture"), "{err}");
         assert!(err.contains("pr_aperture"), "{err}");
         assert!(err.contains("Wrong broad"), "{err}");
+        Ok(())
     }
 
     #[test]
-    fn tokmd_packet_rejects_not_imported_limitation_when_seed_is_projected() {
+    fn tokmd_packet_rejects_not_imported_limitation_when_seed_is_projected() -> Result<(), String> {
         let expected = stable_byte_candidate_projection();
         let entry = serde_json::json!({
             "ledger_state_limitation": "ledger state is packet-local manual candidate metadata; external seed ledger rows are not imported",
             "stable_byte_seed": stable_byte_seed_projection(),
         });
 
-        let err =
-            check_tokmd_ledger_state_limitation(&entry, &expected, "tokmd-packets.json packets[0]")
-                .expect_err("joined seed packets must not say seed rows are not imported");
+        let err = err_text(check_tokmd_ledger_state_limitation(
+            &entry,
+            &expected,
+            "tokmd-packets.json packets[0]",
+        ))?;
 
         assert!(
             err.contains("external seed ledger rows are not imported"),
             "{err}"
         );
         assert!(err.contains("stable_byte_seed is projected"), "{err}");
+        Ok(())
     }
 
     #[test]
-    fn review_kit_stable_byte_seed_rejects_rust_native_sink_projection_drift() {
+    fn review_kit_stable_byte_seed_rejects_rust_native_sink_projection_drift() -> Result<(), String>
+    {
         let expected = stable_byte_candidate_projection();
         let mut seed = stable_byte_seed_projection();
         seed["rust_native_sink"] =
             serde_json::json!("src/runtime/webcore/Wrong.rs slice materialization");
 
-        let err = check_review_kit_stable_byte_seed(
+        let err = err_text(check_review_kit_stable_byte_seed(
             &seed,
             &expected,
             "review-kit.json handoff manual_candidates candidate_queue[0]",
-        )
-        .expect_err("rust_native_sink drift should fail review-kit stable-byte seed verification");
+        ))?;
 
         assert!(err.contains("rust_native_sink"), "{err}");
         assert!(err.contains("stable_byte.sink"), "{err}");
         assert!(err.contains("Wrong.rs"), "{err}");
+        Ok(())
     }
 
     #[test]
-    fn review_kit_stable_byte_seed_rejects_pr_aperture_consistency_drift() {
+    fn review_kit_stable_byte_seed_rejects_pr_aperture_consistency_drift() -> Result<(), String> {
         let expected = stable_byte_candidate_projection();
         let mut seed = stable_byte_seed_projection();
         seed["candidate_consistency"]["suggested_first_pr_has_manual_candidate_pr_aperture"] =
             serde_json::json!(false);
 
-        let err = check_review_kit_stable_byte_seed(
+        let err = err_text(check_review_kit_stable_byte_seed(
             &seed,
             &expected,
             "review-kit.json handoff manual_candidates candidate_queue[0]",
-        )
-        .expect_err(
-            "false PR aperture consistency should fail review-kit stable-byte seed verification",
-        );
+        ))?;
 
         assert!(
             err.contains("suggested_first_pr_has_manual_candidate_pr_aperture"),
             "{err}"
         );
+        Ok(())
     }
 }

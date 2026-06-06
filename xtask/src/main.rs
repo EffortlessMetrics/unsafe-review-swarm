@@ -4644,12 +4644,12 @@ fn check_stable_byte_coverage_fixture_path(
             "{path}:{line} stable-byte coverage row for `{seed_id}` positive fixture `{fixture_path}` is not registered in fixtures/calibration.toml"
         ));
     }
-    if let Some(expected_fixture) = dogfood_stable_byte_primary_fixture(seed_id) {
-        if fixture_name != expected_fixture {
-            return Err(format!(
-                "{path}:{line} stable-byte coverage row for `{seed_id}` positive fixture `{fixture_path}` must match primary fixture `fixtures/{expected_fixture}`"
-            ));
-        }
+    if let Some(expected_fixture) = dogfood_stable_byte_primary_fixture(seed_id)
+        && fixture_name != expected_fixture
+    {
+        return Err(format!(
+            "{path}:{line} stable-byte coverage row for `{seed_id}` positive fixture `{fixture_path}` must match primary fixture `fixtures/{expected_fixture}`"
+        ));
     }
     Ok(())
 }
@@ -12308,7 +12308,7 @@ OperationFamily::RawPointerRead => vec![
         text.push_str("A suggested witness route is not evidence until it is run externally.\n");
         text.push_str("Only `agent_readiness.state` `ready_for_agent` packets are edit tasks.\n");
         for heading in FIX_RECIPE_REQUIRED_SECTIONS {
-            text.push_str("\n");
+            text.push('\n');
             text.push_str(heading);
             text.push_str("\n\n");
             text.push_str("What `unsafe-review` is looking for:\n\n");

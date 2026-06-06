@@ -605,14 +605,12 @@ fn review_kit_repair_queue_index(
             if let Some(reason) = entry
                 .get("bucket_reason")
                 .and_then(serde_json::Value::as_str)
-            {
-                if !projection
+                && !projection
                     .bucket_reasons
                     .iter()
                     .any(|candidate| candidate == reason)
-                {
-                    projection.bucket_reasons.push(reason.to_string());
-                }
+            {
+                projection.bucket_reasons.push(reason.to_string());
             }
             if projection.agent_readiness.is_null() {
                 projection.agent_readiness = entry
@@ -753,13 +751,13 @@ fn review_kit_manual_candidate_queue_entry(
         "context_json": context_command(root, &candidate.id),
         "witness_plan": candidate_witness_plan_command(root, &candidate.id),
     });
-    if let Some(seed) = stable_byte_seed {
-        if let Some(object) = value.as_object_mut() {
-            object.insert(
-                "stable_byte_seed".to_string(),
-                review_kit_stable_byte_seed(seed, candidate),
-            );
-        }
+    if let Some(seed) = stable_byte_seed
+        && let Some(object) = value.as_object_mut()
+    {
+        object.insert(
+            "stable_byte_seed".to_string(),
+            review_kit_stable_byte_seed(seed, candidate),
+        );
     }
     value
 }

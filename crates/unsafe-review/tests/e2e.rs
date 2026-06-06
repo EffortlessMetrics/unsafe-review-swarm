@@ -2901,7 +2901,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             "stop at PR aperture: {}",
             manual_candidates["candidates"][0]["pr_aperture"]
                 .as_str()
-                .unwrap()
+                .unwrap_or_default()
         )
     );
     assert_eq!(
@@ -2911,9 +2911,9 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(
         tokmd_packets["packets"][0]["preset_inputs"]["bun-ub-pr-body"]["claims_not_made"]
             .as_array()
-            .unwrap()
-            .iter()
-            .any(|claim| claim.as_str() == Some("not Miri-clean status"))
+            .is_some_and(|claims| claims
+                .iter()
+                .any(|claim| claim.as_str() == Some("not Miri-clean status")))
     );
     assert!(
         tokmd_packets["packets"][0]["preset_inputs"]["bun-ub-review-map"]["comment_plan"]["relationship"]
@@ -4337,13 +4337,15 @@ fn outcome_compares_existing_json_snapshots_without_safety_claim() -> Result<(),
             "missing outcome trust boundary phrase: {phrase}"
         );
     }
-    let limitations = outcome["limitations"]
-        .as_array()
-        .expect("limitations should be an array");
     assert!(
-        limitations
-            .iter()
-            .any(|item| item.as_str().unwrap_or("").contains("Miri-clean status"))
+        outcome["limitations"]
+            .as_array()
+            .is_some_and(|limitations| {
+                limitations
+                    .iter()
+                    .any(|item| item.as_str().unwrap_or("").contains("Miri-clean status"))
+            }),
+        "limitations should be an array mentioning Miri-clean status"
     );
 
     let markdown = run_success([
@@ -5464,13 +5466,17 @@ fn assert_manual_candidate_front_panel(
     assert!(text.contains("did not run witnesses"));
     assert!(text.contains("edit source"));
     assert!(text.contains("policy inputs"));
+    let manual_index = text.find("## Manual candidates");
+    let later_index = text.find(later_heading);
     assert!(
-        text.find("## Manual candidates")
-            .expect("manual candidate section should exist")
-            < text
-                .find(later_heading)
-                .expect("later front-door heading should exist")
+        manual_index.is_some(),
+        "manual candidate section should exist"
     );
+    assert!(
+        later_index.is_some(),
+        "later front-door heading should exist"
+    );
+    assert!(manual_index < later_index);
 }
 
 fn assert_manual_candidate_witness_follow_up(text: &str) {
@@ -5540,13 +5546,14 @@ fn assert_manual_candidate_witness_follow_up(text: &str) {
     assert!(text.contains("did not run witnesses"));
     assert!(text.contains("did not edit source"));
     assert!(text.contains("policy inputs"));
+    let witness_index = text.find("## Manual candidate witness follow-up");
+    let trust_index = text.find("## Trust boundary");
     assert!(
-        text.find("## Manual candidate witness follow-up")
-            .expect("manual candidate witness section should exist")
-            < text
-                .find("## Trust boundary")
-                .expect("trust boundary section should exist")
+        witness_index.is_some(),
+        "manual candidate witness section should exist"
     );
+    assert!(trust_index.is_some(), "trust boundary section should exist");
+    assert!(witness_index < trust_index);
 }
 
 fn assert_default_repo_status_scope(

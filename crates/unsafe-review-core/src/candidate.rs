@@ -232,32 +232,32 @@ impl ManualCandidateStableByte {
                 self.proof_required
             ));
         }
-        if let Some(proof_mode) = proof_mode {
-            if self.proof_required != proof_mode.kind {
-                return Err(format!(
-                    "manual candidate stable_byte.proof_required `{}` must match proof_mode.kind `{}`",
-                    self.proof_required, proof_mode.kind
-                ));
-            }
+        if let Some(proof_mode) = proof_mode
+            && self.proof_required != proof_mode.kind
+        {
+            return Err(format!(
+                "manual candidate stable_byte.proof_required `{}` must match proof_mode.kind `{}`",
+                self.proof_required, proof_mode.kind
+            ));
         }
         require_nonempty(
             "stable_byte.suggested_fix_boundary",
             &self.suggested_fix_boundary,
         )?;
-        if let Some(fix_boundary) = fix_boundary {
-            if self.suggested_fix_boundary != fix_boundary {
-                return Err(format!(
-                    "manual candidate stable_byte.suggested_fix_boundary must match fix_boundary `{fix_boundary}`"
-                ));
-            }
+        if let Some(fix_boundary) = fix_boundary
+            && self.suggested_fix_boundary != fix_boundary
+        {
+            return Err(format!(
+                "manual candidate stable_byte.suggested_fix_boundary must match fix_boundary `{fix_boundary}`"
+            ));
         }
         require_nonempty("stable_byte.pr_aperture", &self.pr_aperture)?;
-        if let Some(pr_aperture) = pr_aperture {
-            if self.pr_aperture != pr_aperture {
-                return Err(format!(
-                    "manual candidate stable_byte.pr_aperture must match pr_aperture `{pr_aperture}`"
-                ));
-            }
+        if let Some(pr_aperture) = pr_aperture
+            && self.pr_aperture != pr_aperture
+        {
+            return Err(format!(
+                "manual candidate stable_byte.pr_aperture must match pr_aperture `{pr_aperture}`"
+            ));
         }
         if !is_known_stable_byte_ledger_state(&self.ledger_state) {
             return Err(format!(
