@@ -28,6 +28,46 @@ gating. None of the family members is itself the gate or the LLM reviewer (see
 UNSAFE-REVIEW-SPEC-0028). They are complementary, not competing, and a
 capability proven in one is expected to flow to the others.
 
+## The wider pattern: sensors + two orchestrators
+
+The same shape recurs across the org: **fast static sensors emit receipts; an
+orchestrator compiles them into a merge surface.** There are two orchestrators,
+at very different maturity:
+
+- **`ub-review`** — *live, in heavy use.* The LLM review layer: composes the
+  sensors + runs model lanes for PR analysis, review, and gating. This is the
+  proven orchestrator and it leads the contracts.
+- **`cockpitctl`** — *early alpha, not yet used; likely bumpy.* The deterministic
+  twin: ingests sensor receipts (`artifacts/*/report.json`, opaque tool payload,
+  contract in the envelope) and renders one deterministic merge surface
+  (`cockpit.report.v1`). Aspirational; it converges toward the proven contracts
+  as it matures, not the other way around.
+
+Beyond the four instruments above, a broader **CI-sensor fleet** (covguard,
+perfgate, lintdiff, diffguard, depguard, semverguard, buildfix, builddiag,
+shiplog) follows the same sensor pattern and is emerging on the cockpitctl side.
+
+**No NIH.** The first-party sensors exist only because no good tool covered the
+gap (e.g. unsafe-contract coverage). Where a good tool already answers the
+question, the orchestrator composes it — `ub-review` already runs third-party
+sensors (`ast-grep`, `actionlint`, `semgrep`, `zizmor`, `gitleaks`,
+`osv-scanner`, `cargo-audit`, `cargo-deny`, `shellcheck`) alongside the
+first-party ones. The bar for building a sensor is a real, uncovered need; the
+default is to compose an existing good tool. The shared receipt envelope is what
+lets first-party and third-party sensors sit in the same merge surface.
+
+**Convergence goal — one receipt, two orchestrators:** a sensor should emit a
+single receipt envelope that *both* `ub-review` (LLM) and `cockpitctl`
+(deterministic) consume. The envelope is anchored on the **proven** side first —
+`ub-review`'s real consumption and `ripr`'s shipped `gate-decision.json`
+(ripr-swarm #1038) — and the deterministic merge-surface side (cockpitctl #173)
+aligns to it. unsafe-review's gate manifest (SPEC-0034) targets that shared
+envelope, not a parallel format.
+
+Maturity is honest here: the emerging side will be bumpy. The posture is to
+exercise it, file precise issues against the receiving repo as bumps surface,
+and drive the fix — proven side leads, emerging side catches up.
+
 ## Shared contracts (converging)
 
 These are the interfaces the family is aligning on so `ub-review` can route all
