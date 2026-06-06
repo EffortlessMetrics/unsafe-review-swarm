@@ -101,6 +101,17 @@ its whole identity) are corrected to: `unsafe-review` is the unsafe coverage
 instrument; it offers a PR-gate mode and is also consumed as a lens inside a
 larger gate such as `ub-review`.
 
+`unsafe-review` is also one of a **family of sibling sensor tools** (with
+`ripr`, `cargo-allow`, `tokmd`) that share interfaces and deliberately learn
+from each other under the same orchestrator. The shared contracts (sensor CLI
+shape, `<tool>-gate.json` manifest envelope, ledger/evidence taxonomy,
+coverage-movement vocabulary, trust-boundary discipline, spec rails) and the
+live bidirectional learning ledger are documented in
+[`docs/interop/sibling-tools.md`](../interop/sibling-tools.md), mirrored in each
+sibling repo. Child specs that define a shared artifact (SPEC-0030 baseline
+movement, SPEC-0034 gate manifest, and the ledger schema) must co-design that
+artifact with the sibling tools rather than invent a parallel format.
+
 ## Surfaces are consumers, not owned modes
 
 There is one source of truth: ReviewCard and manual-candidate identity. Every
