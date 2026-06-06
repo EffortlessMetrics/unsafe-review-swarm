@@ -62,6 +62,26 @@ projection coherence before any curated promotion to `unsafe-review`.
 - optional nightly/MIR fact adapter ADR
 - repo outcome comparison
 
+## Next analyzer work
+
+Recorded as known follow-ups; not claimed as implemented by any current
+release.
+
+- stale-span-after-reentry detection: flag a raw pointer/length obtained from a
+  JS ArrayBuffer/TypedArray that is used after a call that can re-enter user JS
+  (`coerce_to_*`, property access, callback) without re-fetching, re-validating,
+  or pinning the span; an `is_detached()` check against a pre-call snapshot is
+  the tell
+  ([swarm #1393](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1393)).
+  Manual candidates can already express this class as
+  `stable-byte-source-getter-reentry` with a re-fetch-or-snapshot-after-reentry
+  fix boundary; the analyzer does not discover it yet.
+- optional confirmation-cue execution (`--allow-heavy`): optionally build and
+  run the per-card minimal repro and report the actual runtime verdict
+  ([swarm #1394](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1394)).
+  Today confirmation cues are emitted as unexecuted hypotheses; unsafe-review
+  does not run them.
+
 ## Deferred
 
 - automatic code fixes
