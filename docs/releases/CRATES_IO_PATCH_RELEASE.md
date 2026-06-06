@@ -32,19 +32,19 @@ facade-only patch releases.
 Synchronized patch example:
 
 ```text
-unsafe-review-core 0.3.1 -> 0.3.2
-unsafe-review-cli  0.3.1 -> 0.3.2
-unsafe-review      0.3.1 -> 0.3.2
+unsafe-review-core 0.3.2 -> 0.3.3
+unsafe-review-cli  0.3.2 -> 0.3.3
+unsafe-review      0.3.2 -> 0.3.3
 ```
 
 Facade-only patching is allowed only when the release-prep PR documents why the
 facade crate is the only published surface that changed.
 
-For the current repo-dogfood case, `0.3.2` is a pre-1.0 repo usability patch
-after a history-preserving swarm import. It is not memory-safety proof, UB-free
-status, Miri-clean status, site-execution proof, calibrated precision/recall,
-policy readiness, witness execution, automatic comment release, or
-source-editing release.
+For the current Bun manual-candidate cockpit case, `0.3.3` is a pre-1.0
+usability patch after a history-preserving swarm import. It is not
+memory-safety proof, UB-free status, Miri-clean status, site-execution proof,
+calibrated precision/recall, policy readiness, witness execution, automatic
+comment release, or source-editing release.
 
 ## Validation
 
@@ -89,21 +89,21 @@ rtk cargo publish -p unsafe-review
 Then smoke the installed crate from crates.io:
 
 ```bash
-rtk cargo install unsafe-review --version 0.3.2 --locked --root target/install-published-0.3.2
-target/install-published-0.3.2/bin/unsafe-review --version
-target/install-published-0.3.2/bin/unsafe-review doctor
-target/install-published-0.3.2/bin/unsafe-review repo --help
-target/install-published-0.3.2/bin/unsafe-review repo --root fixtures --include '**/*.rs' --list-files
-target/install-published-0.3.2/bin/unsafe-review repo --root fixtures/raw_pointer_alignment --format markdown --out target/unsafe-review-published-0.3.2-repo.md --timeout-seconds 300
-rm -rf target/unsafe-review-published-0.3.2-fixture target/unsafe-review-published-0.3.2-smoke
-cp -R fixtures/raw_pointer_alignment target/unsafe-review-published-0.3.2-fixture
-mkdir -p target/unsafe-review-published-0.3.2-fixture/.unsafe-review/candidates
-target/install-published-0.3.2/bin/unsafe-review candidate import docs/examples/manual-candidates/textdecoder-sab.json --out target/unsafe-review-published-0.3.2-fixture/.unsafe-review/candidates/R4R2-S001.json
-target/install-published-0.3.2/bin/unsafe-review first-pr --root target/unsafe-review-published-0.3.2-fixture --diff target/unsafe-review-published-0.3.2-fixture/change.diff --out-dir target/unsafe-review-published-0.3.2-smoke
-rtk cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review-published-0.3.2-smoke
-target/install-published-0.3.2/bin/unsafe-review explain <card-id>
-target/install-published-0.3.2/bin/unsafe-review context <card-id> --json
-target/install-published-0.3.2/bin/unsafe-review support
+rtk cargo install unsafe-review --version 0.3.3 --locked --root target/install-published-0.3.3
+target/install-published-0.3.3/bin/unsafe-review --version
+target/install-published-0.3.3/bin/unsafe-review doctor
+target/install-published-0.3.3/bin/unsafe-review repo --help
+target/install-published-0.3.3/bin/unsafe-review repo --root fixtures --include '**/*.rs' --list-files
+target/install-published-0.3.3/bin/unsafe-review repo --root fixtures/raw_pointer_alignment --format markdown --out target/unsafe-review-published-0.3.3-repo.md --timeout-seconds 300
+rm -rf target/unsafe-review-published-0.3.3-fixture target/unsafe-review-published-0.3.3-smoke
+cp -R fixtures/raw_pointer_alignment target/unsafe-review-published-0.3.3-fixture
+mkdir -p target/unsafe-review-published-0.3.3-fixture/.unsafe-review/candidates
+target/install-published-0.3.3/bin/unsafe-review candidate import docs/examples/manual-candidates/textdecoder-sab.json --out target/unsafe-review-published-0.3.3-fixture/.unsafe-review/candidates/R4R2-S001.json
+target/install-published-0.3.3/bin/unsafe-review first-pr --root target/unsafe-review-published-0.3.3-fixture --diff target/unsafe-review-published-0.3.3-fixture/change.diff --out-dir target/unsafe-review-published-0.3.3-smoke
+rtk cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review-published-0.3.3-smoke
+target/install-published-0.3.3/bin/unsafe-review explain <card-id>
+target/install-published-0.3.3/bin/unsafe-review context <card-id> --json
+target/install-published-0.3.3/bin/unsafe-review support
 ```
 
 Verify crates.io and docs.rs rendering for every published crate. For
