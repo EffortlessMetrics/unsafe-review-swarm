@@ -545,6 +545,11 @@ required_core_fixtures = [
   "js_buffer_reentry_node_fs_rab_scalar_write_scheduled_before_capture_no_card",
   "js_buffer_reentry_node_fs_rab_encoded_write_scheduled_before_capture_no_card",
   "js_buffer_reentry_node_fs_rab_encoded_write_recapture_after_dispatch_no_card",
+  "js_buffer_stale_span_slice_index_after_reentry",
+  "js_buffer_stale_span_stale_detached_check",
+  "js_buffer_stale_span_refetch_before_use_no_card",
+  "js_buffer_stale_span_pinned_before_use_no_card",
+  "js_buffer_stale_span_use_before_reentry_no_card",
   "stable_byte_sab_borrowed_slice",
   "stable_byte_sab_mysql_blob_rawslice",
   "stable_byte_sab_snapshot_no_card",
@@ -5931,6 +5936,47 @@ fixture = "js_buffer_reentry_node_fs_rab_encoded_write_recapture_after_dispatch_
 kind = "false_positive_control"
 claim = "Stable-byte RAB async heuristic does not emit a ReviewCard when encoded write input is recaptured into a fresh container after async dispatch"
 support_tier = "Stable-byte RAB async heuristic"
+expected_cards = 0
+
+[[cases]]
+fixture = "js_buffer_stale_span_slice_index_after_reentry"
+kind = "positive"
+claim = "JS-backed buffer span materialized before options getter reentry and indexed afterward without re-fetch emits one advisory getter-reentry ReviewCard"
+support_tier = "JS-backed buffer reentry heuristic"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "stable_byte_source_getter_reentry"
+expected_hazard = "stable_byte_source"
+
+[[cases]]
+fixture = "js_buffer_stale_span_stale_detached_check"
+kind = "positive"
+claim = "JS-backed buffer span used after reentry behind a stale pre-reentry is_detached check emits one advisory getter-reentry ReviewCard naming the stale guard"
+support_tier = "JS-backed buffer reentry heuristic"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "stable_byte_source_getter_reentry"
+expected_hazard = "stable_byte_source"
+
+[[cases]]
+fixture = "js_buffer_stale_span_refetch_before_use_no_card"
+kind = "false_positive_control"
+claim = "JS-backed buffer stale-span heuristic does not emit a ReviewCard when the descriptor is re-fetched after reentry before any span use"
+support_tier = "JS-backed buffer reentry heuristic"
+expected_cards = 0
+
+[[cases]]
+fixture = "js_buffer_stale_span_pinned_before_use_no_card"
+kind = "false_positive_control"
+claim = "JS-backed buffer stale-span heuristic does not emit a ReviewCard when the buffer is pinned after reentry before any span use"
+support_tier = "JS-backed buffer reentry heuristic"
+expected_cards = 0
+
+[[cases]]
+fixture = "js_buffer_stale_span_use_before_reentry_no_card"
+kind = "false_positive_control"
+claim = "JS-backed buffer stale-span heuristic does not emit a ReviewCard when the span is only used before any possible JS reentry"
+support_tier = "JS-backed buffer reentry heuristic"
 expected_cards = 0
 
 [[cases]]

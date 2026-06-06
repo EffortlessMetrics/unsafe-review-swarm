@@ -73,9 +73,13 @@ release.
   or pinning the span; an `is_detached()` check against a pre-call snapshot is
   the tell
   ([swarm #1393](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1393)).
-  Manual candidates can already express this class as
-  `stable-byte-source-getter-reentry` with a re-fetch-or-snapshot-after-reentry
-  fix boundary; the analyzer does not discover it yet.
+  A first fixture-pinned advisory heuristic now covers the same-function shape:
+  materialize-after-reentry and stale-span-use-after-reentry both emit
+  `stable-byte-source-getter-reentry` cards, and a stale pre-reentry
+  `is_detached()` check is named in the card instead of counting as a guard.
+  Remaining follow-ups: cross-function span flow, helper-returned spans, and
+  length-only staleness; the heuristic is syntactic and fixture-pinned, not a
+  dataflow proof.
 - optional confirmation-cue execution (`--allow-heavy`): optionally build and
   run the per-card minimal repro and report the actual runtime verdict
   ([swarm #1394](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1394)).
