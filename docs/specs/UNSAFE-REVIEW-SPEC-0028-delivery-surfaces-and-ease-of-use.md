@@ -67,27 +67,43 @@ It emits artifacts those systems consume. It does not become those systems.
 ## The product boundary
 
 ```text
-unsafe-review = coverage instrument
-ub-review     = CI cockpit / orchestrator
+unsafe-review = unsafe coverage instrument
+ub-review     = LLM review layer / orchestrator on top of the sensor tools
 ```
 
-`ub-review` (or any thin wrapper) orchestrates clippy, ripr, cargo-allow,
-generated tests, LLM review, comment posting, blocking policy, caches, and
-runners. `unsafe-review` provides the high-integrity unsafe coverage substrate
-and the artifacts. The actor that posts a comment, blocks a merge, or runs a
-witness is the orchestrator or an explicit opt-in path — never `unsafe-review`
-by default.
+`unsafe-review` is one of a **series of deterministic, fast, useful static PR
+tools** (with `ripr`, `cargo-allow`, `tokmd`): each is cheap, runs on a diff,
+and emits trusted coverage artifacts without executing the repo's code or making
+a verdict.
 
-`unsafe-review` does ship a first-class **standalone PR-gate mode** for adopters
-who want only this one tool in their CI: `first-pr`/`repo` plus the optional
-`--policy no-new-debt` exit hook (UNSAFE-REVIEW-SPEC-0030) is a complete,
-self-contained gate. That mode is real and supported. But it is a thin opt-in
-over the same coverage artifacts, not a separate product — and the reference
-architecture, including the maintainer's own use, is `unsafe-review` as a
-**component inside `ub-review`**, where ub-review owns orchestration and posting
-and consumes unsafe-review's artifacts. The two are not in tension: the
-standalone gate and the orchestrated component read the identical coverage
-substrate; only the actor and the blocking decision differ.
+`ub-review` is a **CI gate** built on that family plus LLM lanes. It lets a repo
+keep its *mandatory* CI surface clean and simple, then dynamically adds the
+**PR-relevant** gate items — composing the deterministic family (the whole set,
+or a subset the user configures, or others) and running **LLM lanes** over their
+coverage artifacts to do PR analysis, review, and gating. So `ub-review` owns
+LLM review, comment posting, the blocking decision, generated tests, caches, and
+runner routing; `unsafe-review` provides the high-integrity coverage substrate
+and the **bounded optic** those LLM lanes read — coverage slots, do-not-do
+rules, and forbidden-claim-checked comment-plan slots. `unsafe-review` is the
+instrument, not the gate and not the LLM reviewer.
+
+**Posting.** `unsafe-review` does not post by default. In its standalone PR-gate
+mode, posting is an explicit opt-in and `unsafe-review` posts the planned
+comments itself (the trusted-poster split-token / idempotency model). When run
+inside `ub-review`, the LLM layer posts and `unsafe-review` only emits the plan.
+`comment-plan.json` is the durable artifact in both deployments; who posts
+depends on deployment, the plan does not.
+
+`unsafe-review` ships a first-class **standalone PR-gate mode** for adopters who
+want only this one tool in their CI: `first-pr`/`repo`, the optional
+`--policy no-new-debt` exit hook (UNSAFE-REVIEW-SPEC-0030), and opt-in comment
+posting make a complete, self-contained gate. That mode is real and supported.
+It is a thin layer over the same coverage artifacts, not a separate product —
+and the reference architecture, including the maintainer's own use, is
+`unsafe-review` as a **component inside `ub-review`**, the LLM layer that
+consumes its artifacts and owns review/posting/blocking. The two are not in
+tension: both read the identical coverage substrate; only the consuming actor,
+the posting actor, and the blocking decision differ.
 
 The standalone gate mode also serves as the instrument's **dogfood and testing
 surface**: running it on this repository's own PRs exercises the full coverage

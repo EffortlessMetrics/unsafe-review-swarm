@@ -22,6 +22,8 @@ If you are new to the repository, read in this order:
 | Agent packet projection | `UNSAFE-REVIEW-SPEC-0013` | `UNSAFE-REVIEW-SPEC-0006`, `0012`, `0019` |
 | Inventory, policy, badges | `UNSAFE-REVIEW-SPEC-0010`, `0014` | support tiers, policy ledgers |
 | Ease of use / adoption surfaces | `UNSAFE-REVIEW-SPEC-0028` | `UNSAFE-REVIEW-SPEC-0029` coverage model, `0030` baseline movement |
+| Adoption surface build (badge/comments/LLM/manifest/repo) | `UNSAFE-REVIEW-SPEC-0028` | `0031` badge, `0032` comment-plan, `0033` LLM packet, `0034` ub-review manifest, `0035` repo-scan |
+| Sibling-tool interop / cross-pollination | `docs/interop/sibling-tools.md` | `UNSAFE-REVIEW-SPEC-0028`, `0034` |
 | Release prep and publication evidence | `UNSAFE-REVIEW-SPEC-0015`, `0016`, `0019`, `0020` | latest closeout in `docs/handoffs/` |
 | Source-of-truth stack maintenance | `UNSAFE-REVIEW-SPEC-0020` | doc artifacts ledger, goals manifest, plan links |
 | Codex/agent execution | active goal manifest | linked plan -> linked spec -> linked proposal |

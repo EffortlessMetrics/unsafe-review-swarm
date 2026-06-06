@@ -1,11 +1,13 @@
 # Sibling tools and bidirectional learning
 
-`unsafe-review` is one of a family of complementary Rust PR-review **sensor
-tools** that share interfaces, are consumed by the same orchestrator, and
-deliberately learn from each other. This document makes that relationship
-explicit so a contributor in any of the repos can see what is shared, what is
-converging, and how to keep the flow going. Each sibling repo carries a mirror
-of this doc pointing back at the same convergence ledger.
+`unsafe-review` is one of a series of **deterministic, fast, useful static PR
+tools** that share interfaces, are composed by the same CI gate, and
+deliberately learn from each other. Each is cheap, runs on a diff, and emits
+trusted coverage artifacts without executing repo code or issuing a verdict.
+This document makes that relationship explicit so a contributor in any of the
+repos can see what is shared, what is converging, and how to keep the flow
+going. Each sibling repo carries a mirror of this doc pointing back at the same
+convergence ledger.
 
 ## The family
 
@@ -15,12 +17,16 @@ of this doc pointing back at the same convergence ledger.
 | `ripr` | `EffortlessMetrics/ripr-swarm` | mutation / weak-oracle exposure coverage |
 | `cargo-allow` | `EffortlessMetrics/cargo-allow` | owned exception ledger (unsafe/panic/lint/etc. allow entries) |
 | `tokmd` | `EffortlessMetrics/tokmd-swarm` | token-aware repo receipts and PR context packets |
-| `ub-review` | `EffortlessMetrics/ub-review` | **orchestrator / cockpit** — runs the sensors, owns posting, blocking, LLM lanes |
+| `ub-review` | `EffortlessMetrics/ub-review` | **CI gate** — composes the family (configurable) + LLM lanes; owns PR analysis, review, posting, and the blocking decision |
 
-Each sensor is an instrument; `ub-review` is the cockpit. None of the sensors
-is the gate or the orchestrator (see UNSAFE-REVIEW-SPEC-0028). They are
-complementary, not competing, and a capability proven in one is expected to
-flow to the others.
+Each family member is a deterministic, fast, static PR tool — an instrument.
+`ub-review` is the CI gate built on top of them: it keeps a repo's mandatory CI
+surface clean and simple, then dynamically adds the PR-relevant gate items by
+composing the family (the whole set, a user-configured subset, or others) and
+running LLM lanes over their coverage artifacts for analysis, review, and
+gating. None of the family members is itself the gate or the LLM reviewer (see
+UNSAFE-REVIEW-SPEC-0028). They are complementary, not competing, and a
+capability proven in one is expected to flow to the others.
 
 ## Shared contracts (converging)
 
