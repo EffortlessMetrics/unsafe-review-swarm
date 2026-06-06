@@ -31,6 +31,7 @@ use unsafe_review_core::{
 };
 
 mod card_lookup;
+mod confirm;
 mod first_pr;
 
 const NO_CHANGED_GAPS_MESSAGE: &str = "No changed unsafe-review gaps were found.";
@@ -115,6 +116,7 @@ pub(crate) fn execute(command: Command) -> Result<(), String> {
         Command::Explain { root, id, format } => explain(&root, &id, format),
         Command::Context { root, id } => context(&root, &id),
         Command::Candidate(command) => candidate(command),
+        Command::Confirm(options) => confirm::run(options),
         Command::ReceiptTemplate(options) => receipt_template(options),
         Command::ReceiptValidate { root } => receipt_validate(&root),
         Command::ReceiptAudit(options) => receipt_audit(options),
@@ -2110,6 +2112,9 @@ fn print_help() {
     );
     println!("  candidate list [--root .] [--format json|markdown] [--out file]");
     println!("  candidate witness-plan [--root .] <candidate-id> [--out file]");
+    println!(
+        "  confirm <card-id> --dry-run|--allow-heavy [--author <owner>] [--root .] [--base origin/main|--diff file] [--expires-at <date>] [--timeout-seconds 600] [--command <override>] [--out file]  (executes the routed witness command only with --allow-heavy; never default; --dry-run previews without executing)"
+    );
     println!("  support");
     println!(
         "  outcome --before <cards.json> --after <cards.json> [--format json|markdown] [--out file]"

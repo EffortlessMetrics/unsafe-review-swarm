@@ -708,6 +708,55 @@ keeps the saved command hash visible when present.
 `unsafe-review` imports receipts. It does not run Miri, `cargo-careful`,
 sanitizers, Loom, Shuttle, Kani, or Crux by default.
 
+## Confirm (Opt-In Witness Execution)
+
+Preview a card's confirmation step without executing anything:
+
+```bash
+unsafe-review confirm <card-id> --dry-run --root .
+```
+
+`--dry-run` resolves the card, then prints the witness route kind, the exact
+command that would run, the working directory, the timeout that would apply,
+and the receipt constructor that would classify the output. It exits 0 and
+executes nothing; it needs neither `--allow-heavy` nor `--author`.
+
+Execute the card's routed witness command locally with the explicit opt-in:
+
+```bash
+unsafe-review confirm <card-id> \
+  --allow-heavy \
+  --author reviewer/name \
+  --root . \
+  --timeout-seconds 600 \
+  --out .unsafe-review/receipts/confirm-miri.json
+```
+
+Without `--allow-heavy` (and without `--dry-run`), `confirm` refuses with exit
+code 2: it executes the routed witness command only with the explicit
+`--allow-heavy` opt-in, and `unsafe-review` never executes witnesses by
+default. `--author` is required with `--allow-heavy` because witness receipts
+record who ran the confirmation.
+
+With `--allow-heavy`, `confirm` picks the `--command` override when given,
+otherwise the card's first witness route that carries a command. Cards that
+route only to `human-deep-review` (or carry no routed command) are refused
+before anything executes. The command runs without a shell: leading
+`VAR=value` or `VAR='value with spaces'` tokens become environment
+assignments and the rest is whitespace-split into argv. The run is killed
+after `--timeout-seconds` (default 600).
+
+The captured output is classified only by the existing saved-output receipt
+constructors for the selected route kind (`miri`, `cargo-careful`,
+`asan`/`msan`/`tsan`/`lsan`, `loom`/`shuttle`, `kani`/`crux`). On success the
+receipt is written to `--out` or
+`.unsafe-review/receipts/confirm-<tool>-<card-hash>.json`; the card upgrades
+only after `check` or `first-pr` imports that saved receipt. If the output does
+not classify as witness evidence, the raw output is saved under
+`target/unsafe-review-confirm/` and no receipt is written; `confirm` never
+fabricates a receipt. A confirm receipt records `strength = "ran"` for a single
+local run; it is not site-execution proof for other configurations.
+
 ## Doctor
 
 Run a lightweight environment check:

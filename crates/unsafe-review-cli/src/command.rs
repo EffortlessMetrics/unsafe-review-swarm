@@ -109,6 +109,37 @@ pub(crate) struct SavedOutputReceiptOptions {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ConfirmOptions {
+    pub card_id: String,
+    pub root: PathBuf,
+    pub base: Option<String>,
+    pub diff: Option<DiffInput>,
+    pub dry_run: bool,
+    pub author: String,
+    pub expires_at: Option<String>,
+    pub timeout_seconds: u64,
+    pub command: Option<String>,
+    pub out: Option<PathBuf>,
+}
+
+impl Default for ConfirmOptions {
+    fn default() -> Self {
+        Self {
+            card_id: String::new(),
+            root: PathBuf::from("."),
+            base: None,
+            diff: None,
+            dry_run: false,
+            author: String::new(),
+            expires_at: None,
+            timeout_seconds: 600,
+            command: None,
+            out: None,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct OutcomeOptions {
     pub before: PathBuf,
     pub after: PathBuf,
@@ -171,6 +202,7 @@ pub(crate) enum Command {
         id: String,
     },
     Candidate(CandidateCommand),
+    Confirm(ConfirmOptions),
     ReceiptTemplate(ReceiptTemplateOptions),
     ReceiptValidate {
         root: PathBuf,

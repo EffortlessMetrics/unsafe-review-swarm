@@ -197,7 +197,11 @@ must include a non-empty `command`.
 - no soundness claim
 - no hidden blocking unless policy mode explicitly enables it
 - no duplicate truth outside this spec and linked policy files
-- no witness execution by `unsafe-review`
+- no witness execution by `unsafe-review` by default; the explicit
+  `confirm --allow-heavy` opt-in executes one routed witness command locally
+  and records the result only as a saved witness receipt through the existing
+  saved-output import constructors, with no success claim without a receipt;
+  the template and `import-*` commands still never execute anything
 - no receipt match without exact card identity
 - no claim that a receipt proves arbitrary callers or the whole repository safe
 

@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use unsafe_review_core::PolicyMode;
 
 mod check_parse;
+mod confirm;
 mod policy;
 mod receipt;
 
@@ -46,6 +47,7 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
         "explain" => parse_explain(rest),
         "context" => parse_context(rest),
         "candidate" => parse_candidate(rest).map(Command::Candidate),
+        "confirm" => confirm::parse_confirm(rest).map(Command::Confirm),
         "outcome" => parse_outcome(rest).map(Command::Outcome),
         "policy" => policy::parse_policy_command(rest),
         "receipt" => receipt::parse_receipt(rest),
@@ -1252,6 +1254,153 @@ mod tests {
 
         assert_eq!(explain, Err("expected exactly one card id".to_string()));
         assert_eq!(context, Err("expected exactly one card id".to_string()));
+    }
+
+    #[test]
+    fn parses_confirm_command_with_allow_heavy_opt_in() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "confirm",
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1",
+            "--allow-heavy",
+            "--root=fixtures/raw_pointer_alignment",
+            "--author",
+            "core/fixtures",
+            "--expires-at=2026-09-18",
+            "--timeout-seconds=120",
+            "--command",
+            "cargo +nightly miri test read_header",
+            "--out",
+            "target/confirm-receipt.json",
+        ]))?;
+
+        let Command::Confirm(options) = command else {
+            return Err("expected confirm command".to_string());
+        };
+        assert_eq!(
+            options.card_id,
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+        );
+        assert_eq!(
+            options.root,
+            PathBuf::from("fixtures/raw_pointer_alignment")
+        );
+        assert_eq!(options.author, "core/fixtures");
+        assert_eq!(options.expires_at.as_deref(), Some("2026-09-18"));
+        assert_eq!(options.timeout_seconds, 120);
+        assert_eq!(
+            options.command.as_deref(),
+            Some("cargo +nightly miri test read_header")
+        );
+        assert_eq!(
+            options.out,
+            Some(PathBuf::from("target/confirm-receipt.json"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn confirm_defaults_timeout_to_600_seconds() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "confirm",
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1",
+            "--allow-heavy",
+            "--author=core/fixtures",
+        ]))?;
+
+        let Command::Confirm(options) = command else {
+            return Err("expected confirm command".to_string());
+        };
+        assert_eq!(options.timeout_seconds, 600);
+        assert_eq!(options.expires_at, None);
+        assert_eq!(options.command, None);
+        assert_eq!(options.out, None);
+        Ok(())
+    }
+
+    #[test]
+    fn confirm_refuses_without_allow_heavy_opt_in() {
+        let command = parse(args([
+            "unsafe-review",
+            "confirm",
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1",
+            "--author",
+            "core/fixtures",
+        ]));
+
+        let err = command.err().unwrap_or_default();
+        assert!(err.contains("only with the explicit --allow-heavy opt-in"));
+        assert!(err.contains("unsafe-review never executes witnesses by default"));
+        assert!(err.contains("--dry-run to preview"));
+    }
+
+    #[test]
+    fn confirm_dry_run_needs_neither_allow_heavy_nor_author() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "confirm",
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1",
+            "--dry-run",
+            "--root=fixtures/raw_pointer_alignment",
+        ]))?;
+
+        let Command::Confirm(options) = command else {
+            return Err("expected confirm command".to_string());
+        };
+        assert!(options.dry_run);
+        assert_eq!(options.author, "");
+        assert_eq!(options.timeout_seconds, 600);
+        Ok(())
+    }
+
+    #[test]
+    fn confirm_rejects_dry_run_combined_with_allow_heavy() {
+        let command = parse(args([
+            "unsafe-review",
+            "confirm",
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1",
+            "--dry-run",
+            "--allow-heavy",
+            "--author=core/fixtures",
+        ]));
+
+        let err = command.err().unwrap_or_default();
+        assert!(err.contains("choose only one of --dry-run or --allow-heavy"));
+    }
+
+    #[test]
+    fn confirm_requires_author_for_accountability() {
+        let command = parse(args([
+            "unsafe-review",
+            "confirm",
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1",
+            "--allow-heavy",
+        ]));
+
+        let err = command.err().unwrap_or_default();
+        assert!(err.contains("confirm requires --author"));
+        assert!(err.contains("accountability"));
+    }
+
+    #[test]
+    fn confirm_rejects_conflicting_diff_sources() {
+        let command = parse(args([
+            "unsafe-review",
+            "confirm",
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1",
+            "--allow-heavy",
+            "--author=core/fixtures",
+            "--base",
+            "origin/main",
+            "--diff",
+            "change.diff",
+        ]));
+
+        assert_eq!(
+            command,
+            Err("choose only one of --base or --diff".to_string())
+        );
     }
 
     #[test]

@@ -76,11 +76,14 @@ release.
   Manual candidates can already express this class as
   `stable-byte-source-getter-reentry` with a re-fetch-or-snapshot-after-reentry
   fix boundary; the analyzer does not discover it yet.
-- optional confirmation-cue execution (`--allow-heavy`): optionally build and
-  run the per-card minimal repro and report the actual runtime verdict
+- optional confirmation-cue execution (`--allow-heavy`): the opt-in
+  `confirm <card-id> --allow-heavy` command now exists and executes a card's
+  routed witness command locally, recording the result only as a saved witness
+  receipt through the existing import constructors
   ([swarm #1394](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1394)).
-  Today confirmation cues are emitted as unexecuted hypotheses; unsafe-review
-  does not run them.
+  Confirmation cues remain unexecuted by default; nothing runs without the
+  explicit `--allow-heavy` opt-in. Remaining follow-up: rank cards by
+  confirmed-vs-pending confirmation state.
 
 ## Deferred
 

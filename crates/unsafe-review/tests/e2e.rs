@@ -3338,6 +3338,147 @@ fn help_reports_first_run_trust_boundary_without_overclaims() -> Result<(), Box<
 }
 
 #[test]
+fn help_lists_confirm_with_allow_heavy_boundary() -> Result<(), Box<dyn Error>> {
+    let output = run_success([os("--help")])?;
+    let text = stdout_text(&output)?;
+
+    assert!(text.contains("confirm <card-id> --dry-run|--allow-heavy"));
+    assert!(
+        text.contains("executes the routed witness command only with --allow-heavy; never default")
+    );
+    assert!(text.contains("--dry-run previews without executing"));
+
+    Ok(())
+}
+
+#[test]
+fn confirm_refuses_without_allow_heavy_and_points_at_dry_run() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+
+    let output = run_failure([
+        os("confirm"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"),
+    ])?;
+
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(stdout_text(&output)?.trim(), "");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("only with the explicit --allow-heavy opt-in"),
+        "stderr should state the opt-in boundary: {stderr}"
+    );
+    assert!(
+        stderr.contains("unsafe-review never executes witnesses by default"),
+        "stderr should restate the default boundary: {stderr}"
+    );
+    assert!(
+        stderr.contains("--dry-run to preview"),
+        "stderr should point at --dry-run: {stderr}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn confirm_dry_run_previews_routed_command_without_executing() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+
+    let json = run_success([
+        os("check"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let value = parse_json(&stdout_text(&json)?)?;
+    let card_id = json_str(&value["cards"][0]["id"], "cards[0].id")?;
+
+    let output = run_success([
+        os("confirm"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--dry-run"),
+        OsString::from(card_id),
+    ])?;
+    let text = stdout_text(&output)?;
+
+    assert!(text.contains("unsafe-review confirm (dry run)"));
+    assert!(text.contains(&format!("card: {card_id}")));
+    assert!(text.contains("operation family: raw_pointer_read"));
+    assert!(text.contains("route: miri"));
+    assert!(text.contains("command: cargo +nightly miri test read_header"));
+    assert!(text.contains("timeout: 600s"));
+    assert!(text.contains("expected evidence: a `miri` witness receipt"));
+    assert!(text.contains("dry run only; nothing was executed"));
+    assert!(text.contains("unsafe-review never executes witnesses by default"));
+    assert!(text.contains("trust boundary: static unsafe contract review only"));
+    assert!(
+        !fixture.join(".unsafe-review").join("receipts").exists(),
+        "dry run must not write a receipt"
+    );
+    assert!(
+        !fixture
+            .join("target")
+            .join("unsafe-review-confirm")
+            .exists(),
+        "dry run must not write an output log"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn confirm_allow_heavy_reports_spawn_failure_without_writing_a_receipt()
+-> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+
+    let json = run_success([
+        os("check"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let value = parse_json(&stdout_text(&json)?)?;
+    let card_id = json_str(&value["cards"][0]["id"], "cards[0].id")?;
+
+    let output = run_failure([
+        os("confirm"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--allow-heavy"),
+        os("--author"),
+        os("core/e2e"),
+        os("--command"),
+        os("unsafe-review-e2e-missing-witness-binary miri-test read_header"),
+        OsString::from(card_id),
+    ])?;
+
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("failed to spawn `unsafe-review-e2e-missing-witness-binary`"),
+        "stderr should report the spawn failure honestly: {stderr}"
+    );
+    assert!(
+        stderr.contains("no receipt was written"),
+        "stderr should confirm no receipt was fabricated: {stderr}"
+    );
+    assert!(
+        !fixture.join(".unsafe-review").join("receipts").exists(),
+        "spawn failure must not write a receipt"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn repo_help_reports_repo_specific_scale_guidance() -> Result<(), Box<dyn Error>> {
     let output = run_success([os("repo"), os("--help")])?;
     let text = stdout_text(&output)?;
