@@ -33,6 +33,10 @@ pub(crate) struct ConfirmationCue {
     build_this_first: BuildThisFirstCue,
     minimal_repro: MinimalReproCue,
     confirmation_step: String,
+    /// True only when an imported witness receipt records that a runtime
+    /// witness tool actually executed for this card. It reflects the imported
+    /// receipt's claim; unsafe-review did not run anything itself.
+    runtime_executed: bool,
     trust_boundary: &'static str,
 }
 
@@ -43,6 +47,7 @@ impl From<&ReviewCard> for ConfirmationCue {
             build_this_first: build_this_first(card),
             minimal_repro: minimal_repro(card),
             confirmation_step: confirmation_step(card),
+            runtime_executed: card.witness.runtime_executed,
             trust_boundary: REVIEWCARD_TRUST_BOUNDARY,
         }
     }

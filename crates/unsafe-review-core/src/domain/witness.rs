@@ -45,6 +45,11 @@ pub struct WitnessRoute {
 pub struct WitnessEvidence {
     pub present: bool,
     pub summary: String,
+    /// True only when an imported receipt records that a runtime witness tool
+    /// actually executed (`ran`, `test_targeted`, or `site_reached`).
+    /// Human review receipts and missing evidence stay `false`. This reflects
+    /// the imported receipt's claim, not execution by unsafe-review itself.
+    pub runtime_executed: bool,
 }
 
 impl WitnessEvidence {
@@ -52,6 +57,7 @@ impl WitnessEvidence {
         Self {
             present: false,
             summary: "No imported witness receipt was found".to_string(),
+            runtime_executed: false,
         }
     }
 
@@ -59,6 +65,7 @@ impl WitnessEvidence {
         Self {
             present: false,
             summary: summary.into(),
+            runtime_executed: false,
         }
     }
 
@@ -66,7 +73,13 @@ impl WitnessEvidence {
         Self {
             present: true,
             summary: summary.into(),
+            runtime_executed: false,
         }
+    }
+
+    pub fn with_runtime_executed(mut self, runtime_executed: bool) -> Self {
+        self.runtime_executed = runtime_executed;
+        self
     }
 }
 

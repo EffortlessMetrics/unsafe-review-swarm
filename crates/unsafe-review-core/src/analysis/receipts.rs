@@ -420,11 +420,18 @@ fn parse_receipt_file(path: &Path) -> Result<ParsedReceipt, String> {
         .map_err(|err| format!("{} {err}", path.display()))?;
     Ok(ParsedReceipt {
         card_id: receipt.card_id.clone(),
-        evidence: WitnessEvidence::present(receipt.evidence_summary()),
+        evidence: WitnessEvidence::present(receipt.evidence_summary())
+            .with_runtime_executed(records_runtime_execution(&receipt.tool, &receipt.strength)),
         expires_at: receipt.expires_at.clone().unwrap_or_default(),
         strength: receipt.strength,
         tool: receipt.tool,
     })
+}
+
+/// A receipt records runtime execution only when a runtime witness tool
+/// actually ran; human review receipts do not count as execution.
+fn records_runtime_execution(tool: &str, strength: &str) -> bool {
+    tool != "human-deep-review" && matches!(strength, "ran" | "test_targeted" | "site_reached")
 }
 
 fn imports_witness_evidence(tool: &str, strength: &str) -> bool {
@@ -882,7 +889,18 @@ mod tests {
         assert!(evidence.summary.contains("core/fixtures"));
         assert!(evidence.summary.contains("2026-08-18"));
         assert!(evidence.summary.contains("fixture only"));
+        assert!(evidence.runtime_executed);
         Ok(())
+    }
+
+    #[test]
+    fn records_runtime_execution_requires_an_executed_runtime_tool() {
+        assert!(records_runtime_execution("miri", "ran"));
+        assert!(records_runtime_execution("asan", "test_targeted"));
+        assert!(records_runtime_execution("cargo-careful", "site_reached"));
+        assert!(!records_runtime_execution("miri", "configured"));
+        assert!(!records_runtime_execution("human-deep-review", "reviewed"));
+        assert!(!records_runtime_execution("human-deep-review", "ran"));
     }
 
     #[test]

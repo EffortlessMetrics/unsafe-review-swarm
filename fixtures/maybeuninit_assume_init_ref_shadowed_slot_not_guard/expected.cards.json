@@ -97,6 +97,7 @@
         "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
       },
       "confirmation_step": "build/run `cargo +nightly miri test borrow_shadowed` first, then attach a matching receipt if it confirms the route",
+      "runtime_executed": false,
       "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
     }
   }
