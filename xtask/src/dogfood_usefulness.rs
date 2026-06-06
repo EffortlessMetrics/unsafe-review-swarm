@@ -1,0 +1,341 @@
+use std::collections::BTreeMap;
+use std::fs;
+
+pub(crate) const USEFULNESS_DOC: &str = "docs/dogfood/USEFULNESS.md";
+const REGENERATE_COMMAND: &str = "cargo run --locked -p xtask -- dogfood-usefulness";
+
+#[derive(Debug)]
+struct JudgmentFileRollup {
+    file_name: String,
+    target: String,
+    cards: usize,
+    missed: usize,
+    labels: BTreeMap<String, usize>,
+}
+
+pub(crate) fn write() -> Result<(), String> {
+    let text = generate()?;
+    let path = crate::workspace_path(USEFULNESS_DOC);
+    fs::write(&path, &text).map_err(|err| format!("write {USEFULNESS_DOC} failed: {err}"))?;
+    println!("dogfood-usefulness: wrote {USEFULNESS_DOC}");
+    Ok(())
+}
+
+pub(crate) fn check() -> Result<(), String> {
+    let expected = generate()?;
+    let actual = crate::read_to_string(&crate::workspace_path(USEFULNESS_DOC))?;
+    check_text(&actual, &expected)
+}
+
+fn check_text(actual: &str, expected: &str) -> Result<(), String> {
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(format!(
+            "{USEFULNESS_DOC} is stale (checked-in rollup does not match the rollup generated from committed judgment records); run `{REGENERATE_COMMAND}`"
+        ))
+    }
+}
+
+fn generate() -> Result<String, String> {
+    let rollups = collect_rollups()?;
+    Ok(render(&rollups))
+}
+
+fn collect_rollups() -> Result<Vec<JudgmentFileRollup>, String> {
+    let judgment_dir = crate::workspace_path(crate::DOGFOOD_JUDGMENT_DIR);
+    if !judgment_dir.is_dir() {
+        return Err(format!("{} is missing", crate::DOGFOOD_JUDGMENT_DIR));
+    }
+
+    let mut paths = Vec::new();
+    for entry in fs::read_dir(&judgment_dir)
+        .map_err(|err| format!("read {} failed: {err}", crate::DOGFOOD_JUDGMENT_DIR))?
+    {
+        let entry = entry
+            .map_err(|err| format!("read {} entry failed: {err}", crate::DOGFOOD_JUDGMENT_DIR))?;
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) == Some("toml") {
+            paths.push(path);
+        }
+    }
+    paths.sort();
+
+    let mut rollups = Vec::new();
+    for path in paths {
+        let file_name = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .map(str::to_string)
+            .ok_or_else(|| {
+                format!(
+                    "{} contains a judgment file with a non-UTF-8 name: {}",
+                    crate::DOGFOOD_JUDGMENT_DIR,
+                    path.display()
+                )
+            })?;
+        let text = crate::read_to_string(&path)?;
+        rollups.push(rollup_from_text(&file_name, &text)?);
+    }
+    Ok(rollups)
+}
+
+fn rollup_from_text(file_name: &str, text: &str) -> Result<JudgmentFileRollup, String> {
+    let context = format!("{}/{file_name}", crate::DOGFOOD_JUDGMENT_DIR);
+    let value = text
+        .parse::<toml::Table>()
+        .map_err(|err| format!("parse {context} failed: {err}"))?;
+
+    let target = value
+        .get("target")
+        .and_then(toml::Value::as_str)
+        .ok_or_else(|| format!("{context} is missing string `target`"))?;
+
+    let mut labels = BTreeMap::new();
+    let mut cards = 0usize;
+    if let Some(entries) = value.get("cards") {
+        let entries = entries
+            .as_array()
+            .ok_or_else(|| format!("{context} `cards` must be an array"))?;
+        for (idx, card) in entries.iter().enumerate() {
+            let judgment = card
+                .get("judgment")
+                .and_then(toml::Value::as_str)
+                .ok_or_else(|| format!("{context} cards[{idx}] is missing string `judgment`"))?;
+            if !crate::DOGFOOD_JUDGMENT_LABELS.contains(&judgment) {
+                return Err(format!(
+                    "{context} cards[{idx}] uses unknown judgment `{judgment}`"
+                ));
+            }
+            *labels.entry(judgment.to_string()).or_insert(0usize) += 1;
+            cards += 1;
+        }
+    }
+
+    let missed = match value.get("missed") {
+        None => 0,
+        Some(entries) => entries
+            .as_array()
+            .ok_or_else(|| format!("{context} `missed` must be an array"))?
+            .len(),
+    };
+
+    Ok(JudgmentFileRollup {
+        file_name: file_name.to_string(),
+        target: target.to_string(),
+        cards,
+        missed,
+        labels,
+    })
+}
+
+fn render(rollups: &[JudgmentFileRollup]) -> String {
+    let total_cards = rollups.iter().map(|rollup| rollup.cards).sum::<usize>();
+    let total_missed = rollups.iter().map(|rollup| rollup.missed).sum::<usize>();
+    let mut label_totals: BTreeMap<&str, usize> = BTreeMap::new();
+    for rollup in rollups {
+        for (label, count) in &rollup.labels {
+            *label_totals.entry(label.as_str()).or_insert(0) += count;
+        }
+    }
+
+    let mut text = String::new();
+    text.push_str("# Dogfood Usefulness Rollup\n");
+    text.push('\n');
+    text.push_str("Status: generated counts file\n");
+    text.push('\n');
+    text.push_str(&format!(
+        "Generated by `{REGENERATE_COMMAND}`; do not edit by hand.\n"
+    ));
+    text.push_str("`cargo run --locked -p xtask -- check-dogfood` fails when this file drifts\n");
+    text.push_str("from the committed judgment records.\n");
+    text.push('\n');
+    text.push_str("This rollup aggregates raw per-label usefulness counts from the maintainer\n");
+    text.push_str(
+        "judgment records under [`judgments/`](judgments/README.md). It counts labeled\n",
+    );
+    text.push_str("rows only.\n");
+    text.push('\n');
+    text.push_str("## Totals\n");
+    text.push('\n');
+    text.push_str("| Measure | Count |\n");
+    text.push_str("|---|---:|\n");
+    text.push_str(&format!("| Judgment files | {} |\n", rollups.len()));
+    text.push_str(&format!("| Judged cards | {total_cards} |\n"));
+    text.push_str(&format!("| Missed-obligation rows | {total_missed} |\n"));
+    text.push('\n');
+    text.push_str("## Judged Cards Per Label\n");
+    text.push('\n');
+    text.push_str("| Label | Count |\n");
+    text.push_str("|---|---:|\n");
+    for label in crate::DOGFOOD_JUDGMENT_LABELS {
+        let count = label_totals.get(*label).copied().unwrap_or(0);
+        text.push_str(&format!("| `{label}` | {count} |\n"));
+    }
+    text.push('\n');
+    text.push_str("## Judged Cards Per Target\n");
+    text.push('\n');
+    text.push_str("| Judgment file | Target | Judged cards | Missed rows | Label counts |\n");
+    text.push_str("|---|---|---:|---:|---|\n");
+    for rollup in rollups {
+        text.push_str(&format!(
+            "| `{}` | `{}` | {} | {} | {} |\n",
+            rollup.file_name,
+            rollup.target,
+            rollup.cards,
+            rollup.missed,
+            label_counts_cell(rollup)
+        ));
+    }
+    text.push('\n');
+    text.push_str("## Trust Boundary\n");
+    text.push('\n');
+    text.push_str("These are labeled usefulness counts from maintainer judgment records for\n");
+    text.push_str("static unsafe contract review only. They are not calibrated precision or\n");
+    text.push_str("recall, not a benchmark, not proof of analyzer quality, not a proof of\n");
+    text.push_str("memory safety, not UB-free status, not a Miri result, not Miri-clean\n");
+    text.push_str("status, not site execution evidence, not witness adequacy, and not policy\n");
+    text.push_str("readiness or policy gating.\n");
+    text
+}
+
+fn label_counts_cell(rollup: &JudgmentFileRollup) -> String {
+    let parts = crate::DOGFOOD_JUDGMENT_LABELS
+        .iter()
+        .filter_map(|label| {
+            rollup
+                .labels
+                .get(*label)
+                .map(|count| format!("`{label}` {count}"))
+        })
+        .collect::<Vec<_>>();
+    if parts.is_empty() {
+        "none".to_string()
+    } else {
+        parts.join(", ")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn err_text<T>(result: Result<T, String>) -> Result<String, String> {
+        match result {
+            Ok(_) => Err("expected error".to_string()),
+            Err(err) => Ok(err),
+        }
+    }
+
+    const SYNTHETIC_JUDGMENT: &str = r#"
+schema_version = "1.0"
+target = "synthetic-target"
+report = "reports/2026-01-01-synthetic.md"
+reviewer = "manual"
+date = "2026-01-01"
+scope = "synthetic usefulness sample"
+trust_boundary = "Static unsafe contract review measurement input; not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not site execution evidence, not witness adequacy, and not policy readiness."
+
+[[cards]]
+family = "vec_set_len"
+judgment = "actionable"
+reason = "Named the initialized-memory obligation."
+next_step = "Keep as a reviewer action sample."
+
+[[cards]]
+family = "comment_plan"
+judgment = "actionable"
+reason = "Selected a bounded comment set."
+next_step = "Keep as a review-budget sample."
+
+[[cards]]
+family = "witness_plan"
+judgment = "noise"
+reason = "Duplicated an existing route suggestion."
+next_step = "Narrow the route grouping."
+
+[[missed]]
+file = "src/lib.rs"
+line = 123
+expected_family = "ffi"
+status = "open"
+reason = "Manual review found a changed unsafe boundary without a useful ReviewCard."
+next_step = "Create a follow-up seed."
+"#;
+
+    #[test]
+    fn rollup_counts_labels_and_missed_rows() -> Result<(), String> {
+        let rollup = rollup_from_text("synthetic.toml", SYNTHETIC_JUDGMENT)?;
+
+        assert_eq!(rollup.file_name, "synthetic.toml");
+        assert_eq!(rollup.target, "synthetic-target");
+        assert_eq!(rollup.cards, 3);
+        assert_eq!(rollup.missed, 1);
+        assert_eq!(rollup.labels.get("actionable"), Some(&2));
+        assert_eq!(rollup.labels.get("noise"), Some(&1));
+        assert_eq!(rollup.labels.get("missed"), None);
+        Ok(())
+    }
+
+    #[test]
+    fn rollup_rejects_unknown_judgment_labels() -> Result<(), String> {
+        let text = SYNTHETIC_JUDGMENT.replace("judgment = \"noise\"", "judgment = \"very-useful\"");
+
+        let err = err_text(rollup_from_text("synthetic.toml", &text))?;
+
+        assert!(err.contains("cards[2] uses unknown judgment `very-useful`"));
+        Ok(())
+    }
+
+    #[test]
+    fn rollup_requires_card_judgment_strings() -> Result<(), String> {
+        let text = SYNTHETIC_JUDGMENT.replace("judgment = \"noise\"", "");
+
+        let err = err_text(rollup_from_text("synthetic.toml", &text))?;
+
+        assert!(err.contains("cards[2] is missing string `judgment`"));
+        Ok(())
+    }
+
+    #[test]
+    fn render_reports_totals_per_label_and_per_target_rows() -> Result<(), String> {
+        let rollup = rollup_from_text("synthetic.toml", SYNTHETIC_JUDGMENT)?;
+
+        let text = render(&[rollup]);
+
+        assert!(text.contains("| Judgment files | 1 |"));
+        assert!(text.contains("| Judged cards | 3 |"));
+        assert!(text.contains("| Missed-obligation rows | 1 |"));
+        assert!(text.contains("| `actionable` | 2 |"));
+        assert!(text.contains("| `noise` | 1 |"));
+        assert!(text.contains("| `good-agent-task` | 0 |"));
+        assert!(text.contains(
+            "| `synthetic.toml` | `synthetic-target` | 3 | 1 | `actionable` 2, `noise` 1 |"
+        ));
+        assert!(text.contains("not calibrated precision or\nrecall, not a benchmark"));
+        assert!(text.contains("not policy\nreadiness or policy gating"));
+        Ok(())
+    }
+
+    #[test]
+    fn rendered_rollup_passes_overclaim_rail() -> Result<(), String> {
+        let rollup = rollup_from_text("synthetic.toml", SYNTHETIC_JUDGMENT)?;
+
+        let text = render(&[rollup]);
+
+        crate::reject_positive_overclaims(std::path::Path::new(USEFULNESS_DOC), &text)
+    }
+
+    #[test]
+    fn stale_usefulness_doc_names_regeneration_command() -> Result<(), String> {
+        let rollup = rollup_from_text("synthetic.toml", SYNTHETIC_JUDGMENT)?;
+        let expected = render(&[rollup]);
+        let edited = expected.replace("| Judged cards | 3 |", "| Judged cards | 30 |");
+
+        let err = err_text(check_text(&edited, &expected))?;
+
+        assert!(err.contains("docs/dogfood/USEFULNESS.md is stale"));
+        assert!(err.contains("run `cargo run --locked -p xtask -- dogfood-usefulness`"));
+        check_text(&expected, &expected)
+    }
+}

@@ -22,6 +22,7 @@ pub(crate) enum XtaskCommand {
     CheckFirstPrArtifacts(PathBuf),
     CheckManualCandidateExamples,
     CheckFirstHour,
+    DogfoodUsefulness,
     SourceDivergence,
 }
 
@@ -71,6 +72,9 @@ impl XtaskCommand {
             ),
             Some("check-first-hour") => {
                 parse_no_extra(args, "check-first-hour", Self::CheckFirstHour)
+            }
+            Some("dogfood-usefulness") => {
+                parse_no_extra(args, "dogfood-usefulness", Self::DogfoodUsefulness)
             }
             Some("source-divergence") | Some("check-source-sync") => {
                 parse_no_extra(args, "source-divergence", Self::SourceDivergence)

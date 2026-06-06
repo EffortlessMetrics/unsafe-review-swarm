@@ -20,6 +20,7 @@ mod calibration_manifest;
 mod command_args;
 mod commands;
 mod docs_automation_paths;
+mod dogfood_usefulness;
 mod first_hour;
 mod markdown;
 mod public_badges;
@@ -833,7 +834,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
     match commands::XtaskCommand::parse(&args)? {
         commands::XtaskCommand::Help => {
             println!(
-                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, source-divergence, check-source-sync"
+                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, source-divergence, check-source-sync"
             );
             Ok(())
         }
@@ -868,6 +869,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckFirstPrArtifacts(dir) => check_first_pr_artifacts(&dir),
         commands::XtaskCommand::CheckManualCandidateExamples => check_manual_candidate_examples(),
         commands::XtaskCommand::CheckFirstHour => check_first_hour(),
+        commands::XtaskCommand::DogfoodUsefulness => dogfood_usefulness::write(),
         commands::XtaskCommand::SourceDivergence => source_sync::report_source_divergence(),
     }
 }
@@ -3348,6 +3350,7 @@ fn check_dogfood() -> Result<(), String> {
     check_dogfood_judgment_schema_docs()?;
     let judgment_stats = check_dogfood_judgments(&ids, &target_kinds)?;
     check_dogfood_real_crate_judgment_sample_index(&judgment_stats)?;
+    dogfood_usefulness::check()?;
 
     println!(
         "check-dogfood: ok ({} targets, {} repositories)",

@@ -22,6 +22,9 @@ inventory requirements for `ripr` are tracked in
 Bun packet preset requirements for `tokmd` are tracked in
 [`tokmd-bun-packet-presets.md`](tokmd-bun-packet-presets.md).
 Reviewer judgment files follow the [`dogfood judgment schema`](judgments/README.md).
+The generated per-label usefulness count rollup lives in
+[`USEFULNESS.md`](USEFULNESS.md); regenerate it with
+`cargo run --locked -p xtask -- dogfood-usefulness`.
 Card-scoped agent repair dry runs follow the
 [`agent repair experiment protocol`](agent-repair-experiments.md).
 
