@@ -36,6 +36,9 @@ Specs define behavior. They do not carry the PR queue.
 25. [Docs automation](UNSAFE-REVIEW-SPEC-0025-docs-automation.md)
 26. [Accuracy validation and calibration](UNSAFE-REVIEW-SPEC-0026-accuracy-validation-and-calibration.md)
 27. [Manual candidate cards](UNSAFE-REVIEW-SPEC-0027-manual-candidate-cards.md)
+28. [Coverage instrument and product boundary](UNSAFE-REVIEW-SPEC-0028-delivery-surfaces-and-ease-of-use.md)
+29. [Unsafe evidence coverage model](UNSAFE-REVIEW-SPEC-0029-unsafe-evidence-coverage-model.md)
+30. [Baseline and coverage movement](UNSAFE-REVIEW-SPEC-0030-baseline-and-coverage-movement.md)
 
 
 ## Appendices

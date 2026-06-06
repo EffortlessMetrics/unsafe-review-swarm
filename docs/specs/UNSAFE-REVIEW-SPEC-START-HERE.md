@@ -21,6 +21,7 @@ If you are new to the repository, read in this order:
 | LSP / IDE projection | `UNSAFE-REVIEW-SPEC-0012` | `UNSAFE-REVIEW-SPEC-0013`, `UNSAFE-REVIEW-SPEC-0019` |
 | Agent packet projection | `UNSAFE-REVIEW-SPEC-0013` | `UNSAFE-REVIEW-SPEC-0006`, `0012`, `0019` |
 | Inventory, policy, badges | `UNSAFE-REVIEW-SPEC-0010`, `0014` | support tiers, policy ledgers |
+| Ease of use / adoption surfaces | `UNSAFE-REVIEW-SPEC-0028` | `UNSAFE-REVIEW-SPEC-0029` coverage model, `0030` baseline movement |
 | Release prep and publication evidence | `UNSAFE-REVIEW-SPEC-0015`, `0016`, `0019`, `0020` | latest closeout in `docs/handoffs/` |
 | Source-of-truth stack maintenance | `UNSAFE-REVIEW-SPEC-0020` | doc artifacts ledger, goals manifest, plan links |
 | Codex/agent execution | active goal manifest | linked plan -> linked spec -> linked proposal |
