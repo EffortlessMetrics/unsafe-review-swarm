@@ -37,6 +37,11 @@ pub(crate) struct ConfirmationCue {
     /// witness tool actually executed for this card. It reflects the imported
     /// receipt's claim; unsafe-review did not run anything itself.
     runtime_executed: bool,
+    /// Derived per-card confirmation state
+    /// (pending/receipt_imported/executed/confirmed/not_reproduced/
+    /// inconclusive). "not_reproduced" is a single-run observation, not a
+    /// safety claim. See `WitnessEvidence::confirmation_state`.
+    confirmation_state: &'static str,
     trust_boundary: &'static str,
 }
 
@@ -48,6 +53,7 @@ impl From<&ReviewCard> for ConfirmationCue {
             minimal_repro: minimal_repro(card),
             confirmation_step: confirmation_step(card),
             runtime_executed: card.witness.runtime_executed,
+            confirmation_state: card.witness.confirmation_state(),
             trust_boundary: REVIEWCARD_TRUST_BOUNDARY,
         }
     }

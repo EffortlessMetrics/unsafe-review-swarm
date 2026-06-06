@@ -124,6 +124,7 @@
       },
       "confirmation_step": "build/run `cargo +nightly miri test byte_to_bool_with_size_guard` first, then attach a matching receipt if it confirms the route",
       "runtime_executed": false,
+      "confirmation_state": "pending",
       "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
     }
   }

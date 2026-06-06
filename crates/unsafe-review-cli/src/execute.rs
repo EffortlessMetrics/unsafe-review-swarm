@@ -1855,6 +1855,9 @@ fn receipt_template(options: ReceiptTemplateOptions) -> Result<(), String> {
         } else {
             Some(options.limitations)
         },
+        // Templates never claim a run happened, so no verdict is emitted;
+        // authors may add one after an actual run.
+        verdict: None,
     };
     receipt.validate()?;
     let rendered = receipt.to_pretty_json()?;

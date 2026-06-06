@@ -75,9 +75,9 @@ pub(crate) fn render_markdown(report: &ReceiptAuditReport) -> String {
         out.push_str("No receipt files found.\n\n");
     } else {
         out.push_str(
-            "| Status | Receipt | Card | Matched target | Tool | Strength | Summary | Author | Recorded | Expires | Command hash | Limitations | Routed tools | Issues |\n",
+            "| Status | Receipt | Card | Matched target | Tool | Strength | Verdict | Summary | Author | Recorded | Expires | Command hash | Limitations | Routed tools | Issues |\n",
         );
-        out.push_str("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n");
+        out.push_str("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|\n");
         for receipt in &report.receipts {
             out.push_str(&receipt_row(receipt));
         }
@@ -142,7 +142,7 @@ fn reach_importable_count(report: &ReceiptAuditReport) -> usize {
 
 fn receipt_row(receipt: &crate::analysis::receipts::ReceiptAuditEntry) -> String {
     format!(
-        "| {} | `{}` | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
+        "| {} | `{}` | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} | {} |\n",
         markdown_cell(&receipt.statuses.join(", ")),
         receipt.path,
         optional_code(receipt.card_id.as_deref()),
@@ -152,6 +152,7 @@ fn receipt_row(receipt: &crate::analysis::receipts::ReceiptAuditEntry) -> String
         ),
         optional_code(receipt.receipt_tool.as_deref()),
         optional_code(receipt.strength.as_deref()),
+        verdict_cell(receipt.verdict.as_deref()),
         summary_cell(receipt.summary.as_deref()),
         optional_code(receipt.author.as_deref()),
         optional_code(receipt.recorded_at.as_deref()),
@@ -161,6 +162,14 @@ fn receipt_row(receipt: &crate::analysis::receipts::ReceiptAuditEntry) -> String
         route_tools(&receipt.route_tools),
         issues_cell(&receipt.issues)
     )
+}
+
+fn verdict_cell(verdict: Option<&str>) -> String {
+    match verdict {
+        Some("not_reproduced") => "`not_reproduced` (single run; not a safety claim)".to_string(),
+        Some(verdict) if !verdict.is_empty() => format!("`{}`", markdown_cell(verdict)),
+        _ => "-".to_string(),
+    }
 }
 
 fn summary_cell(summary: Option<&str>) -> String {
@@ -211,13 +220,14 @@ fn matched_target(
     }
     if let Some(card) = card {
         return format!(
-            "`{}` / `{}` / proof path `{}` / source `{}` / `{}` / {} missing; next: {}",
+            "`{}` / `{}` / proof path `{}` / source `{}` / `{}` / {} missing; confirmation {}; next: {}",
             card.class_name,
             card.operation_family,
             card.proof_path,
             card.source,
             markdown_cell(&card.operation),
             card.missing_count,
+            confirmation_state_label(&card.confirmation_state),
             markdown_cell(&card.next_action)
         );
     }
@@ -288,6 +298,13 @@ fn manual_candidate_target(candidate: &ReceiptAuditManualCandidate) -> String {
     parts.join("; ")
 }
 
+fn confirmation_state_label(state: &str) -> String {
+    if state == "not_reproduced" {
+        return "`not_reproduced` (single run; not a safety claim)".to_string();
+    }
+    format!("`{}`", markdown_cell(state))
+}
+
 fn markdown_cell(value: &str) -> String {
     value.replace('|', "\\|").replace('\n', " ")
 }
@@ -334,6 +351,7 @@ mod tests {
                     ),
                     receipt_tool: Some("miri".to_string()),
                     strength: Some("ran".to_string()),
+                    verdict: None,
                     summary: None,
                     author: Some("core/fixtures".to_string()),
                     recorded_at: Some("2026-05-20T00:00:00Z".to_string()),
@@ -356,6 +374,7 @@ mod tests {
                     ),
                     receipt_tool: Some("miri".to_string()),
                     strength: Some("ran".to_string()),
+                    verdict: Some("not_reproduced".to_string()),
                     summary: Some("focused witness passed".to_string()),
                     author: Some("core/fixtures".to_string()),
                     recorded_at: Some("2026-05-20T00:00:00Z".to_string()),
@@ -374,6 +393,7 @@ mod tests {
                         operation: "unsafe { ptr.cast::<Header>().read() }".to_string(),
                         operation_family: "raw_pointer_read".to_string(),
                         proof_path: "source_route_only".to_string(),
+                        confirmation_state: "executed".to_string(),
                         missing_count: 2,
                         next_action: "Add or expose guard | witness\nThen attach receipt"
                             .to_string(),
@@ -392,6 +412,7 @@ mod tests {
                     ),
                     receipt_tool: Some("loom".to_string()),
                     strength: Some("configured".to_string()),
+                    verdict: None,
                     summary: Some("focused witness".to_string()),
                     author: Some("core/fixtures".to_string()),
                     recorded_at: Some("2026-05-20T00:00:00Z".to_string()),
@@ -415,6 +436,7 @@ mod tests {
                         operation: "unsafe { ptr.cast::<Header>().read() }".to_string(),
                         operation_family: "raw_pointer_read".to_string(),
                         proof_path: "source_route_only".to_string(),
+                        confirmation_state: "executed".to_string(),
                         missing_count: 2,
                         next_action: "Add or expose guard | witness\nThen attach receipt"
                             .to_string(),
@@ -452,8 +474,10 @@ mod tests {
             )
         );
         assert!(markdown.contains(
-            "| Status | Receipt | Card | Matched target | Tool | Strength | Summary | Author | Recorded | Expires | Command hash | Limitations | Routed tools | Issues |"
+            "| Status | Receipt | Card | Matched target | Tool | Strength | Verdict | Summary | Author | Recorded | Expires | Command hash | Limitations | Routed tools | Issues |"
         ));
+        assert!(markdown.contains("`not_reproduced` (single run; not a safety claim)"));
+        assert!(markdown.contains("missing; confirmation `executed`; next:"));
         assert!(markdown.contains("focused witness"));
         assert!(markdown.contains("focused witness passed"));
         assert!(markdown.contains("`core/fixtures`"));
@@ -512,6 +536,7 @@ mod tests {
                 card_id: Some("R4R2-S001".to_string()),
                 receipt_tool: Some("human-deep-review".to_string()),
                 strength: Some("test_targeted".to_string()),
+                verdict: None,
                 summary: Some("manual route reviewed".to_string()),
                 author: Some("core/fixtures".to_string()),
                 recorded_at: Some("2026-05-20T00:00:00Z".to_string()),

@@ -117,6 +117,10 @@ struct RepairQueueEntry {
     path: String,
     line: usize,
     missing_evidence: Vec<String>,
+    /// Informational projection of the derived per-card confirmation state;
+    /// it does not change bucket membership or readiness. "not_reproduced"
+    /// is a single-run observation, not a safety claim.
+    confirmation_state: &'static str,
     agent_readiness: RepairQueueReadiness,
     bucket_reason: &'static str,
     context_command: String,
@@ -141,6 +145,7 @@ impl RepairQueueEntry {
             path: path_display(&card.site.location.file),
             line: card.site.location.line,
             missing_evidence: missing_evidence(card),
+            confirmation_state: card.witness.confirmation_state(),
             agent_readiness: RepairQueueReadiness::from(&projection.agent_readiness),
             bucket_reason: bucket_reason(bucket),
             context_command: format!("unsafe-review context {} --json", card.id),
@@ -265,6 +270,7 @@ mod tests {
         assert_eq!(guard["class"], "guard_missing");
         assert_eq!(guard["operation_family"], "raw_pointer_read");
         assert_eq!(guard["bucket_reason"], "guard_evidence_missing");
+        assert_eq!(guard["confirmation_state"], "pending");
         assert_eq!(
             guard["context_command"],
             format!("unsafe-review context {card_id} --json")

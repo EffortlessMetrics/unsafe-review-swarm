@@ -247,6 +247,9 @@ pub struct ReceiptAuditEntry {
     pub card_id: Option<String>,
     pub receipt_tool: Option<String>,
     pub strength: Option<String>,
+    /// Structured receipt verdict when the saved receipt recorded one;
+    /// "not_reproduced" is a single-run observation, not a safety claim.
+    pub verdict: Option<String>,
     pub summary: Option<String>,
     pub author: Option<String>,
     pub recorded_at: Option<String>,
@@ -268,6 +271,10 @@ pub struct ReceiptAuditCard {
     pub operation: String,
     pub operation_family: String,
     pub proof_path: String,
+    /// Derived per-card confirmation state (see
+    /// `WitnessEvidence::confirmation_state`); "not_reproduced" is a
+    /// single-run observation, not a safety claim.
+    pub confirmation_state: String,
     pub missing_count: usize,
     pub next_action: String,
     pub source: String,
@@ -421,7 +428,8 @@ fn parse_receipt_file(path: &Path) -> Result<ParsedReceipt, String> {
     Ok(ParsedReceipt {
         card_id: receipt.card_id.clone(),
         evidence: WitnessEvidence::present(receipt.evidence_summary())
-            .with_runtime_executed(records_runtime_execution(&receipt.tool, &receipt.strength)),
+            .with_runtime_executed(records_runtime_execution(&receipt.tool, &receipt.strength))
+            .with_verdict(receipt.verdict.clone()),
         expires_at: receipt.expires_at.clone().unwrap_or_default(),
         strength: receipt.strength,
         tool: receipt.tool,
@@ -537,6 +545,7 @@ fn audit_receipt_record(
             card_id: None,
             receipt_tool: None,
             strength: None,
+            verdict: None,
             summary: None,
             author: None,
             recorded_at: None,
@@ -559,6 +568,7 @@ fn audit_receipt_record(
             card_id: None,
             receipt_tool: None,
             strength: None,
+            verdict: None,
             summary: None,
             author: None,
             recorded_at: None,
@@ -671,6 +681,7 @@ fn audit_receipt_record(
         card_id: Some(receipt.card_id),
         receipt_tool: Some(receipt.tool),
         strength: Some(receipt.strength),
+        verdict: receipt.verdict,
         summary: receipt.summary,
         author: receipt.author,
         recorded_at: receipt.recorded_at,
@@ -719,6 +730,7 @@ fn receipt_audit_card_from_review_card(card: &ReviewCard) -> ReceiptAuditCard {
         operation: card.operation.expression.clone(),
         operation_family: card.operation.family.as_str().to_string(),
         proof_path: card.proof_path.as_str().to_string(),
+        confirmation_state: card.witness.confirmation_state().to_string(),
         missing_count: card.missing.len(),
         next_action: card.next_action.summary.clone(),
         source: "analyzer".to_string(),
@@ -890,6 +902,74 @@ mod tests {
         assert!(evidence.summary.contains("2026-08-18"));
         assert!(evidence.summary.contains("fixture only"));
         assert!(evidence.runtime_executed);
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_index_carries_receipt_verdict_into_witness_evidence() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-verdict-receipt-index")?;
+        let receipts = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipts).map_err(|err| format!("create receipt dir failed: {err}"))?;
+        let card_id =
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+        fs::write(
+            receipts.join("miri.json"),
+            format!(
+                r#"{{
+  "schema_version": "0.1",
+  "card_id": "{card_id}",
+  "tool": "miri",
+  "strength": "ran",
+  "author": "core/fixtures",
+  "recorded_at": "2025-12-18T00:00:00Z",
+  "expires_at": "2026-08-18",
+  "verdict": "not_reproduced"
+}}"#
+            ),
+        )
+        .map_err(|err| format!("write receipt failed: {err}"))?;
+
+        let index = ReceiptIndex::load_with_date(&root, "2026-05-18")?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+        let evidence = index
+            .witness_evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri));
+        assert!(evidence.present);
+        assert!(evidence.runtime_executed);
+        assert_eq!(evidence.verdict.as_deref(), Some("not_reproduced"));
+        assert_eq!(evidence.confirmation_state(), "not_reproduced");
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_index_rejects_unknown_receipt_verdict() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-bad-verdict-receipt")?;
+        let receipts = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipts).map_err(|err| format!("create receipt dir failed: {err}"))?;
+        fs::write(
+            receipts.join("bad.json"),
+            r#"{
+  "schema_version": "0.1",
+  "card_id": "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1",
+  "tool": "miri",
+  "strength": "ran",
+  "author": "core/fixtures",
+  "recorded_at": "2025-12-18T00:00:00Z",
+  "expires_at": "2026-08-18",
+  "verdict": "proved-safe"
+}"#,
+        )
+        .map_err(|err| format!("write receipt failed: {err}"))?;
+
+        let result = ReceiptIndex::load(&root);
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+        assert!(
+            result
+                .err()
+                .unwrap_or_default()
+                .contains("unknown receipt verdict")
+        );
         Ok(())
     }
 
@@ -1362,6 +1442,7 @@ mod tests {
             "unsafe { ptr.cast::<Header>().read() }"
         );
         assert_eq!(matched_card.operation_family, "raw_pointer_read");
+        assert_eq!(matched_card.confirmation_state, "pending");
         assert_eq!(matched_card.missing_count, 2);
         assert!(matched_card.next_action.contains("Add or expose"));
         let expected_command_hash = WitnessReceipt::command_hash("cargo test");

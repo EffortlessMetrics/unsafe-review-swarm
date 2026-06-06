@@ -848,6 +848,14 @@ mod tests {
             value["cards"][0]["confirmation_cue"]["build_this_first"]["kind"],
             "verify_command"
         );
+        assert_eq!(
+            value["cards"][0]["confirmation_cue"]["confirmation_state"],
+            "pending"
+        );
+        assert_eq!(
+            value["cards"][0]["confirmation_cue"]["runtime_executed"],
+            false
+        );
         assert!(
             value["cards"][0]["confirmation_cue"]["hypothesis_to_confirm"]
                 .as_str()
@@ -859,6 +867,32 @@ mod tests {
                 .as_str()
                 .unwrap_or("")
                 .contains("unsafe-review did not run this command")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn confirmation_cue_projects_runtime_receipt_verdict_state() -> Result<(), String> {
+        use crate::domain::WitnessEvidence;
+
+        let mut output = fixture_output("raw_pointer_alignment")?;
+        let card = output
+            .cards
+            .first_mut()
+            .ok_or_else(|| "alignment fixture should emit a card".to_string())?;
+        card.witness = WitnessEvidence::present("miri receipt imported")
+            .with_runtime_executed(true)
+            .with_verdict(Some("not_reproduced".to_string()));
+
+        let value = parse_json(&render(&output))?;
+
+        assert_eq!(
+            value["cards"][0]["confirmation_cue"]["confirmation_state"],
+            "not_reproduced"
+        );
+        assert_eq!(
+            value["cards"][0]["confirmation_cue"]["runtime_executed"],
+            true
         );
         Ok(())
     }

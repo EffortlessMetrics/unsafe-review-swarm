@@ -364,13 +364,58 @@ fn render_counts_table(out: &mut String, label: &str, counts: BTreeMap<String, u
 }
 
 pub(crate) fn render_pr_summary(output: &AnalyzeOutput) -> String {
+    let ranked = confirmation_ranked_cards(output);
     let mut out = String::new();
     render_pr_summary_header(&mut out, output);
-    render_pr_summary_reviewer_cockpit(&mut out, output);
-    render_pr_summary_card_table(&mut out, output);
-    render_pr_summary_witness_plan(&mut out, output);
+    render_pr_summary_build_this_first_lead(&mut out, ranked.first().copied());
+    render_pr_summary_reviewer_cockpit(&mut out, ranked.first().copied());
+    render_pr_summary_card_table(&mut out, &ranked);
+    render_pr_summary_witness_plan(&mut out, &ranked);
     render_pr_summary_trust_boundary(&mut out);
     out
+}
+
+/// Presentation-only ranking for pr-summary: cards that are one executable
+/// command away from credible confirmation evidence (an available command and
+/// a `pending`/`executed` confirmation state) sort first; everything else,
+/// including cards that already carry a `confirmed`/`not_reproduced` verdict,
+/// keeps the existing priority order behind them. Card identity, cards.json
+/// ordering, and comment-plan selection are unchanged.
+fn confirmation_ranked_cards(output: &AnalyzeOutput) -> Vec<&ReviewCard> {
+    let mut cards = output.cards.iter().collect::<Vec<_>>();
+    cards.sort_by_key(|card| confirmation_rank(card));
+    cards
+}
+
+fn confirmation_rank(card: &ReviewCard) -> u8 {
+    let has_command = !card.next_action.verify_commands.is_empty()
+        || card
+            .routes
+            .first()
+            .is_some_and(|route| route.command.is_some());
+    if has_command && matches!(card.witness.confirmation_state(), "pending" | "executed") {
+        0
+    } else {
+        1
+    }
+}
+
+fn confirmation_state_label(card: &ReviewCard) -> String {
+    let state = card.witness.confirmation_state();
+    if state == "not_reproduced" {
+        return format!("`{state}` (single run; not a safety claim)");
+    }
+    format!("`{state}`")
+}
+
+fn render_pr_summary_build_this_first_lead(out: &mut String, card: Option<&ReviewCard>) {
+    let Some(card) = card else {
+        return;
+    };
+    out.push_str(&format!(
+        "BUILD THIS FIRST: {} (cards are ranked by cheapest credible confirmation; this is a confirmation cue, not a verdict)\n\n",
+        top_card_build_this_first(card)
+    ));
 }
 
 /// Bounded summary fragment suitable for `GITHUB_STEP_SUMMARY`.
@@ -457,9 +502,9 @@ fn render_pr_summary_header(out: &mut String, output: &AnalyzeOutput) {
     render_pr_summary_header_bullets(out, output);
 }
 
-fn render_pr_summary_reviewer_cockpit(out: &mut String, output: &AnalyzeOutput) {
+fn render_pr_summary_reviewer_cockpit(out: &mut String, top_card: Option<&ReviewCard>) {
     out.push_str("## Reviewer cockpit\n\n");
-    if let Some(card) = output.cards.first() {
+    if let Some(card) = top_card {
         out.push_str(&format!("- Top card: `{}`\n", card.id));
         out.push_str(&format!("- Class: `{}`\n", card.class.as_str()));
         out.push_str(&format!(
@@ -497,6 +542,10 @@ fn render_pr_summary_reviewer_cockpit(out: &mut String, output: &AnalyzeOutput) 
         ));
         out.push_str(&format!("  - Reach: {}\n", card.reach.summary));
         out.push_str(&format!("  - Witness: {}\n", card.witness.summary));
+        out.push_str(&format!(
+            "- Confirmation state: {}\n",
+            confirmation_state_label(card)
+        ));
         out.push_str(&format!(
             "- Missing/weak evidence: {}\n",
             missing_summary(card)
@@ -632,16 +681,16 @@ fn render_minimal_repro_cue(out: &mut String, card: &ReviewCard, label: &str, in
     out.push('\n');
 }
 
-fn render_pr_summary_card_table(out: &mut String, output: &AnalyzeOutput) {
+fn render_pr_summary_card_table(out: &mut String, ranked_cards: &[&ReviewCard]) {
     out.push_str("## Card table\n\n");
     out.push_str(
-        "| ID | Class | Proof path | Location | Operation family | Operation | Missing evidence | Route | Next action |\n",
+        "| ID | Class | Proof path | Location | Operation family | Operation | Missing evidence | Route | Next action | Confirmation state |\n",
     );
-    out.push_str("|---|---|---|---|---|---|---|---|---|\n");
-    for card in &output.cards {
+    out.push_str("|---|---|---|---|---|---|---|---|---|---|\n");
+    for card in ranked_cards {
         let route = repo_primary_route(card);
         out.push_str(&format!(
-            "| `{}` | `{}` | `{}` | {} | `{}` | `{}` | {} | `{}` | {} |\n",
+            "| `{}` | `{}` | `{}` | {} | `{}` | `{}` | {} | `{}` | {} | {} |\n",
             md_cell(&card.id.to_string()),
             card.class.as_str(),
             card.proof_path.as_str(),
@@ -654,22 +703,27 @@ fn render_pr_summary_card_table(out: &mut String, output: &AnalyzeOutput) {
             md_cell(&one_line(&card.operation.expression)),
             md_cell(&missing_summary(card)),
             route,
-            md_cell(&card.next_action.summary)
+            md_cell(&card.next_action.summary),
+            confirmation_state_label(card)
         ));
     }
 }
 
-fn render_pr_summary_witness_plan(out: &mut String, output: &AnalyzeOutput) {
+fn render_pr_summary_witness_plan(out: &mut String, ranked_cards: &[&ReviewCard]) {
     out.push_str("\n## Witness plan\n\n");
-    if output.cards.is_empty() {
+    if ranked_cards.is_empty() {
         out.push_str("No witness route is recommended because no review cards were emitted.\n\n");
         return;
     }
-    for card in &output.cards {
+    for card in ranked_cards {
         out.push_str(&format!(
             "- `{}` hypothesis: {}\n",
             card.id,
             top_card_hypothesis(card)
+        ));
+        out.push_str(&format!(
+            "  - Confirmation state: {}\n",
+            confirmation_state_label(card)
         ));
         out.push_str(&format!(
             "  - Confirmation step: {}\n",
@@ -960,6 +1014,14 @@ mod tests {
             .ok_or_else(|| "raw pointer fixture should emit a card".to_string())?;
 
         assert!(rendered.contains("# unsafe-review PR summary"));
+        assert!(rendered.contains(&format!(
+            "BUILD THIS FIRST: {}",
+            top_card_build_this_first(card)
+        )));
+        assert!(rendered.contains("this is a confirmation cue, not a verdict"));
+        assert!(rendered.contains("- Confirmation state: `pending`"));
+        assert!(rendered.contains("  - Confirmation state: `pending`"));
+        assert!(rendered.contains("| Next action | Confirmation state |"));
         assert!(rendered.contains("## Reviewer cockpit"));
         assert!(rendered.contains("- Diff scope: 1 file changed (1 Rust, 0 non-Rust)"));
         assert!(rendered.contains(&format!("- Top card: `{}`", card.id)));
@@ -1025,6 +1087,45 @@ mod tests {
         assert!(rendered.contains("not Miri-clean status"));
         assert!(rendered.contains("not a site-execution claim"));
         assert!(rendered.contains("not memory-safety proof"));
+        Ok(())
+    }
+
+    #[test]
+    fn pr_summary_ranks_cards_by_cheapest_credible_confirmation() -> Result<(), String> {
+        use crate::domain::WitnessEvidence;
+
+        let mut output = fixture_output("duplicate_raw_pointer_reads")?;
+        if output.cards.len() < 2 {
+            return Err("duplicate fixture should emit at least two cards".to_string());
+        }
+        // Give the first card a runtime receipt verdict; it already has
+        // evidence, so the still-pending second card should rank first.
+        output.cards[0].witness = WitnessEvidence::present("miri receipt imported")
+            .with_runtime_executed(true)
+            .with_verdict(Some("not_reproduced".to_string()));
+        let pending_id = output.cards[1].id.to_string();
+        let evidenced_id = output.cards[0].id.to_string();
+
+        let rendered = render_pr_summary(&output);
+
+        assert!(rendered.contains(&format!("- Top card: `{pending_id}`")));
+        assert!(rendered.contains("- Confirmation state: `pending`"));
+        assert!(
+            rendered.contains("`not_reproduced` (single run; not a safety claim)"),
+            "not_reproduced lines must carry the single-run qualifier: {rendered}"
+        );
+        let pending_row = rendered
+            .find(&format!("| `{pending_id}` |"))
+            .ok_or("pending row missing")?;
+        let evidenced_row = rendered
+            .find(&format!("| `{evidenced_id}` |"))
+            .ok_or("evidenced row missing")?;
+        assert!(
+            pending_row < evidenced_row,
+            "pending card with an executable command must rank before the card with evidence"
+        );
+        // Presentation-only: cards.json ordering is untouched.
+        assert_eq!(output.cards[0].id.to_string(), evidenced_id);
         Ok(())
     }
 

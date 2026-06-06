@@ -19,6 +19,12 @@ pub struct WitnessReceipt {
     pub command: Option<String>,
     pub command_hash: Option<String>,
     pub limitations: Option<Vec<String>>,
+    /// Optional structured verdict for the saved run. "confirmed" means the
+    /// UB-risk hypothesis reproduced; "not_reproduced" means this single run
+    /// did not reproduce it — it is NOT a safety claim. "inconclusive" marks
+    /// an ambiguous or partial run. Absent on older receipts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verdict: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -93,6 +99,7 @@ impl WitnessReceipt {
         validate_tool(&self.tool)?;
         validate_strength(&self.strength)?;
         validate_strength_for_tool(&self.tool, &self.strength)?;
+        validate_verdict(self.verdict.as_deref())?;
         if receipt_card_id_kind(&self.card_id).is_none() {
             return Err(
                 "card_id must be an exact counted UR-* identity ending in -cN or a path-safe manual candidate id"
@@ -160,6 +167,11 @@ impl WitnessReceipt {
             command: Some(input.command),
             command_hash: Some(command_hash),
             limitations: Some(limitations),
+            // The saved-output adapter only accepts clean targeted runs
+            // (hazard markers are rejected above), so the only derivable
+            // verdict here is `not_reproduced`: this single run did not
+            // reproduce the hypothesis. It is not a safety claim.
+            verdict: Some("not_reproduced".to_string()),
         };
         receipt.validate()?;
         Ok(receipt)
@@ -189,6 +201,9 @@ impl WitnessReceipt {
             command: Some(input.command),
             command_hash: Some(command_hash),
             limitations: Some(limitations),
+            // Clean targeted run only (failure markers rejected above), so
+            // the derivable verdict is `not_reproduced`; not a safety claim.
+            verdict: Some("not_reproduced".to_string()),
         };
         receipt.validate()?;
         Ok(receipt)
@@ -221,6 +236,10 @@ impl WitnessReceipt {
             command: Some(input.command),
             command_hash: Some(command_hash),
             limitations: Some(limitations),
+            // Clean targeted run only (sanitizer failure markers rejected
+            // above), so the derivable verdict is `not_reproduced`; not a
+            // safety claim.
+            verdict: Some("not_reproduced".to_string()),
         };
         receipt.validate()?;
         Ok(receipt)
@@ -252,6 +271,9 @@ impl WitnessReceipt {
             command: Some(input.command),
             command_hash: Some(command_hash),
             limitations: Some(limitations),
+            // Clean targeted run only (failure markers rejected above), so
+            // the derivable verdict is `not_reproduced`; not a safety claim.
+            verdict: Some("not_reproduced".to_string()),
         };
         receipt.validate()?;
         Ok(receipt)
@@ -284,6 +306,10 @@ impl WitnessReceipt {
             command: Some(input.command),
             command_hash: Some(command_hash),
             limitations: Some(limitations),
+            // Successful verification output only (failure markers rejected
+            // above); the recorded run did not reproduce the hypothesis, so
+            // the derivable verdict is `not_reproduced`; not a safety claim.
+            verdict: Some("not_reproduced".to_string()),
         };
         receipt.validate()?;
         Ok(receipt)
@@ -344,6 +370,18 @@ fn validate_required_option<'a>(value: &'a Option<String>, key: &str) -> Result<
     };
     validate_required(value, key)?;
     Ok(value)
+}
+
+fn validate_verdict(value: Option<&str>) -> Result<(), String> {
+    match value {
+        // Absent keeps back-compat with every receipt written before the
+        // verdict field existed.
+        None => Ok(()),
+        Some("confirmed" | "not_reproduced" | "inconclusive") => Ok(()),
+        Some(other) => Err(format!(
+            "uses unknown receipt verdict `{other}`; expected `confirmed`, `not_reproduced`, or `inconclusive` (or omit the field)"
+        )),
+    }
 }
 
 fn validate_strength(value: &str) -> Result<(), String> {
@@ -734,6 +772,81 @@ mod tests {
             receipt.evidence_summary(),
             "Imported miri receipt with `ran` strength; command_hash: 3e163b0bce29ff2e; limitations: fixture only"
         );
+    }
+
+    #[test]
+    fn witness_receipt_validation_accepts_absent_and_known_verdicts() -> Result<(), String> {
+        let mut receipt = fixture_receipt();
+        receipt.verdict = None;
+        receipt.validate()?;
+
+        for verdict in ["confirmed", "not_reproduced", "inconclusive"] {
+            receipt.verdict = Some(verdict.to_string());
+            receipt.validate()?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn witness_receipt_validation_rejects_unknown_verdict() {
+        let mut receipt = fixture_receipt();
+        receipt.verdict = Some("proved-safe".to_string());
+
+        let err = receipt.validate().err().unwrap_or_default();
+        assert!(err.contains("unknown receipt verdict `proved-safe`"));
+        assert!(err.contains("`confirmed`, `not_reproduced`, or `inconclusive`"));
+    }
+
+    #[test]
+    fn witness_receipt_json_without_verdict_field_still_parses() -> Result<(), String> {
+        let json = r#"{
+  "schema_version": "0.1",
+  "card_id": "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1",
+  "tool": "miri",
+  "strength": "ran",
+  "author": "core/fixtures",
+  "recorded_at": "2026-05-18T00:00:00Z",
+  "expires_at": "2026-08-18"
+}"#;
+        let receipt: WitnessReceipt = serde_json::from_str(json)
+            .map_err(|err| format!("deserialize receipt without verdict failed: {err}"))?;
+        assert_eq!(receipt.verdict, None);
+        receipt.validate()?;
+        let rendered = receipt.to_pretty_json()?;
+        assert!(
+            !rendered.contains("verdict"),
+            "absent verdict must stay absent on re-serialization: {rendered}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn saved_output_constructors_record_not_reproduced_verdict() -> Result<(), String> {
+        let card_id =
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+        let miri = WitnessReceipt::from_miri_output(MiriReceiptInput {
+            card_id: card_id.to_string(),
+            output: "test result: ok. 1 passed; 0 failed; finished in 0.01s\n".to_string(),
+            author: "core/fixtures".to_string(),
+            recorded_at: "2026-05-18T00:00:00Z".to_string(),
+            expires_at: "2026-08-18".to_string(),
+            command: "cargo +nightly miri test read_header".to_string(),
+            limitations: Vec::new(),
+        })?;
+        assert_eq!(miri.verdict.as_deref(), Some("not_reproduced"));
+
+        let proof = WitnessReceipt::from_proof_output(ProofReceiptInput {
+            card_id: card_id.to_string(),
+            tool: "kani".to_string(),
+            output: "VERIFICATION:- SUCCESSFUL\n".to_string(),
+            author: "core/fixtures".to_string(),
+            recorded_at: "2026-05-18T00:00:00Z".to_string(),
+            expires_at: "2026-08-18".to_string(),
+            command: "cargo kani --harness byte_to_bool_harness".to_string(),
+            limitations: Vec::new(),
+        })?;
+        assert_eq!(proof.verdict.as_deref(), Some("not_reproduced"));
+        Ok(())
     }
 
     #[test]
@@ -1364,6 +1477,7 @@ mod tests {
                 "cargo +nightly miri test read_header",
             )),
             limitations: Some(vec!["fixture only".to_string()]),
+            verdict: None,
         }
     }
 }
