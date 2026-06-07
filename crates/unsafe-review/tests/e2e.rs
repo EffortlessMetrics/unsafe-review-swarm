@@ -3873,6 +3873,58 @@ fn check_reports_missing_diff_file_as_cli_failure() -> Result<(), Box<dyn Error>
 }
 
 #[test]
+fn check_reports_unparseable_diff_as_cli_failure() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-garbage-diff-e2e")?;
+
+    // Copy the fixture into a temp dir so we can place the garbage diff alongside it.
+    copy_dir_all(&fixture, temp.path())?;
+
+    let garbage_diff = temp.path().join("garbage.diff");
+    fs::write(&garbage_diff, "this is not a diff at all")?;
+
+    let cards_out = temp.path().join("cards.json");
+
+    let output = run_failure([
+        os("check"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--diff"),
+        garbage_diff.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+        os("--out"),
+        cards_out.as_os_str().to_os_string(),
+    ])?;
+
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(
+        stdout_text(&output)?.trim(),
+        "",
+        "stdout should be empty on parse failure"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("garbage.diff"),
+        "stderr should include the diff path: {stderr}"
+    );
+    assert!(
+        stderr.contains("could not be parsed as a unified diff"),
+        "stderr should describe the parse failure: {stderr}"
+    );
+    assert!(
+        stderr.contains("no analysis was run"),
+        "stderr should state no analysis was run: {stderr}"
+    );
+    assert!(
+        !cards_out.exists(),
+        "output file must not be created when diff is unparseable"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn repo_list_files_honors_selection_controls() -> Result<(), Box<dyn Error>> {
     let temp = TempDir::new("unsafe-review-repo-list-files")?;
     write_e2e_file(temp.path(), "src/lib.rs")?;
