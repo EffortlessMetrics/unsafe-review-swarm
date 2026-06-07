@@ -1,5 +1,9 @@
 use crate::api::{AnalyzeOutput, Scope, Summary};
-use crate::domain::{EvidenceState, ObligationEvidence, ReviewCard, WitnessRoute};
+use crate::domain::{
+    AgentLspReadiness, BaselineState, CommentPlanStatus, Coverage, CoverageBlock, EvidenceState,
+    ManualContext, ObligationEvidence, OutcomeMovement, ReviewCard, WitnessReceiptCoverage,
+    WitnessRoute,
+};
 use crate::output::REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY;
 use crate::output::confirmation::ConfirmationCue;
 use crate::util::path_display;
@@ -107,6 +111,7 @@ struct JsonCard<'a> {
     next_action: &'a str,
     verify_commands: &'a [String],
     confirmation_cue: ConfirmationCue,
+    coverage: JsonCoverageBlock,
 }
 
 impl<'a> From<&'a ReviewCard> for JsonCard<'a> {
@@ -144,6 +149,7 @@ impl<'a> From<&'a ReviewCard> for JsonCard<'a> {
             next_action: &card.next_action.summary,
             verify_commands: &card.next_action.verify_commands,
             confirmation_cue: ConfirmationCue::from(card),
+            coverage: JsonCoverageBlock::from(card.coverage_block()),
         }
     }
 }
@@ -239,6 +245,64 @@ fn scope_str(output: &AnalyzeOutput) -> &'static str {
         Scope::Diff => "diff",
         Scope::Repo => "repo",
     }
+}
+
+/// JSON projection of a card's machine-readable coverage block (SPEC-0029).
+#[derive(Serialize)]
+struct JsonCoverageBlock {
+    contract_coverage: &'static str,
+    guard_coverage: &'static str,
+    test_reach_coverage: &'static str,
+    witness_receipt_coverage: &'static str,
+    manual_context: &'static str,
+    baseline_state: &'static str,
+    outcome_movement: &'static str,
+    comment_plan_status: &'static str,
+    agent_lsp_readiness: &'static str,
+}
+
+impl From<CoverageBlock> for JsonCoverageBlock {
+    fn from(block: CoverageBlock) -> Self {
+        Self {
+            contract_coverage: coverage_str(block.contract_coverage),
+            guard_coverage: coverage_str(block.guard_coverage),
+            test_reach_coverage: coverage_str(block.test_reach_coverage),
+            witness_receipt_coverage: witness_receipt_str(block.witness_receipt_coverage),
+            manual_context: manual_context_str(block.manual_context),
+            baseline_state: baseline_state_str(block.baseline_state),
+            outcome_movement: outcome_movement_str(block.outcome_movement),
+            comment_plan_status: comment_plan_status_str(block.comment_plan_status),
+            agent_lsp_readiness: agent_lsp_readiness_str(block.agent_lsp_readiness),
+        }
+    }
+}
+
+fn coverage_str(coverage: Coverage) -> &'static str {
+    coverage.as_str()
+}
+
+fn witness_receipt_str(coverage: WitnessReceiptCoverage) -> &'static str {
+    coverage.as_str()
+}
+
+fn manual_context_str(context: ManualContext) -> &'static str {
+    context.as_str()
+}
+
+fn baseline_state_str(state: BaselineState) -> &'static str {
+    state.as_str()
+}
+
+fn outcome_movement_str(movement: OutcomeMovement) -> &'static str {
+    movement.as_str()
+}
+
+fn comment_plan_status_str(status: CommentPlanStatus) -> &'static str {
+    status.as_str()
+}
+
+fn agent_lsp_readiness_str(readiness: AgentLspReadiness) -> &'static str {
+    readiness.as_str()
 }
 
 #[cfg(test)]
@@ -957,6 +1021,37 @@ mod tests {
             ));
         }
 
+        Ok(())
+    }
+
+    /// Regenerate all `expected.cards.json` golden files from the current output.
+    ///
+    /// Run with `UPDATE_GOLDENS=1 cargo test -p unsafe-review-core bless_fixture_card_goldens`
+    /// after intentional changes to the JSON card shape (e.g. adding a new field).
+    #[test]
+    fn bless_fixture_card_goldens() -> Result<(), String> {
+        if std::env::var("UPDATE_GOLDENS").as_deref() != Ok("1") {
+            return Ok(());
+        }
+        for fixture in FIXTURE_GOLDENS {
+            let output = fixture_output(fixture)?;
+            let rendered = parse_json(&render(&output))?;
+            let Some(cards) = rendered.get("cards") else {
+                return Err(format!("{fixture} JSON output is missing `cards`"));
+            };
+            let path = fixture_root(fixture).join("expected.cards.json");
+            let mut text = serde_json::to_string_pretty(cards)
+                .map_err(|err| format!("serialize {fixture} cards failed: {err}"))?;
+            text.push('\n');
+            // Ensure LF line endings (the repo is LF-only).
+            let text = text.replace("\r\n", "\n");
+            fs::write(&path, text.as_bytes())
+                .map_err(|err| format!("write {} failed: {err}", path.display()))?;
+        }
+        println!(
+            "bless_fixture_card_goldens: updated {} fixtures",
+            FIXTURE_GOLDENS.len()
+        );
         Ok(())
     }
 

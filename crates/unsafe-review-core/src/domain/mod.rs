@@ -1,4 +1,5 @@
 mod classification;
+pub mod coverage;
 mod evidence;
 mod hazard;
 mod ids;
@@ -10,6 +11,10 @@ mod review_card;
 mod witness;
 
 pub use classification::{Confidence, Priority, ProofPath, ReviewClass};
+pub use coverage::{
+    AgentLspReadiness, BaselineState, CommentPlanStatus, Coverage, CoverageBlock, ManualContext,
+    OutcomeMovement, WitnessReceiptCoverage,
+};
 pub use evidence::{
     ContractEvidence, DischargeEvidence, EvidenceState, MissingEvidence, ObligationEvidence,
     ReachEvidence, RelatedTest,

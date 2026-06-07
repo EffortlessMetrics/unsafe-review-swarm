@@ -1,42 +1,67 @@
 [
   {
-    "id": "UR-nonnull-new-reassigned-ptr-not-guard-src-lib-rs-expose-nonnull-after-stale-question-mark-operation-nonnull_unchecked-nonnull-unchecked-eee16b5e2cd1-pointer_validity-c1",
     "class": "guard_missing",
-    "priority": "high",
     "confidence": "medium",
-    "proof_path": "source_route_only",
-    "site": {
-      "file": "src/lib.rs",
-      "line": 10,
-      "column": 5,
-      "kind": "operation",
-      "owner": "expose_nonnull_after_stale_question_mark",
-      "visibility": "private",
-      "public_api_surface": false,
-      "snippet": "Some(unsafe { NonNull::new_unchecked(ptr) })"
+    "confirmation_cue": {
+      "build_this_first": {
+        "command": "cargo +nightly miri test expose_nonnull_after_stale_question_mark",
+        "kind": "verify_command",
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test expose_nonnull_after_stale_question_mark` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "confirmation_state": "pending",
+      "confirmation_step": "build/run `cargo +nightly miri test expose_nonnull_after_stale_question_mark` first, then attach a matching receipt if it confirms the route",
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `Some(unsafe { NonNull::new_unchecked(ptr) })`; confirm with external evidence before treating it as observed runtime behavior",
+      "minimal_repro": {
+        "command": "cargo +nightly miri test expose_nonnull_after_stale_question_mark",
+        "kind": "verify_command",
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety.",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-nonnull-new-reassigned-ptr-not-guard-src-lib-rs-expose-nonnull-after-stale-question-mark-operation-nonnull_unchecked-nonnull-unchecked-eee16b5e2cd1-pointer_validity-c1` still maps to `Some(unsafe { NonNull::new_unchecked(ptr) })` at `src/lib.rs:10:5` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test expose_nonnull_after_stale_question_mark` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ]
+      },
+      "runtime_executed": false,
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
     },
-    "operation": "Some(unsafe { NonNull::new_unchecked(ptr) })",
-    "operation_family": "nonnull_unchecked",
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "coverage": {
+      "agent_lsp_readiness": "ready",
+      "baseline_state": "unknown",
+      "comment_plan_status": "not_eligible",
+      "contract_coverage": "present",
+      "guard_coverage": "missing",
+      "manual_context": "absent",
+      "outcome_movement": "unknown",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing"
+    },
+    "discharge": "No visible local guard detected",
     "hazards": [
       "pointer_validity"
     ],
-    "obligations": [
-      "pointer is non-null before constructing NonNull"
+    "id": "UR-nonnull-new-reassigned-ptr-not-guard-src-lib-rs-expose-nonnull-after-stale-question-mark-operation-nonnull_unchecked-nonnull-unchecked-eee16b5e2cd1-pointer_validity-c1",
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
     ],
+    "next_action": "Add or expose the local guard that discharges the `nonnull_unchecked` safety obligation.",
     "obligation_evidence": [
       {
-        "key": "non-null",
-        "description": "pointer is non-null before constructing NonNull",
         "contract": {
           "present": true,
           "state": "present",
           "summary": "Nearby `SAFETY:` comment was detected"
         },
+        "description": "pointer is non-null before constructing NonNull",
         "discharge": {
           "present": false,
           "state": "missing",
           "summary": "No nullability guard code was detected"
         },
+        "key": "non-null",
         "reach": {
           "present": true,
           "state": "present",
@@ -49,56 +74,42 @@
         }
       }
     ],
-    "contract": "Nearby `SAFETY:` comment was detected",
-    "discharge": "No visible local guard detected",
+    "obligations": [
+      "pointer is non-null before constructing NonNull"
+    ],
+    "operation": "Some(unsafe { NonNull::new_unchecked(ptr) })",
+    "operation_family": "nonnull_unchecked",
+    "priority": "high",
+    "proof_path": "source_route_only",
     "reach": "1 related test file(s) mention owner `expose_nonnull_after_stale_question_mark`",
-    "witness": "No imported witness receipt was found",
-    "witness_routes": [
-      {
-        "kind": "miri",
-        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
-        "command": "cargo +nightly miri test expose_nonnull_after_stale_question_mark",
-        "required": false
-      },
-      {
-        "kind": "cargo-careful",
-        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
-        "command": "cargo +nightly careful test expose_nonnull_after_stale_question_mark",
-        "required": false
-      }
-    ],
-    "missing": [
-      "Missing visible local guard for inferred safety obligations",
-      "No witness receipt imported for this card"
-    ],
-    "next_action": "Add or expose the local guard that discharges the `nonnull_unchecked` safety obligation.",
+    "site": {
+      "column": 5,
+      "file": "src/lib.rs",
+      "kind": "operation",
+      "line": 10,
+      "owner": "expose_nonnull_after_stale_question_mark",
+      "public_api_surface": false,
+      "snippet": "Some(unsafe { NonNull::new_unchecked(ptr) })",
+      "visibility": "private"
+    },
     "verify_commands": [
       "cargo +nightly miri test expose_nonnull_after_stale_question_mark",
       "cargo +nightly careful test expose_nonnull_after_stale_question_mark"
     ],
-    "confirmation_cue": {
-      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `Some(unsafe { NonNull::new_unchecked(ptr) })`; confirm with external evidence before treating it as observed runtime behavior",
-      "build_this_first": {
-        "kind": "verify_command",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
         "command": "cargo +nightly miri test expose_nonnull_after_stale_question_mark",
-        "route_kind": "miri",
-        "summary": "Build/run `cargo +nightly miri test expose_nonnull_after_stale_question_mark` first for this card; attach a matching receipt only if it confirms the route"
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "required": false
       },
-      "minimal_repro": {
-        "kind": "verify_command",
-        "command": "cargo +nightly miri test expose_nonnull_after_stale_question_mark",
-        "route_kind": "miri",
-        "steps": [
-          "Confirm ReviewCard `UR-nonnull-new-reassigned-ptr-not-guard-src-lib-rs-expose-nonnull-after-stale-question-mark-operation-nonnull_unchecked-nonnull-unchecked-eee16b5e2cd1-pointer_validity-c1` still maps to `Some(unsafe { NonNull::new_unchecked(ptr) })` at `src/lib.rs:10:5` before upgrading confidence.",
-          "Build/run `cargo +nightly miri test expose_nonnull_after_stale_question_mark` as the smallest available command for this card.",
-          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
-        ],
-        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
-      },
-      "confirmation_step": "build/run `cargo +nightly miri test expose_nonnull_after_stale_question_mark` first, then attach a matching receipt if it confirms the route",
-      "runtime_executed": false,
-      "confirmation_state": "pending",
-      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
-    }
+      {
+        "command": "cargo +nightly careful test expose_nonnull_after_stale_question_mark",
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "required": false
+      }
+    ]
   }
 ]
