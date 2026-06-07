@@ -448,7 +448,7 @@ pub fn baseline_init(
     let ledger_path = out
         .map(Path::to_path_buf)
         .unwrap_or_else(|| root.join("policy/unsafe-review-baseline.toml"));
-    let snapshot_path = root.join(crate::policy::SNAPSHOT_PATH);
+    let snapshot_path = baseline_snapshot_path(&ledger_path);
     let ledger_existed = ledger_path.is_file();
 
     // Run a full repo scan to get all current cards.
@@ -531,7 +531,7 @@ pub fn baseline_add(
     let ledger_path = out
         .map(Path::to_path_buf)
         .unwrap_or_else(|| root.join("policy/unsafe-review-baseline.toml"));
-    let snapshot_path = root.join(crate::policy::SNAPSHOT_PATH);
+    let snapshot_path = baseline_snapshot_path(&ledger_path);
 
     // Run a full repo scan.
     let output = pipeline::analyze(AnalyzeInput {
@@ -584,6 +584,20 @@ pub fn baseline_add(
     write_coverage_snapshot(&snapshot_path, &sorted_snapshot)?;
 
     Ok(())
+}
+
+/// Derive the coverage snapshot path from the baseline ledger path: the snapshot is written
+/// as a sibling `<ledger-stem>-snapshot.toml`. The default ledger
+/// `policy/unsafe-review-baseline.toml` keeps producing
+/// `policy/unsafe-review-baseline-snapshot.toml`, and a custom `--out` keeps both files
+/// together instead of writing the snapshot into the scanned `--root` (which would edit a
+/// repo unsafe-review only promised to read).
+fn baseline_snapshot_path(ledger_path: &Path) -> PathBuf {
+    let stem = ledger_path
+        .file_stem()
+        .map(|stem| stem.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "unsafe-review-baseline".to_string());
+    ledger_path.with_file_name(format!("{stem}-snapshot.toml"))
 }
 
 /// Default `review_after` date: one year from today (ISO 8601 YYYY-MM-DD).
@@ -688,5 +702,32 @@ mod tests {
         assert_eq!(input.policy, PolicyMode::Advisory);
         assert!(input.include_unchanged_tests);
         assert_eq!(input.max_cards, None);
+    }
+
+    #[test]
+    fn baseline_snapshot_path_keeps_default_canonical_location() {
+        let ledger = Path::new("repo/policy/unsafe-review-baseline.toml");
+        assert_eq!(
+            baseline_snapshot_path(ledger),
+            PathBuf::from("repo/policy/unsafe-review-baseline-snapshot.toml")
+        );
+    }
+
+    #[test]
+    fn baseline_snapshot_path_follows_custom_out_as_sibling() {
+        let ledger = Path::new("elsewhere/bun-baseline.toml");
+        assert_eq!(
+            baseline_snapshot_path(ledger),
+            PathBuf::from("elsewhere/bun-baseline-snapshot.toml")
+        );
+    }
+
+    #[test]
+    fn baseline_snapshot_path_handles_extension_less_out() {
+        let ledger = Path::new("elsewhere/baseline");
+        assert_eq!(
+            baseline_snapshot_path(ledger),
+            PathBuf::from("elsewhere/baseline-snapshot.toml")
+        );
     }
 }

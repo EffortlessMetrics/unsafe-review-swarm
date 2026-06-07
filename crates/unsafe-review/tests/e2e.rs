@@ -5505,6 +5505,39 @@ fn no_new_debt_policy_fails_only_for_unbaselined_actionable_gaps() -> Result<(),
 }
 
 #[test]
+fn baseline_init_out_override_never_writes_into_root() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-baseline-out-e2e")?;
+    let copied = temp.path().join("fixture");
+    copy_dir_all(&fixture, &copied)?;
+    let out_dir = temp.path().join("out");
+    fs::create_dir_all(&out_dir)?;
+    let out_ledger = out_dir.join("consumer-baseline.toml");
+
+    let output = run_success([
+        os("baseline"),
+        os("init"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--out"),
+        out_ledger.as_os_str().to_os_string(),
+    ])?;
+    let stdout = stdout_text(&output)?;
+    assert!(stdout.contains("baseline init: ok"));
+    assert!(stdout.contains("consumer-baseline-snapshot.toml"));
+
+    // Both authored files follow --out as siblings.
+    assert!(out_ledger.is_file());
+    assert!(out_dir.join("consumer-baseline-snapshot.toml").is_file());
+
+    // The scanned root stays read-only: no ledger, snapshot, or policy directory
+    // is created inside --root when --out points elsewhere.
+    assert!(!copied.join("policy").exists());
+
+    Ok(())
+}
+
+#[test]
 fn policy_report_is_advisory_and_counts_baseline_state() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment");
     let report = run_success([

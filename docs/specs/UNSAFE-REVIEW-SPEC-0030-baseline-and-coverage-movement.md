@@ -58,6 +58,13 @@ the existing required fields (`card_id`, `owner`, `reason`, `evidence`,
 `review_after` date. `baseline init` never marks anything safe; it records that a
 gap pre-existed.
 
+The coverage snapshot is written as a sibling of the ledger, derived from the
+ledger file name (`<ledger-stem>-snapshot.toml`). The default ledger path keeps
+the canonical `policy/unsafe-review-baseline-snapshot.toml`; a custom `--out`
+keeps both authored files together. Baseline authoring never writes into
+`--root` when `--out` points elsewhere: the scanned repository stays read-only,
+matching the advisory no-source-edits boundary.
+
 `unsafe-review baseline add --card-id <UR-...-cN> --owner <name> --reason <text>
 --evidence <text> [--review-after <date>]` adds or updates a single entry, so the
 ledger does not have to be hand-edited as raw TOML.

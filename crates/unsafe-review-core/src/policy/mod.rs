@@ -46,8 +46,6 @@ impl SnapshotCoverage {
     }
 }
 
-pub(crate) const SNAPSHOT_PATH: &str = "policy/unsafe-review-baseline-snapshot.toml";
-
 #[derive(Clone, Debug, Default)]
 pub(crate) struct PolicyState {
     baseline_ids: BTreeSet<String>,
