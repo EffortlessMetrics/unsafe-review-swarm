@@ -21665,6 +21665,7 @@ review_after = "2026-08-01"
             },
             "artifacts": [
                 {"path":"review-kit.json","kind":"review_kit_manifest","format":"json","schema_version":"0.1"},
+                {"path":"unsafe-review-gate.json","kind":"gate_manifest","format":"json","schema_version":"unsafe-review-gate/v1"},
                 {"path":"cards.json","kind":"review_cards","format":"json","schema_version":"0.1"},
                 {"path":"pr-summary.md","kind":"reviewer_summary","format":"markdown","schema_version":serde_json::Value::Null},
                 {"path":"github-summary.md","kind":"github_summary","format":"markdown","schema_version":serde_json::Value::Null},
@@ -21684,6 +21685,36 @@ review_after = "2026-08-01"
         });
         fs::write(dir.join("review-kit.json"), value.to_string())
             .map_err(|err| format!("write review kit failed: {err}"))
+    }
+
+    fn write_gate_manifest_artifact(dir: &Path) -> Result<(), String> {
+        let value = serde_json::json!({
+            "schema_version": "unsafe-review-gate/v1",
+            "dialect": "unsafe-review",
+            "status": "advisory",
+            "summary": {
+                "new_gaps": 0,
+                "worsened_gaps": 0,
+                "resolved_gaps": 0,
+                "inherited_gaps": 0
+            },
+            "artifacts": {
+                "cards": "cards.json",
+                "comment_plan": "comment-plan.json",
+                "repair_queue": "repair-queue.json",
+                "receipt_audit": "receipt-audit.md",
+                "review_kit": "review-kit.json",
+                "pr_summary": "pr-summary.md",
+                "sarif": "cards.sarif",
+                "lsp": "lsp.json",
+                "policy_report": "policy-report.json"
+            },
+            "trust_boundary": "static unsafe-review coverage evidence; not proof, not a merge verdict",
+            "tool": "unsafe-review",
+            "tool_version": "0.2.1-test"
+        });
+        fs::write(dir.join("unsafe-review-gate.json"), value.to_string())
+            .map_err(|err| format!("write gate manifest failed: {err}"))
     }
 
     fn write_empty_manual_candidates_artifact(dir: &Path) -> Result<(), String> {
@@ -23197,6 +23228,7 @@ review_after = "2026-08-01"
         write_empty_manual_repair_queue_artifact(dir)?;
         write_empty_tokmd_packets_artifact(dir)?;
         write_review_kit_artifact(dir, 1, 1, Some("card-1"))?;
+        write_gate_manifest_artifact(dir)?;
         Ok(())
     }
 
@@ -23321,6 +23353,7 @@ This artifact is static unsafe contract review. It routes reviewers to credible 
         write_empty_manual_repair_queue_artifact(dir)?;
         write_empty_tokmd_packets_artifact(dir)?;
         write_review_kit_artifact(dir, 0, 0, None)?;
+        write_gate_manifest_artifact(dir)?;
         Ok(())
     }
 

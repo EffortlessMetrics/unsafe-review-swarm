@@ -25,7 +25,7 @@ use unsafe_review_core::{
     discover_repo_files, evaluate_policy_report, evaluate_policy_report_from_output,
     lint_manual_candidate_text, load_manual_candidates, manual_candidate_implementer_handoff,
     new_manual_candidate_skeleton, read_manual_candidate, render_badge_jsons, render_comment_plan,
-    render_github_summary, render_human, render_json, render_lsp,
+    render_gate_manifest, render_github_summary, render_human, render_json, render_lsp,
     render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
     render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
     render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,
@@ -43,6 +43,7 @@ const FIRST_RUN_TRUST_BOUNDARY: &str = "static unsafe contract review only; not 
 type FirstPrRenderer = fn(&AnalyzeOutput) -> String;
 
 const REVIEW_KIT_ARTIFACT: &str = "review-kit.json";
+const GATE_MANIFEST_ARTIFACT: &str = "unsafe-review-gate.json";
 const RECEIPT_AUDIT_ARTIFACT: &str = "receipt-audit.md";
 const POLICY_REPORT_JSON_ARTIFACT: &str = "policy-report.json";
 const POLICY_REPORT_MARKDOWN_ARTIFACT: &str = "policy-report.md";
@@ -59,8 +60,9 @@ const FIRST_PR_RENDERED_ARTIFACTS: [(&str, FirstPrRenderer); 8] = [
     ("lsp.json", render_lsp),
     ("repair-queue.json", render_repair_queue),
 ];
-const FIRST_PR_ARTIFACTS: [&str; 15] = [
+const FIRST_PR_ARTIFACTS: [&str; 16] = [
     REVIEW_KIT_ARTIFACT,
+    GATE_MANIFEST_ARTIFACT,
     "cards.json",
     "pr-summary.md",
     "github-summary.md",
@@ -1154,6 +1156,10 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
             &manual_candidates,
             &FIRST_PR_ARTIFACTS,
         ),
+    )?;
+    write_artifact(
+        &options.out_dir.join(GATE_MANIFEST_ARTIFACT),
+        render_gate_manifest(&output),
     )?;
 
     first_pr::print_first_pr_report(first_pr::FirstPrReport {

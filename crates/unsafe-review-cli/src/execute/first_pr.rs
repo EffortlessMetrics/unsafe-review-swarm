@@ -2389,6 +2389,7 @@ fn artifact_entry(path: &str) -> serde_json::Value {
 fn artifact_kind(path: &str) -> &'static str {
     match path {
         "review-kit.json" => "review_kit_manifest",
+        "unsafe-review-gate.json" => "gate_manifest",
         "cards.json" => "review_cards",
         "pr-summary.md" => "reviewer_summary",
         "github-summary.md" => "github_summary",
@@ -2423,6 +2424,7 @@ fn artifact_schema_version(path: &str) -> Option<&'static str> {
     match path {
         "review-kit.json" | "cards.json" | "comment-plan.json" | "lsp.json"
         | "repair-queue.json" | "policy-report.json" => Some("0.1"),
+        "unsafe-review-gate.json" => Some("unsafe-review-gate/v1"),
         "manual-candidates.json" => Some("manual-candidates/v1"),
         "manual-repair-queue.json" => Some("manual-repair-queue/v1"),
         "tokmd-packets.json" => Some("tokmd-packets/v1"),

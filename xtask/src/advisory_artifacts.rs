@@ -233,8 +233,9 @@ const REPAIR_QUEUE_READINESS_STATES: [&str; 4] = [
     "requires_witness_receipt",
     "unsupported",
 ];
-const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 15] = [
+const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 16] = [
     "review-kit.json",
+    "unsafe-review-gate.json",
     "cards.json",
     "pr-summary.md",
     "github-summary.md",
@@ -4989,6 +4990,7 @@ fn check_review_kit_artifact_path(path: &str) -> Result<(), String> {
 fn expected_review_kit_artifact_kind(path: &str) -> &'static str {
     match path {
         "review-kit.json" => "review_kit_manifest",
+        "unsafe-review-gate.json" => "gate_manifest",
         "cards.json" => "review_cards",
         "pr-summary.md" => "reviewer_summary",
         "github-summary.md" => "github_summary",
@@ -5010,6 +5012,7 @@ fn expected_review_kit_artifact_kind(path: &str) -> &'static str {
 fn expected_review_kit_artifact_format(path: &str) -> &'static str {
     match path {
         "review-kit.json"
+        | "unsafe-review-gate.json"
         | "cards.json"
         | "comment-plan.json"
         | "lsp.json"
@@ -5037,6 +5040,7 @@ fn check_review_kit_artifact_schema_version(
     let expected = match path {
         "review-kit.json" | "cards.json" | "comment-plan.json" | "lsp.json"
         | "repair-queue.json" | "policy-report.json" => Some("0.1"),
+        "unsafe-review-gate.json" => Some("unsafe-review-gate/v1"),
         "manual-candidates.json" => Some("manual-candidates/v1"),
         "manual-repair-queue.json" => Some("manual-repair-queue/v1"),
         "tokmd-packets.json" => Some("tokmd-packets/v1"),
@@ -9431,6 +9435,7 @@ fn require_known_card_id<'a>(
 fn check_advisory_artifact_overclaims(dir: &Path) -> Result<(), String> {
     for name in [
         "review-kit.json",
+        "unsafe-review-gate.json",
         "cards.json",
         "pr-summary.md",
         "github-summary.md",
@@ -9463,6 +9468,7 @@ fn is_machine_json_artifact(name: &str) -> bool {
     matches!(
         name,
         "review-kit.json"
+            | "unsafe-review-gate.json"
             | "cards.json"
             | "cards.sarif"
             | "comment-plan.json"

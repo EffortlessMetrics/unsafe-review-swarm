@@ -1854,6 +1854,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("Agent packet:"));
     assert!(stdout.contains("Artifacts:"));
     assert!(stdout.contains("review-kit.json"));
+    assert!(stdout.contains("unsafe-review-gate.json"));
     assert!(stdout.contains("cards.json"));
     assert!(stdout.contains("pr-summary.md"));
     assert!(stdout.contains("github-summary.md"));
@@ -2379,6 +2380,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     let artifacts = json_array(&review_kit["artifacts"], "review_kit.artifacts")?;
     for expected in [
         "review-kit.json",
+        "unsafe-review-gate.json",
         "cards.json",
         "pr-summary.md",
         "github-summary.md",
@@ -2416,6 +2418,9 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             | "repair-queue.json" | "policy-report.json" => {
                 assert_eq!(entry["schema_version"], "0.1")
             }
+            "unsafe-review-gate.json" => {
+                assert_eq!(entry["schema_version"], "unsafe-review-gate/v1")
+            }
             "manual-candidates.json" => {
                 assert_eq!(entry["schema_version"], "manual-candidates/v1")
             }
@@ -2429,6 +2434,50 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             _ => assert!(entry["schema_version"].is_null()),
         }
     }
+    // Verify the gate manifest file content.
+    let gate_manifest = parse_json(&fs::read_to_string(
+        out_dir.join("unsafe-review-gate.json"),
+    )?)?;
+    assert_eq!(gate_manifest["schema_version"], "unsafe-review-gate/v1");
+    assert_eq!(gate_manifest["dialect"], "unsafe-review");
+    assert_eq!(gate_manifest["status"], "advisory");
+    assert_eq!(
+        gate_manifest["trust_boundary"],
+        "static unsafe-review coverage evidence; not proof, not a merge verdict"
+    );
+    assert_eq!(gate_manifest["artifacts"]["cards"], "cards.json");
+    assert_eq!(
+        gate_manifest["artifacts"]["comment_plan"],
+        "comment-plan.json"
+    );
+    assert_eq!(
+        gate_manifest["artifacts"]["repair_queue"],
+        "repair-queue.json"
+    );
+    assert_eq!(
+        gate_manifest["summary"]["new_gaps"],
+        cards["summary"]["new_gaps"]
+    );
+    assert_eq!(
+        gate_manifest["summary"]["worsened_gaps"],
+        cards["summary"]["worsened_gaps"]
+    );
+    assert_eq!(
+        gate_manifest["summary"]["resolved_gaps"],
+        cards["summary"]["resolved_gaps"]
+    );
+    assert_eq!(
+        gate_manifest["summary"]["inherited_gaps"],
+        cards["summary"]["inherited_gaps"]
+    );
+    assert!(
+        gate_manifest.get("generated_at").is_none(),
+        "gate manifest must not contain volatile timestamp field"
+    );
+    assert!(
+        gate_manifest.get("wall_seconds").is_none(),
+        "gate manifest must not contain volatile wall_seconds field"
+    );
     assert!(
         review_kit["trust_boundary"]
             .as_str()

@@ -2,8 +2,8 @@ use crate::analysis::{pipeline, receipts};
 use crate::domain::{CardId, ReviewCard};
 use crate::input::workspace;
 use crate::output::{
-    agent, badges, comment_plan, confirmation, human, json, lsp, markdown, outcome, policy_report,
-    receipt_audit, repair_queue, sarif, witness_plan,
+    agent, badges, comment_plan, confirmation, gate_manifest, human, json, lsp, markdown, outcome,
+    policy_report, receipt_audit, repair_queue, sarif, witness_plan,
 };
 use std::path::PathBuf;
 
@@ -289,6 +289,16 @@ pub fn render_witness_plan(output: &AnalyzeOutput) -> String {
 
 pub fn render_repair_queue(output: &AnalyzeOutput) -> String {
     repair_queue::render(output)
+}
+
+/// Render the `unsafe-review-gate.json` routing manifest (SPEC-0034).
+///
+/// The manifest is a thin index over the artifacts a `first-pr`/`repo` run
+/// produced, plus the SPEC-0030 movement summary.  It is fully deterministic —
+/// it carries no timestamp or wall-time field — so it is safe to include in
+/// byte-compared goldens or reproducibility rails.
+pub fn render_gate_manifest(output: &AnalyzeOutput) -> String {
+    gate_manifest::render(output)
 }
 
 pub fn project_review_card_confirmation(card: &ReviewCard) -> ReviewCardConfirmationProjection {
