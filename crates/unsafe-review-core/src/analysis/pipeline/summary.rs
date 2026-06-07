@@ -5,10 +5,10 @@ use std::collections::BTreeSet;
 /// Summarize card counts and compute SPEC-0030 movement fields.
 ///
 /// **Movement definitions (SPEC-0030)**:
-/// - `new_gaps`:      open actionable cards not in the baseline ledger, constrained to
-///                    changed-line sites on a diff-scoped run.
+/// - `new_gaps`: open actionable cards not in the baseline ledger, constrained to
+///   changed-line sites on a diff-scoped run.
 /// - `worsened_gaps`: baseline cards whose coverage regressed; always 0 until a coverage
-///                    snapshot mechanism (`baseline init`) lands (deferred to a follow-up slice).
+///   snapshot mechanism (`baseline init`) lands (deferred to a follow-up slice).
 /// - `resolved_gaps`: baseline ledger entries whose card is no longer present.
 /// - `inherited_gaps`: cards classified `BaselineKnown` (matched baseline, still open).
 pub(super) fn summarize(
