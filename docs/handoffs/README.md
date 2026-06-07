@@ -5,6 +5,7 @@ what not to do next. Do not put active specs here.
 
 | Handoff | Date | Scope |
 |---|---|---|
+| [0.3.4 consumer validation](2026-06-07-0.3.4-consumer-validation.md) | 2026-06-07 | validates released 0.3.4 in its consumers (ub-review structured ingestion #363 + inline comments #365; Bun baseline/no-new-debt + stable-byte-too-narrow finding) and records what it proved/did not prove with narrow filed issues #1542-#1546, no proof/UB/Miri/site-execution/calibrated claims |
 | [Source 0.3.4 publication sync](2026-06-07-source-0.3.4-publication-sync.md) | 2026-06-07 | mirrors the verified 0.3.4 publication (source PRs #529/#530, crates.io core/cli/facade 0.3.4, docs.rs versioned-docs redirect, install smoke, tag v0.3.4, GitHub Release) into the swarm workbench and moves the source-sync checkpoint without new safety, proof, or policy-readiness claims |
 | [Release 0.3.4 preparation](2026-06-07-release-0.3.4-preparation.md) | 2026-06-07 | coverage-instrument usability patch release preparation, synchronized 0.3.4 version bump, coverage-slot/baseline/gate-manifest/file-range/diagnosability notes, validation checklist, and manual publish order |
 | [Source 0.3.3 publication sync](2026-06-06-source-0.3.3-publication-sync.md) | 2026-06-06 | mirrors the verified 0.3.3 publication (source PRs #526/#527/#528, crates.io core/cli/facade 0.3.3, docs.rs checks, install smoke, tag v0.3.3, GitHub Release) into the swarm workbench and moves the source-sync checkpoint without new safety, proof, or policy-readiness claims |
