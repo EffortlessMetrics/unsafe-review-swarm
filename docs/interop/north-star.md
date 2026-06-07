@@ -46,6 +46,34 @@ runs. The 1M context is the spec that matters most — this task is context-boun
 so a cheap-but-capable model that holds everything is the right fit; you do not
 need a frontier reasoner.
 
+The move is not "AI is cheap." It is **"AI makes selectivity cheap"** — you pay
+a cheap model to decide which deterministic checks deserve runner time, instead
+of running the heavy pile every PR.
+
+## What makes the thesis hold — and the receipts that prove it
+
+The $0.50/PR economics are valid **only while the loop stays bounded,
+cache-amplified, single-runner, and receipted.** Drop any of those and it
+breaks: the 1M window is the *aperture, not the budget* (at $0.60/M, $0.50 buys
+~833k tokens — so the window must be mostly cached precontext with a bounded
+fresh payload of diff + new artifacts), two runs/PR keeps spend bounded, and the
+deterministic floor must keep finishing *inside* the LLM window. The standing
+risk is the **half-life**: every new sensor wants to be mandatory, and the floor
+silently grows from "free under latency" into the long pole.
+
+The defense is **receipts** — they make "selectivity is cheap" auditable instead
+of a story, and they own the boundary cleanly:
+
+- **unsafe-review owns only the floor.** `unsafe-review-gate.json` (SPEC-0034)
+  exposes `required_floor_wall_seconds` + artifact pointers; it never becomes the
+  cost accountant.
+- **ub-review owns the cost/quality story** (it owns the LLM lanes, caching,
+  runners, and fill selection): a per-run cost receipt that *composes* the floor
+  wall-time, a suggested-fill ledger (did the model's compute-allocation choices
+  find signal?), a floor-time release trend (the half-life alarm), and quality
+  telemetry (at $0.50/PR, cost won't warn you when quality drifts — a separate
+  signal must). Tracked in ub-review #336–#339.
+
 ## The CI gate
 
 One tight gate, one runner, one required check:
