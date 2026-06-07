@@ -147,6 +147,56 @@ If a named helper is unavailable, perform the same role explicitly. Do not let a
 helper create a second source of truth, widen the PR scope, skip validation, or
 turn advisory unsafe-review findings into enforcement.
 
+## Model routing and orchestration economics
+
+Use the cheapest model that can produce a checked artifact for the current
+phase, and escalate only when synthesis, integration, or risk requires it. The
+shape mirrors the product itself: cheap bounded sensors emit evidence, an
+orchestrator compiles it, and the deterministic gate — never the model —
+decides pass/fail.
+
+```text
+cheap parallel discovery -> structured evidence packets -> capable-model
+synthesis or implementation -> cheap independent verification ->
+deterministic gate -> cleanup / ledger / issue filing
+```
+
+Default routing:
+
+- **Discovery, classification, refutation, claim scans, log triage, cleanup
+  audits**: cheap fast model (Haiku-class), many bounded passes with distinct
+  roles, each returning an evidence packet (facts, paths, commands, status,
+  uncertainty, next action) — not essays.
+- **Implementation, integration tradeoffs, PR bodies, release sequencing**:
+  mid model (Sonnet-class), started only after discovery has made the task
+  legible, briefed with objective, scope, non-goals, evidence, acceptance
+  criteria, and proof commands.
+- **Architecture arbitration, cross-repo conflicts, high-cost-of-wrongness
+  decisions**: top model (Opus-class), rarely.
+
+Project subagent roles live in `.claude/agents/` (repo-preflight,
+claim-boundary, plan-refuter, artifact-verifier, ci-log-triage,
+cleanup-auditor, implementer) with the model pinned per role. Equivalent roles
+in other harnesses should follow the same routing.
+
+Rules that keep the economics honest:
+
+- The writer never grades itself: a different, cheaper pass verifies every
+  meaningful diff (claim scan, artifact check, or refutation) before the
+  deterministic gate runs.
+- Ask verifiers checkable questions ("does this diff violate SPEC-0032?"),
+  never "is this good?".
+- On disagreement between cheap passes, escalate the specific conflict — not
+  the whole task — to the next model tier.
+- Keep bulk content (logs, large diffs, raw JSON, inventories) in subagent
+  contexts; the main context holds objective, plan, decisions, artifact paths,
+  validation status, and next action.
+- Stable doctrine belongs in cacheable prefixes (this file, specs, schemas);
+  per-task content stays in the suffix. Do not bake timestamps or run ids into
+  reusable prompts.
+- The LLM proposes; the deterministic floor disposes. No model verdict ever
+  substitutes for `check-pr`, the test suite, or the required CI check.
+
 ## PR queue discipline
 
 Review PRs before merging them. Do not merge a batch blindly because checks are

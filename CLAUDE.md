@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Read first
 
-- `AGENTS.md` — the agent operating contract. It governs command style (prefix local commands with `rtk`), repository roles, worktree/branch hygiene, PR queue discipline, and product boundaries. This file summarizes; AGENTS.md wins on conflict.
+- `AGENTS.md` — the agent operating contract. It governs command style (prefix local commands with `rtk`), repository roles, worktree/branch hygiene, model routing (cheap discovery/verification, mid-tier implementation, top-tier arbitration — project subagent roles in `.claude/agents/`), PR queue discipline, and product boundaries. This file summarizes; AGENTS.md wins on conflict.
 - Source-of-truth stack for choosing and scoping work: `.unsafe-review-spec/goals/active.toml` → linked plan item → linked spec in `docs/specs/`. Make one PR-sized change and run the proof commands the plan item lists.
 
 ## Repository roles
