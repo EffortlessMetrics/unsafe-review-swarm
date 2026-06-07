@@ -145,7 +145,7 @@ owner = "product / cli"
 
 [[lane]]
 id = "validation-residue"
-name = "0.3.4 validation residue to road-worthy instrument"
+name = "instrument truthfulness and consumer reliability"
 path = ".unsafe-review-spec/lanes/validation-residue/implementation-plan.md"
 status = "active"
 owner = "product / cli"

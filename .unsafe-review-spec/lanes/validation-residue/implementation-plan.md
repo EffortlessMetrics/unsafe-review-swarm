@@ -1,96 +1,116 @@
-# Validation-residue lane: from shipped 0.3.4 to road-worthy instrument
+# Instrument-truthfulness lane: make the coverage instrument hard to fool
 
-## Scope
+## End state
 
-Convert the 0.3.4 consumer-validation findings into a finished, road-worthy
-coverage instrument. The build-out goal (SPEC-0029 through SPEC-0035) shipped in
-0.3.4 and was proven load-bearing in both intended consumers (ub-review
-structured ingestion + inline comments; Bun brownfield baseline/no-new-debt —
-see `docs/handoffs/2026-06-07-0.3.4-consumer-validation.md`). Validation
-converted "shipped" into a concrete residue of honesty and loop-completion
-gaps. This lane burns that residue down and ends at the next source promotion.
+0.3.4 shipped the unsafe coverage instrument and validation proved it
+load-bearing. This lane ends with `unsafe-review` being a **truthful**
+instrument: when it says
 
-This lane is issue-driven by design: the filed validation issues are the work
-items. No broad analyzer expansion happens inside this lane.
+```text
+I scanned this scope.
+I found these gaps.
+This receipt applies to this input.
+This diff added this debt.
+This report is partial or complete.
+```
+
+every line is exactly true. Not broader, not louder, not "find more" yet:
+
+> The next useful work is not making `unsafe-review` see more. It is making
+> sure what it says it saw is exactly what it actually measured.
+
+A user on a real repo should be able to trust the instrument panel: scope and
+input identity stated, files considered/skipped counted, nested repos skipped
+and explainable, partial runs labelled partial with a stop reason and next
+action, malformed input failing instead of silently rescoping, policy results
+distinguishable from usage errors, and receipts traceable to the exact
+tool/input that generated them.
+
+## End state by capability
+
+1. **Scope truthfulness** — nested `.git` directories and gitfile worktrees
+   are skipped by default; default ignores documented; skipped nested-repo
+   paths explainable in status/report; badge counts cannot inflate from
+   scratch worktrees.
+2. **Diff truthfulness** — a supplied `--diff` is either parsed and used or
+   fails explicitly; no whole-repo fallback; no receipt claims `scope=diff`
+   unless diff scope actually ran.
+3. **Exit-code truthfulness** — success, policy violation, usage error,
+   input/IO error, and internal error are distinct documented codes with
+   machine-readable reasons.
+4. **Receipt provenance** — receipts carry tool version, schema version,
+   command/mode, generated_at, root identity, base/head or diff identity,
+   diff hash/source, platform, dirty marker when available, and the trust
+   boundary. Receipts stay traceable evidence metadata, never proof.
+5. **Partial-status honesty** — timeout and `--max-cards` behave
+   symmetrically: both produce a status artifact, partial artifacts say
+   partial, summaries never look complete, the gate manifest carries partial
+   status.
+6. **Large-repo adoption guidance** — docs and `--help` explain scan cost,
+   include/exclude/default ignores, partial behavior, and Bun-scale scoping.
+7. **CI/workbench hygiene** — runner scratch pre-cleaned before gates, rerun
+   recomputes routing, agent worktrees/watchers/artifacts cleaned or
+   recorded; the tool and its workbench do not poison their own measurements.
 
 ## Operating rule
 
-One issue -> one PR-sized slice -> proof commands -> merge. Each slice keeps
-ReviewCard as the single projected truth and preserves the advisory trust
-boundary (no proof, UB-free, Miri-clean, site-execution, calibrated-precision,
-or policy-ready claim; no witness execution, posting, source edits, or default
-blocking).
+One PR, one reason, in sequence. Preflight every slice (main, open PRs,
+source-divergence, dirty worktrees) with cheap bounded agent passes per the
+AGENTS.md model-routing section: preflight, claim-boundary, plan refutation,
+artifact verification, cleanup audit. Merge or park with evidence before the
+next slice. ReviewCard stays the single projected truth; the advisory trust
+boundary holds everywhere.
 
-## Phase 1 — instrument honesty at consumer scale
+## PR-by-PR path
 
-The instrument's numbers must mean what they say on foreign repos at Bun scale.
+| # | Slice | Issues | Core acceptance |
+|---|---|---|---|
+| 1 | repo: ignore nested git checkouts and gitfile worktrees by default | #1552 | nested-repo cards not counted; skipped paths explainable; badge tests independent of local scratch state. (Workbench hygiene half — gitignoring `.claude/worktrees/` — landed in #1554; this PR is the product-level fix for all consumers.) |
+| 2 | check: reject unparseable diffs instead of falling back to whole repo | #1516 | malformed diff exits nonzero with parse diagnostic; no whole-repo cards; receipt never claims diff scope that did not run |
+| 3 | cli: exit-code taxonomy (policy vs usage vs input vs internal) | #1518 | no-new-debt failure distinguishable from bad input; terminal wording and JSON/status artifact name the category; docs/CLI updated. Separate PR from 2 — exit codes are an external contract |
+| 4 | receipt: record tool and input provenance | #1517 | receipt traceable to exact generation context; stale/mismatched receipts detectable later; wording still avoids proof/UB-free/Miri-clean claims |
+| 5 | repo: status artifact when --max-cards stops analysis | #1545 | a cap-stopped scan emits the same status artifact the timeout path emits, carrying an explicit stop reason, the cap value, cards emitted, and next-action guidance; markdown summary says partial; gate manifest never implies a full scan. Pre-step inside this slice: reconcile SPEC-0035's declared schema with the shipped timeout artifact (they have drifted — `phase`/`elapsed_seconds` vs `completed`/`elapsed_ms`) so "symmetric" is defined before fields are added; exact field names resolve against the reconciled spec, not this plan |
+| 6 | docs: scan cost and large-repo scoping | #1546 | docs match the behavior PRs 1 and 5 actually shipped; copyable examples; no completeness overclaims |
+| 7 | ci: pre-clean known scratch paths before gates | #1519 | bounded, logged cleanup of known temp/scratch only; never touches user-owned worktrees |
+| 8 | ci: rerun recomputes route instead of reusing stale blocked route | #1513 | rerun after no_idle_runner can select fallback without an empty commit; route result visible |
+| 9 | specs: align gate/baseline/receipt vocabulary with sibling schemas (ripr, cargo-allow) | #1522 #1523 #1540 #1520 | no adapter soup in ub-review for similar concepts; differences explicit and versioned; no field renames that break 0.3.4 consumers. After the truthfulness fixes, so interop aligns with correct semantics |
+| 10 | analysis: stable-byte subclass hints + narrow follow-up controls | #1544 #1393 | cards say "missing stable-byte evidence", never UB; expansion only around observed Bun friction; false-positive controls land before breadth |
+| 11 | ux: hypothesis + minimal confirmation cue per finding | #1394 | findings framed as hypotheses pending confirmation; concrete cue when known; no witness execution by default |
+| 12 | confirm: command provenance + argv hardening | #1514 | command source visible (analyzer / manual candidate / reviewer); no silent shell interpretation; runtime_executed never fabricated |
+| 13 | repair-queue: bounded applicable edits for consumers | #1542 | consumers can render one-click suggestions; unsafe-review never edits source; do_not_auto_repair / requires_human_review respected |
+| 14 | xtask: bless-goldens + calibration bookkeeping toil | #1511 #1512 | golden churn controlled; calibration count updates less error-prone; no behavior change |
 
-1. **#1543 `baseline init/add --out` wrote into `--root/policy/`** — DONE
-   2026-06-07 (PR #1551, merged `b368f112`). Snapshot now derives as sibling
-   `<ledger-stem>-snapshot.toml`; scanned repo stays read-only; rule codified
-   in SPEC-0030.
-2. **#1545 `--max-cards` caps silently.** A capped scan exits 0 with no status
-   artifact, so consumers cannot distinguish "complete, N cards" from "cap hit
-   mid-file". Emit a status artifact (and a `capped` signal in the report)
-   mirroring the existing `--timeout-seconds` status path. Proof: e2e asserting
-   the status artifact and capped signal; existing timeout-path tests stay
-   green.
-3. **#1552 repo self-scan walks nested git checkouts.** Nested worktrees or
-   vendored checkouts under the scan root inflate posture counts (observed 3x:
-   576 -> 1728). The scanner should stop at directories carrying a `.git`
-   entry other than the scan root. Proof: fixture or e2e with a nested
-   checkout; the in-place `xtask` badge tests pass again on polluted local
-   checkouts.
-4. **#1546 per-file scan cost is undocumented at scale.** Document observed
-   per-file cost and large-repo scoping guidance (`--max-cards`,
-   `--timeout-seconds`, path scoping) so first runs on big repos are planned,
-   not surprising. Docs-only; aligns with SPEC-0035 diagnosability.
+## Dependency PR policy
 
-## Phase 2 — close the orchestrator loop
+Handled in parallel, never displacing the truthfulness sequence:
 
-5. **#1542 repair-queue applicable edits.** Repair-queue entries today carry
-   intent but not applicable edits, so ub-review's inline `suggestion`
-   facility (already wired and waiting on their side) has nothing to render.
-   Emit bounded, explicitly-labelled candidate edits in the repair-queue
-   projection. Trust boundary: edits are proposals projected from ReviewCards;
-   unsafe-review never applies them, never posts them, and labels them
-   non-verified. Proof: repair-queue schema goldens + e2e; consumer smoke via
-   the pinned ub-review integration.
+- `ra_ap_syntax`: routine parser bump; merge when the full suite is green.
+- `Factory-AI/droid-action`: merge only after action pinning/permission
+  posture is checked.
+- `signal-hook` 0.3 -> 0.4: run cancellation/status/timeout tests first.
 
-## Phase 3 — deliberate breadth decision (a gate, not work)
+## End-of-lane acceptance
 
-**#1544 stable-byte v1 breadth.** Validation showed stable-byte v1 misses the
-canonical Bun seam (JS-owned buffer raw pointer held across a JS promise
-resolution, in safe Rust above the unsafe block). Analyzer breadth is a new
-lane that starts with a proposal/spec, not code. Exit criterion for this lane:
-either a drafted breadth proposal linked from the index, or an explicit parked
-disposition recorded on the issue. Either outcome closes phase 3.
+- [ ] nested repos/worktrees do not inflate scans
+- [ ] malformed diffs fail truthfully
+- [ ] exit codes distinguish policy vs input vs usage vs internal failure
+- [ ] receipts include provenance
+- [ ] max-card cap produces a partial/status artifact
+- [ ] large-repo scoping docs match behavior
+- [ ] CI scratch/rerun route issues closed or explicitly parked
+- [ ] interop schema alignment has a clear, versioned map
+- [ ] analyzer follow-ups are issue-backed, not speculative
+- [ ] validation closeout records what was proven and what remains
 
-## Release cutline
+## Do not start with
 
-When phases 1 and 2 are merged green on swarm, promote to source as the next
-0.3.x through the standard ceremony (history-preserving via shipper, local
-gates first, publication receipts recorded in a handoff). Phase 3's decision
-can ride along as a disposition note; its implementation cannot.
+Broad stable-byte v2, more manual candidates, another release, default
+posting, policy gates, LLM behavior inside unsafe-review, badge polish, or
+dependency queue-clearing. Those wait until the instrument is hard to fool.
 
-## Do not block on
+## Boundaries
 
-- Analyzer breadth (#1544 implementation) — separate future lane.
-- Floor-time/cost receipts — owned by the workflow/ub-review layer, not
-  gate.json.
-- Editor-extension and marketplace lanes — independent tracks.
-- Dependabot/automation PR queue — routine hygiene, parallel to this lane.
-
-## Proof commands
-
-```bash
-cargo test --workspace --locked
-cargo run --locked -p xtask -- check-pr
-cargo run --locked -p xtask -- check-advisory-artifacts <dir>   # for artifact-shape slices
-cargo run --locked -p xtask -- source-divergence
-git diff --check
-```
-
-Known caveat until #1552 lands: run badge-affected gates (`check-pr`,
-`cargo test -p xtask public_*`) from a clean worktree of `origin/main` when the
-local checkout contains nested worktrees.
+No UB-proof, UB-free, Miri-clean, site-execution, or calibrated
+precision/recall claims; no default posting; no silent source edits; no
+default blocking. Receipts are evidence metadata, not proof. The deterministic
+gate — never a model — decides pass/fail.
