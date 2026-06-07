@@ -1174,12 +1174,17 @@ fn enforce_policy(output: &unsafe_review_core::AnalyzeOutput) -> Result<(), Stri
     match output.policy {
         PolicyMode::Advisory => Ok(()),
         PolicyMode::NoNewDebt => {
-            if output.summary.open_actionable_gaps == 0 {
+            // SPEC-0030: fail iff `new` OR `worsened` movement is non-empty.
+            // Inherited debt (baseline-known cards) must NOT fail the gate.
+            // This replaces the previous zero-debt check that blocked brownfield adoption.
+            let new = output.summary.new_gaps;
+            let worsened = output.summary.worsened_gaps;
+            if new == 0 && worsened == 0 {
                 Ok(())
             } else {
                 Err(format!(
-                    "no-new-debt policy found {} open actionable gap(s)",
-                    output.summary.open_actionable_gaps
+                    "no-new-debt policy: {} new gap(s), {} worsened gap(s)",
+                    new, worsened
                 ))
             }
         }

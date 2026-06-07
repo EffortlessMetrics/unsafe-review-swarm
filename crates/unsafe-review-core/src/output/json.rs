@@ -65,6 +65,11 @@ struct JsonSummary {
     requires_loom: usize,
     miri_unsupported: usize,
     static_unknown: usize,
+    /// Coverage movement counts (SPEC-0030).
+    new_gaps: usize,
+    worsened_gaps: usize,
+    resolved_gaps: usize,
+    inherited_gaps: usize,
 }
 
 impl From<&Summary> for JsonSummary {
@@ -84,6 +89,10 @@ impl From<&Summary> for JsonSummary {
             requires_loom: summary.requires_loom,
             miri_unsupported: summary.miri_unsupported,
             static_unknown: summary.static_unknown,
+            new_gaps: summary.new_gaps,
+            worsened_gaps: summary.worsened_gaps,
+            resolved_gaps: summary.resolved_gaps,
+            inherited_gaps: summary.inherited_gaps,
         }
     }
 }

@@ -187,23 +187,40 @@ impl CoverageBlock {
     /// **manual_context**: always `Absent` from a bare ReviewCard — a higher-level layer that
     /// resolves manual candidates against cards may upgrade to `Present`.
     ///
-    /// **baseline_state**: `Unknown` — populated by SPEC-0030 movement.
+    /// **baseline_state**: derived from `card.class` per SPEC-0030.
     ///
-    /// **outcome_movement**: `Unknown` — populated by SPEC-0030 movement.
+    /// - `BaselineKnown` class → `Inherited` (card matched a baseline ledger entry and is still
+    ///   open unchanged).
+    /// - Actionable class → `New` (open actionable gap not covered by the baseline ledger).
+    /// - All other classes (non-actionable, `Suppressed`) → `Unknown` (no baseline relation or
+    ///   suppression is a separate ledger concept).
+    ///
+    /// `Worsened` and `Resolved` cannot be derived from the card alone: `worsened` requires a
+    /// saved coverage snapshot and `resolved` applies to baseline entries with no current card.
+    /// Both default to `Unknown` at card level; they are surfaced in the `Summary` movement
+    /// counts and the policy report, not on individual cards.
+    ///
+    /// **outcome_movement**: derived from `baseline_state` per SPEC-0030.
+    ///
+    /// - `Inherited` baseline → `Unchanged` (gap persists but was not introduced by this change).
+    /// - `New` baseline → `Regressed` (the change introduced this gap).
+    /// - All other states → `Unknown`.
     ///
     /// **comment_plan_status**: `NotEligible` — populated by SPEC-0032 comment plan.
     ///
     /// **agent_lsp_readiness**: derived from `card.class` and `card.routes` using the same
     /// logic as the agent readiness module.
     pub fn derive(card: &ReviewCard) -> Self {
+        let baseline_state = derive_baseline_state(card);
+        let outcome_movement = derive_outcome_movement(baseline_state);
         Self {
             contract_coverage: derive_contract_coverage(card),
             guard_coverage: derive_guard_coverage(card),
             test_reach_coverage: derive_test_reach_coverage(card),
             witness_receipt_coverage: derive_witness_receipt_coverage(card),
             manual_context: ManualContext::Absent,
-            baseline_state: BaselineState::Unknown,
-            outcome_movement: OutcomeMovement::Unknown,
+            baseline_state,
+            outcome_movement,
             comment_plan_status: CommentPlanStatus::NotEligible,
             agent_lsp_readiness: derive_agent_lsp_readiness(card),
         }
@@ -254,6 +271,30 @@ fn derive_witness_receipt_coverage(card: &ReviewCard) -> WitnessReceiptCoverage 
         WitnessReceiptCoverage::Present
     } else {
         WitnessReceiptCoverage::Missing
+    }
+}
+
+/// Derive `BaselineState` from a card's class (SPEC-0030).
+///
+/// `BaselineKnown` → `Inherited`; actionable class → `New`; all others → `Unknown`.
+/// `Worsened` and `Resolved` are not derivable from a single card.
+fn derive_baseline_state(card: &ReviewCard) -> BaselineState {
+    use super::ReviewClass;
+    match card.class {
+        ReviewClass::BaselineKnown => BaselineState::Inherited,
+        ref class if class.is_actionable() => BaselineState::New,
+        _ => BaselineState::Unknown,
+    }
+}
+
+/// Derive `OutcomeMovement` from a card's baseline state (SPEC-0030).
+///
+/// `Inherited` → `Unchanged`; `New` → `Regressed`; all others → `Unknown`.
+fn derive_outcome_movement(baseline_state: BaselineState) -> OutcomeMovement {
+    match baseline_state {
+        BaselineState::Inherited => OutcomeMovement::Unchanged,
+        BaselineState::New => OutcomeMovement::Regressed,
+        _ => OutcomeMovement::Unknown,
     }
 }
 
@@ -474,16 +515,62 @@ mod tests {
     }
 
     #[test]
-    fn baseline_state_defaults_to_unknown() {
+    fn baseline_state_new_for_actionable_class() {
+        // An actionable card not in the baseline ledger is `new` (SPEC-0030).
         let card = minimal_card(ReviewClass::GuardMissing);
+        let block = CoverageBlock::derive(&card);
+        assert_eq!(block.baseline_state, BaselineState::New);
+        assert_eq!(block.baseline_state.as_str(), "new");
+    }
+
+    #[test]
+    fn baseline_state_inherited_for_baseline_known_class() {
+        // A card with class `BaselineKnown` is `inherited` — it matched the baseline ledger.
+        let card = minimal_card(ReviewClass::BaselineKnown);
+        let block = CoverageBlock::derive(&card);
+        assert_eq!(block.baseline_state, BaselineState::Inherited);
+        assert_eq!(block.baseline_state.as_str(), "inherited");
+    }
+
+    #[test]
+    fn baseline_state_unknown_for_non_actionable_non_baseline_class() {
+        // Non-actionable cards that are not baseline-known have no movement posture.
+        let card = minimal_card(ReviewClass::GuardedAndWitnessed);
         let block = CoverageBlock::derive(&card);
         assert_eq!(block.baseline_state, BaselineState::Unknown);
         assert_eq!(block.baseline_state.as_str(), "unknown");
     }
 
     #[test]
-    fn outcome_movement_defaults_to_unknown() {
+    fn baseline_state_unknown_for_suppressed_class() {
+        // Suppressed cards have their own ledger; they do not carry baseline posture.
+        let card = minimal_card(ReviewClass::Suppressed);
+        let block = CoverageBlock::derive(&card);
+        assert_eq!(block.baseline_state, BaselineState::Unknown);
+        assert_eq!(block.baseline_state.as_str(), "unknown");
+    }
+
+    #[test]
+    fn outcome_movement_regressed_for_new_actionable_card() {
+        // An open actionable card not in baseline represents a regression.
         let card = minimal_card(ReviewClass::GuardMissing);
+        let block = CoverageBlock::derive(&card);
+        assert_eq!(block.outcome_movement, OutcomeMovement::Regressed);
+        assert_eq!(block.outcome_movement.as_str(), "regressed");
+    }
+
+    #[test]
+    fn outcome_movement_unchanged_for_baseline_known_card() {
+        // A baseline-known card persists but was not introduced by this change.
+        let card = minimal_card(ReviewClass::BaselineKnown);
+        let block = CoverageBlock::derive(&card);
+        assert_eq!(block.outcome_movement, OutcomeMovement::Unchanged);
+        assert_eq!(block.outcome_movement.as_str(), "unchanged");
+    }
+
+    #[test]
+    fn outcome_movement_unknown_for_non_actionable_non_baseline_class() {
+        let card = minimal_card(ReviewClass::GuardedAndWitnessed);
         let block = CoverageBlock::derive(&card);
         assert_eq!(block.outcome_movement, OutcomeMovement::Unknown);
         assert_eq!(block.outcome_movement.as_str(), "unknown");

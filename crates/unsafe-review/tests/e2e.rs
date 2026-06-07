@@ -5329,10 +5329,8 @@ fn no_new_debt_policy_fails_only_for_unbaselined_actionable_gaps() -> Result<(),
     let failing_json = parse_json(&stdout_text(&failing)?)?;
     assert_eq!(failing_json["policy"], "no-new-debt");
     assert_eq!(failing_json["summary"]["open_actionable_gaps"], 1);
-    assert!(
-        String::from_utf8(failing.stderr)?
-            .contains("no-new-debt policy found 1 open actionable gap(s)")
-    );
+    // SPEC-0030: no-new-debt fails on new/worsened gaps, not total open actionable count.
+    assert!(String::from_utf8(failing.stderr)?.contains("no-new-debt policy: 1 new gap(s)"));
 
     let temp = TempDir::new("unsafe-review-no-new-debt-e2e")?;
     let copied = temp.path().join("fixture");
@@ -5483,7 +5481,8 @@ fn policy_report_is_advisory_and_counts_baseline_state() -> Result<(), Box<dyn E
     let markdown = fs::read_to_string(markdown_path)?;
     assert!(markdown.contains("# unsafe-review policy report"));
     assert!(markdown.contains("## Reviewer front panel"));
-    assert!(markdown.contains("- New unbaselined gaps: 0"));
+    // SPEC-0030: reviewer front panel shows movement counts.
+    assert!(markdown.contains("- Movement: 0 new gap(s), 0 worsened, 1 resolved, 1 inherited"));
     assert!(markdown.contains("- Current ledger-covered cards: 1 baseline-known, 0 suppressed"));
     assert!(markdown.contains("- Ledger cleanup: 1 resolved baseline entries"));
     assert!(markdown.contains("consider pruning or updating resolved baseline entries"));
@@ -5491,7 +5490,7 @@ fn policy_report_is_advisory_and_counts_baseline_state() -> Result<(), Box<dyn E
     assert!(markdown.contains("## Classification explanations"));
     assert!(markdown.contains("Exact ReviewCard identity matched a baseline ledger entry"));
     assert!(markdown.contains("Next action"));
-    assert!(markdown.contains("| Status | Reason | Card | Class |"));
+    assert!(markdown.contains("| Status | Baseline | Changed |"));
     assert!(markdown.contains("raw_pointer_read"));
     assert!(markdown.contains("unsafe { ptr.cast::<Header>().read() }"));
     assert!(markdown.contains("Known baseline card"));

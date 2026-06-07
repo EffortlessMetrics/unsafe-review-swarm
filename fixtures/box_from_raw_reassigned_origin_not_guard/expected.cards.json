@@ -109,8 +109,8 @@
       "test_reach_coverage": "missing",
       "witness_receipt_coverage": "missing",
       "manual_context": "absent",
-      "baseline_state": "unknown",
-      "outcome_movement": "unknown",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
       "comment_plan_status": "not_eligible",
       "agent_lsp_readiness": "ready"
     }

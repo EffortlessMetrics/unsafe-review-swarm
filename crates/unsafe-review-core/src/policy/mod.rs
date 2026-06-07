@@ -31,6 +31,11 @@ impl PolicyState {
     pub(crate) fn is_suppressed(&self, id: &CardId) -> bool {
         self.suppression_ids.contains(&id.0)
     }
+
+    /// All card IDs registered in the baseline ledger (for movement computation, SPEC-0030).
+    pub(crate) fn baseline_ids(&self) -> &BTreeSet<String> {
+        &self.baseline_ids
+    }
 }
 
 #[derive(Clone, Copy)]

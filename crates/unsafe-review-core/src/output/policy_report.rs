@@ -41,9 +41,12 @@ pub struct PolicyReportClassificationExplanations {
 pub struct PolicyReportSummary {
     pub cards: usize,
     pub new_gaps: usize,
+    /// Baseline cards whose coverage regressed (always 0 until baseline-init snapshot lands).
+    pub worsened_gaps: usize,
+    pub resolved_baseline: usize,
+    pub inherited_gaps: usize,
     pub baseline_known: usize,
     pub suppressed: usize,
-    pub resolved_baseline: usize,
     pub unmatched_baseline: usize,
     pub expired_suppressions: usize,
     pub invalid_ledger_entries: usize,
@@ -59,6 +62,10 @@ pub struct PolicyReportCard {
     pub proof_path: String,
     pub policy_status: String,
     pub policy_reason: String,
+    /// SPEC-0030 baseline posture: `new_gap`, `inherited`, `non_actionable`, or `suppressed`.
+    pub baseline_state: String,
+    /// Whether the card's unsafe site is on a changed line (diff-scoped attribution, SPEC-0030).
+    pub changed_line: bool,
     pub missing_count: usize,
     pub next_action: String,
 }
@@ -122,6 +129,7 @@ fn evaluate_with_date(output: &AnalyzeOutput, audit_date: &str) -> Result<Policy
         .iter()
         .map(|card| {
             let status = policy_status(&card.class);
+            let baseline_state = policy_baseline_state(status).to_string();
             PolicyReportCard {
                 card_id: card.id.0.clone(),
                 class_name: card.class.as_str().to_string(),
@@ -130,6 +138,8 @@ fn evaluate_with_date(output: &AnalyzeOutput, audit_date: &str) -> Result<Policy
                 proof_path: card.proof_path.as_str().to_string(),
                 policy_status: status.as_str().to_string(),
                 policy_reason: policy_reason(status).to_string(),
+                baseline_state,
+                changed_line: card.site.changed,
                 missing_count: card.missing.len(),
                 next_action: card.next_action.summary.clone(),
             }
@@ -141,6 +151,12 @@ fn evaluate_with_date(output: &AnalyzeOutput, audit_date: &str) -> Result<Policy
             .iter()
             .filter(|card| card.policy_status == "new_gap")
             .count(),
+        worsened_gaps: 0, // always 0 until baseline-init coverage snapshot lands (SPEC-0030 note)
+        resolved_baseline: resolved_baseline.len(),
+        inherited_gaps: cards
+            .iter()
+            .filter(|card| card.policy_status == "baseline_known")
+            .count(),
         baseline_known: cards
             .iter()
             .filter(|card| card.policy_status == "baseline_known")
@@ -149,7 +165,6 @@ fn evaluate_with_date(output: &AnalyzeOutput, audit_date: &str) -> Result<Policy
             .iter()
             .filter(|card| card.policy_status == "suppressed")
             .count(),
-        resolved_baseline: resolved_baseline.len(),
         unmatched_baseline: resolved_baseline.len(),
         expired_suppressions: expired_suppressions.len(),
         invalid_ledger_entries: 0,
@@ -225,15 +240,17 @@ mod markdown_sections {
 
     pub(super) fn render_summary(out: &mut String, report: &PolicyReport) {
         out.push_str("## Summary\n\n");
-        out.push_str("| Cards | New gaps | Baseline known | Suppressed | Resolved baseline | Expired suppressions |\n");
-        out.push_str("|---:|---:|---:|---:|---:|---:|\n");
+        out.push_str("| Cards | New gaps | Worsened | Resolved | Inherited | Baseline known | Suppressed | Expired suppressions |\n");
+        out.push_str("|---:|---:|---:|---:|---:|---:|---:|---:|\n");
         out.push_str(&format!(
-            "| {} | {} | {} | {} | {} | {} |\n\n",
+            "| {} | {} | {} | {} | {} | {} | {} | {} |\n\n",
             report.summary.cards,
             report.summary.new_gaps,
+            report.summary.worsened_gaps,
+            report.summary.resolved_baseline,
+            report.summary.inherited_gaps,
             report.summary.baseline_known,
             report.summary.suppressed,
-            report.summary.resolved_baseline,
             report.summary.expired_suppressions
         ));
     }
@@ -241,8 +258,11 @@ mod markdown_sections {
     pub(super) fn render_reviewer_front_panel(out: &mut String, report: &PolicyReport) {
         out.push_str("## Reviewer front panel\n\n");
         out.push_str(&format!(
-            "- New unbaselined gaps: {}\n",
-            report.summary.new_gaps
+            "- Movement: {} new gap(s), {} worsened, {} resolved, {} inherited\n",
+            report.summary.new_gaps,
+            report.summary.worsened_gaps,
+            report.summary.resolved_baseline,
+            report.summary.inherited_gaps
         ));
         out.push_str(&format!(
             "- Current ledger-covered cards: {} baseline-known, {} suppressed\n",
@@ -312,12 +332,14 @@ mod markdown_sections {
             return;
         }
 
-        out.push_str("| Status | Reason | Card | Class | Proof path | Operation family | Operation | Missing evidence | Next action |\n");
-        out.push_str("|---|---|---|---|---|---|---|---:|---|\n");
+        out.push_str("| Status | Baseline | Changed | Reason | Card | Class | Proof path | Operation family | Operation | Missing evidence | Next action |\n");
+        out.push_str("|---|---|---|---|---|---|---|---|---|---:|---|\n");
         for card in &report.cards {
             out.push_str(&format!(
-                "| `{}` | {} | `{}` | `{}` | `{}` | `{}` | `{}` | {} | {} |\n",
+                "| `{}` | `{}` | {} | {} | `{}` | `{}` | `{}` | `{}` | `{}` | {} | {} |\n",
                 card.policy_status,
+                card.baseline_state,
+                if card.changed_line { "yes" } else { "no" },
                 markdown_cell(&card.policy_reason),
                 card.card_id,
                 card.class_name,
@@ -413,6 +435,16 @@ fn policy_reason(status: PolicyStatus) -> &'static str {
         PolicyStatus::NonActionable => {
             "ReviewCard class is not actionable under the advisory policy report."
         }
+    }
+}
+
+/// SPEC-0030 baseline posture label for the policy report card (separate from `policy_status`).
+fn policy_baseline_state(status: PolicyStatus) -> &'static str {
+    match status {
+        PolicyStatus::NewGap => "new_gap",
+        PolicyStatus::BaselineKnown => "inherited",
+        PolicyStatus::Suppressed => "suppressed",
+        PolicyStatus::NonActionable => "non_actionable",
     }
 }
 
@@ -532,7 +564,8 @@ mod tests {
         assert!(card.next_action.contains("Add or expose"));
         let markdown = render_markdown(&report);
         assert!(markdown.contains("## Reviewer front panel"));
-        assert!(markdown.contains("- New unbaselined gaps: 1"));
+        // SPEC-0030: movement summary replaces "New unbaselined gaps".
+        assert!(markdown.contains("- Movement: 1 new gap(s), 0 worsened, 0 resolved, 0 inherited"));
         assert!(
             markdown.contains("- Current ledger-covered cards: 0 baseline-known, 0 suppressed")
         );
@@ -544,7 +577,7 @@ mod tests {
         assert!(markdown.contains("## Classification explanations"));
         assert!(markdown.contains("Exact ReviewCard identity was not found"));
         assert!(markdown.contains("Operation family | Operation"));
-        assert!(markdown.contains("| Status | Reason | Card | Class |"));
+        assert!(markdown.contains("| Status | Baseline | Changed |"));
         assert!(markdown.contains("| `raw_pointer_read` |"));
         assert!(markdown.contains("unsafe { ptr.cast::<Header>().read() }"));
         assert!(markdown.contains("Add or expose"));
