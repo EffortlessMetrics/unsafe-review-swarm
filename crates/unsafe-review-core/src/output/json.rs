@@ -422,6 +422,8 @@ mod tests {
         "js_buffer_stale_span_refetch_before_use_no_card",
         "js_buffer_stale_span_pinned_before_use_no_card",
         "js_buffer_stale_span_use_before_reentry_no_card",
+        "js_buffer_stale_span_passed_as_arg_after_reentry",
+        "js_buffer_stale_span_snapshot_before_use_no_card",
         "panic_from_safe_js_direct_try_from_expect",
         "panic_from_safe_js_bound_try_from_unwrap",
         "panic_from_safe_js_observed_only_not_guard",

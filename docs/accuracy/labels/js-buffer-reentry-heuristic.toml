@@ -156,6 +156,31 @@ label_source = "fixture_golden"
 rationale = "A span used only before any possible JS reentry has no stale window and should not trigger the stale-span heuristic."
 
 [[samples]]
+id = "js-buffer-stale-span-passed-as-arg-after-reentry-emits-advisory-card"
+fixture = "js_buffer_stale_span_passed_as_arg_after_reentry"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "stable_byte_source_getter_reentry"
+expected_hazard = "stable_byte_source"
+expected_owner = "compress_after_options"
+expected_site_kind = "operation"
+expected_obligation_key = "byte-stability"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A same-owner JS-backed buffer span materialized before options getter reentry and then passed as a function argument afterward without refetch, snapshot, or pinning should stay an advisory stable-byte ReviewCard naming the missing stable-byte evidence at the stale use site."
+
+[[samples]]
+id = "js-buffer-stale-span-snapshot-before-use-emits-no-card"
+fixture = "js_buffer_stale_span_snapshot_before_use_no_card"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "Snapshotting the span via to_vec after reentry before any use creates stable owned storage (missing stable-byte evidence is resolved) and should not trigger the stale-span heuristic."
+
+[[samples]]
 id = "js-buffer-options-before-capture-emits-no-card"
 fixture = "js_buffer_reentry_options_before_capture_no_card"
 kind = "false_positive_control"

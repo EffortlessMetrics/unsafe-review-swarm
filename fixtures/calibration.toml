@@ -550,6 +550,8 @@ required_core_fixtures = [
   "js_buffer_stale_span_refetch_before_use_no_card",
   "js_buffer_stale_span_pinned_before_use_no_card",
   "js_buffer_stale_span_use_before_reentry_no_card",
+  "js_buffer_stale_span_passed_as_arg_after_reentry",
+  "js_buffer_stale_span_snapshot_before_use_no_card",
   "stable_byte_sab_borrowed_slice",
   "stable_byte_sab_mysql_blob_rawslice",
   "stable_byte_sab_snapshot_no_card",
@@ -5976,6 +5978,23 @@ expected_cards = 0
 fixture = "js_buffer_stale_span_use_before_reentry_no_card"
 kind = "false_positive_control"
 claim = "JS-backed buffer stale-span heuristic does not emit a ReviewCard when the span is only used before any possible JS reentry"
+support_tier = "JS-backed buffer reentry heuristic"
+expected_cards = 0
+
+[[cases]]
+fixture = "js_buffer_stale_span_passed_as_arg_after_reentry"
+kind = "positive"
+claim = "JS-backed buffer span materialized before options getter reentry and passed as a function argument afterward without re-fetch, snapshot, or pinning emits one advisory missing-stable-byte-evidence ReviewCard"
+support_tier = "JS-backed buffer reentry heuristic"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "stable_byte_source_getter_reentry"
+expected_hazard = "stable_byte_source"
+
+[[cases]]
+fixture = "js_buffer_stale_span_snapshot_before_use_no_card"
+kind = "false_positive_control"
+claim = "JS-backed buffer stale-span heuristic does not emit a ReviewCard when the span is snapshotted via to_vec after reentry before any use"
 support_tier = "JS-backed buffer reentry heuristic"
 expected_cards = 0
 

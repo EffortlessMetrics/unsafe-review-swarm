@@ -1,6 +1,6 @@
 [
   {
-    "id": "UR-js-buffer-stale-span-stale-detached-check-fixture-src-lib-rs-read-after-options-operation-stable_byte_source_getter_reentry-as-array-buffer-e878446e1c4a-stable_byte_source-c1",
+    "id": "UR-js-buffer-stale-span-stale-detached-check-fixture-src-lib-rs-read-after-options-operation-stable_byte_source_getter_reentry-as-array-buffer-1862a393702d-stable_byte_source-c1",
     "class": "guard_missing",
     "priority": "high",
     "confidence": "medium",
@@ -15,7 +15,7 @@
       "public_api_surface": false,
       "snippet": "Ok(bytes[offset as usize] as usize)"
     },
-    "operation": "stable-byte-source-getter-reentry candidate; proof required: observable-red-green; JS-backed buffer span materialized before possible JS reentry and used afterward without re-fetch, re-validation, or pinning; capture: let buffer = ArrayBuffer::as_array_buffer(global, arg0)?;; span: let bytes = buffer.byte_slice();; reentry: let offset = options.get(global, \"\")?;; use: Ok(bytes[offset as usize] as usize); stale-guard: if buffer.is_detached() { checks a pre-reentry snapshot and does not re-validate the span",
+    "operation": "stable-byte-source-getter-reentry candidate; missing stable-byte evidence: no refetch, snapshot, or pin found after JS reentry; proof required: observable-red-green; JS-backed buffer span materialized before possible JS reentry and used afterward without re-fetch, re-validation, or pinning; capture: let buffer = ArrayBuffer::as_array_buffer(global, arg0)?;; span: let bytes = buffer.byte_slice();; reentry: let offset = options.get(global, \"\")?;; use: Ok(bytes[offset as usize] as usize); stale-guard: if buffer.is_detached() { checks a pre-reentry snapshot and does not re-validate the span",
     "operation_family": "stable_byte_source_getter_reentry",
     "hazards": [
       "stable_byte_source"
@@ -69,7 +69,7 @@
     "next_action": "Review this stable-byte-source-getter-reentry card through an observable-red-green proof path: add or expose byte-stability guard evidence, confirm the safe JS caller route, then parse options before capture or re-fetch/copy bytes after reentry, and keep the PR inside that getter-reentry aperture.",
     "verify_commands": [],
     "confirmation_cue": {
-      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `stable-byte-source-getter-reentry candidate; proof required: observable-red-green; JS-backed buffer span materialized before possible JS reentry and used afterward without re-fetch, re-validation, or pinning; capture: let buffer = ArrayBuffer::as_array_buffer(global, arg0)?;; span: let bytes = buffer.byte_slice();; reentry: let offset = options.get(global, \"\")?;; use: Ok(bytes[offset as usize] as usize); stale-guard: if buffer.is_detached() { checks a pre-reentry snapshot and does not re-validate the span`; confirm with external evidence before treating it as observed runtime behavior",
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `stable-byte-source-getter-reentry candidate; missing stable-byte evidence: no refetch, snapshot, or pin found after JS reentry; proof required: observable-red-green; JS-backed buffer span materialized before possible JS reentry and used afterward without re-fetch, re-validation, or pinning; capture: let buffer = ArrayBuffer::as_array_buffer(global, arg0)?;; span: let bytes = buffer.byte_slice();; reentry: let offset = options.get(global, \"\")?;; use: Ok(bytes[offset as usize] as usize); stale-guard: if buffer.is_detached() { checks a pre-reentry snapshot and does not re-validate the span`; confirm with external evidence before treating it as observed runtime behavior",
       "build_this_first": {
         "kind": "witness_route",
         "command": null,
@@ -81,7 +81,7 @@
         "command": null,
         "route_kind": "human-deep-review",
         "steps": [
-          "Confirm ReviewCard `UR-js-buffer-stale-span-stale-detached-check-fixture-src-lib-rs-read-after-options-operation-stable_byte_source_getter_reentry-as-array-buffer-e878446e1c4a-stable_byte_source-c1` still maps to `stable-byte-source-getter-reentry candidate; proof required: observable-red-green; JS-backed buffer span materialized before possible JS reentry and used afterward without re-fetch, re-validation, or pinning; capture: let buffer = ArrayBuffer::as_array_buffer(global, arg0)?;; span: let bytes = buffer.byte_slice();; reentry: let offset = options.get(global, \"\")?;; use: Ok(bytes[offset as usize] as usize); stale-guard: if buffer.is_detached() { checks a pre-reentry snapshot and does not re-validate the span` at `src/lib.rs:37:5` before upgrading confidence.",
+          "Confirm ReviewCard `UR-js-buffer-stale-span-stale-detached-check-fixture-src-lib-rs-read-after-options-operation-stable_byte_source_getter_reentry-as-array-buffer-1862a393702d-stable_byte_source-c1` still maps to `stable-byte-source-getter-reentry candidate; missing stable-byte evidence: no refetch, snapshot, or pin found after JS reentry; proof required: observable-red-green; JS-backed buffer span materialized before possible JS reentry and used afterward without re-fetch, re-validation, or pinning; capture: let buffer = ArrayBuffer::as_array_buffer(global, arg0)?;; span: let bytes = buffer.byte_slice();; reentry: let offset = options.get(global, \"\")?;; use: Ok(bytes[offset as usize] as usize); stale-guard: if buffer.is_detached() { checks a pre-reentry snapshot and does not re-validate the span` at `src/lib.rs:37:5` before upgrading confidence.",
           "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
           "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
         ],

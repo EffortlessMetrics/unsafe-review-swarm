@@ -166,6 +166,12 @@ fn js_buffer_stale_span_use_site(
             // span was used; treat the function as routed to the safe form.
             return None;
         }
+        if is_js_buffer_span_snapshot(&line.text, &span_binding) {
+            // A snapshot (to_vec/to_owned/copy_from_slice) after reentry
+            // stabilises the bytes before any unsafe use — missing
+            // stable-byte evidence is resolved; suppress the card.
+            return None;
+        }
         if is_stale_detach_check(&line.text, &span_binding, capture_binding.as_deref()) {
             stale_guard_idx = Some(idx);
             continue;
@@ -437,7 +443,22 @@ fn is_js_buffer_async_args_slice_materialization(line: &str) -> bool {
 }
 
 fn is_js_buffer_span_pinning(line: &str) -> bool {
-    line.to_ascii_lowercase().contains("as_pinned")
+    let lower = line.to_ascii_lowercase();
+    lower.contains("as_pinned")
+}
+
+/// Returns `true` when the line creates a stable owned copy of the span
+/// (snapshot evidence). Recognising a snapshot after reentry suppresses
+/// the stale-span card because the bytes are stabilised before any unsafe
+/// use, consistent with `is_owned_byte_snapshot` in the native-FFI scanner.
+fn is_js_buffer_span_snapshot(line: &str, span_binding: &str) -> bool {
+    if !line_mentions_identifier(line, span_binding) {
+        return false;
+    }
+    contains_any(
+        line,
+        &[".to_vec()", ".to_owned()", "copy_from_slice", "snapshot"],
+    )
 }
 
 fn is_stale_detach_check(line: &str, span_binding: &str, capture_binding: Option<&str>) -> bool {
@@ -461,6 +482,30 @@ fn is_js_buffer_span_use(line: &str, span_binding: &str) -> bool {
         || line.contains(&format!("{span_binding}.write("))
         || line.contains(&format!("{span_binding}.copy_from"))
         || line.contains(&format!("{span_binding}.copy_to"))
+        // Span passed as a function/method argument — the callee reads through
+        // a potentially-invalidated slice pointer without evidence of
+        // refetch, snapshot, or pinning, closing this coverage gap.
+        || is_span_passed_as_argument(line, span_binding)
+}
+
+/// Returns `true` when `span_binding` appears as a function call argument
+/// (not as the receiver of a method call). Checks the two common argument
+/// positions: immediately after an opening paren, or after a `, ` separator.
+///
+/// This is the "missing stable-byte evidence" coverage gap for the pattern
+/// `process_bytes(bytes)` / `compress(input, bytes)` where the stale span
+/// is forwarded to a callee that reads through it.
+fn is_span_passed_as_argument(line: &str, span_binding: &str) -> bool {
+    // Don't flag function *definitions* — they have a type annotation.
+    if line.contains(&format!("{span_binding}:")) {
+        return false;
+    }
+    // Span appears as the first argument or a subsequent argument.
+    let open = format!("({span_binding}");
+    let sep = format!(", {span_binding}");
+    let sep2 = format!(",{span_binding}");
+    (line.contains(&open) || line.contains(&sep) || line.contains(&sep2))
+        && line_mentions_identifier(line, span_binding)
 }
 
 fn js_buffer_stale_span_expression(
@@ -471,7 +516,7 @@ fn js_buffer_stale_span_expression(
     stale_guard: Option<&JsBufferLine>,
 ) -> String {
     let mut text = format!(
-        "stable-byte-source-getter-reentry candidate; proof required: observable-red-green; JS-backed buffer span materialized before possible JS reentry and used afterward without re-fetch, re-validation, or pinning; capture: {}; span: {}; reentry: {}; use: {}",
+        "stable-byte-source-getter-reentry candidate; missing stable-byte evidence: no refetch, snapshot, or pin found after JS reentry; proof required: observable-red-green; JS-backed buffer span materialized before possible JS reentry and used afterward without re-fetch, re-validation, or pinning; capture: {}; span: {}; reentry: {}; use: {}",
         one_line(&capture.text),
         one_line(&span.text),
         one_line(&reentry.text),

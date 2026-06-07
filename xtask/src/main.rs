@@ -6320,6 +6320,9 @@ fn is_fixture_operation_snippet_exception(path: &str, operation: &str) -> bool {
         || (normalized.contains("fixtures/js_buffer_stale_span_")
             && operation
                 .starts_with("stable-byte-source-getter-reentry candidate; proof required: observable-red-green; JS-backed buffer span materialized before possible JS reentry"))
+        || (normalized.contains("fixtures/js_buffer_stale_span_")
+            && operation
+                .starts_with("stable-byte-source-getter-reentry candidate; missing stable-byte evidence: no refetch, snapshot, or pin found after JS reentry; proof required: observable-red-green; JS-backed buffer span materialized before possible JS reentry"))
         || (normalized.contains("fixtures/stable_byte_sab_")
             && operation
                 .starts_with("stable-byte-source-sab-race candidate; proof required: mutation-plus-miri; shared JS backing reaches Rust/native borrowed-slice materialization before snapshot"))
@@ -10121,6 +10124,20 @@ jobs:
         assert!(!is_fixture_operation_snippet_exception(
             "fixtures/js_buffer_reentry_sync_compression/expected.cards.json",
             "ptr.read()",
+        ));
+        // stale-span fixtures with the "missing stable-byte evidence" prefix are allowed.
+        let stale_span_operation = "stable-byte-source-getter-reentry candidate; missing stable-byte evidence: no refetch, snapshot, or pin found after JS reentry; proof required: observable-red-green; JS-backed buffer span materialized before possible JS reentry and used afterward without re-fetch, re-validation, or pinning; capture: x; span: y; reentry: z; use: w";
+        assert!(is_fixture_operation_snippet_exception(
+            "fixtures/js_buffer_stale_span_passed_as_arg_after_reentry/expected.cards.json",
+            stale_span_operation,
+        ));
+        assert!(is_fixture_operation_snippet_exception(
+            "fixtures\\js_buffer_stale_span_passed_as_arg_after_reentry\\expected.cards.json",
+            stale_span_operation,
+        ));
+        assert!(!is_fixture_operation_snippet_exception(
+            "fixtures/raw_pointer_alignment/expected.cards.json",
+            stale_span_operation,
         ));
     }
 
