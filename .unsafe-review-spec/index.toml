@@ -142,3 +142,10 @@ name = "marketplace and first-hour UX"
 path = ".unsafe-review-spec/lanes/marketplace-first-hour-ux/tracker.toml"
 status = "active"
 owner = "product / cli"
+
+[[lane]]
+id = "validation-residue"
+name = "0.3.4 validation residue to road-worthy instrument"
+path = ".unsafe-review-spec/lanes/validation-residue/implementation-plan.md"
+status = "active"
+owner = "product / cli"
