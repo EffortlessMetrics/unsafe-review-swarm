@@ -201,6 +201,11 @@ jobs:
             echo "  manual fuzz harness, and tracked generated artifacts."
             echo "- runner: ${RUNNER_KIND:-github}  event: ${GITHUB_EVENT_NAME}  base: ${GITHUB_BASE_REF:-n/a}  sha: ${GITHUB_SHA}"
           } > target/ci-core/precontext.md
+          # Record the wall-clock start for the advisory floor-time signal. This
+          # timestamp is consumed by the "Assert core gate verdict" step to compute
+          # required_floor_wall_seconds. It is purely advisory and never gates the
+          # merge; failures here are non-fatal (|| true).
+          date +%s > target/ci-core/gate_start || true
           # Launch the full deterministic core gate in the background, sharing the
           # workspace target dir (cargo's lock serialises any overlap with
           # ub-review's cargo work safely). The && chain short-circuits, so the
@@ -271,6 +276,8 @@ jobs:
       # blocks the merge.
       - name: Assert core gate verdict
         if: ${{ always() }}
+        env:
+          RUNNER_KIND: ${{ needs.route.outputs.runner_kind }}
         run: |
           set -uo pipefail
           deadline=$((SECONDS + 3000))
@@ -297,4 +304,27 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           echo "core_exit=${core_exit}"
+          # Advisory floor-time signal: emit wall-time + run context for
+          # ub-review's cost receipt (ub-review#336) to compose. This block is
+          # wrapped in a subshell with || true so any arithmetic or write failure
+          # is STRICTLY non-fatal and cannot change the gate verdict below.
+          (
+            gate_end="$(date +%s)"
+            gate_start="$(cat target/ci-core/gate_start 2>/dev/null || echo "")"
+            if [ -n "${gate_start}" ] && [ "${gate_end}" -gt "${gate_start}" ] 2>/dev/null; then
+              elapsed=$(( gate_end - gate_start ))
+            else
+              elapsed="null"
+            fi
+            fallback_used="false"
+            if [ "${RUNNER_KIND:-github}" = "github" ]; then
+              fallback_used="true"
+            fi
+            {
+              printf '{"required_floor_wall_seconds":%s,"runner_kind":"%s","fallback_used":%s,"cache_hit_state":"unknown"}\n' \
+                "${elapsed}" "${RUNNER_KIND:-github}" "${fallback_used}"
+            } > target/ci-core/floor-time.json
+            echo "floor-time: required_floor_wall_seconds=${elapsed} runner_kind=${RUNNER_KIND:-github} fallback_used=${fallback_used} cache_hit_state=unknown" \
+              >> "$GITHUB_STEP_SUMMARY"
+          ) || true
           test "${core_exit}" = "0"
