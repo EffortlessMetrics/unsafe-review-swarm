@@ -1,3 +1,4 @@
+use crate::domain::coverage::{Coverage, WitnessReceiptCoverage};
 use crate::domain::{Confidence, OperationFamily, Priority, ReviewCard, ReviewClass};
 use crate::output::REVIEWCARD_TRUST_BOUNDARY;
 use crate::output::confirmation::{
@@ -21,13 +22,54 @@ pub(super) const MAX_COMMENT_BUDGET_REASON: ReviewBudgetReason = ReviewBudgetRea
     message: "comment-plan max of three candidates reached",
 };
 
-const SELECTED_HIGH_CONFIDENCE_REASON: ReviewBudgetReason = ReviewBudgetReason {
+// Selection reasons referencing coverage gap (SPEC-0032).
+const SELECTED_CONTRACT_MISSING_HIGH_CONFIDENCE: ReviewBudgetReason = ReviewBudgetReason {
     code: "top_actionable_card",
-    message: "actionable high-confidence review card",
+    message: "contract_coverage: missing — actionable high-confidence card",
 };
-const SELECTED_HIGH_PRIORITY_REASON: ReviewBudgetReason = ReviewBudgetReason {
+const SELECTED_CONTRACT_MISSING_HIGH_PRIORITY: ReviewBudgetReason = ReviewBudgetReason {
     code: "top_actionable_card",
-    message: "actionable high-priority review card",
+    message: "contract_coverage: missing — actionable high-priority card",
+};
+const SELECTED_GUARD_MISSING_HIGH_CONFIDENCE: ReviewBudgetReason = ReviewBudgetReason {
+    code: "top_actionable_card",
+    message: "guard_coverage: missing — actionable high-confidence card",
+};
+const SELECTED_GUARD_MISSING_HIGH_PRIORITY: ReviewBudgetReason = ReviewBudgetReason {
+    code: "top_actionable_card",
+    message: "guard_coverage: missing — actionable high-priority card",
+};
+const SELECTED_GUARD_WEAK_HIGH_CONFIDENCE: ReviewBudgetReason = ReviewBudgetReason {
+    code: "top_actionable_card",
+    message: "guard_coverage: weak — actionable high-confidence card",
+};
+const SELECTED_GUARD_WEAK_HIGH_PRIORITY: ReviewBudgetReason = ReviewBudgetReason {
+    code: "top_actionable_card",
+    message: "guard_coverage: weak — actionable high-priority card",
+};
+const SELECTED_TEST_REACH_MISSING_HIGH_CONFIDENCE: ReviewBudgetReason = ReviewBudgetReason {
+    code: "top_actionable_card",
+    message: "test_reach_coverage: missing — actionable high-confidence card",
+};
+const SELECTED_TEST_REACH_MISSING_HIGH_PRIORITY: ReviewBudgetReason = ReviewBudgetReason {
+    code: "top_actionable_card",
+    message: "test_reach_coverage: missing — actionable high-priority card",
+};
+const SELECTED_TEST_REACH_WEAK_HIGH_CONFIDENCE: ReviewBudgetReason = ReviewBudgetReason {
+    code: "top_actionable_card",
+    message: "test_reach_coverage: weak — actionable high-confidence card",
+};
+const SELECTED_TEST_REACH_WEAK_HIGH_PRIORITY: ReviewBudgetReason = ReviewBudgetReason {
+    code: "top_actionable_card",
+    message: "test_reach_coverage: weak — actionable high-priority card",
+};
+const SELECTED_WITNESS_RECEIPT_MISSING_HIGH_CONFIDENCE: ReviewBudgetReason = ReviewBudgetReason {
+    code: "top_actionable_card",
+    message: "witness_receipt_coverage: missing — actionable high-confidence card",
+};
+const SELECTED_WITNESS_RECEIPT_MISSING_HIGH_PRIORITY: ReviewBudgetReason = ReviewBudgetReason {
+    code: "top_actionable_card",
+    message: "witness_receipt_coverage: missing — actionable high-priority card",
 };
 const NOT_SELECTED_OUTSIDE_CHANGED_HUNK_REASON: ReviewBudgetReason = ReviewBudgetReason {
     code: "outside_changed_hunk",
@@ -80,11 +122,76 @@ pub(super) fn non_selection_reason(card: &ReviewCard) -> ReviewBudgetReason {
     }
 }
 
+/// Derive the primary coverage gap for a card (SPEC-0032).
+///
+/// Returns a string of the form `"<slot>: <state>"` naming the weak or missing
+/// SPEC-0029 coverage slot that makes this card worth surfacing. Priority order:
+/// `contract_coverage` → `guard_coverage` → `test_reach_coverage` →
+/// `witness_receipt_coverage`. Falls back to `"witness_receipt_coverage: missing"`
+/// when all slots appear present (should not happen for actionable cards).
+pub(super) fn coverage_gap(card: &ReviewCard) -> String {
+    let block = card.coverage_block();
+    if block.contract_coverage != Coverage::Present {
+        return format!("contract_coverage: {}", block.contract_coverage.as_str());
+    }
+    if block.guard_coverage != Coverage::Present {
+        return format!("guard_coverage: {}", block.guard_coverage.as_str());
+    }
+    if block.test_reach_coverage != Coverage::Present {
+        return format!(
+            "test_reach_coverage: {}",
+            block.test_reach_coverage.as_str()
+        );
+    }
+    if block.witness_receipt_coverage != WitnessReceiptCoverage::Present {
+        return format!(
+            "witness_receipt_coverage: {}",
+            block.witness_receipt_coverage.as_str()
+        );
+    }
+    // Fallback: all slots appear present on an actionable card.
+    "witness_receipt_coverage: missing".to_string()
+}
+
 pub(super) fn selection_reason(card: &ReviewCard) -> ReviewBudgetReason {
-    if matches!(card.confidence, Confidence::High) {
-        SELECTED_HIGH_CONFIDENCE_REASON
+    let block = card.coverage_block();
+    let high_confidence = matches!(card.confidence, Confidence::High);
+    // Select the gap-specific reason matching the primary coverage gap.
+    if block.contract_coverage != Coverage::Present {
+        if high_confidence {
+            return SELECTED_CONTRACT_MISSING_HIGH_CONFIDENCE;
+        }
+        return SELECTED_CONTRACT_MISSING_HIGH_PRIORITY;
+    }
+    if block.guard_coverage == Coverage::Missing {
+        if high_confidence {
+            return SELECTED_GUARD_MISSING_HIGH_CONFIDENCE;
+        }
+        return SELECTED_GUARD_MISSING_HIGH_PRIORITY;
+    }
+    if block.guard_coverage == Coverage::Weak {
+        if high_confidence {
+            return SELECTED_GUARD_WEAK_HIGH_CONFIDENCE;
+        }
+        return SELECTED_GUARD_WEAK_HIGH_PRIORITY;
+    }
+    if block.test_reach_coverage == Coverage::Weak {
+        if high_confidence {
+            return SELECTED_TEST_REACH_WEAK_HIGH_CONFIDENCE;
+        }
+        return SELECTED_TEST_REACH_WEAK_HIGH_PRIORITY;
+    }
+    if block.test_reach_coverage != Coverage::Present {
+        if high_confidence {
+            return SELECTED_TEST_REACH_MISSING_HIGH_CONFIDENCE;
+        }
+        return SELECTED_TEST_REACH_MISSING_HIGH_PRIORITY;
+    }
+    // Witness receipt gap or fallback.
+    if high_confidence {
+        SELECTED_WITNESS_RECEIPT_MISSING_HIGH_CONFIDENCE
     } else {
-        SELECTED_HIGH_PRIORITY_REASON
+        SELECTED_WITNESS_RECEIPT_MISSING_HIGH_PRIORITY
     }
 }
 

@@ -50,6 +50,12 @@ struct CardProjection {
     obligation_evidence: Vec<serde_json::Value>,
     verify_commands: Vec<String>,
     witness_routes: Vec<WitnessRouteProjection>,
+    /// SPEC-0029 coverage block slots (from cards.json coverage_block).
+    /// Empty string when coverage_block is absent from the card JSON.
+    contract_coverage: String,
+    guard_coverage: String,
+    test_reach_coverage: String,
+    witness_receipt_coverage: String,
 }
 
 struct WitnessRouteProjection {
@@ -173,8 +179,19 @@ const MINIMAL_REPRO_LIMITATION: &str = "Minimal repro cue only; unsafe-review di
 const COMMENT_PLAN_REVIEW_BUDGET_REASON: &str = "bounded reviewer noise";
 const COMMENT_PLAN_REVIEW_BUDGET_REASON_CODE: &str = "bounded_reviewer_noise";
 const COMMENT_PLAN_SELECTION_REASONS: &[&str] = &[
-    "actionable high-confidence review card",
-    "actionable high-priority review card",
+    // Gap-specific reasons (SPEC-0032): "<slot>: <state> — actionable <signal> card"
+    "contract_coverage: missing — actionable high-confidence card",
+    "contract_coverage: missing — actionable high-priority card",
+    "guard_coverage: missing — actionable high-confidence card",
+    "guard_coverage: missing — actionable high-priority card",
+    "guard_coverage: weak — actionable high-confidence card",
+    "guard_coverage: weak — actionable high-priority card",
+    "test_reach_coverage: missing — actionable high-confidence card",
+    "test_reach_coverage: missing — actionable high-priority card",
+    "test_reach_coverage: weak — actionable high-confidence card",
+    "test_reach_coverage: weak — actionable high-priority card",
+    "witness_receipt_coverage: missing — actionable high-confidence card",
+    "witness_receipt_coverage: missing — actionable high-priority card",
 ];
 const COMMENT_PLAN_SELECTION_REASON_CODES: &[&str] = &["top_actionable_card"];
 const COMMENT_PLAN_NON_SELECTION_REASONS: &[&str] = &[
@@ -201,6 +218,29 @@ const KNOWN_PROOF_PATHS: &[&str] = &[
     "source_route_only",
     "helper_gated",
     "human_review_only",
+];
+/// Closed vocabulary for per-card confirmation state (SPEC-0032 / SPEC-0030).
+const CONFIRMATION_STATES: &[&str] = &[
+    "pending",
+    "receipt_imported",
+    "executed",
+    "confirmed",
+    "not_reproduced",
+    "inconclusive",
+];
+/// Terms whose presence in a comment body indicates a forbidden overclaim
+/// (SPEC-0032 forbidden-claim rail-cage). Checked case-insensitively.
+const FORBIDDEN_CLAIM_TERMS: &[&str] = &[
+    "UB-free",
+    "Miri-clean",
+    "site-execution",
+    "site execution",
+    "proof of",
+    "proves ",
+    "calibrated precision",
+    "calibrated recall",
+    "memory-safe",
+    "memory safe",
 ];
 const TOKMD_PACKET_PRESETS: &[&str] = &[
     "bun-ub-handoff",
@@ -6102,7 +6142,7 @@ fn check_comment_plan_artifact(
         )?;
         require_expected_value(
             selection_reason,
-            expected_selection_reason(card_projection),
+            &expected_selection_reason(card_projection),
             "comment-plan.json comment selection_reason",
         )?;
         let selection_reason_code = super::require_non_empty_json_str(
@@ -6120,6 +6160,35 @@ fn check_comment_plan_artifact(
             expected_selection_reason_code(card_projection),
             "comment-plan.json comment selection_reason_code",
         )?;
+        // Validate coverage_gap field (SPEC-0032).
+        let coverage_gap_value = super::require_non_empty_json_str(
+            comment,
+            "coverage_gap",
+            "comment-plan.json comment",
+        )?;
+        require_expected_value(
+            coverage_gap_value,
+            &expected_coverage_gap(card_projection),
+            "comment-plan.json comment coverage_gap",
+        )?;
+        require_coverage_gap_referenced_in_selection_reason(
+            coverage_gap_value,
+            selection_reason,
+            "comment-plan.json comment",
+        )?;
+        // Validate confirmation_state field (SPEC-0032).
+        let confirmation_state_value = super::require_non_empty_json_str(
+            comment,
+            "confirmation_state",
+            "comment-plan.json comment",
+        )?;
+        require_allowed_value(
+            confirmation_state_value,
+            CONFIRMATION_STATES,
+            "comment-plan.json comment confirmation_state",
+        )?;
+        // Validate forbidden-claim terms in comment body (SPEC-0032).
+        require_no_forbidden_claim_terms(body, "comment-plan.json comment body")?;
         let actionability = super::require_non_empty_json_str(
             comment,
             "actionability",
@@ -6822,6 +6891,47 @@ fn require_known_proof_path(proof_path: &str, context: &str) -> Result<(), Strin
     }
 }
 
+/// Verify that the `selection_reason` string references the `coverage_gap`
+/// slot name (SPEC-0032: "The `selection_reason` must reference that slot").
+fn require_coverage_gap_referenced_in_selection_reason(
+    coverage_gap: &str,
+    selection_reason: &str,
+    context: &str,
+) -> Result<(), String> {
+    // coverage_gap is "<slot>: <state>"; extract the slot name.
+    let slot = coverage_gap.split(':').next().unwrap_or(coverage_gap);
+    if !selection_reason.contains(slot) {
+        return Err(format!(
+            "{context} selection_reason must reference coverage_gap slot `{slot}`; got `{selection_reason}`"
+        ));
+    }
+    Ok(())
+}
+
+/// Reject comment bodies that contain forbidden overclaim terms (SPEC-0032).
+///
+/// The forbidden-claim check is explicit rather than relying solely on
+/// boundary-wording presence: even a body that includes the plan boundary can
+/// still overclaim if it uses UB-free/Miri-clean/site-execution/proof/calibrated
+/// language. Both checks must pass.
+///
+/// The trust boundary section (from "Trust boundary:" onward) is exempt because
+/// it contains the correct negative disclaimers ("not UB-free", "not Miri-clean")
+/// that are required, not forbidden. Only the candidate-written sections are
+/// checked for overclaim wording.
+fn require_no_forbidden_claim_terms(body: &str, context: &str) -> Result<(), String> {
+    // Split at the trust boundary marker to exclude the standard disclaimer.
+    let claim_body = body.split("Trust boundary:").next().unwrap_or(body);
+    for term in FORBIDDEN_CLAIM_TERMS {
+        if super::text_contains_ignore_ascii_case(claim_body, term) {
+            return Err(format!(
+                "{context} must not contain forbidden overclaim term `{term}`"
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn require_comment_body_boundary(body: &str) -> Result<(), String> {
     for expected in [
         "artifact-only inline comment candidate",
@@ -7108,6 +7218,37 @@ fn advisory_card_projections(
             })
             .transpose()?
             .unwrap_or_default();
+        // Read SPEC-0029 coverage block slots if present (SPEC-0032 validation).
+        let (contract_coverage, guard_coverage, test_reach_coverage, witness_receipt_coverage) =
+            if let Some(block) = card.get("coverage_block") {
+                let cc = super::require_non_empty_json_str(
+                    block,
+                    "contract_coverage",
+                    "cards.json card coverage_block",
+                )
+                .map(str::to_string)?;
+                let gc = super::require_non_empty_json_str(
+                    block,
+                    "guard_coverage",
+                    "cards.json card coverage_block",
+                )
+                .map(str::to_string)?;
+                let trc = super::require_non_empty_json_str(
+                    block,
+                    "test_reach_coverage",
+                    "cards.json card coverage_block",
+                )
+                .map(str::to_string)?;
+                let wrc = super::require_non_empty_json_str(
+                    block,
+                    "witness_receipt_coverage",
+                    "cards.json card coverage_block",
+                )
+                .map(str::to_string)?;
+                (cc, gc, trc, wrc)
+            } else {
+                (String::new(), String::new(), String::new(), String::new())
+            };
         let projection = CardProjection {
             id,
             class_name,
@@ -7130,6 +7271,10 @@ fn advisory_card_projections(
             obligation_evidence,
             verify_commands,
             witness_routes,
+            contract_coverage,
+            guard_coverage,
+            test_reach_coverage,
+            witness_receipt_coverage,
         };
         require_card_confirmation_cue_projection(
             card,
@@ -7781,11 +7926,54 @@ fn should_project_planned_comment(card: &CardProjection) -> bool {
         && !matches!(card.confidence.as_str(), "low" | "unknown")
 }
 
-fn expected_selection_reason(card: &CardProjection) -> &'static str {
-    if card.confidence == "high" {
-        "actionable high-confidence review card"
+/// Derive the expected `selection_reason` string from the card's coverage block
+/// and signal level, mirroring the production logic in `selection.rs` (SPEC-0032).
+fn expected_selection_reason(card: &CardProjection) -> String {
+    let gap = expected_coverage_gap(card);
+    let signal = if card.confidence == "high" {
+        "high-confidence"
     } else {
-        "actionable high-priority review card"
+        "high-priority"
+    };
+    format!("{gap} — actionable {signal} card")
+}
+
+/// Derive the expected `coverage_gap` string for a card from its SPEC-0029
+/// coverage block slots. Mirrors `selection::coverage_gap` in unsafe-review-core.
+///
+/// Priority: contract_coverage → guard_coverage → test_reach_coverage →
+/// witness_receipt_coverage → fallback.
+fn expected_coverage_gap(card: &CardProjection) -> String {
+    // When coverage_block is absent (e.g. older fixture cards without the
+    // block), fall back to the class-based heuristic.
+    if !card.contract_coverage.is_empty() {
+        if card.contract_coverage != "present" {
+            return format!("contract_coverage: {}", card.contract_coverage);
+        }
+        if card.guard_coverage != "present" {
+            return format!("guard_coverage: {}", card.guard_coverage);
+        }
+        if card.test_reach_coverage != "present" {
+            return format!("test_reach_coverage: {}", card.test_reach_coverage);
+        }
+        if card.witness_receipt_coverage != "present" {
+            return format!(
+                "witness_receipt_coverage: {}",
+                card.witness_receipt_coverage
+            );
+        }
+        return "witness_receipt_coverage: missing".to_string();
+    }
+    // Fallback heuristic when coverage_block is absent.
+    expected_coverage_gap_from_class(&card.class_name)
+}
+
+fn expected_coverage_gap_from_class(class_name: &str) -> String {
+    match class_name {
+        "contract_missing" => "contract_coverage: missing".to_string(),
+        "guard_missing" => "guard_coverage: missing".to_string(),
+        "unsafe_unreached" => "test_reach_coverage: missing".to_string(),
+        _ => "witness_receipt_coverage: missing".to_string(),
     }
 }
 

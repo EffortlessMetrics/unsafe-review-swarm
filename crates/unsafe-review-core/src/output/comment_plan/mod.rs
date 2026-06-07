@@ -82,8 +82,13 @@ mod tests {
             "build/run `cargo +nightly miri test read_header` first, then attach a matching receipt if it confirms the route"
         );
         assert_eq!(
+            value["comments"][0]["coverage_gap"],
+            "guard_coverage: missing"
+        );
+        assert_eq!(value["comments"][0]["confirmation_state"], "pending");
+        assert_eq!(
             value["comments"][0]["selection_reason"],
-            "actionable high-priority review card"
+            "guard_coverage: missing — actionable high-priority card"
         );
         assert_eq!(
             value["comments"][0]["selection_reason_code"],
@@ -401,7 +406,7 @@ mod tests {
         assert_review_budget_summary(&value, 1, 0)?;
         assert_eq!(
             value["comments"][0]["selection_reason"],
-            "actionable high-confidence review card"
+            "guard_coverage: missing — actionable high-confidence card"
         );
         assert_eq!(
             value["comments"][0]["selection_reason_code"],
@@ -474,7 +479,7 @@ mod tests {
         assert_eq!(selected["comments"].as_array().map_or(0, Vec::len), 1);
         assert_eq!(
             selected["comments"][0]["selection_reason"],
-            "actionable high-priority review card"
+            "guard_coverage: missing — actionable high-priority card"
         );
         assert_eq!(
             selected["comments"][0]["selection_reason_code"],

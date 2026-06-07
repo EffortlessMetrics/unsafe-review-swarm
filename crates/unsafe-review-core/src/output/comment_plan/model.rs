@@ -14,7 +14,8 @@ use std::collections::BTreeSet;
 
 use super::selection::{
     MAX_COMMENT_BUDGET_REASON, OPERATION_FAMILY_BUDGET_REASON, ReviewBudgetReason, actionability,
-    comment_body, non_selection_reason, relevance, selection_reason, should_plan_comment,
+    comment_body, coverage_gap, non_selection_reason, relevance, selection_reason,
+    should_plan_comment,
 };
 
 const MAX_PLANNED_COMMENTS: usize = 3;
@@ -142,6 +143,14 @@ pub(super) struct PlannedComment {
     priority: &'static str,
     confidence: &'static str,
     proof_path: &'static str,
+    /// The primary weak or missing SPEC-0029 coverage slot that makes this
+    /// card worth surfacing (SPEC-0032). Format: `"<slot>: <state>"`.
+    coverage_gap: String,
+    /// Per-card confirmation state derived from the imported witness receipt,
+    /// if any (SPEC-0032 / SPEC-0030). Closed vocabulary: `pending`,
+    /// `receipt_imported`, `executed`, `confirmed`, `not_reproduced`,
+    /// `inconclusive`.
+    confirmation_state: &'static str,
     hypothesis_to_confirm: String,
     operation: String,
     operation_family: &'static str,
@@ -176,6 +185,8 @@ impl From<&ReviewCard> for PlannedComment {
             priority: card.priority.as_str(),
             confidence: card.confidence.as_str(),
             proof_path: card.proof_path.as_str(),
+            coverage_gap: coverage_gap(card),
+            confirmation_state: card.witness.confirmation_state(),
             hypothesis_to_confirm: hypothesis_to_confirm(card),
             operation: card.operation.expression.clone(),
             operation_family: card.operation.family.as_str(),
@@ -209,6 +220,12 @@ pub(super) struct NotSelectedCard {
     priority: &'static str,
     confidence: &'static str,
     proof_path: &'static str,
+    /// The primary weak or missing SPEC-0029 coverage slot for this card
+    /// (SPEC-0032). Format: `"<slot>: <state>"`. Present for all cards so
+    /// the posting wrapper can explain why the card is worth reviewing even
+    /// when it was not selected for inline comment.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    coverage_gap: Option<String>,
     operation: String,
     operation_family: &'static str,
     next_action: String,
@@ -225,6 +242,13 @@ pub(super) struct NotSelectedCard {
 impl NotSelectedCard {
     fn from_reason(card: &ReviewCard, reason: ReviewBudgetReason) -> Self {
         let repair = CommentPlanRepairMetadata::from(card);
+        // Surface coverage_gap for actionable cards so the posting wrapper
+        // can explain why the card is worth reviewing (SPEC-0032).
+        let gap = if card.class.is_actionable() {
+            Some(coverage_gap(card))
+        } else {
+            None
+        };
         Self {
             card_id: card.id.0.clone(),
             path: path_display(&card.site.location.file),
@@ -234,6 +258,7 @@ impl NotSelectedCard {
             priority: card.priority.as_str(),
             confidence: card.confidence.as_str(),
             proof_path: card.proof_path.as_str(),
+            coverage_gap: gap,
             operation: card.operation.expression.clone(),
             operation_family: card.operation.family.as_str(),
             next_action: card.next_action.summary.clone(),
