@@ -1,38 +1,53 @@
-use crate::api::AnalyzeOutput;
+use crate::api::{AnalyzeOutput, Summary};
 use serde::Serialize;
 
 pub(crate) fn render(output: &AnalyzeOutput) -> (String, String) {
-    let base_count = output.summary.open_actionable_gaps;
+    let base_count = open_actionable_count(&output.summary);
     let base_color = badge_color(base_count);
-    let evidence_quality = EvidenceQualityCounts {
-        contract_missing: output.summary.contract_missing,
-        guard_missing: output.summary.guard_missing,
-        guarded_unwitnessed: output.summary.guarded_unwitnessed,
-    };
-    let plus_count = evidence_quality.total();
+    let plus_count = evidence_quality_count(&output.summary);
     let plus_color = badge_color(plus_count);
     let main = badge("unsafe-review", base_count, base_color);
     let plus = badge("unsafe-review+", plus_count, plus_color);
     (render_pretty(&main), render_pretty(&plus))
 }
 
-#[derive(Clone, Copy)]
-struct EvidenceQualityCounts {
-    contract_missing: usize,
-    guard_missing: usize,
-    guarded_unwitnessed: usize,
-}
-
-impl EvidenceQualityCounts {
-    fn total(self) -> usize {
-        self.contract_missing + self.guard_missing + self.guarded_unwitnessed
+/// Return the baseline-aware open-actionable count for the main badge (SPEC-0031).
+///
+/// When a recorded baseline is present (`inherited_gaps` or `resolved_gaps` are nonzero),
+/// the badge shows movement-relevant gaps only: `new_gaps + worsened_gaps`.  This reflects
+/// cards that are above the baseline floor, not the full inherited debt.
+///
+/// When no baseline exists, fall back to the raw `open_actionable_gaps` count — the honest
+/// "this repo has not set a floor yet" reading.
+fn open_actionable_count(summary: &Summary) -> usize {
+    if has_baseline(summary) {
+        summary.new_gaps + summary.worsened_gaps
+    } else {
+        summary.open_actionable_gaps
     }
 }
 
-fn badge_color(open_actionable_gaps: usize) -> &'static str {
-    if open_actionable_gaps == 0 {
+/// Return the evidence-quality count for the `unsafe-review+` badge (SPEC-0031).
+///
+/// `contract_missing + guard_missing + guarded_unwitnessed` already excludes
+/// `BaselineKnown` cards (which are reclassified before those counters are incremented),
+/// so the count is inherently baseline-aware when a baseline is present and falls back
+/// to the raw total when no baseline exists.
+fn evidence_quality_count(summary: &Summary) -> usize {
+    summary.contract_missing + summary.guard_missing + summary.guarded_unwitnessed
+}
+
+/// A recorded baseline floor is present when at least one card is inherited (still open,
+/// matched the baseline ledger) or at least one baseline entry has since been resolved.
+/// Both require a non-empty baseline ledger to be non-zero.
+fn has_baseline(summary: &Summary) -> bool {
+    summary.inherited_gaps > 0 || summary.resolved_gaps > 0
+}
+
+fn badge_color(count: usize) -> &'static str {
+    if count == 0 {
         "green"
-    } else if open_actionable_gaps < 10 {
+    } else if count < 10 {
         "yellow"
     } else {
         "orange"
@@ -195,6 +210,201 @@ mod tests {
             }
         }
 
+        Ok(())
+    }
+
+    /// SPEC-0031: when a baseline is recorded, the main badge reflects movement-relevant
+    /// gaps (`new_gaps + worsened_gaps`), not the full inherited debt.
+    #[test]
+    fn baseline_aware_badge_uses_new_and_worsened_gaps_not_full_debt() -> Result<(), String> {
+        let output = AnalyzeOutput {
+            schema_version: "0.1".to_string(),
+            tool: "unsafe-review".to_string(),
+            root: PathBuf::from("."),
+            scope: Scope::Repo,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            summary: Summary {
+                // 3 total open-actionable non-baseline cards (new), 5 baseline-known (inherited)
+                open_actionable_gaps: 3,
+                new_gaps: 3,
+                worsened_gaps: 0,
+                inherited_gaps: 5,
+                resolved_gaps: 0,
+                contract_missing: 2,
+                guard_missing: 1,
+                guarded_unwitnessed: 0,
+                ..Summary::default()
+            },
+            cards: Vec::new(),
+        };
+        let (main, plus) = render(&output);
+        let main = parse_json(&main)?;
+        let plus = parse_json(&plus)?;
+
+        // Main badge shows movement-relevant count (new_gaps + worsened_gaps = 3 + 0 = 3)
+        assert_eq!(
+            main["message"], "3",
+            "baseline-present badge must show new_gaps, not full open_actionable_gaps"
+        );
+        // Plus badge shows evidence quality (contract_missing + guard_missing + guarded_unwitnessed)
+        // which already excludes BaselineKnown cards
+        assert_eq!(
+            plus["message"], "3",
+            "plus badge shows missing+weak evidence count (baseline-known excluded by classification)"
+        );
+
+        assert_shields_endpoint_fields_only(&main)?;
+        assert_shields_endpoint_fields_only(&plus)?;
+        assert_badge_endpoint_contract(
+            "unsafe-review",
+            "unsafe_review",
+            &serde_json::to_string(&main).map_err(|e| e.to_string())?,
+        )?;
+        assert_badge_endpoint_contract(
+            "unsafe-review+",
+            "unsafe_review_plus",
+            &serde_json::to_string(&plus).map_err(|e| e.to_string())?,
+        )?;
+        Ok(())
+    }
+
+    /// SPEC-0031: when worsened_gaps > 0 (coverage regression), those count in the baseline-aware badge.
+    #[test]
+    fn baseline_aware_badge_includes_worsened_gaps() -> Result<(), String> {
+        let output = AnalyzeOutput {
+            schema_version: "0.1".to_string(),
+            tool: "unsafe-review".to_string(),
+            root: PathBuf::from("."),
+            scope: Scope::Repo,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            summary: Summary {
+                open_actionable_gaps: 2,
+                new_gaps: 2,
+                worsened_gaps: 1,
+                inherited_gaps: 3,
+                resolved_gaps: 0,
+                contract_missing: 1,
+                guard_missing: 1,
+                guarded_unwitnessed: 0,
+                ..Summary::default()
+            },
+            cards: Vec::new(),
+        };
+        let (main, _plus) = render(&output);
+        let main = parse_json(&main)?;
+
+        // Main badge = new_gaps + worsened_gaps = 2 + 1 = 3
+        assert_eq!(
+            main["message"], "3",
+            "baseline-present badge must include worsened_gaps in the count"
+        );
+        assert_shields_endpoint_fields_only(&main)?;
+        Ok(())
+    }
+
+    /// SPEC-0031: when resolved_gaps > 0 (some baseline entries resolved) but no inherited gaps,
+    /// a baseline is still considered present and the badge uses movement counts.
+    #[test]
+    fn resolved_gaps_signal_baseline_is_present() -> Result<(), String> {
+        let output = AnalyzeOutput {
+            schema_version: "0.1".to_string(),
+            tool: "unsafe-review".to_string(),
+            root: PathBuf::from("."),
+            scope: Scope::Repo,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            summary: Summary {
+                open_actionable_gaps: 1,
+                new_gaps: 1,
+                worsened_gaps: 0,
+                inherited_gaps: 0,
+                resolved_gaps: 2, // baseline entries resolved — baseline is present
+                contract_missing: 1,
+                guard_missing: 0,
+                guarded_unwitnessed: 0,
+                ..Summary::default()
+            },
+            cards: Vec::new(),
+        };
+        let (main, _plus) = render(&output);
+        let main = parse_json(&main)?;
+
+        // Baseline present (resolved_gaps > 0), so badge uses new_gaps = 1
+        assert_eq!(
+            main["message"], "1",
+            "resolved_gaps signals baseline presence; badge uses new_gaps"
+        );
+        assert_shields_endpoint_fields_only(&main)?;
+        Ok(())
+    }
+
+    /// SPEC-0031: no-baseline fallback — when no baseline floor is recorded, the badge
+    /// shows raw open_actionable_gaps (the honest "no floor set yet" reading).
+    #[test]
+    fn no_baseline_fallback_uses_raw_open_actionable_gaps() -> Result<(), String> {
+        let output = AnalyzeOutput {
+            schema_version: "0.1".to_string(),
+            tool: "unsafe-review".to_string(),
+            root: PathBuf::from("."),
+            scope: Scope::Repo,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            summary: Summary {
+                // No baseline: new_gaps == open_actionable_gaps, inherited_gaps == 0
+                open_actionable_gaps: 5,
+                new_gaps: 5,
+                worsened_gaps: 0,
+                inherited_gaps: 0,
+                resolved_gaps: 0,
+                contract_missing: 3,
+                guard_missing: 2,
+                guarded_unwitnessed: 0,
+                ..Summary::default()
+            },
+            cards: Vec::new(),
+        };
+        let (main, plus) = render(&output);
+        let main = parse_json(&main)?;
+        let plus = parse_json(&plus)?;
+
+        // No baseline: falls back to open_actionable_gaps = 5
+        assert_eq!(
+            main["message"], "5",
+            "no-baseline fallback must use raw open_actionable_gaps"
+        );
+        assert_eq!(
+            plus["message"], "5",
+            "plus badge shows raw evidence quality count"
+        );
+        assert_shields_endpoint_fields_only(&main)?;
+        assert_shields_endpoint_fields_only(&plus)?;
+        Ok(())
+    }
+
+    /// SPEC-0031: overclaim-term rejection covers baseline-aware outputs too.
+    #[test]
+    fn baseline_aware_badge_payloads_are_overclaim_free() -> Result<(), String> {
+        let output = AnalyzeOutput {
+            schema_version: "0.1".to_string(),
+            tool: "unsafe-review".to_string(),
+            root: PathBuf::from("."),
+            scope: Scope::Repo,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            summary: Summary {
+                open_actionable_gaps: 1,
+                new_gaps: 1,
+                inherited_gaps: 3,
+                contract_missing: 1,
+                ..Summary::default()
+            },
+            cards: Vec::new(),
+        };
+        let (main, plus) = render(&output);
+        assert_badge_endpoint_contract("unsafe-review", "unsafe_review", &main)?;
+        assert_badge_endpoint_contract("unsafe-review+", "unsafe_review_plus", &plus)?;
         Ok(())
     }
 
