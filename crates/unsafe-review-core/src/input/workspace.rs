@@ -117,7 +117,20 @@ fn should_visit_entry(root: &Path, entry: &DirEntry, large_repo_ignores: bool) -
     let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
         return true;
     };
-    !is_default_skipped_dir(name) && (!large_repo_ignores || !is_large_repo_skipped_dir(name))
+    if is_default_skipped_dir(name) {
+        return false;
+    }
+    if large_repo_ignores && is_large_repo_skipped_dir(name) {
+        return false;
+    }
+    // Skip nested git checkouts (contain a `.git` directory) and gitfile
+    // worktrees (contain a `.git` file).  The scan root is excluded above so
+    // the root's own `.git` sibling is never checked here.
+    let dot_git = path.join(".git");
+    if dot_git.is_dir() || dot_git.is_file() {
+        return false;
+    }
+    true
 }
 
 fn is_default_skipped_dir(name: &str) -> bool {
@@ -249,6 +262,118 @@ mod tests {
         assert_eq!(
             unignored,
             vec![PathBuf::from("src/lib.rs"), PathBuf::from("ignored/lib.rs")]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn discovery_skips_nested_git_checkout_directory() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-workspace-nested-git-dir")?;
+        write_file(&root, "src/lib.rs")?;
+        // Nested checkout: a subdirectory that contains a .git directory.
+        let nested = root.join("vendor-clone");
+        fs::create_dir_all(nested.join(".git"))
+            .map_err(|err| format!("create nested .git dir failed: {err}"))?;
+        write_file(&root, "vendor-clone/src/lib.rs")?;
+
+        let files = discover_rust_files(
+            &root,
+            &DiscoveryOptions {
+                respect_gitignore: false,
+                ..DiscoveryOptions::default()
+            },
+        )?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert_eq!(files, vec![PathBuf::from("src/lib.rs")]);
+        Ok(())
+    }
+
+    #[test]
+    fn discovery_skips_nested_gitfile_worktree() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-workspace-nested-gitfile")?;
+        write_file(&root, "src/lib.rs")?;
+        // Gitfile worktree: a subdirectory that contains a .git FILE.
+        let nested = root.join("linked-worktree");
+        fs::create_dir_all(&nested)
+            .map_err(|err| format!("create nested worktree dir failed: {err}"))?;
+        fs::write(
+            nested.join(".git"),
+            "gitdir: ../somewhere/.git/worktrees/linked-worktree\n",
+        )
+        .map_err(|err| format!("write .git file failed: {err}"))?;
+        write_file(&root, "linked-worktree/src/lib.rs")?;
+
+        let files = discover_rust_files(
+            &root,
+            &DiscoveryOptions {
+                respect_gitignore: false,
+                ..DiscoveryOptions::default()
+            },
+        )?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert_eq!(files, vec![PathBuf::from("src/lib.rs")]);
+        Ok(())
+    }
+
+    #[test]
+    fn discovery_skips_nested_git_even_without_gitignore() -> Result<(), String> {
+        // Both nested-checkout and gitfile-worktree skips must be independent of
+        // gitignore handling (respect_gitignore: false).
+        let root = unique_temp_dir("unsafe-review-workspace-nested-git-no-gitignore")?;
+        write_file(&root, "src/lib.rs")?;
+
+        let nested_checkout = root.join("checkout-clone");
+        fs::create_dir_all(nested_checkout.join(".git"))
+            .map_err(|err| format!("create checkout .git dir failed: {err}"))?;
+        write_file(&root, "checkout-clone/src/unsafe.rs")?;
+
+        let gitfile_worktree = root.join("worktree-link");
+        fs::create_dir_all(&gitfile_worktree)
+            .map_err(|err| format!("create worktree dir failed: {err}"))?;
+        fs::write(
+            gitfile_worktree.join(".git"),
+            "gitdir: ../main-repo/.git/worktrees/worktree-link\n",
+        )
+        .map_err(|err| format!("write gitfile failed: {err}"))?;
+        write_file(&root, "worktree-link/src/unsafe.rs")?;
+
+        let files = discover_rust_files(
+            &root,
+            &DiscoveryOptions {
+                respect_gitignore: false,
+                ..DiscoveryOptions::default()
+            },
+        )?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert_eq!(files, vec![PathBuf::from("src/lib.rs")]);
+        Ok(())
+    }
+
+    #[test]
+    fn discovery_does_not_skip_plain_subdirectory_without_dot_git() -> Result<(), String> {
+        // A normal subdirectory without a .git entry must still be discovered.
+        let root = unique_temp_dir("unsafe-review-workspace-plain-subdir")?;
+        write_file(&root, "src/lib.rs")?;
+        write_file(&root, "subdir/src/lib.rs")?;
+
+        let files = discover_rust_files(
+            &root,
+            &DiscoveryOptions {
+                respect_gitignore: false,
+                ..DiscoveryOptions::default()
+            },
+        )?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert_eq!(
+            files,
+            vec![
+                PathBuf::from("src/lib.rs"),
+                PathBuf::from("subdir/src/lib.rs"),
+            ]
         );
         Ok(())
     }

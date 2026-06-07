@@ -452,7 +452,9 @@ paths. Repo discovery respects gitignore files by default; use
 `--no-respect-gitignore` only when the review intentionally includes ignored
 Rust files. Repo discovery also skips common large or generated directories by
 default: `.git`, `.github`, `.unsafe-review*`, `target`, `node_modules`,
-`vendor`, `build`, `dist`, and `generated`.
+`vendor`, `build`, `dist`, and `generated`. Any subdirectory that contains a
+`.git` entry (nested git checkout or gitfile worktree) is also skipped, so
+scratch worktrees and vendored repository copies do not inflate the scan.
 
 Use `--list-files` as a dry run before scanning a large repo:
 

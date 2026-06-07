@@ -3802,6 +3802,47 @@ fn repo_help_reports_repo_specific_scale_guidance() -> Result<(), Box<dyn Error>
 }
 
 #[test]
+fn repo_scan_skips_nested_git_checkouts() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-repo-nested-git-e2e")?;
+
+    // Copy the target fixture to the temp root so we control its layout.
+    copy_dir_all(&fixture, temp.path())?;
+
+    // Create a nested directory that looks like a git checkout: it contains a
+    // .git directory and a src/lib.rs with unsafe code that would produce cards.
+    let vendor_clone = temp.path().join("vendor-clone");
+    fs::create_dir_all(vendor_clone.join(".git"))?;
+    fs::create_dir_all(vendor_clone.join("src"))?;
+    fs::write(
+        vendor_clone.join("src/lib.rs"),
+        "// nested checkout — must not contribute cards\n\
+         unsafe fn nested_raw_ptr(ptr: *const u8) -> u8 { *ptr }\n",
+    )?;
+
+    let output = run_success([
+        os("repo"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let repo = parse_json(&stdout_text(&output)?)?;
+
+    // The fixture itself has exactly 1 card; the nested checkout must not add more.
+    assert_eq!(
+        repo["summary"]["cards"], 1,
+        "nested checkout must not inflate the card count: {repo}"
+    );
+    assert_eq!(
+        repo["summary"]["open_actionable_gaps"], 1,
+        "nested checkout must not inflate open-gap count: {repo}"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn check_reports_missing_diff_file_as_cli_failure() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("safe_code_no_cards");
     let missing_diff = fixture.join("missing.diff");
