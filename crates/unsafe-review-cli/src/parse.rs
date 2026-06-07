@@ -1,7 +1,7 @@
 use crate::command::{
     CandidateCommand, CandidateImportOptions, CandidateLintOptions, CandidateListOptions,
-    CandidateNewOptions, CandidateWitnessPlanOptions, CheckOptions, Command, DiffInput,
-    FirstPrOptions, Format, OutcomeOptions, RepoOptions,
+    CandidateNewOptions, CandidateWitnessPlanOptions, CheckOptions, Command, ContextQuery,
+    DiffInput, FirstPrOptions, Format, OutcomeOptions, RepoOptions,
 };
 use std::path::PathBuf;
 use unsafe_review_core::{MANUAL_CANDIDATE_STABLE_BYTE_CLASSES, PolicyMode};
@@ -475,7 +475,11 @@ fn parse_explain(args: Vec<String>) -> Result<Command, String> {
 
 fn parse_context(args: Vec<String>) -> Result<Command, String> {
     let mut root = PathBuf::from(".");
-    let mut id: Option<String> = None;
+    let mut card_id: Option<String> = None;
+    let mut file: Option<PathBuf> = None;
+    let mut line_start: Option<u32> = None;
+    let mut line_end: Option<u32> = None;
+    let mut changed_only = false;
     let mut idx = 0usize;
     while idx < args.len() {
         match args[idx].as_str() {
@@ -485,6 +489,30 @@ fn parse_context(args: Vec<String>) -> Result<Command, String> {
             }
             arg if arg.starts_with("--root=") => {
                 root = parse_inline_path_value(arg, "--root")?;
+            }
+            "--file" => {
+                idx += 1;
+                let raw = value(&args, idx, "--file")?;
+                file = Some(PathBuf::from(raw));
+            }
+            arg if arg.starts_with("--file=") => {
+                file = Some(PathBuf::from(inline_value(arg, "--file")?));
+            }
+            "--lines" => {
+                idx += 1;
+                let raw = value(&args, idx, "--lines")?;
+                let (s, e) = parse_line_range(raw)?;
+                line_start = Some(s);
+                line_end = Some(e);
+            }
+            arg if arg.starts_with("--lines=") => {
+                let raw = inline_value(arg, "--lines")?;
+                let (s, e) = parse_line_range(raw)?;
+                line_start = Some(s);
+                line_end = Some(e);
+            }
+            "--changed-only" => {
+                changed_only = true;
             }
             "--json" => {}
             "--format" => {
@@ -502,14 +530,75 @@ fn parse_context(args: Vec<String>) -> Result<Command, String> {
             value if value.starts_with('-') => {
                 return Err(format!("unknown context argument `{value}`"));
             }
-            value => set_card_id(&mut id, value)?,
+            value => set_card_id(&mut card_id, value)?,
         }
         idx += 1;
     }
-    Ok(Command::Context {
-        root,
-        id: id.ok_or_else(|| "missing card id".to_string())?,
-    })
+
+    // Determine the query mode: file-range or card-id.
+    let has_file = file.is_some();
+    let has_lines = line_start.is_some();
+    let has_id = card_id.is_some();
+
+    if has_file && has_id {
+        return Err("context: use either a card-id or --file/--lines, not both".to_string());
+    }
+    if has_lines && !has_file {
+        return Err("context: --lines requires --file".to_string());
+    }
+    if has_file && !has_lines {
+        return Err("context: --file requires --lines Y-Z".to_string());
+    }
+    if changed_only && !has_file {
+        return Err("context: --changed-only requires --file and --lines".to_string());
+    }
+
+    if let (Some(f), Some(s), Some(e)) = (file, line_start, line_end) {
+        return Ok(Command::Context {
+            root,
+            query: ContextQuery::FileRange {
+                file: f,
+                line_start: s,
+                line_end: e,
+                changed_only,
+            },
+        });
+    }
+
+    match card_id {
+        Some(id) => Ok(Command::Context {
+            root,
+            query: ContextQuery::CardId(id),
+        }),
+        None => Err(
+            "missing card id (or use --file <path> --lines Y-Z for a file-range scan)".to_string(),
+        ),
+    }
+}
+
+fn parse_line_range(raw: &str) -> Result<(u32, u32), String> {
+    let Some((left, right)) = raw.split_once('-') else {
+        return Err(format!(
+            "invalid --lines value `{raw}`: expected format Y-Z (e.g. 10-20)"
+        ));
+    };
+    let start = left.parse::<u32>().map_err(|_parse_err| {
+        format!("invalid --lines value `{raw}`: start `{left}` is not a positive integer")
+    })?;
+    let end = right.parse::<u32>().map_err(|_parse_err| {
+        format!("invalid --lines value `{raw}`: end `{right}` is not a positive integer")
+    })?;
+    if start == 0 || end == 0 {
+        return Err(format!(
+            "invalid --lines value `{raw}`: line numbers must be >= 1"
+        ));
+    }
+    if start > end {
+        return Err(format!(
+            "invalid --lines value `{raw}`: start {start} is after end {end}"
+        ));
+    }
+    Ok((start, end))
 }
 
 fn parse_outcome(args: Vec<String>) -> Result<OutcomeOptions, String> {
@@ -1385,7 +1474,7 @@ mod tests {
             command,
             Command::Context {
                 root: PathBuf::from("."),
-                id: "UR-card".to_string()
+                query: ContextQuery::CardId("UR-card".to_string()),
             }
         );
         Ok(())
@@ -1475,7 +1564,7 @@ mod tests {
             context,
             Command::Context {
                 root: PathBuf::from("fixtures/raw_pointer_deref"),
-                id: "UR-card".to_string(),
+                query: ContextQuery::CardId("UR-card".to_string()),
             }
         );
         Ok(())
@@ -1530,6 +1619,137 @@ mod tests {
 
         assert_eq!(explain, Err("expected exactly one card id".to_string()));
         assert_eq!(context, Err("expected exactly one card id".to_string()));
+    }
+
+    #[test]
+    fn parses_context_file_range() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "context",
+            "--file",
+            "src/lib.rs",
+            "--lines",
+            "10-20",
+            "--json",
+        ]))?;
+        assert_eq!(
+            command,
+            Command::Context {
+                root: PathBuf::from("."),
+                query: ContextQuery::FileRange {
+                    file: PathBuf::from("src/lib.rs"),
+                    line_start: 10,
+                    line_end: 20,
+                    changed_only: false,
+                },
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parses_context_file_range_changed_only() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "context",
+            "--root",
+            "fixtures/raw_pointer_alignment",
+            "--file=src/lib.rs",
+            "--lines=5-15",
+            "--changed-only",
+            "--json",
+        ]))?;
+        assert_eq!(
+            command,
+            Command::Context {
+                root: PathBuf::from("fixtures/raw_pointer_alignment"),
+                query: ContextQuery::FileRange {
+                    file: PathBuf::from("src/lib.rs"),
+                    line_start: 5,
+                    line_end: 15,
+                    changed_only: true,
+                },
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_context_file_without_lines() {
+        let command = parse(args(["unsafe-review", "context", "--file", "src/lib.rs"]));
+        assert_eq!(
+            command,
+            Err("context: --file requires --lines Y-Z".to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_context_lines_without_file() {
+        let command = parse(args(["unsafe-review", "context", "--lines", "10-20"]));
+        assert_eq!(command, Err("context: --lines requires --file".to_string()));
+    }
+
+    #[test]
+    fn rejects_context_file_and_card_id_together() {
+        let command = parse(args([
+            "unsafe-review",
+            "context",
+            "--file",
+            "src/lib.rs",
+            "--lines",
+            "10-20",
+            "UR-card",
+        ]));
+        assert_eq!(
+            command,
+            Err("context: use either a card-id or --file/--lines, not both".to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_context_changed_only_without_file() {
+        let command = parse(args([
+            "unsafe-review",
+            "context",
+            "--changed-only",
+            "UR-card",
+        ]));
+        assert_eq!(
+            command,
+            Err("context: --changed-only requires --file and --lines".to_string())
+        );
+    }
+
+    #[test]
+    fn rejects_invalid_line_range_formats() {
+        let bad_range = parse(args([
+            "unsafe-review",
+            "context",
+            "--file",
+            "src/lib.rs",
+            "--lines",
+            "abc-20",
+        ]));
+        assert!(
+            bad_range
+                .err()
+                .unwrap_or_default()
+                .contains("not a positive integer"),
+            "expected parse error for non-numeric start"
+        );
+
+        let reversed = parse(args([
+            "unsafe-review",
+            "context",
+            "--file",
+            "src/lib.rs",
+            "--lines",
+            "20-10",
+        ]));
+        assert_eq!(
+            reversed,
+            Err("invalid --lines value `20-10`: start 20 is after end 10".to_string())
+        );
     }
 
     #[test]

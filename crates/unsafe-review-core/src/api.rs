@@ -5,7 +5,8 @@ use crate::output::{
     agent, badges, comment_plan, confirmation, gate_manifest, human, json, lsp, markdown, outcome,
     policy_report, receipt_audit, repair_queue, sarif, witness_plan,
 };
-use std::path::PathBuf;
+use crate::util::path_display;
+use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Scope {
@@ -358,6 +359,58 @@ pub fn collect_context(output: &AnalyzeOutput, id: &CardId) -> Option<String> {
         .iter()
         .find(|card| &card.id == id)
         .map(agent::render)
+}
+
+/// Render a `file_range_scan` envelope for SPEC-0033.
+///
+/// Collects packets for all cards whose unsafe site overlaps `file:line_start-line_end`
+/// (1-based, both endpoints inclusive).  If `changed_only` is `true`, further
+/// restricts to cards whose `baseline_state` is `new` or `worsened` (SPEC-0030).
+///
+/// File paths are matched by normalizing both to forward-slash display form,
+/// then checking whether the card's site file ends with the queried fragment so
+/// callers may pass either root-relative or short relative paths (e.g. `src/lib.rs`).
+/// The `root` parameter is used to strip a leading root prefix from the queried path
+/// before the suffix comparison.
+pub fn collect_context_range(
+    output: &AnalyzeOutput,
+    root: &Path,
+    file: &Path,
+    line_start: u32,
+    line_end: u32,
+    changed_only: bool,
+) -> String {
+    let queried_display = path_display(file);
+    let root_display = path_display(root);
+
+    // Strip the workspace root prefix from the queried path so that callers
+    // can use either a short relative path ("src/lib.rs") or an absolute one.
+    let queried_suffix = queried_display
+        .strip_prefix(&root_display)
+        .map(|rest| rest.trim_start_matches('/'))
+        .unwrap_or(&queried_display);
+
+    // Pre-filter to the requested file; range + changed-only filtering happens
+    // inside render_range_scan.
+    let file_cards: Vec<&ReviewCard> = output
+        .cards
+        .iter()
+        .filter(|card| {
+            let card_file = path_display(&card.site.location.file);
+            card_file == queried_display
+                || card_file == queried_suffix
+                || card_file.ends_with(&format!("/{queried_suffix}"))
+        })
+        .collect();
+
+    agent::render_range_scan(
+        queried_display,
+        line_start,
+        line_end,
+        changed_only,
+        &file_cards,
+        &output.schema_version,
+    )
 }
 
 pub use outcome::OutcomeReport;

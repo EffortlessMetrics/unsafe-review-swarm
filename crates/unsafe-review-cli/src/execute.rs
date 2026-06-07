@@ -1,7 +1,7 @@
 use crate::command::{
     CandidateCommand, CandidateImportOptions, CandidateLintOptions, CandidateListOptions,
-    CandidateNewOptions, CandidateWitnessPlanOptions, CheckOptions, Command, DiffInput,
-    FirstPrOptions, Format, OutcomeOptions, ReceiptTemplateOptions, RepoOptions,
+    CandidateNewOptions, CandidateWitnessPlanOptions, CheckOptions, Command, ContextQuery,
+    DiffInput, FirstPrOptions, Format, OutcomeOptions, ReceiptTemplateOptions, RepoOptions,
     SavedOutputReceiptOptions,
 };
 #[cfg(unix)]
@@ -21,15 +21,16 @@ use unsafe_review_core::{
     ConcurrencyReceiptInput, DiffSource, DiscoveryOptions, MiriReceiptInput, PolicyMode,
     ProofReceiptInput, RepoScanEvent, RepoScanPhase, RepoScanStatus, SanitizerReceiptInput, Scope,
     WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze, analyze_with_discovery,
-    analyze_with_discovery_and_repo_events, audit_witness_receipts, compare_outcome_json,
-    discover_repo_files, evaluate_policy_report, evaluate_policy_report_from_output,
-    lint_manual_candidate_text, load_manual_candidates, manual_candidate_implementer_handoff,
-    new_manual_candidate_skeleton, read_manual_candidate, render_badge_jsons, render_comment_plan,
-    render_gate_manifest, render_github_summary, render_human, render_json, render_lsp,
-    render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
-    render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
-    render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,
-    render_repair_queue, render_sarif, render_witness_plan, validate_witness_receipts,
+    analyze_with_discovery_and_repo_events, audit_witness_receipts, collect_context_range,
+    compare_outcome_json, discover_repo_files, evaluate_policy_report,
+    evaluate_policy_report_from_output, lint_manual_candidate_text, load_manual_candidates,
+    manual_candidate_implementer_handoff, new_manual_candidate_skeleton, read_manual_candidate,
+    render_badge_jsons, render_comment_plan, render_gate_manifest, render_github_summary,
+    render_human, render_json, render_lsp, render_manual_candidate_witness_plan, render_markdown,
+    render_outcome_json, render_outcome_markdown, render_policy_report_json,
+    render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
+    render_receipt_audit_markdown, render_repair_queue, render_sarif, render_witness_plan,
+    validate_witness_receipts,
 };
 
 mod card_lookup;
@@ -118,7 +119,7 @@ pub(crate) fn execute(command: Command) -> Result<(), String> {
         Command::FirstPr(options) => first_pr(options),
         Command::Badges { root, out } => badges(&root, &out),
         Command::Explain { root, id, format } => explain(&root, &id, format),
-        Command::Context { root, id } => context(&root, &id),
+        Command::Context { root, query } => context(&root, query),
         Command::Candidate(command) => candidate(command),
         Command::Confirm(options) => confirm::run(options),
         Command::ReceiptTemplate(options) => receipt_template(options),
@@ -1459,16 +1460,32 @@ fn explain(root: &Path, id: &str, format: Format) -> Result<(), String> {
     Ok(())
 }
 
-fn context(root: &Path, id: &str) -> Result<(), String> {
-    let output = card_lookup::analyze_repo_cards(root)?;
-    let id = CardId(id.to_string());
-    let packet = match card_lookup::context_packet(&output, &id) {
-        Ok(packet) => packet,
-        Err(_) => card_lookup::manual_candidate_context(root, &id.0)?
-            .ok_or_else(|| format!("card `{id}` not found"))?,
-    };
-    println!("{packet}");
-    Ok(())
+fn context(root: &Path, query: ContextQuery) -> Result<(), String> {
+    match query {
+        ContextQuery::CardId(id) => {
+            let output = card_lookup::analyze_repo_cards(root)?;
+            let card_id = CardId(id.clone());
+            let packet = match card_lookup::context_packet(&output, &card_id) {
+                Ok(packet) => packet,
+                Err(_) => card_lookup::manual_candidate_context(root, &id)?
+                    .ok_or_else(|| format!("card `{id}` not found"))?,
+            };
+            println!("{packet}");
+            Ok(())
+        }
+        ContextQuery::FileRange {
+            file,
+            line_start,
+            line_end,
+            changed_only,
+        } => {
+            let output = card_lookup::analyze_repo_cards(root)?;
+            let envelope =
+                collect_context_range(&output, root, &file, line_start, line_end, changed_only);
+            println!("{envelope}");
+            Ok(())
+        }
+    }
 }
 
 fn candidate(command: CandidateCommand) -> Result<(), String> {
@@ -2200,6 +2217,7 @@ fn print_help() {
     println!("  badges  [--root .] [--out badges]");
     println!("  explain [--root .] [--json|--format json] <card-id>");
     println!("  context [--root .] [--json|--format json] <card-id>");
+    println!("  context [--root .] --file <path> --lines Y-Z [--changed-only] --json");
     println!("  candidate new --class <stable-byte-class> [--id R4R2-S000-TODO] [--out file]");
     println!(
         "  candidate import <manual-candidate.json> [--out .unsafe-review/candidates/<id>.json]"

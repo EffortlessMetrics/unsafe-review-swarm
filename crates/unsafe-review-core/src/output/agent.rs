@@ -22,6 +22,7 @@ mod context;
 mod evidence;
 mod packet;
 mod queue;
+mod range_scan;
 mod readiness;
 mod repairs;
 
@@ -30,6 +31,45 @@ mod tests;
 
 pub(crate) fn render(card: &ReviewCard) -> String {
     render_pretty(&packet::AgentPacket::from(card))
+}
+
+/// Render a `file_range_scan` envelope for SPEC-0033.
+///
+/// Accepts a pre-file-filtered slice of cards (already restricted to the
+/// requested file).  Applies line-range and optional `changed_only` filters,
+/// sorts the result deterministically by site line then card id, and wraps the
+/// matching packets in the `file_range_scan` envelope.
+pub(crate) fn render_range_scan<'a>(
+    queried_file: String,
+    queried_line_start: u32,
+    queried_line_end: u32,
+    changed_only: bool,
+    file_cards: &[&'a ReviewCard],
+    analyzed_base: &'a str,
+) -> String {
+    let mut matching: Vec<&'a ReviewCard> = file_cards
+        .iter()
+        .copied()
+        .filter(|card| range_scan::site_overlaps_range(card, queried_line_start, queried_line_end))
+        .filter(|card| !changed_only || range_scan::is_new_or_worsened(card))
+        .collect();
+    // Deterministic order: ascending site line then card id.
+    matching.sort_by(|a, b| {
+        a.site
+            .location
+            .line
+            .cmp(&b.site.location.line)
+            .then_with(|| a.id.0.cmp(&b.id.0))
+    });
+    let envelope = range_scan::FileRangeScanEnvelope::build(
+        queried_file,
+        queried_line_start,
+        queried_line_end,
+        changed_only,
+        matching,
+        analyzed_base,
+    );
+    render_pretty(&envelope)
 }
 
 fn render_pretty(value: &impl Serialize) -> String {

@@ -1,6 +1,20 @@
 use std::path::PathBuf;
 use unsafe_review_core::{DiscoveryOptions, PolicyMode};
 
+/// Query surface for `context` — either a single card by id or a file:line range.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum ContextQuery {
+    /// Existing card-id lookup (bounded_repair_packet mode).
+    CardId(String),
+    /// File:line range scan (file_range_scan mode, SPEC-0033).
+    FileRange {
+        file: PathBuf,
+        line_start: u32,
+        line_end: u32,
+        changed_only: bool,
+    },
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum DiffInput {
     File(PathBuf),
@@ -213,7 +227,7 @@ pub(crate) enum Command {
     },
     Context {
         root: PathBuf,
-        id: String,
+        query: ContextQuery,
     },
     Candidate(CandidateCommand),
     Confirm(ConfirmOptions),
