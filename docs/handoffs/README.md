@@ -5,6 +5,8 @@ what not to do next. Do not put active specs here.
 
 | Handoff | Date | Scope |
 |---|---|---|
+| [Source 0.3.4 publication sync](2026-06-07-source-0.3.4-publication-sync.md) | 2026-06-07 | mirrors the verified 0.3.4 publication (source PRs #529/#530, crates.io core/cli/facade 0.3.4, docs.rs versioned-docs redirect, install smoke, tag v0.3.4, GitHub Release) into the swarm workbench and moves the source-sync checkpoint without new safety, proof, or policy-readiness claims |
+| [Release 0.3.4 preparation](2026-06-07-release-0.3.4-preparation.md) | 2026-06-07 | coverage-instrument usability patch release preparation, synchronized 0.3.4 version bump, coverage-slot/baseline/gate-manifest/file-range/diagnosability notes, validation checklist, and manual publish order |
 | [Source 0.3.3 publication sync](2026-06-06-source-0.3.3-publication-sync.md) | 2026-06-06 | mirrors the verified 0.3.3 publication (source PRs #526/#527/#528, crates.io core/cli/facade 0.3.3, docs.rs checks, install smoke, tag v0.3.3, GitHub Release) into the swarm workbench and moves the source-sync checkpoint without new safety, proof, or policy-readiness claims |
 | [Release 0.3.3 preparation](2026-06-05-release-0.3.3-preparation.md) | 2026-06-05 | Bun manual-candidate cockpit usability patch release preparation, synchronized 0.3.3 version bump, confirmation-cue/oracle-map/manual-handoff notes, validation checklist, and manual publish order |
 | [Source workbench docs and readiness sync](2026-06-05-source-workbench-docs-readiness-sync.md) | 2026-06-05 | acknowledges source PR #525 history-preserving catch-up of current swarm workbench docs, readiness contracts, public review workflow, and CI cookbook history without claiming publication, proof, or policy readiness |

@@ -13,6 +13,94 @@ comments, edit source, or block by default.
 
 Nothing yet.
 
+## 0.3.4 - 2026-06-07
+
+0.3.4 is the coverage-instrument usability patch. It ships the post-0.3.3
+coverage-slot model, baseline movement tracking, diff-scoped no-new-debt,
+baseline-aware badges, comment-plan gap-anchoring, LSP file:range context,
+the `unsafe-review-gate.json` routing manifest, repo-scan diagnosability,
+candidate authoring UX, and stable-byte coverage v1. It remains advisory
+static coverage evidence: it does not prove memory safety, UB-free status,
+Miri-clean status, site execution, calibrated precision/recall, or policy
+readiness, and it does not run witnesses, post comments, edit source, or
+block by default.
+
+### Added
+
+- Added the SPEC-0029 unsafe-evidence coverage block: a slot-based model that
+  assigns each `unsafe` site a coverage slot and tracks which slots have
+  evidence, enabling baseline-aware gap reporting.
+  [#1529](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1529)
+- Added the SPEC-0030 baseline coverage-movement keystone: baseline recording,
+  movement tracking, diff-scoped `no-new-debt` reporting, and `worsened_gaps`
+  emission. Baseline `init` and `add` authoring subcommands create and extend
+  baselines without changing tool advisory posture.
+  [#1531](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1531)
+  [#1536](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1536)
+- Added the SPEC-0031 baseline-aware badge: the coverage badge reflects
+  baseline movement state so repos can surface coverage trends without
+  implied proof.
+  [#1532](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1532)
+- Added the SPEC-0032 comment-plan coverage-gap hardening: comment plans are
+  now anchored to coverage gaps, preventing phantom anchors and improving
+  comment-plan signal quality.
+  [#1535](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1535)
+- Added the SPEC-0033 file:range context scan for LLM/agent consumers: the
+  `context` subcommand now emits a `file:range` context packet with precise
+  source span information for LLM and agent consumers.
+  [#1534](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1534)
+- Added the SPEC-0034 `unsafe-review-gate.json` routing manifest: every
+  `first-pr` run writes a structured gate manifest that downstream CI and
+  agent consumers can read to route decisions without parsing human output.
+  [#1533](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1533)
+- Added the SPEC-0035 repo-scan diagnosability: `repo` output now includes
+  scan-scope metadata and diagnosability fields so consumers can distinguish
+  scanned-but-empty from not-scanned.
+  [#1528](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1528)
+- Added stale JS-buffer span detection: the analyzer flags use of a stale
+  JS `ArrayBuffer`/`TypedArray` span after a GC-reentry point.
+  [#1508](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1508)
+  [#1538](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1538)
+- Added stable-byte coverage v1 with span-as-arg detection and snapshot
+  suppression: the scanner detects span values passed as arguments after
+  reentry, and suppresses cards when a snapshot is taken before use.
+  [#1538](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1538)
+- Added candidate `new` and `lint` authoring subcommands for structured
+  candidate creation and linting without changing the manual/advisory boundary.
+  [#1526](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1526)
+- Added opt-in `confirm --allow-heavy` cue executor for running emitted
+  confirmation cues with explicit opt-in; `runtime_executed` is projected
+  into output. Execution remains opt-in and does not change default advisory
+  posture.
+  [#1510](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1510)
+  [#1509](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1509)
+- Added confirmation state projection and cheapest-confirmation ranking to
+  output surfaces.
+  [#1525](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1525)
+- Added dogfood usefulness rollup with a drift rail to catch usefulness
+  regressions across real-crate dogfood samples.
+  [#1527](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1527)
+- Required node-parity oracle maps for Bun-oriented candidates.
+  [#1497](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1497)
+
+### Changed
+
+- CI now falls back to full GitHub-hosted gate by default with a single tight
+  deterministic core gate plus an advisory ub-review LLM layer.
+  [#1507](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1507)
+  [#1524](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1524)
+
+### Documented
+
+- Encoded the receipted economic thesis and ownership split in the interop
+  north-star.
+  [#1530](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1530)
+- Added ease-of-use lane specs: SPEC-0028 delivery surfaces and ease of use,
+  SPEC-0029 coverage model, SPEC-0030 baseline movement.
+  [#1521](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1521)
+- Mirrored source 0.3.3 publication into swarm workbench.
+  [#1506](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1506)
+
 ## 0.3.3 - 2026-06-05
 
 0.3.3 is the Bun manual-candidate cockpit usability patch. It ships the
