@@ -14,13 +14,14 @@ mod policy;
 mod util;
 
 pub use api::{
-    AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, DiscoveryOptions, OutcomeReport,
-    PolicyMode, PolicyReport, ReceiptAuditReport, RepoScanEvent, RepoScanPhase, RepoScanStatus,
-    ReviewCardConfirmationProjection, Scope, analyze, analyze_with_discovery,
+    AnalysisMode, AnalyzeInput, AnalyzeOutput, BaselineInitResult, DiffSource, DiscoveryOptions,
+    OutcomeReport, PolicyMode, PolicyReport, ReceiptAuditReport, RepoScanEvent, RepoScanPhase,
+    RepoScanStatus, ReviewCardConfirmationProjection, Scope, analyze, analyze_with_discovery,
     analyze_with_discovery_and_progress, analyze_with_discovery_and_repo_events,
-    audit_witness_receipts, collect_context, collect_context_range, compare_outcome_json,
-    discover_repo_files, evaluate_policy_report, evaluate_policy_report_from_output, explain_card,
-    project_editor, project_review_card_confirmation, render_badge_jsons, render_comment_plan,
+    audit_witness_receipts, baseline_add, baseline_init, collect_context, collect_context_range,
+    compare_outcome_json, discover_repo_files, evaluate_policy_report,
+    evaluate_policy_report_from_output, explain_card, project_editor,
+    project_review_card_confirmation, render_badge_jsons, render_comment_plan,
     render_gate_manifest, render_github_summary, render_human, render_json, render_lsp,
     render_markdown, render_outcome_json, render_outcome_markdown, render_policy_report_json,
     render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,

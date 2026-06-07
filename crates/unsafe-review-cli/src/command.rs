@@ -202,11 +202,53 @@ pub(crate) struct CandidateWitnessPlanOptions {
     pub out: Option<PathBuf>,
 }
 
+/// Options for `baseline init` (SPEC-0030).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct BaselineInitOptions {
+    pub root: PathBuf,
+    /// Override the default ledger output path (`policy/unsafe-review-baseline.toml`).
+    pub out: Option<PathBuf>,
+    /// Override the default `review_after` date (ISO 8601 YYYY-MM-DD).
+    pub review_after: Option<String>,
+}
+
+impl Default for BaselineInitOptions {
+    fn default() -> Self {
+        Self {
+            root: PathBuf::from("."),
+            out: None,
+            review_after: None,
+        }
+    }
+}
+
+/// Options for `baseline add` (SPEC-0030).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct BaselineAddOptions {
+    pub root: PathBuf,
+    pub card_id: String,
+    pub owner: String,
+    pub reason: String,
+    pub evidence: String,
+    pub review_after: Option<String>,
+    /// Override the default ledger output path.
+    pub out: Option<PathBuf>,
+}
+
+/// Subcommand variants for `baseline`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum BaselineCommand {
+    Init(BaselineInitOptions),
+    Add(BaselineAddOptions),
+    Help,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Command {
     Help,
     RepoHelp,
     CandidateHelp,
+    BaselineHelp,
     Version,
     Support,
     Doctor {
@@ -230,6 +272,7 @@ pub(crate) enum Command {
         query: ContextQuery,
     },
     Candidate(CandidateCommand),
+    Baseline(BaselineCommand),
     Confirm(ConfirmOptions),
     ReceiptTemplate(ReceiptTemplateOptions),
     ReceiptValidate {

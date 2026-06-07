@@ -1,7 +1,8 @@
 use crate::command::{
-    CandidateCommand, CandidateImportOptions, CandidateLintOptions, CandidateListOptions,
-    CandidateNewOptions, CandidateWitnessPlanOptions, CheckOptions, Command, ContextQuery,
-    DiffInput, FirstPrOptions, Format, OutcomeOptions, RepoOptions,
+    BaselineAddOptions, BaselineCommand, BaselineInitOptions, CandidateCommand,
+    CandidateImportOptions, CandidateLintOptions, CandidateListOptions, CandidateNewOptions,
+    CandidateWitnessPlanOptions, CheckOptions, Command, ContextQuery, DiffInput, FirstPrOptions,
+    Format, OutcomeOptions, RepoOptions,
 };
 use std::path::PathBuf;
 use unsafe_review_core::{MANUAL_CANDIDATE_STABLE_BYTE_CLASSES, PolicyMode};
@@ -32,6 +33,11 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
     {
         return Ok(Command::CandidateHelp);
     }
+    if command == "baseline"
+        && (rest.is_empty() || has_help_flag(&rest) || is_exact_help_word(&rest))
+    {
+        return Ok(Command::BaselineHelp);
+    }
     if has_help_flag(&rest) {
         return Ok(Command::Help);
     }
@@ -50,6 +56,7 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
         "explain" => parse_explain(rest),
         "context" => parse_context(rest),
         "candidate" => parse_candidate(rest).map(Command::Candidate),
+        "baseline" => parse_baseline(rest).map(Command::Baseline),
         "confirm" => confirm::parse_confirm(rest).map(Command::Confirm),
         "outcome" => parse_outcome(rest).map(Command::Outcome),
         "policy" => policy::parse_policy_command(rest),
@@ -247,6 +254,154 @@ fn parse_candidate_witness_plan(args: Vec<String>) -> Result<CandidateWitnessPla
         id: id.ok_or_else(|| "missing manual candidate id".to_string())?,
         out,
     })
+}
+
+fn parse_baseline(args: Vec<String>) -> Result<BaselineCommand, String> {
+    let mut rest = args.into_iter();
+    let Some(subcommand) = rest.next() else {
+        return Ok(BaselineCommand::Help);
+    };
+    let rest = rest.collect::<Vec<_>>();
+    match subcommand.as_str() {
+        "init" => parse_baseline_init(rest).map(BaselineCommand::Init),
+        "add" => parse_baseline_add(rest).map(BaselineCommand::Add),
+        other => Err(format!("unknown baseline subcommand `{other}`")),
+    }
+}
+
+fn parse_baseline_init(args: Vec<String>) -> Result<BaselineInitOptions, String> {
+    let mut options = BaselineInitOptions::default();
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--root" => {
+                idx += 1;
+                options.root = parse_path_value(&args, idx, "--root")?;
+            }
+            arg if arg.starts_with("--root=") => {
+                options.root = parse_inline_path_value(arg, "--root")?;
+            }
+            "--out" => {
+                idx += 1;
+                options.out = Some(parse_path_value(&args, idx, "--out")?);
+            }
+            arg if arg.starts_with("--out=") => {
+                options.out = Some(parse_inline_path_value(arg, "--out")?);
+            }
+            "--review-after" => {
+                idx += 1;
+                options.review_after = Some(parse_iso_date_value(&args, idx, "--review-after")?);
+            }
+            arg if arg.starts_with("--review-after=") => {
+                options.review_after = Some(parse_inline_iso_date_value(arg, "--review-after")?);
+            }
+            other => return Err(format!("unknown baseline init argument `{other}`")),
+        }
+        idx += 1;
+    }
+    Ok(options)
+}
+
+fn parse_baseline_add(args: Vec<String>) -> Result<BaselineAddOptions, String> {
+    let mut root = PathBuf::from(".");
+    let mut card_id: Option<String> = None;
+    let mut owner: Option<String> = None;
+    let mut reason: Option<String> = None;
+    let mut evidence: Option<String> = None;
+    let mut review_after: Option<String> = None;
+    let mut out: Option<PathBuf> = None;
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--root" => {
+                idx += 1;
+                root = parse_path_value(&args, idx, "--root")?;
+            }
+            arg if arg.starts_with("--root=") => {
+                root = parse_inline_path_value(arg, "--root")?;
+            }
+            "--card-id" => {
+                idx += 1;
+                card_id = Some(value(&args, idx, "--card-id")?.to_string());
+            }
+            arg if arg.starts_with("--card-id=") => {
+                card_id = Some(inline_value(arg, "--card-id")?.to_string());
+            }
+            "--owner" => {
+                idx += 1;
+                owner = Some(value(&args, idx, "--owner")?.to_string());
+            }
+            arg if arg.starts_with("--owner=") => {
+                owner = Some(inline_value(arg, "--owner")?.to_string());
+            }
+            "--reason" => {
+                idx += 1;
+                reason = Some(value(&args, idx, "--reason")?.to_string());
+            }
+            arg if arg.starts_with("--reason=") => {
+                reason = Some(inline_value(arg, "--reason")?.to_string());
+            }
+            "--evidence" => {
+                idx += 1;
+                evidence = Some(value(&args, idx, "--evidence")?.to_string());
+            }
+            arg if arg.starts_with("--evidence=") => {
+                evidence = Some(inline_value(arg, "--evidence")?.to_string());
+            }
+            "--review-after" => {
+                idx += 1;
+                review_after = Some(parse_iso_date_value(&args, idx, "--review-after")?);
+            }
+            arg if arg.starts_with("--review-after=") => {
+                review_after = Some(parse_inline_iso_date_value(arg, "--review-after")?);
+            }
+            "--out" => {
+                idx += 1;
+                out = Some(parse_path_value(&args, idx, "--out")?);
+            }
+            arg if arg.starts_with("--out=") => {
+                out = Some(parse_inline_path_value(arg, "--out")?);
+            }
+            other => return Err(format!("unknown baseline add argument `{other}`")),
+        }
+        idx += 1;
+    }
+    Ok(BaselineAddOptions {
+        root,
+        card_id: card_id.ok_or("missing --card-id")?,
+        owner: owner.ok_or("missing --owner")?,
+        reason: reason.ok_or("missing --reason")?,
+        evidence: evidence.ok_or("missing --evidence")?,
+        review_after,
+        out,
+    })
+}
+
+fn parse_iso_date_value(args: &[String], idx: usize, flag: &str) -> Result<String, String> {
+    let raw = value(args, idx, flag)?;
+    validate_iso_date(raw, flag)?;
+    Ok(raw.to_string())
+}
+
+fn parse_inline_iso_date_value(arg: &str, flag: &str) -> Result<String, String> {
+    let raw = inline_value(arg, flag)?;
+    validate_iso_date(raw, flag)?;
+    Ok(raw.to_string())
+}
+
+fn validate_iso_date(raw: &str, flag: &str) -> Result<(), String> {
+    let bytes = raw.as_bytes();
+    if bytes.len() == 10
+        && bytes[0..4].iter().all(u8::is_ascii_digit)
+        && bytes[4] == b'-'
+        && bytes[5..7].iter().all(u8::is_ascii_digit)
+        && bytes[7] == b'-'
+        && bytes[8..10].iter().all(u8::is_ascii_digit)
+    {
+        Ok(())
+    } else {
+        Err(format!("{flag} must be a YYYY-MM-DD date, got `{raw}`"))
+    }
 }
 
 fn has_help_flag(args: &[String]) -> bool {

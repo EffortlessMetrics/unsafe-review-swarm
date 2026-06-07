@@ -1,8 +1,8 @@
 use crate::command::{
-    CandidateCommand, CandidateImportOptions, CandidateLintOptions, CandidateListOptions,
-    CandidateNewOptions, CandidateWitnessPlanOptions, CheckOptions, Command, ContextQuery,
-    DiffInput, FirstPrOptions, Format, OutcomeOptions, ReceiptTemplateOptions, RepoOptions,
-    SavedOutputReceiptOptions,
+    BaselineAddOptions, BaselineCommand, BaselineInitOptions, CandidateCommand,
+    CandidateImportOptions, CandidateLintOptions, CandidateListOptions, CandidateNewOptions,
+    CandidateWitnessPlanOptions, CheckOptions, Command, ContextQuery, DiffInput, FirstPrOptions,
+    Format, OutcomeOptions, ReceiptTemplateOptions, RepoOptions, SavedOutputReceiptOptions,
 };
 #[cfg(unix)]
 use signal_hook::consts::signal::{SIGINT, SIGTERM};
@@ -21,8 +21,8 @@ use unsafe_review_core::{
     ConcurrencyReceiptInput, DiffSource, DiscoveryOptions, MiriReceiptInput, PolicyMode,
     ProofReceiptInput, RepoScanEvent, RepoScanPhase, RepoScanStatus, SanitizerReceiptInput, Scope,
     WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze, analyze_with_discovery,
-    analyze_with_discovery_and_repo_events, audit_witness_receipts, collect_context_range,
-    compare_outcome_json, discover_repo_files, evaluate_policy_report,
+    analyze_with_discovery_and_repo_events, audit_witness_receipts, baseline_add, baseline_init,
+    collect_context_range, compare_outcome_json, discover_repo_files, evaluate_policy_report,
     evaluate_policy_report_from_output, lint_manual_candidate_text, load_manual_candidates,
     manual_candidate_implementer_handoff, new_manual_candidate_skeleton, read_manual_candidate,
     render_badge_jsons, render_comment_plan, render_gate_manifest, render_github_summary,
@@ -94,6 +94,10 @@ pub(crate) fn execute(command: Command) -> Result<(), String> {
             print_candidate_help();
             Ok(())
         }
+        Command::BaselineHelp => {
+            print_baseline_help();
+            Ok(())
+        }
         Command::Version => {
             println!("unsafe-review {}", env!("CARGO_PKG_VERSION"));
             Ok(())
@@ -121,6 +125,7 @@ pub(crate) fn execute(command: Command) -> Result<(), String> {
         Command::Explain { root, id, format } => explain(&root, &id, format),
         Command::Context { root, query } => context(&root, query),
         Command::Candidate(command) => candidate(command),
+        Command::Baseline(command) => run_baseline(command),
         Command::Confirm(options) => confirm::run(options),
         Command::ReceiptTemplate(options) => receipt_template(options),
         Command::ReceiptValidate { root } => receipt_validate(&root),
@@ -2199,6 +2204,115 @@ fn receipt_import_proof(options: SavedOutputReceiptOptions) -> Result<(), String
     Ok(())
 }
 
+fn run_baseline(command: BaselineCommand) -> Result<(), String> {
+    match command {
+        BaselineCommand::Init(options) => run_baseline_init(options),
+        BaselineCommand::Add(options) => run_baseline_add(options),
+        BaselineCommand::Help => {
+            print_baseline_help();
+            Ok(())
+        }
+    }
+}
+
+fn run_baseline_init(options: BaselineInitOptions) -> Result<(), String> {
+    let result = baseline_init(
+        &options.root,
+        options.out.as_deref(),
+        options.review_after.as_deref(),
+    )?;
+    println!("baseline init: ok");
+    println!("captured: {} open actionable card(s)", result.captured);
+    println!("ledger: {}", result.ledger_path.display());
+    println!("snapshot: {}", result.snapshot_path.display());
+    if result.ledger_existed {
+        println!(
+            "note: ledger already existed; merged existing entries (new entries added, unchanged entries kept)."
+        );
+    } else {
+        println!("note: new ledger created.");
+    }
+    println!();
+    println!("next:");
+    println!(
+        "  git add {} {}",
+        result.ledger_path.display(),
+        result.snapshot_path.display()
+    );
+    println!("  git commit -m 'baseline: record pre-existing debt floor'");
+    println!("  # from now on:");
+    println!(
+        "  unsafe-review check --policy no-new-debt   # fails only when the diff adds or worsens debt"
+    );
+    println!();
+    println!(
+        "trust boundary: baseline entries are debt records, not safety records. A baseline init pass means only that the open actionable gaps were recorded as pre-existing; it does not prove memory safety, UB-free status, Miri-clean status, or that any unsafe site executed safely."
+    );
+    Ok(())
+}
+
+fn run_baseline_add(options: BaselineAddOptions) -> Result<(), String> {
+    baseline_add(
+        &options.root,
+        &options.card_id,
+        &options.owner,
+        &options.reason,
+        &options.evidence,
+        options.review_after.as_deref(),
+        options.out.as_deref(),
+    )?;
+    println!("baseline add: ok");
+    println!("card: {}", options.card_id);
+    println!("owner: {}", options.owner);
+    println!(
+        "trust boundary: baseline entries are debt records, not safety records. Adding a card to the baseline records that the gap pre-existed; it does not prove memory safety, UB-free status, Miri-clean status, or that the unsafe site executed safely."
+    );
+    Ok(())
+}
+
+fn print_baseline_help() {
+    println!("unsafe-review baseline: record pre-existing debt as the coverage floor (SPEC-0030)");
+    println!();
+    println!("Usage:");
+    println!(
+        "  unsafe-review baseline init [--root .] [--out policy/unsafe-review-baseline.toml] [--review-after YYYY-MM-DD]"
+    );
+    println!(
+        "  unsafe-review baseline add --card-id <UR-...-cN> --owner <name> --reason <text> --evidence <text> [--root .] [--review-after YYYY-MM-DD] [--out policy/unsafe-review-baseline.toml]"
+    );
+    println!();
+    println!("What baseline does:");
+    println!(
+        "- `init` scans the repo for open actionable cards and records each as a baseline ledger entry with its current coverage state in the snapshot."
+    );
+    println!(
+        "- `add` adds or updates a single ledger entry and its snapshot state without rescanning the entire ledger."
+    );
+    println!(
+        "- The baseline ledger is `policy/unsafe-review-baseline.toml`; the snapshot is `policy/unsafe-review-baseline-snapshot.toml`."
+    );
+    println!();
+    println!("Brownfield onboarding:");
+    println!("  unsafe-review baseline init");
+    println!(
+        "  git add policy/unsafe-review-baseline.toml policy/unsafe-review-baseline-snapshot.toml"
+    );
+    println!("  git commit -m 'baseline: record pre-existing debt floor'");
+    println!("  # from now on:");
+    println!("  unsafe-review check --policy no-new-debt");
+    println!();
+    println!("Trust boundary:");
+    println!(
+        "- Baseline entries are debt records, not safety records. A baseline init pass means only that the open actionable gaps were recorded as pre-existing debt."
+    );
+    println!(
+        "- Adding a card to the baseline does not prove memory safety, UB-free status, Miri-clean status, or that any unsafe site executed safely."
+    );
+    println!(
+        "- unsafe-review does not execute witnesses, post comments, edit source, run an agent, or enforce blocking policy by default."
+    );
+}
+
 fn print_help() {
     println!("unsafe-review: cheap unsafe contract review for Rust");
     println!();
@@ -2225,6 +2339,12 @@ fn print_help() {
     println!("  candidate lint <manual-candidate.json>");
     println!("  candidate list [--root .] [--format json|markdown] [--out file]");
     println!("  candidate witness-plan [--root .] <candidate-id> [--out file]");
+    println!(
+        "  baseline init [--root .] [--out policy/unsafe-review-baseline.toml] [--review-after YYYY-MM-DD]"
+    );
+    println!(
+        "  baseline add --card-id <UR-...-cN> --owner <name> --reason <text> --evidence <text> [--root .] [--review-after YYYY-MM-DD] [--out policy/unsafe-review-baseline.toml]"
+    );
     println!(
         "  confirm <card-id> --dry-run|--allow-heavy [--author <owner>] [--root .] [--base origin/main|--diff file] [--expires-at <date>] [--timeout-seconds 600] [--command <override>] [--out file]  (executes the routed witness command only with --allow-heavy; never default; --dry-run previews without executing)"
     );

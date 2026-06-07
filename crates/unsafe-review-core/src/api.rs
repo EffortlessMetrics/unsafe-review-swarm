@@ -413,6 +413,247 @@ pub fn collect_context_range(
     )
 }
 
+/// Result returned by `baseline_init` summarizing what was captured.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BaselineInitResult {
+    /// Number of open actionable cards captured as baseline entries.
+    pub captured: usize,
+    /// Whether the baseline ledger file already existed before this run.
+    pub ledger_existed: bool,
+    /// Path to the baseline ledger written.
+    pub ledger_path: PathBuf,
+    /// Path to the coverage snapshot written.
+    pub snapshot_path: PathBuf,
+}
+
+/// `baseline init` (SPEC-0030): scan the repo for open actionable cards, capture each
+/// card's identity and coverage state, and write both the baseline ledger and the coverage
+/// snapshot.  Idempotent — re-running overwrites with a fresh snapshot of the current state.
+///
+/// The honest default `reason` and `review_after` are set to record pre-existing debt only;
+/// no card is marked safe, reviewed, or UB-free.
+///
+/// `review_after` defaults to one year from today's date.
+pub fn baseline_init(
+    root: &Path,
+    out: Option<&Path>,
+    review_after: Option<&str>,
+) -> Result<BaselineInitResult, String> {
+    use crate::domain::coverage::CoverageBlock;
+    use crate::policy::{
+        LedgerEntry, SnapshotCoverage, merge_and_write_baseline_ledger, write_coverage_snapshot,
+    };
+    use std::collections::BTreeMap;
+
+    let ledger_path = out
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| root.join("policy/unsafe-review-baseline.toml"));
+    let snapshot_path = root.join(crate::policy::SNAPSHOT_PATH);
+    let ledger_existed = ledger_path.is_file();
+
+    // Run a full repo scan to get all current cards.
+    let output = pipeline::analyze(AnalyzeInput {
+        root: root.to_path_buf(),
+        scope: Scope::Repo,
+        diff: DiffSource::NoneRepoScan,
+        mode: AnalysisMode::Repo,
+        policy: PolicyMode::Advisory,
+        include_unchanged_tests: true,
+        max_cards: None,
+    })?;
+
+    // Determine review_after date (required by ledger validator).
+    let review_after = review_after
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(default_review_after_date);
+
+    // Collect open actionable cards.
+    let mut ledger_entries: Vec<LedgerEntry> = Vec::new();
+    let mut snapshot_entries: BTreeMap<String, SnapshotCoverage> = BTreeMap::new();
+
+    for card in &output.cards {
+        if card.class.is_actionable() {
+            ledger_entries.push(LedgerEntry {
+                card_id: card.id.0.clone(),
+                owner: "baseline-init".to_string(),
+                reason: "captured by `baseline init`; pre-existing debt, not reviewed as safe"
+                    .to_string(),
+                evidence: "baseline-init capture".to_string(),
+                review_after: Some(review_after.clone()),
+                expires: None,
+            });
+            let block = CoverageBlock::derive(card);
+            snapshot_entries.insert(
+                card.id.0.clone(),
+                SnapshotCoverage {
+                    contract_coverage: block.contract_coverage.as_str().to_string(),
+                    guard_coverage: block.guard_coverage.as_str().to_string(),
+                    test_reach_coverage: block.test_reach_coverage.as_str().to_string(),
+                    witness_receipt_coverage: block.witness_receipt_coverage.as_str().to_string(),
+                },
+            );
+        }
+    }
+
+    let captured = ledger_entries.len();
+    merge_and_write_baseline_ledger(&ledger_path, &ledger_entries)?;
+    write_coverage_snapshot(&snapshot_path, &snapshot_entries)?;
+
+    Ok(BaselineInitResult {
+        captured,
+        ledger_existed,
+        ledger_path,
+        snapshot_path,
+    })
+}
+
+/// `baseline add` (SPEC-0030): add or update a single baseline entry (plus its snapshot state)
+/// by re-analyzing the repo, finding the card matching `card_id`, and recording its current
+/// coverage state.
+///
+/// Returns `Err` if the card cannot be found in the current scan.
+pub fn baseline_add(
+    root: &Path,
+    card_id: &str,
+    owner: &str,
+    reason: &str,
+    evidence: &str,
+    review_after: Option<&str>,
+    out: Option<&Path>,
+) -> Result<(), String> {
+    use crate::domain::coverage::CoverageBlock;
+    use crate::policy::{
+        LedgerEntry, SnapshotCoverage, load_coverage_snapshot, merge_and_write_baseline_ledger,
+        write_coverage_snapshot,
+    };
+    use std::collections::BTreeMap;
+
+    let ledger_path = out
+        .map(Path::to_path_buf)
+        .unwrap_or_else(|| root.join("policy/unsafe-review-baseline.toml"));
+    let snapshot_path = root.join(crate::policy::SNAPSHOT_PATH);
+
+    // Run a full repo scan.
+    let output = pipeline::analyze(AnalyzeInput {
+        root: root.to_path_buf(),
+        scope: Scope::Repo,
+        diff: DiffSource::NoneRepoScan,
+        mode: AnalysisMode::Repo,
+        policy: PolicyMode::Advisory,
+        include_unchanged_tests: true,
+        max_cards: None,
+    })?;
+
+    // Find the specific card.
+    let card = output
+        .cards
+        .iter()
+        .find(|card| card.id.0 == card_id)
+        .ok_or_else(|| format!("card `{card_id}` not found in current repo scan"))?;
+
+    let review_after = review_after
+        .map(ToOwned::to_owned)
+        .unwrap_or_else(default_review_after_date);
+
+    let entry = LedgerEntry {
+        card_id: card_id.to_string(),
+        owner: owner.to_string(),
+        reason: reason.to_string(),
+        evidence: evidence.to_string(),
+        review_after: Some(review_after),
+        expires: None,
+    };
+
+    // Update the snapshot.
+    let mut snapshot = load_coverage_snapshot(&snapshot_path)?;
+    let block = CoverageBlock::derive(card);
+    snapshot.insert(
+        card_id.to_string(),
+        SnapshotCoverage {
+            contract_coverage: block.contract_coverage.as_str().to_string(),
+            guard_coverage: block.guard_coverage.as_str().to_string(),
+            test_reach_coverage: block.test_reach_coverage.as_str().to_string(),
+            witness_receipt_coverage: block.witness_receipt_coverage.as_str().to_string(),
+        },
+    );
+
+    // Sort snapshot to BTreeMap (already sorted).
+    let sorted_snapshot: BTreeMap<String, SnapshotCoverage> = snapshot.into_iter().collect();
+
+    merge_and_write_baseline_ledger(&ledger_path, &[entry])?;
+    write_coverage_snapshot(&snapshot_path, &sorted_snapshot)?;
+
+    Ok(())
+}
+
+/// Default `review_after` date: one year from today (ISO 8601 YYYY-MM-DD).
+fn default_review_after_date() -> String {
+    // Use a fixed date offset from June 2026 (the current date per context).
+    // We can't use std::time for date arithmetic without chrono, so we hardcode
+    // a safe one-year increment from a known epoch base.
+    // This is called only in baseline authoring, not in analysis; precision is not critical.
+    compute_review_after_date()
+}
+
+fn compute_review_after_date() -> String {
+    // Use SystemTime to get the current date offset by ~365 days.
+    use std::time::{SystemTime, UNIX_EPOCH};
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    // Approximate: add 365 days worth of seconds.
+    let future_secs = secs + 365 * 24 * 3600;
+    // Convert to a YYYY-MM-DD string using a simple algorithm.
+    unix_secs_to_iso_date(future_secs)
+}
+
+fn unix_secs_to_iso_date(secs: u64) -> String {
+    // Days since Unix epoch.
+    let days = secs / 86400;
+    // Gregorian calendar calculation.
+    let mut remaining_days = days;
+    let mut year = 1970u32;
+    loop {
+        let days_in_year = if is_leap_year(year) { 366 } else { 365 };
+        if remaining_days < days_in_year {
+            break;
+        }
+        remaining_days -= days_in_year;
+        year += 1;
+    }
+    let mut month = 1u32;
+    loop {
+        let days_in_month = days_in_month(year, month);
+        if remaining_days < days_in_month {
+            break;
+        }
+        remaining_days -= days_in_month;
+        month += 1;
+    }
+    let day = remaining_days + 1;
+    format!("{year:04}-{month:02}-{day:02}")
+}
+
+fn is_leap_year(year: u32) -> bool {
+    year.is_multiple_of(400) || (year.is_multiple_of(4) && !year.is_multiple_of(100))
+}
+
+fn days_in_month(year: u32, month: u32) -> u64 {
+    match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 => {
+            if is_leap_year(year) {
+                29
+            } else {
+                28
+            }
+        }
+        _ => 30,
+    }
+}
+
 pub use outcome::OutcomeReport;
 pub use policy_report::PolicyReport;
 pub use receipts::ReceiptAuditReport;
