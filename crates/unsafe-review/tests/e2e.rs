@@ -994,6 +994,94 @@ fn manual_candidate_import_explain_context_and_witness_plan_preserve_manual_mark
 }
 
 #[test]
+fn candidate_import_rejects_malformed_packet_and_preserves_source_manual_on_valid()
+-> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-candidate-import-reject-e2e")?;
+
+    // Invalid JSON is rejected with a parse error.
+    let not_json = temp.path().join("not-json.json");
+    fs::write(&not_json, b"not json")?;
+    let bad_parse = run_failure([
+        os("candidate"),
+        os("import"),
+        not_json.as_os_str().to_os_string(),
+    ])?;
+    let bad_parse_stderr = String::from_utf8_lossy(&bad_parse.stderr).to_string();
+    assert!(
+        bad_parse_stderr.contains("parse manual candidate"),
+        "import should report parse error: {bad_parse_stderr}"
+    );
+    assert_eq!(
+        bad_parse.status.code(),
+        Some(2),
+        "import should exit 2 on malformed input"
+    );
+
+    // Wrong schema_version is rejected naming the field.
+    let wrong_schema = temp.path().join("wrong-schema.json");
+    fs::write(
+        &wrong_schema,
+        br#"{
+          "schema_version": "manual-candidate/v0",
+          "id": "R4R2-S001",
+          "title": "t",
+          "location": {"file": "f.rs", "line": 1},
+          "operation_family": "raw_pointer_read",
+          "unsafe_operation": "op",
+          "invariant": "inv",
+          "safe_caller": "caller",
+          "evidence": [],
+          "trust_boundary": "manual candidate; not analyzer-discovered; not witness execution; not proof of memory safety; not UB-free status; not Miri-clean status; not site-execution proof; not policy readiness"
+        }"#,
+    )?;
+    let bad_schema = run_failure([
+        os("candidate"),
+        os("import"),
+        wrong_schema.as_os_str().to_os_string(),
+    ])?;
+    let bad_schema_stderr = String::from_utf8_lossy(&bad_schema.stderr).to_string();
+    assert!(
+        bad_schema_stderr.contains("schema_version"),
+        "import should name schema_version on version mismatch: {bad_schema_stderr}"
+    );
+
+    // A valid committed example is accepted with source = manual and
+    // analyzer_discovered = false enforced by the importer.
+    let out = temp.path().join("R4R2-S001.json");
+    let import = run_success([
+        os("candidate"),
+        os("import"),
+        manual_candidate_example_path().into_os_string(),
+        os("--out"),
+        out.as_os_str().to_os_string(),
+    ])?;
+    let import_stdout = stdout_text(&import)?;
+    assert!(
+        import_stdout.contains("source: manual"),
+        "import stdout should confirm source=manual: {import_stdout}"
+    );
+    assert!(
+        import_stdout.contains("manual_candidate: true"),
+        "import stdout should confirm manual_candidate: {import_stdout}"
+    );
+    let canonical: serde_json::Value = serde_json::from_str(&fs::read_to_string(&out)?)?;
+    assert_eq!(
+        canonical["source"], "manual",
+        "canonical artifact must have source=manual"
+    );
+    assert_eq!(
+        canonical["manual_candidate"], true,
+        "canonical artifact must have manual_candidate=true"
+    );
+    assert_eq!(
+        canonical["analyzer_discovered"], false,
+        "canonical artifact must have analyzer_discovered=false"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn candidate_new_skeleton_is_schema_correct_but_fails_lint_on_todos() -> Result<(), Box<dyn Error>>
 {
     let temp = TempDir::new("unsafe-review-candidate-new-e2e")?;
