@@ -226,9 +226,11 @@ jobs:
         id: ubreview
         if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false }}
         continue-on-error: true
-        # Pinned to the v0.1 commit SHA (immutable) so a re-tag cannot silently
+        # Pinned to the structured-ingestion commit SHA (immutable) so a re-tag cannot silently
         # change unsafe-review's gate. Bump deliberately; keep the allowlist in sync.
-        uses: EffortlessMetrics/ub-review@e1e41124e0468b3714827fd32574c8c583803b72
+        # SHA 4053bc0df7cd5918f8c6f80ceb3f714a572789d7 — #363 structured gate.json ingestion
+        # (routes by schema, no markdown scraping) + #365 inline path:line review comments.
+        uses: EffortlessMetrics/ub-review@4053bc0df7cd5918f8c6f80ceb3f714a572789d7
         with:
           preset: bun-ub
           mode: intelligent-ci
