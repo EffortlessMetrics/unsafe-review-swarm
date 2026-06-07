@@ -1,147 +1,147 @@
 [
   {
+    "id": "UR-ffi-libc-call-sanitizer-route-src-lib-rs-len-ffi_call-ffi-strlen-b8e01df867a9-ffi_abi-c1",
     "class": "miri_unsupported",
+    "priority": "medium",
     "confidence": "medium",
-    "confirmation_cue": {
-      "build_this_first": {
-        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test len",
-        "kind": "verify_command",
-        "route_kind": "asan",
-        "summary": "Build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test len` first for this card; attach a matching receipt only if it confirms the route"
-      },
-      "confirmation_state": "pending",
-      "confirmation_step": "build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test len` first, then attach a matching receipt if it confirms the route",
-      "hypothesis_to_confirm": "static `miri_unsupported` ReviewCard for `unsafe { libc::strlen(ptr) }`; confirm with external evidence before treating it as observed runtime behavior",
-      "minimal_repro": {
-        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test len",
-        "kind": "verify_command",
-        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety.",
-        "route_kind": "asan",
-        "steps": [
-          "Confirm ReviewCard `UR-ffi-libc-call-sanitizer-route-src-lib-rs-len-ffi_call-ffi-strlen-b8e01df867a9-ffi_abi-c1` still maps to `unsafe { libc::strlen(ptr) }` at `src/lib.rs:3:5` before upgrading confidence.",
-          "Build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test len` as the smallest available command for this card.",
-          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
-        ]
-      },
-      "runtime_executed": false,
-      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    "proof_path": "observable_red_green",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 3,
+      "column": 5,
+      "kind": "ffi_call",
+      "owner": "len",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { libc::strlen(ptr) }"
     },
-    "contract": "Nearby `SAFETY:` comment was detected",
-    "coverage": {
-      "agent_lsp_readiness": "needs_human",
-      "baseline_state": "unknown",
-      "comment_plan_status": "not_eligible",
-      "contract_coverage": "present",
-      "guard_coverage": "missing",
-      "manual_context": "absent",
-      "outcome_movement": "unknown",
-      "test_reach_coverage": "missing",
-      "witness_receipt_coverage": "missing"
-    },
-    "discharge": "No visible local guard detected",
+    "operation": "unsafe { libc::strlen(ptr) }",
+    "operation_family": "ffi",
     "hazards": [
       "ffi_abi",
       "ffi_ownership"
-    ],
-    "id": "UR-ffi-libc-call-sanitizer-route-src-lib-rs-len-ffi_call-ffi-strlen-b8e01df867a9-ffi_abi-c1",
-    "missing": [
-      "Missing visible local guard for inferred safety obligations",
-      "No witness receipt imported for this card"
-    ],
-    "next_action": "Use sanitizer/cargo-careful or an explicit FFI boundary contract; Miri may not exercise this seam.",
-    "obligation_evidence": [
-      {
-        "contract": {
-          "present": true,
-          "state": "present",
-          "summary": "Nearby `SAFETY:` comment was detected"
-        },
-        "description": "foreign declaration matches ABI and layout on both sides",
-        "discharge": {
-          "present": false,
-          "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
-        },
-        "key": "abi",
-        "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `len`"
-        },
-        "witness": {
-          "present": false,
-          "state": "missing",
-          "summary": "No imported witness receipt was found"
-        }
-      },
-      {
-        "contract": {
-          "present": true,
-          "state": "present",
-          "summary": "Nearby `SAFETY:` comment was detected"
-        },
-        "description": "ownership, lifetime, and nullability contract is explicit",
-        "discharge": {
-          "present": false,
-          "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
-        },
-        "key": "ownership",
-        "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `len`"
-        },
-        "witness": {
-          "present": false,
-          "state": "missing",
-          "summary": "No imported witness receipt was found"
-        }
-      }
     ],
     "obligations": [
       "foreign declaration matches ABI and layout on both sides",
       "ownership, lifetime, and nullability contract is explicit"
     ],
-    "operation": "unsafe { libc::strlen(ptr) }",
-    "operation_family": "ffi",
-    "priority": "medium",
-    "proof_path": "observable_red_green",
+    "obligation_evidence": [
+      {
+        "key": "abi",
+        "description": "foreign declaration matches ABI and layout on both sides",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `len`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "ownership",
+        "description": "ownership, lifetime, and nullability contract is explicit",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `len`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "No visible local guard detected",
     "reach": "1 related test file(s) mention owner `len`",
-    "site": {
-      "column": 5,
-      "file": "src/lib.rs",
-      "kind": "ffi_call",
-      "line": 3,
-      "owner": "len",
-      "public_api_surface": false,
-      "snippet": "unsafe { libc::strlen(ptr) }",
-      "visibility": "private"
-    },
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "asan",
+        "reason": "FFI boundary detected; sanitizer/cargo-careful is usually more suitable than Miri for foreign calls",
+        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test len",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful can cheaply exercise Rust-side FFI boundary assumptions when a focused test exists",
+        "command": "cargo +nightly careful test len",
+        "required": false
+      },
+      {
+        "kind": "human-deep-review",
+        "reason": "Reviewed FFI ABI and ownership seams can be recorded with a human deep-review receipt when executable witnesses cannot cross the foreign boundary",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Use sanitizer/cargo-careful or an explicit FFI boundary contract; Miri may not exercise this seam.",
     "verify_commands": [
       "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test len",
       "cargo +nightly careful test len"
     ],
-    "witness": "No imported witness receipt was found",
-    "witness_routes": [
-      {
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `miri_unsupported` ReviewCard for `unsafe { libc::strlen(ptr) }`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
         "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test len",
-        "kind": "asan",
-        "reason": "FFI boundary detected; sanitizer/cargo-careful is usually more suitable than Miri for foreign calls",
-        "required": false
+        "route_kind": "asan",
+        "summary": "Build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test len` first for this card; attach a matching receipt only if it confirms the route"
       },
-      {
-        "command": "cargo +nightly careful test len",
-        "kind": "cargo-careful",
-        "reason": "cargo-careful can cheaply exercise Rust-side FFI boundary assumptions when a focused test exists",
-        "required": false
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test len",
+        "route_kind": "asan",
+        "steps": [
+          "Confirm ReviewCard `UR-ffi-libc-call-sanitizer-route-src-lib-rs-len-ffi_call-ffi-strlen-b8e01df867a9-ffi_abi-c1` still maps to `unsafe { libc::strlen(ptr) }` at `src/lib.rs:3:5` before upgrading confidence.",
+          "Build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test len` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
       },
-      {
-        "command": null,
-        "kind": "human-deep-review",
-        "reason": "Reviewed FFI ABI and ownership seams can be recorded with a human deep-review receipt when executable witnesses cannot cross the foreign boundary",
-        "required": false
-      }
-    ]
+      "confirmation_step": "build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test len` first, then attach a matching receipt if it confirms the route",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "present",
+      "guard_coverage": "missing",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "unknown",
+      "outcome_movement": "unknown",
+      "comment_plan_status": "not_eligible",
+      "agent_lsp_readiness": "needs_human"
+    }
   }
 ]

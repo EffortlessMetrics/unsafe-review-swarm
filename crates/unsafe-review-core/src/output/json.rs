@@ -1035,12 +1035,12 @@ mod tests {
         }
         for fixture in FIXTURE_GOLDENS {
             let output = fixture_output(fixture)?;
-            let rendered = parse_json(&render(&output))?;
-            let Some(cards) = rendered.get("cards") else {
-                return Err(format!("{fixture} JSON output is missing `cards`"));
-            };
+            // Serialize the typed Vec<JsonCard> directly so that serde emits
+            // keys in struct-field order (not alphabetically as serde_json::Value
+            // would after a round-trip through BTreeMap).
+            let cards: Vec<JsonCard<'_>> = output.cards.iter().map(JsonCard::from).collect();
             let path = fixture_root(fixture).join("expected.cards.json");
-            let mut text = serde_json::to_string_pretty(cards)
+            let mut text = serde_json::to_string_pretty(&cards)
                 .map_err(|err| format!("serialize {fixture} cards failed: {err}"))?;
             text.push('\n');
             // Ensure LF line endings (the repo is LF-only).

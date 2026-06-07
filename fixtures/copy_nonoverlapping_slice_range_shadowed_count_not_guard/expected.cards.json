@@ -1,69 +1,45 @@
 [
   {
+    "id": "UR-copy-nonoverlapping-slice-range-shadowed-count-not-guard-fixture-src-lib-rs-copy-checked-operation-copy_nonoverlapping-copy-nonoverlapping-3b394b24b2ef-pointer_validity-c1",
     "class": "guard_missing",
+    "priority": "high",
     "confidence": "medium",
-    "confirmation_cue": {
-      "build_this_first": {
-        "command": "cargo +nightly miri test copy_checked",
-        "kind": "verify_command",
-        "route_kind": "miri",
-        "summary": "Build/run `cargo +nightly miri test copy_checked` first for this card; attach a matching receipt only if it confirms the route"
-      },
-      "confirmation_state": "pending",
-      "confirmation_step": "build/run `cargo +nightly miri test copy_checked` first, then attach a matching receipt if it confirms the route",
-      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe { core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count) }`; confirm with external evidence before treating it as observed runtime behavior",
-      "minimal_repro": {
-        "command": "cargo +nightly miri test copy_checked",
-        "kind": "verify_command",
-        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety.",
-        "route_kind": "miri",
-        "steps": [
-          "Confirm ReviewCard `UR-copy-nonoverlapping-slice-range-shadowed-count-not-guard-fixture-src-lib-rs-copy-checked-operation-copy_nonoverlapping-copy-nonoverlapping-3b394b24b2ef-pointer_validity-c1` still maps to `unsafe { core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count) }` at `src/lib.rs:6:5` before upgrading confidence.",
-          "Build/run `cargo +nightly miri test copy_checked` as the smallest available command for this card.",
-          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
-        ]
-      },
-      "runtime_executed": false,
-      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    "proof_path": "source_route_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 6,
+      "column": 5,
+      "kind": "operation",
+      "owner": "copy_checked",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count) }"
     },
-    "contract": "Nearby `SAFETY:` comment was detected",
-    "coverage": {
-      "agent_lsp_readiness": "ready",
-      "baseline_state": "unknown",
-      "comment_plan_status": "not_eligible",
-      "contract_coverage": "present",
-      "guard_coverage": "missing",
-      "manual_context": "absent",
-      "outcome_movement": "unknown",
-      "test_reach_coverage": "missing",
-      "witness_receipt_coverage": "missing"
-    },
-    "discharge": "No visible local guard detected",
+    "operation": "unsafe { core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count) }",
+    "operation_family": "copy_nonoverlapping",
     "hazards": [
       "pointer_validity",
       "bounds",
       "aliasing_or_provenance"
     ],
-    "id": "UR-copy-nonoverlapping-slice-range-shadowed-count-not-guard-fixture-src-lib-rs-copy-checked-operation-copy_nonoverlapping-copy-nonoverlapping-3b394b24b2ef-pointer_validity-c1",
-    "missing": [
-      "Missing visible local guard for inferred safety obligations",
-      "No witness receipt imported for this card"
+    "obligations": [
+      "source and destination do not overlap",
+      "both ranges are valid for count elements"
     ],
-    "next_action": "Add or expose the local guard that discharges the `copy_nonoverlapping` safety obligation.",
     "obligation_evidence": [
       {
+        "key": "non-overlap",
+        "description": "source and destination do not overlap",
         "contract": {
           "present": true,
           "state": "present",
           "summary": "Nearby `SAFETY:` comment was detected"
         },
-        "description": "source and destination do not overlap",
         "discharge": {
           "present": false,
           "state": "missing",
           "summary": "No obligation-specific guard code was detected"
         },
-        "key": "non-overlap",
         "reach": {
           "present": true,
           "state": "present",
@@ -76,18 +52,18 @@
         }
       },
       {
+        "key": "valid-range",
+        "description": "both ranges are valid for count elements",
         "contract": {
           "present": true,
           "state": "present",
           "summary": "Nearby `SAFETY:` comment was detected"
         },
-        "description": "both ranges are valid for count elements",
         "discharge": {
           "present": false,
           "state": "missing",
           "summary": "No length or bounds guard code was detected"
         },
-        "key": "valid-range",
         "reach": {
           "present": true,
           "state": "present",
@@ -100,43 +76,67 @@
         }
       }
     ],
-    "obligations": [
-      "source and destination do not overlap",
-      "both ranges are valid for count elements"
-    ],
-    "operation": "unsafe { core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count) }",
-    "operation_family": "copy_nonoverlapping",
-    "priority": "high",
-    "proof_path": "source_route_only",
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "No visible local guard detected",
     "reach": "1 related test file(s) mention owner `copy_checked`",
-    "site": {
-      "column": 5,
-      "file": "src/lib.rs",
-      "kind": "operation",
-      "line": 6,
-      "owner": "copy_checked",
-      "public_api_surface": false,
-      "snippet": "unsafe { core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count) }",
-      "visibility": "private"
-    },
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test copy_checked",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test copy_checked",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose the local guard that discharges the `copy_nonoverlapping` safety obligation.",
     "verify_commands": [
       "cargo +nightly miri test copy_checked",
       "cargo +nightly careful test copy_checked"
     ],
-    "witness": "No imported witness receipt was found",
-    "witness_routes": [
-      {
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe { core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count) }`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
         "command": "cargo +nightly miri test copy_checked",
-        "kind": "miri",
-        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
-        "required": false
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test copy_checked` first for this card; attach a matching receipt only if it confirms the route"
       },
-      {
-        "command": "cargo +nightly careful test copy_checked",
-        "kind": "cargo-careful",
-        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
-        "required": false
-      }
-    ]
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test copy_checked",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-copy-nonoverlapping-slice-range-shadowed-count-not-guard-fixture-src-lib-rs-copy-checked-operation-copy_nonoverlapping-copy-nonoverlapping-3b394b24b2ef-pointer_validity-c1` still maps to `unsafe { core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count) }` at `src/lib.rs:6:5` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test copy_checked` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo +nightly miri test copy_checked` first, then attach a matching receipt if it confirms the route",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "present",
+      "guard_coverage": "missing",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "unknown",
+      "outcome_movement": "unknown",
+      "comment_plan_status": "not_eligible",
+      "agent_lsp_readiness": "ready"
+    }
   }
 ]
