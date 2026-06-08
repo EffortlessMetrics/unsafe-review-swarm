@@ -4448,6 +4448,9 @@ fn repo_progress_writes_status_sidecar_for_out_reports() -> Result<(), Box<dyn E
     assert_eq!(status["scan_scope"]["large_repo_ignores"], true);
     assert_eq!(status["scan_scope"]["max_files"], 5);
     assert_eq!(status["completed"], true);
+    assert_eq!(status["partial"], false);
+    assert_eq!(status["stop_reason"], "none");
+    assert_eq!(status["cap"], Value::Null);
     assert_eq!(status["files_discovered"], 1);
     assert_eq!(status["files_scanned"], 1);
     assert_eq!(status["files_remaining"], 0);
@@ -4501,6 +4504,9 @@ fn repo_output_failure_keeps_partial_and_marks_status_incomplete() -> Result<(),
     assert_eq!(status["phase"], "failed");
     assert_default_repo_status_scope(&status, &fixture, 0)?;
     assert_eq!(status["completed"], false);
+    assert_eq!(status["partial"], true);
+    assert_eq!(status["stop_reason"], "timeout");
+    assert_eq!(status["cap"], Value::Null);
     assert_eq!(status["files_discovered"], 1);
     assert_eq!(status["files_scanned"], 1);
     assert_eq!(status["cards_found"], 1);
@@ -4574,6 +4580,9 @@ fn repo_analysis_failure_keeps_completed_file_partial_snapshot() -> Result<(), B
     assert_eq!(status["phase"], "failed");
     assert_default_repo_status_scope(&status, &scan_root, 1)?;
     assert_eq!(status["completed"], false);
+    assert_eq!(status["partial"], true);
+    assert_eq!(status["stop_reason"], "timeout");
+    assert_eq!(status["cap"], Value::Null);
     assert_eq!(status["files_discovered"], 2);
     assert_eq!(status["files_scanned"], 1);
     assert_eq!(status["cards_found"], 1);
@@ -4663,6 +4672,9 @@ fn repo_timeout_keeps_completed_file_partial_snapshot() -> Result<(), Box<dyn Er
     assert_eq!(status["phase"], "failed");
     assert_default_repo_status_scope(&status, &scan_root, 1)?;
     assert_eq!(status["completed"], false);
+    assert_eq!(status["partial"], true);
+    assert_eq!(status["stop_reason"], "timeout");
+    assert_eq!(status["cap"], Value::Null);
     assert_eq!(status["files_discovered"], 2);
     assert_eq!(status["files_scanned"], 1);
     assert_eq!(status["cards_found"], 1);
@@ -4741,6 +4753,9 @@ fn repo_sigterm_writes_interrupted_status_sidecar() -> Result<(), Box<dyn Error>
     assert_eq!(status["phase"], "terminated");
     assert_default_repo_status_scope(&status, &fixture, 0)?;
     assert_eq!(status["completed"], false);
+    assert_eq!(status["partial"], true);
+    assert_eq!(status["stop_reason"], "terminated");
+    assert_eq!(status["cap"], Value::Null);
     assert_eq!(status["signal"], "SIGTERM");
     assert!(
         status["error"]
@@ -4826,6 +4841,9 @@ fn repo_sigterm_keeps_completed_file_partial_report() -> Result<(), Box<dyn Erro
     assert_eq!(status["phase"], "terminated");
     assert_default_repo_status_scope(&status, &scan_root, 1)?;
     assert_eq!(status["completed"], false);
+    assert_eq!(status["partial"], true);
+    assert_eq!(status["stop_reason"], "terminated");
+    assert_eq!(status["cap"], Value::Null);
     assert_eq!(status["signal"], "SIGTERM");
     assert_eq!(status["files_discovered"], 2);
     assert_eq!(status["files_scanned"], 1);
@@ -6320,6 +6338,122 @@ fn assert_manual_candidate_witness_follow_up(text: &str) {
     );
     assert!(trust_index.is_some(), "trust boundary section should exist");
     assert!(witness_index < trust_index);
+}
+
+#[test]
+fn repo_max_cards_cap_emits_partial_status_sidecar() -> Result<(), Box<dyn Error>> {
+    // Build a temp crate with >=2 unsafe sites so max-cards=1 stops early.
+    let temp = TempDir::new("unsafe-review-repo-maxcards-e2e")?;
+    let scan_root = temp.path().join("fixture");
+    fs::create_dir_all(scan_root.join("src"))?;
+    fs::write(
+        scan_root.join("Cargo.toml"),
+        "[package]\nname = \"maxcards-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+    )?;
+    // Two unsafe files — cap of 1 guarantees the scan stops after the first card.
+    fs::write(
+        scan_root.join("src/lib.rs"),
+        "pub unsafe fn alpha(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+    )?;
+    fs::write(
+        scan_root.join("src/beta.rs"),
+        "pub unsafe fn beta(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+    )?;
+
+    let report_path = temp.path().join("repo.json");
+    let status_path = temp.path().join("repo.json.status.json");
+    let partial_path = temp.path().join("repo.json.partial");
+
+    // A capped scan is NOT an error — exit code must be success.
+    let output = run_success([
+        os("repo"),
+        os("--root"),
+        scan_root.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+        os("--out"),
+        report_path.as_os_str().to_os_string(),
+        os("--max-cards"),
+        os("1"),
+    ])?;
+
+    assert_eq!(stdout_text(&output)?.trim(), "");
+
+    // The final report is written (a capped scan still promotes the capped result).
+    assert!(
+        report_path.exists(),
+        "capped repo scan should write a final report"
+    );
+    // The partial file is promoted away after success.
+    assert!(
+        !partial_path.exists(),
+        "capped scan should promote the partial file and remove it"
+    );
+
+    // Status sidecar must exist and carry the partial/cap markers.
+    assert!(
+        status_path.exists(),
+        "capped repo scan should write a status sidecar"
+    );
+    let status = parse_json(&fs::read_to_string(&status_path)?)?;
+    assert_eq!(status["schema_version"], "repo-scan-status/v1");
+    assert_eq!(
+        status["phase"], "complete",
+        "capped scan phase should still be 'complete'"
+    );
+    assert_eq!(
+        status["completed"], false,
+        "capped scan completed must be false"
+    );
+    assert_eq!(
+        status["partial"], true,
+        "capped scan must mark partial=true"
+    );
+    assert_eq!(
+        status["stop_reason"], "max_cards",
+        "capped scan must carry stop_reason=max_cards"
+    );
+    assert_eq!(
+        status["cap"], 1,
+        "capped scan must record the configured cap"
+    );
+    assert_eq!(
+        status["cards_found"], 1,
+        "capped scan cards_found must equal the emitted card count"
+    );
+    assert!(status["error"].is_null(), "capped scan must not set error");
+    assert!(
+        status["signal"].is_null(),
+        "capped scan must not set signal"
+    );
+    assert!(
+        status["partial_path"].is_null(),
+        "capped scan must not set partial_path (the final report is the capped artifact)"
+    );
+
+    // Operator block: state=capped, next_action mentions include/exclude or max-cards.
+    let operator = status
+        .get("operator")
+        .ok_or("repo status missing operator")?;
+    assert_eq!(operator["state"], "capped");
+    assert_eq!(operator["partial_report_available"], false);
+    let next_action = operator["next_action"].as_str().unwrap_or("");
+    assert!(
+        next_action.contains("include/exclude") || next_action.contains("max-cards"),
+        "operator next_action should guide narrowing scope or raising cap: {next_action}"
+    );
+    let limitation = operator["partial_report_limitation"].as_str().unwrap_or("");
+    assert!(
+        limitation.contains("Completed-file snapshot only"),
+        "operator limitation should say partial snapshot scope: {limitation}"
+    );
+    let boundary = operator["claim_boundary"].as_str().unwrap_or("");
+    assert!(
+        boundary.contains("not complete repo posture"),
+        "operator claim_boundary must carry partial posture wording: {boundary}"
+    );
+
+    Ok(())
 }
 
 fn assert_default_repo_status_scope(

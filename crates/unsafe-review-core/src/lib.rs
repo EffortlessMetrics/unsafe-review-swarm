@@ -16,8 +16,8 @@ mod util;
 pub use api::{
     AnalysisMode, AnalyzeInput, AnalyzeOutput, BaselineInitResult, DiffSource, DiscoveryOptions,
     OutcomeReport, PolicyMode, PolicyReport, Provenance, ReceiptAuditReport, RepoScanEvent,
-    RepoScanPhase, RepoScanStatus, ReviewCardConfirmationProjection, Scope, analyze,
-    analyze_with_discovery, analyze_with_discovery_and_progress,
+    RepoScanPhase, RepoScanStatus, RepoStopReason, ReviewCardConfirmationProjection, Scope,
+    analyze, analyze_with_discovery, analyze_with_discovery_and_progress,
     analyze_with_discovery_and_repo_events, audit_witness_receipts, baseline_add, baseline_init,
     collect_context, collect_context_range, compare_outcome_json, discover_repo_files,
     evaluate_policy_report, evaluate_policy_report_from_output, explain_card, project_editor,

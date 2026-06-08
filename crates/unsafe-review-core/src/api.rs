@@ -74,6 +74,34 @@ impl RepoScanPhase {
     }
 }
 
+/// Why a repo scan stopped short of scanning every discovered file.
+///
+/// A `Complete` scan has `stop_reason: None` (or equivalently `"none"`
+/// in the JSON sidecar).  Every other variant indicates a bounded-but-partial
+/// run; `completed` stays `false` for all partial variants.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RepoStopReason {
+    /// Scan ran to completion — every in-scope file was read.
+    None,
+    /// `--max-cards N` was reached; scanning stopped after `N` cards were emitted.
+    MaxCards,
+    /// `--timeout-seconds N` elapsed while the scan was in progress.
+    Timeout,
+    /// A unix signal (SIGTERM / SIGINT) interrupted the scan.
+    Terminated,
+}
+
+impl RepoStopReason {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::MaxCards => "max_cards",
+            Self::Timeout => "timeout",
+            Self::Terminated => "terminated",
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RepoScanStatus {
     pub schema_version: String,
@@ -84,6 +112,14 @@ pub struct RepoScanStatus {
     pub cards_found: usize,
     pub last_path: Option<PathBuf>,
     pub completed: bool,
+    /// Whether this is a partial (bounded) scan result.
+    /// `true` for max-cards, timeout, and signal-terminated scans.
+    pub partial: bool,
+    /// The reason the scan stopped.  `None` for a complete scan, or one of the
+    /// named stop reasons for a bounded/interrupted scan.
+    pub stop_reason: RepoStopReason,
+    /// The configured card cap when `stop_reason == MaxCards`; `None` otherwise.
+    pub cap: Option<usize>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]

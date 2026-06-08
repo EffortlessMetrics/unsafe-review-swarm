@@ -13,6 +13,29 @@ comments, edit source, or block by default.
 
 ### Added
 
+- `repo --max-cards N` capped scans now emit a partial status sidecar with
+  `partial: true`, `stop_reason: "max_cards"`, `cap: N`, `cards_found: N`, and
+  a cap-specific `operator.next_action` ("narrow include/exclude filters or raise
+  --max-cards…").  A capped scan exits 0 — it is a successful-but-bounded run, not
+  a failure.  Previously a capped scan emitted an unconditional `phase: "complete"`
+  + `completed: true` sidecar, making truncated scans indistinguishable from
+  complete ones.  All stop reasons now emit a `stop_reason` field: `"none"` for
+  a full complete scan, `"max_cards"` for a cap-stopped scan, `"timeout"` for a
+  timed-out scan, and `"terminated"` for a signal-interrupted scan.  A `partial`
+  boolean accompanies the field (`false` only for `stop_reason: "none"`).
+  ([#1545](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1545))
+
+- SPEC-0035 (`repo-scan-status/v1` diagnosability) field names corrected to match
+  the shipped JSON sidecar: `scan_scope` (not `scope`), `elapsed_ms` (not
+  `elapsed_seconds`), `files_discovered`/`files_scanned`/`files_remaining` (not
+  `discovered`/`scanned`/`remaining`), `cards_found` (not `cards`), `completed`,
+  `partial`, `stop_reason`, `cap`, `error`, `signal`, `partial_path`, `operator`.
+  Phase vocabulary corrected to match shipped code: `discovering | scanning |
+  complete | failed | terminated` (the spec previously declared `rendering | done |
+  timed_out` which were never implemented).  Timeout stays `phase: "failed"` +
+  `stop_reason: "timeout"` — no breaking rename.
+  ([#1545](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1545))
+
 - `cards.json` and `check`/`repo` `--format json` output bump `schema_version`
   from `0.1` to `0.2` and now carry provenance metadata: top-level
   `tool_version`, plus a `provenance` block with `tool_version`,
