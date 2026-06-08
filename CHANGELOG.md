@@ -26,6 +26,18 @@ comments, edit source, or block by default.
   partial-status reconciliation.
   ([#1517](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1517))
 
+### Changed
+
+- A supplied `--diff` or `--base` that resolves to an empty diff (e.g. `git diff`
+  on a clean branch or an empty diff file) now produces a complete diff-scoped
+  no-op run: scope stays `diff`, 0 selected files, 0 cards, and
+  `--policy no-new-debt` exits 0. Previously, an empty diff caused the pipeline
+  to silently fall back to scanning the whole repository while still reporting
+  `scope: "diff"` in artifacts — inflating counts and misrepresenting the scope.
+  Callers with clean PRs that relied on the whole-repo fallback should switch to
+  `unsafe-review repo` for explicit full-repo analysis.
+  ([#1558](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1558))
+
 ### Changed (breaking for callers that check exit codes)
 
 - `--policy no-new-debt` violations now exit **1** instead of **2**. The stable

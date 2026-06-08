@@ -46,6 +46,12 @@ creating non-Rust ReviewCards or changing advisory policy.
 `pr-summary` and `github-summary` render the same diff scope as a reviewer-facing
 header bullet when a diff is supplied.
 
+A valid empty diff — such as `git diff` output when no files changed — is a
+complete diff-scoped no-op run: scope is `diff`, zero files are selected, zero
+cards are emitted, and `--policy no-new-debt` exits 0. This is distinct from a
+malformed diff (which exits 2 with a parse diagnostic and runs no analysis) and
+from running without `--diff`/`--base` (which keeps its existing behavior).
+
 Use `--root` when reviewing a fixture or another workspace:
 
 ```bash

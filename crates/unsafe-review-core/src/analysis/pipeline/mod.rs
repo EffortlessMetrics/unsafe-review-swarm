@@ -11,8 +11,8 @@ use self::input_loading::{load_diff_index, package_name};
 use self::summary::summarize;
 use super::{receipts, scanner};
 use crate::api::{
-    AnalysisMode, AnalyzeInput, AnalyzeOutput, DiscoveryOptions, RepoScanEvent, RepoScanPhase,
-    RepoScanStatus, Scope,
+    AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, DiscoveryOptions, RepoScanEvent,
+    RepoScanPhase, RepoScanStatus, Scope,
 };
 use crate::domain::ReviewCard;
 use crate::input::workspace;
@@ -117,7 +117,12 @@ fn analyze_with_receipts(
     } else {
         receipts::ReceiptIndex::default()
     };
-    let candidate_files = if repo_mode || diff_index.is_empty() {
+    // A diff was *supplied* when the source is Text or File (even if the
+    // parsed index is empty — an empty `git diff` is a valid zero-change diff,
+    // not a repo-scan trigger).  Only NoneRepoScan means "no diff at all" and
+    // should fall back to scanning everything.
+    let diff_supplied = !matches!(input.diff, DiffSource::NoneRepoScan);
+    let candidate_files = if repo_mode || !diff_supplied {
         all_rust_files.clone()
     } else {
         all_rust_files
@@ -126,7 +131,7 @@ fn analyze_with_receipts(
             .cloned()
             .collect::<Vec<_>>()
     };
-    let changed_rust_files = if repo_mode || diff_index.is_empty() {
+    let changed_rust_files = if repo_mode || !diff_supplied {
         candidate_files.len()
     } else {
         diff_index.changed_rust_file_count()
@@ -5721,5 +5726,87 @@ evidence = "test fixture"
             .map_err(|err| format!("system clock before UNIX_EPOCH: {err}"))?
             .as_nanos();
         Ok(std::env::temp_dir().join(format!("{prefix}-{nanos}")))
+    }
+
+    /// Build a minimal temporary crate with one `unsafe fn` so the repo-scan
+    /// path and diff-scoped paths produce contrasting results.
+    fn temp_unsafe_crate(prefix: &str) -> Result<PathBuf, String> {
+        let root = unique_temp_dir(prefix)?;
+        fs::create_dir_all(root.join("src")).map_err(|err| format!("create dirs failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"empty-diff-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "pub unsafe fn danger(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+        )
+        .map_err(|err| format!("write src/lib.rs failed: {err}"))?;
+        Ok(root)
+    }
+
+    #[test]
+    fn empty_diff_text_yields_zero_candidates_zero_cards() -> Result<(), String> {
+        // Scope::Diff + DiffSource::Text("") → zero candidate files, zero cards.
+        // This is the core fix for issue #1558: a valid empty diff must NOT
+        // fall back to scanning all files.
+        let root = temp_unsafe_crate("unsafe-review-empty-diff-text")?;
+        let output = analyze(AnalyzeInput {
+            root: root.clone(),
+            scope: Scope::Diff,
+            diff: DiffSource::Text(String::new()),
+            mode: AnalysisMode::Draft,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: None,
+        });
+        let _ = fs::remove_dir_all(&root);
+        let output = output?;
+
+        assert_eq!(output.scope, Scope::Diff);
+        assert_eq!(
+            output.summary.cards, 0,
+            "empty diff should produce zero cards, not whole-repo cards"
+        );
+        assert_eq!(
+            output.summary.changed_rust_files, 0,
+            "empty diff should report zero changed rust files"
+        );
+        assert_eq!(
+            output.summary.changed_files, 0,
+            "empty diff should report zero changed files"
+        );
+        assert!(output.cards.is_empty(), "card list must be empty");
+        Ok(())
+    }
+
+    #[test]
+    fn none_repo_scan_repo_scope_still_produces_cards() -> Result<(), String> {
+        // Control: Scope::Repo + NoneRepoScan → all files scanned, cards produced.
+        // This is the existing repo-scan default; the fix must not change it.
+        let root = temp_unsafe_crate("unsafe-review-none-repo-scan")?;
+        let output = analyze(AnalyzeInput {
+            root: root.clone(),
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: None,
+        });
+        let _ = fs::remove_dir_all(&root);
+        let output = output?;
+
+        assert_eq!(output.scope, Scope::Repo);
+        assert!(
+            output.summary.changed_rust_files > 0,
+            "NoneRepoScan repo scan with an unsafe file should report changed_rust_files > 0"
+        );
+        assert!(
+            !output.cards.is_empty(),
+            "NoneRepoScan repo scan should still produce cards from the unsafe file"
+        );
+        Ok(())
     }
 }

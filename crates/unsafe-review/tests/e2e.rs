@@ -3952,6 +3952,98 @@ fn check_reports_unparseable_diff_as_cli_failure() -> Result<(), Box<dyn Error>>
 }
 
 #[test]
+fn check_empty_diff_is_complete_noop_not_whole_repo_scan() -> Result<(), Box<dyn Error>> {
+    // A valid but empty diff (e.g. from `git diff` on a clean branch) must
+    // produce a complete diff-scoped no-op run: scope=diff, 0 selected files,
+    // 0 cards, no whole-repo cards.  This is distinct from a malformed diff
+    // (which exits 2) and from a no-diff-supplied run (which keeps its own
+    // existing behavior).
+    //
+    // Covers issue #1558 (instrument-truthfulness: valid empty diff = no-op).
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-empty-diff-e2e")?;
+
+    // Copy the fixture so we can place an empty diff alongside it.
+    copy_dir_all(&fixture, temp.path())?;
+
+    let empty_diff = temp.path().join("empty.diff");
+    fs::write(&empty_diff, "")?;
+
+    let output = run_success([
+        os("check"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--diff"),
+        empty_diff.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+
+    let value = parse_json(&stdout_text(&output)?)?;
+    assert_eq!(value["scope"], "diff", "empty diff must produce scope=diff");
+    assert_eq!(
+        value["summary"]["cards"], 0,
+        "empty diff must produce 0 cards, not whole-repo cards"
+    );
+    assert_eq!(
+        value["summary"]["changed_files"], 0,
+        "empty diff must report 0 changed_files"
+    );
+    assert_eq!(
+        value["summary"]["changed_rust_files"], 0,
+        "empty diff must report 0 changed_rust_files"
+    );
+    assert!(
+        value["cards"].as_array().is_some_and(Vec::is_empty),
+        "empty diff must produce an empty cards array"
+    );
+    assert!(
+        value["trust_boundary"]
+            .as_str()
+            .is_some_and(|s| s.contains("not memory-safety proof")),
+        "trust boundary must still be present on no-op output"
+    );
+    // The no-op output must not read as a safety pass.
+    let rendered = serde_json::to_string(&value)?;
+    assert!(
+        !rendered.contains("all clear") && !rendered.contains("All clear"),
+        "no-op output must not contain 'all clear'"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn check_empty_diff_no_new_debt_exits_0() -> Result<(), Box<dyn Error>> {
+    // A valid empty diff with --policy no-new-debt must exit 0: no new unsafe
+    // seams were added, so the no-new-debt policy is satisfied.
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-empty-diff-nnd-e2e")?;
+    copy_dir_all(&fixture, temp.path())?;
+    let empty_diff = temp.path().join("empty.diff");
+    fs::write(&empty_diff, "")?;
+
+    let output = run_success([
+        os("check"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--diff"),
+        empty_diff.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+        os("--policy"),
+        os("no-new-debt"),
+    ])?;
+
+    let value = parse_json(&stdout_text(&output)?)?;
+    assert_eq!(value["scope"], "diff");
+    assert_eq!(value["summary"]["cards"], 0);
+    assert_eq!(value["policy"], "no-new-debt");
+
+    Ok(())
+}
+
+#[test]
 fn repo_list_files_honors_selection_controls() -> Result<(), Box<dyn Error>> {
     let temp = TempDir::new("unsafe-review-repo-list-files")?;
     write_e2e_file(temp.path(), "src/lib.rs")?;
