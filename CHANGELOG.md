@@ -11,7 +11,15 @@ comments, edit source, or block by default.
 
 ## Unreleased
 
-Nothing yet.
+### Changed (breaking for callers that check exit codes)
+
+- `--policy no-new-debt` violations now exit **1** instead of **2**. The stable
+  contract is: 0 = ran to completion (clean or advisory findings); 1 = ran to
+  completion, policy found new or worsened coverage gaps; 2 = tool did not
+  complete a review (usage, input/IO, or internal error). Callers that tested
+  `$? -ne 0` are unaffected; callers that tested `$? -eq 2` to detect policy
+  failures should update to `$? -eq 1`.
+  ([#1518](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1518))
 
 ## 0.3.4 - 2026-06-07
 

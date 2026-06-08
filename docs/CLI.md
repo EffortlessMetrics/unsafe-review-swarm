@@ -56,8 +56,8 @@ unsafe-review check \
 ```
 
 The default policy is `advisory`; it reports cards but does not fail the
-command. The explicit no-new-debt mode exits nonzero when unbaselined actionable
-gaps remain:
+command. The explicit no-new-debt mode exits 1 when unbaselined actionable
+coverage gaps remain:
 
 ```bash
 unsafe-review check --base origin/main --policy no-new-debt
@@ -824,3 +824,20 @@ Use `--out` to write artifacts without printing them:
 ```bash
 unsafe-review check --diff change.diff --format sarif --out target/unsafe-review/cards.sarif
 ```
+
+## Exit Code Contract
+
+| Code | Meaning |
+|------|---------|
+| `0` | Ran to completion: clean, or advisory findings (default advisory policy) |
+| `1` | Ran to completion: `--policy no-new-debt` found new or worsened coverage gaps |
+| `2` | Tool did not complete a review: usage error, missing/unreadable input, I/O error, or internal error |
+
+The distinction matters for CI: exit 1 means the diff added coverage debt (the
+tool reviewed the diff and found it); exit 2 means the tool could not complete a
+review (check flags, diff path, and root). The stderr prefix names the category:
+`unsafe-review: policy: …` for exit 1 and `unsafe-review: …` for exit 2.
+
+Advisory policy (the default) always exits 0 when the review completes,
+regardless of findings. Exit 1 only fires when `--policy no-new-debt` is
+explicit and the diff adds or worsens coverage gaps.

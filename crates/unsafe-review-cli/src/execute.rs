@@ -80,7 +80,7 @@ const FIRST_PR_ARTIFACTS: [&str; 16] = [
     "repair-queue.json",
 ];
 
-pub(crate) fn execute(command: Command) -> Result<(), String> {
+pub(crate) fn execute(command: Command) -> Result<(), crate::RunFailure> {
     match command {
         Command::Help => {
             print_help();
@@ -106,7 +106,7 @@ pub(crate) fn execute(command: Command) -> Result<(), String> {
             print_support();
             Ok(())
         }
-        Command::Doctor { root } => doctor(&root),
+        Command::Doctor { root } => doctor(&root).map_err(crate::RunFailure::Tool),
         Command::Check(options) => run_check(
             options,
             Scope::Diff,
@@ -120,24 +120,40 @@ pub(crate) fn execute(command: Command) -> Result<(), String> {
             AnalysisMode::Draft,
             DiscoveryOptions::default(),
         ),
-        Command::FirstPr(options) => first_pr(options),
-        Command::Badges { root, out } => badges(&root, &out),
-        Command::Explain { root, id, format } => explain(&root, &id, format),
-        Command::Context { root, query } => context(&root, query),
-        Command::Candidate(command) => candidate(command),
-        Command::Baseline(command) => run_baseline(command),
-        Command::Confirm(options) => confirm::run(options),
-        Command::ReceiptTemplate(options) => receipt_template(options),
-        Command::ReceiptValidate { root } => receipt_validate(&root),
-        Command::ReceiptAudit(options) => receipt_audit(options),
-        Command::ReceiptImportMiri(options) => receipt_import_miri(options),
-        Command::ReceiptImportCareful(options) => receipt_import_careful(options),
-        Command::ReceiptImportSanitizer(options) => receipt_import_sanitizer(options),
-        Command::ReceiptImportConcurrency(options) => receipt_import_concurrency(options),
-        Command::ReceiptImportProof(options) => receipt_import_proof(options),
-        Command::Outcome(options) => outcome(options),
-        Command::PolicyReport(options) => policy_report(options),
-        Command::Lsp => crate::lsp::serve(),
+        Command::FirstPr(options) => first_pr(options).map_err(crate::RunFailure::Tool),
+        Command::Badges { root, out } => badges(&root, &out).map_err(crate::RunFailure::Tool),
+        Command::Explain { root, id, format } => {
+            explain(&root, &id, format).map_err(crate::RunFailure::Tool)
+        }
+        Command::Context { root, query } => context(&root, query).map_err(crate::RunFailure::Tool),
+        Command::Candidate(command) => candidate(command).map_err(crate::RunFailure::Tool),
+        Command::Baseline(command) => run_baseline(command).map_err(crate::RunFailure::Tool),
+        Command::Confirm(options) => confirm::run(options).map_err(crate::RunFailure::Tool),
+        Command::ReceiptTemplate(options) => {
+            receipt_template(options).map_err(crate::RunFailure::Tool)
+        }
+        Command::ReceiptValidate { root } => {
+            receipt_validate(&root).map_err(crate::RunFailure::Tool)
+        }
+        Command::ReceiptAudit(options) => receipt_audit(options).map_err(crate::RunFailure::Tool),
+        Command::ReceiptImportMiri(options) => {
+            receipt_import_miri(options).map_err(crate::RunFailure::Tool)
+        }
+        Command::ReceiptImportCareful(options) => {
+            receipt_import_careful(options).map_err(crate::RunFailure::Tool)
+        }
+        Command::ReceiptImportSanitizer(options) => {
+            receipt_import_sanitizer(options).map_err(crate::RunFailure::Tool)
+        }
+        Command::ReceiptImportConcurrency(options) => {
+            receipt_import_concurrency(options).map_err(crate::RunFailure::Tool)
+        }
+        Command::ReceiptImportProof(options) => {
+            receipt_import_proof(options).map_err(crate::RunFailure::Tool)
+        }
+        Command::Outcome(options) => outcome(options).map_err(crate::RunFailure::Tool),
+        Command::PolicyReport(options) => policy_report(options).map_err(crate::RunFailure::Tool),
+        Command::Lsp => crate::lsp::serve().map_err(crate::RunFailure::Tool),
     }
 }
 
@@ -177,8 +193,8 @@ fn run_check(
     scope: Scope,
     mode: AnalysisMode,
     discovery: DiscoveryOptions,
-) -> Result<(), String> {
-    let diff = diff_source(&options)?;
+) -> Result<(), crate::RunFailure> {
+    let diff = diff_source(&options).map_err(crate::RunFailure::Tool)?;
     let policy = options.policy.clone();
     let output = analyze_with_discovery(
         AnalyzeInput {
@@ -191,12 +207,14 @@ fn run_check(
             max_cards: options.max_cards,
         },
         discovery,
-    )?;
+    )
+    .map_err(crate::RunFailure::Tool)?;
     let rendered = render_with_format(&output, &options.format);
     if let Some(path) = options.out {
-        ensure_parent_dir(&path)?;
-        fs::write(&path, rendered)
-            .map_err(|err| format!("write {} failed: {err}", path.display()))?;
+        ensure_parent_dir(&path).map_err(crate::RunFailure::Tool)?;
+        fs::write(&path, rendered).map_err(|err| {
+            crate::RunFailure::Tool(format!("write {} failed: {err}", path.display()))
+        })?;
     } else {
         println!("{rendered}");
     }
@@ -204,16 +222,16 @@ fn run_check(
     Ok(())
 }
 
-fn repo(options: RepoOptions) -> Result<(), String> {
+fn repo(options: RepoOptions) -> Result<(), crate::RunFailure> {
     if options.list_files {
-        return repo_list_files(options);
+        return repo_list_files(options).map_err(crate::RunFailure::Tool);
     }
     run_repo_check(options)
 }
 
-fn run_repo_check(options: RepoOptions) -> Result<(), String> {
+fn run_repo_check(options: RepoOptions) -> Result<(), crate::RunFailure> {
     let check = options.check;
-    let diff = diff_source(&check)?;
+    let diff = diff_source(&check).map_err(crate::RunFailure::Tool)?;
     let policy = check.policy.clone();
     let report_path = check.out.clone();
     let partial_path = report_path.as_deref().map(repo_partial_path);
@@ -226,7 +244,8 @@ fn run_repo_check(options: RepoOptions) -> Result<(), String> {
         check.format.clone(),
         options.timeout_seconds,
         scan_scope,
-    )?;
+    )
+    .map_err(crate::RunFailure::Tool)?;
     maybe_pause_for_repo_interrupt_test();
     let output = match analyze_with_discovery_and_repo_events(
         AnalyzeInput {
@@ -243,11 +262,11 @@ fn run_repo_check(options: RepoOptions) -> Result<(), String> {
     ) {
         Ok(output) => output,
         Err(err) => {
-            return Err(repo_incomplete_error(
+            return Err(crate::RunFailure::Tool(repo_incomplete_error(
                 &mut reporter,
                 &err,
                 partial_path.as_deref(),
-            ));
+            )));
         }
     };
     if reporter.files_discovered() == 0 {
@@ -259,7 +278,11 @@ fn run_repo_check(options: RepoOptions) -> Result<(), String> {
     if let Some(path) = report_path {
         let partial = repo_partial_path(&path);
         if let Err(err) = write_repo_report(&path, &partial, rendered) {
-            return Err(repo_incomplete_error(&mut reporter, &err, Some(&partial)));
+            return Err(crate::RunFailure::Tool(repo_incomplete_error(
+                &mut reporter,
+                &err,
+                Some(&partial),
+            )));
         }
     } else {
         println!("{rendered}");
@@ -1182,7 +1205,7 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     Ok(())
 }
 
-fn enforce_policy(output: &unsafe_review_core::AnalyzeOutput) -> Result<(), String> {
+fn enforce_policy(output: &unsafe_review_core::AnalyzeOutput) -> Result<(), crate::RunFailure> {
     match output.policy {
         PolicyMode::Advisory => Ok(()),
         PolicyMode::NoNewDebt => {
@@ -1194,13 +1217,17 @@ fn enforce_policy(output: &unsafe_review_core::AnalyzeOutput) -> Result<(), Stri
             if new == 0 && worsened == 0 {
                 Ok(())
             } else {
-                Err(format!(
+                Err(crate::RunFailure::PolicyViolation(format!(
                     "no-new-debt policy: {} new gap(s), {} worsened gap(s)",
                     new, worsened
-                ))
+                )))
             }
         }
-        PolicyMode::Blocking => Err("blocking policy is not implemented".to_string()),
+        // PolicyMode::Blocking is not a policy violation — the tool did not
+        // complete a review because the mode is unimplemented.
+        PolicyMode::Blocking => Err(crate::RunFailure::Tool(
+            "blocking policy is not implemented".to_string(),
+        )),
     }
 }
 
@@ -2381,6 +2408,11 @@ fn print_help() {
     println!();
     println!("Flags may be passed as `--flag value` or `--flag=value`.");
     println!();
+    println!("Exit codes:");
+    println!("  0  ran to completion: clean, or advisory findings (advisory policy default)");
+    println!("  1  ran to completion: no-new-debt policy found new or worsened coverage gaps");
+    println!("  2  tool did not complete a review: usage, input/IO, or internal error");
+    println!();
     println!("Trust boundary: {FIRST_RUN_TRUST_BOUNDARY}");
 }
 
@@ -2428,7 +2460,7 @@ fn print_repo_help() {
         "- --format <name> chooses human, json, markdown, pr-summary, github-summary, sarif, comment-plan, lsp, or witness-plan output."
     );
     println!(
-        "- --policy advisory is the default; --policy no-new-debt exits nonzero for open actionable gaps."
+        "- --policy advisory is the default; --policy no-new-debt exits 1 for new or worsened coverage gaps."
     );
     println!("- --out <file> writes the rendered report to a file instead of stdout.");
     println!("- --max-cards <N> stops after N cards are collected; it does not limit discovery.");
@@ -2505,7 +2537,7 @@ fn print_candidate_help() {
         "- lint validates a manual candidate file with the same schema and cross-field checks as import, without importing or writing anything, and also flags remaining TODO placeholder markers; it reports the first schema error plus all TODO markers."
     );
     println!(
-        "- lint exits 0 with `candidate lint: ok` when clean and exits nonzero listing the problems otherwise."
+        "- lint exits 0 with `candidate lint: ok` when clean and exits 2 listing the problems otherwise."
     );
     println!(
         "- list reports imported manual candidates from .unsafe-review/candidates without adding them to ReviewCard-only outputs."

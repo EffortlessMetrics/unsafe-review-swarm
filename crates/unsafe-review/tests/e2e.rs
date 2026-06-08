@@ -5556,11 +5556,27 @@ fn no_new_debt_policy_fails_only_for_unbaselined_actionable_gaps() -> Result<(),
         os("--policy"),
         os("no-new-debt"),
     ])?;
+    // Exit-code taxonomy: policy violations exit 1, tool errors exit 2.
+    assert_eq!(
+        failing.status.code(),
+        Some(1),
+        "no-new-debt violation must exit 1 (policy), not 2 (tool error)"
+    );
     let failing_json = parse_json(&stdout_text(&failing)?)?;
     assert_eq!(failing_json["policy"], "no-new-debt");
     assert_eq!(failing_json["summary"]["open_actionable_gaps"], 1);
     // SPEC-0030: no-new-debt fails on new/worsened gaps, not total open actionable count.
-    assert!(String::from_utf8(failing.stderr)?.contains("no-new-debt policy: 1 new gap(s)"));
+    let failing_stderr = String::from_utf8(failing.stderr.clone())?;
+    assert!(
+        failing_stderr.contains("no-new-debt policy: 1 new gap(s)"),
+        "stderr should contain policy gap counts: {failing_stderr}"
+    );
+    // The policy category prefix must appear in stderr so wrappers can distinguish
+    // policy violations from tool errors.
+    assert!(
+        failing_stderr.contains("policy:"),
+        "stderr should carry the 'policy:' category prefix: {failing_stderr}"
+    );
 
     let temp = TempDir::new("unsafe-review-no-new-debt-e2e")?;
     let copied = temp.path().join("fixture");
@@ -5594,6 +5610,76 @@ fn no_new_debt_policy_fails_only_for_unbaselined_actionable_gaps() -> Result<(),
     assert_eq!(passing["summary"]["open_actionable_gaps"], 0);
     assert_eq!(passing["cards"][0]["class"], "baseline_known");
 
+    Ok(())
+}
+
+// Exit-code taxonomy tests (issue #1518):
+//   0 = ran to completion (clean or advisory findings)
+//   1 = ran to completion: policy violation
+//   2 = tool did not complete: usage / input / IO / internal error
+
+#[test]
+fn unknown_flag_exits_2() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let output = run_failure([
+        os("check"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--this-flag-does-not-exist"),
+    ])?;
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "unknown flag must exit 2 (tool/usage error)"
+    );
+    Ok(())
+}
+
+#[test]
+fn missing_diff_file_exits_2() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let missing = fixture.join("does-not-exist.diff");
+    let output = run_failure([
+        os("check"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        missing.as_os_str().to_os_string(),
+    ])?;
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "missing diff file must exit 2 (tool/input error)"
+    );
+    Ok(())
+}
+
+#[test]
+fn advisory_run_with_findings_exits_0() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    // Advisory policy (default) exits 0 even when cards are found.
+    let output = run_success([
+        os("check"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "advisory run with findings must exit 0"
+    );
+    let value = parse_json(&stdout_text(&output)?)?;
+    // Confirm there actually are cards so the test is not vacuous.
+    assert_eq!(
+        value["summary"]["cards"], 1,
+        "fixture should produce 1 card (test is checking exit 0 with findings)"
+    );
     Ok(())
 }
 
