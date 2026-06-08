@@ -22,7 +22,7 @@ fn cargo_subcommand_alias_runs_check_json() -> Result<(), Box<dyn Error>> {
     let stdout = String::from_utf8(output.stdout)?;
     let value: Value = serde_json::from_str(&stdout)?;
 
-    assert_eq!(value["schema_version"], "0.1");
+    assert_eq!(value["schema_version"], "0.2");
     assert_eq!(value["tool"], "unsafe-review");
     assert_eq!(value["scope"], "diff");
     assert_eq!(value["summary"]["cards"], 1);

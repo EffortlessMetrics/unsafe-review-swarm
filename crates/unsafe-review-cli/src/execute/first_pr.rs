@@ -2422,8 +2422,10 @@ fn artifact_format(path: &str) -> &'static str {
 
 fn artifact_schema_version(path: &str) -> Option<&'static str> {
     match path {
-        "review-kit.json" | "cards.json" | "comment-plan.json" | "lsp.json"
-        | "repair-queue.json" | "policy-report.json" => Some("0.1"),
+        // cards.json was bumped to 0.2 when provenance metadata was added.
+        "cards.json" => Some("0.2"),
+        "review-kit.json" | "comment-plan.json" | "lsp.json" | "repair-queue.json"
+        | "policy-report.json" => Some("0.1"),
         "unsafe-review-gate.json" => Some("unsafe-review-gate/v1"),
         "manual-candidates.json" => Some("manual-candidates/v1"),
         "manual-repair-queue.json" => Some("manual-repair-queue/v1"),
@@ -2594,7 +2596,7 @@ mod tests {
                 .contains("did not run witnesses")
         );
         assert_eq!(value["artifacts"][0]["path"], "review-kit.json");
-        assert_eq!(value["artifacts"][1]["schema_version"], "0.1");
+        assert_eq!(value["artifacts"][1]["schema_version"], "0.2");
         assert!(value["artifacts"][2]["schema_version"].is_null());
         assert!(
             value["trust_boundary"]

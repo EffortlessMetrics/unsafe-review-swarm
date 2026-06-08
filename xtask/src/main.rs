@@ -19417,7 +19417,7 @@ Snapshot reports:
         write_valid_artifacts(&dir)?;
         fs::write(
             dir.join("cards.json"),
-            r#"{"schema_version":"0.1","tool":"unsafe-review","policy":"advisory","summary":{"cards":1},"cards":[{"id":"card-1"}]}"#,
+            r#"{"schema_version":"0.2","tool":"unsafe-review","policy":"advisory","summary":{"cards":1},"cards":[{"id":"card-1"}]}"#,
         )
         .map_err(|err| format!("write cards failed: {err}"))?;
 
@@ -21374,7 +21374,7 @@ Snapshot reports:
             result
                 .err()
                 .unwrap_or_default()
-                .contains("cards.json key `schema_version` is `2.0`, expected `0.1`")
+                .contains("cards.json key `schema_version` is `2.0`, expected `0.2`")
         );
         Ok(())
     }
@@ -21683,7 +21683,7 @@ review_after = "2026-08-01"
             "artifacts": [
                 {"path":"review-kit.json","kind":"review_kit_manifest","format":"json","schema_version":"0.1"},
                 {"path":"unsafe-review-gate.json","kind":"gate_manifest","format":"json","schema_version":"unsafe-review-gate/v1"},
-                {"path":"cards.json","kind":"review_cards","format":"json","schema_version":"0.1"},
+                {"path":"cards.json","kind":"review_cards","format":"json","schema_version":"0.2"},
                 {"path":"pr-summary.md","kind":"reviewer_summary","format":"markdown","schema_version":serde_json::Value::Null},
                 {"path":"github-summary.md","kind":"github_summary","format":"markdown","schema_version":serde_json::Value::Null},
                 {"path":"cards.sarif","kind":"sarif","format":"sarif","schema_version":"2.1.0"},
@@ -23134,7 +23134,7 @@ review_after = "2026-08-01"
     fn write_valid_artifacts(dir: &Path) -> Result<(), String> {
         fs::write(
             dir.join("cards.json"),
-            r#"{"schema_version":"0.1","tool":"unsafe-review","policy":"advisory","scope":"diff","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"changed_files":1,"changed_rust_files":1,"changed_non_rust_files":0,"cards":1,"open_actionable_gaps":1},"cards":[{"id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hazards":["alignment"],"site":{"file":"src/lib.rs","line":7,"column":5},"operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","obligation_evidence":[{"key":"alignment","description":"pointer aligned","contract":{"present":true,"state":"present","summary":"safety contract"},"discharge":{"present":false,"state":"missing","summary":"No visible local guard"},"reach":{"present":true,"state":"present","summary":"related test mention"},"witness":{"present":false,"state":"missing","summary":"No imported witness receipt"}}],"contract":"safety contract","discharge":"No visible local guard","reach":"related test mention","witness":"No imported witness receipt","verify_commands":["cargo +nightly miri test card"],"witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}]}]}"#,
+            r#"{"schema_version":"0.2","tool":"unsafe-review","policy":"advisory","scope":"diff","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"changed_files":1,"changed_rust_files":1,"changed_non_rust_files":0,"cards":1,"open_actionable_gaps":1},"cards":[{"id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hazards":["alignment"],"site":{"file":"src/lib.rs","line":7,"column":5},"operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","obligation_evidence":[{"key":"alignment","description":"pointer aligned","contract":{"present":true,"state":"present","summary":"safety contract"},"discharge":{"present":false,"state":"missing","summary":"No visible local guard"},"reach":{"present":true,"state":"present","summary":"related test mention"},"witness":{"present":false,"state":"missing","summary":"No imported witness receipt"}}],"contract":"safety contract","discharge":"No visible local guard","reach":"related test mention","witness":"No imported witness receipt","verify_commands":["cargo +nightly miri test card"],"witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}]}]}"#,
         )
         .map_err(|err| format!("write cards failed: {err}"))?;
         add_confirmation_cues_to_cards(&dir.join("cards.json"))?;
@@ -23253,7 +23253,7 @@ review_after = "2026-08-01"
         write_valid_artifacts(dir)?;
         fs::write(
             dir.join("cards.json"),
-            r#"{"schema_version":"0.1","tool":"unsafe-review","policy":"advisory","scope":"diff","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"changed_files":1,"changed_rust_files":1,"changed_non_rust_files":0,"cards":2,"open_actionable_gaps":2},"cards":[{"id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hazards":["alignment"],"site":{"file":"src/lib.rs","line":7,"column":5},"operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verify_commands":["cargo +nightly miri test card"],"witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}]},{"id":"card-2","class":"contract_missing","priority":"high","confidence":"high","proof_path":"human_review_only","hazards":["unknown"],"site":{"file":"src/lib.rs","line":7,"column":1},"operation":"unsafe fn read_header(ptr: *const u8)","operation_family":"unknown","next_action":"Add a precise public `# Safety` section that names the required caller obligations.","verify_commands":[],"witness_routes":[{"kind":"human-deep-review","reason":"route","command":null,"required":false}]}]}"#,
+            r#"{"schema_version":"0.2","tool":"unsafe-review","policy":"advisory","scope":"diff","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"changed_files":1,"changed_rust_files":1,"changed_non_rust_files":0,"cards":2,"open_actionable_gaps":2},"cards":[{"id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hazards":["alignment"],"site":{"file":"src/lib.rs","line":7,"column":5},"operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verify_commands":["cargo +nightly miri test card"],"witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}]},{"id":"card-2","class":"contract_missing","priority":"high","confidence":"high","proof_path":"human_review_only","hazards":["unknown"],"site":{"file":"src/lib.rs","line":7,"column":1},"operation":"unsafe fn read_header(ptr: *const u8)","operation_family":"unknown","next_action":"Add a precise public `# Safety` section that names the required caller obligations.","verify_commands":[],"witness_routes":[{"kind":"human-deep-review","reason":"route","command":null,"required":false}]}]}"#,
         )
         .map_err(|err| format!("write cards failed: {err}"))?;
         add_confirmation_cues_to_cards(&dir.join("cards.json"))?;
@@ -23407,7 +23407,7 @@ This artifact is static unsafe contract review. It routes reviewers to credible 
     fn write_valid_zero_card_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         fs::write(
             dir.join("cards.json"),
-            r#"{"schema_version":"0.1","tool":"unsafe-review","policy":"advisory","scope":"diff","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"changed_files":0,"changed_rust_files":0,"changed_non_rust_files":0,"cards":0,"open_actionable_gaps":0},"cards":[]}"#,
+            r#"{"schema_version":"0.2","tool":"unsafe-review","policy":"advisory","scope":"diff","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"changed_files":0,"changed_rust_files":0,"changed_non_rust_files":0,"cards":0,"open_actionable_gaps":0},"cards":[]}"#,
         )
         .map_err(|err| format!("write cards failed: {err}"))?;
         fs::write(

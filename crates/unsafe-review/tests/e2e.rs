@@ -22,7 +22,7 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
         os("json"),
     ])?;
     let value = parse_json(&stdout_text(&json)?)?;
-    assert_eq!(value["schema_version"], "0.1");
+    assert_eq!(value["schema_version"], "0.2");
     assert_eq!(value["scope"], "diff");
     assert_eq!(value["summary"]["changed_files"], 1);
     assert_eq!(value["summary"]["changed_non_rust_files"], 0);
@@ -34,6 +34,30 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     );
     assert_eq!(value["cards"][0]["operation_family"], "raw_pointer_read");
     let card_id = json_str(&value["cards"][0]["id"], "cards[0].id")?;
+
+    // schema 0.2 provenance block assertions (instrument-truthfulness lane)
+    assert!(
+        value["tool_version"].is_string(),
+        "tool_version must be present in schema 0.2 artifact"
+    );
+    assert!(
+        value["provenance"].is_object(),
+        "provenance block must be present in schema 0.2 artifact"
+    );
+    assert!(
+        value["provenance"]["diff_sha256"]
+            .as_str()
+            .is_some_and(|s| s.len() == 64),
+        "provenance.diff_sha256 must be a 64-char hex string when --diff <file> is used"
+    );
+    let generated_at = json_str(
+        &value["provenance"]["generated_at"],
+        "provenance.generated_at",
+    )?;
+    assert!(
+        generated_at.ends_with('Z') && generated_at.contains('T'),
+        "provenance.generated_at must be RFC3339 UTC: {generated_at}"
+    );
 
     let human = run_success([
         os("check"),
@@ -1967,7 +1991,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("enforce blocking policy"));
 
     let cards = parse_json(&fs::read_to_string(out_dir.join("cards.json"))?)?;
-    assert_eq!(cards["schema_version"], "0.1");
+    assert_eq!(cards["schema_version"], "0.2");
     assert_eq!(cards["scope"], "diff");
     assert_eq!(cards["policy"], "advisory");
     assert_eq!(cards["summary"]["cards"], 1);
@@ -2502,8 +2526,11 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             assert_eq!(entry["format"], "sarif");
         }
         match expected {
-            "review-kit.json" | "cards.json" | "comment-plan.json" | "lsp.json"
-            | "repair-queue.json" | "policy-report.json" => {
+            "cards.json" => {
+                assert_eq!(entry["schema_version"], "0.2")
+            }
+            "review-kit.json" | "comment-plan.json" | "lsp.json" | "repair-queue.json"
+            | "policy-report.json" => {
                 assert_eq!(entry["schema_version"], "0.1")
             }
             "unsafe-review-gate.json" => {
@@ -4149,7 +4176,7 @@ fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<()
         os("json"),
     ])?;
     let repo = parse_json(&stdout_text(&repo)?)?;
-    assert_eq!(repo["schema_version"], "0.1");
+    assert_eq!(repo["schema_version"], "0.2");
     assert_eq!(repo["tool"], "unsafe-review");
     assert_eq!(repo["scope"], "repo");
     assert_eq!(repo["mode"], "repo");

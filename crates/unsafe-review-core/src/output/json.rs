@@ -1,4 +1,4 @@
-use crate::api::{AnalyzeOutput, Scope, Summary};
+use crate::api::{AnalyzeOutput, Provenance, Scope, Summary};
 use crate::domain::{
     AgentLspReadiness, BaselineState, CommentPlanStatus, Coverage, CoverageBlock, EvidenceState,
     ManualContext, ObligationEvidence, OutcomeMovement, ReviewCard, WitnessReceiptCoverage,
@@ -9,8 +9,19 @@ use crate::output::confirmation::ConfirmationCue;
 use crate::util::path_display;
 use serde::Serialize;
 
+/// Schema version for the plain (no-provenance) JSON analyze artifact.
+const SCHEMA_VERSION_PLAIN: &str = "0.1";
+
+/// Schema version for the JSON analyze artifact with provenance block.
+const SCHEMA_VERSION_WITH_PROVENANCE: &str = "0.2";
+
 pub(crate) fn render(output: &AnalyzeOutput) -> String {
-    render_pretty(&JsonAnalyzeOutput::from(output))
+    render_pretty(&JsonAnalyzeOutput::from_plain(output))
+}
+
+/// Render the JSON analyze artifact with an attached provenance block (schema 0.2).
+pub(crate) fn render_with_provenance(output: &AnalyzeOutput, provenance: &Provenance) -> String {
+    render_pretty(&JsonAnalyzeOutput::from_with_provenance(output, provenance))
 }
 
 fn render_pretty(value: &impl Serialize) -> String {
@@ -22,8 +33,12 @@ fn render_pretty(value: &impl Serialize) -> String {
 
 #[derive(Serialize)]
 struct JsonAnalyzeOutput<'a> {
-    schema_version: &'a str,
+    schema_version: &'static str,
     tool: &'a str,
+    /// Semver tool version. Present in all schema 0.2+ artifacts; also appears nested
+    /// in the provenance block for consumers that parse that block exclusively.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tool_version: Option<&'static str>,
     scope: &'static str,
     mode: &'static str,
     policy: &'static str,
@@ -31,13 +46,38 @@ struct JsonAnalyzeOutput<'a> {
     root: String,
     summary: JsonSummary,
     cards: Vec<JsonCard<'a>>,
+    /// Traceable evidence metadata (schema 0.2+). Absent in 0.1 artifacts for
+    /// backward compatibility; `schema_version` distinguishes the two shapes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    provenance: Option<JsonProvenance>,
 }
 
-impl<'a> From<&'a AnalyzeOutput> for JsonAnalyzeOutput<'a> {
-    fn from(output: &'a AnalyzeOutput) -> Self {
+/// JSON projection of [`Provenance`].
+#[derive(Serialize)]
+struct JsonProvenance {
+    tool_version: &'static str,
+    generated_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    root_abs: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    base_sha: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    head_sha: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    diff_path: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    diff_sha256: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dirty_worktree: Option<bool>,
+}
+
+impl<'a> JsonAnalyzeOutput<'a> {
+    /// Build from output without provenance (schema 0.1, backward-compatible).
+    fn from_plain(output: &'a AnalyzeOutput) -> Self {
         Self {
-            schema_version: &output.schema_version,
+            schema_version: SCHEMA_VERSION_PLAIN,
             tool: &output.tool,
+            tool_version: None,
             scope: scope_str(output),
             mode: output.mode.as_str(),
             policy: output.policy.as_str(),
@@ -45,6 +85,34 @@ impl<'a> From<&'a AnalyzeOutput> for JsonAnalyzeOutput<'a> {
             root: path_display(&output.root),
             summary: JsonSummary::from(&output.summary),
             cards: output.cards.iter().map(JsonCard::from).collect(),
+            provenance: None,
+        }
+    }
+
+    /// Build from output with provenance block (schema 0.2).
+    fn from_with_provenance(output: &'a AnalyzeOutput, provenance: &Provenance) -> Self {
+        let json_provenance = JsonProvenance {
+            tool_version: env!("CARGO_PKG_VERSION"),
+            generated_at: provenance.generated_at.clone(),
+            root_abs: provenance.root_abs.clone(),
+            base_sha: provenance.base_sha.clone(),
+            head_sha: provenance.head_sha.clone(),
+            diff_path: provenance.diff_path.clone(),
+            diff_sha256: provenance.diff_sha256.clone(),
+            dirty_worktree: provenance.dirty_worktree,
+        };
+        Self {
+            schema_version: SCHEMA_VERSION_WITH_PROVENANCE,
+            tool: &output.tool,
+            tool_version: Some(env!("CARGO_PKG_VERSION")),
+            scope: scope_str(output),
+            mode: output.mode.as_str(),
+            policy: output.policy.as_str(),
+            trust_boundary: TRUST_BOUNDARY,
+            root: path_display(&output.root),
+            summary: JsonSummary::from(&output.summary),
+            cards: output.cards.iter().map(JsonCard::from).collect(),
+            provenance: Some(json_provenance),
         }
     }
 }
@@ -1103,5 +1171,92 @@ mod tests {
             Ok(text) => text,
             Err(err) => format!("<failed to render JSON: {err}>"),
         }
+    }
+
+    /// `render_with_provenance` emits schema 0.2 with `tool_version` top-level
+    /// and a `provenance` block; `render` still emits 0.1 (backward compat).
+    #[test]
+    fn provenance_render_emits_schema_0_2_with_tool_version() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let plain = parse_json(&render(&output))?;
+        assert_eq!(plain["schema_version"], "0.1");
+        assert!(
+            plain["tool_version"].is_null(),
+            "plain render must omit tool_version"
+        );
+        assert!(
+            plain["provenance"].is_null(),
+            "plain render must omit provenance block"
+        );
+
+        let prov = crate::api::Provenance {
+            generated_at: "2026-06-07T00:00:00Z".to_string(),
+            ..Default::default()
+        };
+        let with_prov = parse_json(&render_with_provenance(&output, &prov))?;
+        assert_eq!(with_prov["schema_version"], "0.2");
+        assert!(
+            with_prov["tool_version"].is_string(),
+            "tool_version must be present"
+        );
+        assert!(
+            with_prov["provenance"].is_object(),
+            "provenance block must be present"
+        );
+        assert_eq!(
+            with_prov["provenance"]["generated_at"],
+            "2026-06-07T00:00:00Z"
+        );
+        assert_eq!(
+            with_prov["provenance"]["tool_version"], with_prov["tool_version"],
+            "top-level tool_version must match provenance.tool_version"
+        );
+        Ok(())
+    }
+
+    /// `diff_path` and `diff_sha256` round-trip into the provenance block.
+    #[test]
+    fn provenance_diff_mode_carries_path_and_sha256() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let diff_content = b"--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1 +1 @@\n-old\n+new\n";
+        let expected_sha = crate::sha256_hex_of(diff_content);
+
+        let prov = crate::api::Provenance {
+            generated_at: "2026-06-07T12:00:00Z".to_string(),
+            diff_path: Some("fixtures/raw_pointer_alignment/change.diff".to_string()),
+            diff_sha256: Some(expected_sha.clone()),
+            ..Default::default()
+        };
+        let value = parse_json(&render_with_provenance(&output, &prov))?;
+        assert_eq!(
+            value["provenance"]["diff_path"],
+            "fixtures/raw_pointer_alignment/change.diff"
+        );
+        assert_eq!(value["provenance"]["diff_sha256"], expected_sha.as_str());
+        assert_eq!(
+            expected_sha.len(),
+            64,
+            "sha256_hex_of must produce 64 hex chars"
+        );
+        Ok(())
+    }
+
+    /// `generated_at` in the provenance block is a syntactically valid RFC3339 UTC timestamp.
+    #[test]
+    fn provenance_generated_at_is_rfc3339_utc() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let prov = crate::api::Provenance::new_now();
+        let value = parse_json(&render_with_provenance(&output, &prov))?;
+        let ts = value["provenance"]["generated_at"]
+            .as_str()
+            .ok_or("generated_at missing")?;
+        // RFC3339 UTC: YYYY-MM-DDTHH:MM:SSZ
+        assert!(ts.len() >= 20, "generated_at too short: {ts}");
+        assert!(ts.ends_with('Z'), "generated_at must end with Z: {ts}");
+        assert!(
+            ts.contains('T'),
+            "generated_at must contain T separator: {ts}"
+        );
+        Ok(())
     }
 }

@@ -19,18 +19,18 @@ use std::time::{Duration, Instant};
 use unsafe_review_core::{
     AnalysisMode, AnalyzeInput, AnalyzeOutput, CardId, CargoCarefulReceiptInput,
     ConcurrencyReceiptInput, DiffSource, DiscoveryOptions, MiriReceiptInput, PolicyMode,
-    ProofReceiptInput, RepoScanEvent, RepoScanPhase, RepoScanStatus, SanitizerReceiptInput, Scope,
-    WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze, analyze_with_discovery,
-    analyze_with_discovery_and_repo_events, audit_witness_receipts, baseline_add, baseline_init,
-    collect_context_range, compare_outcome_json, discover_repo_files, evaluate_policy_report,
-    evaluate_policy_report_from_output, lint_manual_candidate_text, load_manual_candidates,
-    manual_candidate_implementer_handoff, new_manual_candidate_skeleton, read_manual_candidate,
-    render_badge_jsons, render_comment_plan, render_gate_manifest, render_github_summary,
-    render_human, render_json, render_lsp, render_manual_candidate_witness_plan, render_markdown,
-    render_outcome_json, render_outcome_markdown, render_policy_report_json,
-    render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
-    render_receipt_audit_markdown, render_repair_queue, render_sarif, render_witness_plan,
-    validate_witness_receipts,
+    ProofReceiptInput, Provenance, RepoScanEvent, RepoScanPhase, RepoScanStatus,
+    SanitizerReceiptInput, Scope, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze,
+    analyze_with_discovery, analyze_with_discovery_and_repo_events, audit_witness_receipts,
+    baseline_add, baseline_init, collect_context_range, compare_outcome_json, discover_repo_files,
+    evaluate_policy_report, evaluate_policy_report_from_output, lint_manual_candidate_text,
+    load_manual_candidates, manual_candidate_implementer_handoff, new_manual_candidate_skeleton,
+    read_manual_candidate, render_badge_jsons, render_comment_plan, render_gate_manifest,
+    render_github_summary, render_human, render_json, render_json_with_provenance, render_lsp,
+    render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
+    render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
+    render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,
+    render_repair_queue, render_sarif, render_witness_plan, validate_witness_receipts,
 };
 
 mod card_lookup;
@@ -194,6 +194,7 @@ fn run_check(
     mode: AnalysisMode,
     discovery: DiscoveryOptions,
 ) -> Result<(), crate::RunFailure> {
+    let provenance = build_provenance(&options);
     let diff = diff_source(&options).map_err(crate::RunFailure::Tool)?;
     let policy = options.policy.clone();
     let output = analyze_with_discovery(
@@ -209,7 +210,7 @@ fn run_check(
         discovery,
     )
     .map_err(crate::RunFailure::Tool)?;
-    let rendered = render_with_format(&output, &options.format);
+    let rendered = render_with_format_and_provenance(&output, &options.format, Some(&provenance));
     if let Some(path) = options.out {
         ensure_parent_dir(&path).map_err(crate::RunFailure::Tool)?;
         fs::write(&path, rendered).map_err(|err| {
@@ -231,6 +232,7 @@ fn repo(options: RepoOptions) -> Result<(), crate::RunFailure> {
 
 fn run_repo_check(options: RepoOptions) -> Result<(), crate::RunFailure> {
     let check = options.check;
+    let provenance = build_provenance(&check);
     let diff = diff_source(&check).map_err(crate::RunFailure::Tool)?;
     let policy = check.policy.clone();
     let report_path = check.out.clone();
@@ -274,7 +276,7 @@ fn run_repo_check(options: RepoOptions) -> Result<(), crate::RunFailure> {
             "unsafe-review repo: no Rust files selected after include/exclude/ignores; check --root, --include, --exclude, --[no-]large-repo-ignores, and --[no-]respect-gitignore"
         );
     }
-    let rendered = render_with_format(&output, &check.format);
+    let rendered = render_with_format_and_provenance(&output, &check.format, Some(&provenance));
     if let Some(path) = report_path {
         let partial = repo_partial_path(&path);
         if let Err(err) = write_repo_report(&path, &partial, rendered) {
@@ -1110,6 +1112,7 @@ fn maybe_pause_for_repo_interrupt_after_scan(_status: &RepoScanStatus) {}
 fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     let mut check = options.check;
     check.policy = PolicyMode::Advisory;
+    let provenance = build_provenance(&check);
     let diff = diff_source(&check)?;
     let root = check.root.clone();
     let output = analyze(AnalyzeInput {
@@ -1137,9 +1140,15 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         .map_err(|err| format!("create {} failed: {err}", options.out_dir.display()))?;
     let mut comment_plan_artifact = None;
     for (name, renderer) in FIRST_PR_RENDERED_ARTIFACTS {
+        // cards.json uses the provenance-aware renderer to emit schema 0.2.
+        let raw_rendered = if name == "cards.json" {
+            render_json_with_provenance(&output, &provenance)
+        } else {
+            renderer(&output)
+        };
         let rendered = first_pr::render_first_pr_front_door_artifact(
             name,
-            renderer(&output),
+            raw_rendered,
             &root,
             &manual_candidates,
         );
@@ -1271,6 +1280,76 @@ fn read_stdin_diff() -> Result<DiffSource, String> {
     Ok(DiffSource::Text(text))
 }
 
+/// Build a [`Provenance`] block from CLI `CheckOptions`.
+///
+/// This is the seam between the CLI layer (where argv, base ref, and diff path are
+/// known) and the core JSON renderer.  Git queries use the same `ProcessCommand`
+/// pattern as the existing base-diff computation in `diff_source`.  Resolution
+/// failures are silent — "when available" semantics per the brief.
+fn build_provenance(options: &CheckOptions) -> Provenance {
+    let mut prov = Provenance::new_now();
+
+    // Resolved absolute root.
+    prov.root_abs = options
+        .root
+        .canonicalize()
+        .ok()
+        .map(|p| p.to_string_lossy().replace('\\', "/"));
+
+    // --base mode: resolve base and head SHAs via `git rev-parse`.
+    if let Some(base) = &options.base {
+        prov.base_sha = git_rev_parse(&options.root, base);
+        prov.head_sha = git_rev_parse(&options.root, "HEAD");
+    }
+
+    // --diff <file> mode: record path + SHA-256 of content.
+    if let Some(DiffInput::File(diff_path)) = &options.diff {
+        let resolved = resolve_diff_path(&options.root, diff_path);
+        prov.diff_path = Some(resolved.to_string_lossy().replace('\\', "/"));
+        if let Ok(bytes) = fs::read(&resolved) {
+            prov.diff_sha256 = Some(unsafe_review_core::sha256_hex_of(&bytes));
+        }
+    }
+
+    // Dirty-worktree marker when git is available.
+    prov.dirty_worktree = git_dirty_worktree(&options.root);
+
+    prov
+}
+
+/// Run `git rev-parse <ref>` in `root` and return the trimmed stdout on success.
+fn git_rev_parse(root: &Path, reference: &str) -> Option<String> {
+    let output = ProcessCommand::new("git")
+        .arg("-C")
+        .arg(root)
+        .arg("rev-parse")
+        .arg("--verify")
+        .arg(reference)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let sha = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if sha.is_empty() { None } else { Some(sha) }
+}
+
+/// Return `Some(true)` when `git status --porcelain` is non-empty (dirty),
+/// `Some(false)` when clean, or `None` when git is unavailable / not a repo.
+fn git_dirty_worktree(root: &Path) -> Option<bool> {
+    let output = ProcessCommand::new("git")
+        .arg("-C")
+        .arg(root)
+        .arg("status")
+        .arg("--porcelain")
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    Some(!output.stdout.is_empty())
+}
+
 fn resolve_diff_path(root: &Path, path: &Path) -> PathBuf {
     if path.exists() || path.is_absolute() {
         path.to_path_buf()
@@ -1290,9 +1369,23 @@ fn ensure_parent_dir(path: &Path) -> Result<(), String> {
 }
 
 fn render_with_format(output: &unsafe_review_core::AnalyzeOutput, format: &Format) -> String {
+    render_with_format_and_provenance(output, format, None)
+}
+
+fn render_with_format_and_provenance(
+    output: &unsafe_review_core::AnalyzeOutput,
+    format: &Format,
+    provenance: Option<&Provenance>,
+) -> String {
     match format {
         Format::Human => render_human(output),
-        Format::Json => render_json(output),
+        Format::Json => {
+            if let Some(prov) = provenance {
+                render_json_with_provenance(output, prov)
+            } else {
+                render_json(output)
+            }
+        }
         Format::Markdown => render_markdown(output),
         Format::PrSummary => render_pr_summary(output),
         Format::GithubSummary => render_github_summary(output),

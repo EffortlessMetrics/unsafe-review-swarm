@@ -5078,8 +5078,10 @@ fn check_review_kit_artifact_schema_version(
         ));
     };
     let expected = match path {
-        "review-kit.json" | "cards.json" | "comment-plan.json" | "lsp.json"
-        | "repair-queue.json" | "policy-report.json" => Some("0.1"),
+        // cards.json was bumped to 0.2 when provenance metadata was added.
+        "cards.json" => Some("0.2"),
+        "review-kit.json" | "comment-plan.json" | "lsp.json" | "repair-queue.json"
+        | "policy-report.json" => Some("0.1"),
         "unsafe-review-gate.json" => Some("unsafe-review-gate/v1"),
         "manual-candidates.json" => Some("manual-candidates/v1"),
         "manual-repair-queue.json" => Some("manual-repair-queue/v1"),
@@ -5731,7 +5733,7 @@ fn check_cards_json_artifact(dir: &Path) -> Result<AdvisoryArtifactManifest, Str
 
     let cards = super::parse_json_file(&dir.join("cards.json"))?;
     reject_manual_candidate_markers(&cards, "cards.json")?;
-    super::require_json_str(&cards, "schema_version", "0.1", "cards.json")?;
+    super::require_json_str(&cards, "schema_version", "0.2", "cards.json")?;
     super::require_json_str(&cards, "tool", "unsafe-review", "cards.json")?;
     super::require_json_str(&cards, "policy", "advisory", "cards.json")?;
     super::require_json_array(&cards, "cards", "cards.json")?;

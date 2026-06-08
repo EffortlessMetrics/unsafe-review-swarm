@@ -1,3 +1,6 @@
+mod sha256;
+pub(crate) use sha256::sha256_hex;
+
 pub(crate) fn path_display(path: &std::path::Path) -> String {
     path.to_string_lossy().replace('\\', "/")
 }

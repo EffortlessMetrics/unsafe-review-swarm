@@ -248,8 +248,56 @@ pub fn evaluate_policy_report_from_output(output: &AnalyzeOutput) -> Result<Poli
     policy_report::evaluate(output)
 }
 
+/// Traceable evidence metadata that the CLI layer assembles from argv, git, and the
+/// filesystem before calling the JSON renderer.
+///
+/// This is "traceable evidence metadata", not proof: the fields identify the inputs
+/// used to produce an artifact so that two runs against different diffs cannot emit
+/// byte-identical clean receipts, but they do not prove correctness or memory safety.
+#[derive(Clone, Debug, Default)]
+pub struct Provenance {
+    /// Absolute path of the resolved workspace root (additive alongside the existing
+    /// relative `root` field which remains unchanged for compatibility).
+    pub root_abs: Option<String>,
+    /// Resolved base commit SHA (when `--base` was supplied and git resolution succeeded).
+    pub base_sha: Option<String>,
+    /// Resolved HEAD commit SHA (when `--base` was supplied and git resolution succeeded).
+    pub head_sha: Option<String>,
+    /// Path of the diff file (when `--diff <file>` was supplied).
+    pub diff_path: Option<String>,
+    /// SHA-256 hex digest of the diff file content (when `--diff <file>` was supplied).
+    pub diff_sha256: Option<String>,
+    /// RFC3339 UTC timestamp at which the artifact was generated.
+    pub generated_at: String,
+    /// Whether the working tree had uncommitted changes when the tool ran (None = git unavailable).
+    pub dirty_worktree: Option<bool>,
+}
+
+impl Provenance {
+    /// Build a minimal provenance block stamped with the current UTC time.
+    pub fn new_now() -> Self {
+        use std::time::{SystemTime, UNIX_EPOCH};
+        let secs = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        Self {
+            generated_at: unix_secs_to_iso_datetime_utc(secs),
+            ..Self::default()
+        }
+    }
+}
+
 pub fn render_json(output: &AnalyzeOutput) -> String {
     json::render(output)
+}
+
+/// Render the JSON analyze artifact with attached traceable evidence metadata.
+///
+/// The `provenance` block is inserted as a nested object in the output.
+/// `tool_version` also appears top-level beside `tool` for consumer grep-ability.
+pub fn render_json_with_provenance(output: &AnalyzeOutput, provenance: &Provenance) -> String {
+    json::render_with_provenance(output, provenance)
 }
 
 pub fn render_human(output: &AnalyzeOutput) -> String {
@@ -620,6 +668,22 @@ fn compute_review_after_date() -> String {
     let future_secs = secs + 365 * 24 * 3600;
     // Convert to a YYYY-MM-DD string using a simple algorithm.
     unix_secs_to_iso_date(future_secs)
+}
+
+/// Extend the date-only helper to a full RFC3339 UTC timestamp (e.g. `2026-06-07T21:30:00Z`).
+///
+/// The time portion is always `T00:00:00Z` (midnight UTC) because we only have
+/// second-level granularity and already discard the sub-day remainder in the
+/// date calculation.  For a provenance `generated_at` field this is sufficient
+/// — the date binds the artifact to a calendar day without requiring chrono.
+pub(crate) fn unix_secs_to_iso_datetime_utc(secs: u64) -> String {
+    let date = unix_secs_to_iso_date(secs);
+    // Compute HH:MM:SS from the remaining seconds in the day.
+    let remainder = secs % 86400;
+    let hh = remainder / 3600;
+    let mm = (remainder % 3600) / 60;
+    let ss = remainder % 60;
+    format!("{date}T{hh:02}:{mm:02}:{ss:02}Z")
 }
 
 fn unix_secs_to_iso_date(secs: u64) -> String {
