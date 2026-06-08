@@ -449,6 +449,11 @@ struct RepoStatusReporter {
     last_phase: Option<String>,
     last_discovery_heartbeat: usize,
     last_scan_heartbeat: usize,
+    /// Set true the moment `record_event` detects a `--timeout-seconds` timeout
+    /// and returns the timeout error.  This is the single source of truth that
+    /// distinguishes a timeout incomplete-scan from an analysis/write error on
+    /// the shared `record_incomplete` path.
+    hit_timeout: bool,
     _signal_guard: Option<RepoSignalGuard>,
 }
 
@@ -508,6 +513,7 @@ impl RepoStatusReporter {
             last_phase: None,
             last_discovery_heartbeat: 0,
             last_scan_heartbeat: 0,
+            hit_timeout: false,
             _signal_guard: signal_guard,
         })
     }
@@ -541,6 +547,7 @@ impl RepoStatusReporter {
             eprintln!("{}", format_repo_progress(&status));
         }
         if self.timed_out(&status) {
+            self.hit_timeout = true;
             return Err(self.timeout_error());
         }
         Ok(())
@@ -560,6 +567,15 @@ impl RepoStatusReporter {
             .lock()
             .map_err(|err| format!("repo status lock poisoned: {err}"))?
             .clone();
+        // A timeout is only ever surfaced when `record_event` detects it and
+        // returns the timeout error (setting `hit_timeout`).  Every other
+        // incomplete stop on this shared path — analysis error mid-scan or a
+        // report-write failure — is an `Error`, not a timeout.
+        let stop_reason = if self.hit_timeout {
+            RepoStopReason::Timeout
+        } else {
+            RepoStopReason::Error
+        };
         fs::write(
             &path,
             render_repo_scan_incomplete_status(
@@ -567,6 +583,7 @@ impl RepoStatusReporter {
                 error,
                 partial_path.filter(|path| path.exists()),
                 &self.scan_scope,
+                stop_reason,
             )?,
         )
         .map_err(|err| format!("write {} failed: {err}", path.display()))?;
@@ -864,6 +881,7 @@ fn render_repo_scan_incomplete_status(
     error: &str,
     partial_path: Option<&Path>,
     scan_scope: &RepoScanScopeMetadata,
+    stop_reason: RepoStopReason,
 ) -> Result<String, String> {
     let value = serde_json::json!({
         "schema_version": status
@@ -881,7 +899,7 @@ fn render_repo_scan_incomplete_status(
             .map(|path| repo_path_display(path)),
         "completed": false,
         "partial": true,
-        "stop_reason": RepoStopReason::Timeout.as_str(),
+        "stop_reason": stop_reason.as_str(),
         "cap": null,
         "error": error,
         "signal": null,
@@ -2698,8 +2716,54 @@ fn print_candidate_help() {
 
 #[cfg(test)]
 mod tests {
-    use super::{resolve_diff_path, writable_status, yes_no};
+    use super::{
+        RepoScanScopeMetadata, render_repo_scan_incomplete_status, resolve_diff_path,
+        writable_status, yes_no,
+    };
     use std::path::{Path, PathBuf};
+    use unsafe_review_core::{DiscoveryOptions, RepoStopReason};
+
+    fn test_scan_scope() -> RepoScanScopeMetadata {
+        RepoScanScopeMetadata::new(Path::new("/tmp/repo"), &DiscoveryOptions::repo_defaults())
+    }
+
+    #[test]
+    fn incomplete_status_labels_timeout_distinctly_from_error() -> Result<(), String> {
+        let scope = test_scan_scope();
+
+        // The shared record_incomplete path serves timeout AND non-timeout
+        // (analysis/write) errors. The stop_reason must be accurate for each.
+        let timeout_json = render_repo_scan_incomplete_status(
+            None,
+            "repo scan timed out after 1s",
+            None,
+            &scope,
+            RepoStopReason::Timeout,
+        )?;
+        let timeout: serde_json::Value = serde_json::from_str(&timeout_json)
+            .map_err(|err| format!("parse timeout status failed: {err}"))?;
+        assert_eq!(timeout["phase"], "failed");
+        assert_eq!(timeout["partial"], true);
+        assert_eq!(timeout["stop_reason"], "timeout");
+
+        let error_json = render_repo_scan_incomplete_status(
+            None,
+            "rename partial repo report failed: is a directory",
+            None,
+            &scope,
+            RepoStopReason::Error,
+        )?;
+        let error: serde_json::Value = serde_json::from_str(&error_json)
+            .map_err(|err| format!("parse error status failed: {err}"))?;
+        assert_eq!(error["phase"], "failed");
+        assert_eq!(error["partial"], true);
+        assert_eq!(
+            error["stop_reason"], "error",
+            "a non-timeout incomplete scan must not be mislabeled as a timeout"
+        );
+
+        Ok(())
+    }
 
     #[test]
     fn resolve_diff_path_joins_relative_path_to_root() {

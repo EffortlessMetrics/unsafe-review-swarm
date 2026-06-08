@@ -4505,7 +4505,9 @@ fn repo_output_failure_keeps_partial_and_marks_status_incomplete() -> Result<(),
     assert_default_repo_status_scope(&status, &fixture, 0)?;
     assert_eq!(status["completed"], false);
     assert_eq!(status["partial"], true);
-    assert_eq!(status["stop_reason"], "timeout");
+    // A report-write failure is an error, not a timeout — the shared
+    // record_incomplete path must label it accurately.
+    assert_eq!(status["stop_reason"], "error");
     assert_eq!(status["cap"], Value::Null);
     assert_eq!(status["files_discovered"], 1);
     assert_eq!(status["files_scanned"], 1);
@@ -4581,7 +4583,8 @@ fn repo_analysis_failure_keeps_completed_file_partial_snapshot() -> Result<(), B
     assert_default_repo_status_scope(&status, &scan_root, 1)?;
     assert_eq!(status["completed"], false);
     assert_eq!(status["partial"], true);
-    assert_eq!(status["stop_reason"], "timeout");
+    // An analysis read failure mid-scan is an error, not a timeout.
+    assert_eq!(status["stop_reason"], "error");
     assert_eq!(status["cap"], Value::Null);
     assert_eq!(status["files_discovered"], 2);
     assert_eq!(status["files_scanned"], 1);

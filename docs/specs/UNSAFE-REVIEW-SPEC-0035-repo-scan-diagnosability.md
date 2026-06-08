@@ -108,7 +108,8 @@ first-class artifact:
 - `complete` — scan finished reading all in-scope files (may be followed by
   `completed: true` for a full scan, or `partial: true` for a `--max-cards`
   capped scan that stopped before all files were read).
-- `failed` — scan did not complete due to a timeout or analysis error.
+- `failed` — scan did not complete due to a timeout, an analysis error, or a
+  report-write error.
 - `terminated` — scan was interrupted by SIGTERM or SIGINT.
 
 **Stop-reason vocabulary:**
@@ -117,6 +118,10 @@ first-class artifact:
   were emitted.  `cap` carries the configured N.
 - `timeout` — `--timeout-seconds N` elapsed.
 - `terminated` — a unix signal (SIGTERM / SIGINT) interrupted the scan.
+- `error` — the scan did not complete due to an analysis error mid-scan or a
+  report-write failure (anything on the `phase: "failed"` path that is not a
+  timeout).  Timeout and error share the `failed` phase but are distinguished by
+  `stop_reason` so a disk-write failure is never mislabeled as a timeout.
 
 The `completed` field is `true` only for a full clean scan; a `max_cards`-capped
 scan sets `completed: false` and `partial: true` even though `phase` is still

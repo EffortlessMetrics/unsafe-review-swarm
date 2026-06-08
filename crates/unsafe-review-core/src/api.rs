@@ -89,6 +89,9 @@ pub enum RepoStopReason {
     Timeout,
     /// A unix signal (SIGTERM / SIGINT) interrupted the scan.
     Terminated,
+    /// The scan did not complete due to an analysis or report-write error
+    /// (anything that is not a timeout, signal, or cap).
+    Error,
 }
 
 impl RepoStopReason {
@@ -98,6 +101,7 @@ impl RepoStopReason {
             Self::MaxCards => "max_cards",
             Self::Timeout => "timeout",
             Self::Terminated => "terminated",
+            Self::Error => "error",
         }
     }
 }

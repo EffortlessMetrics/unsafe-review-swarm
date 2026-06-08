@@ -21,8 +21,11 @@ comments, edit source, or block by default.
   + `completed: true` sidecar, making truncated scans indistinguishable from
   complete ones.  All stop reasons now emit a `stop_reason` field: `"none"` for
   a full complete scan, `"max_cards"` for a cap-stopped scan, `"timeout"` for a
-  timed-out scan, and `"terminated"` for a signal-interrupted scan.  A `partial`
-  boolean accompanies the field (`false` only for `stop_reason: "none"`).
+  timed-out scan, `"terminated"` for a signal-interrupted scan, and `"error"` for
+  an analysis or report-write failure.  Timeout and error share the
+  `phase: "failed"` status but are distinguished by `stop_reason`, so a disk-write
+  or internal error is never mislabeled as a timeout.  A `partial` boolean
+  accompanies the field (`false` only for `stop_reason: "none"`).
   ([#1545](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1545))
 
 - SPEC-0035 (`repo-scan-status/v1` diagnosability) field names corrected to match
