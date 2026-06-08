@@ -483,6 +483,35 @@ sorting, so it bounds both `--list-files` output and repo analysis input.
 not interrupt a single file mid-scan, but it prevents a long scan from looking
 successful after the configured budget expires.
 
+### Scan cost and large-repo scoping
+
+Per-file scan time is not uniform: it grows with file size and unsafe density,
+and large files dominate a run. Observed on a real large repository, a
+740-line file with 52 unsafe sites took ~36s and an ~1100-line file took ~28s,
+so a 123-file subtree extrapolated past 1200s. A whole-repo scan of a
+thousand-plus-file repository is generally intractable without scoping, and an
+unscoped run that exceeds `--timeout-seconds` records a partial scan
+(`stop_reason: "timeout"`) rather than a complete posture.
+
+Scope deliberately on large or brownfield repositories rather than scanning
+everything:
+
+- Narrow with `--include`/`--exclude` to the review lane you actually care about
+  (one crate, one subtree), instead of the whole tree.
+- Preview the selection with `--list-files` before a real scan to confirm the
+  scope and rough file count.
+- Bound the run with `--timeout-seconds` and/or `--max-cards`. Both stops are
+  recorded truthfully in `<out>.status.json` (`stop_reason: "timeout"` or
+  `"max_cards"`, `partial: true`) and as a `<out>.partial` completed-file
+  snapshot; neither a capped nor a timed-out scan is reported as complete.
+- Re-run on a narrower scope (or a higher cap) to cover the remaining files,
+  using the `scan_scope` recorded in the status sidecar to replay.
+
+A partial scan is a snapshot of the files that finished, not whole-repo posture.
+Default-ignored directories, nested git checkouts, and gitfile worktrees (see
+above) are already excluded, so the cost is over the in-scope first-party Rust
+files only.
+
 Badge JSON reports open review gaps, not raw unsafe usage and not safety status:
 
 ```bash

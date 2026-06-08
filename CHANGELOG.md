@@ -13,6 +13,13 @@ comments, edit source, or block by default.
 
 ### Added
 
+- CLI guide now documents per-file scan cost and the large-repo/brownfield
+  scoping workflow (narrow with `--include`/`--exclude`, preview with
+  `--list-files`, bound with `--timeout-seconds`/`--max-cards`, re-run on a
+  narrower scope), so whole-repo scans of large repositories are scoped
+  deliberately rather than timing out.
+  ([#1546](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1546))
+
 - `repo --max-cards N` capped scans now emit a partial status sidecar with
   `partial: true`, `stop_reason: "max_cards"`, `cap: N`, `cards_found: N`, and
   a cap-specific `operator.next_action` ("narrow include/exclude filters or raise
