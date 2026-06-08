@@ -204,7 +204,9 @@ Requirements:
 
 ```text
 must parse as JSON
-must include schema_version
+must include schema_version = 0.2
+must include tool_version
+must include a provenance block
 must include trust boundary
 must include stable ReviewCard identities
 must include operation family
@@ -223,6 +225,47 @@ cue, but it must not imply that unsafe-review executed the cue, observed runtime
 behavior, proved site execution, proved UB, or proved repository safety.
 
 All other PR artifacts are projections from this card set.
+
+##### 3.1.1 Provenance block (schema 0.2)
+
+Schema 0.2 adds top-level `tool_version` and a nested `provenance` object to
+`cards.json` and to `check`/`repo` `--format json` output. The bump is
+additive: every schema 0.1 field is unchanged, and `schema_version` is the
+discriminator consumers route on. Consumers that accepted 0.1 should accept
+0.2.
+
+```text
+tool_version           always present; the unsafe-review semver
+provenance.tool_version always present; same value, for consumers that parse
+                         the provenance block exclusively
+provenance.generated_at always present; RFC3339 UTC timestamp of artifact
+                         generation
+provenance.root_abs     resolved absolute workspace root; omitted when path
+                         resolution fails (the existing relative `root` field
+                         is unchanged)
+provenance.base_sha     resolved base commit SHA in --base mode; omitted when
+                         --base was not supplied or git resolution fails
+provenance.head_sha     resolved HEAD commit SHA in --base mode; omitted under
+                         the same conditions as base_sha
+provenance.diff_path    diff file path in --diff <file> mode; omitted otherwise
+provenance.diff_sha256  SHA-256 hex digest of the diff file content in
+                         --diff <file> mode; omitted when the file is unreadable
+provenance.dirty_worktree true when `git status --porcelain` reports
+                         uncommitted changes, false when clean; omitted when
+                         git is unavailable or the root is not a repository
+```
+
+Unavailable fields are omitted from the JSON object rather than emitted as
+null; presence is the availability signal. The provenance block is traceable
+evidence metadata, not proof: it identifies the inputs used to produce the
+artifact so two runs against different inputs cannot emit byte-identical clean
+receipts, but it does not prove correctness, input integrity against a
+motivated attacker, or memory safety.
+
+Partial/interim repo reports (the `.partial` report written during a repo scan
+and on interrupt) still emit schema 0.1 without a provenance block, pending the
+SPEC-0035 partial-status reconciliation in the next lane slice. Final reports
+and `cards.json` always emit 0.2.
 
 #### 3.2 `pr-summary.md`
 

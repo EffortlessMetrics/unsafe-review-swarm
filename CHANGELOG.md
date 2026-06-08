@@ -11,6 +11,21 @@ comments, edit source, or block by default.
 
 ## Unreleased
 
+### Added
+
+- `cards.json` and `check`/`repo` `--format json` output bump `schema_version`
+  from `0.1` to `0.2` and now carry provenance metadata: top-level
+  `tool_version`, plus a `provenance` block with `tool_version`,
+  `generated_at` (RFC3339 UTC), resolved absolute root (`root_abs`), resolved
+  `base_sha`/`head_sha` in `--base` mode, `diff_path` + `diff_sha256` (SHA-256
+  content digest) in `--diff <file>` mode, and a `dirty_worktree` marker.
+  Fields that cannot be resolved are omitted, not null. The bump is additive —
+  every existing field is unchanged — so consumers routing on `schema_version`
+  should accept `0.2` wherever they accepted `0.1`. Partial/interim repo
+  reports still emit `0.1` without provenance pending the SPEC-0035
+  partial-status reconciliation.
+  ([#1517](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1517))
+
 ### Changed (breaking for callers that check exit codes)
 
 - `--policy no-new-debt` violations now exit **1** instead of **2**. The stable
