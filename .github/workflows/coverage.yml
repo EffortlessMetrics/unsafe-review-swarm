@@ -80,7 +80,7 @@ jobs:
             --lcov \
             --output-path target/llvm-cov/lcov.info
 
-      - uses: codecov/codecov-action@v6
+      - uses: codecov/codecov-action@v7
         if: always()
         with:
           files: target/llvm-cov/lcov.info
