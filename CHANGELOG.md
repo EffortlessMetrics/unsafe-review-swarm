@@ -11,6 +11,17 @@ comments, edit source, or block by default.
 
 ## Unreleased
 
+## 0.3.5 - 2026-06-08
+
+0.3.5 is the instrument-truthfulness patch. It makes `unsafe-review`'s core
+assertions exact for downstream automation: what scope ran, whether the diff
+input parsed, which exit category occurred, what receipt applies, whether a
+scan completed or was capped, and how to scope large repositories. It adds no
+analyzer breadth. It remains advisory static coverage evidence: it does not
+prove memory safety, UB-free status, Miri-clean status, site execution,
+calibrated precision/recall, or policy readiness, and it does not run
+witnesses, post comments, edit source, or block by default.
+
 ### Added
 
 - CLI guide now documents per-file scan cost and the large-repo/brownfield
@@ -60,6 +71,20 @@ comments, edit source, or block by default.
   ([#1517](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1517))
 
 ### Changed
+
+- Repo discovery now skips any subdirectory containing a `.git` entry — a nested
+  git checkout (`.git` directory) or a gitfile worktree (`.git` file) — by
+  default, so scratch worktrees and vendored repository copies no longer inflate
+  scan counts as if they were the target repository. The skip is independent of
+  gitignore handling. All scan surfaces (repo posture, badges, baseline) share
+  the same discovery, so the exclusion applies uniformly.
+  ([#1552](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1552))
+
+- A supplied `--diff` whose content does not parse as a unified diff is now an
+  explicit input error (exit 2, no analysis, no artifacts) instead of silently
+  falling back to a whole-repo scan that still reported `scope: "diff"`. Empty
+  or whitespace-only diff input and binary-only diffs remain accepted.
+  ([#1516](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1516))
 
 - A supplied `--diff` or `--base` that resolves to an empty diff (e.g. `git diff`
   on a clean branch or an empty diff file) now produces a complete diff-scoped
