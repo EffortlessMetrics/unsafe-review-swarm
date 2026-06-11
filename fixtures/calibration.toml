@@ -4,6 +4,7 @@ status = "experimental"
 required_core_fixtures = [
   "raw_pointer_alignment",
   "raw_pointer_alignment_receipted",
+  "witness_mismatch_tool",
   "align_of_only_not_guard",
   "alignment_other_pointer_not_guard",
   "raw_pointer_alignment_post_check_not_guard",
@@ -584,6 +585,16 @@ expected_cards = 1
 expected_class = "guard_missing"
 expected_operation_family = "raw_pointer_read"
 expected_hazard = "alignment"
+
+[[cases]]
+fixture = "witness_mismatch_tool"
+kind = "positive"
+claim = "a receipt whose tool does not match any routed witness tool produces a witness_mismatch card"
+support_tier = "Witness receipt import"
+expected_cards = 1
+expected_class = "witness_mismatch"
+expected_operation_family = "box_from_raw"
+expected_hazard = "pointer_validity"
 
 [[cases]]
 fixture = "align_of_only_not_guard"

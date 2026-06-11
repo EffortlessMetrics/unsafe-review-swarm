@@ -5,6 +5,8 @@ Owner: core/spec
 Created: 2026-05-17
 Linked proposal: ../proposals/UNSAFE-REVIEW-PROP-0001-product-contract.md
 Linked plan: ../../plans/0.1.0/implementation-plan.md
+Linked issues:
+- EffortlessMetrics/unsafe-review-swarm#1602 (WitnessMismatch is_actionable fix)
 
 ## Problem
 
@@ -28,7 +30,36 @@ strength. A `configured`, expired, wrong-tool, or non-human `reviewed` receipt
 remains valid receipt metadata for audit or is rejected by validation as
 specified below, but it does not remove the missing witness gap. Card-level
 witness summaries should surface same-card metadata-only state so reviewers can
-see why a saved receipt did not import as current witness evidence. Receipt
+see why a saved receipt did not import as current witness evidence.
+
+When an otherwise-sound card (contract, guard, and reach evidence all present)
+has an imported receipt whose `tool` does not match any of the card's routed
+witness tools, the card is classified as `WitnessMismatch` rather than
+`GuardedUnwitnessed`. A tool mismatch is a live, surfaced condition — a saved
+receipt exists but it cannot satisfy the current route — so
+`ReviewClass::is_actionable()` returns `true` for `WitnessMismatch`. This means
+`WitnessMismatch` cards feed the same downstream surfaces as any other open
+actionable class:
+
+- **LSP diagnostics** — a `warning`-severity diagnostic is emitted (same rule
+  as all actionable classes in `lsp/diagnostics.rs`).
+- **Baseline state** — `BaselineState::New` is produced by `CoverageBlock` so
+  the card participates in no-new-debt accounting.
+- **Policy report** — `PolicyStatus::NewGap` is produced by `policy_report.rs`
+  so the card increments the new-debt counter.
+- **Agent/LSP readiness** — `agent_lsp_readiness = "ready"` is set by
+  `agent/readiness.rs`.
+- **Comment plan** — `comment_plan/selection.rs` considers the card eligible
+  for the `specific_receipt_missing` bucket.
+- **Summary action count** — `pipeline/summary.rs` counts the card in the open
+  actionable set.
+- **API** — `api.rs` exposes the card in the actionable gap list.
+
+Rule: any change to the `is_actionable()` match arm is cross-surface by
+construction. A new variant added to or removed from that arm must update tests
+in `lsp/tests.rs`, `output/policy_report.rs`, and `domain/coverage.rs` (the
+baseline-state and outcome-movement drift-locks) so regressions are caught at
+compile time, not at customer sites. Receipt
 import does not discharge contracts or guards. Receipt import does not discharge
 reach evidence except for the explicitly reach-only
 `tool = "external-integration-test"` / `strength = "site_reached"` receipt
@@ -252,6 +283,13 @@ must include a non-empty `command`.
   does not remove the `witness` missing-evidence item.
 - A matching wrong-tool receipt validates and appears in receipt audit, but does
   not remove the `witness` missing-evidence item.
+- A card whose contract, guard, and reach evidence are all present, but whose
+  only imported receipt has a tool that does not match any routed witness tool,
+  is classified as `WitnessMismatch` (not `GuardedUnwitnessed`).
+- A `WitnessMismatch` card is actionable: it produces a `warning`-severity LSP
+  diagnostic, `BaselineState::New`, `PolicyStatus::NewGap`, and is included in
+  the open actionable set reported to the agent and comment plan surfaces
+  (issue #1602).
 - A receipt with unknown tool is rejected.
 - A receipt with unknown strength is rejected.
 - A receipt with uncounted card identity is rejected.

@@ -327,10 +327,15 @@ fn did_change_does_not_trigger_analysis_by_default() {
 
 /// Drift-lock: non-actionable cards must not appear in LSP diagnostics.
 ///
-/// The non-actionable classes (GuardedAndWitnessed, WitnessMismatch, Suppressed,
-/// BaselineKnown) represent resolved or policy-suppressed states; surfacing them
-/// as IDE diagnostics is noise with no required action. This test verifies the
-/// filter added in `diagnostics_by_uri` (issue #1593).
+/// The non-actionable classes (GuardedAndWitnessed, Suppressed, BaselineKnown)
+/// represent resolved or policy-suppressed states; surfacing them as IDE
+/// diagnostics is noise with no required action. This test verifies the filter
+/// added in `diagnostics_by_uri` (issue #1593).
+///
+/// WitnessMismatch was previously listed here but is NOW actionable (issue
+/// #1602): a saved receipt whose tool does not match any routed witness tool is
+/// a live "fix your receipt" condition, not a resolved state. See the positive
+/// arm below for its drift-lock coverage.
 ///
 /// Cards are constructed programmatically by cloning a real fixture card and
 /// overriding the class field — the same pattern recommended by the verify pass
@@ -345,7 +350,6 @@ fn non_actionable_cards_produce_no_lsp_diagnostic() -> Result<(), Box<dyn Error>
         .ok_or("fixture must have at least one card")?;
     let non_actionable_classes = [
         ReviewClass::GuardedAndWitnessed,
-        ReviewClass::WitnessMismatch,
         ReviewClass::Suppressed,
         ReviewClass::BaselineKnown,
     ];
@@ -370,6 +374,11 @@ fn non_actionable_cards_produce_no_lsp_diagnostic() -> Result<(), Box<dyn Error>
 ///
 /// Verifies that the filter in `diagnostics_by_uri` does not accidentally suppress
 /// actionable cards (issue #1593).
+///
+/// WitnessMismatch is included here (issue #1602): a saved receipt whose tool
+/// does not match any routed witness tool is a live "fix your receipt" condition
+/// and must be visible as an IDE diagnostic. This arm would fail if
+/// `is_actionable()` were reverted to exclude WitnessMismatch.
 #[test]
 fn actionable_cards_produce_lsp_diagnostic() -> Result<(), Box<dyn Error>> {
     let (root, base_output) = fixture_output("raw_pointer_alignment")?;
@@ -383,6 +392,7 @@ fn actionable_cards_produce_lsp_diagnostic() -> Result<(), Box<dyn Error>> {
         ReviewClass::GuardedUnwitnessed,
         ReviewClass::ReachableUnwitnessed,
         ReviewClass::UnsafeUnreached,
+        ReviewClass::WitnessMismatch,
         ReviewClass::RequiresLoom,
         ReviewClass::RequiresSanitizer,
         ReviewClass::RequiresKaniOrCrux,

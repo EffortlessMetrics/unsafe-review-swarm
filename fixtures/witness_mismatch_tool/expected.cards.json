@@ -1,0 +1,116 @@
+[
+  {
+    "id": "UR-witness-mismatch-tool-fixture-src-lib-rs-round-trip-operation-box_from_raw-from-raw-6a054e97d17a-pointer_validity-c1",
+    "class": "witness_mismatch",
+    "priority": "medium",
+    "confidence": "medium",
+    "proof_path": "observable_red_green",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 13,
+      "column": 5,
+      "kind": "operation",
+      "owner": "round_trip",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { Box::from_raw(ptr) }"
+    },
+    "operation": "unsafe { Box::from_raw(ptr) }",
+    "operation_family": "box_from_raw",
+    "hazards": [
+      "pointer_validity",
+      "drop_or_deallocation",
+      "leak_or_ownership_transfer"
+    ],
+    "obligations": [
+      "raw pointer was produced by compatible allocator and is uniquely owned"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "ownership",
+        "description": "raw pointer was produced by compatible allocator and is uniquely owned",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `# Safety` documentation was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Box::into_raw ownership evidence was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `round_trip`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "Saved `kani` receipt for this card does not match routed witness tools: miri, cargo-careful"
+        }
+      }
+    ],
+    "contract": "Nearby `# Safety` documentation was detected",
+    "discharge": "All inferred safety obligations have visible local discharge evidence",
+    "reach": "1 related test file(s) mention owner `round_trip`",
+    "witness": "Saved `kani` receipt for this card does not match routed witness tools: miri, cargo-careful",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test round_trip",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test round_trip",
+        "required": false
+      }
+    ],
+    "missing": [
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Review the witness identity or tool mismatch and attach a matching receipt for this card.",
+    "verify_commands": [
+      "cargo +nightly miri test round_trip",
+      "cargo +nightly careful test round_trip"
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `witness_mismatch` ReviewCard for `unsafe { Box::from_raw(ptr) }`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test round_trip",
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test round_trip` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test round_trip",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-witness-mismatch-tool-fixture-src-lib-rs-round-trip-operation-box_from_raw-from-raw-6a054e97d17a-pointer_validity-c1` still maps to `unsafe { Box::from_raw(ptr) }` at `src/lib.rs:13:5` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test round_trip` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo +nightly miri test round_trip` first, then attach a matching receipt if it confirms the route",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "present",
+      "guard_coverage": "present",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "not_eligible",
+      "agent_lsp_readiness": "ready"
+    }
+  }
+]

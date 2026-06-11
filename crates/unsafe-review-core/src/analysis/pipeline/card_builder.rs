@@ -74,6 +74,22 @@ pub(super) fn build_card(
             class = ReviewClass::GuardedAndWitnessed;
             priority = Priority::Low;
         }
+    } else if class == ReviewClass::GuardedUnwitnessed
+        && ctx.receipt_index.has_tool_mismatch_for(&id, &routes)
+    {
+        // A receipt exists but its tool does not match any routed witness tool.
+        // Only upgrade from GuardedUnwitnessed: the card is otherwise sound
+        // (contract + guard + reach present) but the receipt is broken.
+        // Surfacing it as WitnessMismatch lets every output surface treat it as
+        // an open actionable condition (see is_actionable() in classification.rs).
+        class = ReviewClass::WitnessMismatch;
+        // Propagate the mismatch summary into the obligation-level witness slot
+        // so that the top-level card.witness.summary and each obligation's
+        // evidence.witness.summary remain consistent (the check-fixtures gate
+        // enforces this invariant).
+        for evidence in &mut obligation_evidence {
+            evidence.witness = crate::domain::EvidenceState::missing(&witness_evidence.summary);
+        }
     }
 
     if ctx.policy_state.is_suppressed(&id) {

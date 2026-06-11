@@ -44,6 +44,7 @@ impl ReviewClass {
                 | Self::GuardMissing
                 | Self::ReachableUnwitnessed
                 | Self::UnsafeUnreached
+                | Self::WitnessMismatch
                 | Self::RequiresLoom
                 | Self::RequiresSanitizer
                 | Self::RequiresKaniOrCrux
@@ -140,12 +141,19 @@ mod tests {
 
     #[test]
     fn review_class_actionability_keeps_closed_outcomes_non_actionable() {
+        // WitnessMismatch is actionable: a saved receipt whose tool does not
+        // match any routed witness tool is a live "fix your receipt" condition,
+        // not a resolved state. Consistent with sarif.rs (level=warning),
+        // comment_plan/selection.rs (specific_receipt_missing bucket),
+        // action_summary.rs (next_action asks for matching receipt), and
+        // outcome/mod.rs (counted in violation list).
         let actionable = [
             ReviewClass::GuardedUnwitnessed,
             ReviewClass::ContractMissing,
             ReviewClass::GuardMissing,
             ReviewClass::ReachableUnwitnessed,
             ReviewClass::UnsafeUnreached,
+            ReviewClass::WitnessMismatch,
             ReviewClass::RequiresLoom,
             ReviewClass::RequiresSanitizer,
             ReviewClass::RequiresKaniOrCrux,
@@ -154,7 +162,6 @@ mod tests {
         ];
         let non_actionable = [
             ReviewClass::GuardedAndWitnessed,
-            ReviewClass::WitnessMismatch,
             ReviewClass::BaselineKnown,
             ReviewClass::Suppressed,
         ];

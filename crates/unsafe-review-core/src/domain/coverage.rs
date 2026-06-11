@@ -666,6 +666,37 @@ mod tests {
         assert_eq!(block.agent_lsp_readiness.as_str(), "ready");
     }
 
+    /// Drift-lock: WitnessMismatch must produce baseline_state=New (issue #1602).
+    ///
+    /// WitnessMismatch is actionable (a broken receipt is a live, surfaced
+    /// condition), so it must feed the no-new-debt/exit-code policy gate like any
+    /// other open actionable class. This test would FAIL if WitnessMismatch were
+    /// reverted to non-actionable in `is_actionable()`.
+    #[test]
+    fn witness_mismatch_baseline_state_is_new() {
+        let card = minimal_card(ReviewClass::WitnessMismatch);
+        let block = CoverageBlock::derive(&card);
+        assert_eq!(
+            block.baseline_state,
+            BaselineState::New,
+            "WitnessMismatch must produce baseline_state=New (actionable) — revert is_actionable() to break this"
+        );
+    }
+
+    /// Drift-lock: WitnessMismatch must produce outcome_movement=Regressed (issue #1602).
+    ///
+    /// Would FAIL if WitnessMismatch were reverted to non-actionable.
+    #[test]
+    fn witness_mismatch_outcome_movement_is_regressed() {
+        let card = minimal_card(ReviewClass::WitnessMismatch);
+        let block = CoverageBlock::derive(&card);
+        assert_eq!(
+            block.outcome_movement,
+            OutcomeMovement::Regressed,
+            "WitnessMismatch must produce outcome_movement=Regressed — revert is_actionable() to break this"
+        );
+    }
+
     #[test]
     fn coverage_block_as_str_methods_cover_all_variants() {
         assert_eq!(Coverage::Present.as_str(), "present");

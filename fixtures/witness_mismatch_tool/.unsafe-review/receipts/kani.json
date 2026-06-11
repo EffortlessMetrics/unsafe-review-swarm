@@ -1,0 +1,16 @@
+{
+  "schema_version": "0.1",
+  "card_id": "UR-witness-mismatch-tool-fixture-src-lib-rs-round-trip-operation-box_from_raw-from-raw-6a054e97d17a-pointer_validity-c1",
+  "tool": "kani",
+  "strength": "ran",
+  "author": "core/fixtures",
+  "recorded_at": "2026-06-11T00:00:00Z",
+  "expires_at": "2028-06-11",
+  "summary": "fixture receipt with mismatched tool: kani was used but miri/cargo-careful are the routed tools for this card",
+  "command": "cargo kani --harness verify_round_trip",
+  "command_hash": "48b5cd46400ee882",
+  "limitations": [
+    "fixture only",
+    "tool kani does not match the routed witness tools miri/cargo-careful for this box_from_raw card"
+  ]
+}

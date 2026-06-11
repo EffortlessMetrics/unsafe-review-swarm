@@ -764,6 +764,23 @@ review_after = "2026-08-01"
         }
     }
 
+    /// Drift-lock: WitnessMismatch must map to PolicyStatus::NewGap (issue #1602).
+    ///
+    /// A broken receipt (saved tool does not match routed witness tools) is a
+    /// live, surfaced condition. It feeds the no-new-debt / exit-code-1 policy
+    /// gate like any other open actionable class. This test would FAIL if
+    /// WitnessMismatch were reverted to non-actionable in `is_actionable()`.
+    #[test]
+    fn witness_mismatch_maps_to_new_gap_policy_status() {
+        let status = policy_status(&ReviewClass::WitnessMismatch);
+        assert_eq!(
+            status,
+            PolicyStatus::NewGap,
+            "WitnessMismatch must map to PolicyStatus::NewGap — revert is_actionable() to break this"
+        );
+        assert_eq!(status.as_str(), "new_gap");
+    }
+
     fn fixture_path(name: &str) -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures")

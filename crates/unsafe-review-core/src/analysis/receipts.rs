@@ -137,6 +137,21 @@ impl ReceiptIndex {
             .unwrap_or(static_reach)
     }
 
+    /// Returns `true` when an imported receipt exists for `id` but its tool
+    /// does not match any of the routed witness tools — a tool mismatch.
+    ///
+    /// This is distinct from "no receipt at all" (`by_card_id` has no entry).
+    pub(crate) fn has_tool_mismatch_for(&self, id: &CardId, routes: &[WitnessRoute]) -> bool {
+        let Some(receipt) = self.by_card_id.get(&id.0) else {
+            return false;
+        };
+        let route_tools = routes
+            .iter()
+            .map(|route| route.kind.as_str())
+            .collect::<Vec<_>>();
+        !route_tools.iter().any(|tool| *tool == receipt.tool)
+    }
+
     pub(crate) fn witness_evidence_for(
         &self,
         id: &CardId,

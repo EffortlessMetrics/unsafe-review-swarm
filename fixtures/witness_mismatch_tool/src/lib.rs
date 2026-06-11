@@ -1,0 +1,26 @@
+/// Round-trips a `Box<u8>` through a raw pointer.
+///
+/// # Safety
+///
+/// The caller must not use `value` after passing it to this function.
+/// The raw pointer is obtained from `Box::into_raw` in the same scope.
+pub fn round_trip(value: Box<u8>) -> Box<u8> {
+    let ptr = Box::into_raw(value);
+    // SAFETY: `ptr` comes from `Box::into_raw` on the same owned value in this
+    // scope; ownership is transferred and the pointer is valid and properly
+    // aligned. This fixture intentionally attaches a receipt with a mismatched
+    // tool so unsafe-review can emit a witness_mismatch card.
+    unsafe { Box::from_raw(ptr) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::round_trip;
+
+    #[test]
+    fn round_trips_box() {
+        let val = Box::new(42_u8);
+        let result = round_trip(val);
+        assert_eq!(*result, 42);
+    }
+}
