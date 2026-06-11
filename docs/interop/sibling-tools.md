@@ -81,9 +81,11 @@ sensors uniformly instead of special-casing each:
   stdout/markdown.
 - **Ledger evidence taxonomy and dialect marker**: typed evidence prefixes
   (`test:`, `doc:`, `spec:`, `adr:`, `ripr:`, `unsafe-review:`, `coverage:`,
-  `issue:`, `pr:`), a `policy = "<tool>"` dialect marker, owner/classification/
-  lifecycle discipline, and one settled `schema_version` form (integer vs
-  string).
+  `issue:`, `pr:`, `baseline-init:`), a `policy = "<tool>"` dialect marker,
+  owner/classification/lifecycle discipline, and one settled `schema_version`
+  form (integer vs string). The `baseline-init:` prefix is unsafe-review-specific
+  and marks entries generated automatically by `baseline init` for pre-existing
+  debt capture.
 - **Coverage-movement vocabulary**: `new` / `worsened` / `resolved` /
   `inherited` reported as posture against a baseline, with diff-scoped
   attribution; the orchestrator decides blocking.
@@ -121,7 +123,7 @@ owns the tracking issue. Keep this table current as items land.
 | Versioned gate manifest + baseline-debt-delta schema | ripr | unsafe-review | unsafe-review-swarm #1522 | open |
 | Multi-mode gate (visible-only → calibrated) | ripr | unsafe-review | unsafe-review-swarm #1522 | open |
 | Canonical `new_unsuppressed` counter for threshold consumers | ripr | (consumer contract) | ripr-swarm #1038 | open |
-| Exception-ledger rigor: typed evidence, classification, structural selectors, ownership, dialect marker | cargo-allow | unsafe-review | unsafe-review-swarm #1523 | open |
+| Exception-ledger rigor: typed evidence, classification, structural selectors, ownership, dialect marker | cargo-allow | unsafe-review | unsafe-review-swarm #1523 | partial (typed-evidence prefix gate landed; structural selectors and dialect marker open) |
 | `schema_version` integer-vs-string convergence | — | family-wide | cargo-allow #1465, tokmd-swarm #224 | open |
 | Machine-checked spec-status dashboard | unsafe-review | ripr | ripr-swarm #1040 | open |
 | No-finding wording-contract verifier | unsafe-review | ripr | ripr-swarm #1040 | open |

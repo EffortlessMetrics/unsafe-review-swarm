@@ -2819,6 +2819,17 @@ fn check_unsafe_review_ledger(path: &Path, kind: LedgerKind) -> Result<(), Strin
         for key in ["card_id", "owner", "reason", "evidence"] {
             require_ledger_entry_string(entry, key, &path_display, idx)?;
         }
+        let evidence = entry
+            .get("evidence")
+            .and_then(toml::Value::as_str)
+            .unwrap_or_default();
+        if !looks_like_typed_evidence(evidence) {
+            return Err(format!(
+                "{path_display} entries[{idx}] `evidence` must start with a typed prefix \
+                 (e.g. test:, doc:, spec:, adr:, ripr:, unsafe-review:, coverage:, \
+                 issue:, pr:, baseline-init:) followed by at least one non-whitespace character"
+            ));
+        }
         let has_review_after = ledger_entry_date(entry, "review_after", &path_display, idx)?;
         let has_expires = ledger_entry_date(entry, "expires", &path_display, idx)?;
         match kind {
@@ -2901,6 +2912,32 @@ fn looks_like_counted_card_id(value: &str) -> bool {
         && !prefix.is_empty()
         && !count.is_empty()
         && count.bytes().all(|byte| byte.is_ascii_digit())
+}
+
+/// Typed evidence prefixes accepted by the ledger gate.
+///
+/// Each prefix must be followed by at least one non-whitespace character.
+/// This list aligns with the cargo-allow interop contract documented in
+/// `docs/interop/sibling-tools.md`.
+const TYPED_EVIDENCE_PREFIXES: &[&str] = &[
+    "test:",
+    "doc:",
+    "spec:",
+    "adr:",
+    "ripr:",
+    "unsafe-review:",
+    "coverage:",
+    "issue:",
+    "pr:",
+    "baseline-init:",
+];
+
+fn looks_like_typed_evidence(value: &str) -> bool {
+    TYPED_EVIDENCE_PREFIXES.iter().any(|prefix| {
+        value
+            .strip_prefix(prefix)
+            .is_some_and(|rest| rest.chars().any(|c: char| !c.is_whitespace()))
+    })
 }
 
 fn check_fixtures() -> Result<(), String> {
@@ -21784,7 +21821,7 @@ status = "active"
 card_id = "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
 owner = "core/policy"
 reason = "accepted current fixture debt"
-evidence = "review-card fixture"
+evidence = "spec: review-card fixture"
 review_after = "2026-08-01"
 "#,
         )
@@ -21809,7 +21846,7 @@ status = "active"
 card_id = "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
 owner = "core/policy"
 reason = "false positive under review"
-evidence = "manual review"
+evidence = "issue: manual-review"
 "#,
         )
         .map_err(|err| format!("write ledger failed: {err}"))?;
@@ -21839,7 +21876,7 @@ status = "active"
 card_id = "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment"
 owner = "core/policy"
 reason = "accepted current fixture debt"
-evidence = "review-card fixture"
+evidence = "spec: review-card fixture"
 review_after = "2026-08-01"
 "#,
         )
@@ -21849,6 +21886,79 @@ review_after = "2026-08-01"
 
         fs::remove_file(&path).map_err(|err| format!("remove ledger failed: {err}"))?;
         assert!(result.err().unwrap_or_default().contains("exact counted"));
+        Ok(())
+    }
+
+    #[test]
+    fn policy_ledger_rejects_untyped_evidence() -> Result<(), String> {
+        let path = unique_temp_dir("unsafe-review-untyped-evidence-ledger")?.with_extension("toml");
+        fs::write(
+            &path,
+            r#"schema_version = "0.1"
+policy = "unsafe-review-baseline"
+status = "active"
+
+[[entries]]
+card_id = "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+owner = "core/policy"
+reason = "accepted current fixture debt"
+evidence = "manual review"
+review_after = "2026-08-01"
+"#,
+        )
+        .map_err(|err| format!("write ledger failed: {err}"))?;
+
+        let result = check_unsafe_review_ledger(&path, LedgerKind::Baseline);
+
+        fs::remove_file(&path).map_err(|err| format!("remove ledger failed: {err}"))?;
+        let err = result.err().unwrap_or_default();
+        assert!(
+            err.contains("evidence") && (err.contains("prefix") || err.contains("typed")),
+            "expected error mentioning 'evidence' and 'prefix'/'typed', got: {err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn policy_ledger_accepts_typed_evidence() -> Result<(), String> {
+        for prefix in [
+            "test: my test",
+            "doc: some doc",
+            "spec: SPEC-0010",
+            "adr: ADR-0001",
+            "ripr: ripr#42",
+            "unsafe-review: UR-card-c1",
+            "coverage: 80%",
+            "issue: #1523",
+            "pr: #42",
+            "baseline-init: capture",
+        ] {
+            let path =
+                unique_temp_dir("unsafe-review-typed-evidence-ledger")?.with_extension("toml");
+            let content = format!(
+                r#"schema_version = "0.1"
+policy = "unsafe-review-baseline"
+status = "active"
+
+[[entries]]
+card_id = "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+owner = "core/policy"
+reason = "accepted current fixture debt"
+evidence = "{prefix}"
+review_after = "2026-08-01"
+"#
+            );
+            fs::write(&path, &content)
+                .map_err(|err| format!("write ledger failed for prefix '{prefix}': {err}"))?;
+
+            let result = check_unsafe_review_ledger(&path, LedgerKind::Baseline);
+
+            fs::remove_file(&path)
+                .map_err(|err| format!("remove ledger failed for prefix '{prefix}': {err}"))?;
+            result.map_err(|err| {
+                format!("expected typed evidence '{prefix}' to be accepted, got: {err}")
+            })?;
+        }
         Ok(())
     }
 

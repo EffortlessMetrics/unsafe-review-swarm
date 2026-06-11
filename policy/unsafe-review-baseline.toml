@@ -9,7 +9,8 @@ status = "empty"
 # card_id = "UR-...-c1"
 # owner = "team-or-person"
 # reason = "why this current card is accepted"
-# evidence = "review link, issue, or receipt"
+# evidence = "issue: #1234"  # must use a typed prefix: test:, doc:, spec:, adr:,
+#                            # ripr:, unsafe-review:, coverage:, issue:, pr:, baseline-init:
 # review_after = "2026-08-01"
 #
 # check-policy validates the shape. Analysis matches exact card_id values only.

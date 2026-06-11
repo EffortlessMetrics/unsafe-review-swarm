@@ -9,7 +9,8 @@ status = "empty"
 # card_id = "UR-...-c1"
 # owner = "team-or-person"
 # reason = "why this card is suppressed"
-# evidence = "review link, issue, or receipt"
+# evidence = "issue: #1234"  # must use a typed prefix: test:, doc:, spec:, adr:,
+#                            # ripr:, unsafe-review:, coverage:, issue:, pr:, baseline-init:
 # expires = "2026-08-01"
 #
 # `review_after` may be used instead of `expires` for non-expiring reviews.

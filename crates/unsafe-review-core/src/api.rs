@@ -575,7 +575,7 @@ pub fn baseline_init(
                 owner: "baseline-init".to_string(),
                 reason: "captured by `baseline init`; pre-existing debt, not reviewed as safe"
                     .to_string(),
-                evidence: "baseline-init capture".to_string(),
+                evidence: "baseline-init: captured by baseline init; pre-existing debt".to_string(),
                 review_after: Some(review_after.clone()),
                 expires: None,
             });
