@@ -16,6 +16,9 @@ pub(super) fn diagnostics_by_uri(
 ) -> BTreeMap<Uri, Vec<Diagnostic>> {
     let mut map = BTreeMap::new();
     for card in &output.cards {
+        if !card.class.is_actionable() {
+            continue;
+        }
         let path = root.join(&card.site.location.file);
         let Some(uri) = uri_from_path(path) else {
             continue;

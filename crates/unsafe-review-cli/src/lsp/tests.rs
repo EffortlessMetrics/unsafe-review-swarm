@@ -8,7 +8,7 @@ use tower_lsp_server::ls_types::{
     HoverProviderCapability, Position,
 };
 use unsafe_review_core::{
-    AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, PolicyMode, Scope, analyze,
+    AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, PolicyMode, ReviewClass, Scope, analyze,
 };
 
 use super::actions::{code_actions_for, execute_card_command};
@@ -323,4 +323,85 @@ fn refresh_failure_clears_stale_diagnostics() -> Result<(), Box<dyn Error>> {
 #[test]
 fn did_change_does_not_trigger_analysis_by_default() {
     assert!(!should_refresh_on_change(&LspConfig::default()));
+}
+
+/// Drift-lock: non-actionable cards must not appear in LSP diagnostics.
+///
+/// The non-actionable classes (GuardedAndWitnessed, WitnessMismatch, Suppressed,
+/// BaselineKnown) represent resolved or policy-suppressed states; surfacing them
+/// as IDE diagnostics is noise with no required action. This test verifies the
+/// filter added in `diagnostics_by_uri` (issue #1593).
+///
+/// Cards are constructed programmatically by cloning a real fixture card and
+/// overriding the class field — the same pattern recommended by the verify pass
+/// (mirrors `domain::coverage` tests) — so no new fixture or calibration entry
+/// is needed for the non-actionable classes.
+#[test]
+fn non_actionable_cards_produce_no_lsp_diagnostic() -> Result<(), Box<dyn Error>> {
+    let (root, base_output) = fixture_output("raw_pointer_alignment")?;
+    let base_card = base_output
+        .cards
+        .first()
+        .ok_or("fixture must have at least one card")?;
+    let non_actionable_classes = [
+        ReviewClass::GuardedAndWitnessed,
+        ReviewClass::WitnessMismatch,
+        ReviewClass::Suppressed,
+        ReviewClass::BaselineKnown,
+    ];
+    for class in non_actionable_classes {
+        let class_str = class.as_str();
+        let mut card = base_card.clone();
+        card.class = class;
+        let output = AnalyzeOutput {
+            cards: vec![card],
+            ..base_output.clone()
+        };
+        let diagnostics = diagnostics_by_uri(&root, &output);
+        assert!(
+            diagnostics.is_empty(),
+            "non-actionable class {class_str} produced an LSP diagnostic — it should be filtered out",
+        );
+    }
+    Ok(())
+}
+
+/// Drift-lock (positive arm): actionable cards must still appear in LSP diagnostics.
+///
+/// Verifies that the filter in `diagnostics_by_uri` does not accidentally suppress
+/// actionable cards (issue #1593).
+#[test]
+fn actionable_cards_produce_lsp_diagnostic() -> Result<(), Box<dyn Error>> {
+    let (root, base_output) = fixture_output("raw_pointer_alignment")?;
+    let base_card = base_output
+        .cards
+        .first()
+        .ok_or("fixture must have at least one card")?;
+    let actionable_classes = [
+        ReviewClass::ContractMissing,
+        ReviewClass::GuardMissing,
+        ReviewClass::GuardedUnwitnessed,
+        ReviewClass::ReachableUnwitnessed,
+        ReviewClass::UnsafeUnreached,
+        ReviewClass::RequiresLoom,
+        ReviewClass::RequiresSanitizer,
+        ReviewClass::RequiresKaniOrCrux,
+        ReviewClass::MiriUnsupported,
+        ReviewClass::StaticUnknown,
+    ];
+    for class in actionable_classes {
+        let class_str = class.as_str();
+        let mut card = base_card.clone();
+        card.class = class;
+        let output = AnalyzeOutput {
+            cards: vec![card],
+            ..base_output.clone()
+        };
+        let diagnostics = diagnostics_by_uri(&root, &output);
+        assert!(
+            !diagnostics.is_empty(),
+            "actionable class {class_str} produced no LSP diagnostic — it should be included",
+        );
+    }
+    Ok(())
 }
