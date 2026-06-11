@@ -921,7 +921,7 @@ fn check_docs() -> Result<(), String> {
         Path::new("docs/handoffs"),
         Path::new("docs/handoffs/README.md"),
     )?;
-    check_no_windows_paths(&[
+    check_local_context(&[
         Path::new("README.md"),
         Path::new("docs"),
         Path::new("plans"),
@@ -8971,7 +8971,7 @@ fn looks_like_repo_path(value: &str) -> bool {
     value.contains('/') || value.ends_with(".md")
 }
 
-fn check_no_windows_paths(paths: &[&Path]) -> Result<(), String> {
+fn check_local_context(paths: &[&Path]) -> Result<(), String> {
     for path in paths {
         visit_text(path, &mut |file| {
             let text = read_to_string(file)?;
@@ -8979,6 +8979,20 @@ fn check_no_windows_paths(paths: &[&Path]) -> Result<(), String> {
                 if has_windows_path(line) {
                     return Err(format!(
                         "{}:{} contains a Windows-style path",
+                        file.display(),
+                        line_no + 1
+                    ));
+                }
+                if has_unix_absolute_machine_path(line) {
+                    return Err(format!(
+                        "{}:{} contains a Unix absolute machine path",
+                        file.display(),
+                        line_no + 1
+                    ));
+                }
+                if has_session_state_marker(line) {
+                    return Err(format!(
+                        "{}:{} contains a session-state marker",
                         file.display(),
                         line_no + 1
                     ));
@@ -9579,6 +9593,32 @@ fn looks_like_git_diff(text: &str) -> bool {
 
 fn has_windows_path(line: &str) -> bool {
     line.contains(":\\") || line.contains("\\\\")
+}
+
+fn has_unix_absolute_machine_path(line: &str) -> bool {
+    const ROOTS: &[&str] = &["/home/", "/tmp/", "/Users/", "/var/", "/root/", "/private/"];
+    for root in ROOTS {
+        // Accept the root only when it appears at the start of the line or
+        // immediately after a boundary character (space, tab, quote, backtick,
+        // opening paren, or opening bracket).  This avoids firing on generic
+        // prose like "refer to /path/to/foo" or "/proc/self/…".
+        if let Some(idx) = line.find(root) {
+            if idx == 0 {
+                return true;
+            }
+            let prev = line.as_bytes()[idx - 1];
+            if matches!(prev, b' ' | b'\t' | b'"' | b'\'' | b'`' | b'(' | b'[') {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+fn has_session_state_marker(line: &str) -> bool {
+    // Fire when any whitespace-delimited token ends with ".rescue".
+    line.split_whitespace()
+        .any(|token| token.ends_with(".rescue"))
 }
 
 fn is_forbidden_generated_path(path: &str) -> bool {
@@ -23913,5 +23953,40 @@ This artifact is static unsafe contract review. It routes reviewers to credible 
             .map_err(|err| format!("system clock before UNIX_EPOCH: {err}"))?
             .as_nanos();
         Ok(std::env::temp_dir().join(format!("{prefix}-{nanos}")))
+    }
+
+    #[test]
+    fn has_unix_absolute_machine_path_fires_on_machine_roots() {
+        assert!(has_unix_absolute_machine_path("/home/alice/project"));
+        assert!(has_unix_absolute_machine_path("/tmp/build-123"));
+        assert!(has_unix_absolute_machine_path("/Users/bob/src"));
+        assert!(has_unix_absolute_machine_path("path: /var/log/output"));
+        assert!(has_unix_absolute_machine_path("see `/home/ci/run`"));
+    }
+
+    #[test]
+    fn has_unix_absolute_machine_path_ignores_generic_prose() {
+        assert!(!has_unix_absolute_machine_path("see /path/to/file"));
+        assert!(!has_unix_absolute_machine_path("refer to /proc/self/fd"));
+        assert!(!has_unix_absolute_machine_path("no absolute paths here"));
+        assert!(!has_unix_absolute_machine_path("/proc/cpuinfo content"));
+    }
+
+    #[test]
+    fn has_session_state_marker_fires_on_rescue_tokens() {
+        assert!(has_session_state_marker("agent.rescue"));
+        assert!(has_session_state_marker(
+            "restored from foo-bar.rescue today"
+        ));
+        assert!(has_session_state_marker("state: session.rescue"));
+    }
+
+    #[test]
+    fn has_session_state_marker_ignores_non_rescue_prose() {
+        assert!(!has_session_state_marker(
+            "rescue the scan from false positives"
+        ));
+        assert!(!has_session_state_marker("rescued data is advisory"));
+        assert!(!has_session_state_marker("no markers here"));
     }
 }
