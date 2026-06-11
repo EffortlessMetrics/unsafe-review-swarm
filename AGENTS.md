@@ -85,7 +85,7 @@ its status is clean.
 
 Use the repo source-of-truth stack:
 
-1. Read `.unsafe-review-spec/goals/active.toml`.
+1. Read `.rails/goals/active.toml`.
 2. Read the linked plan item.
 3. Read the linked spec.
 4. Read the linked proposal only for context.
@@ -100,7 +100,7 @@ If a specific command, lint, API, feature flag, crate name, or workflow name is 
 
 Spec rails are meant to make routine progress easier, not ceremonial. If a PR or
 agent task references a not-yet-existing rail and the rail belongs in the repo,
-add or align it in `.unsafe-review-spec` or the corresponding `docs/specs/`
+add or align it in `.rails` or the corresponding `docs/specs/`
 contract. Prefer the smallest useful rail: a plan item, spec clause, template,
 or verifier hook that keeps future PRs pointed at the same truth without adding
 fake enforcement.
@@ -124,7 +124,7 @@ follow-up when it would turn the PR into a mixed-scope change.
 
 Do not put durable repo operating state in `.codex`; keep agent-local state
 there only if a local tool requires it. Durable unsafe-review repo state belongs
-under `.unsafe-review-spec`, `docs/specs`, or the documented handoff/status
+under `.rails`, `docs/specs`, or the documented handoff/status
 surfaces.
 
 ## Helper roles and workflows
@@ -209,7 +209,7 @@ For Codex Web or other generated PR batches:
 2. Inspect the stated intent and actual diff.
 3. Verify the change is scoped to the PR title and does not create a second
    analyzer truth outside `ReviewCard`.
-4. Check whether the change advances an active `.unsafe-review-spec` plan item,
+4. Check whether the change advances an active `.rails` plan item,
    a documented projection contract, or a narrow maintainability/test goal. If
    it creates a useful new rail, land the rail in the source-of-truth stack with
    the same PR or a clearly linked follow-up.

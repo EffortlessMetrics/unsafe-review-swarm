@@ -455,8 +455,8 @@ const DOC_ARTIFACT_LEDGER: &str = "policy/doc-artifacts.toml";
 const DOCS_AUTOMATION_LEDGER: &str = "policy/docs-automation.toml";
 const CI_LANE_LEDGER: &str = "policy/ci-lane-whitelist.toml";
 const PACKAGE_BOUNDARY_LEDGER: &str = "policy/package-boundary.toml";
-const SOURCE_OF_TRUTH_INDEX: &str = ".unsafe-review-spec/index.toml";
-const ACTIVE_GOAL_MANIFEST: &str = ".unsafe-review-spec/goals/active.toml";
+const SOURCE_OF_TRUTH_INDEX: &str = ".rails/index.toml";
+const ACTIVE_GOAL_MANIFEST: &str = ".rails/goals/active.toml";
 const DOC_ARTIFACT_KINDS: &[&str] = &["proposal", "spec", "adr", "plan", "goal"];
 const DOC_ARTIFACT_STATUSES: &[&str] = &["proposed", "accepted", "active", "done", "deferred"];
 const DOCS_AUTOMATION_KINDS: &[&str] = &[
@@ -925,7 +925,7 @@ fn check_docs() -> Result<(), String> {
         Path::new("README.md"),
         Path::new("docs"),
         Path::new("plans"),
-        Path::new(".unsafe-review-spec"),
+        Path::new(".rails"),
         Path::new("policy"),
     ])?;
     println!("check-docs: ok");
@@ -12424,7 +12424,7 @@ OperationFamily::RawPointerRead => vec![
             &ledger, &index,
         ))?;
 
-        assert!(err.contains(".unsafe-review-spec/index.toml"));
+        assert!(err.contains(".rails/index.toml"));
         assert!(err.contains("UNSAFE-REVIEW-SPEC-0026"));
         assert!(err.contains("status `draft` must match"));
         Ok(())

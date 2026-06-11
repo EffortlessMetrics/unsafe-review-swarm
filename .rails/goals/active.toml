@@ -77,7 +77,7 @@ id = "accuracy-calibration-rail"
 status = "active"
 proposal = "UNSAFE-REVIEW-PROP-0002"
 spec = "UNSAFE-REVIEW-SPEC-0026"
-plan = ".unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md"
+plan = ".rails/lanes/accuracy-calibration/implementation-plan.md"
 commands = [
   "cargo run --locked -p xtask -- check-calibration",
   "cargo run --locked -p xtask -- check-dogfood",
@@ -93,7 +93,7 @@ id = "manual-candidate-bun-cockpit"
 status = "active"
 proposal = "UNSAFE-REVIEW-PROP-0002"
 spec = "UNSAFE-REVIEW-SPEC-0027"
-plan = ".unsafe-review-spec/lanes/bun-stable-byte-cockpit/implementation-plan.md"
+plan = ".rails/lanes/bun-stable-byte-cockpit/implementation-plan.md"
 commands = [
   "cargo test -p unsafe-review-core manual_candidate",
   "cargo test -p unsafe-review-core receipt",
@@ -111,7 +111,7 @@ commands = [
 id = "validation-residue"
 status = "active"
 proposal = "UNSAFE-REVIEW-PROP-0002"
-plan = ".unsafe-review-spec/lanes/validation-residue/implementation-plan.md"
+plan = ".rails/lanes/validation-residue/implementation-plan.md"
 commands = [
   "cargo test --workspace --locked",
   "cargo run --locked -p xtask -- check-pr",

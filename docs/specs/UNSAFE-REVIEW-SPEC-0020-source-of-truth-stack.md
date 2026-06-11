@@ -31,6 +31,11 @@ source-of-truth ledgers. Upstream tools are implementation substrates; they do
 not become durable repo authority until an accepted spec, plan item, support
 tier, or policy ledger records the wrapper, proof command, and claim boundary.
 
+The coordination directory is `.rails/` — a portable, "Rust on Rails"-named
+convention (renamed from the earlier `.unsafe-review-spec/`). The naming
+rationale and the rule against storing durable state in tool namespaces
+(`.codex/`, `.spec/`, `.claude/`, `.jules/`) live in `.rails/README.md`.
+
 ## Non-goals
 
 This spec does not define runtime unsafe-analysis behavior.
@@ -49,7 +54,7 @@ Policy-contract workflow commands and TOML parse checks.
 
 ## Implementation mapping
 
-`docs/`, `plans/`, `.unsafe-review-spec/goals/`, `policy/`,
+`docs/`, `plans/`, `.rails/goals/`, `policy/`,
 `.github/workflows/`, and `AGENTS.md` for the agent-facing operating entrypoint.
 
 ## CI proof

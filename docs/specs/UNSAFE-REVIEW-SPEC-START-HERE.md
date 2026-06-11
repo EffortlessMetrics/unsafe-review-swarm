@@ -4,7 +4,7 @@ This file is the operator front door for the spec system.
 
 If you are new to the repository, read in this order:
 
-1. `.unsafe-review-spec/goals/active.toml` (what is active now)
+1. `.rails/goals/active.toml` (what is active now)
 2. linked `plans/.../implementation-plan.md` (what PR-sized step is next)
 3. linked spec and proposal (behavior contract and rationale)
 4. `docs/specs/UNSAFE-REVIEW-SPEC-STATUS.md` (lifecycle state and proof posture)

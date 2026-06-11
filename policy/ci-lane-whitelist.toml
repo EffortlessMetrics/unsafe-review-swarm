@@ -26,7 +26,7 @@ owner = "repo-infra"
 intent = "Validate source-of-truth ledgers and links"
 proof_obligation = "doc artifacts, docs automation, active goals, package boundary, CI lane ledger, and policy bundle parse and resolve"
 cost_estimate = "low"
-trigger_policy = "pull_request(paths: policy/**, .unsafe-review-spec/**, docs/specs/**, docs/status/**, .github/workflows/**, xtask/**), push(main), workflow_dispatch"
+trigger_policy = "pull_request(paths: policy/**, .rails/**, docs/specs/**, docs/status/**, .github/workflows/**, xtask/**), push(main), workflow_dispatch"
 status = "advisory"
 review_after = "2026-07-01"
 

@@ -152,7 +152,7 @@ After a successful publication:
 - Tag the commit, for example `git tag v0.1.0-vscode && git push --tags`.
 - Update `editors/vscode/CHANGELOG.md` with the published version row.
 - Move `marketplace-publish-workflow` work item in
-  `.unsafe-review-spec/lanes/marketplace-first-hour-ux/tracker.toml` from
+  `.rails/lanes/marketplace-first-hour-ux/tracker.toml` from
   `blocked` to `done`.
 - Replace the README's `extension planned` badges with
   `installs` / `downloads` shields for the published listings.

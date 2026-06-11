@@ -103,7 +103,7 @@ fn visit(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), String> 
         if path.is_dir() {
             if matches!(
                 name.as_str(),
-                ".git" | "target" | ".unsafe-review" | ".unsafe-review-spec" | "node_modules"
+                ".git" | "target" | ".unsafe-review" | ".rails" | "node_modules"
             ) {
                 continue;
             }

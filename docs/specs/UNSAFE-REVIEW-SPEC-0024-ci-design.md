@@ -322,7 +322,7 @@ source-of-truth rails:
 
 ```text
 policy/**
-.unsafe-review-spec/**
+.rails/**
 docs/specs/**
 docs/status/**
 .github/workflows/**

@@ -43,8 +43,8 @@ proof_commands = [
   "git diff --check",
 ]
 
-linked_plan = ".unsafe-review-spec/lanes/marketplace-first-hour-ux/implementation-plan.md"
-linked_closeout = ".unsafe-review-spec/lanes/marketplace-first-hour-ux/closeout.md"
+linked_plan = ".rails/lanes/marketplace-first-hour-ux/implementation-plan.md"
+linked_closeout = ".rails/lanes/marketplace-first-hour-ux/closeout.md"
 
 [[work_item]]
 id = "first-hour-guide"

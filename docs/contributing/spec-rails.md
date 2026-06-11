@@ -6,7 +6,7 @@ When proposing or implementing source-of-truth changes, keep durable rails in re
 
 Primary durable scope for this repository:
 
-- `.unsafe-review-spec/`
+- `.rails/`
 - `docs/` source-of-truth artifacts
 - `plans/` implementation plans
 - `policy/` enforcement ledgers and references
@@ -31,8 +31,8 @@ These directories may exist for external tools, but this lane does not migrate, 
 
 ## Directory Intent
 
-- `.unsafe-review-spec/goals/`: active and archived goal metadata.
-- `.unsafe-review-spec/lanes/`: focused lane trackers and implementation sequencing.
+- `.rails/goals/`: active and archived goal metadata.
+- `.rails/lanes/`: focused lane trackers and implementation sequencing.
 - `docs/proposals/`: why a workstream exists, alternatives, and success criteria.
 - `docs/specs/`: behavior and evidence requirements.
 - `docs/adr/`: durable architecture decisions.
@@ -40,6 +40,6 @@ These directories may exist for external tools, but this lane does not migrate, 
 - `docs/status/`: support posture, objective audits, dogfood lane status, and closeout-facing status notes.
 - `policy/`: live baselines, suppressions, ledgers, and policy references.
 
-Prefer focused lane trackers under `.unsafe-review-spec/lanes/` rather than one
-global active queue. Keep durable rails indexed through `.unsafe-review-spec/index.toml`
+Prefer focused lane trackers under `.rails/lanes/` rather than one
+global active queue. Keep durable rails indexed through `.rails/index.toml`
 when they need stable machine discovery.

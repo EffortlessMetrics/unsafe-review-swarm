@@ -134,8 +134,10 @@ fn should_visit_entry(root: &Path, entry: &DirEntry, large_repo_ignores: bool) -
 }
 
 fn is_default_skipped_dir(name: &str) -> bool {
-    matches!(name, ".git" | ".github" | "target" | "node_modules")
-        || name.starts_with(".unsafe-review")
+    matches!(
+        name,
+        ".git" | ".github" | "target" | "node_modules" | ".rails"
+    ) || name.starts_with(".unsafe-review")
 }
 
 fn is_large_repo_skipped_dir(name: &str) -> bool {
@@ -223,7 +225,7 @@ mod tests {
             ".git/hooks/hook.rs",
             ".github/workflows/action.rs",
             ".unsafe-review/cache.rs",
-            ".unsafe-review-spec/spec.rs",
+            ".rails/spec.rs",
             "node_modules/pkg/lib.rs",
             "vendor/pkg/lib.rs",
             "build/out/lib.rs",

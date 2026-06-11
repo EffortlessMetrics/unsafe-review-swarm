@@ -13,7 +13,7 @@ Run and interpret:
 2. `git fetch origin && git log --oneline origin/main -5` — has main moved past local?
 3. `cargo run --locked -p xtask -- source-divergence` — is the source/swarm sync acknowledged (`new_source_commits` must be 0 for routine work)?
 4. `gh pr list --limit 10` and, when a task references an issue, `gh issue view <n>` — is the task already landed, in an open PR, or superseded?
-5. `.unsafe-review-spec/goals/active.toml` — which work item / lane plan controls this task?
+5. `.rails/goals/active.toml` — which work item / lane plan controls this task?
 
 Return an evidence packet, not an essay:
 

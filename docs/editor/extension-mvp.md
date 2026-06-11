@@ -8,8 +8,8 @@ It is a planning companion to:
 - [UNSAFE-REVIEW-SPEC-0012: LSP and editor projection](../specs/UNSAFE-REVIEW-SPEC-0012-lsp-editor-projection.md)
 - [UNSAFE-REVIEW-SPEC-0021: VS Code and Open VSX editor extension](../specs/UNSAFE-REVIEW-SPEC-0021-vscode-openvsx-extension.md)
 - [docs/editor/saved-lsp-json.md](saved-lsp-json.md)
-- [.unsafe-review-spec/lanes/editor-extension/tracker.toml](../../.unsafe-review-spec/lanes/editor-extension/tracker.toml)
-- [.unsafe-review-spec/lanes/marketplace-first-hour-ux/tracker.toml](../../.unsafe-review-spec/lanes/marketplace-first-hour-ux/tracker.toml)
+- [.rails/lanes/editor-extension/tracker.toml](../../.rails/lanes/editor-extension/tracker.toml)
+- [.rails/lanes/marketplace-first-hour-ux/tracker.toml](../../.rails/lanes/marketplace-first-hour-ux/tracker.toml)
 
 The MVP path explicitly frees the first publishable extension from the
 `UNSAFE-REVIEW-SPEC-0018` live-LSP hardening gate by removing all live
@@ -177,7 +177,7 @@ The MVP is acceptable when:
 After the MVP ships and is installed at least once:
 
 - `extension-lsp-client` in
-  `.unsafe-review-spec/lanes/editor-extension/tracker.toml` unblocks behind
+  `.rails/lanes/editor-extension/tracker.toml` unblocks behind
   the live-LSP hardening gate, adding a `live` mode toggle to the same
   extension.
 - The MVP saved-bundle mode remains the default until live mode passes the

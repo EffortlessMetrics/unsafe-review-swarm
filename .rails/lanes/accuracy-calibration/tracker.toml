@@ -24,7 +24,7 @@ end_state = [
 id = "accuracy-spec-and-policy"
 status = "ready"
 spec = "UNSAFE-REVIEW-SPEC-0026"
-plan = ".unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md"
+plan = ".rails/lanes/accuracy-calibration/implementation-plan.md"
 commands = [
   "cargo run --locked -p xtask -- check-calibration",
   "cargo run --locked -p xtask -- check-doc-artifacts",

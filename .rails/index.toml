@@ -1,7 +1,7 @@
 schema_version = "1.0"
 
 repo = "unsafe-review"
-namespace = ".unsafe-review-spec"
+namespace = ".rails"
 
 [conventions]
 proposal_prefix = "UNSAFE-REVIEW-PROP"
@@ -90,62 +90,62 @@ linked_spec = "UNSAFE-REVIEW-SPEC-0021"
 [[lane]]
 id = "docs/source-of-truth-scaffold"
 name = "source-of-truth scaffold"
-path = ".unsafe-review-spec/goals/active.toml"
+path = ".rails/goals/active.toml"
 status = "active"
 owner = "repo-infra"
 
 [[lane]]
 id = "ci-design-rail"
 name = "CI design contract"
-path = ".unsafe-review-spec/goals/active.toml"
+path = ".rails/goals/active.toml"
 status = "active"
 owner = "repo-infra"
 
 [[lane]]
 id = "docs-automation-control-plane"
 name = "docs automation control plane"
-path = ".unsafe-review-spec/goals/active.toml"
+path = ".rails/goals/active.toml"
 status = "active"
 owner = "repo-infra"
 
 [[lane]]
 id = "accuracy-calibration-rail"
 name = "accuracy calibration rail"
-path = ".unsafe-review-spec/goals/active.toml"
+path = ".rails/goals/active.toml"
 status = "active"
 owner = "calibration"
 
 [[lane]]
 id = "manual-candidate-bun-cockpit"
 name = "manual candidate Bun cockpit"
-path = ".unsafe-review-spec/goals/active.toml"
+path = ".rails/goals/active.toml"
 status = "active"
 owner = "product / cli"
 
 [[lane]]
 id = "editor-extension"
 name = "VS Code and Open VSX editor adapter"
-path = ".unsafe-review-spec/lanes/editor-extension/tracker.toml"
+path = ".rails/lanes/editor-extension/tracker.toml"
 status = "active"
 owner = "editor/extension"
 
 [[lane]]
 id = "public-product-surfaces"
 name = "public product surfaces"
-path = ".unsafe-review-spec/lanes/public-product-surfaces/tracker.toml"
+path = ".rails/lanes/public-product-surfaces/tracker.toml"
 status = "proposed"
 owner = "release/public-surface"
 
 [[lane]]
 id = "marketplace-first-hour-ux"
 name = "marketplace and first-hour UX"
-path = ".unsafe-review-spec/lanes/marketplace-first-hour-ux/tracker.toml"
+path = ".rails/lanes/marketplace-first-hour-ux/tracker.toml"
 status = "active"
 owner = "product / cli"
 
 [[lane]]
 id = "validation-residue"
 name = "instrument truthfulness and consumer reliability"
-path = ".unsafe-review-spec/lanes/validation-residue/implementation-plan.md"
+path = ".rails/lanes/validation-residue/implementation-plan.md"
 status = "active"
 owner = "product / cli"

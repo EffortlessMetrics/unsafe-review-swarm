@@ -303,7 +303,7 @@ implementer pinned to mid). Use them instead of inlining those jobs into the
 orchestrator.
 
 The operating contract is in `AGENTS.md`. The source-of-truth stack is:
-`.unsafe-review-spec/goals/active.toml` → linked plan item → linked spec in
+`.rails/goals/active.toml` → linked plan item → linked spec in
 `docs/specs/`. One PR-sized change, then run the proof commands from the plan item.
 
 The trust boundary for this tool: advisory, no proof, no UB-free claim, no

@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - "policy/**"
-      - ".unsafe-review-spec/**"
+      - ".rails/**"
       - "docs/specs/**"
       - "docs/status/**"
       - ".github/workflows/**"

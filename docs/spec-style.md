@@ -6,10 +6,10 @@ The repository keeps a full source-of-truth stack:
 roadmap -> proposal -> spec -> ADR -> implementation plan -> PRs -> proof -> support/policy -> closeout
 ```
 
-The durable control plane for this stack is repo-owned state rooted in `.unsafe-review-spec/` and linked repository artifacts (for example `docs/`, `plans/`, and `policy/`).
+The durable control plane for this stack is repo-owned state rooted in `.rails/` and linked repository artifacts (for example `docs/`, `plans/`, and `policy/`).
 
 When contributors refer to source-of-truth "rails" in this repository, they mean
-this existing `.unsafe-review-spec/` plus linked-docs control plane. Do not add a
+this existing `.rails/` plus linked-docs control plane. Do not add a
 parallel durable root such as `.rails/` unless a future accepted spec changes the
 namespace.
 
@@ -17,7 +17,7 @@ namespace.
 
 Durable rails in this repository:
 
-- `.unsafe-review-spec/` for active lane coordination metadata.
+- `.rails/` for active lane coordination metadata.
 - `docs/` for human-facing specs, proposals, ADRs, and contributor guidance.
 - `policy/` for live enforcement ledgers and reference maps.
 - `plans/` for PR-sized implementation sequencing.

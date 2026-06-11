@@ -3,7 +3,7 @@
 ## Swarm internal work program
 
 Swarm-internal roadmap execution continues in
-`.unsafe-review-spec/lanes/swarm-roadmap/implementation-plan.md`.
+`.rails/lanes/swarm-roadmap/implementation-plan.md`.
 
 This lane is not a publication/release commitment; it tracks workbench
 hardening, analyzer validation, dogfood, CI/process alignment, and ReviewCard

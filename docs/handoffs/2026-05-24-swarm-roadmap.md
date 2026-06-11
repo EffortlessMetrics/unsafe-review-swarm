@@ -8,7 +8,7 @@ This handoff records the swarm-internal roadmap posture:
 
 Primary source for ongoing execution:
 
-- `.unsafe-review-spec/lanes/swarm-roadmap/implementation-plan.md`
+- `.rails/lanes/swarm-roadmap/implementation-plan.md`
 
 Trust boundary reminder:
 

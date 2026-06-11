@@ -33,7 +33,7 @@ linked_spec = "UNSAFE-REVIEW-SPEC-0020"
 [[artifact]]
 id = "UNSAFE-REVIEW-GOAL-0002"
 kind = "goal"
-path = ".unsafe-review-spec/goals/active.toml"
+path = ".rails/goals/active.toml"
 status = "active"
 owner = "repo-infra"
 linked_proposal = "UNSAFE-REVIEW-PROP-0002"

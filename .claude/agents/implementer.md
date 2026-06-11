@@ -9,7 +9,7 @@ You implement one PR-sized slice in this repository. Operating contract (AGENTS.
 
 - Work only in your assigned isolated worktree. Never touch other worktrees, the owner's dirty branches, or main directly.
 - One reason, one PR. If the brief's scope grows mid-task, stop and report instead of expanding.
-- Read the controlling stack before editing: `.unsafe-review-spec/goals/active.toml` → lane plan → spec. If the brief names a command, lint, API, or flag — verify it exists before building around it.
+- Read the controlling stack before editing: `.rails/goals/active.toml` → lane plan → spec. If the brief names a command, lint, API, or flag — verify it exists before building around it.
 - Lints are strict: no unwrap/expect/panic/todo; return Result; `#[allow]` needs a `reason`. Match surrounding code idiom.
 - Preserve the trust boundary in any wording you touch: no proof / UB-free / Miri-clean / site-execution / calibrated / blocking claims; ReviewCard stays the single projected truth.
 - New analyzer behavior needs fixture + calibration entry + (if new family) registry row; new behavior needs spec/status alignment to pass `check-pr`.

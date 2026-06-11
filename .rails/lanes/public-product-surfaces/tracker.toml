@@ -35,5 +35,5 @@ proof_commands = [
   "git diff --check",
 ]
 
-linked_plan = ".unsafe-review-spec/lanes/public-product-surfaces/implementation-plan.md"
-linked_closeout = ".unsafe-review-spec/lanes/public-product-surfaces/closeout.md"
+linked_plan = ".rails/lanes/public-product-surfaces/implementation-plan.md"
+linked_closeout = ".rails/lanes/public-product-surfaces/closeout.md"

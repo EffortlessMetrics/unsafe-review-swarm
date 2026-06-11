@@ -2,7 +2,7 @@ schema_version = "1.0"
 
 [scope]
 owned_roots = [
-  ".unsafe-review-spec",
+  ".rails",
   "docs",
   "policy",
   "plans",
@@ -24,7 +24,7 @@ path = "docs/specs/UNSAFE-REVIEW-SPEC-STATUS.md"
 mode = "check"
 sources = [
   "policy/doc-artifacts.toml",
-  ".unsafe-review-spec/goals/active.toml",
+  ".rails/goals/active.toml",
   "docs/specs",
   "docs/handoffs",
 ]
@@ -41,11 +41,11 @@ kind = "operator_front_door"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-START-HERE.md"
 mode = "check"
 sources = [
-  ".unsafe-review-spec/goals/active.toml",
+  ".rails/goals/active.toml",
   "docs/specs",
 ]
 must_include = [
-  ".unsafe-review-spec/goals/active.toml",
+  ".rails/goals/active.toml",
   "linked plan",
   "linked spec",
   "linked proposal",
@@ -80,7 +80,7 @@ must_include = [
 [[generated_or_checked]]
 id = "accuracy-calibration-plan"
 kind = "lane_plan"
-path = ".unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md"
+path = ".rails/lanes/accuracy-calibration/implementation-plan.md"
 mode = "check"
 sources = [
   "policy/accuracy-calibration.toml",

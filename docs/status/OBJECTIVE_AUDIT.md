@@ -58,7 +58,7 @@ The latest closed execution lane is recorded in
 
 The active calibration rail is now recorded in
 `docs/specs/UNSAFE-REVIEW-SPEC-0026-accuracy-validation-and-calibration.md`,
-`.unsafe-review-spec/lanes/accuracy-calibration/implementation-plan.md`,
+`.rails/lanes/accuracy-calibration/implementation-plan.md`,
 `policy/accuracy-calibration.toml`, and
 `docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 39
 fixture-pinned claims, 561 calibration cases, 39 label ledgers, and 574 label
