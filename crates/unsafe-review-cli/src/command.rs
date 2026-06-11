@@ -245,12 +245,31 @@ pub(crate) enum BaselineCommand {
     Help,
 }
 
+/// Target subcommand for per-subcommand help pages.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum SubcommandHelpTarget {
+    Check,
+    FirstPr,
+    Pilot,
+    Explain,
+    Context,
+    Confirm,
+    Receipt,
+    Outcome,
+    Policy,
+    Doctor,
+    Badges,
+    Lsp,
+    Support,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Command {
     Help,
     RepoHelp,
     CandidateHelp,
     BaselineHelp,
+    SubcommandHelp(SubcommandHelpTarget),
     Version,
     Support,
     Doctor {

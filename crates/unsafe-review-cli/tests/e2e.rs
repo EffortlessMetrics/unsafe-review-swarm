@@ -174,6 +174,57 @@ fn candidate_help_is_command_specific() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[test]
+fn subcommand_help_is_command_specific() -> Result<(), Box<dyn Error>> {
+    // Table of (subcommand args, expected keyword unique to that subcommand's help).
+    let cases: &[(&[&str], &str)] = &[
+        (&["check", "--help"], "unsafe-review check:"),
+        (&["first-pr", "--help"], "unsafe-review first-pr:"),
+        (&["review", "--help"], "unsafe-review first-pr:"),
+        (&["pilot", "--help"], "unsafe-review pilot:"),
+        (&["explain", "--help"], "unsafe-review explain:"),
+        (&["context", "--help"], "unsafe-review context:"),
+        (&["confirm", "--help"], "unsafe-review confirm:"),
+        (&["receipt", "--help"], "unsafe-review receipt:"),
+        (&["receipt", "audit", "-h"], "unsafe-review receipt:"),
+        (&["outcome", "--help"], "unsafe-review outcome:"),
+        (&["policy", "--help"], "unsafe-review policy:"),
+        (&["doctor", "--help"], "unsafe-review doctor:"),
+        (&["badges", "--help"], "unsafe-review badges:"),
+        (&["lsp", "--help"], "unsafe-review lsp:"),
+    ];
+
+    for (subargs, expected) in cases {
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"));
+        cmd.arg("unsafe-review");
+        for arg in *subargs {
+            cmd.arg(arg);
+        }
+        let output = checked_output(&mut cmd)?;
+        let stdout = String::from_utf8(output.stdout)?;
+
+        assert!(
+            stdout.contains(expected),
+            "subcommand {:?}: expected stdout to contain `{expected}`\nstdout:\n{stdout}",
+            subargs
+        );
+        // Must NOT fall back to the top-level command list header.
+        assert!(
+            !stdout.contains("Commands:\n  check"),
+            "subcommand {:?}: fell back to top-level help\nstdout:\n{stdout}",
+            subargs
+        );
+        // Each help must contain "Usage:".
+        assert!(
+            stdout.contains("Usage:"),
+            "subcommand {:?}: missing 'Usage:'\nstdout:\n{stdout}",
+            subargs
+        );
+    }
+
+    Ok(())
+}
+
 fn assert_contains(haystack: &str, needle: &str) {
     assert!(
         haystack.contains(needle),

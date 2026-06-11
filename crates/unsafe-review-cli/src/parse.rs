@@ -2,7 +2,7 @@ use crate::command::{
     BaselineAddOptions, BaselineCommand, BaselineInitOptions, CandidateCommand,
     CandidateImportOptions, CandidateLintOptions, CandidateListOptions, CandidateNewOptions,
     CandidateWitnessPlanOptions, CheckOptions, Command, ContextQuery, DiffInput, FirstPrOptions,
-    Format, OutcomeOptions, RepoOptions,
+    Format, OutcomeOptions, RepoOptions, SubcommandHelpTarget,
 };
 use std::path::PathBuf;
 use unsafe_review_core::{MANUAL_CANDIDATE_STABLE_BYTE_CLASSES, PolicyMode};
@@ -39,7 +39,7 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
         return Ok(Command::BaselineHelp);
     }
     if has_help_flag(&rest) {
-        return Ok(Command::Help);
+        return Ok(subcommand_help_for(&command));
     }
     match command.as_str() {
         "--version" | "-V" => Ok(Command::Version),
@@ -402,6 +402,26 @@ fn validate_iso_date(raw: &str, flag: &str) -> Result<(), String> {
     } else {
         Err(format!("{flag} must be a YYYY-MM-DD date, got `{raw}`"))
     }
+}
+
+fn subcommand_help_for(command: &str) -> Command {
+    let target = match command {
+        "check" => SubcommandHelpTarget::Check,
+        "first-pr" | "review" => SubcommandHelpTarget::FirstPr,
+        "pilot" => SubcommandHelpTarget::Pilot,
+        "explain" => SubcommandHelpTarget::Explain,
+        "context" => SubcommandHelpTarget::Context,
+        "confirm" => SubcommandHelpTarget::Confirm,
+        "receipt" | "receipt-template" => SubcommandHelpTarget::Receipt,
+        "outcome" => SubcommandHelpTarget::Outcome,
+        "policy" => SubcommandHelpTarget::Policy,
+        "doctor" => SubcommandHelpTarget::Doctor,
+        "badges" => SubcommandHelpTarget::Badges,
+        "lsp" => SubcommandHelpTarget::Lsp,
+        "support" => SubcommandHelpTarget::Support,
+        _ => return Command::Help,
+    };
+    Command::SubcommandHelp(target)
 }
 
 fn has_help_flag(args: &[String]) -> bool {
@@ -1029,14 +1049,70 @@ mod tests {
     }
 
     #[test]
-    fn parses_help_flag_after_subcommand_as_help() -> Result<(), String> {
+    fn parses_help_flag_after_subcommand_as_subcommand_help() -> Result<(), String> {
         assert_eq!(
             parse(args(["unsafe-review", "check", "--help"]))?,
-            Command::Help
+            Command::SubcommandHelp(SubcommandHelpTarget::Check)
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "check", "-h"]))?,
+            Command::SubcommandHelp(SubcommandHelpTarget::Check)
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "first-pr", "--help"]))?,
+            Command::SubcommandHelp(SubcommandHelpTarget::FirstPr)
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "review", "--help"]))?,
+            Command::SubcommandHelp(SubcommandHelpTarget::FirstPr)
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "pilot", "--help"]))?,
+            Command::SubcommandHelp(SubcommandHelpTarget::Pilot)
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "explain", "--help"]))?,
+            Command::SubcommandHelp(SubcommandHelpTarget::Explain)
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "context", "--help"]))?,
+            Command::SubcommandHelp(SubcommandHelpTarget::Context)
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "confirm", "--help"]))?,
+            Command::SubcommandHelp(SubcommandHelpTarget::Confirm)
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "receipt", "--help"]))?,
+            Command::SubcommandHelp(SubcommandHelpTarget::Receipt)
         );
         assert_eq!(
             parse(args(["unsafe-review", "receipt", "audit", "-h"]))?,
-            Command::Help
+            Command::SubcommandHelp(SubcommandHelpTarget::Receipt)
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "outcome", "--help"]))?,
+            Command::SubcommandHelp(SubcommandHelpTarget::Outcome)
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "policy", "--help"]))?,
+            Command::SubcommandHelp(SubcommandHelpTarget::Policy)
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "doctor", "--help"]))?,
+            Command::SubcommandHelp(SubcommandHelpTarget::Doctor)
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "badges", "--help"]))?,
+            Command::SubcommandHelp(SubcommandHelpTarget::Badges)
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "lsp", "--help"]))?,
+            Command::SubcommandHelp(SubcommandHelpTarget::Lsp)
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "support", "--help"]))?,
+            Command::SubcommandHelp(SubcommandHelpTarget::Support)
         );
         Ok(())
     }

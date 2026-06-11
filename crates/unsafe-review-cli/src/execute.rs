@@ -3,6 +3,7 @@ use crate::command::{
     CandidateImportOptions, CandidateLintOptions, CandidateListOptions, CandidateNewOptions,
     CandidateWitnessPlanOptions, CheckOptions, Command, ContextQuery, DiffInput, FirstPrOptions,
     Format, OutcomeOptions, ReceiptTemplateOptions, RepoOptions, SavedOutputReceiptOptions,
+    SubcommandHelpTarget,
 };
 #[cfg(unix)]
 use signal_hook::consts::signal::{SIGINT, SIGTERM};
@@ -98,6 +99,10 @@ pub(crate) fn execute(command: Command) -> Result<(), crate::RunFailure> {
         }
         Command::BaselineHelp => {
             print_baseline_help();
+            Ok(())
+        }
+        Command::SubcommandHelp(target) => {
+            print_subcommand_help(target);
             Ok(())
         }
         Command::Version => {
@@ -2517,6 +2522,389 @@ fn run_baseline_add(options: BaselineAddOptions) -> Result<(), String> {
         "trust boundary: baseline entries are debt records, not safety records. Adding a card to the baseline records that the gap pre-existed; it does not prove memory safety, UB-free status, Miri-clean status, or that the unsafe site executed safely."
     );
     Ok(())
+}
+
+fn print_subcommand_help(target: SubcommandHelpTarget) {
+    match target {
+        SubcommandHelpTarget::Check => print_check_help(),
+        SubcommandHelpTarget::FirstPr => print_first_pr_help(),
+        SubcommandHelpTarget::Pilot => print_pilot_help(),
+        SubcommandHelpTarget::Explain => print_explain_help(),
+        SubcommandHelpTarget::Context => print_context_help(),
+        SubcommandHelpTarget::Confirm => print_confirm_help(),
+        SubcommandHelpTarget::Receipt => print_receipt_help(),
+        SubcommandHelpTarget::Outcome => print_outcome_help(),
+        SubcommandHelpTarget::Policy => print_policy_help(),
+        SubcommandHelpTarget::Doctor => print_doctor_help(),
+        SubcommandHelpTarget::Badges => print_badges_help(),
+        SubcommandHelpTarget::Lsp => print_lsp_help(),
+        SubcommandHelpTarget::Support => print_support(),
+    }
+}
+
+fn print_check_help() {
+    println!("unsafe-review check: advisory diff-scoped unsafe contract review");
+    println!();
+    println!("Usage:");
+    println!(
+        "  unsafe-review check [--root .] [--base <ref> | --diff <file|->] \
+         [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] \
+         [--policy advisory|no-new-debt] [--out <file>] [--max-cards <N>]"
+    );
+    println!();
+    println!("Options:");
+    println!(
+        "- --root <dir>     repository or subdirectory to review (default: current directory)"
+    );
+    println!("- --base <ref>     git ref to diff against HEAD; e.g. origin/main");
+    println!("- --diff <file|->  read a unified diff from a file or stdin (-)");
+    println!(
+        "- --format <name>  output format: human (default), json, markdown, pr-summary, github-summary, sarif, comment-plan, lsp, or witness-plan"
+    );
+    println!(
+        "- --policy <name>  advisory (default, exit 0) or no-new-debt (exit 1 for new/worsened gaps)"
+    );
+    println!("- --out <file>     write rendered output to a file instead of stdout");
+    println!("- --max-cards <N>  stop collecting after N cards");
+    println!("- --json           shorthand for --format json");
+    println!("- --markdown       shorthand for --format markdown");
+    println!();
+    println!("Examples:");
+    println!("  unsafe-review check --base origin/main");
+    println!("  unsafe-review check --diff change.diff --format json --out target/cards.json");
+    println!("  unsafe-review check --diff - --format sarif < patch.diff");
+    println!("  unsafe-review check --base origin/main --policy no-new-debt");
+    println!();
+    println!("Trust boundary: {FIRST_RUN_TRUST_BOUNDARY}");
+}
+
+fn print_first_pr_help() {
+    println!("unsafe-review first-pr: write a full advisory PR artifact bundle");
+    println!();
+    println!("Usage:");
+    println!(
+        "  unsafe-review first-pr [--root .] [--base origin/main | --diff <file|->] \
+         [--out-dir target/unsafe-review] [--max-cards <N>]"
+    );
+    println!();
+    println!("  review   alias for first-pr");
+    println!();
+    println!("What first-pr writes:");
+    println!("- cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json,");
+    println!(
+        "  witness-plan.md, lsp.json, repair-queue.json, receipt-audit.md, receipt-audit.json,"
+    );
+    println!("  policy-report.json, policy-report.md, manual-candidates.json,");
+    println!(
+        "  manual-repair-queue.json, tokmd-packets.json, review-kit.json, unsafe-review-gate.json"
+    );
+    println!();
+    println!("Options:");
+    println!("- --root <dir>    repository or subdirectory to review (default: current directory)");
+    println!("- --base <ref>    git ref to diff against HEAD (default: origin/main)");
+    println!("- --diff <file|-> read diff from a file or stdin instead of --base");
+    println!("- --out-dir <dir> directory for all artifacts (default: target/unsafe-review)");
+    println!("- --max-cards <N> stop collecting after N cards");
+    println!();
+    println!("Examples:");
+    println!("  unsafe-review first-pr");
+    println!("  unsafe-review first-pr --diff change.diff --out-dir target/review");
+    println!("  unsafe-review review --base origin/main --max-cards 20");
+    println!();
+    println!("Trust boundary: always advisory; {FIRST_RUN_TRUST_BOUNDARY}");
+    println!(
+        "unsafe-review does not execute witnesses, post comments, edit source, or enforce blocking policy by default."
+    );
+}
+
+fn print_pilot_help() {
+    println!("unsafe-review pilot: quick diff review capped at 5 cards");
+    println!();
+    println!("Usage:");
+    println!("  unsafe-review pilot [--root .] [--base <ref> | --diff <file|->] [--max-cards <N>]");
+    println!();
+    println!("What pilot does:");
+    println!(
+        "- Same diff-scoped analysis as `check`, but defaults --max-cards to 5 for a fast first look."
+    );
+    println!("- Accepts all `check` flags except --policy (always advisory) and --out.");
+    println!();
+    println!("Examples:");
+    println!("  unsafe-review pilot --base origin/main");
+    println!("  unsafe-review pilot --diff change.diff --format json");
+    println!("  unsafe-review pilot --base origin/main --max-cards 10");
+    println!();
+    println!("Trust boundary: {FIRST_RUN_TRUST_BOUNDARY}");
+}
+
+fn print_explain_help() {
+    println!("unsafe-review explain: show full detail for a single ReviewCard");
+    println!();
+    println!("Usage:");
+    println!("  unsafe-review explain [--root .] [--format json|markdown] <card-id>");
+    println!();
+    println!("Options:");
+    println!("- --root <dir>    repository root (default: current directory)");
+    println!("- --format <name> json (default) or markdown");
+    println!("- --json          shorthand for --format json");
+    println!("- --markdown      shorthand for --format markdown");
+    println!();
+    println!("Examples:");
+    println!("  unsafe-review explain UR-abc123-c1");
+    println!("  unsafe-review explain --format markdown UR-abc123-c1");
+    println!("  unsafe-review explain --json --root /path/to/repo UR-abc123-c1");
+    println!();
+    println!("Trust boundary: {FIRST_RUN_TRUST_BOUNDARY}");
+}
+
+fn print_context_help() {
+    println!("unsafe-review context: emit an LLM-ready context packet for a card or file range");
+    println!();
+    println!("Usage:");
+    println!("  unsafe-review context [--root .] [--json] <card-id>");
+    println!(
+        "  unsafe-review context [--root .] --file <path> --lines Y-Z [--changed-only] --json"
+    );
+    println!();
+    println!("Options:");
+    println!("- --root <dir>      repository root (default: current directory)");
+    println!("- --json            output format (context only supports json)");
+    println!("- --file <path>     file path for file-range scan mode");
+    println!("- --lines Y-Z       line range to include in the context packet");
+    println!("- --changed-only    restrict to changed lines within the range");
+    println!();
+    println!("Examples:");
+    println!("  unsafe-review context --json UR-abc123-c1");
+    println!("  unsafe-review context --root /path/to/repo --json UR-abc123-c1");
+    println!("  unsafe-review context --file src/lib.rs --lines 10-50 --json");
+    println!("  unsafe-review context --file src/lib.rs --lines 10-50 --changed-only --json");
+    println!();
+    println!("Trust boundary: {FIRST_RUN_TRUST_BOUNDARY}");
+}
+
+fn print_confirm_help() {
+    println!("unsafe-review confirm: route and optionally execute a witness for a ReviewCard");
+    println!();
+    println!("Usage:");
+    println!(
+        "  unsafe-review confirm <card-id> --dry-run [--author <owner>] [--root .] \
+         [--base <ref> | --diff <file>] [--expires-at <YYYY-MM-DD>] \
+         [--timeout-seconds 600] [--command <override>] [--out <file>]"
+    );
+    println!(
+        "  unsafe-review confirm <card-id> --allow-heavy --author <owner> [--root .] \
+         [--base <ref> | --diff <file>] [--expires-at <YYYY-MM-DD>] \
+         [--timeout-seconds 600] [--command <override>] [--out <file>]"
+    );
+    println!();
+    println!("Options:");
+    println!("- --dry-run            preview the routed witness command without executing it");
+    println!(
+        "- --allow-heavy        execute the routed witness command (required opt-in; never default)"
+    );
+    println!(
+        "- --author <owner>     who is running the confirmation (required with --allow-heavy)"
+    );
+    println!("- --root <dir>         repository root (default: current directory)");
+    println!("- --base <ref>         git ref to diff against HEAD");
+    println!("- --diff <file>        read diff from a file");
+    println!("- --expires-at <date>  expiry date for the witness receipt (YYYY-MM-DD)");
+    println!("- --timeout-seconds N  witness timeout in seconds (default: 600)");
+    println!("- --command <cmd>      override the routed witness command");
+    println!("- --out <file>         write the receipt to a file instead of stdout");
+    println!();
+    println!("Examples:");
+    println!("  unsafe-review confirm UR-abc123-c1 --dry-run");
+    println!(
+        "  unsafe-review confirm UR-abc123-c1 --allow-heavy --author alice --expires-at 2026-12-31"
+    );
+    println!();
+    println!("Trust boundary:");
+    println!(
+        "- confirm executes the routed witness command only with --allow-heavy; unsafe-review never executes witnesses by default."
+    );
+    println!("- --dry-run previews the confirmation step without executing.");
+    println!("- {FIRST_RUN_TRUST_BOUNDARY}");
+}
+
+fn print_receipt_help() {
+    println!("unsafe-review receipt: manage witness receipts for ReviewCards");
+    println!();
+    println!("Usage:");
+    println!(
+        "  unsafe-review receipt template <card-id> --tool <lane> \
+         --strength <level> --author <owner> --recorded-at <utc> \
+         --expires-at <date> [--summary <text>] [--command <text>] \
+         [--limitation <text>] [--out <file>]"
+    );
+    println!(
+        "  unsafe-review receipt import-miri <card-id> --log <file> \
+         --author <owner> --recorded-at <utc> --expires-at <date> \
+         --command <cmd> [--limitation <text>] [--out <file>]"
+    );
+    println!(
+        "  unsafe-review receipt import-careful <card-id> --log <file> \
+         --author <owner> --recorded-at <utc> --expires-at <date> \
+         --command <cmd> [--limitation <text>] [--out <file>]"
+    );
+    println!(
+        "  unsafe-review receipt import-sanitizer <card-id> --tool asan|msan|tsan|lsan \
+         --log <file> --author <owner> --recorded-at <utc> --expires-at <date> \
+         --command <cmd> [--allow-runtime] [--limitation <text>] [--out <file>]"
+    );
+    println!(
+        "  unsafe-review receipt import-concurrency <card-id> --tool loom|shuttle \
+         --log <file> --author <owner> --recorded-at <utc> --expires-at <date> \
+         --command <cmd> [--limitation <text>] [--out <file>]"
+    );
+    println!(
+        "  unsafe-review receipt import-proof <card-id> --tool kani|crux \
+         --log <file> --author <owner> --recorded-at <utc> --expires-at <date> \
+         --command <cmd> [--limitation <text>] [--out <file>]"
+    );
+    println!("  unsafe-review receipt validate [--root .]");
+    println!(
+        "  unsafe-review receipt audit [--root .] [--base <ref> | --diff <file>] \
+         [--format json|markdown] [--out <file>] [--max-cards <N>]"
+    );
+    println!();
+    println!("Subcommands:");
+    println!("- template         emit a receipt skeleton for manual authoring");
+    println!("- import-miri      import a saved cargo-miri test log as a witness receipt");
+    println!("- import-careful   import a saved cargo-careful test log as a witness receipt");
+    println!(
+        "- import-sanitizer  import a saved sanitizer (asan/msan/tsan/lsan) log as a witness receipt"
+    );
+    println!(
+        "- import-concurrency import a saved concurrency-checker (loom/shuttle) log as a witness receipt"
+    );
+    println!(
+        "- import-proof      import a saved formal-proof tool (kani/crux) log as a witness receipt"
+    );
+    println!("- validate         validate all receipts in .unsafe-review/receipts/");
+    println!("- audit            check receipt coverage for cards found in a diff or repo scan");
+    println!();
+    println!("Examples:");
+    println!("  unsafe-review receipt import-miri UR-abc123-c1 \\");
+    println!("    --log target/miri-output.txt --author alice \\");
+    println!("    --recorded-at 2026-06-10T12:00:00Z --expires-at 2026-12-31 \\");
+    println!("    --command 'cargo +nightly miri test'");
+    println!("  unsafe-review receipt validate");
+    println!("  unsafe-review receipt audit --base origin/main --format markdown");
+    println!();
+    println!("Trust boundary:");
+    println!(
+        "- Receipts record external evidence; they do not prove memory safety or UB-free status."
+    );
+    println!("- {FIRST_RUN_TRUST_BOUNDARY}");
+}
+
+fn print_outcome_help() {
+    println!("unsafe-review outcome: compare two cards.json snapshots");
+    println!();
+    println!("Usage:");
+    println!(
+        "  unsafe-review outcome --before <cards.json> --after <cards.json> \
+         [--format json|markdown] [--out <file>]"
+    );
+    println!();
+    println!("Options:");
+    println!("- --before <file>  path to the baseline cards.json snapshot");
+    println!("- --after <file>   path to the updated cards.json snapshot");
+    println!("- --format <name>  json (default) or markdown");
+    println!("- --json           shorthand for --format json");
+    println!("- --markdown       shorthand for --format markdown");
+    println!("- --out <file>     write rendered output to a file instead of stdout");
+    println!();
+    println!("Examples:");
+    println!("  unsafe-review outcome --before before/cards.json --after after/cards.json");
+    println!(
+        "  unsafe-review outcome --before before/cards.json --after after/cards.json --format markdown --out outcome.md"
+    );
+    println!();
+    println!("Trust boundary: {FIRST_RUN_TRUST_BOUNDARY}");
+}
+
+fn print_policy_help() {
+    println!("unsafe-review policy: advisory policy simulation");
+    println!();
+    println!("Usage:");
+    println!(
+        "  unsafe-review policy report [--root .] [--base <ref> | --diff <file>] \
+         [--format json|markdown] [--out <file>] [--max-cards <N>]"
+    );
+    println!();
+    println!("Subcommands:");
+    println!("- report   show which cards would trigger a no-new-debt policy gate");
+    println!();
+    println!("Options:");
+    println!("- --root <dir>    repository root (default: current directory)");
+    println!("- --base <ref>    git ref to diff against HEAD");
+    println!("- --diff <file>   read diff from a file");
+    println!("- --format <name> json (default) or markdown");
+    println!("- --out <file>    write rendered output to a file instead of stdout");
+    println!("- --max-cards <N> stop collecting after N cards");
+    println!();
+    println!("Examples:");
+    println!("  unsafe-review policy report --base origin/main");
+    println!("  unsafe-review policy report --diff change.diff --format markdown");
+    println!();
+    println!("Trust boundary:");
+    println!("- Policy report is advisory simulation only; it does not enforce gating.");
+    println!("- {FIRST_RUN_TRUST_BOUNDARY}");
+}
+
+fn print_doctor_help() {
+    println!("unsafe-review doctor: check the repository setup");
+    println!();
+    println!("Usage:");
+    println!("  unsafe-review doctor [--root .]");
+    println!();
+    println!("Options:");
+    println!("- --root <dir>  repository root to inspect (default: current directory)");
+    println!();
+    println!("Examples:");
+    println!("  unsafe-review doctor");
+    println!("  unsafe-review doctor --root /path/to/repo");
+    println!();
+    println!("Trust boundary: {FIRST_RUN_TRUST_BOUNDARY}");
+}
+
+fn print_badges_help() {
+    println!("unsafe-review badges: generate badge JSON files for the repository");
+    println!();
+    println!("Usage:");
+    println!("  unsafe-review badges [--root .] [--out badges]");
+    println!();
+    println!("Options:");
+    println!("- --root <dir>  repository root to scan (default: current directory)");
+    println!("- --out <dir>   output directory for badge JSON files (default: badges)");
+    println!();
+    println!("Examples:");
+    println!("  unsafe-review badges");
+    println!("  unsafe-review badges --root /path/to/repo --out target/badges");
+    println!();
+    println!("Trust boundary: {FIRST_RUN_TRUST_BOUNDARY}");
+}
+
+fn print_lsp_help() {
+    println!("unsafe-review lsp: start the Language Server Protocol server");
+    println!();
+    println!("Usage:");
+    println!("  unsafe-review lsp");
+    println!();
+    println!("What lsp does:");
+    println!(
+        "- Reads lsp.json (the saved LSP diagnostic artifact from first-pr) and serves it over the LSP stdio protocol."
+    );
+    println!(
+        "- Intended for editor integration where the lsp.json was produced by a previous first-pr or check run."
+    );
+    println!();
+    println!("Examples:");
+    println!("  unsafe-review lsp");
+    println!();
+    println!("Trust boundary: {FIRST_RUN_TRUST_BOUNDARY}");
 }
 
 fn print_baseline_help() {
