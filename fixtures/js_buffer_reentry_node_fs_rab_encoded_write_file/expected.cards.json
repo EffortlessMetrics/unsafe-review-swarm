@@ -17,6 +17,7 @@
     },
     "operation": "stable-byte-source-rab-async candidate; proof required: observable-red-green; RAB-backed JS buffer descriptor captured through async helper before possible JS reentry or async scheduling and later helper/native materialization; capture: data: from_js_with_encoding_maybe_async_into::<StringOrBuffer>(global, data, encoding)?,; boundary: dispatch_async_worker(&args)?;; materialize: write_file_worker(&args)",
     "operation_family": "stable_byte_source_rab_async",
+    "stable_byte_sub_class": "rab-async",
     "hazards": [
       "stable_byte_source"
     ],

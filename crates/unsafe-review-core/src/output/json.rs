@@ -1,8 +1,8 @@
 use crate::api::{AnalyzeOutput, Provenance, Scope, Summary};
 use crate::domain::{
     AgentLspReadiness, BaselineState, CommentPlanStatus, Coverage, CoverageBlock, EvidenceState,
-    ManualContext, ObligationEvidence, OutcomeMovement, ReviewCard, WitnessReceiptCoverage,
-    WitnessRoute,
+    ManualContext, ObligationEvidence, OperationFamily, OutcomeMovement, ReviewCard,
+    WitnessReceiptCoverage, WitnessRoute,
 };
 use crate::output::REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY;
 use crate::output::confirmation::ConfirmationCue;
@@ -176,6 +176,12 @@ struct JsonCard<'a> {
     site: JsonSite<'a>,
     operation: &'a str,
     operation_family: &'static str,
+    /// Advisory static sub-class hint for stable-byte-source operation families.
+    /// Absent for all other operation families (backward-compatible via skip).
+    /// This is a heuristic aperture label, not a memory-safety proof, UB-free
+    /// status, Miri-clean status, or site-execution claim.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stable_byte_sub_class: Option<&'static str>,
     hazards: Vec<&'static str>,
     obligations: Vec<&'a str>,
     obligation_evidence: Vec<JsonObligationEvidence<'a>>,
@@ -202,6 +208,7 @@ impl<'a> From<&'a ReviewCard> for JsonCard<'a> {
             site: JsonSite::from(card),
             operation: &card.operation.expression,
             operation_family: card.operation.family.as_str(),
+            stable_byte_sub_class: stable_byte_sub_class(&card.operation.family),
             hazards: card.hazards.iter().map(|hazard| hazard.as_str()).collect(),
             obligations: card
                 .obligations
@@ -321,6 +328,21 @@ fn scope_str(output: &AnalyzeOutput) -> &'static str {
     match output.scope {
         Scope::Diff => "diff",
         Scope::Repo => "repo",
+    }
+}
+
+/// Return the advisory stable-byte sub-class hint for the four `StableByteSource*`
+/// operation families, or `None` for all other families.
+///
+/// This is a heuristic aperture label. It does not prove memory-safety, UB-free
+/// status, Miri-clean status, or site execution.
+fn stable_byte_sub_class(family: &OperationFamily) -> Option<&'static str> {
+    match family {
+        OperationFamily::StableByteSourceGetterReentry => Some("getter-reentry"),
+        OperationFamily::StableByteSourceRabAsync => Some("rab-async"),
+        OperationFamily::StableByteSourceSabRace => Some("sab-race"),
+        OperationFamily::StableByteSourceNativeFfiRead => Some("native-ffi-read"),
+        _ => None,
     }
 }
 

@@ -24,7 +24,13 @@ same operation expression.
 Cards include the concrete operation expression, operation family, hazards, and
 an `obligation_evidence` array that reports contract, discharge, reach, and
 witness state per safety obligation. `operation_family` and `hazards` must use
-the canonical `OperationFamily` and `HazardKind` vocabulary. Each hazard,
+the canonical `OperationFamily` and `HazardKind` vocabulary. Cards for the four
+stable-byte-source operation families additionally carry a
+`stable_byte_sub_class` field whose value is one of `getter-reentry`,
+`rab-async`, `sab-race`, or `native-ffi-read`; this field is absent for all
+other families (backward-compatible via `skip_serializing_if`). The sub-class
+hint is a static advisory aperture label, not a memory-safety proof, UB-free
+status, Miri-clean status, or site-execution claim. Each hazard,
 obligation evidence key, and witness route kind must belong to the operation
 family's registry row, and a card must not duplicate a hazard entry. Top-level
 evidence summaries remain for compatibility and human scanning. Cards also

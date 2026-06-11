@@ -17,6 +17,7 @@
     },
     "operation": "stable-byte-source-getter-reentry candidate; proof required: observable-red-green; JS-backed buffer descriptor captured before possible JS reentry and materialized afterward; capture: let buffer = source.as_array_buffer(global)?;; reentry: let start = offset.coerce_to_int64(global)?;; materialize: let ptr = buffer.as_ptr();",
     "operation_family": "stable_byte_source_getter_reentry",
+    "stable_byte_sub_class": "getter-reentry",
     "hazards": [
       "stable_byte_source"
     ],

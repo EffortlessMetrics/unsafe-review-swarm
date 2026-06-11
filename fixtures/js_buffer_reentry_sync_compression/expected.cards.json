@@ -17,6 +17,7 @@
     },
     "operation": "stable-byte-source-getter-reentry candidate; proof required: observable-red-green; JS-backed buffer descriptor captured before possible JS reentry and materialized afterward; capture: let input = StringOrBuffer::from_js(global, arg0)?;; reentry: let level = options.get(global, \"\")?;; materialize: native_compress(&input, level)",
     "operation_family": "stable_byte_source_getter_reentry",
+    "stable_byte_sub_class": "getter-reentry",
     "hazards": [
       "stable_byte_source"
     ],

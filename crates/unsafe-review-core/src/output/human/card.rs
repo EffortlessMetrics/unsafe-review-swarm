@@ -1,4 +1,4 @@
-use crate::domain::ReviewCard;
+use crate::domain::{OperationFamily, ReviewCard};
 use crate::util::path_display;
 
 pub(super) fn render_card(out: &mut String, card: &ReviewCard) {
@@ -14,6 +14,9 @@ pub(super) fn render_card(out: &mut String, card: &ReviewCard) {
         "  operation_family: {}\n",
         card.operation.family.as_str()
     ));
+    if let Some(sub_class) = stable_byte_sub_class(&card.operation.family) {
+        out.push_str(&format!("  stable_byte_sub_class: {sub_class}\n"));
+    }
     out.push_str(&format!("  proof_path: {}\n", card.proof_path.as_str()));
     push_list(
         out,
@@ -78,5 +81,20 @@ fn push_list<'a>(out: &mut String, title: &str, lines: impl Iterator<Item = &'a 
         out.push_str("    - ");
         out.push_str(line);
         out.push('\n');
+    }
+}
+
+/// Return the advisory stable-byte sub-class hint for the four `StableByteSource*`
+/// operation families, or `None` for all other families.
+///
+/// This is a heuristic aperture label. It does not prove memory-safety, UB-free
+/// status, Miri-clean status, or site execution.
+fn stable_byte_sub_class(family: &OperationFamily) -> Option<&'static str> {
+    match family {
+        OperationFamily::StableByteSourceGetterReentry => Some("getter-reentry"),
+        OperationFamily::StableByteSourceRabAsync => Some("rab-async"),
+        OperationFamily::StableByteSourceSabRace => Some("sab-race"),
+        OperationFamily::StableByteSourceNativeFfiRead => Some("native-ffi-read"),
+        _ => None,
     }
 }

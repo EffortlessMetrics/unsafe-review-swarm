@@ -162,6 +162,7 @@
     },
     "operation": "stable-byte-source-native-ffi-read candidate; proof required: observable-red-green; JS-backed bytes reach native FFI pointer/length read before snapshot; source: let input = JSArrayBufferView::from_js(global, value);; native read: unsafe { zstd_compress_into(input.as_ptr(), input.len(), output.as_mut_ptr(), output.len()) }",
     "operation_family": "stable_byte_source_native_ffi_read",
+    "stable_byte_sub_class": "native-ffi-read",
     "hazards": [
       "stable_byte_source"
     ],

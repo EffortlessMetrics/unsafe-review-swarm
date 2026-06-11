@@ -211,6 +211,7 @@
     },
     "operation": "stable-byte-source-sab-race candidate; proof required: mutation-plus-miri; shared JS backing reaches Rust/native borrowed-slice materialization before snapshot; source: if view.is_shared_array_buffer() {; materialize: let bytes = unsafe { core::slice::from_raw_parts(view.as_ptr(), view.len()) };",
     "operation_family": "stable_byte_source_sab_race",
+    "stable_byte_sub_class": "sab-race",
     "hazards": [
       "stable_byte_source"
     ],

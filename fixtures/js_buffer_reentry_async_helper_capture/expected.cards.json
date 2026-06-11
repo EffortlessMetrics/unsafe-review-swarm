@@ -17,6 +17,7 @@
     },
     "operation": "stable-byte-source-rab-async candidate; proof required: observable-red-green; RAB-backed JS buffer descriptor captured through async helper before possible JS reentry or async scheduling and later helper/native materialization; capture: let input = from_js_maybe_async_into::<StringOrBuffer>(global, arg0)?;; boundary: callback.call(global)?;; materialize: finish_async_input(&input)",
     "operation_family": "stable_byte_source_rab_async",
+    "stable_byte_sub_class": "rab-async",
     "hazards": [
       "stable_byte_source"
     ],

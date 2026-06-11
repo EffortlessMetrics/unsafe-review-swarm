@@ -17,6 +17,7 @@
     },
     "operation": "stable-byte-source-getter-reentry candidate; missing stable-byte evidence: no refetch, snapshot, or pin found after JS reentry; proof required: observable-red-green; JS-backed buffer span materialized before possible JS reentry and used afterward without re-fetch, re-validation, or pinning; capture: let buffer = ArrayBuffer::as_array_buffer(global, arg0)?;; span: let bytes = buffer.byte_slice();; reentry: let offset = options.get(global, \"\")?;; use: Ok(bytes[offset as usize] as usize)",
     "operation_family": "stable_byte_source_getter_reentry",
+    "stable_byte_sub_class": "getter-reentry",
     "hazards": [
       "stable_byte_source"
     ],
