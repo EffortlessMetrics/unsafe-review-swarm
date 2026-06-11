@@ -143,7 +143,16 @@ The aggregate queue may group cards into bounded work buckets:
 
 Each entry must include the card ID, operation family, missing evidence summary,
 agent-readiness state, bucket reason, do-not-do rules, and a copyable
-`unsafe-review context <card-id> --json` command. Cards may appear in more than
+`unsafe-review context <card-id> --json` command. Each entry may also carry an
+optional advisory `applicable_edit` string — the first card-scoped allowed
+repair template derived from the same `allowed_repairs` computation used by
+context packets. This field is copy-only and is intended to give consumers
+(e.g. PR review tooling) a single ready-to-paste suggestion-block text without
+fabricating edits. It does not mean unsafe-review applied an edit, ran a
+witness, resolved the card, or proved anything about the unsafe code. Entries in
+the `do_not_auto_repair` or `requires_human_review` buckets must not carry this
+field, because those buckets are terminal and the hint must not imply that
+auto-application is safe. Cards may appear in more than
 one bucket only when the reasons are distinct and card-scoped, such as a card
 that is repairable by guard evidence but still requires a witness receipt for a
 stronger review signal. A card must not repeat within the same bucket.

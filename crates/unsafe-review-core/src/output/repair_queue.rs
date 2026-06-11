@@ -124,6 +124,16 @@ struct RepairQueueEntry {
     agent_readiness: RepairQueueReadiness,
     bucket_reason: &'static str,
     context_command: String,
+    /// Optional advisory copy-only hint for consumers that render suggestion
+    /// blocks (e.g. GitHub review suggestions). Set to the first card-scoped
+    /// allowed repair template from `allowed_repairs`. Present only when a
+    /// card-scoped repair exists; `None` for entries where no bounded template
+    /// is derivable. This field does not mean unsafe-review applied an edit,
+    /// ran a witness, resolved the card, or proved anything about the unsafe
+    /// code. It is not present on entries where `do_not_auto_repair` or
+    /// `requires_human_review` is the sole reason the card is queued.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    applicable_edit: Option<String>,
     do_not_do: &'static [&'static str],
     trust_boundary: &'static str,
 }
@@ -149,6 +159,7 @@ impl RepairQueueEntry {
             agent_readiness: RepairQueueReadiness::from(&projection.agent_readiness),
             bucket_reason: bucket_reason(bucket),
             context_command: format!("unsafe-review context {} --json", card.id),
+            applicable_edit: applicable_edit(bucket, &projection.allowed_repairs),
             do_not_do: agent::DO_NOT_DO,
             trust_boundary: TRUST_BOUNDARY,
         }
@@ -208,6 +219,18 @@ pub(crate) fn bucket_reason(bucket: &str) -> &'static str {
         "requires_human_review" => "human_review_required",
         "do_not_auto_repair" => "not_ready_for_automatic_repair",
         _ => "unknown_bucket",
+    }
+}
+
+/// Returns the first allowed-repair string as an advisory copy-only hint for
+/// suggestion-block consumers, but only for buckets where bounded applicable
+/// edits make sense. Entries in terminal buckets (`do_not_auto_repair`,
+/// `requires_human_review`) do not receive a hint to avoid implying that the
+/// edit is auto-applicable.
+fn applicable_edit(bucket: &str, allowed_repairs: &[String]) -> Option<String> {
+    match bucket {
+        "do_not_auto_repair" | "requires_human_review" => None,
+        _ => allowed_repairs.first().cloned(),
     }
 }
 
@@ -301,6 +324,23 @@ mod tests {
                 .contains("does not edit source")
         );
         assert_repair_queue_boundaries(guard)?;
+
+        // applicable_edit: repairable_by_guard entries must carry a non-empty
+        // advisory hint string; it is copy-only, not auto-application proof.
+        let edit = guard["applicable_edit"]
+            .as_str()
+            .ok_or("repairable_by_guard entry should have applicable_edit")?;
+        if edit.is_empty() {
+            return Err("applicable_edit must not be empty for repairable_by_guard".to_string());
+        }
+        // The edit should come from the raw_pointer_read operation family; it
+        // names a guard action (pointer-live is typically the first discharge).
+        if !edit.contains("guard") {
+            return Err(format!(
+                "applicable_edit for raw_pointer_read should mention a guard action, got: {edit}"
+            ));
+        }
+
         Ok(())
     }
 
@@ -327,6 +367,16 @@ mod tests {
         );
         assert_repair_queue_boundaries(human)?;
         assert_repair_queue_boundaries(no_auto)?;
+
+        // applicable_edit: terminal bucket entries must NOT carry applicable_edit
+        // to avoid implying auto-application is safe for human-review cards.
+        if !human["applicable_edit"].is_null() {
+            return Err("requires_human_review entry must not have applicable_edit".to_string());
+        }
+        if !no_auto["applicable_edit"].is_null() {
+            return Err("do_not_auto_repair entry must not have applicable_edit".to_string());
+        }
+
         Ok(())
     }
 
