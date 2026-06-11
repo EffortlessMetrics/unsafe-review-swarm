@@ -131,6 +131,20 @@ The sidecar is written via write-then-rename so a reader never observes a torn
 file. `last_path` and the discovered/scanned/remaining counts make a stalled or
 slow scan diagnosable without attaching a debugger.
 
+### Start-stub guarantee
+
+When `--out` is given, `<out>.status.json` is written **immediately after the
+reporter is initialised and before the analysis pipeline is entered**.  This
+in-progress stub has `phase: "discovering"`, `completed: false`, `partial:
+false`, `stop_reason: "none"`, `elapsed_ms: 0`, all counts zero, and an
+`operator.state` of `"in_progress"`.  Its sole purpose is to leave a durable
+artifact if the process is killed (SIGKILL, OOM) before the pipeline fires its
+first event — a window that the signal handler cannot cover.  Every non-SIGKILL
+exit path (success, timeout, error, SIGTERM/SIGINT) overwrites the stub with the
+final or incomplete status, so a persisted `phase: "discovering"` sidecar means
+the process died before discovery started.  The start-stub is not a partial
+report and asserts no findings.
+
 ### Timeout, SIGTERM, SIGINT, and --max-cards leave durable evidence
 
 A run that hits `--timeout-seconds`, receives SIGTERM/SIGINT, or reaches
@@ -197,6 +211,9 @@ and operator block report what the scan did; they make no safety claim.
   - A `--max-cards N` run over a multi-card tree leaves a final report with
     `partial: true`, `stop_reason: "max_cards"`, `cap: N`, `cards_found: N`, and
     a cap-specific operator `next_action`; exit code is 0 (not an error).
+  - A run with `--out` that is stopped before the pipeline enters (start-stub test)
+    leaves `<out>.status.json` with `phase: "discovering"`, `stop_reason: "none"`,
+    `completed: false`, `partial: false`, and a populated `scan_scope`.
 - `cargo test -p unsafe-review-core --lib` — pipeline unit test: `max_cards: Some(1)`
   over a multi-card tree emits a final status with `partial: true`,
   `stop_reason: MaxCards`, `cap: Some(1)`, `completed: false`.
