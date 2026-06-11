@@ -328,6 +328,15 @@ impl Provenance {
     }
 }
 
+/// Regenerate `expected.cards.json` for each named fixture (or all registered
+/// fixtures if `names` is empty), always writing LF line endings.
+///
+/// Called by `cargo run -p xtask -- bless-goldens [fixture ...]`.
+/// Does not execute witnesses or assess soundness.
+pub fn bless_fixture_card_goldens(names: &[&str]) -> Result<Vec<PathBuf>, String> {
+    json::bless_fixture_card_goldens(names)
+}
+
 pub fn render_json(output: &AnalyzeOutput) -> String {
     json::render(output)
 }

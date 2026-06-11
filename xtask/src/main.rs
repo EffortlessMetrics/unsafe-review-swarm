@@ -836,7 +836,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
     match commands::XtaskCommand::parse(&args)? {
         commands::XtaskCommand::Help => {
             println!(
-                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, sync-calibration-snapshot, source-divergence, check-source-sync"
+                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...]"
             );
             Ok(())
         }
@@ -874,6 +874,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::DogfoodUsefulness => dogfood_usefulness::write(),
         commands::XtaskCommand::SyncCalibrationSnapshot => sync_calibration_snapshot(),
         commands::XtaskCommand::SourceDivergence => source_sync::report_source_divergence(),
+        commands::XtaskCommand::BlessGoldens(names) => bless_goldens(&names),
     }
 }
 
@@ -2977,6 +2978,16 @@ fn sync_calibration_snapshot() -> Result<(), String> {
     sync_calibration_report(&stats)?;
     sync_objective_audit_snapshot(&stats)?;
     println!("sync-calibration-snapshot: ok");
+    Ok(())
+}
+
+fn bless_goldens(names: &[String]) -> Result<(), String> {
+    let refs: Vec<&str> = names.iter().map(|s| s.as_str()).collect();
+    let written = unsafe_review_core::bless_fixture_card_goldens(&refs)?;
+    println!("bless-goldens: updated {} fixture(s)", written.len());
+    for path in &written {
+        println!("  {}", path.display());
+    }
     Ok(())
 }
 
@@ -6153,6 +6164,16 @@ fn check_fixture(dir: &Path) -> Result<(), String> {
 
     let expected_cards = dir.join("expected.cards.json");
     if expected_cards.is_file() {
+        // Guard: reject CRLF before parsing so the PowerShell Set-Content foot-gun
+        // is caught at gate time rather than silently committed.
+        let raw = fs::read(&expected_cards)
+            .map_err(|err| format!("read {} failed: {err}", expected_cards.display()))?;
+        if raw.windows(2).any(|w| w == b"\r\n") {
+            return Err(format!(
+                "{}/expected.cards.json contains CRLF line endings; normalize to LF before committing",
+                dir.display()
+            ));
+        }
         let expected_cards = parse_json_file(&expected_cards)?;
         let Some(cards) = expected_cards.as_array() else {
             return Err(format!(
