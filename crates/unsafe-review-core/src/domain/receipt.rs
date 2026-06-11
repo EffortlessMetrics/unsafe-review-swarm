@@ -65,6 +65,11 @@ pub struct SanitizerReceiptInput {
     pub expires_at: String,
     pub command: String,
     pub limitations: Vec<String>,
+    /// When `true`, accept output from a runtime/program-level sanitizer run
+    /// that is not a `cargo test` harness. A clean run (no sanitizer markers)
+    /// records `not_reproduced`; a run with sanitizer markers records
+    /// `confirmed` (failure observed — not a safety claim).
+    pub allow_runtime: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -211,35 +216,41 @@ impl WitnessReceipt {
 
     pub fn from_sanitizer_output(input: SanitizerReceiptInput) -> Result<Self, String> {
         validate_sanitizer_tool(&input.tool)?;
-        validate_saved_success_output(&input.output, &input.tool)?;
-        validate_sanitizer_success_output(&input.output, &input.tool)?;
         validate_required(&input.command, "command")?;
         validate_sanitizer_command(&input.command)?;
         let command_hash = Self::command_hash(&input.command);
+
+        let (summary, verdict, extra_limitations) = if input.allow_runtime {
+            sanitizer_runtime_classify(&input.output, &input.tool)?
+        } else {
+            validate_saved_success_output(&input.output, &input.tool)?;
+            validate_sanitizer_success_output(&input.output, &input.tool)?;
+            (
+                format!("saved {} output reported `test result: ok`", input.tool),
+                "not_reproduced".to_string(),
+                vec![],
+            )
+        };
+
         let mut limitations = vec![
             "saved-output adapter; unsafe-review did not run a sanitizer".to_string(),
             "receipt strength is `ran`; site reach is not claimed".to_string(),
         ];
+        limitations.extend(extra_limitations);
         limitations.extend(input.limitations);
         let receipt = Self {
             schema_version: WITNESS_RECEIPT_SCHEMA_VERSION.to_string(),
             card_id: input.card_id,
-            tool: input.tool.clone(),
+            tool: input.tool,
             strength: "ran".to_string(),
             author: Some(input.author),
             recorded_at: Some(input.recorded_at),
             expires_at: Some(input.expires_at),
-            summary: Some(format!(
-                "saved {} output reported `test result: ok`",
-                input.tool
-            )),
+            summary: Some(summary),
             command: Some(input.command),
             command_hash: Some(command_hash),
             limitations: Some(limitations),
-            // Clean targeted run only (sanitizer failure markers rejected
-            // above), so the derivable verdict is `not_reproduced`; not a
-            // safety claim.
-            verdict: Some("not_reproduced".to_string()),
+            verdict: Some(verdict),
         };
         receipt.validate()?;
         Ok(receipt)
@@ -388,7 +399,9 @@ fn validate_strength(value: &str) -> Result<(), String> {
     if is_supported_receipt_strength(value) {
         Ok(())
     } else {
-        Err(format!("uses unknown receipt strength `{value}`"))
+        Err(format!(
+            "uses unknown receipt strength `{value}`; valid values: `configured`, `ran`, `test_targeted`, `site_reached`, `reviewed`"
+        ))
     }
 }
 
@@ -564,6 +577,50 @@ fn validate_sanitizer_success_output(output: &str, tool: &str) -> Result<(), Str
         }
     }
     Ok(())
+}
+
+/// Classify a runtime (non-cargo-test) sanitizer run.
+///
+/// Returns `(summary, verdict, extra_limitations)`.
+/// A run with sanitizer markers → `confirmed` (signal observed, not a safety
+/// claim). A clean run → `not_reproduced` (no signal this run, not a safety
+/// claim).
+fn sanitizer_runtime_classify(
+    output: &str,
+    tool: &str,
+) -> Result<(String, String, Vec<String>), String> {
+    if output.trim().is_empty() {
+        return Err(format!("saved {tool} output is empty"));
+    }
+    let lower = output.to_ascii_lowercase();
+    let sanitizer_fired = [
+        "addresssanitizer:",
+        "memorysanitizer:",
+        "threadsanitizer:",
+        "leaksanitizer:",
+        "detected memory leaks",
+        "data race",
+        "deadlysignal",
+        "undefined behavior",
+    ]
+    .iter()
+    .any(|needle| lower.contains(needle));
+
+    let extra =
+        vec!["runtime witness mode: this was a program run, not a cargo test harness".to_string()];
+    if sanitizer_fired {
+        Ok((
+            format!("{tool} runtime run: sanitizer signal observed"),
+            "confirmed".to_string(),
+            extra,
+        ))
+    } else {
+        Ok((
+            format!("{tool} runtime run: clean runtime run, no sanitizer signal observed"),
+            "not_reproduced".to_string(),
+            extra,
+        ))
+    }
 }
 
 fn validate_utc_timestamp(value: &str, key: &str) -> Result<(), String> {
@@ -1147,6 +1204,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test read_header".to_string(),
             limitations: vec!["fixture only".to_string()],
+            allow_runtime: false,
         })?;
 
         assert_eq!(receipt.tool, "asan");
@@ -1182,6 +1240,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test read_header".to_string(),
             limitations: Vec::new(),
+            allow_runtime: false,
         });
 
         assert!(
@@ -1204,6 +1263,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test read_header".to_string(),
             limitations: Vec::new(),
+            allow_runtime: false,
         });
 
         assert!(result.err().unwrap_or_default().contains("failure marker"));
@@ -1221,6 +1281,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo test read_header".to_string(),
             limitations: Vec::new(),
+            allow_runtime: false,
         });
 
         assert!(
@@ -1459,6 +1520,84 @@ mod tests {
                 .unwrap_or_default()
                 .contains("proof receipt command")
         );
+    }
+
+    #[test]
+    fn sanitizer_receipt_from_runtime_output_records_confirmed_when_sanitizer_fires()
+    -> Result<(), String> {
+        // A runtime ASAN run that fires: verdict should be "confirmed"
+        let receipt = WitnessReceipt::from_sanitizer_output(SanitizerReceiptInput {
+            card_id: "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                .to_string(),
+            tool: "asan".to_string(),
+            output: "==123==ERROR: AddressSanitizer: attempting free on address which was not malloc()-ed\n==123==    #0 0x... in free\n".to_string(),
+            author: "core/fixtures".to_string(),
+            recorded_at: "2026-05-18T00:00:00Z".to_string(),
+            expires_at: "2026-08-18".to_string(),
+            command: "ASAN_OPTIONS=abort_on_error=0 ./target/release/my-program".to_string(),
+            limitations: vec!["fixture only".to_string()],
+            allow_runtime: true,
+        })?;
+
+        assert_eq!(receipt.tool, "asan");
+        assert_eq!(receipt.strength, "ran");
+        assert_eq!(receipt.verdict.as_deref(), Some("confirmed"));
+        let summary = receipt.summary.as_deref().unwrap_or("");
+        assert!(
+            summary.contains("sanitizer signal observed"),
+            "summary was: {summary}"
+        );
+        let limitations = receipt.limitations.as_ref().ok_or("missing limitations")?;
+        assert!(
+            limitations
+                .iter()
+                .any(|item| item.contains("runtime witness mode"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn sanitizer_receipt_from_runtime_output_records_not_reproduced_on_clean_run()
+    -> Result<(), String> {
+        // A runtime ASAN run with no sanitizer signal: verdict should be "not_reproduced"
+        let receipt = WitnessReceipt::from_sanitizer_output(SanitizerReceiptInput {
+            card_id: "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                .to_string(),
+            tool: "asan".to_string(),
+            output: "Program output: processed 100 items successfully\nProcess exited with code 0\n".to_string(),
+            author: "core/fixtures".to_string(),
+            recorded_at: "2026-05-18T00:00:00Z".to_string(),
+            expires_at: "2026-08-18".to_string(),
+            command: "ASAN_OPTIONS=abort_on_error=0 ./target/release/my-program".to_string(),
+            limitations: vec!["fixture only".to_string()],
+            allow_runtime: true,
+        })?;
+
+        assert_eq!(receipt.verdict.as_deref(), Some("not_reproduced"));
+        let summary = receipt.summary.as_deref().unwrap_or("");
+        assert!(
+            summary.contains("no sanitizer signal"),
+            "summary was: {summary}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn sanitizer_receipt_runtime_mode_still_rejects_empty_output() {
+        let result = WitnessReceipt::from_sanitizer_output(SanitizerReceiptInput {
+            card_id: "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                .to_string(),
+            tool: "asan".to_string(),
+            output: "".to_string(),
+            author: "core/fixtures".to_string(),
+            recorded_at: "2026-05-18T00:00:00Z".to_string(),
+            expires_at: "2026-08-18".to_string(),
+            command: "ASAN_OPTIONS=abort_on_error=0 ./target/release/my-program".to_string(),
+            limitations: Vec::new(),
+            allow_runtime: true,
+        });
+
+        assert!(result.err().unwrap_or_default().contains("empty"));
     }
 
     fn fixture_receipt() -> WitnessReceipt {

@@ -2302,6 +2302,7 @@ fn receipt_import_sanitizer(options: SavedOutputReceiptOptions) -> Result<(), St
         expires_at: options.expires_at,
         command: options.command,
         limitations: options.limitations,
+        allow_runtime: options.allow_runtime,
     })?;
     let rendered = receipt.to_pretty_json()?;
     if let Some(path) = options.out {
@@ -2518,7 +2519,7 @@ fn print_help() {
         "  policy report [--root .] [--base origin/main|--diff file] [--format json|markdown] [--out file] [--max-cards N]"
     );
     println!(
-        "  receipt template <card-id> --tool <lane> --strength <level> --author <owner> --recorded-at <utc> --expires-at <date> [--summary text] [--command text] [--limitation text] [--out file]"
+        "  receipt template <card-id> --tool <lane> --strength configured|ran|test_targeted|site_reached|reviewed --author <owner> --recorded-at <utc> --expires-at <date> [--summary text] [--command text] [--limitation text] [--out file]"
     );
     println!(
         "  receipt import-miri <card-id> --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command <cmd> [--limitation text] [--out file]"
@@ -2527,7 +2528,7 @@ fn print_help() {
         "  receipt import-careful <card-id> --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command <cmd> [--limitation text] [--out file]"
     );
     println!(
-        "  receipt import-sanitizer <card-id> --tool asan|msan|tsan|lsan --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command <cmd> [--limitation text] [--out file]"
+        "  receipt import-sanitizer <card-id> --tool asan|msan|tsan|lsan --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command <cmd> [--allow-runtime] [--limitation text] [--out file]"
     );
     println!(
         "  receipt import-concurrency <card-id> --tool loom|shuttle --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command <cmd> [--limitation text] [--out file]"

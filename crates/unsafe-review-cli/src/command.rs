@@ -120,6 +120,8 @@ pub(crate) struct SavedOutputReceiptOptions {
     pub command: String,
     pub limitations: Vec<String>,
     pub out: Option<PathBuf>,
+    /// When true, accept a runtime/program-level sanitizer log (no `test result: ok` required).
+    pub allow_runtime: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

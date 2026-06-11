@@ -276,6 +276,7 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
                 expires_at: fields.expires_at,
                 command: fields.command,
                 limitations,
+                allow_runtime: false,
             })
         }
         ConfirmLane::Concurrency(tool) => {

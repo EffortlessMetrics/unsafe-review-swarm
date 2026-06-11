@@ -133,6 +133,10 @@ impl<'a> SavedOutputParser<'a> {
                 self.options.out = Some(inline_path(arg, "--out")?);
                 Ok(true)
             }
+            "--allow-runtime" => {
+                self.options.allow_runtime = true;
+                Ok(true)
+            }
             _ => Ok(false),
         }
     }

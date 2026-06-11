@@ -5554,6 +5554,102 @@ fn receipt_import_sanitizer_writes_receipt_from_saved_success_log() -> Result<()
 }
 
 #[test]
+fn receipt_import_sanitizer_runtime_failure_records_confirmed() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment_receipted");
+    let temp = TempDir::new("unsafe-review-sanitizer-runtime-failure-e2e")?;
+    let receipt_path = temp.path().join("asan_runtime_failure.json");
+    let card_id =
+        "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+
+    let output = run_success([
+        os("receipt"),
+        os("import-sanitizer"),
+        os(card_id),
+        os("--tool"),
+        os("asan"),
+        os("--allow-runtime"),
+        os("--log"),
+        fixture.join("asan.runtime_failure.log").into_os_string(),
+        os("--author"),
+        os("core/fixtures"),
+        os("--recorded-at"),
+        os("2026-05-18T00:00:00Z"),
+        os("--expires-at"),
+        os("2026-08-18"),
+        os("--command"),
+        os("ASAN_OPTIONS=abort_on_error=0 ./target/release/my-program"),
+        os("--limitation"),
+        os("fixture only"),
+        os("--out"),
+        receipt_path.as_os_str().to_os_string(),
+    ])?;
+
+    assert_eq!(stdout_text(&output)?.trim(), "");
+    let receipt = parse_json(&fs::read_to_string(receipt_path)?)?;
+    assert_eq!(receipt["tool"], "asan");
+    assert_eq!(receipt["strength"], "ran");
+    assert_eq!(receipt["verdict"], "confirmed");
+    let summary = receipt["summary"].as_str().unwrap_or("");
+    assert!(
+        summary.contains("sanitizer signal observed"),
+        "expected 'sanitizer signal observed' in summary, got: {summary}"
+    );
+    let limitations = receipt["limitations"]
+        .as_array()
+        .ok_or("receipt limitations should be an array")?;
+    assert!(
+        limitations
+            .iter()
+            .any(|item| { item.as_str().unwrap_or("").contains("runtime witness mode") })
+    );
+    Ok(())
+}
+
+#[test]
+fn receipt_import_sanitizer_runtime_clean_records_not_reproduced() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment_receipted");
+    let temp = TempDir::new("unsafe-review-sanitizer-runtime-clean-e2e")?;
+    let receipt_path = temp.path().join("asan_runtime_clean.json");
+    let card_id =
+        "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+
+    let output = run_success([
+        os("receipt"),
+        os("import-sanitizer"),
+        os(card_id),
+        os("--tool"),
+        os("asan"),
+        os("--allow-runtime"),
+        os("--log"),
+        fixture.join("asan.runtime_clean.log").into_os_string(),
+        os("--author"),
+        os("core/fixtures"),
+        os("--recorded-at"),
+        os("2026-05-18T00:00:00Z"),
+        os("--expires-at"),
+        os("2026-08-18"),
+        os("--command"),
+        os("ASAN_OPTIONS=abort_on_error=0 ./target/release/my-program"),
+        os("--limitation"),
+        os("fixture only"),
+        os("--out"),
+        receipt_path.as_os_str().to_os_string(),
+    ])?;
+
+    assert_eq!(stdout_text(&output)?.trim(), "");
+    let receipt = parse_json(&fs::read_to_string(receipt_path)?)?;
+    assert_eq!(receipt["tool"], "asan");
+    assert_eq!(receipt["strength"], "ran");
+    assert_eq!(receipt["verdict"], "not_reproduced");
+    let summary = receipt["summary"].as_str().unwrap_or("");
+    assert!(
+        summary.contains("no sanitizer signal"),
+        "expected 'no sanitizer signal' in summary, got: {summary}"
+    );
+    Ok(())
+}
+
+#[test]
 fn receipt_import_concurrency_writes_receipt_from_saved_success_log() -> Result<(), Box<dyn Error>>
 {
     let fixture = fixture_root("unsafe_impl_send");

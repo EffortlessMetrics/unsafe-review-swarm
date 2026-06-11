@@ -1,0 +1,7 @@
+Starting my-program with ASAN
+Processing buffer...
+==12345==ERROR: AddressSanitizer: attempting free on address which was not malloc()-ed
+==12345==    #0 0x7f1234 in free (/lib/x86_64-linux-gnu/libc.so.6+0x...)
+==12345==    #1 0x555678 in process_buffer (main.c:42)
+==12345==SUMMARY: AddressSanitizer: bad-free
+Aborted (core dumped)
