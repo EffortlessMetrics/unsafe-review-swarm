@@ -447,6 +447,14 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
     let mut options = FirstPrOptions::default();
     let mut idx = 0usize;
     while idx < args.len() {
+        // `--out` belongs to `check`/`repo`; `first-pr` uses `--out-dir`.
+        // Intercept before try_apply_check_arg silently consumes it.
+        let arg = args[idx].as_str();
+        if arg == "--out" || arg.starts_with("--out=") {
+            return Err(format!(
+                "unknown first-pr argument `{arg}`; did you mean `--out-dir`?"
+            ));
+        }
         if let Some(consumed) = check_parse::try_apply_check_arg(&args, idx, &mut options.check)? {
             idx += consumed;
             continue;
@@ -1498,6 +1506,38 @@ mod tests {
         assert_eq!(options.check.max_cards, Some(3));
         assert_eq!(options.out_dir, PathBuf::from("target/unsafe-review"));
         Ok(())
+    }
+
+    #[test]
+    fn first_pr_rejects_out_and_suggests_out_dir() {
+        // Regression test for EffortlessMetrics/unsafe-review#531: `--out` is
+        // a `check`/`repo` flag; `first-pr` uses `--out-dir`. The parser must
+        // reject `--out` with a suggestion rather than silently consuming it.
+        let space_form = parse(args([
+            "unsafe-review",
+            "first-pr",
+            "--diff=change.diff",
+            "--out",
+            "/tmp/sensor-dir",
+        ]));
+        let equals_form = parse(args([
+            "unsafe-review",
+            "first-pr",
+            "--diff=change.diff",
+            "--out=/tmp/sensor-dir",
+        ]));
+
+        for result in [space_form, equals_form] {
+            let err = result.err().unwrap_or_default();
+            assert!(
+                err.contains("--out"),
+                "error must name the unknown flag: {err}"
+            );
+            assert!(
+                err.contains("--out-dir"),
+                "error must suggest --out-dir: {err}"
+            );
+        }
     }
 
     #[test]

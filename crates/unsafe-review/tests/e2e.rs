@@ -5779,6 +5779,50 @@ fn unknown_flag_exits_2() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn first_pr_unknown_flag_out_exits_2_without_writing_bundle() -> Result<(), Box<dyn Error>> {
+    // Regression test for EffortlessMetrics/unsafe-review#531:
+    // `first-pr --out <dir>` must exit 2 (usage/input error), name the unknown
+    // flag in the diagnostic, and must NOT silently write a review bundle to the
+    // default `target/unsafe-review` output directory.
+    let source_fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-first-pr-unknown-flag-e2e")?;
+    let fixture = temp.path().join("fixture");
+    copy_dir_all(&source_fixture, &fixture)?;
+    // The default out-dir would be inside the fixture copy; confirm it is absent.
+    let default_out_dir = fixture.join("target").join("unsafe-review");
+
+    let output = run_failure([
+        os("first-pr"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--out"),
+        temp.path().join("sensor-dir").as_os_str().to_os_string(),
+    ])?;
+
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "unknown `--out` flag on first-pr must exit 2 (usage/input error)"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--out"),
+        "diagnostic must name the unknown flag `--out`: {stderr}"
+    );
+    assert!(
+        stderr.contains("--out-dir"),
+        "diagnostic must suggest `--out-dir`: {stderr}"
+    );
+    assert!(
+        !default_out_dir.exists(),
+        "no review bundle must be written to default out-dir on a bad invocation: {default_out_dir:?}"
+    );
+    Ok(())
+}
+
+#[test]
 fn missing_diff_file_exits_2() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment");
     let missing = fixture.join("does-not-exist.diff");
