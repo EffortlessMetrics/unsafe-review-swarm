@@ -1,4 +1,5 @@
 use super::*;
+use crate::command::Format;
 
 mod arg_value;
 mod saved_output;
@@ -41,8 +42,13 @@ pub(super) fn parse_receipt(args: Vec<String>) -> Result<Command, String> {
 }
 
 fn parse_receipt_audit(args: Vec<String>) -> Result<CheckOptions, String> {
+    let explicit_format = has_explicit_format_arg(&args);
     let mut options = parse_check(args)?;
-    options.format = normalize_report_format(options.format, parse_receipt_audit_format)?;
+    options.format = if explicit_format && options.format == Format::Human {
+        parse_receipt_audit_format(options.format)?
+    } else {
+        normalize_report_format(options.format, parse_receipt_audit_format)?
+    };
     require_advisory_policy(&options, "receipt audit is advisory-only")?;
     Ok(options)
 }

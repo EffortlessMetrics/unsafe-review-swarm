@@ -11,7 +11,7 @@ pub(super) fn parse_policy_command(args: Vec<String>) -> Result<Command, String>
 }
 
 fn parse_policy_report(args: &[String]) -> Result<CheckOptions, String> {
-    let explicit_format = has_explicit_format_arg(args);
+    let explicit_format = super::has_explicit_format_arg(args);
     let mut options = super::parse_check(args.to_vec())?;
     options.format = if explicit_format && options.format == Format::Human {
         normalize_policy_report_format(options.format)?
@@ -20,11 +20,6 @@ fn parse_policy_report(args: &[String]) -> Result<CheckOptions, String> {
     };
     super::require_advisory_policy(&options, "policy report is advisory-only")?;
     Ok(options)
-}
-
-fn has_explicit_format_arg(args: &[String]) -> bool {
-    args.iter()
-        .any(|arg| arg == "--format" || arg.starts_with("--format="))
 }
 
 fn normalize_policy_report_format(format: Format) -> Result<Format, String> {

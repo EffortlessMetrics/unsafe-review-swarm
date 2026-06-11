@@ -899,6 +899,11 @@ pub(super) fn parse_receipt_audit_format(format: Format) -> Result<Format, Strin
     json_or_markdown_format(format, "receipt audit")
 }
 
+pub(super) fn has_explicit_format_arg(args: &[String]) -> bool {
+    args.iter()
+        .any(|arg| arg == "--format" || arg.starts_with("--format="))
+}
+
 fn set_card_id(id: &mut Option<String>, value: &str) -> Result<(), String> {
     if id.replace(value.to_string()).is_some() {
         return Err("expected exactly one card id".to_string());
@@ -2647,6 +2652,75 @@ mod tests {
             command,
             Err("receipt audit only supports json or markdown output, got `sarif`".to_string())
         );
+    }
+
+    #[test]
+    fn receipt_audit_rejects_explicit_human_format() {
+        // Regression test: explicit `--format human` must error, not silently convert to json.
+        // Matches the behaviour of `policy report`, which also rejects explicit human.
+        let equals_form = parse(args([
+            "unsafe-review",
+            "receipt",
+            "audit",
+            "--format=human",
+        ]));
+        let space_form = parse(args([
+            "unsafe-review",
+            "receipt",
+            "audit",
+            "--format",
+            "human",
+        ]));
+
+        for result in [equals_form, space_form] {
+            let err = result.err().unwrap_or_default();
+            assert!(
+                err.contains("receipt audit only supports json or markdown output"),
+                "error must name the command and supported formats: {err}"
+            );
+            assert!(
+                err.contains("human"),
+                "error must name the rejected value: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn receipt_audit_defaults_to_json_without_explicit_format() -> Result<(), String> {
+        // Default (no --format flag) must stay json, not error.
+        let command = parse(args(["unsafe-review", "receipt", "audit"]))?;
+
+        let Command::ReceiptAudit(options) = command else {
+            return Err("expected receipt audit command".to_string());
+        };
+        assert_eq!(
+            options.format,
+            Format::Json,
+            "default format must be json when --format is omitted"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_audit_accepts_explicit_supported_formats() -> Result<(), String> {
+        // Explicit --format json and --format markdown must both succeed.
+        let json_form = parse(args(["unsafe-review", "receipt", "audit", "--format=json"]))?;
+        let markdown_form = parse(args([
+            "unsafe-review",
+            "receipt",
+            "audit",
+            "--format=markdown",
+        ]))?;
+
+        let Command::ReceiptAudit(json_options) = json_form else {
+            return Err("expected receipt audit command".to_string());
+        };
+        let Command::ReceiptAudit(md_options) = markdown_form else {
+            return Err("expected receipt audit command".to_string());
+        };
+        assert_eq!(json_options.format, Format::Json);
+        assert_eq!(md_options.format, Format::Markdown);
+        Ok(())
     }
 
     #[test]
