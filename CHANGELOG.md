@@ -11,6 +11,60 @@ comments, edit source, or block by default.
 
 ## Unreleased
 
+## 0.3.6 - 2026-06-11
+
+0.3.6 is the CLI-truthfulness and evidence-intake patch. It makes the command
+line hard to misuse and lets real external evidence enter the receipt ledger:
+unknown flags now fail loudly instead of being silently ignored, a `repo --out`
+run that is killed before it finishes still leaves a status artifact, and
+runtime sanitizer witnesses can be imported as evidence. It adds no analyzer
+breadth. It remains advisory static coverage evidence: it does not prove memory
+safety, UB-free status, Miri-clean status, site execution, calibrated
+precision/recall, or policy readiness, and it does not run witnesses, post
+comments, edit source, or block by default.
+
+### Added
+
+- `receipt import-sanitizer --allow-runtime` accepts runtime/program
+  AddressSanitizer (and similar) witness logs as receipt evidence without
+  requiring a `test result: ok` line. A run where the sanitizer fires records
+  verdict `confirmed` (a failure was observed — not a safety claim); a clean
+  run records `not_reproduced` (no signal observed this run — not a safety
+  claim). The accepted `--strength` values
+  (`configured`/`ran`/`test_targeted`/`site_reached`/`reviewed`) are now listed
+  in CLI help and in the unknown-value error.
+  ([#519](https://github.com/EffortlessMetrics/unsafe-review/issues/519))
+- Auto-emitted cards for the stable-byte-source operation families now carry an
+  additive `stable_byte_sub_class` hint (omitted for other families). It is a
+  heuristic aperture label, not a memory-safety, UB-free, Miri-clean, or
+  site-execution claim.
+  ([#1571](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1571))
+- Repair-queue entries now carry a bounded `applicable_edit` hint for
+  repairable buckets so consumers can render one-click suggestions; entries in
+  the terminal `do_not_auto_repair` / `requires_human_review` buckets carry no
+  such hint. unsafe-review still does not edit source.
+  ([#1542](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1542))
+
+### Changed
+
+- Unknown CLI flags now fail loudly instead of being silently ignored. In
+  particular `first-pr --out ...` previously exited 0 and wrote a review kit to
+  the default location while ignoring the flag; it now exits 2 with a diagnostic
+  that names the flag and suggests `--out-dir`, and writes no bundle.
+  ([#531](https://github.com/EffortlessMetrics/unsafe-review/issues/531))
+- `confirm` now surfaces command provenance (analyzer-derived route vs
+  `--command` override) in dry-run and pre-execution output, and validates
+  owner-derived argv tokens so a flag-shaped or shell-ish owner can never be
+  spliced into a routed witness command; an invalid owner yields no command
+  rather than a fabricated one. `runtime_executed` is never fabricated.
+  ([#1514](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1514))
+- `unsafe-review repo --out <path>` now writes a "scan started" status stub to
+  `<path>.status.json` before analysis begins, so a run killed before it can
+  finish still leaves a durable, honest record that a scan was attempted
+  (`phase: "discovering"`, `completed: false`). Every normal, capped, timed-out,
+  or interrupted outcome supersedes the stub.
+  ([#518](https://github.com/EffortlessMetrics/unsafe-review/issues/518))
+
 ## 0.3.5 - 2026-06-08
 
 0.3.5 is the instrument-truthfulness patch. It makes `unsafe-review`'s core
