@@ -58,10 +58,15 @@ movement summary; it recomputes nothing.
     "comment_plan": "comment-plan.json",
     "repair_queue": "repair-queue.json",
     "receipt_audit": "receipt-audit.json",
-    "outcome": "outcome.json",
-    "badges": "badges.json"
+    "review_kit": "review-kit.json",
+    "pr_summary": "pr-summary.md",
+    "sarif": "cards.sarif",
+    "lsp": "lsp.json",
+    "policy_report": "policy-report.json"
   },
-  "trust_boundary": "static unsafe-review coverage evidence; not proof, not a merge verdict"
+  "trust_boundary": "static unsafe-review coverage evidence; not proof, not a merge verdict",
+  "tool": "unsafe-review",
+  "tool_version": "<semver>"
 }
 ```
 

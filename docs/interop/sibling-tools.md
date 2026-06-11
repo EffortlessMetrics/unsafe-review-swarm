@@ -94,6 +94,23 @@ sensors uniformly instead of special-casing each:
 - **Spec lifecycle dashboard + wording-contract verifier**: machine-checked
   spec status with proof commands, and a verifier that rejects overclaim drift.
 
+## Manifest envelope constants
+
+The following fixed values are the schema-routing anchor for `unsafe-review-gate.json`
+(SPEC-0034). Consumers MUST route by `schema_version` and `dialect`; they MUST NOT
+infer tool identity from filenames or stdout format.
+
+| Field | Fixed value | Notes |
+|---|---|---|
+| `schema_version` | `"unsafe-review-gate/v1"` | String form; agreed with ripr envelope |
+| `dialect` | `"unsafe-review"` | Sensor identity marker for shared router dispatch |
+| `status` | `"advisory"` | Always advisory; manifest carries posture, not a block verdict |
+| `trust_boundary` | `"static unsafe-review coverage evidence; not proof, not a merge verdict"` | Fixed advisory string; no proof / UB-free / Miri-clean / site-execution claim |
+
+These constants are verified by `cargo test -p unsafe-review-core gate_manifest` and
+enforced in `check-pr`. See SPEC-0034 for the full envelope shape including the
+`summary`, `artifacts`, `tool`, and `tool_version` fields.
+
 ## Bidirectional learning ledger
 
 Live convergence items. Direction = which tool is ahead; the receiving repo
