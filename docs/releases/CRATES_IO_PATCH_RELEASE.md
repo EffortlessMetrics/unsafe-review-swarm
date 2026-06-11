@@ -118,7 +118,10 @@ After publication:
    versions, docs.rs status, install smoke, repo help/list-files/status smoke,
    first-pr smoke, manual candidate smoke, explain/context smoke, support smoke,
    known limits, and trust boundary.
-2. Mirror release metadata back to `unsafe-review-swarm`.
+2. Mirror release metadata back to `unsafe-review-swarm` following
+   [`docs/contributing/SWARM_MIRROR.md`](../contributing/SWARM_MIRROR.md)
+   (squash PR, advance the `policy/source-sync.toml` checkpoint, apply the
+   CHANGELOG `Unreleased` -> dated convention; do not wholesale-copy CHANGELOG).
 3. Do not import source badge counts into swarm badge endpoints unless a
    separate source-of-truth policy explicitly says to do so.
 
