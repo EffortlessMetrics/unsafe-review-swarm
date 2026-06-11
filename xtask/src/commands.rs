@@ -23,6 +23,7 @@ pub(crate) enum XtaskCommand {
     CheckManualCandidateExamples,
     CheckFirstHour,
     DogfoodUsefulness,
+    SyncCalibrationSnapshot,
     SourceDivergence,
 }
 
@@ -76,6 +77,11 @@ impl XtaskCommand {
             Some("dogfood-usefulness") => {
                 parse_no_extra(args, "dogfood-usefulness", Self::DogfoodUsefulness)
             }
+            Some("sync-calibration-snapshot") => parse_no_extra(
+                args,
+                "sync-calibration-snapshot",
+                Self::SyncCalibrationSnapshot,
+            ),
             Some("source-divergence") | Some("check-source-sync") => {
                 parse_no_extra(args, "source-divergence", Self::SourceDivergence)
             }
