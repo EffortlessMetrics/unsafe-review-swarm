@@ -6027,6 +6027,105 @@ fn first_pr_unknown_flag_out_exits_2_without_writing_bundle() -> Result<(), Box<
 }
 
 #[test]
+fn first_pr_format_flag_exits_2_without_writing_bundle() -> Result<(), Box<dyn Error>> {
+    // Generalizes EffortlessMetrics/unsafe-review#531 to --format/--json/--markdown:
+    // these flags belong to `check`/`repo`. `first-pr` always writes a full
+    // advisory artifact bundle to `--out-dir` and never honors a format flag.
+    // Each form must exit 2 (usage/input error) and must NOT write a bundle.
+    let source_fixture = fixture_root("raw_pointer_alignment");
+
+    for (label, flag_args) in [
+        ("--format json (space)", vec![os("--format"), os("json")]),
+        ("--format=json (equals)", vec![os("--format=json")]),
+        ("--json shorthand", vec![os("--json")]),
+        ("--markdown shorthand", vec![os("--markdown")]),
+    ] {
+        let temp = TempDir::new("unsafe-review-first-pr-format-flag-e2e")?;
+        let fixture = temp.path().join("fixture");
+        copy_dir_all(&source_fixture, &fixture)?;
+        let default_out_dir = fixture.join("target").join("unsafe-review");
+
+        let mut cmd_args = vec![
+            os("first-pr"),
+            os("--root"),
+            fixture.as_os_str().to_os_string(),
+            os("--diff"),
+            fixture.join("change.diff").into_os_string(),
+        ];
+        cmd_args.extend(flag_args);
+
+        let output = run_failure(cmd_args)?;
+
+        assert_eq!(
+            output.status.code(),
+            Some(2),
+            "{label}: --format/--json/--markdown on first-pr must exit 2"
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains("check") || stderr.contains("repo"),
+            "{label}: diagnostic must mention `check`/`repo` subcommands: {stderr}"
+        );
+        assert!(
+            !default_out_dir.exists(),
+            "{label}: no review bundle must be written on a bad invocation: {default_out_dir:?}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn first_pr_policy_flag_exits_2_without_writing_bundle() -> Result<(), Box<dyn Error>> {
+    // Generalizes EffortlessMetrics/unsafe-review#531 to --policy:
+    // this flag belongs to `check`/`repo`. `first-pr` is always advisory-only
+    // and never honors a policy flag. Must exit 2 and must NOT write a bundle.
+    let source_fixture = fixture_root("raw_pointer_alignment");
+
+    for (label, flag_args) in [
+        (
+            "--policy no-new-debt (space)",
+            vec![os("--policy"), os("no-new-debt")],
+        ),
+        (
+            "--policy=no-new-debt (equals)",
+            vec![os("--policy=no-new-debt")],
+        ),
+    ] {
+        let temp = TempDir::new("unsafe-review-first-pr-policy-flag-e2e")?;
+        let fixture = temp.path().join("fixture");
+        copy_dir_all(&source_fixture, &fixture)?;
+        let default_out_dir = fixture.join("target").join("unsafe-review");
+
+        let mut cmd_args = vec![
+            os("first-pr"),
+            os("--root"),
+            fixture.as_os_str().to_os_string(),
+            os("--diff"),
+            fixture.join("change.diff").into_os_string(),
+        ];
+        cmd_args.extend(flag_args);
+
+        let output = run_failure(cmd_args)?;
+
+        assert_eq!(
+            output.status.code(),
+            Some(2),
+            "{label}: --policy on first-pr must exit 2"
+        );
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(
+            stderr.contains("check") || stderr.contains("repo"),
+            "{label}: diagnostic must mention `check`/`repo` subcommands: {stderr}"
+        );
+        assert!(
+            !default_out_dir.exists(),
+            "{label}: no review bundle must be written on a bad invocation: {default_out_dir:?}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn missing_diff_file_exits_2() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment");
     let missing = fixture.join("does-not-exist.diff");

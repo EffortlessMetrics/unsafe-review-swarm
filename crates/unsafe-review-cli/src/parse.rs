@@ -455,6 +455,23 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
                 "unknown first-pr argument `{arg}`; did you mean `--out-dir`?"
             ));
         }
+        // `--format`, `--policy`, `--json`, `--markdown` belong to `check`/`repo`.
+        // `first-pr` always writes a full advisory artifact bundle to `--out-dir`
+        // and is advisory-only; none of these flags are honored.
+        // Intercept before try_apply_check_arg silently consumes them.
+        if arg == "--format"
+            || arg.starts_with("--format=")
+            || arg == "--policy"
+            || arg.starts_with("--policy=")
+            || arg == "--json"
+            || arg == "--markdown"
+        {
+            return Err(format!(
+                "unknown first-pr argument `{arg}`; `--format` and `--policy` belong to the \
+                 `check`/`repo` subcommands — `first-pr` always writes a full advisory artifact \
+                 bundle to `--out-dir`"
+            ));
+        }
         if let Some(consumed) = check_parse::try_apply_check_arg(&args, idx, &mut options.check)? {
             idx += consumed;
             continue;
@@ -1536,6 +1553,77 @@ mod tests {
             assert!(
                 err.contains("--out-dir"),
                 "error must suggest --out-dir: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn first_pr_rejects_format_flag() {
+        // Generalizes #531: `--format` belongs to `check`/`repo`; `first-pr`
+        // always writes a full advisory artifact bundle and never honors it.
+        let space_form = parse(args([
+            "unsafe-review",
+            "first-pr",
+            "--diff=change.diff",
+            "--format",
+            "json",
+        ]));
+        let equals_form = parse(args([
+            "unsafe-review",
+            "first-pr",
+            "--diff=change.diff",
+            "--format=json",
+        ]));
+        let json_shorthand = parse(args([
+            "unsafe-review",
+            "first-pr",
+            "--diff=change.diff",
+            "--json",
+        ]));
+        let markdown_shorthand = parse(args([
+            "unsafe-review",
+            "first-pr",
+            "--diff=change.diff",
+            "--markdown",
+        ]));
+
+        for result in [space_form, equals_form, json_shorthand, markdown_shorthand] {
+            let err = result.err().unwrap_or_default();
+            assert!(
+                !err.is_empty(),
+                "first-pr must reject --format/--json/--markdown"
+            );
+            assert!(
+                err.contains("check") || err.contains("repo"),
+                "error must mention `check`/`repo` subcommands: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn first_pr_rejects_policy_flag() {
+        // Generalizes #531: `--policy` belongs to `check`/`repo`; `first-pr`
+        // is always advisory-only and never honors the --policy flag.
+        let space_form = parse(args([
+            "unsafe-review",
+            "first-pr",
+            "--diff=change.diff",
+            "--policy",
+            "no-new-debt",
+        ]));
+        let equals_form = parse(args([
+            "unsafe-review",
+            "first-pr",
+            "--diff=change.diff",
+            "--policy=no-new-debt",
+        ]));
+
+        for result in [space_form, equals_form] {
+            let err = result.err().unwrap_or_default();
+            assert!(!err.is_empty(), "first-pr must reject --policy");
+            assert!(
+                err.contains("check") || err.contains("repo"),
+                "error must mention `check`/`repo` subcommands: {err}"
             );
         }
     }
