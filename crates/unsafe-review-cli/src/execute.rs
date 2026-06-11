@@ -1837,6 +1837,12 @@ fn candidate_import(options: CandidateImportOptions) -> Result<(), String> {
 }
 
 fn candidate_list(options: CandidateListOptions) -> Result<(), String> {
+    if !options.root.is_dir() {
+        return Err(format!(
+            "root {} is not a directory",
+            options.root.display()
+        ));
+    }
     let candidates = load_manual_candidates(&options.root)?;
     let rendered = match options.format {
         Format::Json => render_candidate_list_json(&options.root, &candidates)?,
@@ -2237,6 +2243,9 @@ fn receipt_template(options: ReceiptTemplateOptions) -> Result<(), String> {
 }
 
 fn receipt_validate(root: &Path) -> Result<(), String> {
+    if !root.is_dir() {
+        return Err(format!("root {} is not a directory", root.display()));
+    }
     let count = validate_witness_receipts(root.to_path_buf())?;
     println!("witness receipts: {count} valid");
     Ok(())

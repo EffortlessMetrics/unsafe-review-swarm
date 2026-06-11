@@ -7129,6 +7129,88 @@ fn empty_review_card_snapshot_json() -> &'static str {
 }"#
 }
 
+#[test]
+fn candidate_list_nonexistent_root_exits_2() -> Result<(), Box<dyn Error>> {
+    let output = run_failure([
+        os("candidate"),
+        os("list"),
+        os("--root"),
+        os("/nonexistent/path/that/does/not/exist"),
+    ])?;
+
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "exit code must be 2 for nonexistent root"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("is not a directory"),
+        "stderr should mention 'is not a directory': {stderr}"
+    );
+    Ok(())
+}
+
+#[test]
+fn candidate_list_valid_root_no_candidates_exits_0() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+
+    let output = run_success([
+        os("candidate"),
+        os("list"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+    ])?;
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "valid root with no candidates subdir must still exit 0"
+    );
+    Ok(())
+}
+
+#[test]
+fn receipt_validate_nonexistent_root_exits_2() -> Result<(), Box<dyn Error>> {
+    let output = run_failure([
+        os("receipt"),
+        os("validate"),
+        os("--root"),
+        os("/nonexistent/path/that/does/not/exist"),
+    ])?;
+
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "exit code must be 2 for nonexistent root"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("is not a directory"),
+        "stderr should mention 'is not a directory': {stderr}"
+    );
+    Ok(())
+}
+
+#[test]
+fn receipt_validate_valid_root_no_receipts_exits_0() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+
+    let output = run_success([
+        os("receipt"),
+        os("validate"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+    ])?;
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "valid root with no receipts subdir must still exit 0"
+    );
+    Ok(())
+}
+
 struct TempDir {
     path: PathBuf,
 }
