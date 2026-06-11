@@ -944,7 +944,11 @@ fn parse_format(raw: &str) -> Result<Format, String> {
         "comment-plan" | "comments" => Ok(Format::CommentPlan),
         "lsp" | "lsp-json" | "editor-json" => Ok(Format::Lsp),
         "witness-plan" | "witness" | "route-plan" => Ok(Format::WitnessPlan),
-        other => Err(format!("unknown format `{other}`")),
+        other => Err(format!(
+            "unknown format `{other}`; valid values: \
+             `human`, `json`, `markdown`, `pr-summary`, `github-summary`, \
+             `sarif`, `comment-plan`, `lsp`, `witness-plan`"
+        )),
     }
 }
 
@@ -953,7 +957,9 @@ fn parse_policy(raw: &str) -> Result<PolicyMode, String> {
         "advisory" => Ok(PolicyMode::Advisory),
         "no-new-debt" | "no_new_debt" => Ok(PolicyMode::NoNewDebt),
         "blocking" => Err("blocking policy is not implemented".to_string()),
-        other => Err(format!("unknown policy `{other}`")),
+        other => Err(format!(
+            "unknown policy `{other}`; valid values: `advisory`, `no-new-debt`"
+        )),
     }
 }
 
@@ -2736,6 +2742,34 @@ mod tests {
         ]));
 
         assert_eq!(command, Err("policy report is advisory-only".to_string()));
+    }
+
+    #[test]
+    fn parse_format_unknown_value_lists_valid_values() {
+        let err = parse_format("bogus").err().unwrap_or_default();
+        assert!(err.contains("unknown format `bogus`"), "{err}");
+        for value in &[
+            "human",
+            "json",
+            "markdown",
+            "pr-summary",
+            "github-summary",
+            "sarif",
+            "comment-plan",
+            "lsp",
+            "witness-plan",
+        ] {
+            assert!(err.contains(value), "missing `{value}` in error: {err}");
+        }
+    }
+
+    #[test]
+    fn parse_policy_unknown_value_lists_valid_values() {
+        let err = parse_policy("bogus").err().unwrap_or_default();
+        assert!(err.contains("unknown policy `bogus`"), "{err}");
+        for value in &["advisory", "no-new-debt"] {
+            assert!(err.contains(value), "missing `{value}` in error: {err}");
+        }
     }
 
     fn args<const N: usize>(values: [&str; N]) -> Vec<String> {
