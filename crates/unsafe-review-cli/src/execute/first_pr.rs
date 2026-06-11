@@ -113,7 +113,7 @@ fn print_receipt_audit_handoff(check: &CheckOptions) {
 
 fn print_policy_report_handoff(out_dir: &Path) {
     println!("Policy report:");
-    println!("  {}", out_dir.join("policy-report.md").display());
+    println!("  {}", artifact_path_display(out_dir, "policy-report.md"));
     println!("  ReviewCard-only policy simulation; manual candidates are not policy inputs");
 }
 
@@ -126,7 +126,7 @@ fn print_manual_candidate_handoff(
     println!("Manual candidates:");
     println!(
         "  {} (manual/advisory; not analyzer ReviewCards)",
-        out_dir.join("manual-candidates.json").display()
+        artifact_path_display(out_dir, "manual-candidates.json")
     );
     println!("  Count: {}", manual_candidates.len());
     println!(
@@ -165,11 +165,11 @@ fn print_manual_candidate_handoff(
     );
     println!(
         "  Manual repair queue: {} (copy-only; unsafe-review did not run an agent)",
-        out_dir.join("manual-repair-queue.json").display()
+        artifact_path_display(out_dir, "manual-repair-queue.json")
     );
     println!(
         "  Tokmd packet export: {} (formatting input only; tokmd was not run)",
-        out_dir.join("tokmd-packets.json").display()
+        artifact_path_display(out_dir, "tokmd-packets.json")
     );
     println!(
         "  manual candidates are advisory manual targets, not analyzer-discovered, not policy inputs, and unsafe-review did not run witnesses"
@@ -252,18 +252,18 @@ fn shell_arg(value: &str) -> String {
 fn print_first_pr_overview(output: &AnalyzeOutput, out_dir: &Path) {
     println!("unsafe-review first-pr");
     println!("unsafe-review wrote an advisory PR bundle.");
-    println!("- Artifact directory: {}", out_dir.display());
+    println!("- Artifact directory: {}", card_path_display(out_dir));
     println!("- Review cards: {}", output.summary.cards);
     println!(
         "- Open actionable gaps: {}",
         output.summary.open_actionable_gaps
     );
     println!("Open:");
-    println!("  {}", out_dir.join("pr-summary.md").display());
+    println!("  {}", artifact_path_display(out_dir, "pr-summary.md"));
     println!("Agent repair queue:");
     println!(
         "  {} (copy-only; unsafe-review did not run an agent)",
-        out_dir.join("repair-queue.json").display()
+        artifact_path_display(out_dir, "repair-queue.json")
     );
 }
 
@@ -2440,7 +2440,7 @@ fn artifact_schema_version(path: &str) -> Option<&'static str> {
 fn print_artifact_paths(out_dir: &Path, artifacts: &[&str]) {
     println!("Artifacts:");
     for name in artifacts {
-        println!("  {}", out_dir.join(name).display());
+        println!("  {}", artifact_path_display(out_dir, name));
     }
 }
 
@@ -2456,6 +2456,14 @@ fn print_trust_boundary() {
 
 fn card_path_display(path: &Path) -> String {
     path.to_string_lossy().replace('\\', "/")
+}
+
+/// Return a forward-slash-normalised display string for an artifact path,
+/// joining `base` and `name` exactly as the file is written on disk but
+/// normalising the separator so every `println!` surface shows `/` on all
+/// platforms.  On-disk paths and machine-readable outputs are unaffected.
+fn artifact_path_display(base: &Path, name: &str) -> String {
+    base.join(name).to_string_lossy().replace('\\', "/")
 }
 
 #[cfg(test)]
@@ -3073,6 +3081,54 @@ mod tests {
           }],
           "trust_boundary": "manual candidate; not analyzer-discovered; not witness execution; not proof of memory safety; not UB-free status; not Miri-clean status; not site-execution proof; not policy readiness"
         }"#
+    }
+
+    #[test]
+    fn artifact_path_display_normalises_separators() {
+        // On every platform the helper must produce forward slashes only.
+        // The base path is constructed with `Path::new` using a backslash-
+        // containing string so that the test exercises the replacement on
+        // platforms where `Path` does not convert separators itself.
+        let base = Path::new("C:\\Users\\smoke\\out");
+        assert_eq!(
+            artifact_path_display(base, "pr-summary.md"),
+            "C:/Users/smoke/out/pr-summary.md"
+        );
+        assert_eq!(
+            artifact_path_display(base, "repair-queue.json"),
+            "C:/Users/smoke/out/repair-queue.json"
+        );
+        assert_eq!(
+            artifact_path_display(base, "policy-report.md"),
+            "C:/Users/smoke/out/policy-report.md"
+        );
+        assert_eq!(
+            artifact_path_display(base, "manual-candidates.json"),
+            "C:/Users/smoke/out/manual-candidates.json"
+        );
+        assert_eq!(
+            artifact_path_display(base, "manual-repair-queue.json"),
+            "C:/Users/smoke/out/manual-repair-queue.json"
+        );
+        assert_eq!(
+            artifact_path_display(base, "tokmd-packets.json"),
+            "C:/Users/smoke/out/tokmd-packets.json"
+        );
+        // Verify no backslash is present in any result.
+        for name in &[
+            "pr-summary.md",
+            "repair-queue.json",
+            "policy-report.md",
+            "manual-candidates.json",
+            "manual-repair-queue.json",
+            "tokmd-packets.json",
+        ] {
+            let display = artifact_path_display(base, name);
+            assert!(
+                !display.contains('\\'),
+                "artifact_path_display({name}) produced backslash: {display}"
+            );
+        }
     }
 
     fn unique_test_root(name: &str) -> Result<std::path::PathBuf, String> {

@@ -84,21 +84,20 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
 
     assert_contains(&stdout, "unsafe-review first-pr");
     assert_contains(&stdout, "unsafe-review wrote an advisory PR bundle.");
+    // Artifact paths in console output are normalised to forward slashes on all
+    // platforms; compare against the normalised form.
     assert_contains(
         &stdout,
-        &format!("- Artifact directory: {}", out_dir.display()),
+        &format!("- Artifact directory: {}", path_display_fwd(&out_dir)),
     );
     assert_contains(&stdout, "Open:");
-    assert_contains(
-        &stdout,
-        &out_dir.join("pr-summary.md").display().to_string(),
-    );
+    assert_contains(&stdout, &path_display_fwd(&out_dir.join("pr-summary.md")));
     assert_contains(&stdout, "Agent repair queue:");
     assert_contains(
         &stdout,
         &format!(
             "{} (copy-only; unsafe-review did not run an agent)",
-            out_dir.join("repair-queue.json").display()
+            path_display_fwd(&out_dir.join("repair-queue.json"))
         ),
     );
     assert_contains(&stdout, "Audit saved receipts:");
@@ -122,21 +121,18 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     );
     assert_contains(&stdout, "--json");
     assert_contains(&stdout, "Artifacts:");
+    assert_contains(&stdout, &path_display_fwd(&out_dir.join("review-kit.json")));
     assert_contains(
         &stdout,
-        &out_dir.join("review-kit.json").display().to_string(),
+        &path_display_fwd(&out_dir.join("github-summary.md")),
     );
     assert_contains(
         &stdout,
-        &out_dir.join("github-summary.md").display().to_string(),
+        &path_display_fwd(&out_dir.join("comment-plan.json")),
     );
     assert_contains(
         &stdout,
-        &out_dir.join("comment-plan.json").display().to_string(),
-    );
-    assert_contains(
-        &stdout,
-        &out_dir.join("receipt-audit.md").display().to_string(),
+        &path_display_fwd(&out_dir.join("receipt-audit.md")),
     );
     assert_contains(&stdout, "Trust boundary:");
     assert_contains(&stdout, "static unsafe contract review only");
@@ -183,6 +179,12 @@ fn assert_contains(haystack: &str, needle: &str) {
         haystack.contains(needle),
         "expected stdout to contain `{needle}`\nstdout:\n{haystack}"
     );
+}
+
+/// Return a forward-slash-normalised display string for a path, matching the
+/// normalisation applied by `artifact_path_display` in the console output.
+fn path_display_fwd(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
 }
 
 fn checked_output(command: &mut Command) -> Result<Output, Box<dyn Error>> {
