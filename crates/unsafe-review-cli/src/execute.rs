@@ -990,6 +990,12 @@ fn repo_status_operator_json(
     cap: Option<usize>,
 ) -> serde_json::Value {
     let partial_report_available = partial_path.is_some();
+    // Operational routing flag: true when a consumer (ub-review / agent / CI) can
+    // safely ingest the scan output without further disambiguation.  A complete scan
+    // and a max-cards capped scan both produce a usable report; in-progress, failed,
+    // and terminated states do not.  This is routing metadata only — it is not a
+    // memory-safety, UB-free, Miri-clean, site-execution, calibrated, or proof claim.
+    let downstream_consumable = matches!(state, "complete" | "capped");
     let partial_report_limitation = match (state, partial_report_available) {
         ("complete", _) => {
             "No partial report is retained after a successful scan; use the final report for the recorded scan scope."
@@ -1029,6 +1035,7 @@ fn repo_status_operator_json(
     };
     let mut obj = serde_json::json!({
         "state": state,
+        "downstream_consumable": downstream_consumable,
         "partial_report_available": partial_report_available,
         "partial_report_limitation": partial_report_limitation,
         "next_action": next_action,
@@ -2798,6 +2805,10 @@ mod tests {
         assert_eq!(timeout["phase"], "failed");
         assert_eq!(timeout["partial"], true);
         assert_eq!(timeout["stop_reason"], "timeout");
+        assert_eq!(
+            timeout["operator"]["downstream_consumable"], false,
+            "a timed-out scan is not downstream-consumable"
+        );
 
         let error_json = render_repo_scan_incomplete_status(
             None,
@@ -2813,6 +2824,10 @@ mod tests {
         assert_eq!(
             error["stop_reason"], "error",
             "a non-timeout incomplete scan must not be mislabeled as a timeout"
+        );
+        assert_eq!(
+            error["operator"]["downstream_consumable"], false,
+            "a failed scan is not downstream-consumable"
         );
 
         Ok(())

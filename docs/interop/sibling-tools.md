@@ -111,7 +111,7 @@ owns the tracking issue. Keep this table current as items land.
 | Diff-first consumer contract alignment | unsafe-review | ripr | ripr-swarm #1041 | open |
 | Coverage-movement vocabulary (new/worsened/resolved/inherited) | unsafe-review | cargo-allow | cargo-allow #1471 | open |
 | tokmd-packets input-schema ownership + `--from-packets` consumer | unsafe-review (producer) ↔ tokmd (consumer) | tokmd | tokmd-swarm #222 | open |
-| `check-local-context` / limited-runtime vocabulary | ripr | unsafe-review | unsafe-review-swarm #1520 | open |
+| `check-local-context` / limited-runtime vocabulary — `downstream_consumable` operator field shipped; `has_unix_absolute_machine_path` / `has_session_state_marker` predicates pending | ripr | unsafe-review | unsafe-review-swarm #1520 | partial |
 | Pre-guard scratch GC for shared CI runners | ripr | unsafe-review | unsafe-review-swarm #1519 | open |
 
 ## Standing process

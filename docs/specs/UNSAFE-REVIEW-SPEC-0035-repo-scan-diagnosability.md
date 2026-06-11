@@ -94,6 +94,7 @@ first-class artifact:
   "partial_path": null,
   "operator": {
     "state": "complete | capped | failed | terminated",
+    "downstream_consumable": true,
     "partial_report_available": false,
     "partial_report_limitation": "...",
     "next_action": "...",
@@ -168,12 +169,20 @@ a partial or completed report can navigate to the seam without a second lookup.
 ### The operator block
 
 Every status sidecar and terminal diagnostic carries an operator block with
-three fields: `state` (what the scan is/was doing), `next_action` (the single
-concrete step — raise the timeout, narrow `--include`, inspect `last_path`), and
-`claim_boundary` (what the artifact does and does not assert). The block is the
-human-facing projection of the same trust boundary every surface ships
-(UNSAFE-REVIEW-SPEC-0028); cross-tool consumers read it per
+four fields: `state` (what the scan is/was doing), `downstream_consumable`
+(operational routing flag), `next_action` (the single concrete step — raise the
+timeout, narrow `--include`, inspect `last_path`), and `claim_boundary` (what
+the artifact does and does not assert). The block is the human-facing projection
+of the same trust boundary every surface ships (UNSAFE-REVIEW-SPEC-0028);
+cross-tool consumers read it per
 [`docs/interop/sibling-tools.md`](../interop/sibling-tools.md).
+
+`downstream_consumable` is `true` for states `complete` and `capped` — the only
+states where the scan produced a usable report artifact that a consumer (ub-review,
+agent, CI) can safely ingest without further disambiguation.  It is `false` for
+`in_progress`, `failed`, and `terminated`.  This is **operational routing
+metadata only**; it is not a memory-safety, UB-free, Miri-clean,
+site-execution, calibrated, or proof claim.
 
 ## Non-goals
 

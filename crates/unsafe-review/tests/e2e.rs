@@ -6787,6 +6787,10 @@ fn repo_max_cards_cap_emits_partial_status_sidecar() -> Result<(), Box<dyn Error
         .get("operator")
         .ok_or("repo status missing operator")?;
     assert_eq!(operator["state"], "capped");
+    assert_eq!(
+        operator["downstream_consumable"], true,
+        "a capped scan is downstream-consumable (it produced a valid bounded report)"
+    );
     assert_eq!(operator["partial_report_available"], false);
     let next_action = operator["next_action"].as_str().unwrap_or("");
     assert!(
@@ -6838,6 +6842,13 @@ fn assert_repo_status_operator(
         .get("operator")
         .ok_or("repo status is missing operator diagnostics")?;
     assert_eq!(operator["state"], state);
+    // downstream_consumable is true only for complete and capped scans; all other
+    // states (in_progress, failed, terminated) are not safe to consume.
+    let expected_consumable = state == "complete" || state == "capped";
+    assert_eq!(
+        operator["downstream_consumable"], expected_consumable,
+        "operator downstream_consumable should be {expected_consumable} for state={state}"
+    );
     assert_eq!(
         operator["partial_report_available"],
         partial_report_available
