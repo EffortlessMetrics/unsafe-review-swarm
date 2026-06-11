@@ -171,11 +171,17 @@ jobs:
           mkdir -p target/ci-core
           if [ "${RUNNER_KIND}" = "self-hosted" ]; then
             # Self-hosted primary: do NOT run the gh disk-free (android/dotnet/ghc/
-            # CodeQL are not on the fleet). Shared-fleet scratch hygiene is tracked
-            # in unsafe-review-swarm #1519; keep this conservative and idempotent —
-            # report headroom and reuse the shared workspace target dir (cargo's
-            # target-lock serialises overlap), without destructive GC of shared dirs.
-            echo "self-hosted runner: reporting headroom; shared workspace target dir reused (cargo lock serialises overlap). Fleet scratch hygiene tracked in unsafe-review-swarm #1519."
+            # CodeQL are not on the fleet). GC stale per-run scratch dirs before
+            # reporting headroom; runs cancelled mid-build skip their cleanup step
+            # and orphaned dirs accumulate until the disk guard fails closed.
+            # Bounded: -mindepth 1 -maxdepth 1 limits to direct children of each
+            # scratch root; -mmin +120 protects dirs newer than 2 h (all workflow
+            # timeouts are <=60 min); 2>/dev/null || true is non-fatal on missing
+            # paths; never touches worktrees, the repo checkout, or paths outside
+            # the scratch mount. Mirrors ripr-swarm#1027. Fixes #1519.
+            find /mnt/ci-scratch/cargo-home /mnt/ci-scratch/target /mnt/ci-scratch/tmp \
+              -mindepth 1 -maxdepth 1 -mmin +120 -print -exec rm -rf {} + 2>/dev/null || true
+            echo "self-hosted runner: reporting headroom; shared workspace target dir reused (cargo lock serialises overlap)."
             df -h . || true
             df -h / || true
           else

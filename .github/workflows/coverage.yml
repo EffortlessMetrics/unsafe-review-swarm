@@ -46,6 +46,17 @@ jobs:
       - name: Prepare scratch and disk preflight
         run: |
           set -euo pipefail
+          # GC stale per-run scratch dirs before the disk guard. Runs cancelled
+          # mid-build (OOM, runner restart, cancel-in-progress) skip the cleanup
+          # step; orphaned dirs accumulate until ci-disk-guard fails closed.
+          # Bounded: -mindepth 1 -maxdepth 1 limits to direct children of each
+          # scratch root; -mmin +120 protects dirs newer than 2 h (timeout <=45
+          # min); 2>/dev/null || true is non-fatal on missing paths; never touches
+          # worktrees, the repo checkout, or paths outside the scratch mount.
+          # Mirrors ripr-swarm#1027. Fixes #1519.
+          find /mnt/ci-scratch/cargo-home /mnt/ci-scratch/target /mnt/ci-scratch/tmp \
+            /mnt/ci-scratch/unsafe-review-coverage \
+            -mindepth 1 -maxdepth 1 -mmin +120 -print -exec rm -rf {} + 2>/dev/null || true
           ci-disk-guard /mnt/ci-scratch 45
           ci-disk-guard /mnt/ci-cache 10
           mkdir -p "$TMPDIR" "$CARGO_TARGET_DIR"
