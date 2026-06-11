@@ -3733,6 +3733,7 @@ fn confirm_dry_run_previews_routed_command_without_executing() -> Result<(), Box
     assert!(text.contains("operation family: raw_pointer_read"));
     assert!(text.contains("route: miri"));
     assert!(text.contains("command: cargo +nightly miri test read_header"));
+    assert!(text.contains("command provenance: analyzer-derived route"));
     assert!(text.contains("timeout: 600s"));
     assert!(text.contains("expected evidence: a `miri` witness receipt"));
     assert!(text.contains("dry run only; nothing was executed"));

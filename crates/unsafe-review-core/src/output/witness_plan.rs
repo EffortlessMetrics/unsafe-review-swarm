@@ -302,7 +302,11 @@ fn route_cannot_prove(kind: WitnessKind) -> &'static str {
 }
 
 fn receipt_hint(card: &ReviewCard, route: &WitnessRoute) -> String {
-    let command = route.command.as_deref().unwrap_or("<command>");
+    // When no command exists for this route, skip the executable hint entirely
+    // rather than emitting a literal placeholder the user might paste verbatim.
+    let Some(command) = route.command.as_deref() else {
+        return "no automatic command for this route; run a witness manually and record the output path before importing".to_string();
+    };
     match route.kind {
         WitnessKind::Miri => receipt_import_hint(card, "import-miri", None, command),
         WitnessKind::CargoCareful => receipt_import_hint(card, "import-careful", None, command),

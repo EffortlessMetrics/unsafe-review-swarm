@@ -19,15 +19,42 @@ const CONFIRM_LIMITATION: &str = "executed via unsafe-review confirm --allow-hea
 const DEFAULT_EXPIRES_DAYS: i64 = 30;
 const POLL_INTERVAL_MS: u64 = 50;
 
+/// Identifies whether the command to be executed came from the analyzer's
+/// automatically-derived witness route, or was overridden by the user with
+/// `--command`.  Printed before execution so a reviewer can see what they are
+/// about to trust.
+#[derive(Clone, Copy, Debug)]
+enum CommandSource {
+    /// Command was derived by the analyzer from the card's witness route.
+    AnalyzerRoute,
+    /// Command was supplied by the user with `--command` (author-controlled).
+    CommandOverride,
+}
+
+impl CommandSource {
+    fn label(self) -> &'static str {
+        match self {
+            Self::AnalyzerRoute => "analyzer-derived route",
+            Self::CommandOverride => "--command override (author-controlled)",
+        }
+    }
+}
+
 pub(super) fn run(options: ConfirmOptions) -> Result<(), String> {
     let card = resolve_card(&options)?;
     let (kind, routed_command) = select_route(&card.id.0, &card.routes)?;
     let lane = confirm_lane(kind, &card.id.0)?;
+    let command_source = if options.command.is_some() {
+        CommandSource::CommandOverride
+    } else {
+        CommandSource::AnalyzerRoute
+    };
     let command_text = options.command.clone().unwrap_or(routed_command);
     if options.dry_run {
-        print_dry_run(&options, &card, kind, lane, &command_text);
+        print_dry_run(&options, &card, kind, lane, &command_text, command_source);
         return Ok(());
     }
+    println!("command provenance: {}", command_source.label());
     let (envs, argv) = parse_command_line(&command_text)?;
     let execution = execute_with_timeout(
         &envs,
@@ -92,12 +119,14 @@ fn print_dry_run(
     kind: WitnessKind,
     lane: ConfirmLane,
     command_text: &str,
+    command_source: CommandSource,
 ) {
     println!("unsafe-review confirm (dry run)");
     println!("card: {}", card.id.0);
     println!("operation family: {}", card.operation.family.as_str());
     println!("route: {}", kind.as_str());
     println!("command: {command_text}");
+    println!("command provenance: {}", command_source.label());
     println!("working directory: {}", options.root.display());
     println!("timeout: {}s", options.timeout_seconds);
     println!(
