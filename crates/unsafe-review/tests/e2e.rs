@@ -3927,6 +3927,52 @@ fn check_reports_missing_diff_file_as_cli_failure() -> Result<(), Box<dyn Error>
 }
 
 #[test]
+fn check_bad_base_ref_emits_actionable_hint() -> Result<(), Box<dyn Error>> {
+    // When --base names a ref that does not exist in the repository git returns
+    // a non-zero exit code with an "unknown revision" message.  The CLI must
+    // surface an actionable error (naming the bad ref and suggesting alternatives)
+    // rather than dumping the raw git stderr without context.
+    //
+    // The fixture lives inside the repository worktree so HEAD is resolvable;
+    // only the invented ref is unknown, which is what we want to exercise.
+    let fixture = fixture_root("raw_pointer_alignment");
+
+    let output = run_failure([
+        os("check"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--base"),
+        os("this-ref-does-not-exist-zzzz"),
+    ])?;
+
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "exit code must be 2 for input error"
+    );
+    assert_eq!(
+        stdout_text(&output)?.trim(),
+        "",
+        "stdout must be empty on ref error"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("this-ref-does-not-exist-zzzz"),
+        "stderr should name the bad ref: {stderr}"
+    );
+    assert!(
+        stderr.contains("could not be resolved by git"),
+        "stderr should describe the resolution failure: {stderr}"
+    );
+    assert!(
+        stderr.contains("--base origin/main") || stderr.contains("--diff"),
+        "stderr should suggest a valid alternative: {stderr}"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn check_reports_unparseable_diff_as_cli_failure() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment");
     let temp = TempDir::new("unsafe-review-garbage-diff-e2e")?;

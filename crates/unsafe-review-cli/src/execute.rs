@@ -1367,16 +1367,37 @@ fn diff_source(options: &CheckOptions) -> Result<DiffSource, String> {
             .output()
             .map_err(|err| format!("failed to run git diff: {err}"))?;
         if !output.status.success() {
-            return Err(format!(
-                "git diff failed: {}",
-                String::from_utf8_lossy(&output.stderr).trim()
-            ));
+            let git_stderr = String::from_utf8_lossy(&output.stderr);
+            let git_stderr = git_stderr.trim();
+            return Err(git_ref_error(base, git_stderr));
         }
         return Ok(DiffSource::Text(
             String::from_utf8_lossy(&output.stdout).into_owned(),
         ));
     }
     Ok(DiffSource::NoneRepoScan)
+}
+
+/// Format a `git diff` failure into an actionable error message.
+///
+/// When git stderr contains well-known "unknown revision" phrases we add a hint
+/// that names the bad ref and suggests valid alternatives.  The original git
+/// message is always preserved so power users retain the full detail.
+fn git_ref_error(base: &str, git_stderr: &str) -> String {
+    let is_ref_error = git_stderr.contains("unknown revision")
+        || git_stderr.contains("ambiguous argument")
+        || git_stderr.contains("bad revision")
+        || git_stderr.contains("not a tree object")
+        || git_stderr.contains("does not exist");
+    if is_ref_error {
+        format!(
+            "base ref '{base}' could not be resolved by git ({git_stderr}). \
+             Pass a branch, tag, or commit SHA that exists in the repository \
+             (e.g. --base origin/main), or supply --diff <file> instead."
+        )
+    } else {
+        format!("git diff failed: {git_stderr}")
+    }
 }
 
 fn read_stdin_diff() -> Result<DiffSource, String> {
