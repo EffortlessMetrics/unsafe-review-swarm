@@ -1091,6 +1091,100 @@ fn agent_packet_marks_no_missing_cards_not_ready_for_repair() -> Result<(), Stri
     Ok(())
 }
 
+// --- SPEC-0029: coverage block in agent context packet ---
+
+#[test]
+fn agent_packet_includes_coverage_block() -> Result<(), String> {
+    let output = fixture_output("raw_pointer_alignment")?;
+    let Some(card) = output.cards.first() else {
+        return Err("fixture should emit one card".to_string());
+    };
+    let value = parse_json(&render(card))?;
+
+    // The coverage block must be present and contain all SPEC-0029 slots.
+    let coverage = &value["coverage"];
+    assert!(
+        coverage.is_object(),
+        "agent packet must include a `coverage` object"
+    );
+
+    // Derive the expected block directly — this verifies no second truth surface.
+    let block = card.coverage_block();
+
+    // All nine slots must be present and match CoverageBlock::derive exactly.
+    assert_eq!(
+        coverage["contract_coverage"].as_str(),
+        Some(block.contract_coverage.as_str()),
+        "coverage.contract_coverage must match CoverageBlock::derive"
+    );
+    assert_eq!(
+        coverage["guard_coverage"].as_str(),
+        Some(block.guard_coverage.as_str()),
+        "coverage.guard_coverage must match CoverageBlock::derive"
+    );
+    assert_eq!(
+        coverage["test_reach_coverage"].as_str(),
+        Some(block.test_reach_coverage.as_str()),
+        "coverage.test_reach_coverage must match CoverageBlock::derive"
+    );
+    assert_eq!(
+        coverage["witness_receipt_coverage"].as_str(),
+        Some(block.witness_receipt_coverage.as_str()),
+        "coverage.witness_receipt_coverage must match CoverageBlock::derive"
+    );
+    assert_eq!(
+        coverage["manual_context"].as_str(),
+        Some(block.manual_context.as_str()),
+        "coverage.manual_context must match CoverageBlock::derive"
+    );
+    assert_eq!(
+        coverage["baseline_state"].as_str(),
+        Some(block.baseline_state.as_str()),
+        "coverage.baseline_state must match CoverageBlock::derive"
+    );
+    assert_eq!(
+        coverage["outcome_movement"].as_str(),
+        Some(block.outcome_movement.as_str()),
+        "coverage.outcome_movement must match CoverageBlock::derive"
+    );
+    assert_eq!(
+        coverage["comment_plan_status"].as_str(),
+        Some(block.comment_plan_status.as_str()),
+        "coverage.comment_plan_status must match CoverageBlock::derive"
+    );
+    assert_eq!(
+        coverage["agent_lsp_readiness"].as_str(),
+        Some(block.agent_lsp_readiness.as_str()),
+        "coverage.agent_lsp_readiness must match CoverageBlock::derive"
+    );
+
+    // Spot-check known values for the raw_pointer_alignment fixture:
+    // - contract_coverage: "present" (SAFETY comment is in source)
+    // - guard_coverage: "missing" (guard_missing class, no discharge)
+    // - witness_receipt_coverage: "missing" (no receipt imported)
+    // - manual_context: "absent" (bare card, no overlay)
+    // - baseline_state: "new" (actionable gap not in any baseline ledger)
+    // - outcome_movement: "regressed" (new baseline → regressed)
+    // - comment_plan_status: "not_eligible" (default, no comment plan run)
+    // - agent_lsp_readiness: "ready" (raw_pointer_read family, Miri route)
+    assert_eq!(coverage["contract_coverage"].as_str(), Some("present"));
+    assert_eq!(coverage["guard_coverage"].as_str(), Some("missing"));
+    assert_eq!(
+        coverage["witness_receipt_coverage"].as_str(),
+        Some("missing")
+    );
+    assert_eq!(coverage["manual_context"].as_str(), Some("absent"));
+    assert_eq!(coverage["baseline_state"].as_str(), Some("new"));
+    assert_eq!(coverage["outcome_movement"].as_str(), Some("regressed"));
+    assert_eq!(
+        coverage["comment_plan_status"].as_str(),
+        Some("not_eligible")
+    );
+    assert_eq!(coverage["agent_lsp_readiness"].as_str(), Some("ready"));
+
+    Ok(())
+}
+
 fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../fixtures")
