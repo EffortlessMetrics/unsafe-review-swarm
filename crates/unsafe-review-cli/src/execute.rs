@@ -2477,6 +2477,20 @@ fn run_baseline_init(options: BaselineInitOptions) -> Result<(), String> {
     )?;
     println!("baseline init: ok");
     println!("captured: {} open actionable card(s)", result.captured);
+    if !result.cards.is_empty() {
+        println!("debt scope:");
+        for card in &result.cards {
+            let file = repo_path_display(&card.site.location.file);
+            let line = card.site.location.line;
+            let family = card.operation.family.as_str();
+            let hazards: Vec<&str> = card.hazards.iter().map(|h| h.as_str()).collect();
+            let hazard_list = hazards.join(", ");
+            println!(
+                "  {}  {}:{}  {}  [{}]",
+                card.id.0, file, line, family, hazard_list
+            );
+        }
+    }
     println!("ledger: {}", result.ledger_path.display());
     println!("snapshot: {}", result.snapshot_path.display());
     if result.ledger_existed {

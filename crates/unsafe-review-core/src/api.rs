@@ -521,6 +521,9 @@ pub struct BaselineInitResult {
     pub ledger_path: PathBuf,
     /// Path to the coverage snapshot written.
     pub snapshot_path: PathBuf,
+    /// The open actionable cards captured, in scan order.
+    /// Used by the CLI to display a debt scope listing for brownfield adoption.
+    pub cards: Vec<ReviewCard>,
 }
 
 /// `baseline init` (SPEC-0030): scan the repo for open actionable cards, capture each
@@ -567,6 +570,7 @@ pub fn baseline_init(
     // Collect open actionable cards.
     let mut ledger_entries: Vec<LedgerEntry> = Vec::new();
     let mut snapshot_entries: BTreeMap<String, SnapshotCoverage> = BTreeMap::new();
+    let mut actionable_cards: Vec<ReviewCard> = Vec::new();
 
     for card in &output.cards {
         if card.class.is_actionable() {
@@ -589,6 +593,7 @@ pub fn baseline_init(
                     witness_receipt_coverage: block.witness_receipt_coverage.as_str().to_string(),
                 },
             );
+            actionable_cards.push(card.clone());
         }
     }
 
@@ -601,6 +606,7 @@ pub fn baseline_init(
         ledger_existed,
         ledger_path,
         snapshot_path,
+        cards: actionable_cards,
     })
 }
 

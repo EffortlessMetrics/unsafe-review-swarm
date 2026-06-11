@@ -6277,6 +6277,59 @@ fn baseline_init_out_override_never_writes_into_root() -> Result<(), Box<dyn Err
 }
 
 #[test]
+fn baseline_init_stdout_lists_debt_scope() -> Result<(), Box<dyn Error>> {
+    // The atomic_pointer_state_fetch_ops fixture has 3 actionable cards
+    // (class: requires_loom). Verify that baseline init outputs a debt scope
+    // listing with card ids and location information.
+    let fixture = fixture_root("atomic_pointer_state_fetch_ops");
+    let temp = TempDir::new("unsafe-review-baseline-debt-scope-e2e")?;
+    let out_dir = temp.path().join("out");
+    fs::create_dir_all(&out_dir)?;
+    let out_ledger = out_dir.join("debt-scope-baseline.toml");
+
+    let output = run_success([
+        os("baseline"),
+        os("init"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--out"),
+        out_ledger.as_os_str().to_os_string(),
+    ])?;
+    let stdout = stdout_text(&output)?;
+
+    // The debt scope heading must appear.
+    assert!(
+        stdout.contains("debt scope:"),
+        "expected 'debt scope:' in stdout:\n{stdout}"
+    );
+
+    // At least one UR- card id must appear in the debt scope listing.
+    assert!(
+        stdout.contains("UR-"),
+        "expected at least one UR- card id in stdout:\n{stdout}"
+    );
+
+    // Extract the debt scope block lines (lines beginning with "  UR-") and
+    // verify none of them contain forbidden trust-boundary overclaims.
+    let debt_scope_lines: Vec<&str> = stdout.lines().filter(|l| l.starts_with("  UR-")).collect();
+    assert!(
+        !debt_scope_lines.is_empty(),
+        "expected at least one '  UR-' debt scope line in stdout:\n{stdout}"
+    );
+    for line in &debt_scope_lines {
+        assert!(
+            !line.contains("memory-safe")
+                && !line.contains("UB-free")
+                && !line.contains("Miri-clean")
+                && !line.contains("site-execution"),
+            "debt scope line must not contain forbidden trust-boundary claims: {line}"
+        );
+    }
+
+    Ok(())
+}
+
+#[test]
 fn policy_report_is_advisory_and_counts_baseline_state() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment");
     let report = run_success([
