@@ -22011,6 +22011,7 @@ review_after = "2026-08-01"
                 {"path":"comment-plan.json","kind":"comment_plan","format":"json","schema_version":"0.1"},
                 {"path":"witness-plan.md","kind":"witness_plan","format":"markdown","schema_version":serde_json::Value::Null},
                 {"path":"receipt-audit.md","kind":"receipt_audit","format":"markdown","schema_version":serde_json::Value::Null},
+                {"path":"receipt-audit.json","kind":"receipt_audit","format":"json","schema_version":"0.1"},
                 {"path":"policy-report.json","kind":"policy_report_json","format":"json","schema_version":"0.1"},
                 {"path":"policy-report.md","kind":"policy_report_markdown","format":"markdown","schema_version":serde_json::Value::Null},
                 {"path":"manual-candidates.json","kind":"manual_candidates","format":"json","schema_version":"manual-candidates/v1"},
@@ -22040,7 +22041,7 @@ review_after = "2026-08-01"
                 "cards": "cards.json",
                 "comment_plan": "comment-plan.json",
                 "repair_queue": "repair-queue.json",
-                "receipt_audit": "receipt-audit.md",
+                "receipt_audit": "receipt-audit.json",
                 "review_kit": "review-kit.json",
                 "pr_summary": "pr-summary.md",
                 "sarif": "cards.sarif",
@@ -22245,6 +22246,7 @@ review_after = "2026-08-01"
             "lsp.json": "ReviewCard-only saved editor projection; manual candidates are not emitted as analyzer diagnostics.",
             "repair-queue.json": "ReviewCard-only repair queue; manual candidates are not automatic repair tasks.",
             "receipt-audit.md": "Receipts may match manual candidate IDs as manual/advisory targets without importing them as ReviewCard witness evidence.",
+            "receipt-audit.json": "Receipts may match manual candidate IDs as manual/advisory targets without importing them as ReviewCard witness evidence.",
             "policy-report.json": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs.",
             "policy-report.md": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs."
         })
@@ -23484,6 +23486,8 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write repair queue failed: {err}"))?;
         fs::write(dir.join("receipt-audit.md"), receipt_audit_markdown())
             .map_err(|err| format!("write receipt audit failed: {err}"))?;
+        fs::write(dir.join("receipt-audit.json"), receipt_audit_json())
+            .map_err(|err| format!("write receipt audit json failed: {err}"))?;
         write_policy_report_artifacts(
             dir,
             vec![policy_report_card_fixture(
@@ -23603,6 +23607,8 @@ review_after = "2026-08-01"
         .map_err(|err| format!("write repair queue failed: {err}"))?;
         fs::write(dir.join("receipt-audit.md"), receipt_audit_markdown())
             .map_err(|err| format!("write receipt audit failed: {err}"))?;
+        fs::write(dir.join("receipt-audit.json"), receipt_audit_json())
+            .map_err(|err| format!("write receipt audit json failed: {err}"))?;
         write_policy_report_artifacts(
             dir,
             vec![
@@ -23772,6 +23778,8 @@ This artifact is static unsafe contract review. It routes reviewers to credible 
         .map_err(|err| format!("write repair queue failed: {err}"))?;
         fs::write(dir.join("receipt-audit.md"), receipt_audit_markdown())
             .map_err(|err| format!("write receipt audit failed: {err}"))?;
+        fs::write(dir.join("receipt-audit.json"), receipt_audit_json())
+            .map_err(|err| format!("write receipt audit json failed: {err}"))?;
         write_policy_report_artifacts(dir, Vec::new(), 0)?;
         write_empty_manual_candidates_artifact(dir)?;
         write_empty_manual_repair_queue_artifact(dir)?;
@@ -23783,6 +23791,10 @@ This artifact is static unsafe contract review. It routes reviewers to credible 
 
     fn receipt_audit_markdown() -> &'static str {
         "# unsafe-review receipt audit\n\nStatic audit of saved receipt metadata against current ReviewCards.\n\n## Summary\n\n| Receipts | Matched | Unmatched | Expired | Stale | Wrong identity | Wrong tool | Weaker than route | Command hash mismatch | Duplicate | Invalid |\n|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n| 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |\n\n## Reviewer front panel\n\n- Matched receipt metadata: 0\n- Receipts imported as current witness evidence: 0\n- Receipts without a current card match: 0 unmatched, 0 stale\n- Problem flags: none\n- Next action: keep matching receipt metadata attached to the review record.\n- Boundary: matched witness receipts improve witness evidence only; they do not erase missing contracts, guards, or reach evidence.\n- Manual boundary: manual candidate receipts attach external evidence to that manual candidate only and do not make it analyzer-discovered.\n\n## Trust boundary\n\nStatic witness receipt audit only; does not execute witnesses, does not prove site reach, and does not independently prove site reach.\n"
+    }
+
+    fn receipt_audit_json() -> &'static str {
+        r#"{"schema_version":"0.1","tool":"unsafe-review","mode":"receipt-audit","policy":"advisory","audit_date":"2026-01-01","trust_boundary":"Static receipt audit only; does not execute witnesses or external tests and does not independently prove site reach.","limitations":["audits saved receipt metadata only","does not execute Miri, cargo-careful, sanitizers, Loom, Shuttle, Kani, Crux, or external integration tests","matched witness receipts improve witness evidence only and do not erase missing contracts, guards, or reach evidence","matched external integration reach receipts improve reach evidence only and do not erase missing contracts, guards, or witness evidence"],"summary":{"receipts":0,"matched":0,"unmatched":0,"expired":0,"stale":0,"wrong_identity":0,"wrong_tool":0,"weaker_than_required":0,"command_hash_mismatch":0,"duplicate":0,"invalid":0},"cards":[]}"#
     }
 
     fn unique_temp_dir(prefix: &str) -> Result<PathBuf, String> {

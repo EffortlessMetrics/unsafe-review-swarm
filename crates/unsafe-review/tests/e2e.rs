@@ -1974,6 +1974,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("comment-plan.json"));
     assert!(stdout.contains("witness-plan.md"));
     assert!(stdout.contains("receipt-audit.md"));
+    assert!(stdout.contains("receipt-audit.json"));
     assert!(stdout.contains("manual-candidates.json"));
     assert!(stdout.contains("manual-repair-queue.json"));
     assert!(stdout.contains("tokmd-packets.json"));
@@ -2500,6 +2501,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         "comment-plan.json",
         "witness-plan.md",
         "receipt-audit.md",
+        "receipt-audit.json",
         "policy-report.json",
         "policy-report.md",
         "manual-candidates.json",
@@ -2530,7 +2532,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
                 assert_eq!(entry["schema_version"], "0.2")
             }
             "review-kit.json" | "comment-plan.json" | "lsp.json" | "repair-queue.json"
-            | "policy-report.json" => {
+            | "policy-report.json" | "receipt-audit.json" => {
                 assert_eq!(entry["schema_version"], "0.1")
             }
             "unsafe-review-gate.json" => {
@@ -2568,6 +2570,30 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(
         gate_manifest["artifacts"]["repair_queue"],
         "repair-queue.json"
+    );
+    assert_eq!(
+        gate_manifest["artifacts"]["receipt_audit"], "receipt-audit.json",
+        "gate manifest receipt_audit pointer must resolve to the structured JSON artifact"
+    );
+    // receipt-audit.json must exist on disk and parse as JSON.
+    let receipt_audit_json_path = out_dir.join("receipt-audit.json");
+    assert!(
+        receipt_audit_json_path.is_file(),
+        "receipt-audit.json must be written alongside receipt-audit.md"
+    );
+    let receipt_audit_json = parse_json(&fs::read_to_string(&receipt_audit_json_path)?)?;
+    assert_eq!(
+        receipt_audit_json["schema_version"], "0.1",
+        "receipt-audit.json must carry schema_version 0.1"
+    );
+    assert_eq!(
+        receipt_audit_json["mode"], "receipt-audit",
+        "receipt-audit.json must carry mode receipt-audit"
+    );
+    // receipt-audit.md must still exist for human consumers (ADDITIVE).
+    assert!(
+        out_dir.join("receipt-audit.md").is_file(),
+        "receipt-audit.md must still be written for human consumers"
     );
     assert_eq!(
         gate_manifest["summary"]["new_gaps"],

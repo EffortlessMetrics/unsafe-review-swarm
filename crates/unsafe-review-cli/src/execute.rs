@@ -46,6 +46,7 @@ type FirstPrRenderer = fn(&AnalyzeOutput) -> String;
 const REVIEW_KIT_ARTIFACT: &str = "review-kit.json";
 const GATE_MANIFEST_ARTIFACT: &str = "unsafe-review-gate.json";
 const RECEIPT_AUDIT_ARTIFACT: &str = "receipt-audit.md";
+const RECEIPT_AUDIT_JSON_ARTIFACT: &str = "receipt-audit.json";
 const POLICY_REPORT_JSON_ARTIFACT: &str = "policy-report.json";
 const POLICY_REPORT_MARKDOWN_ARTIFACT: &str = "policy-report.md";
 const MANUAL_CANDIDATES_ARTIFACT: &str = "manual-candidates.json";
@@ -61,7 +62,7 @@ const FIRST_PR_RENDERED_ARTIFACTS: [(&str, FirstPrRenderer); 8] = [
     ("lsp.json", render_lsp),
     ("repair-queue.json", render_repair_queue),
 ];
-const FIRST_PR_ARTIFACTS: [&str; 16] = [
+const FIRST_PR_ARTIFACTS: [&str; 17] = [
     REVIEW_KIT_ARTIFACT,
     GATE_MANIFEST_ARTIFACT,
     "cards.json",
@@ -71,6 +72,7 @@ const FIRST_PR_ARTIFACTS: [&str; 16] = [
     "comment-plan.json",
     "witness-plan.md",
     RECEIPT_AUDIT_ARTIFACT,
+    RECEIPT_AUDIT_JSON_ARTIFACT,
     POLICY_REPORT_JSON_ARTIFACT,
     POLICY_REPORT_MARKDOWN_ARTIFACT,
     MANUAL_CANDIDATES_ARTIFACT,
@@ -1261,6 +1263,10 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     write_artifact(
         &options.out_dir.join(RECEIPT_AUDIT_ARTIFACT),
         render_receipt_audit_markdown(&receipt_audit),
+    )?;
+    write_artifact(
+        &options.out_dir.join(RECEIPT_AUDIT_JSON_ARTIFACT),
+        render_receipt_audit_json(&receipt_audit),
     )?;
     write_artifact(
         &options.out_dir.join(POLICY_REPORT_JSON_ARTIFACT),

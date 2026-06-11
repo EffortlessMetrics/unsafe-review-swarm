@@ -116,7 +116,7 @@ impl From<&AnalyzeOutput> for GateArtifacts {
             cards: "cards.json",
             comment_plan: "comment-plan.json",
             repair_queue: "repair-queue.json",
-            receipt_audit: "receipt-audit.md",
+            receipt_audit: "receipt-audit.json",
             review_kit: "review-kit.json",
             pr_summary: "pr-summary.md",
             sarif: "cards.sarif",
@@ -237,7 +237,7 @@ mod tests {
         assert_eq!(artifacts["cards"], "cards.json");
         assert_eq!(artifacts["comment_plan"], "comment-plan.json");
         assert_eq!(artifacts["repair_queue"], "repair-queue.json");
-        assert_eq!(artifacts["receipt_audit"], "receipt-audit.md");
+        assert_eq!(artifacts["receipt_audit"], "receipt-audit.json");
         assert_eq!(artifacts["review_kit"], "review-kit.json");
         assert_eq!(artifacts["pr_summary"], "pr-summary.md");
         assert_eq!(artifacts["sarif"], "cards.sarif");

@@ -273,7 +273,7 @@ const REPAIR_QUEUE_READINESS_STATES: [&str; 4] = [
     "requires_witness_receipt",
     "unsupported",
 ];
-const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 16] = [
+const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 17] = [
     "review-kit.json",
     "unsafe-review-gate.json",
     "cards.json",
@@ -283,6 +283,7 @@ const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 16] = [
     "comment-plan.json",
     "witness-plan.md",
     "receipt-audit.md",
+    "receipt-audit.json",
     "policy-report.json",
     "policy-report.md",
     "manual-candidates.json",
@@ -324,6 +325,7 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         &manual_candidates,
     )?;
     check_receipt_audit_artifact(dir)?;
+    check_receipt_audit_json_artifact(dir)?;
     check_policy_report_artifacts(dir, &summary)?;
     let manual_repair_queue = check_manual_repair_queue_artifact(dir, &manual_candidates)?;
     check_tokmd_packets_artifact(dir, &manual_candidates, &manual_repair_queue)?;
@@ -995,6 +997,24 @@ fn check_receipt_audit_artifact(dir: &Path) -> Result<(), String> {
         &path,
     )?;
 
+    Ok(())
+}
+
+fn check_receipt_audit_json_artifact(dir: &Path) -> Result<(), String> {
+    let path = dir.join("receipt-audit.json");
+    let report = super::parse_json_file(&path)?;
+    super::require_json_str(&report, "schema_version", "0.1", "receipt-audit.json")?;
+    super::require_json_str(&report, "tool", "unsafe-review", "receipt-audit.json")?;
+    super::require_json_str(&report, "mode", "receipt-audit", "receipt-audit.json")?;
+    super::require_json_str(&report, "policy", "advisory", "receipt-audit.json")?;
+    let boundary = report
+        .get("trust_boundary")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "receipt-audit.json is missing trust_boundary".to_string())?;
+    // receipt-audit has its own trust boundary wording (not "static unsafe contract review");
+    // verify the key non-execution claims present in the receipt_audit trust boundary.
+    super::require_text_contains(boundary, "does not execute witnesses", &path)?;
+    super::require_text_contains(boundary, "does not independently prove site reach", &path)?;
     Ok(())
 }
 
@@ -5038,6 +5058,7 @@ fn expected_review_kit_artifact_kind(path: &str) -> &'static str {
         "comment-plan.json" => "comment_plan",
         "witness-plan.md" => "witness_plan",
         "receipt-audit.md" => "receipt_audit",
+        "receipt-audit.json" => "receipt_audit",
         "policy-report.json" => "policy_report_json",
         "policy-report.md" => "policy_report_markdown",
         "manual-candidates.json" => "manual_candidates",
@@ -5060,7 +5081,8 @@ fn expected_review_kit_artifact_format(path: &str) -> &'static str {
         | "manual-candidates.json"
         | "manual-repair-queue.json"
         | "tokmd-packets.json"
-        | "policy-report.json" => "json",
+        | "policy-report.json"
+        | "receipt-audit.json" => "json",
         "pr-summary.md" | "github-summary.md" | "witness-plan.md" | "receipt-audit.md"
         | "policy-report.md" => "markdown",
         "cards.sarif" => "sarif",
@@ -5081,7 +5103,7 @@ fn check_review_kit_artifact_schema_version(
         // cards.json was bumped to 0.2 when provenance metadata was added.
         "cards.json" => Some("0.2"),
         "review-kit.json" | "comment-plan.json" | "lsp.json" | "repair-queue.json"
-        | "policy-report.json" => Some("0.1"),
+        | "policy-report.json" | "receipt-audit.json" => Some("0.1"),
         "unsafe-review-gate.json" => Some("unsafe-review-gate/v1"),
         "manual-candidates.json" => Some("manual-candidates/v1"),
         "manual-repair-queue.json" => Some("manual-repair-queue/v1"),
@@ -9633,6 +9655,7 @@ fn check_advisory_artifact_overclaims(dir: &Path) -> Result<(), String> {
         "comment-plan.json",
         "witness-plan.md",
         "receipt-audit.md",
+        "receipt-audit.json",
         "policy-report.json",
         "policy-report.md",
         "manual-candidates.json",
@@ -9668,6 +9691,7 @@ fn is_machine_json_artifact(name: &str) -> bool {
             | "tokmd-packets.json"
             | "lsp.json"
             | "repair-queue.json"
+            | "receipt-audit.json"
     )
 }
 

@@ -1552,6 +1552,7 @@ pub(super) fn render_manual_candidates_artifact(
             "lsp.json": "ReviewCard-only saved editor projection; manual candidates are not emitted as analyzer diagnostics.",
             "repair-queue.json": "ReviewCard-only repair queue; manual candidates are not automatic repair tasks.",
             "receipt-audit.md": "Receipts may match manual candidate IDs as manual/advisory targets without importing them as ReviewCard witness evidence.",
+            "receipt-audit.json": "Receipts may match manual candidate IDs as manual/advisory targets without importing them as ReviewCard witness evidence.",
             "policy-report.json": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs.",
             "policy-report.md": "ReviewCard-only policy simulation; manual candidates are not policy gating inputs."
         },
@@ -2397,6 +2398,7 @@ fn artifact_kind(path: &str) -> &'static str {
         "comment-plan.json" => "comment_plan",
         "witness-plan.md" => "witness_plan",
         "receipt-audit.md" => "receipt_audit",
+        "receipt-audit.json" => "receipt_audit",
         "policy-report.json" => "policy_report_json",
         "policy-report.md" => "policy_report_markdown",
         "manual-candidates.json" => "manual_candidates",
@@ -2425,7 +2427,7 @@ fn artifact_schema_version(path: &str) -> Option<&'static str> {
         // cards.json was bumped to 0.2 when provenance metadata was added.
         "cards.json" => Some("0.2"),
         "review-kit.json" | "comment-plan.json" | "lsp.json" | "repair-queue.json"
-        | "policy-report.json" => Some("0.1"),
+        | "policy-report.json" | "receipt-audit.json" => Some("0.1"),
         "unsafe-review-gate.json" => Some("unsafe-review-gate/v1"),
         "manual-candidates.json" => Some("manual-candidates/v1"),
         "manual-repair-queue.json" => Some("manual-repair-queue/v1"),
