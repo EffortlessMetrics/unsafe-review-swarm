@@ -163,3 +163,10 @@ name = "low-noise usefulness telemetry projection"
 path = ".rails/lanes/usefulness-telemetry/implementation-plan.md"
 status = "active"
 owner = "product / cli"
+
+[[lane]]
+id = "pr-alias-zero-config-entry-point"
+name = "pr alias zero-config entry point"
+path = ".rails/goals/active.toml"
+status = "active"
+owner = "product / cli"

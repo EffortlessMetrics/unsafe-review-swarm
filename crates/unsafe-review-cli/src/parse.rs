@@ -47,6 +47,15 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
         "doctor" => parse_doctor(rest),
         "check" => parse_check(rest).map(Command::Check),
         "first-pr" | "review" => parse_first_pr(rest).map(Command::FirstPr),
+        "pr" => parse_first_pr(rest).map(|mut options| {
+            // `pr` is a pure alias for `first-pr`; the only difference is that
+            // execute auto-detects the git root and base ref when the user did
+            // not supply explicit --root/--base/--diff arguments.
+            options.auto_detect = options.check.root == std::path::Path::new(".")
+                && options.check.base.as_deref() == Some("origin/main")
+                && options.check.diff.is_none();
+            Command::FirstPr(options)
+        }),
         "repo" => parse_repo(rest).map(Command::Repo),
         "pilot" => parse_check(rest).map(|mut options| {
             options.max_cards = Some(options.max_cards.unwrap_or(5));
@@ -407,7 +416,7 @@ fn validate_iso_date(raw: &str, flag: &str) -> Result<(), String> {
 fn subcommand_help_for(command: &str) -> Command {
     let target = match command {
         "check" => SubcommandHelpTarget::Check,
-        "first-pr" | "review" => SubcommandHelpTarget::FirstPr,
+        "first-pr" | "review" | "pr" => SubcommandHelpTarget::FirstPr,
         "pilot" => SubcommandHelpTarget::Pilot,
         "explain" => SubcommandHelpTarget::Explain,
         "context" => SubcommandHelpTarget::Context,
@@ -1610,6 +1619,71 @@ mod tests {
         assert_eq!(options.check.max_cards, Some(3));
         assert_eq!(options.out_dir, PathBuf::from("target/unsafe-review"));
         Ok(())
+    }
+
+    #[test]
+    fn parse_pr_alias_maps_to_first_pr() -> Result<(), String> {
+        // `pr` is a pure parse-time alias for `first-pr`; it must map to
+        // Command::FirstPr with the same defaults as `first-pr`.
+        let command = parse(args(["unsafe-review", "pr"]))?;
+        let Command::FirstPr(options) = command else {
+            return Err("expected first-pr command from `pr` alias".to_string());
+        };
+        assert_eq!(options.check.root, PathBuf::from("."));
+        assert_eq!(
+            options.check.base,
+            Some("origin/main".to_string()),
+            "`pr` with no args must default base to origin/main"
+        );
+        assert_eq!(options.check.diff, None);
+        assert_eq!(options.out_dir, PathBuf::from("target/unsafe-review"));
+        // With no explicit args, auto-detection is requested at execute time.
+        assert!(
+            options.auto_detect,
+            "`pr` with no args must set auto_detect = true"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parse_pr_alias_accepts_all_first_pr_flags() -> Result<(), String> {
+        // `pr` accepts the same flags as `first-pr`; with explicit flags,
+        // auto_detect is false (user supplied explicit args).
+        let command = parse(args([
+            "unsafe-review",
+            "pr",
+            "--root=fixtures/raw_pointer_alignment",
+            "--diff=change.diff",
+            "--out-dir=target/pr-review",
+        ]))?;
+        let Command::FirstPr(options) = command else {
+            return Err("expected first-pr command from `pr` alias".to_string());
+        };
+        assert_eq!(
+            options.check.root,
+            PathBuf::from("fixtures/raw_pointer_alignment")
+        );
+        assert_eq!(
+            options.check.diff,
+            Some(DiffInput::File(PathBuf::from("change.diff")))
+        );
+        assert_eq!(options.out_dir, PathBuf::from("target/pr-review"));
+        // Explicit flags disable auto-detection.
+        assert!(
+            !options.auto_detect,
+            "`pr` with explicit --diff must not set auto_detect"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parse_pr_alias_help_routes_to_first_pr_help() {
+        // `pr --help` must show the first-pr subcommand help, not the generic help.
+        let result = parse(args(["unsafe-review", "pr", "--help"]));
+        assert_eq!(
+            result,
+            Ok(Command::SubcommandHelp(SubcommandHelpTarget::FirstPr))
+        );
     }
 
     #[test]

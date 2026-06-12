@@ -167,3 +167,67 @@ cargo run --locked -p xtask -- check-pr
 Move to accepted when the first-use guide, CLI guide, first-pr bundle verifier,
 explain examples, support posture output, saved LSP walkthrough, and agent
 packet examples all align with this spec.
+
+## 9. Zero-arg convenience entry point (`unsafe-review pr`)
+
+`unsafe-review pr` is a pure parse-time alias for `first-pr`. It maps to the
+same `FirstPr` command and produces the same advisory output bundle. No new
+output surface or second analyzer truth is introduced.
+
+### 9.1 Auto-detection behavior
+
+When `pr` is invoked without explicit `--root`, `--base`, or `--diff` flags,
+execute auto-detects the missing values before running the review:
+
+- **root** — resolved from the git repository containing the current working
+  directory (`git rev-parse --show-toplevel`).
+- **base** — resolved in order: (1) `git symbolic-ref refs/remotes/origin/HEAD`
+  stripped of `refs/remotes/`; (2) `git rev-parse --verify origin/main`; (3)
+  `git rev-parse --verify origin/master`. The first that succeeds is used.
+- **out-dir** — uses the same default as `first-pr`: `target/unsafe-review`.
+
+When any explicit flag is supplied (`--root`, `--base`, or `--diff`),
+auto-detection is skipped for all three values; the behavior is identical to
+`first-pr` with those flags.
+
+### 9.2 Unresolved-base error
+
+If auto-detection cannot resolve a base ref (no `origin/HEAD`, no `origin/main`,
+no `origin/master`), the command exits with a tool-error (exit code 2) and
+prints an actionable message naming the exact flag to use:
+
+```text
+could not detect a default base ref (tried origin/HEAD, origin/main, origin/master).
+Run `unsafe-review pr --base <ref>` or `unsafe-review first-pr --base <ref>`
+and pass a branch, tag, or commit SHA that exists in the repository
+(e.g. --base origin/main).
+```
+
+If the current directory is not inside a git repository, the error names the
+explicit flags too:
+
+```text
+could not detect a git repository in the current directory (<git stderr>).
+Run `unsafe-review first-pr --root <repo> --base <ref>` to supply them explicitly.
+```
+
+### 9.3 Advisory posture
+
+`unsafe-review pr` inherits all advisory constraints of `first-pr`:
+
+- output is advisory only; not memory-safety proof, not UB-free status, not
+  Miri-clean status, and not a site-execution claim unless a matching witness
+  receipt says so
+- does not post comments, edit source, execute witnesses, or enforce a blocking
+  policy by default
+
+### 9.4 Help hint
+
+The top-level help output includes a one-line hint pointing users at
+`unsafe-review pr`:
+
+```text
+  pr      zero-config entry point: auto-detects root and base ref; alias for first-pr
+```
+
+`unsafe-review pr --help` routes to the `first-pr` subcommand help page.

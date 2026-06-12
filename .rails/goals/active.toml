@@ -130,3 +130,16 @@ commands = [
   "cargo test -p unsafe-review --test e2e first_pr_emits_usefulness_telemetry_artifact",
   "cargo run --locked -p xtask -- check-pr",
 ]
+
+[[work_item]]
+id = "pr-alias-zero-config-entry-point"
+status = "active"
+spec = "UNSAFE-REVIEW-SPEC-0023"
+plan = ".rails/goals/active.toml"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1622"
+commands = [
+  "cargo fmt --all --check",
+  "cargo clippy --workspace --all-targets --locked -- -D warnings",
+  "cargo test --workspace --locked",
+  "cargo run --locked -p xtask -- check-pr",
+]

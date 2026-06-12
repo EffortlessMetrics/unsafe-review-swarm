@@ -63,6 +63,10 @@ impl Default for CheckOptions {
 pub(crate) struct FirstPrOptions {
     pub check: CheckOptions,
     pub out_dir: PathBuf,
+    /// When `true`, execute auto-detects the git root and default base ref
+    /// rather than using the parse-time defaults.  Set only when the user
+    /// invokes `unsafe-review pr` without explicit `--root`/`--base`/`--diff`.
+    pub auto_detect: bool,
 }
 
 impl Default for FirstPrOptions {
@@ -70,6 +74,7 @@ impl Default for FirstPrOptions {
         Self {
             check: CheckOptions::default(),
             out_dir: PathBuf::from("target/unsafe-review"),
+            auto_detect: false,
         }
     }
 }
