@@ -306,6 +306,17 @@ it converges. The mechanisms, in priority order:
 - **Verification includes reviewers and the controller.** A reviewer's verdict
   is also a ~12% claim. The controller checks the *decisive fact* before an
   irreversible step (merge), not the verdict.
+- **A green PR can still prove the wrong property.** Passing every gate is
+  necessary, not sufficient: a change can be green — fmt, clippy, tests, the
+  full deterministic gate all pass — and still demonstrate the wrong thing. An
+  implementer can honestly report "deviations: none" while having built a case
+  that satisfies the *letter* of the brief and misses its *point* (e.g. a
+  "resolved gap" fixture that resolves by deleting the unsafe rather than by
+  adding the review evidence that was supposed to be rewarded — a near-tautology
+  that passes CI but proves nothing the lane cares about). The controller's job
+  is **semantic acceptance**: does this artifact actually demonstrate the
+  intended product property? Check that against the brief's *intent*, not just
+  the green check. Green CI ≠ correct outcome.
 - **Your *weightings* can be biased, not just your facts.** Verification applies
   hardest to your own reasoning. Beyond "is this fact right?", ask "is my
   *value-weighting* skewed?" — a standing lean (for example, toward
