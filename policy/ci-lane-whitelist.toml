@@ -109,3 +109,13 @@ cost_estimate = "medium"
 trigger_policy = "pull_request(opened, synchronize, reopened, ready_for_review) for non-draft PRs"
 status = "advisory"
 review_after = "2026-07-01"
+
+[[lane]]
+id = "corpus-backstop"
+owner = "repo-infra"
+intent = "Run the fixture corpus on a weekly schedule to collect wall time, output size, and external peak RSS as a resource triage backstop"
+proof_obligation = "workflow runs on schedule/dispatch only, is never a required PR gate, produces a resource-report.json artifact, and carries the diagnostic-triage-input-only trust boundary"
+cost_estimate = "low"
+trigger_policy = "schedule (weekly), workflow_dispatch"
+status = "advisory"
+review_after = "2026-08-12"

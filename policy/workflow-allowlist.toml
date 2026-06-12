@@ -93,3 +93,17 @@ actions = [
 reason = "Owner-requested advisory Droid PR review bot. It configures Factory BYOK with MiniMax M3 via the Anthropic-compatible MiniMax endpoint, uses Droid's shallow review preset with low reasoning effort, disables Droid security review blocking, passes the scoped workflow GitHub token to Droid, grants id-token: write for the pinned Factory Droid validator OIDC path, runs only on non-draft pull requests, bounds the Droid action step with a timeout and continue-on-error so review-bot failures stay advisory, cancels superseded PR review runs per PR, clears ambient Anthropic globals, posts advisory review/security comments through Factory, and does not run unsafe-review witnesses, edit source, publish artifacts, or make unsafe-correctness claims."
 created = "2026-06-01"
 review_after = "2026-07-01"
+
+[[workflow]]
+id = "workflow-0008"
+path = ".github/workflows/corpus-backstop.yml"
+permissions = "contents: read"
+actions = [
+  "actions/checkout@v6",
+  "dtolnay/rust-toolchain@1.95.0",
+  "Swatinem/rust-cache@v2",
+  "actions/upload-artifact@v7",
+]
+reason = "Advisory scheduled corpus resource backstop. Runs the fixture-control targets from docs/dogfood/corpus.toml on a weekly schedule (Monday 04:00 UTC) and workflow_dispatch only. Collects wall time, output size, and peak RSS measured externally via /usr/bin/time -v on the Linux runner. Uploads resource-report.json as a 30-day artifact. Never a required PR gate, never triggers on pull_request or push, no witness execution, no source edits, no comment posting, no write permissions. Diagnostic triage input only — not a performance SLA, coverage claim, memory-safety claim, UB-free claim, or merge blocker."
+created = "2026-06-12"
+review_after = "2026-08-12"

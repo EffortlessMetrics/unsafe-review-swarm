@@ -1,0 +1,43 @@
+{
+  "schema_version": "0.1",
+  "generated_at": "2026-06-12T04:00:00Z",
+  "corpus_source": "docs/dogfood/corpus.toml",
+  "run_summary": {
+    "target_count": 2,
+    "completed": 2,
+    "failed": 0,
+    "skipped": 0
+  },
+  "runs": [
+    {
+      "id": "safe-code-no-cards-control",
+      "kind": "fixture-control",
+      "elapsed_ms": 280,
+      "output_bytes": 1024,
+      "files_discovered": 2,
+      "files_scanned": 1,
+      "files_skipped": 1,
+      "card_count": 0,
+      "status": "completed"
+    },
+    {
+      "id": "bun-manual-candidates-first-pr-smoke",
+      "kind": "fixture-control",
+      "elapsed_ms": 420,
+      "output_bytes": 8192,
+      "files_discovered": 3,
+      "files_scanned": 2,
+      "files_skipped": 1,
+      "card_count": 2,
+      "status": "completed"
+    }
+  ],
+  "totals": {
+    "elapsed_ms_total": 700,
+    "output_bytes_total": 9216,
+    "card_count_total": 2
+  },
+  "peak_rss_bytes": null,
+  "peak_rss_source": null,
+  "trust_boundary": "Corpus backstop report is diagnostic triage input only, not a coverage, precision, recall, memory-safety, UB-free, Miri-clean, site-execution, or performance SLA claim; not a gate."
+}

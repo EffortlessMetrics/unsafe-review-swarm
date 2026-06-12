@@ -20,6 +20,7 @@ const XTASK_COMMANDS: &[&str] = &[
     "check-advisory-artifacts",
     "check-calibration",
     "check-ci-lanes",
+    "check-corpus-backstop-schema",
     "check-doc-artifacts",
     "check-docs",
     "check-docs-automation",

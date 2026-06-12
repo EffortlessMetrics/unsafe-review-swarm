@@ -132,3 +132,16 @@ commands = [
   "cargo test --workspace --locked",
   "cargo run --locked -p xtask -- check-pr",
 ]
+
+[[work_item]]
+id = "scheduled-corpus-backstop"
+status = "active"
+spec = "UNSAFE-REVIEW-SPEC-0039"
+plan = ".rails/goals/active.toml"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1625"
+commands = [
+  "cargo fmt --all --check",
+  "cargo clippy --workspace --all-targets --locked -- -D warnings",
+  "cargo test --workspace --locked",
+  "cargo run --locked -p xtask -- check-pr",
+]

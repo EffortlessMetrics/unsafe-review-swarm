@@ -1,0 +1,72 @@
+name: corpus-backstop
+
+# Advisory scheduled corpus resource backstop.
+# Runs the fixture corpus broadly, measures wall time and output size, captures
+# peak RSS externally via /usr/bin/time -v, and uploads a resource-report.json
+# as an artifact. DIAGNOSTIC TRIAGE INPUT ONLY — not a performance SLA, not a
+# coverage claim, not a memory-safety or UB-free claim, and never a PR gate.
+
+on:
+  schedule:
+    - cron: '0 4 * * 1'   # weekly, Monday 04:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  corpus_backstop:
+    name: corpus backstop (advisory, non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@1.95.0
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build unsafe-review binary
+        run: cargo build --locked -p unsafe-review --release
+
+      - name: Run corpus backstop under /usr/bin/time -v
+        id: run_backstop
+        run: |
+          mkdir -p target/corpus-backstop
+          /usr/bin/time -v \
+            cargo run --locked -p xtask -- corpus-backstop --out target/corpus-backstop/resource-report.json \
+            2>target/corpus-backstop/time-output.txt || true
+          echo "time_output_file=target/corpus-backstop/time-output.txt" >> "$GITHUB_OUTPUT"
+
+      - name: Inject peak RSS into resource-report.json
+        run: |
+          set -euo pipefail
+          TIME_FILE="target/corpus-backstop/time-output.txt"
+          REPORT="target/corpus-backstop/resource-report.json"
+          if [ -f "$TIME_FILE" ] && [ -f "$REPORT" ]; then
+            RSS_KB=$(grep "Maximum resident set size" "$TIME_FILE" | grep -oE '[0-9]+' | tail -1 || echo "")
+            if [ -n "$RSS_KB" ]; then
+              RSS_BYTES=$((RSS_KB * 1024))
+              jq --argjson rss "$RSS_BYTES" \
+                '.peak_rss_bytes = $rss | .peak_rss_source = "/usr/bin/time -v on Linux ubuntu-latest runner"' \
+                "$REPORT" > "${REPORT}.tmp" && mv "${REPORT}.tmp" "$REPORT"
+              echo "Injected peak_rss_bytes: $RSS_BYTES"
+            else
+              echo "Could not parse peak RSS from /usr/bin/time output — leaving null"
+            fi
+          fi
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: corpus-backstop-report
+          path: target/corpus-backstop/
+          if-no-files-found: warn
+          retention-days: 30

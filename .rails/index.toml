@@ -66,6 +66,13 @@ status = "proposed"
 owner = "product / cli"
 
 [[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0039"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0039-scheduled-corpus-backstop.md"
+status = "proposed"
+owner = "repo-infra"
+
+[[artifact]]
 id = "UNSAFE-REVIEW-SPEC-0021"
 kind = "spec"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-0021-vscode-openvsx-extension.md"
@@ -156,3 +163,10 @@ name = "pr alias zero-config entry point"
 path = ".rails/goals/active.toml"
 status = "active"
 owner = "product / cli"
+
+[[lane]]
+id = "scheduled-corpus-backstop"
+name = "scheduled corpus backstop"
+path = ".rails/goals/active.toml"
+status = "active"
+owner = "repo-infra"
