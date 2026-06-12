@@ -61,8 +61,11 @@ specific costs (a dependency = footprint + supply-chain + maintenance; `unsafe`
 alternatives *for the job at hand*, and do not spend a governed exception where
 a free path suffices. See
 [`ADR-0008`](../adr/UNSAFE-REVIEW-ADR-0008-resource-measurement-placement.md)
-for a worked example (in-product RSS via ledgered FFI rather than a shipped
-crate).
+for a worked example: resource measurement is external-first (peak RAM on the
+scheduled bench harness, no `unsafe` in the shipped binary), with in-product RSS
+via a ledgered FFI implemented but parked pending validated demand — an
+illustration of not spending a governed exception where a free path (external
+measurement) suffices.
 
 ## Boundary
 
