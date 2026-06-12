@@ -1,0 +1,10 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -10,1 +10,5 @@
++// SAFETY: Wrapper does not alias any live reference when call is invoked.
++unsafe impl AliasFreeCall for Wrapper {
++    fn call(&self) {
++        let _ = self.0;
++    }
++}

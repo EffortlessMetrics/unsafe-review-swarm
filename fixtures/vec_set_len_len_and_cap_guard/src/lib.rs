@@ -1,0 +1,25 @@
+/// Probe: belt-and-suspenders guard: new_len is checked against BOTH len
+/// (ensuring no uninitialized elements are exposed) AND capacity (ensuring
+/// the buffer is not overrun). Both vec_set_len obligations (capacity and
+/// initialized) should be discharged, yielding guarded_unwitnessed.
+pub fn shrink_len_and_cap(values: &mut Vec<u8>, new_len: usize) {
+    // SAFETY: new_len does not exceed len (so no uninitialized elements are
+    // exposed) and does not exceed capacity (so the buffer is not overrun).
+    if new_len <= values.len() && new_len <= values.capacity() {
+        unsafe {
+            values.set_len(new_len);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::shrink_len_and_cap;
+
+    #[test]
+    fn probe_len_and_cap_guard() {
+        let mut values = vec![1_u8, 2, 3];
+        shrink_len_and_cap(&mut values, 2);
+        assert_eq!(values.len(), 2);
+    }
+}

@@ -1,0 +1,140 @@
+[
+  {
+    "id": "UR-vec-set-len-len-and-cap-guard-src-lib-rs-shrink-len-and-cap-operation-vec_set_len-set-len-33f18cb7f407-initialized_memory-c1",
+    "class": "guarded_unwitnessed",
+    "priority": "medium",
+    "confidence": "medium",
+    "proof_path": "observable_red_green",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 10,
+      "column": 13,
+      "kind": "operation",
+      "owner": "shrink_len_and_cap",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "values.set_len(new_len);"
+    },
+    "operation": "values.set_len(new_len);",
+    "operation_family": "vec_set_len",
+    "hazards": [
+      "initialized_memory",
+      "bounds"
+    ],
+    "obligations": [
+      "new length is at most capacity",
+      "elements in the extended range are initialized"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "capacity",
+        "description": "new length is at most capacity",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Capacity guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `shrink_len_and_cap`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "initialized",
+        "description": "elements in the extended range are initialized",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Initialization evidence was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `shrink_len_and_cap`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "All inferred safety obligations have visible local discharge evidence",
+    "reach": "1 related test file(s) mention owner `shrink_len_and_cap`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test shrink_len_and_cap",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test shrink_len_and_cap",
+        "required": false
+      }
+    ],
+    "missing": [
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Attach a focused Miri or cargo-careful witness receipt or mark the static limitation explicitly.",
+    "verify_commands": [
+      "cargo +nightly miri test shrink_len_and_cap",
+      "cargo +nightly careful test shrink_len_and_cap"
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guarded_unwitnessed` ReviewCard for `values.set_len(new_len);`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test shrink_len_and_cap",
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test shrink_len_and_cap` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test shrink_len_and_cap",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-vec-set-len-len-and-cap-guard-src-lib-rs-shrink-len-and-cap-operation-vec_set_len-set-len-33f18cb7f407-initialized_memory-c1` still maps to `values.set_len(new_len);` at `src/lib.rs:10:13` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test shrink_len_and_cap` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo +nightly miri test shrink_len_and_cap` first, then attach a matching receipt if it confirms the route",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "present",
+      "guard_coverage": "present",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "not_eligible",
+      "agent_lsp_readiness": "ready"
+    }
+  }
+]

@@ -1,0 +1,24 @@
+/// This fixture is an adversarial probe: checking new_len against capacity
+/// (not len) is NOT sufficient safety evidence for set_len, because capacity
+/// can exceed the initialized range. The tool must not confuse a capacity guard
+/// (which discharges the capacity obligation) with initialized evidence.
+pub fn unsafe_shrink_cap_only(values: &mut Vec<u8>, new_len: usize) {
+    // SAFETY: new_len is at most capacity — but this is insufficient:
+    // it does not prove that elements in [0..new_len] are initialized.
+    if new_len <= values.capacity() {
+        unsafe {
+            values.set_len(new_len);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::unsafe_shrink_cap_only;
+
+    #[test]
+    fn probe_cap_guard() {
+        let mut values = vec![1_u8, 2, 3];
+        unsafe_shrink_cap_only(&mut values, 2);
+    }
+}

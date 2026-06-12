@@ -1,0 +1,141 @@
+[
+  {
+    "id": "UR-transmute-all-obligations-met-src-lib-rs-byte-to-bool-both-guards-operation-transmute-u8-bool-bdefdb7b6120-invalid_value-c1",
+    "class": "guarded_unwitnessed",
+    "priority": "medium",
+    "confidence": "medium",
+    "proof_path": "observable_red_green",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 9,
+      "column": 5,
+      "kind": "operation",
+      "owner": "byte_to_bool_both_guards",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { core::mem::transmute::<u8, bool>(value) }"
+    },
+    "operation": "unsafe { core::mem::transmute::<u8, bool>(value) }",
+    "operation_family": "transmute",
+    "hazards": [
+      "invalid_value",
+      "layout_or_repr",
+      "aliasing_or_provenance"
+    ],
+    "obligations": [
+      "source and destination layouts are compatible",
+      "destination value satisfies Rust validity rules"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "layout",
+        "description": "source and destination layouts are compatible",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Transmute layout size evidence was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `byte_to_bool_both_guards`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "valid-value",
+        "description": "destination value satisfies Rust validity rules",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Transmute u8-to-bool valid-value evidence was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `byte_to_bool_both_guards`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "All inferred safety obligations have visible local discharge evidence",
+    "reach": "1 related test file(s) mention owner `byte_to_bool_both_guards`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test byte_to_bool_both_guards",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test byte_to_bool_both_guards",
+        "required": false
+      }
+    ],
+    "missing": [
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Attach a focused Miri or cargo-careful witness receipt or mark the static limitation explicitly.",
+    "verify_commands": [
+      "cargo +nightly miri test byte_to_bool_both_guards",
+      "cargo +nightly careful test byte_to_bool_both_guards"
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guarded_unwitnessed` ReviewCard for `unsafe { core::mem::transmute::<u8, bool>(value) }`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test byte_to_bool_both_guards",
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test byte_to_bool_both_guards` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test byte_to_bool_both_guards",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-transmute-all-obligations-met-src-lib-rs-byte-to-bool-both-guards-operation-transmute-u8-bool-bdefdb7b6120-invalid_value-c1` still maps to `unsafe { core::mem::transmute::<u8, bool>(value) }` at `src/lib.rs:9:5` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test byte_to_bool_both_guards` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo +nightly miri test byte_to_bool_both_guards` first, then attach a matching receipt if it confirms the route",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "present",
+      "guard_coverage": "present",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "not_eligible",
+      "agent_lsp_readiness": "ready"
+    }
+  }
+]

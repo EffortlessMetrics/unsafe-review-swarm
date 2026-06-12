@@ -27,6 +27,7 @@ required_core_fixtures = [
   "split_unsafe_block",
   "public_unsafe_fn_missing_safety",
   "public_unsafe_trait_missing_safety",
+  "public_unsafe_trait_with_safety_docs",
   "public_unsafe_fn_safety_comment_not_docs",
   "split_public_unsafe_fn_missing_safety",
   "public_unsafe_fn_with_safety_docs",
@@ -137,6 +138,8 @@ required_core_fixtures = [
   "vec_set_len_zero_clear",
   "vec_set_len_post_init_not_guard",
   "vec_set_len_unrelated_initialization_not_guard",
+  "vec_set_len_cap_not_len_not_guard",
+  "vec_set_len_len_and_cap_guard",
   "drop_in_place_deallocation",
   "drop_in_place_box_origin",
   "drop_in_place_reassigned_origin_not_guard",
@@ -420,6 +423,8 @@ required_core_fixtures = [
   "static_mut_global_state",
   "transmute_invalid_value",
   "transmute_layout_size_guard",
+  "transmute_layout_only_not_guard",
+  "transmute_all_obligations_met",
   "transmute_layout_conjunct_branch_guard",
   "transmute_layout_disjunct_branch_not_guard",
   "transmute_layout_mismatch_return_guard",
@@ -469,6 +474,7 @@ required_core_fixtures = [
   "unsafe_impl_send_generic_owner",
   "unsafe_impl_sync_generic_bound",
   "unsafe_impl_custom_trait_not_send_sync",
+  "unsafe_impl_custom_trait_contract_not_guard",
   "ffi_sanitizer_route",
   "ffi_missing_boundary_contract",
   "ffi_call_sanitizer_route",
@@ -814,6 +820,16 @@ claim = "public unsafe trait without a # Safety contract reports contract_missin
 support_tier = "Contract evidence mining"
 expected_cards = 1
 expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+
+[[cases]]
+fixture = "public_unsafe_trait_with_safety_docs"
+kind = "positive"
+claim = "public unsafe trait WITH # Safety docs discharges the contract obligation and reports guarded_unwitnessed"
+support_tier = "Contract evidence mining"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
 expected_operation_family = "unknown"
 expected_hazard = "unknown"
 
@@ -1914,6 +1930,26 @@ claim = "Vec::set_len does not accept unrelated MaybeUninit initialization as ev
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "vec_set_len_cap_not_len_not_guard"
+kind = "false_positive_control"
+claim = "Vec::set_len guarded only by new_len <= capacity discharges the capacity obligation but not initialized; card stays guard_missing"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "vec_set_len_len_and_cap_guard"
+kind = "positive"
+claim = "Vec::set_len guarded by both new_len <= len and new_len <= capacity discharges both obligations and yields guarded_unwitnessed"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
 expected_operation_family = "vec_set_len"
 expected_hazard = "initialized_memory"
 
@@ -4748,6 +4784,26 @@ expected_operation_family = "transmute"
 expected_hazard = "invalid_value"
 
 [[cases]]
+fixture = "transmute_layout_only_not_guard"
+kind = "false_positive_control"
+claim = "transmute::<u8, bool> with size_of layout assertion but no valid-value assertion still reports guard_missing; partial obligation discharge does not upgrade the card"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "transmute_all_obligations_met"
+kind = "positive"
+claim = "transmute::<u8, bool> with both size_of layout and value <= 1 range assertions discharges both obligations and yields guarded_unwitnessed"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+
+[[cases]]
 fixture = "transmute_layout_conjunct_branch_guard"
 kind = "positive"
 claim = "transmute::<u8, bool> recognizes size_of layout evidence as a top-level conjunct in an open branch"
@@ -5232,6 +5288,16 @@ fixture = "unsafe_impl_custom_trait_not_send_sync"
 kind = "false_positive_control"
 claim = "custom unsafe trait impls do not receive Send/Sync concurrency witness routing"
 support_tier = "Witness routing"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+
+[[cases]]
+fixture = "unsafe_impl_custom_trait_contract_not_guard"
+kind = "false_positive_control"
+claim = "custom unsafe impl WITH a SAFETY comment provides contract but the unknown obligation still has no discharge path for impl sites; card stays guard_missing"
+support_tier = "Contract evidence mining"
 expected_cards = 1
 expected_class = "guard_missing"
 expected_operation_family = "unknown"
