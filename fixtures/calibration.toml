@@ -564,6 +564,7 @@ required_core_fixtures = [
   "panic_from_safe_js_return_guard_no_card",
   "panic_from_safe_js_non_js_signed_no_card",
   "comment_alignment_not_guard",
+  "unsafe_fn_unknown_family_no_card",
 ]
 
 [[cases]]
@@ -758,23 +759,17 @@ expected_hazard = "alignment"
 
 [[cases]]
 fixture = "split_unsafe_block"
-kind = "positive"
-claim = "split unsafe block syntax emits a single unknown unsafe-block card when no concrete operation is found"
+kind = "false_positive_control"
+claim = "diff-scope filters split unsafe-block owner cards with no concrete operation family as unclassified noise"
 support_tier = "Diff unsafe site inventory"
-expected_cards = 1
-expected_class = "contract_missing"
-expected_operation_family = "unknown"
-expected_hazard = "unknown"
+expected_cards = 0
 
 [[cases]]
 fixture = "public_unsafe_fn_missing_safety"
-kind = "positive"
-claim = "public unsafe function without a # Safety contract reports contract_missing"
+kind = "false_positive_control"
+claim = "diff-scope filters public unsafe-fn owner cards with no concrete operation family as unclassified noise"
 support_tier = "Contract evidence mining"
-expected_cards = 1
-expected_class = "contract_missing"
-expected_operation_family = "unknown"
-expected_hazard = "unknown"
+expected_cards = 0
 
 [[cases]]
 fixture = "public_unsafe_trait_missing_safety"
@@ -789,62 +784,44 @@ expected_hazard = "unknown"
 [[cases]]
 fixture = "public_unsafe_fn_safety_comment_not_docs"
 kind = "false_positive_control"
-claim = "public unsafe function requires # Safety docs and does not accept a local SAFETY comment as public API docs"
+claim = "diff-scope filters public unsafe-fn with only a SAFETY comment and no concrete operation family as unclassified noise"
 support_tier = "Contract evidence mining"
-expected_cards = 1
-expected_class = "contract_missing"
-expected_operation_family = "unknown"
-expected_hazard = "unknown"
+expected_cards = 0
 
 [[cases]]
 fixture = "split_public_unsafe_fn_missing_safety"
-kind = "positive"
-claim = "split public unsafe function syntax still reports missing # Safety docs"
+kind = "false_positive_control"
+claim = "diff-scope filters split public unsafe-fn owner cards with no concrete operation family as unclassified noise"
 support_tier = "Contract evidence mining"
-expected_cards = 1
-expected_class = "contract_missing"
-expected_operation_family = "unknown"
-expected_hazard = "unknown"
+expected_cards = 0
 
 [[cases]]
 fixture = "public_unsafe_fn_with_safety_docs"
-kind = "positive"
-claim = "public unsafe function with a # Safety contract does not report a missing local declaration guard"
+kind = "false_positive_control"
+claim = "diff-scope filters public unsafe-fn with safety docs and no concrete operation family as unclassified noise"
 support_tier = "Contract evidence mining"
-expected_cards = 1
-expected_class = "guarded_unwitnessed"
-expected_operation_family = "unknown"
-expected_hazard = "unknown"
+expected_cards = 0
 
 [[cases]]
 fixture = "public_unsafe_fn_safety_colon_docs"
-kind = "positive"
-claim = "public unsafe function with Safety: doc prose is treated as documented contract evidence"
+kind = "false_positive_control"
+claim = "diff-scope filters public unsafe-fn with Safety: colon docs and no concrete operation family as unclassified noise"
 support_tier = "Contract evidence mining"
-expected_cards = 1
-expected_class = "guarded_unwitnessed"
-expected_operation_family = "unknown"
-expected_hazard = "unknown"
+expected_cards = 0
 
 [[cases]]
 fixture = "documented_private_unsafe_fn"
-kind = "positive"
-claim = "private unsafe function with a # Safety contract does not report a missing local declaration guard"
+kind = "false_positive_control"
+claim = "diff-scope filters documented private unsafe-fn owner cards with no concrete operation family as unclassified noise"
 support_tier = "Contract evidence mining"
-expected_cards = 1
-expected_class = "guarded_unwitnessed"
-expected_operation_family = "unknown"
-expected_hazard = "unknown"
+expected_cards = 0
 
 [[cases]]
 fixture = "private_unsafe_helper_safety_comment"
-kind = "positive"
-claim = "private unsafe helper can use nearby SAFETY comments as contract evidence without satisfying guard evidence"
+kind = "false_positive_control"
+claim = "diff-scope filters private unsafe helper owner cards with no concrete operation family as unclassified noise"
 support_tier = "Contract evidence mining"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "unknown"
-expected_hazard = "unknown"
+expected_cards = 0
 
 [[cases]]
 fixture = "local_safety_colon_comment"
@@ -5347,12 +5324,12 @@ expected_hazard = "target_feature"
 [[cases]]
 fixture = "attributed_unsafe_fn_no_duplicate"
 kind = "false_positive_control"
-claim = "attributed unsafe fn declarations are not duplicated by fallback line scanning"
+claim = "attributed unsafe fn declarations are not duplicated by fallback line scanning; unclassified-family owner card filtered in diff scope"
 support_tier = "Diff unsafe site inventory"
-expected_cards = 2
+expected_cards = 1
 expected_class = "contract_missing"
-expected_operation_family = "unknown"
-expected_hazard = "unknown"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
 
 [[cases]]
 fixture = "inline_unsafe_raw_pointer_deref_no_duplicate"
@@ -5767,9 +5744,9 @@ expected_hazard = "unknown"
 [[cases]]
 fixture = "long_unsafe_fn_owner_inference"
 kind = "positive"
-claim = "operations deep inside long unsafe functions preserve the enclosing function owner"
+claim = "operations deep inside long unsafe functions preserve the enclosing function owner; unclassified-family owner filtered in diff scope"
 support_tier = "Diff unsafe site inventory"
-expected_cards = 2
+expected_cards = 1
 expected_class = "contract_missing"
 expected_operation_family = "drop_in_place"
 expected_hazard = "pointer_validity"
@@ -6110,3 +6087,10 @@ expected_cards = 1
 expected_class = "guard_missing"
 expected_operation_family = "raw_pointer_read"
 expected_hazard = "alignment"
+
+[[cases]]
+fixture = "unsafe_fn_unknown_family_no_card"
+kind = "false_positive_control"
+claim = "diff-scope filters unsafe-fn owner cards whose operation family is unknown; the filter reduces PR-review noise by keeping repo-scoped inventory intact"
+support_tier = "Diff unsafe site inventory"
+expected_cards = 0

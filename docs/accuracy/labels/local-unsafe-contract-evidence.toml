@@ -13,32 +13,18 @@ ReviewCard contract evidence behavior; they are not a proof of memory safety, no
 [[samples]]
 id = "documented-private-unsafe-fn-contract-present"
 fixture = "documented_private_unsafe_fn"
-kind = "positive"
-expected_cards = 1
-expected_class = "guarded_unwitnessed"
-expected_operation_family = "unknown"
-expected_hazard = "unknown"
-expected_obligation_key = "unknown"
-expected_contract_state = "present"
-expected_discharge_state = "present"
-expected_witness_route_kinds = ["human-deep-review"]
+kind = "false_positive_control"
+expected_cards = 0
 label_source = "fixture_golden"
-rationale = "A private unsafe function with a documented safety contract has local contract evidence and remains advisory."
+rationale = "A private unsafe fn with no concrete operation family is filtered as unclassified noise in diff scope; the local contract evidence is visible only in repo-scope inventory."
 
 [[samples]]
 id = "private-unsafe-helper-safety-comment-contract-only"
 fixture = "private_unsafe_helper_safety_comment"
-kind = "positive"
-expected_cards = 1
-expected_class = "guard_missing"
-expected_operation_family = "unknown"
-expected_hazard = "unknown"
-expected_obligation_key = "unknown"
-expected_contract_state = "present"
-expected_discharge_state = "missing"
-expected_witness_route_kinds = ["human-deep-review"]
+kind = "false_positive_control"
+expected_cards = 0
 label_source = "fixture_golden"
-rationale = "A local SAFETY comment can provide contract evidence while still leaving guard evidence missing."
+rationale = "A private unsafe helper with a local SAFETY comment and no concrete operation family is filtered in diff scope; the local contract evidence is visible only in repo-scope inventory."
 
 [[samples]]
 id = "local-safety-colon-comment-contract-only"

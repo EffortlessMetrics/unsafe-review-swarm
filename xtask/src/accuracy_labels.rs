@@ -1209,6 +1209,10 @@ rationale = "Public unsafe API contract evidence claims must pin the ReviewCard 
 
     #[test]
     fn label_ledger_rejects_wrong_obligation_contract_state() -> Result<(), String> {
+        // Uses public_unsafe_trait_missing_safety: still emits a card in diff scope
+        // (unsafe trait has no concrete operation family but is NOT an unsafe-fn/block owner,
+        // so the diff-scope filter does not apply to it). The golden has contract.state = "missing";
+        // asserting "present" should be rejected by check_fixture_obligation_evidence_state.
         let ledger = r#"
 schema_version = "0.1"
 status = "fixture_pinned"
@@ -1221,7 +1225,7 @@ trust_boundary = "Static unsafe contract review only; this is not a proof of mem
 
 [[samples]]
 id = "bad-contract-state"
-fixture = "public_unsafe_fn_missing_safety"
+fixture = "public_unsafe_trait_missing_safety"
 kind = "positive"
 expected_cards = 1
 expected_class = "contract_missing"
@@ -1238,7 +1242,7 @@ rationale = "The fixture intentionally lacks public safety docs, so present cont
         .map_err(|err| format!("parse test ledger failed: {err}"))?;
         let mut cases = BTreeMap::new();
         cases.insert(
-            "public_unsafe_fn_missing_safety".to_string(),
+            "public_unsafe_trait_missing_safety".to_string(),
             CalibrationFixtureCase {
                 kind: "positive".to_string(),
                 expected_cards: 1,
@@ -1250,7 +1254,7 @@ rationale = "The fixture intentionally lacks public safety docs, so present cont
         let claim = PolicyClaim {
             operation_family: Some("unknown".to_string()),
             hazard: Some("unknown".to_string()),
-            fixtures: BTreeSet::from(["public_unsafe_fn_missing_safety".to_string()]),
+            fixtures: BTreeSet::from(["public_unsafe_trait_missing_safety".to_string()]),
             label_ledgers: BTreeSet::new(),
         };
 

@@ -229,7 +229,9 @@ fn agent_packet_is_parseable_bounded_and_card_sourced() -> Result<(), String> {
 
 #[test]
 fn agent_packet_queues_contract_gaps_without_auto_repair_ready() -> Result<(), String> {
-    let output = fixture_output("public_unsafe_fn_missing_safety")?;
+    // Use repo scope to bypass the diff-scope filter; this test verifies card
+    // properties (contract gaps, repair queue), not filter behavior.
+    let output = fixture_output_repo("public_unsafe_fn_missing_safety")?;
     let Some(card) = output.cards.first() else {
         return Err("fixture should emit one card".to_string());
     };
@@ -1023,12 +1025,53 @@ fn agent_packet_preserves_delegation_boundaries_across_families() -> Result<(), 
 fn agent_packet_repair_queue_matches_aggregate_projection() -> Result<(), String> {
     for fixture in [
         "raw_pointer_alignment",
-        "public_unsafe_fn_missing_safety",
         "ffi_sanitizer_route",
         "atomic_pointer_state_fetch_ops",
         "inline_asm_human_review",
     ] {
         let output = fixture_output(fixture)?;
+        let Some(card) = output.cards.first() else {
+            return Err(format!("fixture `{fixture}` should emit at least one card"));
+        };
+        let value = parse_json(&render(card))?;
+        let projection = repair_queue_projection(card);
+
+        assert_eq!(
+            json_string_array(&value["repair_queue"]["buckets"], "repair queue buckets")?,
+            projection
+                .repair_queue
+                .buckets
+                .iter()
+                .map(|bucket| (*bucket).to_string())
+                .collect::<Vec<_>>(),
+            "{fixture} context packet must match aggregate repair queue buckets"
+        );
+        assert_eq!(
+            value["repair_queue"]["summary"].as_str(),
+            Some(projection.repair_queue.summary.as_str()),
+            "{fixture} context packet must match aggregate repair queue summary"
+        );
+        assert_eq!(
+            value["agent_readiness"]["ready"].as_bool(),
+            Some(projection.agent_readiness.ready),
+            "{fixture} context packet must match aggregate repair queue readiness"
+        );
+        assert_eq!(
+            value["agent_readiness"]["state"].as_str(),
+            Some(projection.agent_readiness.state),
+            "{fixture} context packet must match aggregate repair queue readiness state"
+        );
+        assert_eq!(
+            json_string_array(&value["agent_readiness"]["reasons"], "readiness reasons")?,
+            projection.agent_readiness.reasons,
+            "{fixture} context packet must match aggregate repair queue readiness reasons"
+        );
+    }
+
+    // public_unsafe_fn_missing_safety: use repo scope because the unknown-family
+    // unsafe-fn owner card is filtered from diff scope.
+    for fixture in ["public_unsafe_fn_missing_safety"] {
+        let output = fixture_output_repo(fixture)?;
         let Some(card) = output.cards.first() else {
             return Err(format!("fixture `{fixture}` should emit at least one card"));
         };
@@ -1194,6 +1237,24 @@ fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
         scope: Scope::Diff,
         diff: DiffSource::File(root.join("change.diff")),
         mode: AnalysisMode::Draft,
+        policy: PolicyMode::Advisory,
+        include_unchanged_tests: true,
+        max_cards: None,
+    })
+}
+
+/// Same as `fixture_output` but uses `Scope::Repo` so that the diff-scope
+/// filter for unclassified-family unsafe-fn/block owner cards is not applied.
+/// Use this in tests that verify card *properties* rather than filter behavior.
+fn fixture_output_repo(name: &str) -> Result<AnalyzeOutput, String> {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fixtures")
+        .join(name);
+    analyze(AnalyzeInput {
+        root: root.clone(),
+        scope: Scope::Repo,
+        diff: DiffSource::NoneRepoScan,
+        mode: AnalysisMode::Repo,
         policy: PolicyMode::Advisory,
         include_unchanged_tests: true,
         max_cards: None,

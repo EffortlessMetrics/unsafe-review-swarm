@@ -489,7 +489,13 @@ mod tests {
                 state: "requires_human_review",
             },
         ] {
-            let output = fixture_output(case.fixture)?;
+            // split_unsafe_block has an unknown-family unsafe-block owner card
+            // that is filtered in diff scope; use repo scope to get the card.
+            let output = if case.fixture == "split_unsafe_block" {
+                fixture_output_repo(case.fixture)?
+            } else {
+                fixture_output(case.fixture)?
+            };
             let value = parse_json(&render(&output))?;
             assert_eq!(
                 value["summary"]["cards"], 1,
@@ -549,7 +555,13 @@ mod tests {
             "inline_asm_human_review",
             "split_unsafe_block",
         ] {
-            let output = fixture_output(fixture)?;
+            // split_unsafe_block has an unknown-family unsafe-block owner card
+            // that is filtered in diff scope; use repo scope to get the card.
+            let output = if fixture == "split_unsafe_block" {
+                fixture_output_repo(fixture)?
+            } else {
+                fixture_output(fixture)?
+            };
             let Some(card) = output.cards.first() else {
                 return Err(format!("{fixture} should emit at least one card"));
             };
@@ -654,6 +666,23 @@ mod tests {
             scope: Scope::Diff,
             diff: DiffSource::File(root.join("change.diff")),
             mode: AnalysisMode::Draft,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: None,
+        })
+    }
+
+    /// Same as `fixture_output` but uses `Scope::Repo` so that the diff-scope
+    /// filter for unclassified-family unsafe-fn/block owner cards is not applied.
+    fn fixture_output_repo(name: &str) -> Result<AnalyzeOutput, String> {
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures")
+            .join(name);
+        analyze(AnalyzeInput {
+            root: root.clone(),
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
             policy: PolicyMode::Advisory,
             include_unchanged_tests: true,
             max_cards: None,

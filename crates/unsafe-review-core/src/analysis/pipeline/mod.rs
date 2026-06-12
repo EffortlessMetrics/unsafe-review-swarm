@@ -14,7 +14,7 @@ use crate::api::{
     AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, DiscoveryOptions, RepoScanEvent,
     RepoScanPhase, RepoScanStatus, RepoStopReason, Scope,
 };
-use crate::domain::ReviewCard;
+use crate::domain::{OperationFamily, ReviewCard, UnsafeSiteKind};
 use crate::input::workspace;
 use crate::policy::PolicyState;
 use std::collections::{BTreeMap, BTreeSet};
@@ -217,6 +217,12 @@ fn analyze_with_receipts(
         }
     }
     sort_cards(&mut cards);
+    // Diff-scope projection filter: drop unclassified-family unsafe-fn/block owner
+    // cards from diff output to reduce PR-review noise. Repo-scope keeps them for
+    // inventory. See `is_unclassified_owner_card` for the predicate and rationale.
+    if !repo_mode {
+        cards.retain(|card| !is_unclassified_owner_card(card));
+    }
     let summary = summarize(
         all_rust_files.len(),
         changed_files,
@@ -277,6 +283,28 @@ fn sort_cards(cards: &mut [ReviewCard]) {
     });
 }
 
+/// Returns `true` for cards that should be excluded from diff-scoped output.
+///
+/// Unsafe-fn and unsafe-block "owner" cards whose operation family is
+/// `Unknown` (no specific operation like `raw_pointer_read` or `transmute`
+/// was detected) add inventory-like volume to diff reviews without an
+/// actionable next step beyond "add a `# Safety` comment". In diff scope
+/// they are filtered here so every downstream surface (JSON, Markdown,
+/// SARIF, LSP, comment-plan, agent packets) sees a focused diff review.
+///
+/// In repo scope (`!diff_scope`) this filter is NOT applied so that the same
+/// cards remain visible in audit/inventory output.
+///
+/// This is a projection/selection filter only: the ReviewCard remains the
+/// single truth object; no card identity or evidence field is mutated.
+fn is_unclassified_owner_card(card: &ReviewCard) -> bool {
+    matches!(card.operation.family, OperationFamily::Unknown)
+        && matches!(
+            card.site.kind,
+            UnsafeSiteKind::UnsafeFn | UnsafeSiteKind::UnsafeBlock
+        )
+}
+
 #[allow(
     clippy::too_many_arguments,
     reason = "mirrors summarize() signature; grouping into a struct would add churn without clarity gain"
@@ -293,6 +321,11 @@ fn partial_analyze_output(
 ) -> AnalyzeOutput {
     let mut cards = cards.to_vec();
     sort_cards(&mut cards);
+    let partial_repo_mode =
+        matches!(input.scope, Scope::Repo) || matches!(input.mode, AnalysisMode::Repo);
+    if !partial_repo_mode {
+        cards.retain(|card| !is_unclassified_owner_card(card));
+    }
     let summary = summarize(
         rust_files,
         changed_files,
@@ -806,7 +839,9 @@ mod tests {
         assert_eq!(safe_reference.summary.cards, 0);
         assert!(safe_reference.cards.is_empty());
 
-        let split_unknown = fixture_output("split_unsafe_block")?;
+        // Use repo scope to bypass the diff-scope filter so we can verify the
+        // card properties; the diff-scope filter behavior is tested separately.
+        let split_unknown = fixture_output_repo("split_unsafe_block")?;
         let card = single_card("split_unsafe_block", &split_unknown)?;
         assert_eq!(card.site.kind, UnsafeSiteKind::UnsafeBlock);
         assert_eq!(card.operation.family, OperationFamily::Unknown);
@@ -1120,13 +1155,20 @@ mod tests {
             "[package]\nname = \"mixed-diff-summary-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
         )
         .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
-        fs::write(root.join("src/lib.rs"), "pub unsafe fn source_root() {}\n")
-            .map_err(|err| format!("write src file failed: {err}"))?;
+        // Use an unsafe block with a raw pointer deref so the card has a
+        // classified operation family and is not filtered by the diff-scope
+        // unclassified-family filter (which only filters UnsafeFn/UnsafeBlock
+        // owner cards, not classified operation cards).
+        fs::write(
+            root.join("src/lib.rs"),
+            "pub fn source_root(p: *const u8) -> u8 { unsafe { *p } }\n",
+        )
+        .map_err(|err| format!("write src file failed: {err}"))?;
         let diff = r#"diff --git a/src/lib.rs b/src/lib.rs
 --- a/src/lib.rs
 +++ b/src/lib.rs
 @@ -1,0 +1,1 @@
-+pub unsafe fn source_root() {}
++pub fn source_root(p: *const u8) -> u8 { unsafe { *p } }
 diff --git a/src/js/buffer.ts b/src/js/buffer.ts
 --- a/src/js/buffer.ts
 +++ b/src/js/buffer.ts
@@ -1245,7 +1287,9 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "public_unsafe_trait_missing_safety",
             "public_unsafe_fn_safety_comment_not_docs",
         ] {
-            let output = fixture_output(fixture)?;
+            // Use repo scope to bypass the diff-scope filter and verify card
+            // properties; the filter suppresses these in diff scope by design.
+            let output = fixture_output_repo(fixture)?;
             let card = single_card(fixture, &output)?;
 
             assert_eq!(card.class, ReviewClass::ContractMissing);
@@ -1279,8 +1323,12 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             "public_unsafe_fn_with_safety_docs",
             "public_unsafe_fn_safety_colon_docs",
         ] {
-            let output = fixture_output(fixture)?;
-            let card = single_card(fixture, &output)?;
+            // Use repo scope to bypass the diff-scope filter and verify card
+            // properties; the filter suppresses these in diff scope by design.
+            // In repo scope the test call site also produces a card, so find
+            // the unsafe-fn owner card explicitly.
+            let output = fixture_output_repo(fixture)?;
+            let card = unsafe_fn_card(fixture, &output)?;
 
             assert_eq!(card.class, ReviewClass::GuardedUnwitnessed);
             assert!(card.site.public_api_surface);
@@ -1300,8 +1348,12 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
 
     #[test]
     fn documented_private_unsafe_fn_does_not_require_local_guard() -> Result<(), String> {
-        let output = fixture_output("documented_private_unsafe_fn")?;
-        let card = single_card("documented_private_unsafe_fn", &output)?;
+        // Use repo scope to bypass the diff-scope filter and verify card
+        // properties; the filter suppresses this in diff scope by design.
+        // In repo scope the test call site also produces a card, so find
+        // the unsafe-fn owner card explicitly.
+        let output = fixture_output_repo("documented_private_unsafe_fn")?;
+        let card = unsafe_fn_card("documented_private_unsafe_fn", &output)?;
 
         assert_eq!(card.class, ReviewClass::GuardedUnwitnessed);
         assert!(!card.site.public_api_surface);
@@ -5214,8 +5266,12 @@ pub fn read_at(offset: i32) -> Result<usize, ()> {
 
     #[test]
     fn private_unsafe_helper_can_use_local_safety_comment() -> Result<(), String> {
-        let output = fixture_output("private_unsafe_helper_safety_comment")?;
-        let card = single_card("private_unsafe_helper_safety_comment", &output)?;
+        // Use repo scope to bypass the diff-scope filter and verify card
+        // properties; the filter suppresses this in diff scope by design.
+        // In repo scope the test call site also produces a card, so find
+        // the unsafe-fn owner card explicitly.
+        let output = fixture_output_repo("private_unsafe_helper_safety_comment")?;
+        let card = unsafe_fn_card("private_unsafe_helper_safety_comment", &output)?;
 
         assert_eq!(card.class, ReviewClass::GuardMissing);
         assert!(!card.site.public_api_surface);
@@ -5588,6 +5644,23 @@ unsafe extern "C" {
         })
     }
 
+    /// Same as `fixture_output` but uses `Scope::Repo` so that the
+    /// diff-scope filter for unclassified-family unsafe-fn/block owner cards
+    /// is not applied. Use this in tests that verify card *properties* rather
+    /// than diff-scope filter behavior.
+    fn fixture_output_repo(name: &str) -> Result<AnalyzeOutput, String> {
+        let root = fixture_root(name);
+        analyze(AnalyzeInput {
+            root: root.to_path_buf(),
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: None,
+        })
+    }
+
     fn fixture_root(name: &str) -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures")
@@ -5602,6 +5675,26 @@ unsafe extern "C" {
             ));
         }
         Ok(&output.cards[0])
+    }
+
+    /// Finds the first card whose site kind is `UnsafeFn`.
+    ///
+    /// Used in repo-scope tests where the test call site may produce an
+    /// additional `unsafe_fn_call` card alongside the unsafe-fn owner card.
+    fn unsafe_fn_card<'a>(
+        fixture: &str,
+        output: &'a AnalyzeOutput,
+    ) -> Result<&'a ReviewCard, String> {
+        output
+            .cards
+            .iter()
+            .find(|card| matches!(card.site.kind, UnsafeSiteKind::UnsafeFn))
+            .ok_or_else(|| {
+                format!(
+                    "{fixture} should emit at least one unsafe-fn owner card, got {} cards",
+                    output.cards.len()
+                )
+            })
     }
 
     fn temp_source_output(prefix: &str, source: &str) -> Result<AnalyzeOutput, String> {
