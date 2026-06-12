@@ -22202,6 +22202,7 @@ review_after = "2026-08-01"
             "summary": {
                 "new_gaps": 0,
                 "worsened_gaps": 0,
+                "improved_gaps": 0,
                 "resolved_gaps": 0,
                 "inherited_gaps": 0
             },

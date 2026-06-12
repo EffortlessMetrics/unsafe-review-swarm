@@ -136,6 +136,12 @@ struct JsonSummary {
     /// Coverage movement counts (SPEC-0030).
     new_gaps: usize,
     worsened_gaps: usize,
+    /// Baseline cards whose evidence coverage improved (pure improvement: at least one slot
+    /// advanced, no slot regressed).  Always 0 until a baseline coverage snapshot exists.
+    ///
+    /// An improved card is still advisory, still open, still present — NOT resolved, NOT safe,
+    /// NOT UB-free, NOT Miri-clean, and NOT a site-execution claim.
+    improved_gaps: usize,
     resolved_gaps: usize,
     inherited_gaps: usize,
 }
@@ -159,6 +165,7 @@ impl From<&Summary> for JsonSummary {
             static_unknown: summary.static_unknown,
             new_gaps: summary.new_gaps,
             worsened_gaps: summary.worsened_gaps,
+            improved_gaps: summary.improved_gaps,
             resolved_gaps: summary.resolved_gaps,
             inherited_gaps: summary.inherited_gaps,
         }

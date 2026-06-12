@@ -476,6 +476,19 @@ fn render_pr_summary_header_bullets(out: &mut String, output: &AnalyzeOutput) {
         "- Open actionable gaps: {}\n",
         output.summary.open_actionable_gaps
     ));
+    // Render coverage movement when any movement signal is present.
+    let s = &output.summary;
+    let has_movement = s.new_gaps > 0
+        || s.worsened_gaps > 0
+        || s.improved_gaps > 0
+        || s.resolved_gaps > 0
+        || s.inherited_gaps > 0;
+    if has_movement {
+        out.push_str(&format!(
+            "- Coverage movement: {} new, {} worsened, {} improved (evidence coverage improved; still advisory), {} resolved, {} inherited\n",
+            s.new_gaps, s.worsened_gaps, s.improved_gaps, s.resolved_gaps, s.inherited_gaps
+        ));
+    }
     out.push_str(&format!("- Policy mode: `{}`\n\n", output.policy.as_str()));
 }
 

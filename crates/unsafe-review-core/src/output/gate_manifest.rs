@@ -61,12 +61,18 @@ impl From<&AnalyzeOutput> for GateManifest {
     }
 }
 
-/// The four-bucket movement block from SPEC-0030, copied verbatim from `Summary`.
+/// The five-bucket movement block from SPEC-0030, copied verbatim from `Summary`.
 /// Field names align with ripr's canonical movement counter vocabulary.
 #[derive(Serialize)]
 struct GateMovementSummary {
     new_gaps: usize,
     worsened_gaps: usize,
+    /// Baseline cards whose evidence coverage improved (at least one slot advanced, no slot
+    /// regressed).  Always 0 until a baseline coverage snapshot exists.
+    ///
+    /// An improved card is still advisory, still open, still present — NOT resolved, NOT safe,
+    /// NOT UB-free, NOT Miri-clean, and NOT a site-execution claim.
+    improved_gaps: usize,
     resolved_gaps: usize,
     inherited_gaps: usize,
 }
@@ -76,6 +82,7 @@ impl From<&Summary> for GateMovementSummary {
         Self {
             new_gaps: summary.new_gaps,
             worsened_gaps: summary.worsened_gaps,
+            improved_gaps: summary.improved_gaps,
             resolved_gaps: summary.resolved_gaps,
             inherited_gaps: summary.inherited_gaps,
         }
@@ -199,6 +206,7 @@ mod tests {
         let output = fixture_output("raw_pointer_alignment")?;
         let expected_new = output.summary.new_gaps;
         let expected_worsened = output.summary.worsened_gaps;
+        let expected_improved = output.summary.improved_gaps;
         let expected_resolved = output.summary.resolved_gaps;
         let expected_inherited = output.summary.inherited_gaps;
 
@@ -215,6 +223,12 @@ mod tests {
                 .as_u64()
                 .ok_or("worsened_gaps not u64")?,
             expected_worsened as u64
+        );
+        assert_eq!(
+            summary["improved_gaps"]
+                .as_u64()
+                .ok_or("improved_gaps not u64")?,
+            expected_improved as u64
         );
         assert_eq!(
             summary["resolved_gaps"]

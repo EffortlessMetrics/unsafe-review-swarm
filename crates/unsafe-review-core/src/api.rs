@@ -222,6 +222,14 @@ pub struct Summary {
     /// `new_gaps`      — open actionable cards not in the baseline ledger.
     /// `worsened_gaps` — baseline cards whose coverage regressed (requires a saved coverage
     ///                   snapshot; always 0 until `baseline init` authoring lands).
+    /// `improved_gaps` — baseline cards whose evidence coverage improved (at least one slot
+    ///                   advanced and no slot regressed; requires a saved coverage snapshot;
+    ///                   always 0 until `baseline init` authoring lands).
+    ///                   Precedence: worsened > improved > inherited.  A card is only counted
+    ///                   improved if it is not already counted worsened.
+    ///                   An improved card is still advisory, still open, still present — it is
+    ///                   NOT resolved, NOT safe, NOT UB-free, NOT Miri-clean, and NOT a
+    ///                   site-execution claim.
     /// `resolved_gaps` — baseline ledger entries whose card is no longer present.
     /// `inherited_gaps`— baseline-known cards still open and unchanged.
     ///
@@ -229,6 +237,7 @@ pub struct Summary {
     /// on a repo-mode run it counts all open actionable non-baseline gaps.
     pub new_gaps: usize,
     pub worsened_gaps: usize,
+    pub improved_gaps: usize,
     pub resolved_gaps: usize,
     pub inherited_gaps: usize,
 }

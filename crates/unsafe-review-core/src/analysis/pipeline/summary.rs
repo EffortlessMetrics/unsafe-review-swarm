@@ -10,6 +10,11 @@ use std::collections::BTreeSet;
 /// - `new_gaps`: open actionable cards not in the baseline ledger, constrained to
 ///   changed-line sites on a diff-scoped run.
 /// - `worsened_gaps`: baseline cards whose coverage regressed since the snapshot.
+/// - `improved_gaps`: baseline cards whose evidence coverage improved (pure improvement:
+///   at least one slot advanced, no slot regressed).  Requires a saved coverage snapshot.
+///   Precedence: worsened > improved > inherited.  A card is only counted improved if it
+///   is not already counted worsened.  An improved card is still advisory, still open, and
+///   still present — it is NOT resolved, NOT safe, NOT UB-free, and NOT Miri-clean.
 /// - `resolved_gaps`: baseline ledger entries whose card is no longer present.
 /// - `inherited_gaps`: cards classified `BaselineKnown` (matched baseline, still open).
 #[allow(
@@ -41,6 +46,7 @@ pub(super) fn summarize(
         ..Summary::default()
     };
     let mut worsened = 0usize;
+    let mut improved = 0usize;
     for card in cards {
         if card.class.is_actionable() {
             summary.open_actionable_gaps += 1;
@@ -51,12 +57,16 @@ pub(super) fn summarize(
         }
         if card.class == ReviewClass::BaselineKnown {
             summary.inherited_gaps += 1;
-            // worsened detection: compare current coverage block against the saved snapshot.
+            // Worsened / improved detection: compare current coverage against the saved snapshot.
+            // Precedence: worsened > improved > inherited (unchanged).
             if let Some(snapshot) = policy_state.snapshot_for(&card.id.0) {
                 let current_cov = coverage_block_to_snapshot(&CoverageBlock::derive(card));
                 if snapshot.is_worsened_by(&current_cov) {
                     worsened += 1;
+                } else if snapshot.is_improved_by(&current_cov) {
+                    improved += 1;
                 }
+                // else: inherited/unchanged — no counter change
             }
         }
         match &card.class {
@@ -76,6 +86,7 @@ pub(super) fn summarize(
         .filter(|id| !current_ids.contains(id.as_str()))
         .count();
     summary.worsened_gaps = worsened;
+    summary.improved_gaps = improved;
     summary
 }
 

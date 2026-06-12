@@ -68,8 +68,16 @@ Object. Derived from `Summary` fields.
 | `actionable_cards` | `Summary.open_actionable_gaps` | SPEC-0029 |
 | `new_cards` | `Summary.new_gaps` | SPEC-0030 |
 | `worsened_cards` | `Summary.worsened_gaps` | SPEC-0030 |
+| `improved_cards` | `Summary.improved_gaps` | SPEC-0030 |
 | `resolved_cards` | `Summary.resolved_gaps` | SPEC-0030 |
 | `inherited_cards` | `Summary.inherited_gaps` | SPEC-0030 |
+
+`improved_cards` counts baseline-known cards whose evidence coverage improved
+(at least one slot advanced, no slot regressed) since the baseline snapshot.
+Always 0 until a baseline coverage snapshot exists.  An improved card is still
+advisory, still open, still present — NOT resolved, NOT safe, NOT UB-free, NOT
+Miri-clean, and NOT a site-execution claim.  See SPEC-0030 for the precedence
+rule (worsened > improved > inherited).
 
 #### `coverage_slots`
 

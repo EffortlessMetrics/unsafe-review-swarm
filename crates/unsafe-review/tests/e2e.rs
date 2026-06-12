@@ -7063,7 +7063,7 @@ fn policy_report_is_advisory_and_counts_baseline_state() -> Result<(), Box<dyn E
     assert!(markdown.contains("# unsafe-review policy report"));
     assert!(markdown.contains("## Reviewer front panel"));
     // SPEC-0030: reviewer front panel shows movement counts.
-    assert!(markdown.contains("- Movement: 0 new gap(s), 0 worsened, 1 resolved, 1 inherited"));
+    assert!(markdown.contains("- Movement: 0 new gap(s), 0 worsened, 0 improved (evidence coverage improved; still advisory), 1 resolved, 1 inherited"));
     assert!(markdown.contains("- Current ledger-covered cards: 1 baseline-known, 0 suppressed"));
     assert!(markdown.contains("- Ledger cleanup: 1 resolved baseline entries"));
     assert!(markdown.contains("consider pruning or updating resolved baseline entries"));
@@ -7827,6 +7827,124 @@ fn receipt_validate_valid_root_no_receipts_exits_0() -> Result<(), Box<dyn Error
         Some(0),
         "valid root with no receipts subdir must still exit 0"
     );
+    Ok(())
+}
+
+// Coverage-improved movement case (SPEC-0030 symmetric to worsened):
+// A PR that adds a `# Safety` contract to a private (non-unsafe) fn owning
+// a raw pointer deref — whose contract slot was `missing` in the baseline
+// snapshot — shows improved_gaps=1, worsened_gaps=0, resolved_gaps=0.
+//
+// The card is still `baseline_known`, still advisory, still open.  This is NOT
+// a resolution, NOT safety proof, NOT UB-free, NOT Miri-clean.  The signal is
+// "evidence coverage improved for a retained baseline site."
+#[test]
+fn coverage_improved_baseline_shows_improved_gap_shape() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_deref_coverage_improved");
+
+    // The fixture ships with a baseline ledger (card is baseline_known) and a
+    // baseline snapshot recording contract_coverage="missing".  The current
+    // source has a `# Safety` doc → contract_coverage is now "present".
+    let advisory = run_success([
+        os("check"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let advisory = parse_json(&stdout_text(&advisory)?)?;
+    assert_eq!(
+        advisory["summary"]["improved_gaps"], 1,
+        "improved_gaps must be 1: contract slot advanced from missing to present"
+    );
+    assert_eq!(
+        advisory["summary"]["worsened_gaps"], 0,
+        "worsened_gaps must be 0: no slot regressed"
+    );
+    assert_eq!(
+        advisory["summary"]["resolved_gaps"], 0,
+        "resolved_gaps must be 0: card is still present (site not removed)"
+    );
+    assert_eq!(
+        advisory["summary"]["new_gaps"], 0,
+        "new_gaps must be 0: site is baseline_known"
+    );
+    assert_eq!(
+        advisory["summary"]["inherited_gaps"], 1,
+        "inherited_gaps must be 1: baseline_known card still open"
+    );
+    assert_eq!(
+        advisory["summary"]["open_actionable_gaps"], 0,
+        "open_actionable_gaps must be 0: baseline_known is not actionable"
+    );
+    // Card must still be baseline_known — NOT resolved.
+    assert_eq!(advisory["cards"][0]["class"], "baseline_known");
+
+    // Usefulness telemetry must record improved_cards=1.
+    let out_dir = TempDir::new("unsafe-review-coverage-improved-e2e")?;
+    run_success([
+        os("first-pr"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--out-dir"),
+        out_dir.path().as_os_str().to_os_string(),
+    ])?;
+    let telemetry_path = out_dir.path().join("usefulness-telemetry.json");
+    let telemetry = parse_json(&fs::read_to_string(&telemetry_path)?)?;
+    assert_eq!(
+        telemetry["card_inventory"]["improved_cards"], 1,
+        "telemetry must record improved_cards=1"
+    );
+    assert_eq!(telemetry["card_inventory"]["worsened_cards"], 0);
+    assert_eq!(telemetry["card_inventory"]["new_cards"], 0);
+    assert_eq!(telemetry["card_inventory"]["resolved_cards"], 0);
+
+    // PR summary must surface the positive movement signal.
+    let pr_summary = fs::read_to_string(out_dir.path().join("pr-summary.md"))?;
+    assert!(
+        pr_summary.contains("1 improved"),
+        "pr-summary must surface improved_gaps=1 as positive movement; got: {}",
+        &pr_summary[..pr_summary.len().min(600)]
+    );
+    assert!(
+        pr_summary.contains("still advisory"),
+        "pr-summary improved wording must say 'still advisory' (trust boundary); got: {}",
+        &pr_summary[..pr_summary.len().min(600)]
+    );
+
+    // Policy report must also surface improved_gaps=1 in the summary table.
+    let policy_report = fs::read_to_string(out_dir.path().join("policy-report.md"))?;
+    assert!(
+        policy_report.contains("1 improved"),
+        "policy-report must surface improved_gaps=1; got: {}",
+        &policy_report[..policy_report.len().min(800)]
+    );
+
+    // no-new-debt must still pass (exit 0): an improved card is still
+    // baseline_known; no new gap was added.
+    let passing = run_success([
+        os("check"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+        os("--policy"),
+        os("no-new-debt"),
+    ])?;
+    let passing = parse_json(&stdout_text(&passing)?)?;
+    assert_eq!(passing["policy"], "no-new-debt");
+    assert_eq!(
+        passing["summary"]["new_gaps"], 0,
+        "no-new-debt must pass: improved card does not count as a new gap"
+    );
+    assert_eq!(passing["summary"]["improved_gaps"], 1);
+
     Ok(())
 }
 

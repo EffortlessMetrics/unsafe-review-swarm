@@ -1,0 +1,22 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -4,6 +4,16 @@
+ /// Read config from a raw pointer.
+ ///
+-/// Caller must ensure the pointer is valid and properly aligned.
++/// # Safety
++///
++/// The caller must ensure `ptr` is non-null, properly aligned for `Config`,
++/// points to an initialized `Config` value that remains live for this call,
++/// and that the access stays within one allocation.
++///
++/// This PR adds the safety contract above; the underlying unsafe dereference
++/// is unchanged.  The coverage slot for contract moves from `missing` to
++/// `present` — an evidence improvement, NOT a safety proof or resolution.
++/// The unsafe site remains open and advisory.
+ pub fn read_config(ptr: *const Config) -> Config {
++    // SAFETY: caller guarantees the invariants documented in the function-level
++    // # Safety section.
+     unsafe { *ptr }
+ }

@@ -80,22 +80,38 @@ Movement is computed against the baseline floor and reported, not enforced:
 ```text
 new        = open actionable cards minus baseline_known minus suppressed
 worsened   = baseline cards whose coverage slot regressed since the baseline
+improved   = baseline cards whose evidence coverage improved (pure improvement:
+             at least one slot advanced and no slot regressed since the baseline)
 resolved   = baseline cards no longer open (site removed or repaired)
 inherited  = baseline_known cards still open and unchanged
 ```
+
+**Precedence rule**: worsened > improved > inherited.  If any slot regressed the
+card is counted worsened.  If no slot regressed but at least one slot improved
+the card is counted improved.  Otherwise the card is inherited/unchanged.
+A mixed up-and-down movement is counted worsened, not improved.
+
+**Trust boundary for `improved`**: an improved card is still advisory, still
+open, and still present.  It is NOT resolved, NOT safe, NOT UB-free, NOT
+Miri-clean, and NOT a site-execution claim.  `improved` means evidence coverage
+got better — the author added a safety contract, guard, test-reach signal, or
+witness receipt — but the card persists.  It is surfaced as positive movement so
+authors are rewarded for adding evidence without the tool being silent about it.
 
 On a diff-scoped run (`first-pr`, `check --base/--diff`), `new` and `worsened`
 are constrained to cards attributable to the diff (changed-line sites), so a PR
 is judged on what it changed. On a repo-mode run, movement is measured against
 the whole baseline floor. A repo with 91 inherited gaps and a PR that adds 2 new
-and worsens 1 reports `new=2 worsened=1 inherited=91`, not "94 failures."
+and worsens 1 but improves 3 reports `new=2 worsened=1 improved=3 inherited=88`,
+not "94 failures."
 
 The movement summary is the shape consumers read (and the basis for the
 `unsafe-review-gate.json` manifest in UNSAFE-REVIEW-SPEC-0034):
 
 ```json
 { "baseline": "target/unsafe-review/baseline.json",
-  "new_gaps": 2, "worsened_gaps": 1, "resolved_gaps": 3, "inherited_gaps": 91,
+  "new_gaps": 2, "worsened_gaps": 1, "improved_gaps": 3,
+  "resolved_gaps": 3, "inherited_gaps": 88,
   "policy": "advisory" }
 ```
 

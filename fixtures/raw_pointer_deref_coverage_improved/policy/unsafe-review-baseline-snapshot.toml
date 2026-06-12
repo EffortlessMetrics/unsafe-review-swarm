@@ -1,0 +1,9 @@
+schema_version = "0.1"
+policy = "unsafe-review-baseline-snapshot"
+
+[[entries]]
+card_id = "UR-raw-pointer-deref-coverage-improved-fixture-src-lib-rs-read-config-operation-raw_pointer_deref-deref-c47737c6108c-pointer_validity-c1"
+contract_coverage = "missing"
+guard_coverage = "missing"
+test_reach_coverage = "missing"
+witness_receipt_coverage = "missing"

@@ -43,6 +43,16 @@ pub struct PolicyReportSummary {
     pub new_gaps: usize,
     /// Baseline cards whose coverage regressed (always 0 until baseline-init snapshot lands).
     pub worsened_gaps: usize,
+    /// Baseline cards whose evidence coverage improved — at least one slot advanced, no slot
+    /// regressed (always 0 until baseline-init snapshot lands).
+    ///
+    /// An improved card is still advisory, still open, and still present.  It is NOT resolved,
+    /// NOT safe, NOT UB-free, NOT Miri-clean, and NOT a site-execution claim.  This is a
+    /// coverage-evidence improvement signal only.
+    ///
+    /// Precedence: worsened > improved > inherited (if any slot regressed it is worsened;
+    /// else if any slot improved it is improved; else inherited/unchanged).
+    pub improved_gaps: usize,
     pub resolved_baseline: usize,
     pub inherited_gaps: usize,
     pub baseline_known: usize,
@@ -151,7 +161,10 @@ fn evaluate_with_date(output: &AnalyzeOutput, audit_date: &str) -> Result<Policy
             .iter()
             .filter(|card| card.policy_status == "new_gap")
             .count(),
-        worsened_gaps: 0, // always 0 until baseline-init coverage snapshot lands (SPEC-0030 note)
+        // Project movement counts from the analyzed Summary (which computes them with snapshot
+        // comparison); these are always 0 until a baseline-init coverage snapshot is present.
+        worsened_gaps: output.summary.worsened_gaps,
+        improved_gaps: output.summary.improved_gaps,
         resolved_baseline: resolved_baseline.len(),
         inherited_gaps: cards
             .iter()
@@ -240,13 +253,14 @@ mod markdown_sections {
 
     pub(super) fn render_summary(out: &mut String, report: &PolicyReport) {
         out.push_str("## Summary\n\n");
-        out.push_str("| Cards | New gaps | Worsened | Resolved | Inherited | Baseline known | Suppressed | Expired suppressions |\n");
-        out.push_str("|---:|---:|---:|---:|---:|---:|---:|---:|\n");
+        out.push_str("| Cards | New gaps | Worsened | Improved | Resolved | Inherited | Baseline known | Suppressed | Expired suppressions |\n");
+        out.push_str("|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n");
         out.push_str(&format!(
-            "| {} | {} | {} | {} | {} | {} | {} | {} |\n\n",
+            "| {} | {} | {} | {} | {} | {} | {} | {} | {} |\n\n",
             report.summary.cards,
             report.summary.new_gaps,
             report.summary.worsened_gaps,
+            report.summary.improved_gaps,
             report.summary.resolved_baseline,
             report.summary.inherited_gaps,
             report.summary.baseline_known,
@@ -258,9 +272,10 @@ mod markdown_sections {
     pub(super) fn render_reviewer_front_panel(out: &mut String, report: &PolicyReport) {
         out.push_str("## Reviewer front panel\n\n");
         out.push_str(&format!(
-            "- Movement: {} new gap(s), {} worsened, {} resolved, {} inherited\n",
+            "- Movement: {} new gap(s), {} worsened, {} improved (evidence coverage improved; still advisory), {} resolved, {} inherited\n",
             report.summary.new_gaps,
             report.summary.worsened_gaps,
+            report.summary.improved_gaps,
             report.summary.resolved_baseline,
             report.summary.inherited_gaps
         ));
@@ -565,7 +580,7 @@ mod tests {
         let markdown = render_markdown(&report);
         assert!(markdown.contains("## Reviewer front panel"));
         // SPEC-0030: movement summary replaces "New unbaselined gaps".
-        assert!(markdown.contains("- Movement: 1 new gap(s), 0 worsened, 0 resolved, 0 inherited"));
+        assert!(markdown.contains("- Movement: 1 new gap(s), 0 worsened, 0 improved (evidence coverage improved; still advisory), 0 resolved, 0 inherited"));
         assert!(
             markdown.contains("- Current ledger-covered cards: 0 baseline-known, 0 suppressed")
         );

@@ -79,6 +79,12 @@ struct CardInventory {
     actionable_cards: usize,
     new_cards: usize,
     worsened_cards: usize,
+    /// Baseline cards whose evidence coverage improved (at least one slot advanced, no slot
+    /// regressed).  Always 0 until a baseline coverage snapshot exists.
+    ///
+    /// An improved card is still advisory, still open, still present — NOT resolved, NOT safe,
+    /// NOT UB-free, NOT Miri-clean, and NOT a site-execution claim.
+    improved_cards: usize,
     resolved_cards: usize,
     inherited_cards: usize,
 }
@@ -198,6 +204,7 @@ fn build_card_inventory(output: &AnalyzeOutput) -> CardInventory {
         actionable_cards: output.summary.open_actionable_gaps,
         new_cards: output.summary.new_gaps,
         worsened_cards: output.summary.worsened_gaps,
+        improved_cards: output.summary.improved_gaps,
         resolved_cards: output.summary.resolved_gaps,
         inherited_cards: output.summary.inherited_gaps,
     }
