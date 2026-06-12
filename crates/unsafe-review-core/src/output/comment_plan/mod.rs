@@ -10,7 +10,7 @@ mod tests {
     use crate::api::{
         AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, PolicyMode, Scope, analyze,
     };
-    use crate::domain::{Confidence, OperationFamily, Priority, ReviewClass};
+    use crate::domain::{Confidence, ContractEvidence, OperationFamily, Priority, ReviewClass};
     use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
     use std::path::PathBuf;
 
@@ -562,6 +562,138 @@ mod tests {
             value["not_selected"][0]["context_command"],
             format!("unsafe-review context {} --json", output.cards[0].id)
         );
+        Ok(())
+    }
+
+    /// Proves that comment-plan candidate selection is importance-ranked, not file-order first.
+    ///
+    /// Four eligible cards with distinct budget keys are arranged so that their
+    /// importance order differs from their file order (line number order).  The
+    /// test asserts that the top-3 selected by importance differ from the
+    /// first-3 in file order, demonstrating that a high-priority / severe-gap
+    /// card later in the file displaces a lower-priority card earlier in the file.
+    ///
+    /// Ranking key (descending importance, as implemented in `selection::importance_rank`):
+    /// 1. Priority: High first.
+    /// 2. Gap severity: contract_coverage: missing > guard_coverage: missing >
+    ///    guard_coverage: weak > test_reach_coverage: weak >
+    ///    test_reach_coverage: missing > witness_receipt_coverage: missing.
+    /// 3. Confidence: High first.
+    /// 4. (file, line) ascending — deterministic tiebreak.
+    ///
+    /// Setup:
+    ///   line  5 — family A  — Priority::Medium, Confidence::High, guard_missing  → importance (1,1,0,5)
+    ///   line 10 — family B  — Priority::Medium, Confidence::High, guard_missing  → importance (1,1,0,10)
+    ///   line 20 — family C  — Priority::Medium, Confidence::High, guard_missing  → importance (1,1,0,20)
+    ///   line 30 — family D  — Priority::High,   Confidence::High, contract_missing → importance (0,0,0,30)
+    ///
+    /// File-order first-3: A(5), B(10), C(20)  — D would be budget_exhausted.
+    /// Importance-ranked top-3: D(30), A(5), B(10) — C is now budget_exhausted.
+    ///
+    /// The expected outcome is that `comments[0]` is the family-D card (line 30,
+    /// contract_missing, high priority) and `not_selected` contains the family-C
+    /// card (line 20) with reason `budget_exhausted`.
+    #[test]
+    fn comment_plan_selects_top_importance_not_first_file_order() -> Result<(), String> {
+        let mut output = fixture_output("raw_pointer_alignment")?;
+        let template = output
+            .cards
+            .first()
+            .cloned()
+            .ok_or_else(|| "fixture should emit a card".to_string())?;
+
+        // Four distinct-family eligible cards. All have changed=true and are
+        // actionable. Priority and gap type differ so importance order ≠ file order.
+        //
+        // Cards A/B/C: guard_missing, Medium priority, High confidence.
+        // Card D:      contract_missing, High priority, High confidence.
+        //              Its importance rank (0,0,0) is higher than A/B/C (1,1,0)
+        //              despite being at line 30 — later than A/B/C.
+        let make_guard_missing =
+            |idx: usize, line: usize, family: OperationFamily| -> crate::domain::ReviewCard {
+                let mut card = template.clone();
+                card.id.0 = format!("test-card-guard-{idx}");
+                card.operation.family = family;
+                card.priority = Priority::Medium;
+                card.confidence = Confidence::High;
+                card.class = ReviewClass::GuardMissing;
+                // contract present so coverage_block shows guard_missing as primary gap
+                card.contract = ContractEvidence::present("SAFETY comment present");
+                card.site.location.line = line;
+                card
+            };
+
+        let mut contract_missing_card = template.clone();
+        contract_missing_card.id.0 = "test-card-contract-missing".to_string();
+        contract_missing_card.operation.family = OperationFamily::MaybeUninitAssumeInit;
+        contract_missing_card.priority = Priority::High;
+        contract_missing_card.confidence = Confidence::High;
+        contract_missing_card.class = ReviewClass::ContractMissing;
+        // contract absent → coverage_block contract_coverage: missing (gap_rank = 0)
+        contract_missing_card.contract = ContractEvidence::missing();
+        contract_missing_card.site.location.line = 30;
+
+        let card_a = make_guard_missing(0, 5, OperationFamily::RawPointerRead);
+        let card_b = make_guard_missing(1, 10, OperationFamily::GetUnchecked);
+        let card_c = make_guard_missing(2, 20, OperationFamily::StrFromUtf8Unchecked);
+        let card_d = contract_missing_card;
+
+        // File order: A(5), B(10), C(20), D(30)
+        output.cards = vec![card_a, card_b, card_c, card_d];
+        output.summary.cards = output.cards.len();
+        output.summary.open_actionable_gaps = output.cards.len();
+
+        let value = parse_json(&render(&output))?;
+
+        // Budget of 3 is respected.
+        let comments = value["comments"]
+            .as_array()
+            .ok_or_else(|| "comments should be an array".to_string())?;
+        assert_eq!(comments.len(), 3, "expected exactly 3 selected comments");
+
+        let not_selected = value["not_selected"]
+            .as_array()
+            .ok_or_else(|| "not_selected should be an array".to_string())?;
+        assert_eq!(
+            not_selected.len(),
+            1,
+            "expected exactly 1 not_selected card"
+        );
+        assert_review_budget_summary(&value, 3, 1)?;
+
+        // Importance-ranked selection: D (contract_missing, High priority, line 30)
+        // must be first, displacing C (guard_missing, Medium priority, line 20).
+        // This is the key assertion: file-order first-3 would be [A,B,C]; importance
+        // ranking selects [D,A,B] instead.
+        assert_eq!(
+            value["comments"][0]["operation_family"], "maybe_uninit_assume_init",
+            "first selected comment must be the contract_missing/high-priority card (line 30, family D)"
+        );
+        assert_eq!(
+            value["comments"][0]["coverage_gap"], "contract_coverage: missing",
+            "first selected comment gap must be contract_coverage: missing"
+        );
+        assert_eq!(
+            value["comments"][0]["selection_reason"],
+            "contract_coverage: missing — actionable high-confidence card",
+        );
+
+        // A and B fill slots 2 and 3 (importance order among equal-rank cards uses file/line).
+        assert_eq!(value["comments"][1]["operation_family"], "raw_pointer_read");
+        assert_eq!(value["comments"][2]["operation_family"], "get_unchecked");
+
+        // C (str_from_utf8_unchecked, line 20) is the card excluded by importance ranking.
+        // Under file-order selection it would have been selected (slot 3); with importance
+        // ranking it is displaced by D and lands in not_selected with budget_exhausted.
+        assert_eq!(
+            value["not_selected"][0]["operation_family"], "str_from_utf8_unchecked",
+            "the card excluded by importance ranking must be str_from_utf8_unchecked (family C, line 20)"
+        );
+        assert_eq!(
+            value["not_selected"][0]["reason_code"], "budget_exhausted",
+            "family C is excluded because the budget was taken by the higher-importance family D card"
+        );
+
         Ok(())
     }
 

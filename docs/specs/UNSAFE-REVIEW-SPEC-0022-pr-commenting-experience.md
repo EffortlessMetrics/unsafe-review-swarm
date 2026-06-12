@@ -112,6 +112,22 @@ Selection is sparse and changed-line only:
 - one comment per operation family plus missing-obligation set by default
 - no duplicate card IDs
 
+Eligible candidates are ranked by importance before the budget cap is applied,
+so the highest-importance card fills each budget slot rather than the first card
+in file order. The importance ranking key (descending importance):
+
+1. Priority: `High` first.
+2. Gap severity: `contract_coverage: missing` > `guard_coverage: missing` >
+   `guard_coverage: weak` > `test_reach_coverage: weak` >
+   `test_reach_coverage: missing` > `witness_receipt_coverage: missing`.
+3. Confidence: `High` first.
+4. `(file, line)` ascending — deterministic tiebreak matching the global card
+   order; equal-importance candidates preserve their relative file order.
+
+The `comments[]` list is ordered by this importance ranking. This ranking is
+advisory reviewer-noise budgeting — it surfaces the most urgent coverage gap
+first. It is not a severity claim, proof, or policy gate.
+
 Never select suppressed, `baseline_known`, `static_unknown`, or
 `operation_family: "unknown"` cards. Prefer actionable changed unsafe
 operations that name specific missing evidence and a concrete next action.

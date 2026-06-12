@@ -49,6 +49,16 @@ new surface and not analyzer expansion. All of SPEC-0022's contract (max 3,
 plan-only/advisory, every card in `comments[]` or `not_selected[]`, renderable
 `path`+`line`, closed-vocabulary reasons) still holds. The additions:
 
+### Candidate selection is importance-ranked
+
+Eligible candidates are ranked by importance before the family/obligation dedup
+and budget cap are applied. This ensures the budget slots are filled by the
+highest-importance unique cards rather than the first eligible cards in file
+order. The ranking key (descending importance) is defined in SPEC-0022 §5 and
+implemented in `output/comment_plan/selection.rs::importance_rank`. The
+`comments[]` list in the emitted plan is ordered by this ranking. This is
+reviewer-noise budgeting, not a severity or safety claim.
+
 ### Every selected comment names its coverage gap
 
 A `selected` candidate must reference the coverage slot it is about — exactly one

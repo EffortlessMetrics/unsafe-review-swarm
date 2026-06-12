@@ -5,6 +5,76 @@ use crate::output::confirmation::{
     build_this_first, confirmation_step, hypothesis_to_confirm, minimal_repro_comment,
 };
 
+/// Importance rank used to select the best candidates within the comment-plan
+/// budget (SPEC-0022 §5, SPEC-0032).
+///
+/// Lower numeric value = higher importance. Candidates are sorted ascending
+/// before the family/obligation dedup and budget cap are applied, so the
+/// highest-importance unique card per family fills each budget slot.
+///
+/// Ranking key (descending importance):
+/// 1. Priority: `High` first (rank 0), all others rank 1.
+/// 2. Gap severity:
+///    `contract_coverage: missing` = 0
+///    `guard_coverage: missing`    = 1
+///    `guard_coverage: weak`       = 2
+///    `test_reach_coverage: weak`  = 3
+///    `test_reach_coverage: missing` = 4
+///    `witness_receipt_coverage: missing` = 5
+/// 3. Confidence: `High` first (rank 0), all others rank 1.
+/// 4. Stable tiebreak: `(file, line)` ascending — matches the global card
+///    order from `sort_cards`, so ties produce deterministic output.
+///
+/// This ranking is purely about which coverage gaps to surface first. It is
+/// not a severity claim, proof, or policy gate.
+pub(super) fn importance_rank(card: &ReviewCard) -> (u8, u8, u8, &std::path::Path, usize) {
+    let priority_rank: u8 = if matches!(card.priority, Priority::High) {
+        0
+    } else {
+        1
+    };
+    let gap_rank: u8 = gap_severity_rank(card);
+    let confidence_rank: u8 = if matches!(card.confidence, Confidence::High) {
+        0
+    } else {
+        1
+    };
+    (
+        priority_rank,
+        gap_rank,
+        confidence_rank,
+        card.site.location.file.as_path(),
+        card.site.location.line,
+    )
+}
+
+/// Numeric rank for the primary coverage gap (lower = more severe / higher importance).
+///
+/// Priority order matches `selection_reason` and `coverage_gap`:
+/// `contract_coverage: missing` → `guard_coverage: missing` →
+/// `guard_coverage: weak` → `test_reach_coverage: weak` →
+/// `test_reach_coverage: missing` → `witness_receipt_coverage: missing`.
+fn gap_severity_rank(card: &ReviewCard) -> u8 {
+    let block = card.coverage_block();
+    if block.contract_coverage != Coverage::Present {
+        return 0;
+    }
+    if block.guard_coverage == Coverage::Missing {
+        return 1;
+    }
+    if block.guard_coverage == Coverage::Weak {
+        return 2;
+    }
+    if block.test_reach_coverage == Coverage::Weak {
+        return 3;
+    }
+    if block.test_reach_coverage != Coverage::Present {
+        return 4;
+    }
+    // Witness receipt gap or fallback.
+    5
+}
+
 const PLAN_BOUNDARY: &str = "Plan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision.";
 
 #[derive(Clone, Copy)]

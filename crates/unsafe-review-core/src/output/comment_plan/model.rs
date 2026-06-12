@@ -14,7 +14,7 @@ use std::collections::BTreeSet;
 
 use super::selection::{
     MAX_COMMENT_BUDGET_REASON, OPERATION_FAMILY_BUDGET_REASON, ReviewBudgetReason, actionability,
-    comment_body, coverage_gap, non_selection_reason, relevance, selection_reason,
+    comment_body, coverage_gap, importance_rank, non_selection_reason, relevance, selection_reason,
     should_plan_comment,
 };
 
@@ -44,29 +44,40 @@ impl From<&AnalyzeOutput> for CommentPlan {
         let mut not_selected = Vec::new();
         let mut selected_budget_keys = BTreeSet::new();
 
-        for card in &output.cards {
-            if should_plan_comment(card) {
-                let budget_key = comment_budget_key(card);
-                if selected_budget_keys.contains(&budget_key) {
-                    not_selected.push(NotSelectedCard::from_reason(
-                        card,
-                        OPERATION_FAMILY_BUDGET_REASON,
-                    ));
-                } else if comments.len() < MAX_PLANNED_COMMENTS {
-                    selected_budget_keys.insert(budget_key);
-                    comments.push(PlannedComment::from(card));
-                } else {
-                    not_selected.push(NotSelectedCard::from_reason(
-                        card,
-                        MAX_COMMENT_BUDGET_REASON,
-                    ));
-                }
+        // Partition cards into eligible and ineligible.
+        // Eligible candidates are sorted by importance before the family/obligation
+        // dedup and budget cap are applied, so the highest-importance unique card
+        // per family fills each budget slot rather than the first one in file order.
+        // The global card order (output.cards = file/line) is preserved for all
+        // other output surfaces; only the comment-plan candidate selection re-ranks.
+        let (mut eligible, ineligible): (Vec<&ReviewCard>, Vec<&ReviewCard>) = output
+            .cards
+            .iter()
+            .partition(|card| should_plan_comment(card));
+        eligible.sort_by(|a, b| importance_rank(a).cmp(&importance_rank(b)));
+
+        for card in eligible {
+            let budget_key = comment_budget_key(card);
+            if selected_budget_keys.contains(&budget_key) {
+                not_selected.push(NotSelectedCard::from_reason(
+                    card,
+                    OPERATION_FAMILY_BUDGET_REASON,
+                ));
+            } else if comments.len() < MAX_PLANNED_COMMENTS {
+                selected_budget_keys.insert(budget_key);
+                comments.push(PlannedComment::from(card));
             } else {
                 not_selected.push(NotSelectedCard::from_reason(
                     card,
-                    non_selection_reason(card),
+                    MAX_COMMENT_BUDGET_REASON,
                 ));
             }
+        }
+        for card in ineligible {
+            not_selected.push(NotSelectedCard::from_reason(
+                card,
+                non_selection_reason(card),
+            ));
         }
 
         Self {
