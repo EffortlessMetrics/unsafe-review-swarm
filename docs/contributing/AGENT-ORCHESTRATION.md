@@ -314,6 +314,17 @@ it converges. The mechanisms, in priority order:
   verify the **root premise** first: a confident chain built on a wrong premise
   is wrong all the way down, so correcting the root collapses everything
   downstream of it.
+- **Live state and owner decisions beat stale planning docs.** A planning doc
+  (or your own earlier summary) is a ~12% claim about a *moving* repo, usually
+  staler than it looks — by the time you act, PRs have merged and decisions have
+  been recorded. When a doc conflicts with current state: verify the live
+  PR / issue / commit / spec state first; identify which guidance is stale (it
+  may propose work already landed, or reopen a settled call); preserve explicit
+  owner decisions already recorded (a merged ADR, a parked PR, a spec status);
+  continue only on the *live* gaps; and **ask before reversing a governance
+  decision** — do not silently un-park, re-flip, or rebuild a settled call on
+  the strength of a stale doc. Long unattended sessions hit this repeatedly: the
+  live repo is the source of truth, the doc is a hypothesis.
 - **Catch early; keep diffs small.** The cost of a wrong claim scales with how
   late it is caught (a spec edit, then a build cycle, then a shipped
   regression). A small diff carries few claims, so it is catchable; and a
