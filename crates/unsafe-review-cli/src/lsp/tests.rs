@@ -18,7 +18,7 @@ use super::diagnostics::{diagnostic_card_id, diagnostics_by_uri};
 use super::hover::hover_for;
 use super::state::clear_uris_for_failure;
 use super::uri::uri_from_path;
-use super::{CMD_PACKET, CMD_REFRESH, CMD_WITNESS_COMMAND};
+use super::{CMD_OPEN_TEST, CMD_PACKET, CMD_REFRESH, CMD_WITNESS_COMMAND, CMD_WITNESS_ROUTE};
 
 fn fixture_output(name: &str) -> Result<(PathBuf, AnalyzeOutput), Box<dyn Error>> {
     let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -55,7 +55,9 @@ fn initialize_returns_read_only_capabilities() -> Result<(), Box<dyn Error>> {
     };
     assert!(commands.contains(&CMD_REFRESH.to_string()));
     assert!(commands.contains(&CMD_PACKET.to_string()));
+    assert!(commands.contains(&CMD_WITNESS_ROUTE.to_string()));
     assert!(commands.contains(&CMD_WITNESS_COMMAND.to_string()));
+    assert!(commands.contains(&CMD_OPEN_TEST.to_string()));
     Ok(())
 }
 
@@ -326,6 +328,65 @@ fn execute_unknown_command_returns_none() -> Result<(), Box<dyn Error>> {
             &output
         )
         .is_none()
+    );
+    Ok(())
+}
+
+/// Drift-lock: `CMD_WITNESS_ROUTE` must return a JSON payload with the expected
+/// shape and trust-boundary string.  If the command is removed from the
+/// dispatcher or the route kind is renamed, this test turns red.
+#[test]
+fn execute_explain_witness_route_returns_route_for_card() -> Result<(), Box<dyn Error>> {
+    let (_root, output) = fixture_output("raw_pointer_alignment")?;
+    let card = output
+        .cards
+        .first()
+        .ok_or("fixture must have at least one card")?;
+    let route = card.routes.first().ok_or(
+        "raw_pointer_alignment card must have at least one witness route; \
+         if the fixture changed, update the fixture or pick one that has routes",
+    )?;
+    let result = execute_card_command(CMD_WITNESS_ROUTE, &[json!({"card_id": card.id.0})], &output)
+        .ok_or("CMD_WITNESS_ROUTE must return Some for a card with routes")?;
+    assert_eq!(result["kind"], "unsafe-review.witness_route");
+    assert_eq!(result["card_id"], card.id.0.as_str());
+    assert_eq!(result["route"], route.kind.as_str());
+    assert!(
+        result["trust_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not a site-execution claim"),
+        "trust_boundary must contain advisory wording"
+    );
+    Ok(())
+}
+
+/// Drift-lock: `CMD_OPEN_TEST` must return a JSON payload with the expected
+/// shape.  If the command is removed from the dispatcher or field names change,
+/// this test turns red.
+#[test]
+fn execute_open_related_test_returns_test_metadata() -> Result<(), Box<dyn Error>> {
+    let (_root, output) = fixture_output("raw_pointer_alignment")?;
+    let card = output
+        .cards
+        .first()
+        .ok_or("fixture must have at least one card")?;
+    let test = card.related_tests.first().ok_or(
+        "raw_pointer_alignment card must have at least one related test; \
+         if the fixture changed, update the fixture or pick one that has related tests",
+    )?;
+    let result = execute_card_command(CMD_OPEN_TEST, &[json!({"card_id": card.id.0})], &output)
+        .ok_or("CMD_OPEN_TEST must return Some for a card with related tests")?;
+    assert_eq!(result["kind"], "unsafe-review.related_test");
+    assert_eq!(result["card_id"], card.id.0.as_str());
+    assert_eq!(result["name"], test.name.as_str());
+    assert!(
+        result["file"].as_str().is_some(),
+        "file field must be a string"
+    );
+    assert!(
+        result["line"].as_u64().is_some(),
+        "line field must be a number"
     );
     Ok(())
 }
