@@ -306,6 +306,14 @@ it converges. The mechanisms, in priority order:
 - **Verification includes reviewers and the controller.** A reviewer's verdict
   is also a ~12% claim. The controller checks the *decisive fact* before an
   irreversible step (merge), not the verdict.
+- **Your *weightings* can be biased, not just your facts.** Verification applies
+  hardest to your own reasoning. Beyond "is this fact right?", ask "is my
+  *value-weighting* skewed?" — a standing lean (for example, toward
+  minimal/lean/external choices) is a systematic bias, not a one-off error, so
+  surface it and invite refutation of the weighting, not only the facts. And
+  verify the **root premise** first: a confident chain built on a wrong premise
+  is wrong all the way down, so correcting the root collapses everything
+  downstream of it.
 - **Catch early; keep diffs small.** The cost of a wrong claim scales with how
   late it is caught (a spec edit, then a build cycle, then a shipped
   regression). A small diff carries few claims, so it is catchable; and a

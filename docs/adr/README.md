@@ -12,3 +12,4 @@ ADRs record durable architecture choices.
 - [ADR 0006: Live LSP server is read-only](UNSAFE-REVIEW-ADR-0006-live-lsp-server-is-read-only.md)
 
 - [ADR 0007: Editor extension is a thin read-only adapter](UNSAFE-REVIEW-ADR-0007-editor-extension-is-thin-adapter.md)
+- [ADR 0008: Resource measurement placement](UNSAFE-REVIEW-ADR-0008-resource-measurement-placement.md)

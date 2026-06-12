@@ -36,6 +36,34 @@ Currently parked (as of 2026-06-11):
 - `#1390` (`signal-hook` 0.3.18 -> 0.4.4, major) — needs a targeted
   SIGINT / timeout / partial-status test for the new API before merge.
 
+## Choosing a mechanism for a new capability
+
+The same risk instinct applies when *adding* a capability, not just bumping a
+dependency. Pick the cleanest tool for the specific job, scoping cost to the
+smallest population that works:
+
+- A **shipped runtime dependency** taxes every user of the binary, forever — the
+  highest-cost option; justify it against the alternatives.
+- A **dev-dependency** lives only in the test build and ships nothing — much
+  cheaper for a test or bench need.
+- A **ledgered `unsafe` block** (`#[allow(unsafe_code, reason = …)]` plus the
+  allow ledger, with a real `# Safety` contract) adds a bounded soundness
+  obligation but **no shipped dependency** — for an in-product need with no good
+  safe wrapper it is often *leaner* than a runtime crate. `unsafe` is forbidden
+  by default but available as a governed exception when it is genuinely the
+  cleanest tool.
+- **External / CI / bench** measurement adds nothing to the binary — right for
+  cadence or profiling concerns that do not belong on the per-PR path.
+
+The rule is not "avoid `unsafe`" or "avoid dependencies": both are tools with
+specific costs (a dependency = footprint + supply-chain + maintenance; `unsafe`
+= a soundness obligation + ledger governance). Weigh those costs against the
+alternatives *for the job at hand*, and do not spend a governed exception where
+a free path suffices. See
+[`ADR-0008`](../adr/UNSAFE-REVIEW-ADR-0008-resource-measurement-placement.md)
+for a worked example (in-product RSS via ledgered FFI rather than a shipped
+crate).
+
 ## Boundary
 
 Dependency bumps do not change product claims or the advisory trust boundary.
