@@ -72,10 +72,61 @@ longer over-counts `ready`.
   (now faithful, with the receipt-gated bucket); `unfulfilled_obligation_count`
   for triage of work behind a single card.
 
+## Corpus validation: inherited debt and resolved evidence (2026-06-12)
+
+Beyond the per-fixture sample, two corpus cases pin the adoption-critical
+movement shapes, and a rollup aggregates the usefulness signal across a
+representative subset:
+
+- **Corpus rollup** (`xtask corpus-usefulness` →
+  `corpus-usefulness-rollup.json`, documented in
+  [SPEC-0039](../specs/UNSAFE-REVIEW-SPEC-0039-scheduled-corpus-backstop.md)):
+  builds the binary once and runs `first-pr` over a curated subset, aggregating
+  the SPEC-0038 telemetry (card inventory, agent-readiness, coverage slots,
+  not-selected reason×class, scan-cost range). Off the PR critical path; a
+  committed schema-only sample is gate-checked. On the current subset the cards
+  were all actionable with no unexpected noise — a *subset* signal, not a
+  precision claim.
+- **Brownfield / inherited debt** (`raw_pointer_deref_brownfield_inherited`):
+  a repo with a baselined pre-existing unsafe gap where a safe-only PR shows
+  `new_gaps=0, worsened_gaps=0, inherited_gaps=1`, card class `baseline_known` /
+  `inherited`, `comment_plan_status=not_eligible`, `selected_count=0`, and
+  `no-new-debt` exits 0. Proves inherited unsafe debt is **visible but not PR
+  comment noise** — the property mature repos need to adopt the tool.
+- **Resolved evidence** (`raw_pointer_deref_resolved`): a PR that adds a
+  `# Safety` contract to a *retained* `pub unsafe fn` shows resolved movement
+  (`resolved_gaps=1, new_gaps=0`) — an evidence improvement, not a deletion,
+  registering as resolved.
+
+### Finding: in-scope evidence reclassifies; "resolved" comes from scope-exit
+
+A precise reading of the resolved case surfaced a behavior nuance worth
+recording. Adding a `# Safety` contract to an unsafe fn that stays **in diff
+scope** does *not* resolve its card — it **reclassifies** it from
+`contract_missing` to `guarded_unwitnessed` (calibration:
+`public_unsafe_fn_with_safety_docs` is a `guarded_unwitnessed` card — still
+actionable, now needing a witness). The card persists as a less-severe class.
+"Resolved" movement arises when the unsafe **site leaves diff scope**: removed,
+or (as in the resolved fixture) a doc-only change that does not touch the unsafe
+body, so the site falls out of the changed hunk and the baselined card goes
+unmatched.
+
+So the honest framing of "unsafe-review rewards evidence improvement" is: for an
+in-scope site, evidence is rewarded by **reclassification to a less-severe
+card** (contract_missing → guarded_unwitnessed → guarded_and_witnessed), not by
+resolution; full resolution of an in-scope site requires discharging every
+obligation. This is defensible — an unwitnessed-but-contracted unsafe site is
+still worth an advisory card — but it means "resolved" is a narrower signal than
+it first appears. Whether a fully-evidenced in-scope site *should* resolve (vs.
+settle at `guarded_and_witnessed`) is a product question for a future lane, not
+a defect.
+
 ## What remains
 
-- **Real-PR (not just fixture) low-noise corpus** — exercise the surfaces on
-  real PR diffs to characterize real-world noise, beyond the controlled sample.
+- **Real external-repo PR noise reading** — the rollup and corpus cases above
+  use local fixtures; exercising the surfaces on real external PR diffs (the
+  dogfood targets need network seeding) remains, to characterize real-world
+  noise beyond controlled fixtures.
 - **Promote the composite Action to the source/public repo** so external repos
   can `uses: EffortlessMetrics/unsafe-review@v1` (a curated release/promotion
   step, not routine swarm work).
@@ -84,3 +135,20 @@ longer over-counts `ready`.
   CI cost issue).
 - **In-tool per-run RSS** stays parked (revivable on validated operator demand;
   ADR-0008).
+
+## Next lane (evidence-backed)
+
+The measured low-noise validation layer is complete: inherited debt is visible
+but quiet, evidence improvements register (as reclassification for an in-scope
+site, as resolved movement on scope-exit), and per-run plus corpus cost are
+instrumented. The next lane should be chosen from observed friction, not roadmap
+inertia. Candidates this lane surfaced:
+
+- the resolve-vs-reclassify product question above (should a fully-evidenced
+  in-scope site resolve, or settle at `guarded_and_witnessed`?);
+- a real external-repo PR noise reading (needs dogfood-target seeding);
+- the deferred items in *What remains*.
+
+Everything here is a characterization on a controlled corpus — explicitly
+**not** a zero-false-positive, calibrated precision/recall, or safety-proof
+claim.
