@@ -6555,6 +6555,99 @@ fn brownfield_inherited_baseline_shows_no_new_debt_with_inherited_shape()
     Ok(())
 }
 
+// Resolved corpus case (Doc-5 adoption criterion, inverse of brownfield):
+// A PR that removes an unsafe site captured in the baseline shows the resolved
+// shape: resolved_gaps=1, new_gaps=0, worsened_gaps=0.  The improvement is
+// recorded in usefulness telemetry as resolved_cards=1.
+//
+// Trust boundary: "resolved" means the baseline-captured coverage gap is absent
+// from the AFTER output because the unsafe site was removed.  It does not prove
+// the code is memory-safe, UB-free, or Miri-clean.
+#[test]
+fn resolved_corpus_case_shows_resolved_gap_and_no_new_debt() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_deref_resolved");
+
+    // The fixture ships with a committed baseline ledger that captures the
+    // pre-existing raw_pointer_deref card.  The PR diff removes the unsafe
+    // site and replaces it with safe code.  Running check must report
+    // resolved_gaps=1, new_gaps=0, worsened_gaps=0, open_actionable_gaps=0.
+    let advisory = run_success([
+        os("check"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let advisory = parse_json(&stdout_text(&advisory)?)?;
+    assert_eq!(
+        advisory["summary"]["resolved_gaps"], 1,
+        "one resolved gap expected: the baseline card is gone after the unsafe site was removed"
+    );
+    assert_eq!(
+        advisory["summary"]["new_gaps"], 0,
+        "no new gaps expected: the PR only removes unsafe code"
+    );
+    assert_eq!(advisory["summary"]["worsened_gaps"], 0);
+    assert_eq!(advisory["summary"]["inherited_gaps"], 0);
+    assert_eq!(advisory["summary"]["open_actionable_gaps"], 0);
+    assert_eq!(
+        advisory["cards"].as_array().map(|a| a.len()).unwrap_or(1),
+        0
+    );
+
+    // The no-new-debt policy must pass (exit 0) because the diff adds no new
+    // gap — it only removes an existing one.
+    let passing = run_success([
+        os("check"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+        os("--policy"),
+        os("no-new-debt"),
+    ])?;
+    let passing = parse_json(&stdout_text(&passing)?)?;
+    assert_eq!(passing["policy"], "no-new-debt");
+    assert_eq!(
+        passing["summary"]["new_gaps"], 0,
+        "no-new-debt must pass with new_gaps=0"
+    );
+    assert_eq!(passing["summary"]["resolved_gaps"], 1);
+
+    // Usefulness telemetry must record resolved_cards=1 and new_cards=0.
+    let out_dir = TempDir::new("unsafe-review-resolved-e2e")?;
+    run_success([
+        os("first-pr"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--out-dir"),
+        out_dir.path().as_os_str().to_os_string(),
+    ])?;
+    let telemetry_path = out_dir.path().join("usefulness-telemetry.json");
+    let telemetry = parse_json(&fs::read_to_string(&telemetry_path)?)?;
+    assert_eq!(
+        telemetry["card_inventory"]["resolved_cards"], 1,
+        "telemetry must record the resolved card shape"
+    );
+    assert_eq!(telemetry["card_inventory"]["new_cards"], 0);
+    assert_eq!(telemetry["card_inventory"]["inherited_cards"], 0);
+
+    // Gate manifest must also surface resolved_gaps=1.
+    let gate_path = out_dir.path().join("unsafe-review-gate.json");
+    let gate = parse_json(&fs::read_to_string(&gate_path)?)?;
+    assert_eq!(gate["summary"]["resolved_gaps"], 1);
+    assert_eq!(gate["summary"]["new_gaps"], 0);
+    assert_eq!(gate["summary"]["worsened_gaps"], 0);
+
+    Ok(())
+}
+
 // Exit-code taxonomy tests (issue #1518):
 //   0 = ran to completion (clean or advisory findings)
 //   1 = ran to completion: policy violation
