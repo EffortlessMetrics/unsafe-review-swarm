@@ -1,3 +1,4 @@
+pub(crate) mod peak_rss;
 mod sha256;
 pub(crate) use sha256::sha256_hex;
 

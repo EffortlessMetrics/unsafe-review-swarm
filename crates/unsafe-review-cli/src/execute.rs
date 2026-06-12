@@ -31,7 +31,8 @@ use unsafe_review_core::{
     render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
     render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
     render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,
-    render_repair_queue, render_sarif, render_witness_plan, validate_witness_receipts,
+    RssSample, render_repair_queue, render_sarif, render_witness_plan, sample_rss,
+    validate_witness_receipts,
 };
 
 mod card_lookup;
@@ -306,6 +307,14 @@ fn run_repo_check(options: RepoOptions) -> Result<(), crate::RunFailure> {
         if let Err(err) = reporter.record_final_output_bytes(output_bytes) {
             eprintln!(
                 "unsafe-review repo: warning: failed to update output_bytes in status sidecar: {err}"
+            );
+        }
+        // Sample peak and current RSS once all artifacts are written.  Errors
+        // are non-fatal; None is a truthful absent value on unsupported platforms.
+        let rss = sample_rss();
+        if let Err(err) = reporter.record_final_rss(&rss) {
+            eprintln!(
+                "unsafe-review repo: warning: failed to update RSS fields in status sidecar: {err}"
             );
         }
     } else {
@@ -708,6 +717,35 @@ impl RepoStatusReporter {
         fs::write(&path, render_repo_scan_status(status, &self.scan_scope)?)
             .map_err(|err| format!("write {} failed: {err}", path.display()))
     }
+
+    /// Stamp the RSS sample (peak + current) into the last-known status and
+    /// re-write the status sidecar.  Called once, after all output artifacts
+    /// are written.  No-op when no `--out` path was given (stdout-only runs).
+    ///
+    /// Both values are approximate, process-wide, and platform-dependent —
+    /// diagnostic only; not a coverage claim, memory-safety proof, UB-free
+    /// status, Miri-clean status, site-execution claim, calibrated metric, or
+    /// performance guarantee.
+    fn record_final_rss(&mut self, rss: &RssSample) -> Result<(), String> {
+        if rss.peak_rss_bytes.is_none() && rss.current_rss_bytes.is_none() {
+            return Ok(());
+        }
+        let Some(path) = self.status_path.clone() else {
+            return Ok(());
+        };
+        let mut last_status = self
+            .last_status
+            .lock()
+            .map_err(|err| format!("repo status lock poisoned: {err}"))?;
+        let Some(ref mut status) = *last_status else {
+            return Ok(());
+        };
+        status.peak_rss_bytes = rss.peak_rss_bytes;
+        status.current_rss_bytes = rss.current_rss_bytes;
+        ensure_parent_dir(&path)?;
+        fs::write(&path, render_repo_scan_status(status, &self.scan_scope)?)
+            .map_err(|err| format!("write {} failed: {err}", path.display()))
+    }
 }
 
 #[cfg(unix)]
@@ -932,6 +970,18 @@ fn render_repo_scan_status(
         // Diagnostic aperture only — not a coverage claim, proof, UB-free,
         // Miri-clean, site-execution, or performance guarantee.
         "output_bytes": status.output_bytes,
+        // Approximate peak RSS of this process in bytes, sampled at run
+        // completion.  Present (Some) on supported platforms; null otherwise.
+        // Diagnostic aperture only — approximate, process-wide, platform-
+        // dependent; not a coverage claim, memory-safety proof, UB-free
+        // status, Miri-clean status, site-execution claim, or performance
+        // guarantee.
+        "peak_rss_bytes": status.peak_rss_bytes,
+        // Approximate current RSS of this process in bytes, sampled at run
+        // completion.  Present on Linux and Windows; null on macOS
+        // (truthful absence) and unsupported platforms.
+        // Same diagnostic-aperture-only claim boundary as peak_rss_bytes.
+        "current_rss_bytes": status.current_rss_bytes,
         "error": null,
         "signal": null,
         "partial_path": null,
@@ -973,6 +1023,9 @@ fn render_repo_scan_incomplete_status(
         "file_timings": serde_json::Value::Null,
         // No output artifact was produced for an incomplete scan.
         "output_bytes": serde_json::Value::Null,
+        // RSS fields are not reported for incomplete/error states.
+        "peak_rss_bytes": serde_json::Value::Null,
+        "current_rss_bytes": serde_json::Value::Null,
         "error": error,
         "signal": null,
         "partial_path": partial_path.map(|path| path.display().to_string()),
@@ -1014,6 +1067,9 @@ fn render_repo_scan_interrupted_status(
         "file_timings": serde_json::Value::Null,
         // No output artifact was produced for a signal-interrupted scan.
         "output_bytes": serde_json::Value::Null,
+        // RSS fields are not reported for signal-interrupted states.
+        "peak_rss_bytes": serde_json::Value::Null,
+        "current_rss_bytes": serde_json::Value::Null,
         "error": format!("repo scan interrupted by {signal_name}"),
         "signal": signal_name,
         "partial_path": partial_path.map(|path| path.display().to_string()),
@@ -1048,6 +1104,9 @@ fn write_scan_start_stub(
         "file_timings": serde_json::Value::Null,
         // No output artifact has been produced yet at start-stub time.
         "output_bytes": serde_json::Value::Null,
+        // RSS fields are not available at start-stub time.
+        "peak_rss_bytes": serde_json::Value::Null,
+        "current_rss_bytes": serde_json::Value::Null,
         "error": serde_json::Value::Null,
         "signal": serde_json::Value::Null,
         "partial_path": serde_json::Value::Null,
@@ -1391,6 +1450,10 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         render_gate_manifest(&output),
     )?;
 
+    // Sample peak and current RSS once all artifact writes are complete.
+    // Errors surface as None — a truthful absent value on unsupported platforms.
+    let rss = sample_rss();
+
     first_pr::print_first_pr_report(first_pr::FirstPrReport {
         output: &output,
         out_dir: &options.out_dir,
@@ -1401,6 +1464,8 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         no_changed_gaps_limitation: NO_CHANGED_GAPS_LIMITATION,
         artifacts: &FIRST_PR_ARTIFACTS,
         output_bytes,
+        peak_rss_bytes: rss.peak_rss_bytes,
+        current_rss_bytes: rss.current_rss_bytes,
     });
 
     Ok(())

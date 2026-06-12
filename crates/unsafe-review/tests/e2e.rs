@@ -5077,6 +5077,276 @@ fn first_pr_reports_output_bytes_in_terminal_output() -> Result<(), Box<dyn Erro
     Ok(())
 }
 
+/// Drift-lock: a first-pr run must report a "Peak RSS" line in its terminal
+/// output.  On supported platforms (unix / windows) the value is a positive
+/// integer.  If the field is dropped or the line is absent, this goes RED.
+#[test]
+fn first_pr_reports_peak_rss_in_terminal_output() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-first-pr-peak-rss-e2e")?;
+    let out_dir = temp.path().join("unsafe-review");
+
+    let output = run_success([
+        os("first-pr"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--out-dir"),
+        out_dir.as_os_str().to_os_string(),
+    ])?;
+    let stdout = stdout_text(&output)?;
+
+    // The terminal summary must include a "Peak RSS" line — diagnostic only;
+    // not a coverage claim, proof, UB-free, Miri-clean, site-execution, or
+    // performance guarantee.
+    assert!(
+        stdout.contains("- Peak RSS:"),
+        "stdout must contain '- Peak RSS:' line; got:\n{stdout}"
+    );
+
+    // On supported platforms, the value should be a positive integer.
+    // On unsupported platforms the line says "unavailable on this platform".
+    let rss_line = stdout
+        .lines()
+        .find(|line| line.contains("- Peak RSS:"))
+        .ok_or("could not find '- Peak RSS:' line")?;
+
+    if rss_line.contains("unavailable") {
+        // Truthful absence on unsupported platforms — acceptable.
+        return Ok(());
+    }
+
+    // Extract and validate the numeric value.
+    let bytes_str = rss_line
+        .split_whitespace()
+        .find(|tok| tok.chars().all(|c| c.is_ascii_digit()))
+        .ok_or_else(|| format!("could not extract byte count from line: {rss_line}"))?;
+    let rss_bytes: u64 = bytes_str
+        .parse()
+        .map_err(|err| format!("peak RSS byte count parse failed: {err}"))?;
+    assert!(
+        rss_bytes > 0,
+        "peak_rss_bytes must be positive for a run on a supported platform; got {rss_bytes}"
+    );
+    // Plausibility: a running Rust process should consume at least 1 MiB.
+    // Also guards against the Linux KB→bytes unit conversion bug.
+    assert!(
+        rss_bytes >= 1024 * 1024,
+        "peak RSS {rss_bytes} bytes is implausibly small for a Rust binary — \
+         possible unit conversion bug (Linux ru_maxrss is KB, must be × 1024)"
+    );
+
+    Ok(())
+}
+
+/// Drift-lock: a completed repo scan with `--out` must report `peak_rss_bytes`
+/// as a positive integer (not null) in the status sidecar on supported
+/// platforms.  If the field is absent or null, this goes RED.
+#[test]
+fn repo_status_sidecar_peak_rss_bytes_present_for_completed_scan() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-repo-peak-rss-e2e")?;
+    let report_path = temp.path().join("repo.json");
+    let status_path = temp.path().join("repo.json.status.json");
+
+    let _output = run_success([
+        os("repo"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+        os("--out"),
+        report_path.as_os_str().to_os_string(),
+    ])?;
+
+    let status = parse_json(&fs::read_to_string(&status_path)?)?;
+
+    // On supported platforms (unix / windows), peak_rss_bytes must be present.
+    // Diagnostic aperture only — not a coverage claim, memory-safety proof,
+    // UB-free status, Miri-clean status, site-execution claim, or performance
+    // guarantee.
+    #[cfg(any(unix, windows))]
+    {
+        let peak_rss = status["peak_rss_bytes"].as_u64().ok_or_else(|| {
+            format!(
+                "peak_rss_bytes must be a non-null positive integer on supported platforms; got: {}",
+                status["peak_rss_bytes"]
+            )
+        })?;
+        assert!(
+            peak_rss > 0,
+            "peak_rss_bytes must be positive for a completed scan on a supported platform"
+        );
+        // Plausibility: Rust process should consume at least 1 MiB.
+        assert!(
+            peak_rss >= 1024 * 1024,
+            "peak_rss_bytes {peak_rss} is implausibly small — \
+             possible Linux KB→bytes conversion bug"
+        );
+    }
+
+    #[cfg(not(any(unix, windows)))]
+    {
+        assert!(
+            status["peak_rss_bytes"].is_null(),
+            "peak_rss_bytes must be null on unsupported platforms; got: {}",
+            status["peak_rss_bytes"]
+        );
+    }
+
+    Ok(())
+}
+
+/// Drift-lock: a timeout-incomplete scan must have `peak_rss_bytes: null` in
+/// its status sidecar.
+#[test]
+fn repo_status_sidecar_peak_rss_bytes_null_for_timeout_path() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-repo-peak-rss-timeout-e2e")?;
+    let scan_root = temp.path().join("fixture");
+    copy_dir_all(&fixture, &scan_root)?;
+    fs::write(scan_root.join("src/z_safe.rs"), "pub fn safe() {}\n")?;
+    let report_path = temp.path().join("repo.json");
+    let status_path = temp.path().join("repo.json.status.json");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_unsafe-review"))
+        .args([
+            os("repo"),
+            os("--root"),
+            scan_root.as_os_str().to_os_string(),
+            os("--format"),
+            os("json"),
+            os("--out"),
+            report_path.as_os_str().to_os_string(),
+            os("--timeout-seconds"),
+            os("1"),
+        ])
+        .env(
+            "UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_AFTER_SCANNED",
+            "1",
+        )
+        .env(
+            "UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_AFTER_SCAN_MS",
+            "1100",
+        )
+        .output()?;
+    assert!(!output.status.success(), "timeout scan must exit non-zero");
+
+    let status = parse_json(&fs::read_to_string(&status_path)?)?;
+    assert_eq!(status["stop_reason"], "timeout");
+    // Timeout incomplete status must have peak_rss_bytes: null.
+    assert!(
+        status["peak_rss_bytes"].is_null(),
+        "peak_rss_bytes must be null in timeout incomplete status; got: {}",
+        status["peak_rss_bytes"]
+    );
+
+    Ok(())
+}
+
+/// Drift-lock: a completed repo scan with `--out` must carry `current_rss_bytes`
+/// on Linux and Windows; on macOS it must be null (truthful absence).
+/// If the field is absent or has the wrong shape, this goes RED.
+#[test]
+fn repo_status_sidecar_current_rss_bytes_present_for_completed_scan() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-repo-current-rss-e2e")?;
+    let report_path = temp.path().join("repo.json");
+    let status_path = temp.path().join("repo.json.status.json");
+
+    let _output = run_success([
+        os("repo"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+        os("--out"),
+        report_path.as_os_str().to_os_string(),
+    ])?;
+
+    let status = parse_json(&fs::read_to_string(&status_path)?)?;
+
+    // Linux and Windows: current_rss_bytes must be a positive integer.
+    // macOS: current_rss_bytes is null (truthful absence — mach task_info
+    // complexity).
+    // Diagnostic aperture only — not a coverage claim, memory-safety proof,
+    // UB-free status, Miri-clean status, site-execution claim, or performance
+    // guarantee.
+    #[cfg(target_os = "linux")]
+    {
+        let current = status["current_rss_bytes"].as_u64().ok_or_else(|| {
+            format!(
+                "current_rss_bytes must be a non-null positive integer on Linux; got: {}",
+                status["current_rss_bytes"]
+            )
+        })?;
+        assert!(
+            current > 0,
+            "current_rss_bytes must be positive for a completed scan on Linux"
+        );
+        assert!(
+            current >= 1024 * 1024,
+            "current_rss_bytes {current} is implausibly small — \
+             possible page-size multiplication bug"
+        );
+    }
+
+    #[cfg(windows)]
+    {
+        let current = status["current_rss_bytes"].as_u64().ok_or_else(|| {
+            format!(
+                "current_rss_bytes must be a non-null positive integer on Windows; got: {}",
+                status["current_rss_bytes"]
+            )
+        })?;
+        assert!(
+            current > 0,
+            "current_rss_bytes must be positive for a completed scan on Windows"
+        );
+    }
+
+    // macOS: truthful absence.
+    #[cfg(all(unix, not(target_os = "linux")))]
+    {
+        assert!(
+            status["current_rss_bytes"].is_null(),
+            "current_rss_bytes must be null on macOS (truthful absence); got: {}",
+            status["current_rss_bytes"]
+        );
+    }
+
+    Ok(())
+}
+
+/// Drift-lock: a first-pr run must report a "Current RSS" line in its terminal
+/// output.  If the line is absent, this goes RED.
+#[test]
+fn first_pr_reports_current_rss_in_terminal_output() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-first-pr-current-rss-e2e")?;
+    let out_dir = temp.path().join("unsafe-review");
+
+    let output = run_success([
+        os("first-pr"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--out-dir"),
+        out_dir.as_os_str().to_os_string(),
+    ])?;
+    let stdout = stdout_text(&output)?;
+
+    // The terminal summary must include a "Current RSS" line.
+    assert!(
+        stdout.contains("- Current RSS:"),
+        "stdout must contain '- Current RSS:' line; got:\n{stdout}"
+    );
+
+    Ok(())
+}
+
 #[cfg(unix)]
 #[test]
 fn repo_sigterm_writes_interrupted_status_sidecar() -> Result<(), Box<dyn Error>> {

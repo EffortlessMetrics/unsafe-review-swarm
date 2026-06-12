@@ -93,6 +93,8 @@ first-class artifact:
     { "file": "crates/foo/src/raw.rs", "scan_ms": 12 }
   ],
   "output_bytes": 142857,
+  "peak_rss_bytes": 52428800,
+  "current_rss_bytes": 48234496,
   "error": null,
   "signal": null,
   "partial_path": null,
@@ -133,6 +135,51 @@ absence of unsafe operations.  It is not a coverage claim, memory-safety proof,
 UB-free status, Miri-clean status, site-execution proof, calibrated metric, or
 performance guarantee.  It is operational diagnosis for identifying runs that
 produce unexpectedly large or small output bundles.
+
+**`peak_rss_bytes` (optional, diagnostic only):** Approximate peak
+resident-set-size (RSS) of the tool process in bytes, sampled once at run
+completion.  Present (`some positive integer`) on supported platforms (Linux,
+macOS, Windows) after a clean scan; `null` on unsupported platforms, when the
+OS call fails, and in in-progress (start-stub), error, timeout, and
+signal-terminated states.
+
+Platform notes: Linux reports `ru_maxrss` in kilobytes; the tool normalises to
+bytes (× 1024) before recording.  macOS reports bytes directly.  Windows uses
+`GetProcessMemoryInfo` / `PeakWorkingSetSize` (bytes).  All values are the
+process-wide cumulative peak — the maximum RSS the process reached at any point,
+not just the working set at sampling time.  The measurement is made via a minimal
+direct `extern` FFI call; no new shipped dependency was added.
+
+The field also appears in the `first-pr` terminal summary as a convenience line.
+
+**Claim boundary:** `peak_rss_bytes` is a **diagnostic aperture only** —
+approximate, process-wide, and platform-dependent.  A high value does not assert
+more coverage or worse code quality.  A low value does not assert safety,
+memory-safety, UB-free status, Miri-clean status, or site-execution proof.  It
+is not a coverage claim, memory-safety proof, calibrated metric, or performance
+guarantee.  Use it for CI-runner sizing, OOM-avoidance visibility, and scan-cost
+accounting.
+
+**`current_rss_bytes` (optional, diagnostic only):** Approximate current
+resident-set-size (RSS) of the tool process in bytes, sampled once at run
+completion.  Present (`some positive integer`) on Linux (via `/proc/self/statm`,
+a safe file read) and Windows (via `GetProcessMemoryInfo` `WorkingSetSize`).
+`null` on macOS (truthful absence — mach `task_info` is disproportionate
+complexity for an in-product telemetry field), on unsupported platforms, and in
+in-progress, error, timeout, and signal-terminated states.
+
+This is the point-in-time working-set size at the moment of sampling; it may
+differ from `peak_rss_bytes`.  It is a **poll-able building block**: an operator
+can externally sample this value into a memory-over-time log without the tool
+building any time-series or logging subsystem.
+
+The field also appears in the `first-pr` terminal summary as a convenience line.
+
+**Claim boundary:** `current_rss_bytes` is a **diagnostic aperture only** —
+approximate, process-wide, platform-dependent, and a point-in-time snapshot.
+Same boundaries as `peak_rss_bytes`: not a coverage claim, memory-safety proof,
+UB-free status, Miri-clean status, site-execution claim, calibrated metric, or
+performance guarantee.
 
 **Claim boundary:** per-file timing is a **diagnostic aperture only**.  A slow
 file does not assert a detection miss, a proof gap, or any safety/UB-free/
@@ -274,6 +321,21 @@ and operator block report what the scan did; they make no safety claim.
     honesty).
   - `output_bytes_none_in_all_pipeline_events` — the pipeline never pre-populates
     `output_bytes`; only the CLI writer layer stamps the value after disk writes.
+  - `peak_rss_bytes_none_in_all_pipeline_events` — the pipeline never
+    pre-populates `peak_rss_bytes` or `current_rss_bytes`; only the CLI writer
+    layer stamps both values after measurement at run completion.
+- `cargo test -p unsafe-review-core --lib util::peak_rss` — unit tests:
+  - `peak_rss_sample_is_some_and_positive_on_supported_platform` — `sample().peak`
+    returns `Some(> 0)` on unix/windows; returns `None` on unsupported platforms.
+  - `current_rss_sample_behaviour_per_platform` — `sample().current` returns
+    `Some(> 0)` on Linux and Windows; `None` on macOS (truthful absence) and
+    unsupported platforms.
+  - `linux_peak_rss_is_in_bytes_not_kilobytes` (Linux only) — peak ≥ 4 MiB,
+    confirming the KB→bytes normalisation was applied.
+  - `linux_current_rss_is_in_bytes_not_pages` (Linux only) — current ≥ 1 MiB,
+    confirming the page-size multiplication was applied.
+  - `peak_rss_bytes_option_serialises_as_expected` — `Option<u64>` round-trips
+    through serde_json correctly for both `Some` and `None` paths.
 - `cargo test -p unsafe-review --test e2e repo_status_sidecar_includes_per_file_timings_for_small_scan`
   — e2e: completed sidecar carries a `file_timings` array with the correct
   entry count and correct field shapes.
@@ -289,6 +351,19 @@ and operator block report what the scan did; they make no safety claim.
 - `cargo test -p unsafe-review --test e2e first_pr_reports_output_bytes_in_terminal_output`
   — e2e: a `first-pr` run reports `output_bytes > 0` in terminal output matching
   the total on-disk size of all artifacts written to `--out-dir`.
+- `cargo test -p unsafe-review --test e2e repo_status_sidecar_peak_rss_bytes_present_for_completed_scan`
+  — e2e: completed sidecar on a supported platform carries `peak_rss_bytes` as a
+  positive integer (not null); confirming the field is populated at run completion.
+- `cargo test -p unsafe-review --test e2e repo_status_sidecar_peak_rss_bytes_null_for_timeout_path`
+  — e2e: timeout incomplete sidecar has `peak_rss_bytes: null`.
+- `cargo test -p unsafe-review --test e2e repo_status_sidecar_current_rss_bytes_present_for_completed_scan`
+  — e2e: completed sidecar on Linux/Windows carries `current_rss_bytes` as a
+  positive integer; on macOS the field is null (truthful absence).
+- `cargo test -p unsafe-review --test e2e first_pr_reports_peak_rss_in_terminal_output`
+  — e2e: a `first-pr` run reports a "Peak RSS" line in terminal output; on
+  supported platforms the value is a positive integer.
+- `cargo test -p unsafe-review --test e2e first_pr_reports_current_rss_in_terminal_output`
+  — e2e: a `first-pr` run reports a "Current RSS" line in terminal output.
 - `cargo run --locked -p xtask -- check-pr`.
 
 ## Machine check

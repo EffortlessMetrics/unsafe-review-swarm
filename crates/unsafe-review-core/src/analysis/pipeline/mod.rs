@@ -402,6 +402,8 @@ fn repo_status(
         cap: None,
         file_timings,
         output_bytes: None,
+        peak_rss_bytes: None,
+        current_rss_bytes: None,
     }
 }
 
@@ -428,6 +430,8 @@ fn repo_status_capped(
         cap: Some(cap),
         file_timings,
         output_bytes: None,
+        peak_rss_bytes: None,
+        current_rss_bytes: None,
     }
 }
 
@@ -6255,6 +6259,62 @@ evidence = "test fixture"
                     event.status.output_bytes.is_none(),
                     "output_bytes must be None in all pipeline events; got: {:?}",
                     event.status.output_bytes
+                );
+                events_checked += 1;
+                Ok(())
+            },
+        )?;
+
+        let _ = fs::remove_dir_all(&root);
+
+        assert!(events_checked > 0, "at least one event must be checked");
+        Ok(())
+    }
+
+    /// Drift-lock: the pipeline emits `peak_rss_bytes: None` for all scan
+    /// events — the CLI writer layer stamps the value after measurement at run
+    /// completion.  If this field is accidentally pre-populated in the pipeline
+    /// the status sidecar would carry a stale value.
+    #[test]
+    fn peak_rss_bytes_none_in_all_pipeline_events() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-peak-rss-pipeline")?;
+        fs::create_dir_all(root.join("src")).map_err(|err| format!("create dirs failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"peak-rss-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "pub unsafe fn beta(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+        )
+        .map_err(|err| format!("write src/lib.rs failed: {err}"))?;
+
+        let mut events_checked: usize = 0;
+        let _output = analyze_with_discovery_and_repo_events(
+            AnalyzeInput {
+                root: root.clone(),
+                scope: Scope::Repo,
+                diff: DiffSource::NoneRepoScan,
+                mode: AnalysisMode::Repo,
+                policy: PolicyMode::Advisory,
+                include_unchanged_tests: true,
+                max_cards: None,
+            },
+            DiscoveryOptions::repo_defaults(),
+            |event| {
+                // The pipeline must never pre-populate peak_rss_bytes or
+                // current_rss_bytes — those are the CLI writer's responsibility
+                // after run completion.
+                assert!(
+                    event.status.peak_rss_bytes.is_none(),
+                    "peak_rss_bytes must be None in all pipeline events; got: {:?}",
+                    event.status.peak_rss_bytes
+                );
+                assert!(
+                    event.status.current_rss_bytes.is_none(),
+                    "current_rss_bytes must be None in all pipeline events; got: {:?}",
+                    event.status.current_rss_bytes
                 );
                 events_checked += 1;
                 Ok(())

@@ -1,4 +1,3 @@
-#![forbid(unsafe_code)]
 //! Core SDK and analysis engine for `unsafe-review`.
 //!
 //! The public API is intentionally small: build an [`AnalyzeInput`], call
@@ -28,7 +27,7 @@ pub use api::{
     render_outcome_json, render_outcome_markdown, render_policy_report_json,
     render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
     render_receipt_audit_markdown, render_repair_queue, render_sarif, render_witness_plan,
-    validate_witness_receipts,
+    RssSample, sample_rss, validate_witness_receipts,
 };
 
 /// Compute the SHA-256 hex digest of raw bytes.

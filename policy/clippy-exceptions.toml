@@ -1,4 +1,33 @@
 schema_version = "0.1"
 policy = "clippy-exceptions"
 owner = "core/policy"
-status = "empty"
+
+[[exceptions]]
+lint = "unsafe_code"
+crate = "unsafe-review-core"
+module = "util::peak_rss"
+reason = """
+Minimal contracted FFI for in-product RSS telemetry (peak + current).
+
+Unix peak: getrusage(RUSAGE_SELF) — RUSAGE_SELF is a valid POSIX constant;
+out-param is zero-initialised; pointer is stack-local and valid for the call;
+return value checked; on Linux result is in KiB (normalised to bytes × 1024),
+on macOS result is already in bytes.
+
+Linux current: sysconf(_SC_PAGESIZE) — _SC_PAGESIZE is a valid POSIX constant;
+always succeeds (returns > 0); no mutable out-params; read-only. The actual
+current-page count is read from /proc/self/statm (safe file read, no unsafe).
+
+Windows peak + current: GetCurrentProcess() (pseudo-handle, never fails,
+never needs closing) + GetProcessMemoryInfo() with a correctly-sized
+zero-initialised PROCESS_MEMORY_COUNTERS struct; cb set before call;
+return value checked; PeakWorkingSetSize and WorkingSetSize are in bytes.
+
+Each unsafe block is minimal — only the FFI call(s).
+SAFETY contracts are documented inline in util/peak_rss.rs.
+No alternative without adding a new shipped dependency.
+Governed by #[allow(unsafe_code, reason = "...")] at function scope;
+[lints.rust] unsafe_code = "deny" in this crate's Cargo.toml overrides
+the workspace "forbid", allowing item-level #[allow].
+"""
+approved_by = "owner (pre-authorised in brief)"

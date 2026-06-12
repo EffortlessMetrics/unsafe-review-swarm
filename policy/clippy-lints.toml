@@ -3,7 +3,11 @@ msrv = "1.95"
 owner = "core/policy"
 
 [workspace]
-unsafe_code = "forbid"
+# "deny" (not "forbid") to allow item-level #[allow(unsafe_code, reason = "...")] in the
+# minimal contracted FFI blocks in util/peak_rss.rs (getrusage + GetProcessMemoryInfo).
+# Governance: each unsafe block has a SAFETY contract + #[allow(unsafe_code, reason)] annotation
+# at the smallest scope, plus a clippy-exceptions.toml ledger entry.
+unsafe_code = "deny"
 unwrap_used = "deny"
 expect_used = "deny"
 panic = "deny"

@@ -5,7 +5,7 @@ use crate::output::{
     agent, badges, comment_plan, confirmation, gate_manifest, human, json, lsp, markdown, outcome,
     policy_report, receipt_audit, repair_queue, sarif, witness_plan,
 };
-use crate::util::path_display;
+use crate::util::{path_display, peak_rss};
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -150,6 +150,32 @@ pub struct RepoScanStatus {
     /// claim, proof, UB-free, Miri-clean, site-execution, or performance
     /// guarantee.
     pub output_bytes: Option<u64>,
+    /// Approximate peak resident-set-size (RSS) of this process in bytes,
+    /// sampled once at run completion.  `Some` on supported platforms (Linux,
+    /// macOS, Windows); `None` on unsupported targets or when the OS call
+    /// fails.
+    ///
+    /// This is a **diagnostic aperture only** — approximate, process-wide,
+    /// platform-dependent.  Use it for CI-runner sizing and OOM-avoidance
+    /// visibility.  It is **not** a coverage claim, memory-safety proof,
+    /// UB-free status, Miri-clean status, site-execution claim, calibrated
+    /// metric, or performance guarantee.
+    pub peak_rss_bytes: Option<u64>,
+    /// Approximate current resident-set-size (RSS) of this process in bytes,
+    /// sampled once at run completion.  `Some` on supported platforms (Linux,
+    /// Windows); `None` on macOS (where current RSS via mach task_info is
+    /// disproportionately complex for an in-product field), on unsupported
+    /// targets, or when the OS call/read fails.
+    ///
+    /// This is a **diagnostic aperture only** — approximate, process-wide,
+    /// platform-dependent, and a point-in-time snapshot only.  The value is
+    /// the RSS at the moment of sampling; it may differ from the peak.
+    /// Use it as a poll-able building block for external memory-over-time
+    /// logging without this tool building any time-series subsystem.
+    /// It is **not** a coverage claim, memory-safety proof, UB-free status,
+    /// Miri-clean status, site-execution claim, calibrated metric, or
+    /// performance guarantee.
+    pub current_rss_bytes: Option<u64>,
 }
 
 /// Maximum number of files for which per-file timing is collected.
@@ -836,6 +862,37 @@ fn days_in_month(year: u32, month: u32) -> u64 {
 pub use outcome::OutcomeReport;
 pub use policy_report::PolicyReport;
 pub use receipts::ReceiptAuditReport;
+
+/// Result of a single RSS sample: peak and current RSS in bytes.
+///
+/// Both fields are **diagnostic apertures only** — approximate, process-wide,
+/// platform-dependent.  Not a coverage claim, memory-safety proof, UB-free
+/// status, Miri-clean status, site-execution claim, calibrated metric, or
+/// performance guarantee.
+pub struct RssSample {
+    /// Approximate peak RSS in bytes (cumulative maximum since process start).
+    pub peak_rss_bytes: Option<u64>,
+    /// Approximate current RSS in bytes (working-set size at sampling time).
+    /// `None` on macOS (truthful absence) and unsupported platforms.
+    pub current_rss_bytes: Option<u64>,
+}
+
+/// Sample the current process's peak and current resident-set-size (RSS) in bytes.
+///
+/// Returns a [`RssSample`] with either or both fields `None` on unsupported
+/// platforms or when the OS call fails.  Call this once at run completion.
+///
+/// This is a **diagnostic aperture only** — approximate, process-wide,
+/// platform-dependent.  Not a coverage claim, memory-safety proof, UB-free
+/// status, Miri-clean status, site-execution claim, calibrated metric, or
+/// performance guarantee.
+pub fn sample_rss() -> RssSample {
+    let inner = peak_rss::sample();
+    RssSample {
+        peak_rss_bytes: inner.peak,
+        current_rss_bytes: inner.current,
+    }
+}
 
 #[cfg(test)]
 mod tests {

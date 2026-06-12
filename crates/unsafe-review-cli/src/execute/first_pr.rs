@@ -92,10 +92,26 @@ pub(super) struct FirstPrReport<'a> {
     /// Diagnostic only — not a coverage claim, proof, UB-free, Miri-clean,
     /// site-execution, or performance guarantee.
     pub(super) output_bytes: u64,
+    /// Approximate peak RSS of the process in bytes, sampled after all
+    /// artifacts were written.  `None` on unsupported platforms.
+    /// Diagnostic only — approximate, process-wide, platform-dependent;
+    /// not a coverage claim, memory-safety proof, UB-free status,
+    /// Miri-clean status, site-execution claim, or performance guarantee.
+    pub(super) peak_rss_bytes: Option<u64>,
+    /// Approximate current RSS of the process in bytes, sampled after all
+    /// artifacts were written.  `None` on macOS and unsupported platforms.
+    /// Same diagnostic-aperture-only claim boundary as `peak_rss_bytes`.
+    pub(super) current_rss_bytes: Option<u64>,
 }
 
 pub(super) fn print_first_pr_report(report: FirstPrReport<'_>) {
-    print_first_pr_overview(report.output, report.out_dir, report.output_bytes);
+    print_first_pr_overview(
+        report.output,
+        report.out_dir,
+        report.output_bytes,
+        report.peak_rss_bytes,
+        report.current_rss_bytes,
+    );
     print_manual_candidate_handoff(report.out_dir, report.root, report.manual_candidates);
     print_receipt_audit_handoff(report.check);
     print_policy_report_handoff(report.out_dir);
@@ -253,7 +269,13 @@ fn shell_arg(value: &str) -> String {
     }
 }
 
-fn print_first_pr_overview(output: &AnalyzeOutput, out_dir: &Path, output_bytes: u64) {
+fn print_first_pr_overview(
+    output: &AnalyzeOutput,
+    out_dir: &Path,
+    output_bytes: u64,
+    peak_rss_bytes: Option<u64>,
+    current_rss_bytes: Option<u64>,
+) {
     println!("unsafe-review first-pr");
     println!("unsafe-review wrote an advisory PR bundle.");
     println!("- Artifact directory: {}", card_path_display(out_dir));
@@ -265,6 +287,18 @@ fn print_first_pr_overview(output: &AnalyzeOutput, out_dir: &Path, output_bytes:
     // Output bundle disk footprint — diagnostic only; not a coverage claim,
     // proof, UB-free, Miri-clean, site-execution, or performance guarantee.
     println!("- Output bundle: {output_bytes} bytes");
+    // Peak and current RSS — approximate, process-wide, platform-dependent
+    // diagnostic aperture only; not a coverage claim, memory-safety proof,
+    // UB-free status, Miri-clean status, site-execution claim, or performance
+    // guarantee.
+    match peak_rss_bytes {
+        Some(rss) => println!("- Peak RSS: {rss} bytes (approximate; diagnostic only)"),
+        None => println!("- Peak RSS: unavailable on this platform"),
+    }
+    match current_rss_bytes {
+        Some(rss) => println!("- Current RSS: {rss} bytes (approximate; diagnostic only)"),
+        None => println!("- Current RSS: unavailable on this platform"),
+    }
     println!("Open:");
     println!("  {}", artifact_path_display(out_dir, "pr-summary.md"));
     println!("Agent repair queue:");

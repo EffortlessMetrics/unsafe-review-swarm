@@ -21,7 +21,11 @@ repository = "https://github.com/EffortlessMetrics/unsafe-review"
 homepage = "https://github.com/EffortlessMetrics/unsafe-review"
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+# "deny" (not "forbid") so that item-level #[allow(unsafe_code, reason = "...")]
+# can be used in the minimal contracted FFI blocks in util/peak_rss.rs.
+# Every unsafe block still requires a documented SAFETY comment and a
+# #[allow(unsafe_code, reason)] annotation; the governance is the attribute + ledger entry.
+unsafe_code = "deny"
 unsafe_op_in_unsafe_fn = "deny"
 unused_must_use = "deny"
 const_item_interior_mutations = "deny"
