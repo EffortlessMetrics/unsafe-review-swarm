@@ -9,3 +9,7 @@
 /fuzz/target/
 /.claude/worktrees/
 /.claude/settings.local.json
+
+# Local scan/projection output dumps written to the repo root during dev runs.
+# Real runs should use --out-dir or a path outside the repo; never commit dumps.
+/*_out.json
