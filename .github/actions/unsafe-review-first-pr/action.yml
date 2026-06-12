@@ -1,0 +1,181 @@
+# unsafe-review-first-pr composite action
+#
+# Renders an advisory unsafe-review first-pr bundle for a pull request, sets
+# step outputs for the bundle directory and advisory gate status, and appends
+# a bounded GitHub job summary.
+#
+# Advisory posture: this action does NOT post comments, does NOT request write
+# tokens, does NOT run witnesses (Miri, cargo-careful, sanitizers, Loom,
+# Shuttle, Kani, Crux), does NOT edit source files, and does NOT fail on
+# advisory findings by default.
+#
+# Trust boundary (fixed):
+#   Static unsafe contract review only. Not memory-safety proof, not UB-free
+#   status, not Miri-clean status, and not site-execution proof.
+#
+# See docs/ci/github-action.md for the adoption guide and
+# docs/specs/UNSAFE-REVIEW-SPEC-0037-pr-gate-composite-action.md for the
+# contract spec.
+#
+# When published to EffortlessMetrics/unsafe-review, callers reference this as:
+#   uses: EffortlessMetrics/unsafe-review@v1
+#
+# This development copy in unsafe-review-swarm is not the published surface.
+
+name: unsafe-review first-pr
+description: >
+  Advisory unsafe-review PR gate. Installs unsafe-review from crates.io, runs
+  first-pr, writes a bounded GitHub job summary, and sets bundle_dir and
+  gate_status outputs. Does not post comments, does not request write tokens,
+  does not run witnesses, and does not fail on advisory findings by default.
+  Static unsafe contract review only — not memory-safety proof, not UB-free
+  status, not Miri-clean status, and not site-execution proof.
+
+inputs:
+  base_ref:
+    description: >
+      Base ref to diff against (e.g. main). Defaults to the repository default
+      branch. The action fetches this ref before running first-pr.
+    required: false
+    default: ${{ github.event.repository.default_branch }}
+  version:
+    description: >
+      unsafe-review crate version to install from crates.io. Pin this to a
+      known-good version to prevent silent breakage on new releases.
+    required: false
+    default: "0.3.5"
+  out_dir:
+    description: >
+      Directory for the advisory bundle output. The caller may pass this to an
+      artifact upload step.
+    required: false
+    default: "target/unsafe-review"
+  fail_on_new_debt:
+    description: >
+      When true, exit non-zero if new or worsened coverage gaps are found in
+      the diff (maps to exit 1; inherited/baseline gaps never fail). Advisory
+      by default — the action never fails on findings unless this is set to
+      true by the caller.
+    required: false
+    default: "false"
+
+outputs:
+  bundle_dir:
+    description: >
+      Absolute path to the advisory bundle directory. Pass this to an artifact
+      upload step. The bundle contains review-kit.json, cards.json,
+      pr-summary.md, github-summary.md, cards.sarif, comment-plan.json,
+      witness-plan.md, receipt-audit.md, manual-candidates.json,
+      manual-repair-queue.json, tokmd-packets.json, lsp.json,
+      repair-queue.json, and unsafe-review-gate.json.
+    value: ${{ steps.set-outputs.outputs.bundle_dir }}
+  gate_status:
+    description: >
+      Contents of the status field from unsafe-review-gate.json — advisory
+      metadata describing coverage movement (e.g. "advisory"). This is NOT a
+      merge verdict. The caller decides how to use it.
+    value: ${{ steps.set-outputs.outputs.gate_status }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install Rust toolchain
+      uses: dtolnay/rust-toolchain@1.95.0
+
+    - name: Fetch base ref
+      shell: bash
+      env:
+        BASE_REF: ${{ inputs.base_ref }}
+      run: |
+        git fetch --no-tags --depth=100 origin \
+          "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
+
+    - name: Install unsafe-review from crates.io
+      shell: bash
+      env:
+        UNSAFE_REVIEW_VERSION: ${{ inputs.version }}
+      run: |
+        cargo install unsafe-review --locked --version "${UNSAFE_REVIEW_VERSION}"
+
+    - name: Render first-pr advisory bundle
+      shell: bash
+      env:
+        BASE_REF: ${{ inputs.base_ref }}
+        BUNDLE_DIR: ${{ inputs.out_dir }}
+        FAIL_ON_NEW_DEBT: ${{ inputs.fail_on_new_debt }}
+      run: |
+        mkdir -p "${BUNDLE_DIR}"
+        exit_code=0
+        unsafe-review first-pr \
+          --base "origin/${BASE_REF}" \
+          --out-dir "${BUNDLE_DIR}" \
+          || exit_code=$?
+
+        # Exit 0: advisory pass (including advisory findings — not a failure).
+        # Exit 1: policy result (new/worsened gaps). Only fail the job when
+        #         fail_on_new_debt is true; otherwise advisory, pass through.
+        # Exit 2: tool error (malformed input, internal failure) — always fail.
+        if [ "${exit_code}" -eq 2 ]; then
+          echo "::error::unsafe-review first-pr encountered a tool error (exit 2)"
+          exit 2
+        fi
+        if [ "${exit_code}" -eq 1 ] && [ "${FAIL_ON_NEW_DEBT}" = "true" ]; then
+          echo "::warning::unsafe-review first-pr found new or worsened coverage gaps (exit 1, fail_on_new_debt=true)"
+          exit 1
+        fi
+        # Exit 1 with fail_on_new_debt=false (default): advisory, do not fail.
+        exit 0
+
+    - name: Verify bundle file shape
+      shell: bash
+      env:
+        BUNDLE_DIR: ${{ inputs.out_dir }}
+      run: |
+        set -euo pipefail
+        for required in \
+          review-kit.json \
+          cards.json \
+          pr-summary.md \
+          github-summary.md \
+          cards.sarif \
+          comment-plan.json \
+          witness-plan.md \
+          receipt-audit.md \
+          manual-candidates.json \
+          manual-repair-queue.json \
+          tokmd-packets.json \
+          lsp.json \
+          repair-queue.json
+        do
+          if [ ! -s "${BUNDLE_DIR}/${required}" ]; then
+            echo "::error::unsafe-review bundle is missing or empty: ${BUNDLE_DIR}/${required}"
+            exit 1
+          fi
+        done
+
+    - name: Set outputs
+      id: set-outputs
+      shell: bash
+      env:
+        BUNDLE_DIR: ${{ inputs.out_dir }}
+      run: |
+        # bundle_dir: report the absolute path so callers can use it directly.
+        abs_dir="$(realpath "${BUNDLE_DIR}")"
+        echo "bundle_dir=${abs_dir}" >> "${GITHUB_OUTPUT}"
+
+        # gate_status: read the status field from unsafe-review-gate.json.
+        # This is advisory metadata (coverage movement), never a merge verdict.
+        gate_file="${BUNDLE_DIR}/unsafe-review-gate.json"
+        if [ -f "${gate_file}" ]; then
+          gate_status="$(python3 -c "import json,sys; d=json.load(open('${gate_file}')); print(d.get('status','advisory'))" 2>/dev/null || echo "advisory")"
+        else
+          gate_status="advisory"
+        fi
+        echo "gate_status=${gate_status}" >> "${GITHUB_OUTPUT}"
+
+    - name: Write GitHub job summary
+      shell: bash
+      env:
+        BUNDLE_DIR: ${{ inputs.out_dir }}
+      run: |
+        cat "${BUNDLE_DIR}/github-summary.md" >> "${GITHUB_STEP_SUMMARY}"
