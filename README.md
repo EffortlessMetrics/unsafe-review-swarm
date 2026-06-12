@@ -106,6 +106,57 @@ For the end-to-end maintainer path from first card to fix, witness receipt, and
 outcome comparison, see [Find and fix UB-risk review seams](docs/FIND_AND_FIX_UB.md).
 For release-note history, see [CHANGELOG.md](CHANGELOG.md).
 
+## Example: Review a fixture PR
+
+Run against the bundled `raw_pointer_alignment` fixture (no real diff required):
+
+```bash
+unsafe-review first-pr \
+  --root fixtures/raw_pointer_alignment \
+  --diff fixtures/raw_pointer_alignment/change.diff
+```
+
+Real output (trimmed):
+
+```text
+unsafe-review first-pr
+unsafe-review wrote an advisory PR bundle.
+- Artifact directory: target/unsafe-review
+- Review cards: 1
+- Open actionable gaps: 1
+Open:
+  target/unsafe-review/pr-summary.md
+Top card:
+  src/lib.rs:8 `raw_pointer_read`
+  Class: `guard_missing`
+  Missing: guard, witness
+  Route: `miri`
+Explain top card:
+  unsafe-review explain --root fixtures/raw_pointer_alignment \
+    UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1
+Artifacts:
+  target/unsafe-review/cards.json
+  target/unsafe-review/pr-summary.md
+  target/unsafe-review/cards.sarif
+  target/unsafe-review/comment-plan.json
+  target/unsafe-review/lsp.json
+  ... (full list in target/unsafe-review/)
+Trust boundary:
+  static unsafe contract review only; not memory-safety proof, not UB-free status,
+  not Miri-clean status, and not a site-execution claim unless a matching witness
+  receipt says so.
+```
+
+Then explain the card:
+
+```bash
+unsafe-review explain --root fixtures/raw_pointer_alignment \
+  UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1
+```
+
+For the full loop from card to fix and witness receipt, see
+[Find and fix UB-risk review seams](docs/FIND_AND_FIX_UB.md).
+
 ## Add badges to your repo
 
 ```bash
@@ -193,6 +244,7 @@ posture live in the status docs.
 | Agent repair workflow | [Bounded agent repair workflow](docs/explanation/agent-repair-workflow.md) |
 | Dogfood evidence | [Dogfood index](docs/dogfood/index.md) |
 | CLI reference | [CLI guide](docs/CLI.md) |
+| LSP/editor integration | [Saved LSP projection guide](docs/editor/saved-lsp-json.md) |
 
 ## Crate surface
 
