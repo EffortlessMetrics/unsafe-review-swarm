@@ -281,6 +281,82 @@ Fill in for your project:
 6. An issue-routing rule (own-org auto-file; third-party log-for-human).
 7. A hygiene reminder: CI-watch, LF verify, cache relocation, cleanup audit.
 
+## 11. Why this works — designing for a ~12% error rate
+
+The whole spine is error-rate engineering. Assume roughly one in ten of any
+agent's claims is wrong — including the orchestrator's own memory. A workflow
+that trusts single assertions accumulates that error; a workflow built to catch
+it converges. The mechanisms, in priority order:
+
+- **Objectify the claim.** Turn a claim into a check — a grep, a command, a
+  deterministic gate — and it is ground truth (~0% error) regardless of which
+  agent runs it. A check beats a verdict. Do this first, always. The decisive
+  fact ("does this symbol have other consumers?") is a grep, not an opinion.
+- **Different angle, not different agent.** The same warm agent catches its own
+  errors when re-aimed: verify the diff *against the plan*, with a *new* test
+  set, or from a different vantage (attacker, downstream consumer, skeptic).
+  "Look again, is it right?" re-samples the same prior and launders the error;
+  a different angle is a genuinely independent draw — at cache-warm cost, not a
+  re-spawn. Reserve a fresh independent agent for irreducible judgment only.
+- **Ask for enumerated actions, never "is it good?"** "Is it good/done/right?"
+  triggers self-confirmation. Ask for tasks that produce an artifact: list the
+  test surfaces and whether each goes red on revert; run the coverage tool;
+  cite the controlling spec; point to the duplication. Name the specific
+  assumptions to check against the code; do not leave grounding to discretion.
+- **Verification includes reviewers and the controller.** A reviewer's verdict
+  is also a ~12% claim. The controller checks the *decisive fact* before an
+  irreversible step (merge), not the verdict.
+- **Catch early; keep diffs small.** The cost of a wrong claim scales with how
+  late it is caught (a spec edit, then a build cycle, then a shipped
+  regression). A small diff carries few claims, so it is catchable; and a
+  correction is a smaller surface than the original write, so the loop shrinks
+  toward zero residual instead of oscillating. One reason per PR is an
+  error-rate strategy, not just tidiness.
+- **Write every correction down.** A drift-lock test plus a spec line plus a
+  changelog entry turns each catch into a zero-cost inherited fact *and* a
+  permanent regression catch. The accumulated docs/tests are the set of errors
+  already caught; that set only grows, so per-PR convergence becomes a
+  project-level ratchet — monotonically harder to regress.
+
+The payoff: well-designed specs and tests are *rails*. Rails are what let cheap,
+~12%-error agents run fast and unattended — the rails catch the one-in-ten
+derailment cheaply and early (a red test, a failed gate, a spec-traced
+contradiction). Without them you must hand-verify everything, which does not
+scale. The real deliverable is therefore the *quality* of the test and spec
+design, not "more agents."
+
+## 12. Guardrails, not handcuffs
+
+Give builders direction, guardrails, and guidance, then iterate. Do not hard-lock
+them to specific practices or files.
+
+- A **handcuff** prescribes the exact *how* ("implement it in this function").
+  It is brittle (the builder often finds a better seam and ignores it) and
+  beside the point (it does not prevent the failures that matter), and it
+  discards the builder's judgment.
+- A **guardrail** is a boundary on the *outcome* ("never drop an actionable
+  finding", "do not cross the trust boundary", "do not expand scope silently",
+  "every surface still projects from the one truth object").
+- **Guidance** points at the goal and the principle to apply; the builder owns
+  the implementation.
+
+Prefer guardrails expressed as tests or gates — an objective boundary catches a
+violation no matter how the builder got there. A brief should carry: goal,
+non-goals, guardrails on outcomes, the specific assumptions to verify against
+the code, and the proof commands — not a step-by-step recipe.
+
+Two corollaries learned the hard way:
+
+- **Specs and plans are directional hypotheses, not binding axioms.** A spec can
+  be wrong. A builder that faithfully implements a wrong premise produces a
+  wrong result that passes its own re-blessed checks. Verify the premise against
+  the data before building on it; when verification falsifies it, update the
+  spec rather than shipping to it.
+- **Beware the re-blessed gate.** A green gate proves only that output matches
+  expectations — which a builder can rewrite. When a change edits the
+  expectations (goldens, calibration) at scale, verify the new expectations are
+  *correct*, not merely that they pass.
+
 ---
 
 ## This-repo mapping
