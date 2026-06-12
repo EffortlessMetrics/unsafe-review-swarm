@@ -9,7 +9,7 @@ Linked docs:
 - ../contributing/dependency-pr-policy.md
 - ../contributing/AGENT-ORCHESTRATION.md (sections 11-12)
 Linked PRs:
-- TBD (output-byte footprint #1618; RSS telemetry: TBD)
+- #1618 (output-byte footprint); #1620 (current + peak RSS telemetry via ledgered FFI)
 
 ## Decision
 

@@ -26,8 +26,11 @@ return value checked; PeakWorkingSetSize and WorkingSetSize are in bytes.
 Each unsafe block is minimal — only the FFI call(s).
 SAFETY contracts are documented inline in util/peak_rss.rs.
 No alternative without adding a new shipped dependency.
-Governed by #[allow(unsafe_code, reason = "...")] at function scope;
-[lints.rust] unsafe_code = "deny" in this crate's Cargo.toml overrides
-the workspace "forbid", allowing item-level #[allow].
+Governed by #[allow(unsafe_code, reason = "...")] at function and extern-block scope.
+The workspace [workspace.lints.rust] unsafe_code was relaxed from "forbid" to
+"deny" (every crate inherits via [lints] workspace = true); "forbid" cannot be
+overridden by #[allow] anywhere, so "deny" is required to permit the item-level
+exception. The deny level + the mandatory reason + this ledger entry + review
+are the gate. See ADR-0008.
 """
 approved_by = "owner (pre-authorised in brief)"

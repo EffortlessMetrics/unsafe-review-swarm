@@ -50,7 +50,7 @@ Commit subjects follow `area: summary` (e.g. `cli:`, `analysis:`, `docs(specs):`
 
 ## Lint posture (matters when writing code)
 
-Workspace lints deny, among others: `unsafe_code` (forbidden), `clippy::unwrap_used`, `clippy::expect_used`, `clippy::panic`, `clippy::todo`, `clippy::unimplemented`, `clippy::unreachable`, `clippy::allow_attributes_without_reason`. Return `Result` and propagate errors; never unwrap. Any `#[allow]` needs a `reason`.
+Workspace lints deny, among others: `unsafe_code` (deny — no unsafe without a governed `#[allow(unsafe_code, reason = …)]` plus a `# Safety` contract recorded in the `policy/clippy-exceptions.toml` ledger; see ADR-0008), `clippy::unwrap_used`, `clippy::expect_used`, `clippy::panic`, `clippy::todo`, `clippy::unimplemented`, `clippy::unreachable`, `clippy::allow_attributes_without_reason`. Return `Result` and propagate errors; never unwrap. Any `#[allow]` needs a `reason`.
 
 ## Architecture
 
