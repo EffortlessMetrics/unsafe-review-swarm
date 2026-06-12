@@ -381,6 +381,21 @@ pub fn project_editor(output: &AnalyzeOutput) -> lsp::EditorProjection {
     lsp::project_editor(output)
 }
 
+/// Render the rich hover markdown for a single [`ReviewCard`] as the live LSP
+/// server would produce it.
+///
+/// The returned string is the same content that `lsp.json` embeds in its
+/// `hovers[].contents` field: obligations, evidence state (contract / guard /
+/// reach / witness), hazard families, verify commands, witness route, handoff
+/// commands, and the advisory trust boundary.
+///
+/// This is **advisory evidence only**: no memory-safety proof, no UB-free
+/// status, no Miri-clean status, and not a site-execution claim unless a
+/// matching witness receipt says so.
+pub fn render_lsp_hover(card: &ReviewCard) -> String {
+    lsp::render_hover(card)
+}
+
 pub fn render_witness_plan(output: &AnalyzeOutput) -> String {
     witness_plan::render(output)
 }

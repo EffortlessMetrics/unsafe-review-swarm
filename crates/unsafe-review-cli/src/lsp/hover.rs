@@ -1,9 +1,8 @@
 use tower_lsp_server::ls_types::{
     Diagnostic, Hover, HoverContents, MarkupContent, MarkupKind, Position,
 };
-use unsafe_review_core::AnalyzeOutput;
+use unsafe_review_core::{AnalyzeOutput, render_lsp_hover};
 
-use super::TRUST_BOUNDARY;
 use super::diagnostics::find_card_at_position;
 
 pub(super) fn hover_for(
@@ -15,14 +14,7 @@ pub(super) fn hover_for(
     Some(Hover {
         contents: HoverContents::Markup(MarkupContent {
             kind: MarkupKind::Markdown,
-            value: format!(
-                "### unsafe-review: {}\n\nCard: `{}`\n\nOperation: `{}`\n\nSuggested next action:\n{}\n\nTrust boundary:\n{}",
-                card.class.as_str(),
-                &card.id.0,
-                card.operation.family.as_str(),
-                card.next_action.summary,
-                TRUST_BOUNDARY
-            ),
+            value: render_lsp_hover(card),
         }),
         range: None,
     })

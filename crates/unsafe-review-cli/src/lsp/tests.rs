@@ -219,8 +219,30 @@ fn hover_selects_card_at_cursor() -> Result<(), Box<dyn Error>> {
     let HoverContents::Markup(markup) = hover.contents else {
         return Err("expected markdown hover".into());
     };
+    // Card identity and trust boundary (preserved from original).
     assert!(markup.value.contains(&output.cards[0].id.0));
     assert!(markup.value.contains("Trust boundary"));
+    // Rich hover: obligations section must be present.
+    assert!(
+        markup.value.contains("Required safety conditions:"),
+        "hover must contain obligations section (got: {:?})",
+        &markup.value[..markup.value.len().min(200)]
+    );
+    // Rich hover: at least one concrete obligation description.
+    assert!(
+        markup.value.contains("pointer is live"),
+        "hover must contain at least one obligation description (got: {:?})",
+        &markup.value[..markup.value.len().min(200)]
+    );
+    // Rich hover: evidence sections must be present.
+    assert!(
+        markup.value.contains("Evidence found:"),
+        "hover must contain evidence-found section"
+    );
+    assert!(
+        markup.value.contains("Evidence missing:"),
+        "hover must contain evidence-missing section"
+    );
     Ok(())
 }
 

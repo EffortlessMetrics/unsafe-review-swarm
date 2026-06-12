@@ -35,6 +35,15 @@ pub type EditorDiagnostic = serde_json::Value;
 pub type EditorHover = serde_json::Value;
 pub type EditorCodeAction = serde_json::Value;
 
+/// Render the rich hover markdown for a single [`ReviewCard`].
+///
+/// This is the same content as `lsp.json` `hovers[].contents`: obligations,
+/// evidence state, hazard families, verify commands, witness route, handoff
+/// commands, and the advisory trust boundary.
+pub(crate) fn render_hover(card: &ReviewCard) -> String {
+    hover::contents(card)
+}
+
 pub(crate) fn project_editor(output: &AnalyzeOutput) -> EditorProjection {
     let projection = LspProjection::from(output);
     EditorProjection {
