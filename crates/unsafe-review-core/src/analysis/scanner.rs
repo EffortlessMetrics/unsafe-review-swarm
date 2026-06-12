@@ -1047,7 +1047,7 @@ mod tests {
         );
 
         let rel = PathBuf::from("src/lib.rs");
-        let sites = scan_file(&root, &rel, Some(&diff), false)?;
+        let sites = scan_file(&root, &rel, Some(&diff), false)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert_eq!(sites.len(), 1, "unexpected sites: {sites:#?}");
@@ -1074,7 +1074,7 @@ mod tests {
         );
 
         let rel = PathBuf::from("src/lib.rs");
-        let sites = scan_file(&root, &rel, Some(&diff), false)?;
+        let sites = scan_file(&root, &rel, Some(&diff), false)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert_eq!(sites.len(), 1, "unexpected sites: {sites:#?}");
@@ -1100,7 +1100,7 @@ mod tests {
         );
 
         let rel = PathBuf::from("src/lib.rs");
-        let sites = scan_file(&root, &rel, Some(&diff), false)?;
+        let sites = scan_file(&root, &rel, Some(&diff), false)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert_eq!(sites.len(), 1, "unexpected sites: {sites:#?}");
@@ -1126,7 +1126,7 @@ mod tests {
         );
 
         let rel = PathBuf::from("src/lib.rs");
-        let sites = scan_file(&root, &rel, Some(&diff), false)?;
+        let sites = scan_file(&root, &rel, Some(&diff), false)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert_eq!(sites.len(), 1, "unexpected sites: {sites:#?}");
@@ -1153,7 +1153,7 @@ mod tests {
         );
 
         let rel = PathBuf::from("src/lib.rs");
-        let sites = scan_file(&root, &rel, Some(&diff), false)?;
+        let sites = scan_file(&root, &rel, Some(&diff), false)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert_eq!(sites.len(), 1, "unexpected sites: {sites:#?}");
@@ -1526,7 +1526,7 @@ mod tests {
         )
         .map_err(|err| format!("write temp source failed: {err}"))?;
 
-        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         let operations = sites
@@ -1554,7 +1554,7 @@ mod tests {
         )
         .map_err(|err| format!("write temp source failed: {err}"))?;
 
-        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert!(sites.is_empty(), "unexpected sites: {sites:#?}");
@@ -1573,7 +1573,7 @@ mod tests {
         )
         .map_err(|err| format!("write temp source failed: {err}"))?;
 
-        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert!(sites.is_empty(), "unexpected sites: {sites:#?}");
@@ -1591,7 +1591,7 @@ mod tests {
         )
         .map_err(|err| format!("write temp source failed: {err}"))?;
 
-        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert!(
@@ -1628,7 +1628,7 @@ mod tests {
         )
         .map_err(|err| format!("write temp source failed: {err}"))?;
 
-        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         let extern_block = sites
@@ -1652,7 +1652,7 @@ mod tests {
         )
         .map_err(|err| format!("write temp source failed: {err}"))?;
 
-        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert!(
@@ -1683,7 +1683,7 @@ mod tests {
         )
         .map_err(|err| format!("write temp source failed: {err}"))?;
 
-        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         let static_mut_sites = sites
@@ -1721,7 +1721,7 @@ mod tests {
         )
         .map_err(|err| format!("write temp source failed: {err}"))?;
 
-        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert!(sites.is_empty(), "unexpected sites: {sites:#?}");
@@ -1739,7 +1739,7 @@ mod tests {
         )
         .map_err(|err| format!("write temp source failed: {err}"))?;
 
-        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         let operations = sites
@@ -1772,7 +1772,7 @@ mod tests {
         )
         .map_err(|err| format!("write temp source failed: {err}"))?;
 
-        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert_eq!(sites.len(), 1, "unexpected sites: {sites:#?}");
@@ -1807,7 +1807,7 @@ impl<T> Tagged<T> {\n\
         )
         .map_err(|err| format!("write temp source failed: {err}"))?;
 
-        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         let atomic_sites = sites
@@ -1836,7 +1836,7 @@ impl<T> Tagged<T> {\n\
         )
         .map_err(|err| format!("write temp source failed: {err}"))?;
 
-        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         let public_fn = sites
@@ -1879,7 +1879,7 @@ impl<T> Tagged<T> {\n\
         )
         .map_err(|err| format!("write temp source failed: {err}"))?;
 
-        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         let families = sites
@@ -1928,8 +1928,8 @@ impl<T> Tagged<T> {\n\
         );
 
         let rel = PathBuf::from("src/lib.rs");
-        let diff_sites = scan_file(&root, &rel, Some(&diff), false)?;
-        let repo_sites = scan_file(&root, &rel, Some(&diff), true)?;
+        let diff_sites = scan_file(&root, &rel, Some(&diff), false)?.sites;
+        let repo_sites = scan_file(&root, &rel, Some(&diff), true)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert_eq!(
@@ -1958,7 +1958,7 @@ impl<T> Tagged<T> {\n\
         )
         .map_err(|err| format!("write temp source failed: {err}"))?;
 
-        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert!(sites.is_empty(), "unexpected sites: {sites:#?}");
@@ -1976,7 +1976,7 @@ impl<T> Tagged<T> {\n\
         )
         .map_err(|err| format!("write temp source failed: {err}"))?;
 
-        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert!(sites.is_empty(), "unexpected sites: {sites:#?}");
@@ -1986,7 +1986,7 @@ impl<T> Tagged<T> {\n\
     #[test]
     fn scan_file_does_not_report_detector_literal_matchers() -> Result<(), String> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let sites = scan_file(&root, &PathBuf::from("src/analysis/scanner.rs"), None, true)?;
+        let sites = scan_file(&root, &PathBuf::from("src/analysis/scanner.rs"), None, true)?.sites;
 
         assert!(
             sites.iter().all(|site| {
@@ -2009,7 +2009,7 @@ impl<T> Tagged<T> {\n\
         )
         .map_err(|err| format!("write temp source failed: {err}"))?;
 
-        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+        let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert!(sites.is_empty(), "unexpected sites: {sites:#?}");

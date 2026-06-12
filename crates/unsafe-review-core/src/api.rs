@@ -106,6 +106,16 @@ impl RepoStopReason {
     }
 }
 
+/// Per-file scan timing entry.  Diagnostic only — not a coverage claim,
+/// proof, UB-free, Miri-clean, site-execution, or performance guarantee.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PerFileScanStats {
+    /// Repository-relative path of the scanned file.
+    pub file: PathBuf,
+    /// Wall-clock milliseconds spent scanning this file (parse + site detection).
+    pub scan_ms: u64,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RepoScanStatus {
     pub schema_version: String,
@@ -124,7 +134,18 @@ pub struct RepoScanStatus {
     pub stop_reason: RepoStopReason,
     /// The configured card cap when `stop_reason == MaxCards`; `None` otherwise.
     pub cap: Option<usize>,
+    /// Per-file timing breakdown for diagnostic use.  Present only when the
+    /// scan covered fewer than [`FILE_TIMINGS_CAP`] files; `None` for large
+    /// scans (cap honesty: the field is absent, not silently truncated).
+    /// This is a **diagnostic aperture only** — not a coverage claim, proof,
+    /// UB-free, Miri-clean, site-execution, or performance guarantee.
+    pub file_timings: Option<Vec<PerFileScanStats>>,
 }
+
+/// Maximum number of files for which per-file timing is collected.
+/// Scans touching more files omit `file_timings` entirely rather than
+/// silently emitting a partial list (truncation honesty).
+pub const FILE_TIMINGS_CAP: usize = 100;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct DiscoveryOptions {

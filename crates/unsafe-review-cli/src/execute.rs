@@ -862,6 +862,21 @@ fn render_repo_scan_status(
     } else {
         ("complete", false, status.stop_reason.as_str())
     };
+    // Render per-file timings when present.  The field is absent (null) for
+    // large scans (>= FILE_TIMINGS_CAP files) — truncation honesty: we do not
+    // silently emit a partial list.  Diagnostic only; not a proof, coverage
+    // claim, UB-free, Miri-clean, site-execution, or performance guarantee.
+    let file_timings_json = status.file_timings.as_ref().map(|timings| {
+        timings
+            .iter()
+            .map(|entry| {
+                serde_json::json!({
+                    "file": repo_path_display(&entry.file),
+                    "scan_ms": entry.scan_ms,
+                })
+            })
+            .collect::<Vec<_>>()
+    });
     let value = serde_json::json!({
         "schema_version": status.schema_version.as_str(),
         "phase": status.phase.as_str(),
@@ -876,6 +891,7 @@ fn render_repo_scan_status(
         "partial": partial,
         "stop_reason": stop_reason,
         "cap": status.cap,
+        "file_timings": file_timings_json,
         "error": null,
         "signal": null,
         "partial_path": null,
@@ -912,6 +928,9 @@ fn render_repo_scan_incomplete_status(
         "partial": true,
         "stop_reason": stop_reason.as_str(),
         "cap": null,
+        // Per-file timings are not available in incomplete/error states; the field
+        // is null rather than a partial list (truncation honesty).
+        "file_timings": serde_json::Value::Null,
         "error": error,
         "signal": null,
         "partial_path": partial_path.map(|path| path.display().to_string()),
@@ -948,6 +967,9 @@ fn render_repo_scan_interrupted_status(
         "partial": true,
         "stop_reason": RepoStopReason::Terminated.as_str(),
         "cap": null,
+        // Per-file timings are not available in signal-interrupted states; the field
+        // is null rather than a partial list (truncation honesty).
+        "file_timings": serde_json::Value::Null,
         "error": format!("repo scan interrupted by {signal_name}"),
         "signal": signal_name,
         "partial_path": partial_path.map(|path| path.display().to_string()),
@@ -978,6 +1000,8 @@ fn write_scan_start_stub(
         "partial": false,
         "stop_reason": "none",
         "cap": serde_json::Value::Null,
+        // Per-file timings are not available in the pre-discovery start stub.
+        "file_timings": serde_json::Value::Null,
         "error": serde_json::Value::Null,
         "signal": serde_json::Value::Null,
         "partial_path": serde_json::Value::Null,

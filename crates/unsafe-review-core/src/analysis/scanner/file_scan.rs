@@ -7,13 +7,25 @@ use crate::input::diff::DiffIndex;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Instant;
+
+/// Result of scanning a single file: the detected sites and the wall-clock
+/// milliseconds spent on parse + site detection.
+#[derive(Debug)]
+pub(crate) struct FileScanResult {
+    pub(crate) sites: Vec<ScannedSite>,
+    /// Wall-clock milliseconds for parse + all detection passes on this file.
+    /// Diagnostic only — not a proof, coverage claim, or performance guarantee.
+    pub(crate) scan_ms: u64,
+}
 
 pub(crate) fn scan_file(
     root: &Path,
     rel: &PathBuf,
     diff: Option<&DiffIndex>,
     repo_mode: bool,
-) -> Result<Vec<ScannedSite>, String> {
+) -> Result<FileScanResult, String> {
+    let file_start = Instant::now();
     let abs = root.join(rel);
     let text =
         fs::read_to_string(&abs).map_err(|err| format!("read {} failed: {err}", abs.display()))?;
@@ -62,5 +74,13 @@ pub(crate) fn scan_file(
             .cmp(&right.site.location.line)
             .then(left.site.location.column.cmp(&right.site.location.column))
     });
-    Ok(out)
+    let scan_ms = file_start
+        .elapsed()
+        .as_millis()
+        .try_into()
+        .unwrap_or(u64::MAX);
+    Ok(FileScanResult {
+        sites: out,
+        scan_ms,
+    })
 }

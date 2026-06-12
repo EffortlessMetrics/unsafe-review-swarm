@@ -4804,6 +4804,116 @@ fn repo_timeout_keeps_completed_file_partial_snapshot() -> Result<(), Box<dyn Er
     Ok(())
 }
 
+/// Drift-lock: if per-file timing emission is dropped from the complete scan
+/// path, `file_timings` will be null here and the assertions below go RED.
+#[test]
+fn repo_status_sidecar_includes_per_file_timings_for_small_scan() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-repo-timings-e2e")?;
+    let report_path = temp.path().join("repo.json");
+    let status_path = temp.path().join("repo.json.status.json");
+
+    run_success([
+        os("repo"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+        os("--out"),
+        report_path.as_os_str().to_os_string(),
+    ])?;
+
+    let status = parse_json(&fs::read_to_string(&status_path)?)?;
+    assert_eq!(status["schema_version"], "repo-scan-status/v1");
+    assert_eq!(status["phase"], "complete");
+    assert_eq!(status["completed"], true);
+
+    // file_timings must be a non-null array for a small fixture scan.
+    // Diagnostic only — not a proof, coverage claim, or performance guarantee.
+    let timings = status["file_timings"].as_array().ok_or_else(|| {
+        format!(
+            "file_timings must be a JSON array; got: {}",
+            status["file_timings"]
+        )
+    })?;
+    assert!(
+        !timings.is_empty(),
+        "file_timings must be non-empty for a scan that scanned files"
+    );
+    // Each entry must have 'file' (string) and 'scan_ms' (number).
+    for entry in timings {
+        assert!(
+            entry["file"].as_str().is_some(),
+            "each file_timings entry must have a string 'file' field; got: {entry}"
+        );
+        assert!(
+            entry["scan_ms"].as_u64().is_some(),
+            "each file_timings entry must have a numeric 'scan_ms' field; got: {entry}"
+        );
+    }
+    // The number of entries must match files_scanned.
+    let files_scanned = status["files_scanned"]
+        .as_u64()
+        .ok_or_else(|| "files_scanned must be numeric".to_string())?;
+    assert_eq!(
+        timings.len() as u64,
+        files_scanned,
+        "file_timings entry count must equal files_scanned"
+    );
+
+    Ok(())
+}
+
+/// Drift-lock: if file_timings is emitted even for the incomplete/timeout path
+/// (which would be a partial list without announcement), this test goes RED by
+/// confirming the field is null in the timeout sidecar.
+#[test]
+fn repo_status_sidecar_file_timings_null_for_timeout_path() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-repo-timings-timeout-e2e")?;
+    let scan_root = temp.path().join("fixture");
+    copy_dir_all(&fixture, &scan_root)?;
+    fs::write(scan_root.join("src/z_safe.rs"), "pub fn safe() {}\n")?;
+    let report_path = temp.path().join("repo.json");
+    let status_path = temp.path().join("repo.json.status.json");
+
+    // Run with a tight timeout so the scan stops mid-way.
+    let output = Command::new(env!("CARGO_BIN_EXE_unsafe-review"))
+        .args([
+            os("repo"),
+            os("--root"),
+            scan_root.as_os_str().to_os_string(),
+            os("--format"),
+            os("json"),
+            os("--out"),
+            report_path.as_os_str().to_os_string(),
+            os("--timeout-seconds"),
+            os("1"),
+        ])
+        .env(
+            "UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_AFTER_SCANNED",
+            "1",
+        )
+        .env(
+            "UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_AFTER_SCAN_MS",
+            "1100",
+        )
+        .output()?;
+    assert!(!output.status.success(), "timeout scan must exit non-zero");
+
+    let status = parse_json(&fs::read_to_string(&status_path)?)?;
+    assert_eq!(status["stop_reason"], "timeout");
+    // Timeout incomplete status must have file_timings: null — truncation
+    // honesty: we never emit a partial list without announcement.
+    assert!(
+        status["file_timings"].is_null(),
+        "file_timings must be null in timeout incomplete status; got: {}",
+        status["file_timings"]
+    );
+
+    Ok(())
+}
+
 #[cfg(unix)]
 #[test]
 fn repo_sigterm_writes_interrupted_status_sidecar() -> Result<(), Box<dyn Error>> {

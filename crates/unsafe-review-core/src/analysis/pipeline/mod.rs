@@ -11,8 +11,8 @@ use self::input_loading::{load_diff_index, package_name};
 use self::summary::summarize;
 use super::{receipts, scanner};
 use crate::api::{
-    AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, DiscoveryOptions, RepoScanEvent,
-    RepoScanPhase, RepoScanStatus, RepoStopReason, Scope,
+    AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, DiscoveryOptions, FILE_TIMINGS_CAP,
+    PerFileScanStats, RepoScanEvent, RepoScanPhase, RepoScanStatus, RepoStopReason, Scope,
 };
 use crate::domain::ReviewCard;
 use crate::input::workspace;
@@ -84,7 +84,16 @@ fn analyze_with_receipts(
     let changed_non_rust_files = diff_index.changed_non_rust_file_count();
     emit_repo_status(
         &mut events,
-        repo_status(RepoScanPhase::Discovering, &started, 0, 0, 0, None, false),
+        repo_status(
+            RepoScanPhase::Discovering,
+            &started,
+            0,
+            0,
+            0,
+            None,
+            false,
+            None,
+        ),
     )?;
     let mut discovered_files = 0usize;
     let all_rust_files = {
@@ -100,6 +109,7 @@ fn analyze_with_receipts(
                     0,
                     Some(path.to_path_buf()),
                     false,
+                    None,
                 ),
             )
         };
@@ -143,6 +153,17 @@ fn analyze_with_receipts(
     let mut files_scanned = 0usize;
     let mut last_scanned_path = None;
     let mut scan_capped = false;
+    // Collect per-file timings only when the candidate set is small enough to
+    // keep the status sidecar bounded.  Scans over FILE_TIMINGS_CAP files omit
+    // the field entirely rather than silently emitting a partial list (truncation
+    // honesty).  The timings are diagnostic only — not a proof, coverage claim,
+    // UB-free, Miri-clean, site-execution, or performance guarantee.
+    let collect_timings = candidate_files.len() < FILE_TIMINGS_CAP;
+    let mut file_timings: Vec<PerFileScanStats> = if collect_timings {
+        Vec::with_capacity(candidate_files.len())
+    } else {
+        Vec::new()
+    };
     emit_repo_status(
         &mut events,
         repo_status(
@@ -153,6 +174,7 @@ fn analyze_with_receipts(
             cards.len(),
             None,
             false,
+            None,
         ),
     )?;
     'files: for rel in &candidate_files {
@@ -169,9 +191,16 @@ fn analyze_with_receipts(
                 cards.len(),
                 Some(rel.clone()),
                 false,
+                None,
             ),
         )?;
-        let scanned = scanner::scan_file(&input.root, rel, Some(&diff_index), repo_mode)?;
+        let file_result = scanner::scan_file(&input.root, rel, Some(&diff_index), repo_mode)?;
+        if collect_timings {
+            file_timings.push(PerFileScanStats {
+                file: rel.clone(),
+                scan_ms: file_result.scan_ms,
+            });
+        }
         files_scanned += 1;
         let mut build_ctx = card_builder::CardBuildContext {
             root: &input.root,
@@ -181,7 +210,7 @@ fn analyze_with_receipts(
             identity_counts: &mut identity_counts,
         };
         let mut reached_max_cards = false;
-        for scanned_site in scanned {
+        for scanned_site in file_result.sites {
             cards.push(card_builder::build_card(&mut build_ctx, scanned_site));
             if cards.len() >= max_cards {
                 reached_max_cards = true;
@@ -198,6 +227,7 @@ fn analyze_with_receipts(
                 cards.len(),
                 Some(rel.clone()),
                 false,
+                None,
             ),
             Some(partial_analyze_output(
                 &input,
@@ -216,6 +246,12 @@ fn analyze_with_receipts(
             break 'files;
         }
     }
+    // Finalize per-file timings: present when collected, absent otherwise.
+    let final_file_timings = if collect_timings {
+        Some(file_timings)
+    } else {
+        None
+    };
     sort_cards(&mut cards);
     let summary = summarize(
         all_rust_files.len(),
@@ -251,6 +287,7 @@ fn analyze_with_receipts(
             // cards.len() reached max_cards, which requires max_cards < usize::MAX,
             // which requires input.max_cards to be Some(_).
             input.max_cards.unwrap_or(max_cards),
+            final_file_timings,
         )
     } else {
         repo_status(
@@ -261,6 +298,7 @@ fn analyze_with_receipts(
             output.cards.len(),
             last_scanned_path,
             true,
+            final_file_timings,
         )
     };
     emit_repo_event(&mut events, final_status, Some(output.clone()))?;
@@ -336,6 +374,10 @@ fn emit_repo_event(
     Ok(())
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "file_timings is the last parameter; grouping would obscure the data flow"
+)]
 fn repo_status(
     phase: RepoScanPhase,
     started: &Instant,
@@ -344,6 +386,7 @@ fn repo_status(
     cards_found: usize,
     last_path: Option<PathBuf>,
     completed: bool,
+    file_timings: Option<Vec<PerFileScanStats>>,
 ) -> RepoScanStatus {
     RepoScanStatus {
         schema_version: "repo-scan-status/v1".to_string(),
@@ -357,6 +400,7 @@ fn repo_status(
         partial: false,
         stop_reason: RepoStopReason::None,
         cap: None,
+        file_timings,
     }
 }
 
@@ -367,6 +411,7 @@ fn repo_status_capped(
     cards_found: usize,
     last_path: Option<PathBuf>,
     cap: usize,
+    file_timings: Option<Vec<PerFileScanStats>>,
 ) -> RepoScanStatus {
     RepoScanStatus {
         schema_version: "repo-scan-status/v1".to_string(),
@@ -380,6 +425,7 @@ fn repo_status_capped(
         partial: true,
         stop_reason: RepoStopReason::MaxCards,
         cap: Some(cap),
+        file_timings,
     }
 }
 
@@ -5986,6 +6032,185 @@ evidence = "test fixture"
         assert_eq!(
             final_status.cards_found, 1,
             "final status cards_found must equal the emitted card count"
+        );
+        Ok(())
+    }
+
+    /// Verify that a repo scan with fewer than FILE_TIMINGS_CAP candidate files
+    /// produces per-file timing entries in the final status, one per scanned file.
+    /// This is a drift-lock: if file_timings emission is dropped, this goes RED.
+    #[test]
+    fn per_file_timings_present_for_small_repo_scan() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-timings-small")?;
+        fs::create_dir_all(root.join("src")).map_err(|err| format!("create dirs failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"timings-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "pub unsafe fn alpha(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+        )
+        .map_err(|err| format!("write src/lib.rs failed: {err}"))?;
+        fs::write(root.join("src/beta.rs"), "pub fn beta() -> u8 { 42 }\n")
+            .map_err(|err| format!("write src/beta.rs failed: {err}"))?;
+
+        let mut final_status: Option<RepoScanStatus> = None;
+        let _output = analyze_with_discovery_and_repo_events(
+            AnalyzeInput {
+                root: root.clone(),
+                scope: Scope::Repo,
+                diff: DiffSource::NoneRepoScan,
+                mode: AnalysisMode::Repo,
+                policy: PolicyMode::Advisory,
+                include_unchanged_tests: true,
+                max_cards: None,
+            },
+            DiscoveryOptions::repo_defaults(),
+            |event| {
+                if event.status.completed || event.status.partial {
+                    final_status = Some(event.status.clone());
+                }
+                Ok(())
+            },
+        )?;
+
+        let _ = fs::remove_dir_all(&root);
+
+        let status = final_status.ok_or_else(|| "expected a final status event".to_string())?;
+        // The scan covered 2 files — well below FILE_TIMINGS_CAP — so
+        // file_timings must be present and contain exactly 2 entries.
+        let timings = status
+            .file_timings
+            .as_ref()
+            .ok_or_else(|| "file_timings must be Some(_) for a small scan".to_string())?;
+        assert_eq!(
+            timings.len(),
+            2,
+            "file_timings must have one entry per scanned file"
+        );
+        assert_eq!(
+            status.files_scanned, 2,
+            "files_scanned must match the number of timing entries"
+        );
+        Ok(())
+    }
+
+    /// Verify that a capped scan (max_cards=1) still emits per-file timings for
+    /// the files that were scanned before the cap was hit.  The timing data is
+    /// partial in the sense that not all files are present, but it must be
+    /// truthful for the files that were scanned.
+    /// Drift-lock: drop file_timings emission from repo_status_capped → RED.
+    #[test]
+    fn per_file_timings_partial_when_scan_capped_at_max_cards() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-timings-capped")?;
+        fs::create_dir_all(root.join("src")).map_err(|err| format!("create dirs failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"timings-capped-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "pub unsafe fn alpha(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+        )
+        .map_err(|err| format!("write src/lib.rs failed: {err}"))?;
+        fs::write(
+            root.join("src/beta.rs"),
+            "pub unsafe fn beta(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+        )
+        .map_err(|err| format!("write src/beta.rs failed: {err}"))?;
+
+        let mut final_status: Option<RepoScanStatus> = None;
+        let _output = analyze_with_discovery_and_repo_events(
+            AnalyzeInput {
+                root: root.clone(),
+                scope: Scope::Repo,
+                diff: DiffSource::NoneRepoScan,
+                mode: AnalysisMode::Repo,
+                policy: PolicyMode::Advisory,
+                include_unchanged_tests: true,
+                max_cards: Some(1),
+            },
+            DiscoveryOptions::repo_defaults(),
+            |event| {
+                if event.status.completed || event.status.partial {
+                    final_status = Some(event.status.clone());
+                }
+                Ok(())
+            },
+        )?;
+
+        let _ = fs::remove_dir_all(&root);
+
+        let status = final_status.ok_or_else(|| "expected a final status event".to_string())?;
+        assert!(status.partial, "capped scan must be partial=true");
+        // The cap was hit after scanning the first file.  Timing data must
+        // reflect only the files that were actually scanned.
+        let timings = status
+            .file_timings
+            .as_ref()
+            .ok_or_else(|| "file_timings must be Some(_) for a capped small scan".to_string())?;
+        assert_eq!(
+            timings.len(),
+            status.files_scanned,
+            "file_timings length must match files_scanned even in a capped scan"
+        );
+        assert!(
+            !timings.is_empty(),
+            "at least one file must have been scanned before the cap"
+        );
+        Ok(())
+    }
+
+    /// Verify that a scan over >= FILE_TIMINGS_CAP files omits the file_timings
+    /// field entirely (truncation honesty — no silent partial list).
+    /// Drift-lock: remove the cap check → timings would be Some(_) here → RED.
+    #[test]
+    fn per_file_timings_absent_when_file_count_at_or_above_cap() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-timings-large")?;
+        fs::create_dir_all(root.join("src")).map_err(|err| format!("create dirs failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"timings-large-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
+        // Create exactly FILE_TIMINGS_CAP files so the condition `< cap` is false.
+        for i in 0..FILE_TIMINGS_CAP {
+            let name = format!("src/f{i:03}.rs");
+            fs::write(root.join(&name), "pub fn f() {}\n")
+                .map_err(|err| format!("write {name} failed: {err}"))?;
+        }
+
+        let mut final_status: Option<RepoScanStatus> = None;
+        let _output = analyze_with_discovery_and_repo_events(
+            AnalyzeInput {
+                root: root.clone(),
+                scope: Scope::Repo,
+                diff: DiffSource::NoneRepoScan,
+                mode: AnalysisMode::Repo,
+                policy: PolicyMode::Advisory,
+                include_unchanged_tests: true,
+                max_cards: None,
+            },
+            DiscoveryOptions::repo_defaults(),
+            |event| {
+                if event.status.completed || event.status.partial {
+                    final_status = Some(event.status.clone());
+                }
+                Ok(())
+            },
+        )?;
+
+        let _ = fs::remove_dir_all(&root);
+
+        let status = final_status.ok_or_else(|| "expected a final status event".to_string())?;
+        assert!(
+            status.file_timings.is_none(),
+            "file_timings must be None when file count >= FILE_TIMINGS_CAP (truncation honesty); \
+             got: {:?}",
+            status.file_timings
         );
         Ok(())
     }
