@@ -145,7 +145,8 @@ runs:
           manual-repair-queue.json \
           tokmd-packets.json \
           lsp.json \
-          repair-queue.json
+          repair-queue.json \
+          unsafe-review-gate.json
         do
           if [ ! -s "${BUNDLE_DIR}/${required}" ]; then
             echo "::error::unsafe-review bundle is missing or empty: ${BUNDLE_DIR}/${required}"
@@ -167,7 +168,7 @@ runs:
         # This is advisory metadata (coverage movement), never a merge verdict.
         gate_file="${BUNDLE_DIR}/unsafe-review-gate.json"
         if [ -f "${gate_file}" ]; then
-          gate_status="$(python3 -c "import json,sys; d=json.load(open('${gate_file}')); print(d.get('status','advisory'))" 2>/dev/null || echo "advisory")"
+          gate_status="$(jq -r '.status // "advisory"' "${gate_file}" 2>/dev/null || echo "advisory")"
         else
           gate_status="advisory"
         fi
