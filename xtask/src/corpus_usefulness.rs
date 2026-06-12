@@ -133,10 +133,16 @@ pub(crate) fn run(out: Option<&Path>) -> Result<(), String> {
         .map(|p| p.to_path_buf())
         .unwrap_or_else(|| PathBuf::from(DEFAULT_OUT));
 
+    // Build the binary once up front so per-fixture elapsed_ms reflects actual
+    // scan time, not compile time.  Without this the first `cargo run` invocation
+    // absorbs the full incremental compilation and inflates the elapsed range.
+    let binary = build_binary()?;
+    println!("corpus-usefulness: binary at {}", binary.display());
+
     let mut per_run: Vec<RunResult> = Vec::new();
 
     for (fixture_name, rationale) in SUBSET {
-        let result = run_fixture(fixture_name, rationale)?;
+        let result = run_fixture(fixture_name, rationale, &binary)?;
         per_run.push(result);
     }
 
@@ -447,7 +453,60 @@ struct RunResult {
     elapsed_ms: u64,
 }
 
-fn run_fixture(fixture_name: &str, rationale: &str) -> Result<RunResult, String> {
+/// Build `unsafe-review` and return the path to the compiled binary.
+///
+/// Using `cargo build` once and then invoking the binary directly keeps
+/// per-fixture `elapsed_ms` honest — it measures scan time only, not
+/// incremental compilation.
+fn build_binary() -> Result<PathBuf, String> {
+    let status = Command::new("cargo")
+        .args(["build", "--locked", "-p", "unsafe-review"])
+        .status()
+        .map_err(|err| format!("cargo build spawn failed: {err}"))?;
+
+    if !status.success() {
+        return Err("cargo build --locked -p unsafe-review failed".to_string());
+    }
+
+    // Resolve the target directory from cargo metadata so the path is correct
+    // regardless of any workspace-level target-dir override.
+    let meta_out = Command::new("cargo")
+        .args(["metadata", "--locked", "--no-deps", "--format-version=1"])
+        .output()
+        .map_err(|err| format!("cargo metadata spawn failed: {err}"))?;
+
+    if !meta_out.status.success() {
+        return Err("cargo metadata failed".to_string());
+    }
+
+    let meta_text =
+        String::from_utf8(meta_out.stdout).map_err(|err| format!("cargo metadata utf8: {err}"))?;
+
+    let meta: serde_json::Value = serde_json::from_str(&meta_text)
+        .map_err(|err| format!("cargo metadata json parse failed: {err}"))?;
+
+    let target_dir = meta
+        .get("target_directory")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "cargo metadata: missing target_directory".to_string())?;
+
+    // Platform-aware binary name.
+    let bin_name = if cfg!(windows) {
+        "unsafe-review.exe"
+    } else {
+        "unsafe-review"
+    };
+
+    let bin_path = PathBuf::from(target_dir).join("debug").join(bin_name);
+
+    if !bin_path.exists() {
+        return Err(format!("built binary not found at {}", bin_path.display()));
+    }
+
+    Ok(bin_path)
+}
+
+fn run_fixture(fixture_name: &str, rationale: &str, binary: &Path) -> Result<RunResult, String> {
     let root = format!("fixtures/{fixture_name}");
     let diff = format!("fixtures/{fixture_name}/change.diff");
 
@@ -468,14 +527,11 @@ fn run_fixture(fixture_name: &str, rationale: &str) -> Result<RunResult, String>
     fs::create_dir_all(&out_dir)
         .map_err(|err| format!("create_dir_all {out_dir} failed: {err}"))?;
 
+    // Invoke the pre-built binary directly — elapsed_ms must reflect scan time,
+    // not compile time.  build_binary() already ensured it is up to date.
     let start = Instant::now();
-    let result = Command::new("cargo")
+    let result = Command::new(binary)
         .args([
-            "run",
-            "--locked",
-            "-p",
-            "unsafe-review",
-            "--",
             "first-pr",
             "--root",
             &root,
