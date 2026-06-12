@@ -272,6 +272,7 @@ cargo run --locked -p xtask -- check-dogfood
 
 ## Documentation map
 
+- [Start here: adopting unsafe-review](docs/START-HERE.md)
 - [First-use guide](docs/FIRST_USE.md)
 - [First-hour guide](docs/FIRST_HOUR.md)
 - [Mission and vision](docs/MISSION.md)

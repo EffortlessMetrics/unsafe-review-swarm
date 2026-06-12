@@ -2,6 +2,7 @@
 
 | Layer | Owns | Path |
 |---|---|---|
+| Adoption front door | one-page newcomer routing to all five delivery surfaces | `docs/START-HERE.md` |
 | Mission / vision | product purpose and end state | `docs/MISSION.md`, `docs/VISION.md` |
 | Roadmap | release direction | `docs/ROADMAP.md` |
 | Find/fix workflow | end-to-end UB-risk review seam workflow from first-pr through explain, agent packet, witness receipt, and outcome comparison | `docs/FIND_AND_FIX_UB.md` |
