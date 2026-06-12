@@ -5453,7 +5453,7 @@ unsafe extern "C" {
         assert_eq!(card.class, ReviewClass::BaselineKnown);
         assert_eq!(card.priority, Priority::Low);
         assert_eq!(output.summary.open_actionable_gaps, 0);
-        assert!(card.next_action.summary.contains("Known baseline"));
+        assert!(card.next_action.summary.contains("baseline ledger"));
         Ok(())
     }
 

@@ -1,0 +1,9 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -11,0 +13,4 @@
++
++/// Module-level description added by this PR (safe code, no new unsafe).
++pub fn module_name() -> &'static str {
++    "brownfield-legacy-io"
++}

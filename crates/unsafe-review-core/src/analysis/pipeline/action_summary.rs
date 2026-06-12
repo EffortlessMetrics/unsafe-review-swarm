@@ -63,7 +63,7 @@ pub(super) fn next_action_summary(
         ReviewClass::MiriUnsupported => "Use sanitizer/cargo-careful or an explicit FFI boundary contract; Miri may not exercise this seam.".to_string(),
         ReviewClass::StaticUnknown => "Review the unsafe site manually; identify the missing contract, guard, test, or witness route before claiming progress.".to_string(),
         ReviewClass::UnsafeUnreached => "Add or identify a focused test path that reaches the safe wrapper around this unsafe seam.".to_string(),
-        ReviewClass::BaselineKnown => "Known baseline card; keep the ledger owner and review date current.".to_string(),
+        ReviewClass::BaselineKnown => "Keep the baseline ledger owner and review date current.".to_string(),
         ReviewClass::Suppressed => "Suppressed card; keep the owner, reason, evidence, and review or expiry date current.".to_string(),
         _ => "Attach a focused witness receipt or mark the static limitation explicitly.".to_string(),
     }

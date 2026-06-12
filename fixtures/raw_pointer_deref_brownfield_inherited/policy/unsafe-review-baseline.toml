@@ -1,0 +1,9 @@
+schema_version = "0.1"
+status = "active"
+
+[[entries]]
+card_id = "UR-raw-pointer-deref-brownfield-inherited-fixture-src-lib-rs-read-header-operation-raw_pointer_deref-deref-c47737c6108c-pointer_validity-c1"
+owner = "baseline-init"
+reason = "captured by `baseline init`; pre-existing debt, not reviewed as safe"
+evidence = "baseline-init: brownfield corpus fixture — inherited unsafe raw pointer deref with no guards, pre-dates this PR"
+review_after = "2027-01-01"

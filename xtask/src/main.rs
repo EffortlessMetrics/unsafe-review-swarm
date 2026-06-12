@@ -6696,6 +6696,9 @@ fn check_fixture_next_action(
         "review ",
         "document ",
         "mark ",
+        // "keep " is needed for baseline_known and suppressed cards that direct the
+        // reviewer to keep ledger entries current rather than take an action-to-close.
+        "keep ",
     ]
     .iter()
     .any(|prefix| normalized.starts_with(prefix));

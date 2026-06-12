@@ -17,6 +17,7 @@ required_core_fixtures = [
   "raw_pointer_alignment_modulo_closed_branch_not_guard",
   "raw_pointer_alignment_modulo_reassigned_pointer_not_guard",
   "raw_pointer_deref",
+  "raw_pointer_deref_brownfield_inherited",
   "raw_pointer_read_unaligned",
   "raw_pointer_write_assignment",
   "raw_pointer_write_unaligned",
@@ -714,6 +715,16 @@ claim = "raw pointer dereference reports pointer, alignment, initialization, and
 support_tier = "Raw pointer card slice"
 expected_cards = 1
 expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_deref"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_deref_brownfield_inherited"
+kind = "positive"
+claim = "brownfield repo with pre-existing raw pointer deref gap baselined as inherited; a safe-code-only PR shows new_gaps=0 and the card class is baseline_known"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "baseline_known"
 expected_operation_family = "raw_pointer_deref"
 expected_hazard = "pointer_validity"
 

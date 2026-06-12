@@ -1,0 +1,4 @@
+[package]
+name = "raw-pointer-deref-brownfield-inherited-fixture"
+version = "0.1.0"
+edition = "2024"

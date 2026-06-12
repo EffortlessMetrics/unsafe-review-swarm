@@ -6465,6 +6465,96 @@ fn no_new_debt_policy_fails_only_for_unbaselined_actionable_gaps() -> Result<(),
     Ok(())
 }
 
+// Brownfield / inherited-debt corpus case (Doc-5 adoption criterion):
+// A repo with pre-existing unsafe gaps baselined before the PR shows the
+// inherited shape: inherited_gaps > 0, new_gaps == 0, no-new-debt passes,
+// and inherited cards are NOT selected for inline PR comments.
+#[test]
+fn brownfield_inherited_baseline_shows_no_new_debt_with_inherited_shape()
+-> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_deref_brownfield_inherited");
+
+    // The fixture ships with a committed baseline ledger that captures the
+    // pre-existing raw_pointer_deref card.  Running without --policy should
+    // exit 0 (advisory) and report inherited_gaps=1, new_gaps=0.
+    let advisory = run_success([
+        os("check"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let advisory = parse_json(&stdout_text(&advisory)?)?;
+    assert_eq!(advisory["summary"]["new_gaps"], 0, "no new gaps expected");
+    assert_eq!(
+        advisory["summary"]["inherited_gaps"], 1,
+        "one inherited gap expected"
+    );
+    assert_eq!(advisory["summary"]["worsened_gaps"], 0);
+    assert_eq!(advisory["summary"]["open_actionable_gaps"], 0);
+    assert_eq!(advisory["cards"][0]["class"], "baseline_known");
+    assert_eq!(
+        advisory["cards"][0]["coverage"]["baseline_state"],
+        "inherited"
+    );
+
+    // The comment-plan must NOT select the inherited card for inline PR
+    // comments — it is not actionable and should be downgraded/summarised.
+    let out_dir = TempDir::new("unsafe-review-brownfield-e2e")?;
+    run_success([
+        os("first-pr"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--out-dir"),
+        out_dir.path().as_os_str().to_os_string(),
+    ])?;
+    let comment_plan_path = out_dir.path().join("comment-plan.json");
+    let comment_plan = parse_json(&fs::read_to_string(&comment_plan_path)?)?;
+    assert_eq!(
+        comment_plan["summary"]["selected_count"], 0,
+        "inherited card must not be selected for inline PR comment"
+    );
+    assert_eq!(comment_plan["summary"]["not_selected_count"], 1);
+    let not_selected = &comment_plan["not_selected"][0];
+    assert_eq!(not_selected["class"], "baseline_known");
+    assert_eq!(not_selected["actionability"], "not_actionable");
+
+    // Usefulness telemetry must record inherited_cards=1.
+    let telemetry_path = out_dir.path().join("usefulness-telemetry.json");
+    let telemetry = parse_json(&fs::read_to_string(&telemetry_path)?)?;
+    assert_eq!(
+        telemetry["card_inventory"]["inherited_cards"], 1,
+        "telemetry must record the inherited card shape"
+    );
+    assert_eq!(telemetry["card_inventory"]["new_cards"], 0);
+
+    // no-new-debt policy must pass (exit 0) because the diff adds no new gap.
+    let passing = run_success([
+        os("check"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+        os("--policy"),
+        os("no-new-debt"),
+    ])?;
+    let passing = parse_json(&stdout_text(&passing)?)?;
+    assert_eq!(passing["policy"], "no-new-debt");
+    assert_eq!(
+        passing["summary"]["new_gaps"], 0,
+        "no-new-debt must pass with new_gaps=0"
+    );
+    assert_eq!(passing["summary"]["inherited_gaps"], 1);
+
+    Ok(())
+}
+
 // Exit-code taxonomy tests (issue #1518):
 //   0 = ran to completion (clean or advisory findings)
 //   1 = ran to completion: policy violation
@@ -6890,7 +6980,7 @@ fn policy_report_is_advisory_and_counts_baseline_state() -> Result<(), Box<dyn E
     assert!(markdown.contains("| Status | Baseline | Changed |"));
     assert!(markdown.contains("raw_pointer_read"));
     assert!(markdown.contains("unsafe { ptr.cast::<Header>().read() }"));
-    assert!(markdown.contains("Known baseline card"));
+    assert!(markdown.contains("Keep the baseline ledger"));
     assert!(markdown.contains("| Card | Owner | Review after | Expires | Reason | Evidence |"));
     assert!(markdown.contains("resolved fixture card"));
     assert!(markdown.contains("## Limitations"));

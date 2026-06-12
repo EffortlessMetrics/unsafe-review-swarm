@@ -123,6 +123,10 @@ pub(crate) const SUBSET: &[(&str, &str)] = &[
         "documented_private_unsafe_fn",
         "documented private unsafe fn: contract coverage shape",
     ),
+    (
+        "raw_pointer_deref_brownfield_inherited",
+        "brownfield/inherited debt: pre-existing baselined gap shows inherited_cards=1 with new_gaps=0 for a safe-only diff",
+    ),
 ];
 
 // ── public API ─────────────────────────────────────────────────────────────
