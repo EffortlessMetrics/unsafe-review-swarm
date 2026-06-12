@@ -146,6 +146,107 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn pr_alias_with_explicit_flags_produces_same_bundle_as_first_pr() -> Result<(), Box<dyn Error>> {
+    // `pr` with explicit --root/--diff behaves identically to `first-pr` with
+    // those flags (no auto-detection path because explicit flags are supplied).
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-pr-alias-e2e")?;
+    let out_dir = temp.path().join("pr-alias-review-kit");
+
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("pr")
+            .arg("--root")
+            .arg(&fixture)
+            .arg("--diff")
+            .arg(fixture.join("change.diff"))
+            .arg("--out-dir")
+            .arg(&out_dir),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+
+    // `pr` must produce the same advisory bundle header as `first-pr`.
+    assert_contains(&stdout, "unsafe-review first-pr");
+    assert_contains(&stdout, "unsafe-review wrote an advisory PR bundle.");
+    assert_contains(&stdout, "Top card:");
+    assert_contains(&stdout, "Class: `guard_missing`");
+    // The advisory bundle files must be on disk.
+    assert!(
+        out_dir.join("pr-summary.md").exists(),
+        "pr-summary.md must be written by `pr` alias"
+    );
+    assert!(
+        out_dir.join("cards.json").exists(),
+        "cards.json must be written by `pr` alias"
+    );
+    assert!(
+        out_dir.join("review-kit.json").exists(),
+        "review-kit.json must be written by `pr` alias"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn pr_alias_auto_detect_unresolved_base_prints_actionable_error() -> Result<(), Box<dyn Error>> {
+    // When `pr` is run without explicit flags from a directory that is not
+    // inside a git repository, the error must name the exact command to run
+    // and must exit with a tool-error code (2), not a policy-violation code (1).
+    let temp = TempDir::new("unsafe-review-pr-no-git")?;
+
+    let output = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("pr")
+        .current_dir(temp.path())
+        .output()?;
+
+    assert!(
+        !output.status.success(),
+        "pr in a non-git directory must exit non-zero"
+    );
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "pr detection failure must use exit code 2 (tool error), not 1 (policy)"
+    );
+    let stderr = String::from_utf8(output.stderr)?;
+    let combined = format!("{stderr}{}", String::from_utf8(output.stdout)?);
+    assert!(
+        combined.contains("--base") || combined.contains("--root"),
+        "error must name the explicit flag to use: {combined}"
+    );
+    assert!(
+        combined.contains("unsafe-review first-pr") || combined.contains("unsafe-review pr"),
+        "error must name the command to run: {combined}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn help_output_mentions_pr_alias() -> Result<(), Box<dyn Error>> {
+    // The top-level help must include a one-line hint about `unsafe-review pr`.
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("--help"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+
+    assert!(
+        stdout.contains("  pr      zero-config"),
+        "help must mention the `pr` zero-config entry point: {stdout}"
+    );
+    assert!(
+        stdout.contains("alias for first-pr"),
+        "help must say pr is an alias for first-pr: {stdout}"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn candidate_help_is_command_specific() -> Result<(), Box<dyn Error>> {
     let output = checked_output(
         Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
@@ -181,6 +282,7 @@ fn subcommand_help_is_command_specific() -> Result<(), Box<dyn Error>> {
         (&["check", "--help"], "unsafe-review check:"),
         (&["first-pr", "--help"], "unsafe-review first-pr:"),
         (&["review", "--help"], "unsafe-review first-pr:"),
+        (&["pr", "--help"], "unsafe-review first-pr:"),
         (&["pilot", "--help"], "unsafe-review pilot:"),
         (&["explain", "--help"], "unsafe-review explain:"),
         (&["context", "--help"], "unsafe-review context:"),

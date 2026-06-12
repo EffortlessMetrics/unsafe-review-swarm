@@ -149,3 +149,10 @@ name = "instrument truthfulness and consumer reliability"
 path = ".rails/lanes/validation-residue/implementation-plan.md"
 status = "active"
 owner = "product / cli"
+
+[[lane]]
+id = "pr-alias-zero-config-entry-point"
+name = "pr alias zero-config entry point"
+path = ".rails/goals/active.toml"
+status = "active"
+owner = "product / cli"

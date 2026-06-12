@@ -1291,9 +1291,98 @@ fn maybe_exit_for_repo_stub_test() {
 #[cfg(not(debug_assertions))]
 fn maybe_exit_for_repo_stub_test() {}
 
+/// Detect the git repository root that contains `start_dir`.
+///
+/// Runs `git rev-parse --show-toplevel` in `start_dir`.  Returns the
+/// repository root as an absolute path, or an actionable error naming the
+/// exact command to run instead.
+fn detect_git_root(start_dir: &Path) -> Result<PathBuf, String> {
+    let output = ProcessCommand::new("git")
+        .args(["rev-parse", "--show-toplevel"])
+        .current_dir(start_dir)
+        .output()
+        .map_err(|err| {
+            format!(
+                "failed to run git: {err}. \
+                 Run `unsafe-review first-pr --root <repo> --base <ref>` to supply the paths explicitly."
+            )
+        })?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        return Err(format!(
+            "could not detect a git repository in the current directory ({}).\n\
+             Run `unsafe-review first-pr --root <repo> --base <ref>` to supply them explicitly.",
+            stderr.trim()
+        ));
+    }
+    let root = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    Ok(PathBuf::from(root))
+}
+
+/// Detect a sensible default base ref for `unsafe-review pr` in `repo_root`.
+///
+/// Resolution order:
+/// 1. Try `origin/HEAD` — run `git symbolic-ref refs/remotes/origin/HEAD` and
+///    strip the `refs/remotes/` prefix (e.g. `origin/main`).
+/// 2. Try whether `origin/main` exists via `git rev-parse --verify origin/main`.
+/// 3. Try whether `origin/master` exists via `git rev-parse --verify origin/master`.
+///
+/// If none resolve, return an actionable error naming `--base`.
+fn detect_default_base(repo_root: &Path) -> Result<String, String> {
+    // Step 1: try origin/HEAD symbolic ref.
+    let sym_output = ProcessCommand::new("git")
+        .args(["symbolic-ref", "refs/remotes/origin/HEAD"])
+        .current_dir(repo_root)
+        .output();
+    if let Ok(out) = sym_output
+        && out.status.success()
+    {
+        let target = String::from_utf8_lossy(&out.stdout).trim().to_string();
+        // target looks like "refs/remotes/origin/main"; strip "refs/remotes/"
+        let base = target
+            .strip_prefix("refs/remotes/")
+            .unwrap_or(&target)
+            .to_string();
+        if !base.is_empty() {
+            return Ok(base);
+        }
+    }
+    // Step 2: try origin/main, then origin/master.
+    for candidate in ["origin/main", "origin/master"] {
+        let verify_output = ProcessCommand::new("git")
+            .args(["rev-parse", "--verify", candidate])
+            .current_dir(repo_root)
+            .output();
+        if let Ok(out) = verify_output
+            && out.status.success()
+        {
+            return Ok(candidate.to_string());
+        }
+    }
+    Err(
+        "could not detect a default base ref (tried origin/HEAD, origin/main, origin/master).\n\
+         Run `unsafe-review pr --base <ref>` or `unsafe-review first-pr --base <ref>` \
+         and pass a branch, tag, or commit SHA that exists in the repository \
+         (e.g. --base origin/main)."
+            .to_string(),
+    )
+}
+
 fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     let mut check = options.check;
     check.policy = PolicyMode::Advisory;
+    // When the caller requested auto-detection (i.e. `unsafe-review pr` with no
+    // explicit --root/--base/--diff), resolve the git root and default base ref
+    // from the current working directory.  This happens in execute, not parse,
+    // so parse only ever sees the user-supplied arguments.
+    if options.auto_detect {
+        let cwd = std::env::current_dir()
+            .map_err(|err| format!("could not read current directory: {err}"))?;
+        let detected_root = detect_git_root(&cwd)?;
+        let detected_base = detect_default_base(&detected_root)?;
+        check.root = detected_root;
+        check.base = Some(detected_base);
+    }
     let provenance = build_provenance(&check);
     let diff = diff_source(&check)?;
     let root = check.root.clone();
@@ -3068,6 +3157,9 @@ fn print_help() {
     );
     println!(
         "  repo    [--root .] [--include glob] [--exclude glob] [--list-files|--dry-run] [--progress] [--timeout-seconds N] [--respect-gitignore|--no-respect-gitignore] [--large-repo-ignores|--no-large-repo-ignores] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
+    );
+    println!(
+        "  pr      zero-config entry point: auto-detects root and base ref; alias for first-pr"
     );
     println!(
         "  first-pr [--root .] [--base origin/main|--diff file|-] [--out-dir target/unsafe-review] [--max-cards N]"
