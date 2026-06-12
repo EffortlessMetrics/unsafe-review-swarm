@@ -4,7 +4,7 @@
 /// Projects from existing ReviewCard/Summary/CoverageBlock/CommentPlan data only.
 /// This is diagnostic operational usefulness only — not calibrated, not a measurement of
 /// detection accuracy, not a guarantee of any kind, not a gate, not a merge verdict.
-use crate::api::AnalyzeOutput;
+use crate::api::{AnalyzeOutput, ScanCost};
 use crate::domain::coverage::{AgentLspReadiness, Coverage, WitnessReceiptCoverage};
 use crate::domain::{Confidence, ReviewClass};
 use crate::output::comment_plan;
@@ -33,6 +33,43 @@ struct UsefulnessTelemetry {
     /// Actionability distribution over all cards, keyed by actionability() value.
     /// Only keys with count > 0 are emitted.
     actionability_distribution: BTreeMap<String, usize>,
+    /// Run cost aperture injected by the CLI emit layer (SPEC-0038 §scan_cost).
+    /// Absent when the renderer is called without cost context (e.g., unit tests
+    /// that call `render` directly).
+    ///
+    /// Diagnostic only — not a coverage claim, proof, UB-free, Miri-clean,
+    /// site-execution, or performance guarantee.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    scan_cost: Option<ScanCostSection>,
+    /// Unfulfilled obligation count: total count of per-obligation evidence slots
+    /// across all cards where at least one of contract/discharge/reach/witness
+    /// is missing (SPEC-0038 §unfulfilled_obligations).
+    ///
+    /// This is a work-surface signal — a card with 5 obligations and all five
+    /// missing contributes 5, not 1.  It is NOT a coverage claim, proof, or
+    /// UB-free status.
+    unfulfilled_obligation_count: usize,
+}
+
+/// Run cost aperture (SPEC-0038 §scan_cost).
+///
+/// Injected by the CLI emit layer.  The CLI owns wall-clock time (Instant) and
+/// accumulates output_bytes_total across all artifact writes; both are outside
+/// `AnalyzeOutput` by design (core must not measure wall time).
+///
+/// Diagnostic only — not a coverage claim, proof, UB-free, Miri-clean,
+/// site-execution, or performance guarantee.
+#[derive(Serialize)]
+struct ScanCostSection {
+    /// Wall-clock milliseconds from before `analyze()` through the last artifact
+    /// write, measured in the CLI emit layer.  Excludes CLI startup time before
+    /// the function is called.
+    elapsed_ms: u64,
+    /// Total bytes written across all output artifacts for this run.
+    /// This is the disk footprint of the output bundle — not the input diff or
+    /// source files.  The telemetry file itself is excluded from this count
+    /// (it is rendered before its own bytes are known).
+    output_bytes_total: u64,
 }
 
 /// Card inventory derived from Summary fields.
@@ -84,6 +121,13 @@ struct CommentSelection {
     not_selected_count: usize,
     /// Histogram of not-selected reason codes. Only keys with count > 0 are emitted.
     not_selected_reason_histogram: BTreeMap<String, usize>,
+    /// Histogram of not-selected cards keyed by `"<reason_code>/<class>"`.
+    ///
+    /// Allows consumers to distinguish a correct FFI/loom `lower_relevance`
+    /// suppression from an unactionable `budget_exhausted` miss.
+    /// Projected from `CommentPlan.not_selected[].reason_code` and `.class`.
+    /// Only keys with count > 0 are emitted (SPEC-0038 §not_selected_class_histogram).
+    not_selected_class_histogram: BTreeMap<String, usize>,
 }
 
 /// Confidence distribution over all cards.
@@ -100,7 +144,16 @@ struct ConfidenceDistribution {
 /// This is a pure projection from the existing `AnalyzeOutput`. It carries no
 /// new analysis state and does not modify any card or summary field.
 pub(crate) fn render(output: &AnalyzeOutput) -> String {
-    let telemetry = build(output);
+    render_with_cost(output, None)
+}
+
+/// Render `usefulness-telemetry.json` with an optional CLI-layer scan cost injection.
+///
+/// The `cost` argument carries `elapsed_ms` and `output_bytes_total` measured in
+/// the CLI emit layer — fields that core cannot compute itself (core must not
+/// measure wall time).  When `cost` is `None` the `scan_cost` section is omitted.
+pub(crate) fn render_with_cost(output: &AnalyzeOutput, cost: Option<&ScanCost>) -> String {
+    let telemetry = build(output, cost);
     match serde_json::to_string_pretty(&telemetry) {
         Ok(mut text) => {
             text.push('\n');
@@ -112,13 +165,18 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
     }
 }
 
-fn build(output: &AnalyzeOutput) -> UsefulnessTelemetry {
+fn build(output: &AnalyzeOutput, cost: Option<&ScanCost>) -> UsefulnessTelemetry {
     let card_inventory = build_card_inventory(output);
     let coverage_slots = build_coverage_slots(output);
     let agent_readiness = build_agent_readiness(output);
     let comment_selection = build_comment_selection(output);
     let confidence_distribution = build_confidence_distribution(output);
     let actionability_distribution = build_actionability_distribution(output);
+    let scan_cost = cost.map(|c| ScanCostSection {
+        elapsed_ms: c.elapsed_ms,
+        output_bytes_total: c.output_bytes_total,
+    });
+    let unfulfilled_obligation_count = build_unfulfilled_obligation_count(output);
 
     UsefulnessTelemetry {
         schema_version: SCHEMA_VERSION,
@@ -129,6 +187,8 @@ fn build(output: &AnalyzeOutput) -> UsefulnessTelemetry {
         comment_selection,
         confidence_distribution,
         actionability_distribution,
+        scan_cost,
+        unfulfilled_obligation_count,
     }
 }
 
@@ -219,6 +279,7 @@ fn build_comment_selection(output: &AnalyzeOutput) -> CommentSelection {
                 selected_count: 0,
                 not_selected_count: 0,
                 not_selected_reason_histogram: BTreeMap::new(),
+                not_selected_class_histogram: BTreeMap::new(),
             };
         }
     };
@@ -227,12 +288,18 @@ fn build_comment_selection(output: &AnalyzeOutput) -> CommentSelection {
     let not_selected_count = plan["summary"]["not_selected_count"].as_u64().unwrap_or(0) as usize;
 
     let mut not_selected_reason_histogram: BTreeMap<String, usize> = BTreeMap::new();
+    let mut not_selected_class_histogram: BTreeMap<String, usize> = BTreeMap::new();
     if let Some(not_selected) = plan["not_selected"].as_array() {
         for entry in not_selected {
             if let Some(code) = entry["reason_code"].as_str() {
                 *not_selected_reason_histogram
                     .entry(code.to_string())
                     .or_insert(0) += 1;
+                // Build (reason_code, class) histogram so consumers can distinguish
+                // a correct lower_relevance suppression from a budget miss.
+                let class = entry["class"].as_str().unwrap_or("unknown");
+                let key = format!("{code}/{class}");
+                *not_selected_class_histogram.entry(key).or_insert(0) += 1;
             }
         }
     }
@@ -241,6 +308,7 @@ fn build_comment_selection(output: &AnalyzeOutput) -> CommentSelection {
         selected_count,
         not_selected_count,
         not_selected_reason_histogram,
+        not_selected_class_histogram,
     }
 }
 
@@ -296,6 +364,30 @@ fn build_actionability_distribution(output: &AnalyzeOutput) -> BTreeMap<String, 
         *distribution.entry(label.to_string()).or_insert(0) += 1;
     }
     distribution
+}
+
+/// Count unfulfilled obligations across all cards (SPEC-0038 §unfulfilled_obligations).
+///
+/// For each card, iterates `obligation_evidence` and counts obligations where at
+/// least one of contract/discharge/reach/witness is missing.  This is a work-surface
+/// signal: a card with 5 obligations and none discharged contributes 5, not 1.
+///
+/// Diagnostic only — not a coverage claim, proof, UB-free, Miri-clean, or
+/// site-execution claim.
+fn build_unfulfilled_obligation_count(output: &AnalyzeOutput) -> usize {
+    let mut count = 0usize;
+    for card in &output.cards {
+        for evidence in &card.obligation_evidence {
+            let unfulfilled = !evidence.contract.present
+                || !evidence.discharge.present
+                || !evidence.reach.present
+                || !evidence.witness.present;
+            if unfulfilled {
+                count += 1;
+            }
+        }
+    }
+    count
 }
 
 #[cfg(test)]
@@ -522,6 +614,140 @@ mod tests {
                 "trust_boundary must not contain '{forbidden}'; got: {boundary}"
             );
         }
+        Ok(())
+    }
+
+    // --- Finding #2: scan_cost injection ---
+
+    #[test]
+    fn scan_cost_absent_when_no_cost_injected() -> Result<(), String> {
+        // render() (no cost) must not emit scan_cost field.
+        let output = fixture_output("raw_pointer_alignment")?;
+        let text = render(&output);
+        let value = parse_json(&text)?;
+        assert!(
+            value["scan_cost"].is_null(),
+            "scan_cost must be absent (null in JSON) when no cost is injected; got: {:?}",
+            value["scan_cost"]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn scan_cost_present_when_cost_injected() -> Result<(), String> {
+        use crate::api::ScanCost;
+        let output = fixture_output("raw_pointer_alignment")?;
+        let cost = ScanCost {
+            elapsed_ms: 1234,
+            output_bytes_total: 56789,
+        };
+        let text = render_with_cost(&output, Some(&cost));
+        let value = parse_json(&text)?;
+
+        let scan_cost = &value["scan_cost"];
+        assert!(
+            !scan_cost.is_null(),
+            "scan_cost must be present when cost is injected"
+        );
+        assert_eq!(
+            scan_cost["elapsed_ms"]
+                .as_u64()
+                .ok_or("elapsed_ms not u64")?,
+            1234,
+            "elapsed_ms must match injected value"
+        );
+        assert_eq!(
+            scan_cost["output_bytes_total"]
+                .as_u64()
+                .ok_or("output_bytes_total not u64")?,
+            56789,
+            "output_bytes_total must match injected value"
+        );
+        Ok(())
+    }
+
+    // --- Finding #3: not_selected_class_histogram ---
+
+    #[test]
+    fn not_selected_class_histogram_keys_have_slash_separator() -> Result<(), String> {
+        // raw_pointer_alignment has 1 card; its not_selected_class_histogram must
+        // have keys in the form "reason_code/class".
+        let output = fixture_output("raw_pointer_alignment")?;
+        let text = render(&output);
+        let value = parse_json(&text)?;
+
+        let histogram = value["comment_selection"]["not_selected_class_histogram"]
+            .as_object()
+            .ok_or("not_selected_class_histogram must be an object")?;
+
+        for key in histogram.keys() {
+            assert!(
+                key.contains('/'),
+                "not_selected_class_histogram key must be 'reason_code/class'; got: {key}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn not_selected_class_histogram_counts_consistent_with_reason_histogram() -> Result<(), String>
+    {
+        // Total count across not_selected_class_histogram must equal total across
+        // not_selected_reason_histogram (same events, different keying).
+        let output = fixture_output("raw_pointer_alignment")?;
+        let text = render(&output);
+        let value = parse_json(&text)?;
+
+        let reason_total: u64 = value["comment_selection"]["not_selected_reason_histogram"]
+            .as_object()
+            .map(|m| m.values().filter_map(|v| v.as_u64()).sum())
+            .unwrap_or(0);
+        let class_total: u64 = value["comment_selection"]["not_selected_class_histogram"]
+            .as_object()
+            .map(|m| m.values().filter_map(|v| v.as_u64()).sum())
+            .unwrap_or(0);
+
+        assert_eq!(
+            reason_total, class_total,
+            "sum of not_selected_class_histogram counts must equal sum of not_selected_reason_histogram counts"
+        );
+        Ok(())
+    }
+
+    // --- Finding #4: unfulfilled_obligation_count ---
+
+    #[test]
+    fn unfulfilled_obligation_count_present_and_non_negative() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let text = render(&output);
+        let value = parse_json(&text)?;
+
+        // Field must be present (even if 0).
+        let count = value["unfulfilled_obligation_count"]
+            .as_u64()
+            .ok_or("unfulfilled_obligation_count must be a non-negative integer")?;
+        // A fixture with 1 card should have >= 1 unfulfilled obligation.
+        assert!(
+            count >= 1,
+            "raw_pointer_alignment has unmet obligations; unfulfilled_obligation_count must be >= 1, got {count}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn unfulfilled_obligation_count_zero_for_no_cards() -> Result<(), String> {
+        // safe_code_no_cards has 0 cards; unfulfilled_obligation_count must be 0.
+        let output = fixture_output("safe_code_no_cards")?;
+        let text = render(&output);
+        let value = parse_json(&text)?;
+
+        let count = value["unfulfilled_obligation_count"]
+            .as_u64()
+            .ok_or("unfulfilled_obligation_count must be a non-negative integer")?;
+        assert_eq!(
+            count, 0,
+            "safe_code_no_cards must have unfulfilled_obligation_count == 0"
+        );
         Ok(())
     }
 }

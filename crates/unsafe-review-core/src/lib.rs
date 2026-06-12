@@ -17,7 +17,7 @@ pub use api::{
     AnalysisMode, AnalyzeInput, AnalyzeOutput, BaselineInitResult, DiffSource, DiscoveryOptions,
     FILE_TIMINGS_CAP, OutcomeReport, PerFileScanStats, PolicyMode, PolicyReport, Provenance,
     ReceiptAuditReport, RepoScanEvent, RepoScanPhase, RepoScanStatus, RepoStopReason,
-    ReviewCardConfirmationProjection, Scope, analyze, analyze_with_discovery,
+    ReviewCardConfirmationProjection, ScanCost, Scope, analyze, analyze_with_discovery,
     analyze_with_discovery_and_progress, analyze_with_discovery_and_repo_events,
     audit_witness_receipts, baseline_add, baseline_init, bless_fixture_card_goldens,
     collect_context, collect_context_range, compare_outcome_json, discover_repo_files,
@@ -28,7 +28,7 @@ pub use api::{
     render_outcome_json, render_outcome_markdown, render_policy_report_json,
     render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
     render_receipt_audit_markdown, render_repair_queue, render_sarif, render_usefulness_telemetry,
-    render_witness_plan, validate_witness_receipts,
+    render_usefulness_telemetry_with_cost, render_witness_plan, validate_witness_receipts,
 };
 
 /// Compute the SHA-256 hex digest of raw bytes.

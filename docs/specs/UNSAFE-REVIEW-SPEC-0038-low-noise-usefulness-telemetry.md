@@ -129,6 +129,46 @@ Known keys: `specific_guard_missing`, `specific_contract_missing`,
 `specific_witness_missing`, `specific_receipt_missing`, `specific_reach_missing`,
 `human_review_only`, `not_actionable`.
 
+#### `scan_cost` (SPEC-0038 §scan_cost)
+
+Object. CLI-layer cost aperture injected by `render_usefulness_telemetry_with_cost`.
+**Absent** (field omitted) when the renderer is called without cost context.
+
+| Field | Source | Notes |
+|---|---|---|
+| `elapsed_ms` | `Instant` started before `analyze()` in CLI emit layer | Wall-clock ms; CLI layer only — core must not measure wall time |
+| `output_bytes_total` | Running byte total accumulated across all artifact writes before telemetry file is written | Excludes the telemetry file itself (it is rendered before its own bytes are known) |
+
+Trust boundary: diagnostic aperture only — not a coverage claim, proof,
+UB-free, Miri-clean, site-execution, or performance guarantee.
+
+#### `comment_selection.not_selected_class_histogram` (SPEC-0038 §not_selected_class_histogram)
+
+Object (BTreeMap). Histogram of not-selected cards keyed by `"<reason_code>/<class>"`.
+Allows consumers to distinguish a correct FFI/loom `lower_relevance` suppression
+from an unactionable `budget_exhausted` miss.  Projected from
+`CommentPlan.not_selected[].reason_code` and `.class`.
+Only keys with count > 0 are emitted.
+
+Example key: `"lower_relevance/ffi_boundary"`, `"budget_exhausted/raw_ptr_deref"`.
+
+The sum of all values must equal the sum of all values in
+`not_selected_reason_histogram` (same events, different keying).
+
+#### `unfulfilled_obligation_count` (SPEC-0038 §unfulfilled_obligations)
+
+Integer. Total count of per-obligation evidence slots across all cards where at
+least one of contract/discharge/reach/witness is `present: false`.
+
+This is a **work-surface signal** — a card with 5 obligations and none discharged
+contributes 5, not 1.  A card with 5 obligations and 4 discharged contributes 1.
+Use alongside `card_inventory.total_cards` to estimate per-card obligation depth.
+
+Projected from `ReviewCard.obligation_evidence[].{contract,discharge,reach,witness}.present`.
+
+Trust boundary: diagnostic aperture only — not a coverage claim, proof, UB-free,
+Miri-clean, or site-execution claim.
+
 ### Gate manifest pointer
 
 `unsafe-review-gate.json` gains an optional `artifacts.usefulness_telemetry` field
@@ -150,13 +190,16 @@ The following fields were considered and intentionally omitted:
 
 | Field | Reason omitted |
 |---|---|
-| `scan_wall_ms` / `elapsed_ms` | No clean deterministic source in `AnalyzeOutput`; wall-clock would break reproducibility rails |
-| `output_bytes` | Only available in CLI emit layer, not core output projection layer |
-| `cards_per_second` | Requires wall time |
+| `cards_per_second` | Requires wall time; derivable from `scan_cost.elapsed_ms` and `card_inventory.total_cards` by the consumer |
 | `time_to_first_useful_result` | No clean deterministic source |
 
-These may be added in a future revision when a clean, deterministic source exists
-in `AnalyzeOutput` or when a separate timing aperture is standardized.
+The following fields were previously omitted but are now implemented:
+
+| Field | Implemented in |
+|---|---|
+| `scan_cost.elapsed_ms` / `scan_cost.output_bytes_total` | SPEC-0038 §scan_cost via CLI injection pattern |
+| `comment_selection.not_selected_class_histogram` | SPEC-0038 §not_selected_class_histogram |
+| `unfulfilled_obligation_count` | SPEC-0038 §unfulfilled_obligations |
 
 ## Proof commands
 

@@ -3568,6 +3568,54 @@ fn first_pr_emits_usefulness_telemetry_artifact() -> Result<(), Box<dyn Error>> 
         "gate manifest must point to usefulness-telemetry.json"
     );
 
+    // --- Finding #2: scan_cost must be present and non-zero ---
+    let scan_cost = &telemetry["scan_cost"];
+    assert!(
+        !scan_cost.is_null(),
+        "scan_cost must be present in first-pr telemetry (injected by CLI)"
+    );
+    let elapsed_ms = scan_cost["elapsed_ms"].as_u64().unwrap_or(0);
+    assert!(
+        elapsed_ms > 0,
+        "scan_cost.elapsed_ms must be > 0 for a real first-pr run; got {elapsed_ms}"
+    );
+    let output_bytes_total = scan_cost["output_bytes_total"].as_u64().unwrap_or(0);
+    assert!(
+        output_bytes_total > 0,
+        "scan_cost.output_bytes_total must be > 0; got {output_bytes_total}"
+    );
+
+    // --- Finding #3: not_selected_class_histogram must be present ---
+    let class_histogram = telemetry["comment_selection"]["not_selected_class_histogram"]
+        .as_object()
+        .ok_or("not_selected_class_histogram must be an object")?;
+    // Every key must be in "reason_code/class" form
+    for key in class_histogram.keys() {
+        assert!(
+            key.contains('/'),
+            "not_selected_class_histogram key must contain '/'; got: {key}"
+        );
+    }
+    // Sum must equal sum of reason histogram
+    let reason_total: u64 = telemetry["comment_selection"]["not_selected_reason_histogram"]
+        .as_object()
+        .map(|m| m.values().filter_map(|v| v.as_u64()).sum())
+        .unwrap_or(0);
+    let class_total: u64 = class_histogram.values().filter_map(|v| v.as_u64()).sum();
+    assert_eq!(
+        reason_total, class_total,
+        "not_selected_class_histogram sum ({class_total}) must equal reason_histogram sum ({reason_total})"
+    );
+
+    // --- Finding #4: unfulfilled_obligation_count must be present and >= 1 ---
+    let unfulfilled = telemetry["unfulfilled_obligation_count"]
+        .as_u64()
+        .ok_or("unfulfilled_obligation_count must be a non-negative integer")?;
+    assert!(
+        unfulfilled >= 1,
+        "raw_pointer_alignment has unmet obligations; unfulfilled_obligation_count must be >= 1, got {unfulfilled}"
+    );
+
     Ok(())
 }
 

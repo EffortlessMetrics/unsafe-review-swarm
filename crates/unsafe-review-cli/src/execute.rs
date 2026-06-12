@@ -21,17 +21,18 @@ use unsafe_review_core::{
     AnalysisMode, AnalyzeInput, AnalyzeOutput, CardId, CargoCarefulReceiptInput,
     ConcurrencyReceiptInput, DiffSource, DiscoveryOptions, MiriReceiptInput, PolicyMode,
     ProofReceiptInput, Provenance, RepoScanEvent, RepoScanPhase, RepoScanStatus, RepoStopReason,
-    SanitizerReceiptInput, Scope, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze,
-    analyze_with_discovery, analyze_with_discovery_and_repo_events, audit_witness_receipts,
-    baseline_add, baseline_init, collect_context_range, compare_outcome_json, discover_repo_files,
-    evaluate_policy_report, evaluate_policy_report_from_output, lint_manual_candidate_text,
-    load_manual_candidates, manual_candidate_implementer_handoff, new_manual_candidate_skeleton,
-    read_manual_candidate, render_badge_jsons, render_comment_plan, render_gate_manifest,
-    render_github_summary, render_human, render_json, render_json_with_provenance, render_lsp,
+    SanitizerReceiptInput, ScanCost, Scope, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt,
+    analyze, analyze_with_discovery, analyze_with_discovery_and_repo_events,
+    audit_witness_receipts, baseline_add, baseline_init, collect_context_range,
+    compare_outcome_json, discover_repo_files, evaluate_policy_report,
+    evaluate_policy_report_from_output, lint_manual_candidate_text, load_manual_candidates,
+    manual_candidate_implementer_handoff, new_manual_candidate_skeleton, read_manual_candidate,
+    render_badge_jsons, render_comment_plan, render_gate_manifest, render_github_summary,
+    render_human, render_json, render_json_with_provenance, render_lsp,
     render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
     render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
     render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,
-    render_repair_queue, render_sarif, render_usefulness_telemetry, render_witness_plan,
+    render_repair_queue, render_sarif, render_usefulness_telemetry_with_cost, render_witness_plan,
     validate_witness_receipts,
 };
 
@@ -1389,6 +1390,10 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     let provenance = build_provenance(&check);
     let diff = diff_source(&check)?;
     let root = check.root.clone();
+    // Start wall-clock timer before analysis — used to populate scan_cost in
+    // usefulness-telemetry.json (SPEC-0038 §scan_cost).  Core must not measure
+    // wall time; this is the only place where an Instant is allowed for this purpose.
+    let scan_started = Instant::now();
     let output = analyze(AnalyzeInput {
         root: root.clone(),
         scope: Scope::Diff,
@@ -1482,9 +1487,19 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         &options.out_dir.join(GATE_MANIFEST_ARTIFACT),
         render_gate_manifest(&output),
     )?;
+    // Build scan_cost for the telemetry injection.  elapsed_ms is measured here
+    // (after all other artifacts are written); output_bytes at this point is the
+    // subtotal excluding the telemetry file itself (it cannot include its own
+    // size because it is rendered before being written).
+    // Diagnostic only — not a coverage claim, proof, UB-free, Miri-clean,
+    // site-execution, or performance guarantee.
+    let scan_cost = ScanCost {
+        elapsed_ms: scan_started.elapsed().as_millis() as u64,
+        output_bytes_total: output_bytes,
+    };
     output_bytes += write_artifact(
         &options.out_dir.join(USEFULNESS_TELEMETRY_ARTIFACT),
-        render_usefulness_telemetry(&output),
+        render_usefulness_telemetry_with_cost(&output, Some(&scan_cost)),
     )?;
 
     first_pr::print_first_pr_report(first_pr::FirstPrReport {

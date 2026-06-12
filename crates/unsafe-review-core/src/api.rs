@@ -319,6 +319,25 @@ pub fn evaluate_policy_report_from_output(output: &AnalyzeOutput) -> Result<Poli
     policy_report::evaluate(output)
 }
 
+/// Run cost aperture measured by the CLI emit layer and injected into
+/// `usefulness-telemetry.json` (SPEC-0038 §scan_cost).
+///
+/// Core must not measure wall time — this struct carries the two cost fields
+/// that only the CLI layer can observe.
+///
+/// Diagnostic only — not a coverage claim, proof, UB-free, Miri-clean,
+/// site-execution, or performance guarantee.
+#[derive(Clone, Debug, Default)]
+pub struct ScanCost {
+    /// Wall-clock milliseconds from before `analyze()` through the last artifact
+    /// write, measured in the CLI emit layer.
+    pub elapsed_ms: u64,
+    /// Total bytes written across all output artifacts for this run, accumulated
+    /// in the CLI emit layer.  The telemetry file itself is excluded (it is
+    /// rendered before its own bytes are known).
+    pub output_bytes_total: u64,
+}
+
 /// Traceable evidence metadata that the CLI layer assembles from argv, git, and the
 /// filesystem before calling the JSON renderer.
 ///
@@ -454,6 +473,20 @@ pub fn render_gate_manifest(output: &AnalyzeOutput) -> String {
 /// a merge verdict.
 pub fn render_usefulness_telemetry(output: &AnalyzeOutput) -> String {
     usefulness_telemetry::render(output)
+}
+
+/// Render `usefulness-telemetry.json` with CLI-layer scan cost injected
+/// (SPEC-0038 §scan_cost).
+///
+/// The `cost` argument carries `elapsed_ms` and `output_bytes_total` measured
+/// in the CLI emit layer — fields that core cannot compute itself (core must
+/// not measure wall time).  When `cost` is `None` the `scan_cost` section is
+/// omitted and the output is identical to `render_usefulness_telemetry`.
+pub fn render_usefulness_telemetry_with_cost(
+    output: &AnalyzeOutput,
+    cost: Option<&ScanCost>,
+) -> String {
+    usefulness_telemetry::render_with_cost(output, cost)
 }
 
 pub fn project_review_card_confirmation(card: &ReviewCard) -> ReviewCardConfirmationProjection {
