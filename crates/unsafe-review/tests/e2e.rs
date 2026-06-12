@@ -4914,6 +4914,169 @@ fn repo_status_sidecar_file_timings_null_for_timeout_path() -> Result<(), Box<dy
     Ok(())
 }
 
+/// Drift-lock: a completed repo scan with `--out` must report `output_bytes > 0`
+/// in the status sidecar, matching the on-disk size of the final report.
+/// If the field is dropped or stays null for a completed scan, this goes RED.
+#[test]
+fn repo_status_sidecar_output_bytes_present_for_completed_scan() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-repo-output-bytes-e2e")?;
+    let report_path = temp.path().join("repo.json");
+    let status_path = temp.path().join("repo.json.status.json");
+
+    run_success([
+        os("repo"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+        os("--out"),
+        report_path.as_os_str().to_os_string(),
+    ])?;
+
+    let status = parse_json(&fs::read_to_string(&status_path)?)?;
+    assert_eq!(status["schema_version"], "repo-scan-status/v1");
+    assert_eq!(status["phase"], "complete");
+    assert_eq!(status["completed"], true);
+
+    // output_bytes must be a positive integer matching the final report size.
+    // Diagnostic only — not a coverage claim, proof, UB-free, Miri-clean,
+    // site-execution, or performance guarantee.
+    let output_bytes = status["output_bytes"].as_u64().ok_or_else(|| {
+        format!(
+            "output_bytes must be a non-null number in a completed sidecar; got: {}",
+            status["output_bytes"]
+        )
+    })?;
+    assert!(
+        output_bytes > 0,
+        "output_bytes must be positive for a completed scan that wrote a report"
+    );
+    // The sidecar's output_bytes must match the actual file size on disk.
+    let actual_size = fs::metadata(&report_path)?.len();
+    assert_eq!(
+        output_bytes, actual_size,
+        "output_bytes in sidecar must match on-disk report file size"
+    );
+
+    Ok(())
+}
+
+/// Drift-lock: a timeout-incomplete scan must have `output_bytes: null` in its
+/// status sidecar — no final report was written, so no byte count is available.
+/// If output_bytes is accidentally populated for an incomplete scan, this goes RED.
+#[test]
+fn repo_status_sidecar_output_bytes_null_for_timeout_path() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-repo-output-bytes-timeout-e2e")?;
+    let scan_root = temp.path().join("fixture");
+    copy_dir_all(&fixture, &scan_root)?;
+    fs::write(scan_root.join("src/z_safe.rs"), "pub fn safe() {}\n")?;
+    let report_path = temp.path().join("repo.json");
+    let status_path = temp.path().join("repo.json.status.json");
+
+    // Run with a tight timeout so the scan stops mid-way.
+    let output = Command::new(env!("CARGO_BIN_EXE_unsafe-review"))
+        .args([
+            os("repo"),
+            os("--root"),
+            scan_root.as_os_str().to_os_string(),
+            os("--format"),
+            os("json"),
+            os("--out"),
+            report_path.as_os_str().to_os_string(),
+            os("--timeout-seconds"),
+            os("1"),
+        ])
+        .env(
+            "UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_AFTER_SCANNED",
+            "1",
+        )
+        .env(
+            "UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_AFTER_SCAN_MS",
+            "1100",
+        )
+        .output()?;
+    assert!(!output.status.success(), "timeout scan must exit non-zero");
+
+    let status = parse_json(&fs::read_to_string(&status_path)?)?;
+    assert_eq!(status["stop_reason"], "timeout");
+    // Timeout incomplete status must have output_bytes: null — no final
+    // report was produced so no byte count is available.
+    assert!(
+        status["output_bytes"].is_null(),
+        "output_bytes must be null in timeout incomplete status; got: {}",
+        status["output_bytes"]
+    );
+
+    Ok(())
+}
+
+/// Drift-lock: a first-pr run must report output_bytes > 0 in its terminal
+/// output, matching the total size of all artifacts written to --out-dir.
+/// If the field is dropped or output_bytes is 0, this goes RED.
+#[test]
+fn first_pr_reports_output_bytes_in_terminal_output() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-first-pr-output-bytes-e2e")?;
+    let out_dir = temp.path().join("unsafe-review");
+
+    let output = run_success([
+        os("first-pr"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--out-dir"),
+        out_dir.as_os_str().to_os_string(),
+    ])?;
+    let stdout = stdout_text(&output)?;
+
+    // The terminal summary must include the output bundle byte count.
+    // Diagnostic only — not a coverage claim, proof, UB-free, Miri-clean,
+    // site-execution, or performance guarantee.
+    assert!(
+        stdout.contains("- Output bundle:"),
+        "stdout must contain '- Output bundle:' line; got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains(" bytes"),
+        "stdout must contain ' bytes' in the output bundle line; got:\n{stdout}"
+    );
+
+    // Extract the byte count and verify it is > 0 and matches on-disk total.
+    let bundle_line = stdout
+        .lines()
+        .find(|line| line.contains("- Output bundle:"))
+        .ok_or("could not find '- Output bundle:' line")?;
+    let bytes_str = bundle_line
+        .split_whitespace()
+        .find(|tok| tok.chars().all(|c| c.is_ascii_digit()))
+        .ok_or_else(|| format!("could not extract byte count from line: {bundle_line}"))?;
+    let reported_bytes: u64 = bytes_str
+        .parse()
+        .map_err(|err| format!("byte count parse failed: {err}"))?;
+    assert!(
+        reported_bytes > 0,
+        "output_bytes must be positive for a run that wrote artifacts"
+    );
+
+    // Verify that the reported total matches the actual sum of artifact sizes.
+    let mut actual_total: u64 = 0;
+    for entry in fs::read_dir(&out_dir)? {
+        let entry = entry?;
+        if entry.file_type()?.is_file() {
+            actual_total += entry.metadata()?.len();
+        }
+    }
+    assert_eq!(
+        reported_bytes, actual_total,
+        "reported output_bytes must equal the sum of all artifact file sizes in --out-dir"
+    );
+
+    Ok(())
+}
+
 #[cfg(unix)]
 #[test]
 fn repo_sigterm_writes_interrupted_status_sidecar() -> Result<(), Box<dyn Error>> {

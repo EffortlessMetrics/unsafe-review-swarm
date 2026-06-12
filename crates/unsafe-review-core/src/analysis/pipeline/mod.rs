@@ -401,6 +401,7 @@ fn repo_status(
         stop_reason: RepoStopReason::None,
         cap: None,
         file_timings,
+        output_bytes: None,
     }
 }
 
@@ -426,6 +427,7 @@ fn repo_status_capped(
         stop_reason: RepoStopReason::MaxCards,
         cap: Some(cap),
         file_timings,
+        output_bytes: None,
     }
 }
 
@@ -6212,6 +6214,56 @@ evidence = "test fixture"
              got: {:?}",
             status.file_timings
         );
+        Ok(())
+    }
+
+    /// Drift-lock: the pipeline emits `output_bytes: None` for all scan events —
+    /// the CLI writer layer stamps the final value after writing.  If this field
+    /// is accidentally set during scanning the status sidecar would carry a stale
+    /// zero instead of the real byte count.
+    #[test]
+    fn output_bytes_none_in_all_pipeline_events() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-output-bytes-pipeline")?;
+        fs::create_dir_all(root.join("src")).map_err(|err| format!("create dirs failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"output-bytes-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "pub unsafe fn alpha(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+        )
+        .map_err(|err| format!("write src/lib.rs failed: {err}"))?;
+
+        let mut events_checked: usize = 0;
+        let _output = analyze_with_discovery_and_repo_events(
+            AnalyzeInput {
+                root: root.clone(),
+                scope: Scope::Repo,
+                diff: DiffSource::NoneRepoScan,
+                mode: AnalysisMode::Repo,
+                policy: PolicyMode::Advisory,
+                include_unchanged_tests: true,
+                max_cards: None,
+            },
+            DiscoveryOptions::repo_defaults(),
+            |event| {
+                // The pipeline must never pre-populate output_bytes — that is
+                // the CLI writer's responsibility after disk writes complete.
+                assert!(
+                    event.status.output_bytes.is_none(),
+                    "output_bytes must be None in all pipeline events; got: {:?}",
+                    event.status.output_bytes
+                );
+                events_checked += 1;
+                Ok(())
+            },
+        )?;
+
+        let _ = fs::remove_dir_all(&root);
+
+        assert!(events_checked > 0, "at least one event must be checked");
         Ok(())
     }
 }

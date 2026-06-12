@@ -290,12 +290,23 @@ fn run_repo_check(options: RepoOptions) -> Result<(), crate::RunFailure> {
     let rendered = render_with_format_and_provenance(&output, &check.format, Some(&provenance));
     if let Some(path) = report_path {
         let partial = repo_partial_path(&path);
-        if let Err(err) = write_repo_report(&path, &partial, rendered) {
-            return Err(crate::RunFailure::Tool(repo_incomplete_error(
-                &mut reporter,
-                &err,
-                Some(&partial),
-            )));
+        let output_bytes = match write_repo_report(&path, &partial, rendered) {
+            Ok(bytes) => bytes,
+            Err(err) => {
+                return Err(crate::RunFailure::Tool(repo_incomplete_error(
+                    &mut reporter,
+                    &err,
+                    Some(&partial),
+                )));
+            }
+        };
+        // Stamp the output byte count into the status sidecar now that the final
+        // report has been written.  Errors here are non-fatal — the report is
+        // already safely written; we surface the warning but do not fail the run.
+        if let Err(err) = reporter.record_final_output_bytes(output_bytes) {
+            eprintln!(
+                "unsafe-review repo: warning: failed to update output_bytes in status sidecar: {err}"
+            );
         }
     } else {
         println!("{rendered}");
@@ -673,6 +684,30 @@ impl RepoStatusReporter {
             .and_then(|guard| guard.as_ref().map(|s| s.files_discovered))
             .unwrap_or(0)
     }
+
+    /// Stamp the output byte count into the last-known status and re-write the
+    /// status sidecar.  Called once, after the final report file is successfully
+    /// written.  No-op when no `--out` path was given (stdout-only runs).
+    ///
+    /// The byte count is the disk footprint of this run's output artifact —
+    /// diagnostic only, not a coverage claim, proof, UB-free, Miri-clean,
+    /// site-execution, or performance guarantee.
+    fn record_final_output_bytes(&mut self, output_bytes: u64) -> Result<(), String> {
+        let Some(path) = self.status_path.clone() else {
+            return Ok(());
+        };
+        let mut last_status = self
+            .last_status
+            .lock()
+            .map_err(|err| format!("repo status lock poisoned: {err}"))?;
+        let Some(ref mut status) = *last_status else {
+            return Ok(());
+        };
+        status.output_bytes = Some(output_bytes);
+        ensure_parent_dir(&path)?;
+        fs::write(&path, render_repo_scan_status(status, &self.scan_scope)?)
+            .map_err(|err| format!("write {} failed: {err}", path.display()))
+    }
 }
 
 #[cfg(unix)]
@@ -892,6 +927,11 @@ fn render_repo_scan_status(
         "stop_reason": stop_reason,
         "cap": status.cap,
         "file_timings": file_timings_json,
+        // Total bytes written to the output artifact for this run.  Present only
+        // when the final report was successfully written; null otherwise.
+        // Diagnostic aperture only — not a coverage claim, proof, UB-free,
+        // Miri-clean, site-execution, or performance guarantee.
+        "output_bytes": status.output_bytes,
         "error": null,
         "signal": null,
         "partial_path": null,
@@ -931,6 +971,8 @@ fn render_repo_scan_incomplete_status(
         // Per-file timings are not available in incomplete/error states; the field
         // is null rather than a partial list (truncation honesty).
         "file_timings": serde_json::Value::Null,
+        // No output artifact was produced for an incomplete scan.
+        "output_bytes": serde_json::Value::Null,
         "error": error,
         "signal": null,
         "partial_path": partial_path.map(|path| path.display().to_string()),
@@ -970,6 +1012,8 @@ fn render_repo_scan_interrupted_status(
         // Per-file timings are not available in signal-interrupted states; the field
         // is null rather than a partial list (truncation honesty).
         "file_timings": serde_json::Value::Null,
+        // No output artifact was produced for a signal-interrupted scan.
+        "output_bytes": serde_json::Value::Null,
         "error": format!("repo scan interrupted by {signal_name}"),
         "signal": signal_name,
         "partial_path": partial_path.map(|path| path.display().to_string()),
@@ -1002,6 +1046,8 @@ fn write_scan_start_stub(
         "cap": serde_json::Value::Null,
         // Per-file timings are not available in the pre-discovery start stub.
         "file_timings": serde_json::Value::Null,
+        // No output artifact has been produced yet at start-stub time.
+        "output_bytes": serde_json::Value::Null,
         "error": serde_json::Value::Null,
         "signal": serde_json::Value::Null,
         "partial_path": serde_json::Value::Null,
@@ -1130,8 +1176,12 @@ fn out_with_suffix(out: &Path, suffix: &str) -> PathBuf {
     }
 }
 
-fn write_repo_report(path: &Path, partial_path: &Path, rendered: String) -> Result<(), String> {
+/// Write the final repo report via write-then-rename, returning the number of
+/// bytes written.  The byte count is the disk footprint of this run's output
+/// artifact — diagnostic only, not a coverage or safety claim.
+fn write_repo_report(path: &Path, partial_path: &Path, rendered: String) -> Result<u64, String> {
     ensure_parent_dir(partial_path)?;
+    let byte_count = rendered.len() as u64;
     fs::write(partial_path, rendered).map_err(|err| {
         format!(
             "write partial repo report {} failed: {err}",
@@ -1145,7 +1195,7 @@ fn write_repo_report(path: &Path, partial_path: &Path, rendered: String) -> Resu
             path.display()
         )
     })?;
-    Ok(())
+    Ok(byte_count)
 }
 
 fn repo_incomplete_error(
@@ -1270,6 +1320,11 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
 
     fs::create_dir_all(&options.out_dir)
         .map_err(|err| format!("create {} failed: {err}", options.out_dir.display()))?;
+    // Accumulate bytes written across all artifact writes.  The total is
+    // the disk footprint of this run's output bundle — diagnostic only,
+    // not a coverage claim, proof, UB-free, Miri-clean, site-execution, or
+    // performance guarantee.
+    let mut output_bytes: u64 = 0;
     let mut comment_plan_artifact = None;
     for (name, renderer) in FIRST_PR_RENDERED_ARTIFACTS {
         // cards.json uses the provenance-aware renderer to emit schema 0.2.
@@ -1287,33 +1342,33 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         if name == "comment-plan.json" {
             comment_plan_artifact = Some(rendered.clone());
         }
-        write_artifact(&options.out_dir.join(name), rendered)?;
+        output_bytes += write_artifact(&options.out_dir.join(name), rendered)?;
     }
-    write_artifact(
+    output_bytes += write_artifact(
         &options.out_dir.join(RECEIPT_AUDIT_ARTIFACT),
         render_receipt_audit_markdown(&receipt_audit),
     )?;
-    write_artifact(
+    output_bytes += write_artifact(
         &options.out_dir.join(RECEIPT_AUDIT_JSON_ARTIFACT),
         render_receipt_audit_json(&receipt_audit),
     )?;
-    write_artifact(
+    output_bytes += write_artifact(
         &options.out_dir.join(POLICY_REPORT_JSON_ARTIFACT),
         render_policy_report_json(&policy_report),
     )?;
-    write_artifact(
+    output_bytes += write_artifact(
         &options.out_dir.join(POLICY_REPORT_MARKDOWN_ARTIFACT),
         render_policy_report_markdown(&policy_report),
     )?;
-    write_artifact(
+    output_bytes += write_artifact(
         &options.out_dir.join(MANUAL_CANDIDATES_ARTIFACT),
         first_pr::render_manual_candidates_artifact(&root, &manual_candidates),
     )?;
-    write_artifact(
+    output_bytes += write_artifact(
         &options.out_dir.join(MANUAL_REPAIR_QUEUE_ARTIFACT),
         first_pr::render_manual_repair_queue_artifact(&root, &manual_candidates),
     )?;
-    write_artifact(
+    output_bytes += write_artifact(
         &options.out_dir.join(TOKMD_PACKETS_ARTIFACT),
         first_pr::render_tokmd_packets_artifact(
             &root,
@@ -1321,7 +1376,7 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
             comment_plan_artifact.as_deref(),
         ),
     )?;
-    write_artifact(
+    output_bytes += write_artifact(
         &options.out_dir.join(REVIEW_KIT_ARTIFACT),
         first_pr::render_review_kit_manifest(
             &output,
@@ -1331,7 +1386,7 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
             &FIRST_PR_ARTIFACTS,
         ),
     )?;
-    write_artifact(
+    output_bytes += write_artifact(
         &options.out_dir.join(GATE_MANIFEST_ARTIFACT),
         render_gate_manifest(&output),
     )?;
@@ -1345,6 +1400,7 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         no_changed_gaps_message: NO_CHANGED_GAPS_MESSAGE,
         no_changed_gaps_limitation: NO_CHANGED_GAPS_LIMITATION,
         artifacts: &FIRST_PR_ARTIFACTS,
+        output_bytes,
     });
 
     Ok(())
@@ -1376,9 +1432,15 @@ fn enforce_policy(output: &unsafe_review_core::AnalyzeOutput) -> Result<(), crat
     }
 }
 
-fn write_artifact(path: &Path, rendered: String) -> Result<(), String> {
+/// Write a single artifact file, returning the number of bytes written.
+/// The byte count contributes to the run's total output footprint telemetry —
+/// diagnostic only, not a coverage claim, proof, UB-free, Miri-clean,
+/// site-execution, or performance guarantee.
+fn write_artifact(path: &Path, rendered: String) -> Result<u64, String> {
     ensure_parent_dir(path)?;
-    fs::write(path, rendered).map_err(|err| format!("write {} failed: {err}", path.display()))
+    let byte_count = rendered.len() as u64;
+    fs::write(path, rendered).map_err(|err| format!("write {} failed: {err}", path.display()))?;
+    Ok(byte_count)
 }
 
 fn diff_source(options: &CheckOptions) -> Result<DiffSource, String> {

@@ -88,10 +88,14 @@ pub(super) struct FirstPrReport<'a> {
     pub(super) no_changed_gaps_message: &'a str,
     pub(super) no_changed_gaps_limitation: &'a str,
     pub(super) artifacts: &'a [&'a str],
+    /// Total bytes written to all artifact files in `out_dir` for this run.
+    /// Diagnostic only — not a coverage claim, proof, UB-free, Miri-clean,
+    /// site-execution, or performance guarantee.
+    pub(super) output_bytes: u64,
 }
 
 pub(super) fn print_first_pr_report(report: FirstPrReport<'_>) {
-    print_first_pr_overview(report.output, report.out_dir);
+    print_first_pr_overview(report.output, report.out_dir, report.output_bytes);
     print_manual_candidate_handoff(report.out_dir, report.root, report.manual_candidates);
     print_receipt_audit_handoff(report.check);
     print_policy_report_handoff(report.out_dir);
@@ -249,7 +253,7 @@ fn shell_arg(value: &str) -> String {
     }
 }
 
-fn print_first_pr_overview(output: &AnalyzeOutput, out_dir: &Path) {
+fn print_first_pr_overview(output: &AnalyzeOutput, out_dir: &Path, output_bytes: u64) {
     println!("unsafe-review first-pr");
     println!("unsafe-review wrote an advisory PR bundle.");
     println!("- Artifact directory: {}", card_path_display(out_dir));
@@ -258,6 +262,9 @@ fn print_first_pr_overview(output: &AnalyzeOutput, out_dir: &Path) {
         "- Open actionable gaps: {}",
         output.summary.open_actionable_gaps
     );
+    // Output bundle disk footprint — diagnostic only; not a coverage claim,
+    // proof, UB-free, Miri-clean, site-execution, or performance guarantee.
+    println!("- Output bundle: {output_bytes} bytes");
     println!("Open:");
     println!("  {}", artifact_path_display(out_dir, "pr-summary.md"));
     println!("Agent repair queue:");

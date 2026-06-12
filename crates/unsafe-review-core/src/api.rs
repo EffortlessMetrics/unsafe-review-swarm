@@ -140,6 +140,16 @@ pub struct RepoScanStatus {
     /// This is a **diagnostic aperture only** — not a coverage claim, proof,
     /// UB-free, Miri-clean, site-execution, or performance guarantee.
     pub file_timings: Option<Vec<PerFileScanStats>>,
+    /// Total bytes written to the output artifact(s) for this run.  `Some`
+    /// only after the final report file is successfully written; `None` for
+    /// in-progress, error, timeout, signal-terminated, and capped states where
+    /// no final artifact was produced.
+    ///
+    /// This is a **diagnostic aperture only** — it measures the disk footprint
+    /// of this run's output, not the files scanned.  It is not a coverage
+    /// claim, proof, UB-free, Miri-clean, site-execution, or performance
+    /// guarantee.
+    pub output_bytes: Option<u64>,
 }
 
 /// Maximum number of files for which per-file timing is collected.

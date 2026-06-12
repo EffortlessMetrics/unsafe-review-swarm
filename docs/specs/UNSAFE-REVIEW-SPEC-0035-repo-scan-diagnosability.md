@@ -92,6 +92,7 @@ first-class artifact:
   "file_timings": [
     { "file": "crates/foo/src/raw.rs", "scan_ms": 12 }
   ],
+  "output_bytes": 142857,
   "error": null,
   "signal": null,
   "partial_path": null,
@@ -117,6 +118,21 @@ files or `null` — it is never silently truncated to a subset.  For a
 hit (i.e., `timings.length == files_scanned`), which may be fewer than
 `files_discovered`; this is correct and expected.  For timeout, error, signal,
 and start-stub states the field is always `null`.
+
+**`output_bytes` (optional, diagnostic only):** Total bytes written to the
+output artifact for this run.  Present (`some positive integer`) only after the
+final report file is successfully written — i.e., in the `complete` state after
+a clean scan when `--out` was given.  `null` for in-progress (start-stub),
+error, timeout, signal-terminated, and capped states where no final artifact was
+produced.
+
+**Claim boundary:** `output_bytes` is a **diagnostic aperture only** — it
+measures the disk footprint of this run's output artifact and nothing more.  A
+large value does not assert more coverage.  A small value does not assert the
+absence of unsafe operations.  It is not a coverage claim, memory-safety proof,
+UB-free status, Miri-clean status, site-execution proof, calibrated metric, or
+performance guarantee.  It is operational diagnosis for identifying runs that
+produce unexpectedly large or small output bundles.
 
 **Claim boundary:** per-file timing is a **diagnostic aperture only**.  A slow
 file does not assert a detection miss, a proof gap, or any safety/UB-free/
@@ -256,12 +272,23 @@ and operator block report what the scan did; they make no safety claim.
   - `per_file_timings_absent_when_file_count_at_or_above_cap` — a scan with
     exactly `FILE_TIMINGS_CAP` files produces `file_timings: None` (truncation
     honesty).
+  - `output_bytes_none_in_all_pipeline_events` — the pipeline never pre-populates
+    `output_bytes`; only the CLI writer layer stamps the value after disk writes.
 - `cargo test -p unsafe-review --test e2e repo_status_sidecar_includes_per_file_timings_for_small_scan`
   — e2e: completed sidecar carries a `file_timings` array with the correct
   entry count and correct field shapes.
 - `cargo test -p unsafe-review --test e2e repo_status_sidecar_file_timings_null_for_timeout_path`
   — e2e: timeout incomplete sidecar has `file_timings: null` (truncation
   honesty preserved on error paths).
+- `cargo test -p unsafe-review --test e2e repo_status_sidecar_output_bytes_present_for_completed_scan`
+  — e2e: completed sidecar carries `output_bytes` matching the on-disk report
+  file size; field is a positive integer, not null.
+- `cargo test -p unsafe-review --test e2e repo_status_sidecar_output_bytes_null_for_timeout_path`
+  — e2e: timeout incomplete sidecar has `output_bytes: null` (no final artifact
+  produced).
+- `cargo test -p unsafe-review --test e2e first_pr_reports_output_bytes_in_terminal_output`
+  — e2e: a `first-pr` run reports `output_bytes > 0` in terminal output matching
+  the total on-disk size of all artifacts written to `--out-dir`.
 - `cargo run --locked -p xtask -- check-pr`.
 
 ## Machine check
