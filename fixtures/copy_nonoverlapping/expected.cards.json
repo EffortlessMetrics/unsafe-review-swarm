@@ -98,7 +98,7 @@
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Add or expose the local guard that discharges the `copy_nonoverlapping` safety obligation.",
+    "next_action": "Add or expose local guards for these `copy_nonoverlapping` safety obligations: (1) source and destination do not overlap, (2) both ranges are valid for count elements.",
     "verify_commands": [
       "cargo +nightly miri test copy_bytes",
       "cargo +nightly careful test copy_bytes"

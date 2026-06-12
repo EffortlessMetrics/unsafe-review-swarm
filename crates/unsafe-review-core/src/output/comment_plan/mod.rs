@@ -36,7 +36,7 @@ mod tests {
         );
         assert_eq!(
             value["comments"][0]["next_action"],
-            "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation."
+            "Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation."
         );
         assert_eq!(
             value["comments"][0]["build_this_first"]["kind"],

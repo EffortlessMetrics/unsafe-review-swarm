@@ -946,7 +946,7 @@ mod tests {
         ));
         assert!(rendered.contains("`source_route_only`"));
         assert!(rendered.contains("unsafe { ptr.cast::<Header>().read() }"));
-        assert!(rendered.contains("Add or expose the local guard"));
+        assert!(rendered.contains("Add or expose local guards"));
         assert!(rendered.contains("not memory-safety proof"));
         Ok(())
     }
@@ -986,7 +986,7 @@ mod tests {
         assert!(rendered.contains("cargo +nightly miri test read_header"));
         assert!(rendered.contains("## What would resolve this"));
         assert!(rendered.contains(
-            "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation."
+            "Add or expose local guards for these `raw_pointer_read` safety obligations:"
         ));
         assert!(rendered.contains("## What would not resolve this"));
         assert!(
@@ -1048,7 +1048,7 @@ mod tests {
         assert!(rendered.contains("- Evidence found:"));
         assert!(rendered.contains("  - Guard/discharge:"));
         assert!(rendered.contains("- Missing/weak evidence: Missing visible local guard"));
-        assert!(rendered.contains("- Next reviewer action: Add or expose the local guard"));
+        assert!(rendered.contains("- Next reviewer action: Add or expose local guards"));
         assert!(rendered.contains(
             "- Confirmation step: build/run `cargo +nightly miri test read_header` first"
         ));
@@ -1214,7 +1214,7 @@ mod tests {
         assert!(rendered.contains("| `source_route_only` |"));
         assert!(rendered.contains("src/lib.rs:8"));
         assert!(rendered.contains("unsafe { ptr.cast::<Header>().read() }"));
-        assert!(rendered.contains("Add or expose the local guard"));
+        assert!(rendered.contains("Add or expose local guards"));
         assert!(rendered.contains("## Trust boundary"));
         assert!(rendered.contains("not raw unsafe usage"));
         assert!(rendered.contains("not UB-free status"));

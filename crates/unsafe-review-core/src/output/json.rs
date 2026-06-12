@@ -1056,7 +1056,7 @@ mod tests {
             value["cards"][0]["next_action"]
                 .as_str()
                 .unwrap_or("")
-                .contains("Add or expose the local guard")
+                .contains("Add or expose local guards")
         );
         assert!(value["cards"][0]["verify_commands"].is_array());
         assert_eq!(

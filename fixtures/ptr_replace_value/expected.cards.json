@@ -149,7 +149,7 @@
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Add or expose the local guard that discharges the `ptr_replace` safety obligation.",
+    "next_action": "Add or expose local guards for these `ptr_replace` safety obligations: (1) destination pointer is valid for read and write, (2) destination pointer is aligned for the value type, (3) destination value is initialized before replace, (4) returned old value and replacement value preserve drop ownership.",
     "verify_commands": [
       "cargo +nightly miri test replace_slot",
       "cargo +nightly careful test replace_slot"

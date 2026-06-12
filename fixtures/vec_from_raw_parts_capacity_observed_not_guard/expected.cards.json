@@ -177,7 +177,7 @@
       "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Add or expose the local guard that discharges the `vec_from_raw_parts` safety obligation.",
+    "next_action": "Add or expose local guards for these `vec_from_raw_parts` safety obligations: (1) pointer was allocated by a compatible allocator for `capacity` elements, (2) pointer is aligned for the element type, (3) first `len` elements are initialized, (4) `len` is at most `capacity`, (5) the constructed Vec receives unique ownership and will not double-free.",
     "verify_commands": [
       "cargo +nightly miri test rebuild_vec",
       "cargo +nightly careful test rebuild_vec"

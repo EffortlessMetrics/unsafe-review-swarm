@@ -118,6 +118,7 @@ pub(super) fn build_card(
             scanned_site.operation.family.as_str(),
             scanned_site.site.public_api_surface,
             &routes,
+            &obligation_evidence,
         )
     };
     let next_action = NextAction {

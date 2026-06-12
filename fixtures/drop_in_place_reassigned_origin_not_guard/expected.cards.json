@@ -124,7 +124,7 @@
       "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Add or expose the local guard that discharges the `drop_in_place` safety obligation.",
+    "next_action": "Add or expose local guards for these `drop_in_place` safety obligations: (1) pointer is valid for dropping one value, (2) pointed-to value is initialized, (3) value will not be dropped again or observed after drop.",
     "verify_commands": [
       "cargo +nightly miri test drop_reassigned",
       "cargo +nightly careful test drop_reassigned"

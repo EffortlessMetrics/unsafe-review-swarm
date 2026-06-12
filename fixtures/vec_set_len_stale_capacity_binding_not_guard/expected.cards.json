@@ -97,7 +97,7 @@
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Add or expose the local guard that discharges the `vec_set_len` safety obligation.",
+    "next_action": "Add or expose local guards for these `vec_set_len` safety obligations: (1) new length is at most capacity, (2) elements in the extended range are initialized.",
     "verify_commands": [
       "cargo +nightly miri test reset_after_capacity_binding",
       "cargo +nightly careful test reset_after_capacity_binding"

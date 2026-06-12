@@ -98,7 +98,7 @@
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Add or expose the local guard that discharges the `transmute` safety obligation.",
+    "next_action": "Add or expose local guards for these `transmute` safety obligations: (1) source and destination layouts are compatible, (2) destination value satisfies Rust validity rules.",
     "verify_commands": [
       "cargo +nightly miri test copy_byte_to_bool_conjunct_layout_return",
       "cargo +nightly careful test copy_byte_to_bool_conjunct_layout_return"

@@ -151,7 +151,7 @@
       "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Add or expose the local guard that discharges the `slice_from_raw_parts` safety obligation.",
+    "next_action": "Add or expose local guards for these `slice_from_raw_parts` safety obligations: (1) pointer is valid for `len` elements, (2) pointer is aligned for the element type, (3) memory range is initialized, (4) range fits in one allocation.",
     "verify_commands": [
       "cargo +nightly miri test expose_mut",
       "cargo +nightly careful test expose_mut"

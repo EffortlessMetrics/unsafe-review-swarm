@@ -81,7 +81,7 @@ fn lsp_projection_is_parseable_and_read_only() -> Result<(), String> {
         value["diagnostics"][0]["next_action"]
             .as_str()
             .unwrap_or("")
-            .contains("Add or expose the local guard")
+            .contains("Add or expose local guards")
     );
     assert_eq!(value["diagnostics"][0]["witness_routes"][0]["kind"], "miri");
     assert!(

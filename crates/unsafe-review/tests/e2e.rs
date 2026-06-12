@@ -85,7 +85,7 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
         "| ID | Class | Proof path | Operation | Hazard | Missing | Route | Next action |"
     ));
     assert!(markdown.contains("unsafe { ptr.cast::<Header>().read() }"));
-    assert!(markdown.contains("Add or expose the local guard"));
+    assert!(markdown.contains("Add or expose local guards"));
 
     let root_relative_diff = run_success([
         os("check"),
@@ -340,7 +340,7 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
         lsp["diagnostics"][0]["next_action"]
             .as_str()
             .unwrap_or("")
-            .contains("Add or expose the local guard")
+            .contains("Add or expose local guards")
     );
     assert_eq!(lsp["diagnostics"][0]["witness_routes"][0]["kind"], "miri");
     assert!(
@@ -581,13 +581,17 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
         "- `cargo-careful`: cargo-careful is a cheaper compatibility-oriented runtime check"
     ));
     assert!(explain.contains("cargo +nightly careful test read_header"));
-    assert!(explain.contains(
-        "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation."
-    ));
+    assert!(
+        explain.contains(
+            "Add or expose local guards for these `raw_pointer_read` safety obligations:"
+        )
+    );
     assert!(explain.contains("## What would resolve this"));
-    assert!(explain.contains(
-        "- Add or expose the local guard that discharges the `raw_pointer_read` safety obligation."
-    ));
+    assert!(
+        explain.contains(
+            "- Add or expose local guards for these `raw_pointer_read` safety obligations:"
+        )
+    );
     assert!(explain.contains("Then attach a matching witness receipt only after running"));
     assert!(explain.contains("## What would not resolve this"));
     assert!(
@@ -4490,7 +4494,7 @@ fn repo_inventory_and_badges_count_open_gaps_without_safety_claim() -> Result<()
     assert!(repo_markdown.contains("src/lib.rs:8"));
     assert!(repo_markdown.contains("unsafe { ptr.cast::<Header>().read() }"));
     assert!(repo_markdown.contains("## Trust boundary"));
-    assert!(repo_markdown.contains("Add or expose the local guard"));
+    assert!(repo_markdown.contains("Add or expose local guards"));
     assert!(repo_markdown.contains("not raw unsafe usage"));
     assert!(repo_markdown.contains("not UB-free status"));
 

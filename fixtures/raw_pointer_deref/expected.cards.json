@@ -174,7 +174,7 @@
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Add or expose the local guard that discharges the `raw_pointer_deref` safety obligation.",
+    "next_action": "Add or expose local guards for these `raw_pointer_deref` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) buffer has enough bytes for the accessed type, (3) pointer is aligned for the accessed type, (4) memory is initialized for the accessed type, (5) access remains inside one live allocation.",
     "verify_commands": [
       "cargo +nightly miri test read_header",
       "cargo +nightly careful test read_header"

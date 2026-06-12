@@ -98,7 +98,7 @@
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Add or expose the local guard that discharges the `ptr_copy` safety obligation.",
+    "next_action": "Add or expose local guards for these `ptr_copy` safety obligations: (1) both ranges are valid for count elements, (2) source range is initialized for count elements.",
     "verify_commands": [
       "cargo +nightly miri test copy_checked",
       "cargo +nightly careful test copy_checked"

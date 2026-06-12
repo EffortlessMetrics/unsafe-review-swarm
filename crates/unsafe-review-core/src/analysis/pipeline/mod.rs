@@ -823,7 +823,7 @@ mod tests {
             (ReviewClass::WitnessMismatch, "matching receipt"),
             (ReviewClass::StaticUnknown, "witness route"),
         ] {
-            let summary = next_action_summary(&class, "raw_pointer_read", false, &[]);
+            let summary = next_action_summary(&class, "raw_pointer_read", false, &[], &[]);
             assert!(
                 summary.contains(expected),
                 "`{}` next action `{summary}` should mention `{expected}`",
@@ -840,6 +840,7 @@ mod tests {
             "unknown",
             false,
             &human_route,
+            &[],
         );
         assert!(
             summary.contains("human deep-review witness receipt"),
@@ -856,6 +857,7 @@ mod tests {
             "raw_pointer_read",
             false,
             &miri_careful_routes,
+            &[],
         );
         assert!(miri_supported.contains("Miri"));
         assert!(miri_supported.contains("cargo-careful"));
@@ -871,6 +873,7 @@ mod tests {
             "inline_asm",
             false,
             &human_route,
+            &[],
         );
 
         assert!(summary.contains("inline_asm"));
@@ -888,6 +891,7 @@ mod tests {
             "pin_unchecked",
             false,
             &human_route,
+            &[],
         );
 
         assert!(summary.contains("pin_unchecked"));
@@ -906,6 +910,7 @@ mod tests {
             "unsafe_fn_call",
             false,
             &human_route,
+            &[],
         );
 
         assert!(summary.contains("unsafe_fn_call"));
@@ -3738,6 +3743,60 @@ pub fn read_at(offset: i32) -> Result<usize, ()> {
         assert_eq!(card.class, ReviewClass::GuardMissing);
         assert!(card.hazards.contains(&HazardKind::AliasingOrProvenance));
         assert!(card.id.0.contains("copy-nonoverlapping"));
+        Ok(())
+    }
+
+    #[test]
+    fn guard_missing_multi_obligation_next_action_enumerates_missing_obligations()
+    -> Result<(), String> {
+        // copy_nonoverlapping has two obligations: non-overlap and valid-range.
+        // When BOTH are undischarged, next_action must name each one so reviewers
+        // know exactly what guards to add.  This is the drift-lock for #1597.
+        let output = fixture_output("copy_nonoverlapping")?;
+        let card = single_card("copy_nonoverlapping", &output)?;
+
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        let na = &card.next_action.summary;
+        assert!(
+            na.contains("non-overlap") || na.contains("source and destination do not overlap"),
+            "multi-obligation next_action must name the non-overlap obligation; got: `{na}`"
+        );
+        assert!(
+            na.contains("valid-range") || na.contains("both ranges are valid for count elements"),
+            "multi-obligation next_action must name the valid-range obligation; got: `{na}`"
+        );
+        assert!(
+            na.contains("obligations"),
+            "multi-obligation next_action should use plural 'obligations'; got: `{na}`"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn guard_missing_single_obligation_next_action_uses_singular_wording() -> Result<(), String> {
+        // copy_nonoverlapping_slice_range_guard discharges the valid-range obligation but
+        // leaves non-overlap undischarged — exactly one missing obligation.
+        // The singular wording must be byte-identical to the pre-#1597 form.
+        let output = fixture_output("copy_nonoverlapping_slice_range_guard")?;
+        let card = single_card("copy_nonoverlapping_slice_range_guard", &output)?;
+
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        // Exactly one obligation is undischarged (non-overlap).
+        let missing_count = card
+            .obligation_evidence
+            .iter()
+            .filter(|ev| !ev.discharge.present)
+            .count();
+        assert_eq!(
+            missing_count, 1,
+            "test pre-condition: fixture should have exactly one undischarged obligation"
+        );
+        let na = &card.next_action.summary;
+        assert_eq!(
+            na,
+            "Add or expose the local guard that discharges the `copy_nonoverlapping` safety obligation.",
+            "single-obligation next_action wording must be unchanged from pre-#1597 form"
+        );
         Ok(())
     }
 

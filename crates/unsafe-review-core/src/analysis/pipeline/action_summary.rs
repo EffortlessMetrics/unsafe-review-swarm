@@ -1,10 +1,11 @@
-use crate::domain::{ReviewClass, WitnessKind, WitnessRoute};
+use crate::domain::{ObligationEvidence, ReviewClass, WitnessKind, WitnessRoute};
 
 pub(super) fn next_action_summary(
     class: &ReviewClass,
     operation: &str,
     public_api_surface: bool,
     routes: &[WitnessRoute],
+    obligation_evidence: &[ObligationEvidence],
 ) -> String {
     match class {
         ReviewClass::ContractMissing if public_api_surface => {
@@ -16,7 +17,27 @@ pub(super) fn next_action_summary(
         ReviewClass::GuardMissing if operation == "unsafe_fn_call" => "Review the `unsafe_fn_call` callee contract manually and add obligation-specific guard evidence for this call.".to_string(),
         ReviewClass::GuardMissing if operation == "inline_asm" => "Review the `inline_asm` register, memory, and target invariants manually; add explicit guard evidence, and attach a human deep-review receipt only as witness evidence.".to_string(),
         ReviewClass::GuardMissing if operation == "pin_unchecked" => "Review the `pin_unchecked` move-prevention and projection invariants manually; add explicit guard evidence, and attach a human deep-review receipt only as witness evidence.".to_string(),
-        ReviewClass::GuardMissing => format!("Add or expose the local guard that discharges the `{operation}` safety obligation."),
+        ReviewClass::GuardMissing => {
+            let missing_obligations: Vec<&ObligationEvidence> = obligation_evidence
+                .iter()
+                .filter(|ev| !ev.discharge.present)
+                .collect();
+            if missing_obligations.len() > 1 {
+                let list = missing_obligations
+                    .iter()
+                    .enumerate()
+                    .map(|(i, ev)| format!("({}) {}", i + 1, ev.obligation.description))
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!(
+                    "Add or expose local guards for these `{operation}` safety obligations: {list}."
+                )
+            } else {
+                format!(
+                    "Add or expose the local guard that discharges the `{operation}` safety obligation."
+                )
+            }
+        }
         ReviewClass::GuardedUnwitnessed if has_witness_route(routes, WitnessKind::HumanDeepReview) => {
             "Attach a human deep-review witness receipt or mark the static limitation explicitly."
                 .to_string()
