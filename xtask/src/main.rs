@@ -22167,6 +22167,7 @@ review_after = "2026-08-01"
                 {"path":"manual-candidates.json","kind":"manual_candidates","format":"json","schema_version":"manual-candidates/v1"},
                 {"path":"manual-repair-queue.json","kind":"manual_repair_queue","format":"json","schema_version":"manual-repair-queue/v1"},
                 {"path":"tokmd-packets.json","kind":"tokmd_packets","format":"json","schema_version":"tokmd-packets/v1"},
+                {"path":"usefulness-telemetry.json","kind":"usefulness_telemetry","format":"json","schema_version":"usefulness-telemetry/v1"},
                 {"path":"lsp.json","kind":"saved_lsp","format":"json","schema_version":"0.1"},
                 {"path":"repair-queue.json","kind":"repair_queue","format":"json","schema_version":"0.1"}
             ],
@@ -22196,7 +22197,8 @@ review_after = "2026-08-01"
                 "pr_summary": "pr-summary.md",
                 "sarif": "cards.sarif",
                 "lsp": "lsp.json",
-                "policy_report": "policy-report.json"
+                "policy_report": "policy-report.json",
+                "usefulness_telemetry": "usefulness-telemetry.json"
             },
             "trust_boundary": "static unsafe-review coverage evidence; not proof, not a merge verdict",
             "tool": "unsafe-review",
@@ -22204,6 +22206,51 @@ review_after = "2026-08-01"
         });
         fs::write(dir.join("unsafe-review-gate.json"), value.to_string())
             .map_err(|err| format!("write gate manifest failed: {err}"))
+    }
+
+    fn write_usefulness_telemetry_artifact(dir: &Path) -> Result<(), String> {
+        let value = serde_json::json!({
+            "schema_version": "usefulness-telemetry/v1",
+            "trust_boundary": "operational diagnostic usefulness only — not calibrated, not a measurement of detection accuracy, not a memory guarantee, not a soundness guarantee, not a gate, and not a merge verdict; all telemetry is projected from ReviewCard/Summary/CoverageBlock/CommentPlan fields deterministically",
+            "card_inventory": {
+                "total_cards": 1,
+                "actionable_cards": 1,
+                "new_cards": 1,
+                "worsened_cards": 0,
+                "resolved_cards": 0,
+                "inherited_cards": 0
+            },
+            "coverage_slots": {
+                "contract_missing": 0,
+                "contract_weak": 0,
+                "guard_missing": 1,
+                "guard_weak": 0,
+                "test_reach_missing": 0,
+                "test_reach_weak": 0,
+                "witness_receipt_missing": 1
+            },
+            "agent_readiness": {
+                "ready": 1,
+                "needs_human": 0,
+                "unsupported": 0
+            },
+            "comment_selection": {
+                "selected_count": 1,
+                "not_selected_count": 0,
+                "not_selected_reason_histogram": {}
+            },
+            "confidence_distribution": {
+                "high": 0,
+                "medium": 1,
+                "low": 0,
+                "unknown": 0
+            },
+            "actionability_distribution": {
+                "specific_guard_missing": 1
+            }
+        });
+        fs::write(dir.join("usefulness-telemetry.json"), value.to_string())
+            .map_err(|err| format!("write usefulness telemetry failed: {err}"))
     }
 
     fn write_empty_manual_candidates_artifact(dir: &Path) -> Result<(), String> {
@@ -23807,6 +23854,7 @@ review_after = "2026-08-01"
         write_empty_manual_candidates_artifact(dir)?;
         write_empty_manual_repair_queue_artifact(dir)?;
         write_empty_tokmd_packets_artifact(dir)?;
+        write_usefulness_telemetry_artifact(dir)?;
         write_review_kit_artifact(dir, 1, 1, Some("card-1"))?;
         write_gate_manifest_artifact(dir)?;
         Ok(())
@@ -23934,6 +23982,7 @@ This artifact is static unsafe contract review. It routes reviewers to credible 
         write_empty_manual_candidates_artifact(dir)?;
         write_empty_manual_repair_queue_artifact(dir)?;
         write_empty_tokmd_packets_artifact(dir)?;
+        write_usefulness_telemetry_artifact(dir)?;
         write_review_kit_artifact(dir, 0, 0, None)?;
         write_gate_manifest_artifact(dir)?;
         Ok(())

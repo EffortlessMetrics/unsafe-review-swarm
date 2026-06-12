@@ -66,6 +66,13 @@ status = "proposed"
 owner = "product / cli"
 
 [[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0038"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0038-low-noise-usefulness-telemetry.md"
+status = "proposed"
+owner = "product / cli"
+
+[[artifact]]
 id = "UNSAFE-REVIEW-SPEC-0021"
 kind = "spec"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-0021-vscode-openvsx-extension.md"
@@ -147,5 +154,12 @@ owner = "product / cli"
 id = "validation-residue"
 name = "instrument truthfulness and consumer reliability"
 path = ".rails/lanes/validation-residue/implementation-plan.md"
+status = "active"
+owner = "product / cli"
+
+[[lane]]
+id = "usefulness-telemetry-projection"
+name = "low-noise usefulness telemetry projection"
+path = ".rails/lanes/usefulness-telemetry/implementation-plan.md"
 status = "active"
 owner = "product / cli"

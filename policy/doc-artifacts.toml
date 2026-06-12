@@ -105,3 +105,10 @@ status = "proposed"
 owner = "product / cli"
 linked_proposal = "UNSAFE-REVIEW-PROP-0002"
 linked_spec = "UNSAFE-REVIEW-SPEC-0020"
+
+[[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0038"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0038-low-noise-usefulness-telemetry.md"
+status = "proposed"
+owner = "product / cli"
