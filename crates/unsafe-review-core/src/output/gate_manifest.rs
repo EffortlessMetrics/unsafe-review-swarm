@@ -105,6 +105,9 @@ struct GateArtifacts {
     lsp: &'static str,
     /// Policy report JSON (always present for first-pr).
     policy_report: &'static str,
+    /// Usefulness telemetry artifact (SPEC-0038; always present for first-pr).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    usefulness_telemetry: Option<&'static str>,
     /// Scope from the analysis run ("diff" or "repo").
     #[serde(skip)]
     _scope_marker: Scope,
@@ -122,6 +125,7 @@ impl From<&AnalyzeOutput> for GateArtifacts {
             sarif: "cards.sarif",
             lsp: "lsp.json",
             policy_report: "policy-report.json",
+            usefulness_telemetry: Some("usefulness-telemetry.json"),
             _scope_marker: output.scope.clone(),
         }
     }

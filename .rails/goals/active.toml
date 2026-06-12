@@ -121,6 +121,17 @@ commands = [
 ]
 
 [[work_item]]
+id = "usefulness-telemetry-projection"
+status = "active"
+spec = "UNSAFE-REVIEW-SPEC-0038"
+plan = ".rails/lanes/usefulness-telemetry/implementation-plan.md"
+commands = [
+  "cargo test -p unsafe-review-core usefulness_telemetry",
+  "cargo test -p unsafe-review --test e2e first_pr_emits_usefulness_telemetry_artifact",
+  "cargo run --locked -p xtask -- check-pr",
+]
+
+[[work_item]]
 id = "pr-alias-zero-config-entry-point"
 status = "active"
 spec = "UNSAFE-REVIEW-SPEC-0023"

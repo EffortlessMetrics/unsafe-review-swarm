@@ -273,7 +273,7 @@ const REPAIR_QUEUE_READINESS_STATES: [&str; 4] = [
     "requires_witness_receipt",
     "unsupported",
 ];
-const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 17] = [
+const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 18] = [
     "review-kit.json",
     "unsafe-review-gate.json",
     "cards.json",
@@ -289,6 +289,7 @@ const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 17] = [
     "manual-candidates.json",
     "manual-repair-queue.json",
     "tokmd-packets.json",
+    "usefulness-telemetry.json",
     "lsp.json",
     "repair-queue.json",
 ];
@@ -5066,6 +5067,7 @@ fn expected_review_kit_artifact_kind(path: &str) -> &'static str {
         "tokmd-packets.json" => "tokmd_packets",
         "lsp.json" => "saved_lsp",
         "repair-queue.json" => "repair_queue",
+        "usefulness-telemetry.json" => "usefulness_telemetry",
         _ => "unknown",
     }
 }
@@ -5082,7 +5084,8 @@ fn expected_review_kit_artifact_format(path: &str) -> &'static str {
         | "manual-repair-queue.json"
         | "tokmd-packets.json"
         | "policy-report.json"
-        | "receipt-audit.json" => "json",
+        | "receipt-audit.json"
+        | "usefulness-telemetry.json" => "json",
         "pr-summary.md" | "github-summary.md" | "witness-plan.md" | "receipt-audit.md"
         | "policy-report.md" => "markdown",
         "cards.sarif" => "sarif",
@@ -5108,6 +5111,7 @@ fn check_review_kit_artifact_schema_version(
         "manual-candidates.json" => Some("manual-candidates/v1"),
         "manual-repair-queue.json" => Some("manual-repair-queue/v1"),
         "tokmd-packets.json" => Some("tokmd-packets/v1"),
+        "usefulness-telemetry.json" => Some("usefulness-telemetry/v1"),
         "cards.sarif" => Some("2.1.0"),
         "pr-summary.md" | "github-summary.md" | "witness-plan.md" | "receipt-audit.md"
         | "policy-report.md" => None,
@@ -9661,6 +9665,7 @@ fn check_advisory_artifact_overclaims(dir: &Path) -> Result<(), String> {
         "manual-candidates.json",
         "manual-repair-queue.json",
         "tokmd-packets.json",
+        "usefulness-telemetry.json",
         "lsp.json",
         "repair-queue.json",
     ] {
@@ -9689,6 +9694,7 @@ fn is_machine_json_artifact(name: &str) -> bool {
             | "manual-candidates.json"
             | "manual-repair-queue.json"
             | "tokmd-packets.json"
+            | "usefulness-telemetry.json"
             | "lsp.json"
             | "repair-queue.json"
             | "receipt-audit.json"

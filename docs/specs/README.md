@@ -45,7 +45,8 @@ Specs define behavior. They do not carry the PR queue.
 34. [ub-review gate manifest](UNSAFE-REVIEW-SPEC-0034-ub-review-gate-manifest.md)
 35. [Repo-scan diagnosability](UNSAFE-REVIEW-SPEC-0035-repo-scan-diagnosability.md)
 36. [PR-gate composite GitHub Action](UNSAFE-REVIEW-SPEC-0037-pr-gate-composite-action.md)
-37. [Scheduled corpus backstop](UNSAFE-REVIEW-SPEC-0039-scheduled-corpus-backstop.md)
+37. [Low-noise usefulness telemetry](UNSAFE-REVIEW-SPEC-0038-low-noise-usefulness-telemetry.md)
+38. [Scheduled corpus backstop](UNSAFE-REVIEW-SPEC-0039-scheduled-corpus-backstop.md)
 
 
 ## Appendices

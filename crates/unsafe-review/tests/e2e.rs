@@ -3490,6 +3490,88 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
 }
 
 #[test]
+fn first_pr_emits_usefulness_telemetry_artifact() -> Result<(), Box<dyn Error>> {
+    // Verifies that first-pr emits usefulness-telemetry.json and that it
+    // correctly projects from the same cards as cards.json (SPEC-0038).
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-usefulness-telemetry-e2e")?;
+    let out_dir = temp.path().join("out");
+
+    run_success([
+        os("first-pr"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--out-dir"),
+        out_dir.as_os_str().to_os_string(),
+    ])?;
+
+    let telemetry_path = out_dir.join("usefulness-telemetry.json");
+    assert!(
+        telemetry_path.exists(),
+        "usefulness-telemetry.json must be emitted"
+    );
+
+    let telemetry: serde_json::Value = parse_json(&fs::read_to_string(&telemetry_path)?)?;
+
+    // Schema version
+    assert_eq!(telemetry["schema_version"], "usefulness-telemetry/v1");
+
+    // Trust boundary present and contains correct text
+    let boundary = telemetry["trust_boundary"].as_str().unwrap_or("");
+    assert!(!boundary.is_empty(), "trust_boundary must be present");
+    assert!(
+        boundary.contains("not calibrated"),
+        "trust_boundary must say 'not calibrated'"
+    );
+    assert!(
+        !boundary.to_ascii_lowercase().contains("precision"),
+        "trust_boundary must not claim precision"
+    );
+    assert!(
+        !boundary.to_ascii_lowercase().contains("recall"),
+        "trust_boundary must not claim recall"
+    );
+
+    // Card inventory projects from cards.json
+    let cards = parse_json(&fs::read_to_string(out_dir.join("cards.json"))?)?;
+    let expected_total = cards["summary"]["cards"].as_u64().unwrap_or(0);
+    assert_eq!(
+        telemetry["card_inventory"]["total_cards"]
+            .as_u64()
+            .unwrap_or(999),
+        expected_total,
+        "total_cards must match cards.json summary.cards"
+    );
+
+    // Agent readiness sums to total_cards
+    let ready = telemetry["agent_readiness"]["ready"].as_u64().unwrap_or(0);
+    let needs_human = telemetry["agent_readiness"]["needs_human"]
+        .as_u64()
+        .unwrap_or(0);
+    let unsupported = telemetry["agent_readiness"]["unsupported"]
+        .as_u64()
+        .unwrap_or(0);
+    assert_eq!(
+        ready + needs_human + unsupported,
+        expected_total,
+        "agent_readiness histogram must sum to total_cards"
+    );
+
+    // Gate manifest pointer present
+    let gate = parse_json(&fs::read_to_string(
+        out_dir.join("unsafe-review-gate.json"),
+    )?)?;
+    assert_eq!(
+        gate["artifacts"]["usefulness_telemetry"], "usefulness-telemetry.json",
+        "gate manifest must point to usefulness-telemetry.json"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("safe_code_no_cards");
     let temp = TempDir::new("unsafe-review-first-pr-clean-e2e")?;

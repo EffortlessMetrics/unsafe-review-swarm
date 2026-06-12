@@ -31,7 +31,8 @@ use unsafe_review_core::{
     render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
     render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
     render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,
-    render_repair_queue, render_sarif, render_witness_plan, validate_witness_receipts,
+    render_repair_queue, render_sarif, render_usefulness_telemetry, render_witness_plan,
+    validate_witness_receipts,
 };
 
 mod card_lookup;
@@ -53,6 +54,7 @@ const POLICY_REPORT_MARKDOWN_ARTIFACT: &str = "policy-report.md";
 const MANUAL_CANDIDATES_ARTIFACT: &str = "manual-candidates.json";
 const MANUAL_REPAIR_QUEUE_ARTIFACT: &str = "manual-repair-queue.json";
 const TOKMD_PACKETS_ARTIFACT: &str = "tokmd-packets.json";
+const USEFULNESS_TELEMETRY_ARTIFACT: &str = "usefulness-telemetry.json";
 const FIRST_PR_RENDERED_ARTIFACTS: [(&str, FirstPrRenderer); 8] = [
     ("cards.json", render_json),
     ("pr-summary.md", render_pr_summary),
@@ -63,7 +65,7 @@ const FIRST_PR_RENDERED_ARTIFACTS: [(&str, FirstPrRenderer); 8] = [
     ("lsp.json", render_lsp),
     ("repair-queue.json", render_repair_queue),
 ];
-const FIRST_PR_ARTIFACTS: [&str; 17] = [
+const FIRST_PR_ARTIFACTS: [&str; 18] = [
     REVIEW_KIT_ARTIFACT,
     GATE_MANIFEST_ARTIFACT,
     "cards.json",
@@ -79,6 +81,7 @@ const FIRST_PR_ARTIFACTS: [&str; 17] = [
     MANUAL_CANDIDATES_ARTIFACT,
     MANUAL_REPAIR_QUEUE_ARTIFACT,
     TOKMD_PACKETS_ARTIFACT,
+    USEFULNESS_TELEMETRY_ARTIFACT,
     "lsp.json",
     "repair-queue.json",
 ];
@@ -1478,6 +1481,10 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     output_bytes += write_artifact(
         &options.out_dir.join(GATE_MANIFEST_ARTIFACT),
         render_gate_manifest(&output),
+    )?;
+    output_bytes += write_artifact(
+        &options.out_dir.join(USEFULNESS_TELEMETRY_ARTIFACT),
+        render_usefulness_telemetry(&output),
     )?;
 
     first_pr::print_first_pr_report(first_pr::FirstPrReport {

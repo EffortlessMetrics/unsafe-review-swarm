@@ -109,6 +109,7 @@ target/unsafe-review/receipt-audit.md
 target/unsafe-review/manual-candidates.json
 target/unsafe-review/manual-repair-queue.json
 target/unsafe-review/tokmd-packets.json
+target/unsafe-review/usefulness-telemetry.json
 target/unsafe-review/lsp.json
 target/unsafe-review/repair-queue.json
 ```
@@ -877,6 +878,7 @@ Open:
 - `target/unsafe-review/manual-candidates.json` (manual/advisory candidates, separate from ReviewCards)
 - `target/unsafe-review/manual-repair-queue.json` (copy-only manual candidate handoff; no agent was run)
 - `target/unsafe-review/tokmd-packets.json` (formatting input only; tokmd was not run)
+- `target/unsafe-review/usefulness-telemetry.json` (operational diagnostic usefulness only; not calibrated precision/recall)
 - `target/unsafe-review/repair-queue.json` (copy-only; no agent was run)
 
 Trust boundary:
@@ -944,7 +946,7 @@ overclaim wording, including `review-kit.json`, `cards.json`, `pr-summary.md`,
 `github-summary.md`, `cards.sarif`, `comment-plan.json`, `witness-plan.md`,
 `receipt-audit.md`, `manual-candidates.json`, `manual-repair-queue.json`,
 `tokmd-packets.json`,
-`lsp.json`, and `repair-queue.json`.
+`usefulness-telemetry.json`, `lsp.json`, and `repair-queue.json`.
 
 ### 8. Policy report relationship
 

@@ -12,6 +12,7 @@ pub(crate) mod policy_report;
 pub(crate) mod receipt_audit;
 pub(crate) mod repair_queue;
 pub(crate) mod sarif;
+pub(crate) mod usefulness_telemetry;
 pub(crate) mod witness_plan;
 
 pub(crate) const NO_CHANGED_GAPS_MESSAGE: &str = "No changed unsafe-review gaps were found.";
