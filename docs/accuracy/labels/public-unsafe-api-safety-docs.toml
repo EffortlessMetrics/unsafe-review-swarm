@@ -13,10 +13,16 @@ ReviewCard contract evidence behavior; they are not a proof of memory safety, no
 [[samples]]
 id = "public-unsafe-fn-missing-safety-docs"
 fixture = "public_unsafe_fn_missing_safety"
-kind = "false_positive_control"
-expected_cards = 0
+kind = "positive"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+expected_obligation_key = "unknown"
+expected_contract_state = "missing"
+expected_discharge_state = "present"
 label_source = "fixture_golden"
-rationale = "A public unsafe fn with no concrete operation family is filtered as unclassified noise in diff scope; the safety-docs obligation is visible only in repo-scope inventory."
+rationale = "A public unsafe fn without nearby `# Safety` documentation is missing caller-contract evidence; the card is actionable in all scopes."
 
 [[samples]]
 id = "public-unsafe-trait-missing-safety-docs"
@@ -35,31 +41,55 @@ rationale = "A public unsafe trait without nearby `# Safety` documentation is mi
 [[samples]]
 id = "public-unsafe-fn-safety-comment-not-docs"
 fixture = "public_unsafe_fn_safety_comment_not_docs"
-kind = "false_positive_control"
-expected_cards = 0
+kind = "positive"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+expected_obligation_key = "unknown"
+expected_contract_state = "missing"
+expected_discharge_state = "present"
 label_source = "fixture_golden"
-rationale = "A public unsafe fn with no concrete operation family is filtered in diff scope; the local SAFETY comment versus public Safety docs distinction is visible in repo-scope inventory only."
+rationale = "A public unsafe fn with only a local SAFETY comment (not public # Safety docs) is still missing the caller-contract evidence; the card is actionable."
 
 [[samples]]
 id = "split-public-unsafe-fn-missing-safety-docs"
 fixture = "split_public_unsafe_fn_missing_safety"
-kind = "false_positive_control"
-expected_cards = 0
+kind = "positive"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+expected_obligation_key = "unknown"
+expected_contract_state = "missing"
+expected_discharge_state = "present"
 label_source = "fixture_golden"
-rationale = "A split public unsafe fn with no concrete operation family is filtered as unclassified noise in diff scope; the safety-docs obligation is visible only in repo-scope inventory."
+rationale = "A split public unsafe fn without nearby `# Safety` documentation is missing caller-contract evidence; the card is actionable."
 
 [[samples]]
 id = "public-unsafe-fn-with-safety-docs"
 fixture = "public_unsafe_fn_with_safety_docs"
-kind = "false_positive_control"
-expected_cards = 0
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+expected_obligation_key = "unknown"
+expected_contract_state = "present"
+expected_discharge_state = "present"
 label_source = "fixture_golden"
-rationale = "A public unsafe fn with no concrete operation family is filtered in diff scope; the accepted Safety docs state is visible only in repo-scope inventory."
+rationale = "A public unsafe fn with `# Safety` docs has a contract but no witness receipt; the guarded_unwitnessed card is actionable."
 
 [[samples]]
 id = "public-unsafe-fn-safety-colon-docs"
 fixture = "public_unsafe_fn_safety_colon_docs"
-kind = "false_positive_control"
-expected_cards = 0
+kind = "positive"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+expected_obligation_key = "unknown"
+expected_contract_state = "present"
+expected_discharge_state = "present"
 label_source = "fixture_golden"
-rationale = "A public unsafe fn with no concrete operation family is filtered in diff scope; the accepted Safety colon docs state is visible only in repo-scope inventory."
+rationale = "A public unsafe fn with `Safety:` colon docs has a contract but no witness receipt; the guarded_unwitnessed card is actionable."

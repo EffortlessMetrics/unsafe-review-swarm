@@ -1,1 +1,105 @@
-[]
+[
+  {
+    "id": "UR-documented-private-unsafe-fn-fixture-src-lib-rs-private-ctrl-unsafe_fn-unknown-private-ctrl-4f79c7b2ab4a-unknown-c1",
+    "class": "guarded_unwitnessed",
+    "priority": "medium",
+    "confidence": "medium",
+    "proof_path": "human_review_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 6,
+      "column": 1,
+      "kind": "unsafe_fn",
+      "owner": "private_ctrl",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe fn private_ctrl(base: *const u8, index: usize) -> *const u8 {"
+    },
+    "operation": "unsafe fn private_ctrl(base: *const u8, index: usize) -> *const u8 {",
+    "operation_family": "unknown",
+    "hazards": [
+      "unknown"
+    ],
+    "obligations": [
+      "unsafe contract could not be inferred from this syntax shape"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "unknown",
+        "description": "unsafe contract could not be inferred from this syntax shape",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `# Safety` documentation was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Documented private unsafe declaration is a caller-contract site; local guard evidence is not expected at the declaration"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `private_ctrl`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `# Safety` documentation was detected",
+    "discharge": "Documented private unsafe declaration is a caller-contract site; local guard evidence is not expected at the declaration",
+    "reach": "1 related test file(s) mention owner `private_ctrl`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Attach a human deep-review witness receipt or mark the static limitation explicitly.",
+    "verify_commands": [],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guarded_unwitnessed` ReviewCard for `unsafe fn private_ctrl(base: *const u8, index: usize) -> *const u8 {`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+      },
+      "minimal_repro": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "steps": [
+          "Confirm ReviewCard `UR-documented-private-unsafe-fn-fixture-src-lib-rs-private-ctrl-unsafe_fn-unknown-private-ctrl-4f79c7b2ab4a-unknown-c1` still maps to `unsafe fn private_ctrl(base: *const u8, index: usize) -> *const u8 {` at `src/lib.rs:6:1` before upgrading confidence.",
+          "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+          "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "present",
+      "guard_coverage": "present",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "not_eligible",
+      "agent_lsp_readiness": "needs_human"
+    }
+  }
+]

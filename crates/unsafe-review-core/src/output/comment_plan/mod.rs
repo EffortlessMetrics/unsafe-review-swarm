@@ -504,10 +504,7 @@ mod tests {
 
     #[test]
     fn comment_plan_skips_unknown_operation_family_cards() -> Result<(), String> {
-        // Use repo scope so the unknown-family card is present in the output;
-        // the diff-scope pipeline filter removes it before comment_plan is
-        // reached, but the selection logic still applies in repo context.
-        let output = fixture_output_repo("public_unsafe_fn_missing_safety")?;
+        let output = fixture_output("public_unsafe_fn_missing_safety")?;
         let value = parse_json(&render(&output))?;
 
         assert_eq!(value["comments"].as_array().map_or(1, Vec::len), 0);
@@ -577,23 +574,6 @@ mod tests {
             scope: Scope::Diff,
             diff: DiffSource::File(root.join("change.diff")),
             mode: AnalysisMode::Draft,
-            policy: PolicyMode::Advisory,
-            include_unchanged_tests: true,
-            max_cards: None,
-        })
-    }
-
-    /// Same as `fixture_output` but uses `Scope::Repo` so that the diff-scope
-    /// filter for unclassified-family unsafe-fn/block owner cards is not applied.
-    fn fixture_output_repo(name: &str) -> Result<AnalyzeOutput, String> {
-        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../fixtures")
-            .join(name);
-        analyze(AnalyzeInput {
-            root: root.clone(),
-            scope: Scope::Repo,
-            diff: DiffSource::NoneRepoScan,
-            mode: AnalysisMode::Repo,
             policy: PolicyMode::Advisory,
             include_unchanged_tests: true,
             max_cards: None,

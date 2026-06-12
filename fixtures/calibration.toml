@@ -759,17 +759,23 @@ expected_hazard = "alignment"
 
 [[cases]]
 fixture = "split_unsafe_block"
-kind = "false_positive_control"
-claim = "diff-scope filters split unsafe-block owner cards with no concrete operation family as unclassified noise"
+kind = "positive"
+claim = "unsafe block with no classified operation family emits a contract_missing card"
 support_tier = "Diff unsafe site inventory"
-expected_cards = 0
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
 
 [[cases]]
 fixture = "public_unsafe_fn_missing_safety"
-kind = "false_positive_control"
-claim = "diff-scope filters public unsafe-fn owner cards with no concrete operation family as unclassified noise"
+kind = "positive"
+claim = "public unsafe fn without # Safety documentation emits a contract_missing card"
 support_tier = "Contract evidence mining"
-expected_cards = 0
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
 
 [[cases]]
 fixture = "public_unsafe_trait_missing_safety"
@@ -783,45 +789,63 @@ expected_hazard = "unknown"
 
 [[cases]]
 fixture = "public_unsafe_fn_safety_comment_not_docs"
-kind = "false_positive_control"
-claim = "diff-scope filters public unsafe-fn with only a SAFETY comment and no concrete operation family as unclassified noise"
+kind = "positive"
+claim = "public unsafe fn with only a SAFETY comment (not # Safety docs) still emits a contract_missing card"
 support_tier = "Contract evidence mining"
-expected_cards = 0
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
 
 [[cases]]
 fixture = "split_public_unsafe_fn_missing_safety"
-kind = "false_positive_control"
-claim = "diff-scope filters split public unsafe-fn owner cards with no concrete operation family as unclassified noise"
+kind = "positive"
+claim = "split public unsafe fn missing safety docs emits a contract_missing card"
 support_tier = "Contract evidence mining"
-expected_cards = 0
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
 
 [[cases]]
 fixture = "public_unsafe_fn_with_safety_docs"
-kind = "false_positive_control"
-claim = "diff-scope filters public unsafe-fn with safety docs and no concrete operation family as unclassified noise"
+kind = "positive"
+claim = "public unsafe fn with # Safety docs but no witness emits a guarded_unwitnessed card"
 support_tier = "Contract evidence mining"
-expected_cards = 0
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
 
 [[cases]]
 fixture = "public_unsafe_fn_safety_colon_docs"
-kind = "false_positive_control"
-claim = "diff-scope filters public unsafe-fn with Safety: colon docs and no concrete operation family as unclassified noise"
+kind = "positive"
+claim = "public unsafe fn with Safety: colon docs but no witness emits a guarded_unwitnessed card"
 support_tier = "Contract evidence mining"
-expected_cards = 0
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
 
 [[cases]]
 fixture = "documented_private_unsafe_fn"
-kind = "false_positive_control"
-claim = "diff-scope filters documented private unsafe-fn owner cards with no concrete operation family as unclassified noise"
+kind = "positive"
+claim = "documented private unsafe fn with SAFETY comment but no witness emits a guarded_unwitnessed card"
 support_tier = "Contract evidence mining"
-expected_cards = 0
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
 
 [[cases]]
 fixture = "private_unsafe_helper_safety_comment"
-kind = "false_positive_control"
-claim = "diff-scope filters private unsafe helper owner cards with no concrete operation family as unclassified noise"
+kind = "positive"
+claim = "private unsafe helper without a guard emits a guard_missing card"
 support_tier = "Contract evidence mining"
-expected_cards = 0
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
 
 [[cases]]
 fixture = "local_safety_colon_comment"
@@ -5324,9 +5348,9 @@ expected_hazard = "target_feature"
 [[cases]]
 fixture = "attributed_unsafe_fn_no_duplicate"
 kind = "false_positive_control"
-claim = "attributed unsafe fn declarations are not duplicated by fallback line scanning; unclassified-family owner card filtered in diff scope"
+claim = "attributed unsafe fn declarations are not duplicated by fallback line scanning; emits owner card plus one operation card"
 support_tier = "Diff unsafe site inventory"
-expected_cards = 1
+expected_cards = 2
 expected_class = "contract_missing"
 expected_operation_family = "raw_pointer_write"
 expected_hazard = "pointer_validity"
@@ -5744,9 +5768,9 @@ expected_hazard = "unknown"
 [[cases]]
 fixture = "long_unsafe_fn_owner_inference"
 kind = "positive"
-claim = "operations deep inside long unsafe functions preserve the enclosing function owner; unclassified-family owner filtered in diff scope"
+claim = "operations deep inside long unsafe functions preserve the enclosing function owner; emits owner card plus one operation card"
 support_tier = "Diff unsafe site inventory"
-expected_cards = 1
+expected_cards = 2
 expected_class = "contract_missing"
 expected_operation_family = "drop_in_place"
 expected_hazard = "pointer_validity"
@@ -6090,7 +6114,10 @@ expected_hazard = "alignment"
 
 [[cases]]
 fixture = "unsafe_fn_unknown_family_no_card"
-kind = "false_positive_control"
-claim = "diff-scope filters unsafe-fn owner cards whose operation family is unknown; the filter reduces PR-review noise by keeping repo-scoped inventory intact"
+kind = "positive"
+claim = "unknown-family unsafe fn missing safety docs emits a contract_missing card in diff scope; unknown family is still actionable"
 support_tier = "Diff unsafe site inventory"
-expected_cards = 0
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"

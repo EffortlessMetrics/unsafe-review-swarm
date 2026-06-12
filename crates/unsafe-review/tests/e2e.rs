@@ -663,26 +663,12 @@ diff --git a/src/binding.cpp b/src/binding.cpp
 fn context_packet_queues_contract_gaps_for_public_safety_docs() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("public_unsafe_fn_missing_safety");
 
-    // Diff-scope (check) suppresses unclassified-family unsafe-fn owner cards to
-    // reduce PR-review noise. Verify zero cards in diff scope.
-    let diff_json = run_success([
+    let json = run_success([
         os("check"),
         os("--root"),
         fixture.as_os_str().to_os_string(),
         os("--diff"),
         fixture.join("change.diff").into_os_string(),
-        os("--format"),
-        os("json"),
-    ])?;
-    let diff_value = parse_json(&stdout_text(&diff_json)?)?;
-    assert_eq!(diff_value["summary"]["cards"], 0);
-
-    // Repo-scope keeps the card for inventory; use it to drive the context-packet
-    // portion of this test.
-    let json = run_success([
-        os("repo"),
-        os("--root"),
-        fixture.as_os_str().to_os_string(),
         os("--format"),
         os("json"),
     ])?;
@@ -727,21 +713,14 @@ fn context_packet_queues_contract_gaps_for_public_safety_docs() -> Result<(), Bo
     Ok(())
 }
 
-/// Drift-lock: asserts BOTH directions of the unclassified-family unsafe-fn filter.
-///
-/// (a) diff scope (first-pr / check) MUST return zero cards for an unsafe fn
-///     whose operation family is `unknown` — the filter reduces PR-review noise.
-/// (b) repo scope MUST still return the card — inventory output is unfiltered.
-///
-/// The test goes RED if the filter is removed (diff count becomes 1) or if the
-/// filter incorrectly applies to repo scope (repo count becomes 0).
+/// Pin: an unsafe fn with no classified operation family emits a contract_missing card
+/// in diff scope. The card is advisory-only with operation_family = "unknown".
 #[test]
-fn unclassified_family_unsafe_fn_filtered_in_diff_scope_but_kept_in_repo_scope()
--> Result<(), Box<dyn Error>> {
+fn unknown_family_unsafe_fn_emits_contract_missing_card_in_diff_scope() -> Result<(), Box<dyn Error>>
+{
     let fixture = fixture_root("unsafe_fn_unknown_family_no_card");
 
-    // (a) Diff scope: filter must produce zero cards.
-    let diff_json = run_success([
+    let json = run_success([
         os("check"),
         os("--root"),
         fixture.as_os_str().to_os_string(),
@@ -750,27 +729,14 @@ fn unclassified_family_unsafe_fn_filtered_in_diff_scope_but_kept_in_repo_scope()
         os("--format"),
         os("json"),
     ])?;
-    let diff_value = parse_json(&stdout_text(&diff_json)?)?;
+    let value = parse_json(&stdout_text(&json)?)?;
     assert_eq!(
-        diff_value["summary"]["cards"], 0,
-        "diff scope must filter unknown-family unsafe-fn owner cards"
+        value["summary"]["cards"], 1,
+        "unknown-family unsafe fn must emit a card in diff scope"
     );
-
-    // (b) Repo scope: the same card must still be emitted for inventory.
-    let repo_json = run_success([
-        os("repo"),
-        os("--root"),
-        fixture.as_os_str().to_os_string(),
-        os("--format"),
-        os("json"),
-    ])?;
-    let repo_value = parse_json(&stdout_text(&repo_json)?)?;
-    assert_eq!(
-        repo_value["summary"]["cards"], 1,
-        "repo scope must keep unknown-family unsafe-fn owner cards for inventory"
-    );
-    assert_eq!(repo_value["cards"][0]["operation_family"], "unknown");
-    assert_eq!(repo_value["cards"][0]["site"]["kind"], "unsafe_fn");
+    assert_eq!(value["cards"][0]["class"], "contract_missing");
+    assert_eq!(value["cards"][0]["operation_family"], "unknown");
+    assert_eq!(value["cards"][0]["site"]["kind"], "unsafe_fn");
 
     Ok(())
 }

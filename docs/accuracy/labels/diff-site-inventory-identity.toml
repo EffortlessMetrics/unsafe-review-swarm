@@ -15,16 +15,24 @@ not calibrated precision or recall, not witness adequacy, and not policy readine
 [[samples]]
 id = "split-unsafe-block-owner-site"
 fixture = "split_unsafe_block"
-kind = "false_positive_control"
-expected_cards = 0
+kind = "positive"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+expected_site_kind = "unsafe_block"
+expected_obligation_key = "unknown"
+expected_contract_state = "missing"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
 label_source = "fixture_golden"
-rationale = "A split unsafe block with no concrete operation family is filtered as unclassified noise in diff scope; zero cards expected."
+rationale = "A split unsafe block with no concrete operation family still emits a contract_missing card; the unknown family is actionable in all scopes."
 
 [[samples]]
 id = "attributed-unsafe-fn-no-duplicate-owner-site"
 fixture = "attributed_unsafe_fn_no_duplicate"
 kind = "false_positive_control"
-expected_cards = 1
+expected_cards = 2
 expected_class = "contract_missing"
 expected_operation_family = "raw_pointer_write"
 expected_hazard = "pointer_validity"
@@ -35,7 +43,7 @@ expected_contract_state = "missing"
 expected_discharge_state = "missing"
 expected_witness_route_kinds = ["miri", "cargo-careful"]
 label_source = "fixture_golden"
-rationale = "An attributed unsafe fn with a concrete raw pointer write emits the operation card; the unclassified-family owner card is filtered in diff scope, leaving exactly one card."
+rationale = "An attributed unsafe fn with a concrete raw pointer write emits both the owner card (unknown family) and the operation card (raw_pointer_write); no line-scanner duplicate."
 
 [[samples]]
 id = "inline-unsafe-raw-pointer-deref-no-wrapper-duplicate"
@@ -75,7 +83,7 @@ rationale = "A multi-line impl Trait bound should not replace the real function 
 id = "long-unsafe-fn-owner-inference"
 fixture = "long_unsafe_fn_owner_inference"
 kind = "positive"
-expected_cards = 1
+expected_cards = 2
 expected_class = "contract_missing"
 expected_operation_family = "drop_in_place"
 expected_hazard = "pointer_validity"
@@ -86,7 +94,7 @@ expected_contract_state = "missing"
 expected_discharge_state = "missing"
 expected_witness_route_kinds = ["miri", "cargo-careful"]
 label_source = "fixture_golden"
-rationale = "An unsafe operation deep inside a long unsafe function retains the enclosing function owner identity; the unclassified-family fn owner card is filtered in diff scope."
+rationale = "An unsafe operation deep inside a long unsafe function retains the enclosing function owner identity; both the owner card (unknown family) and the operation card (drop_in_place) are emitted."
 
 [[samples]]
 id = "macro-rules-owner-inference"
