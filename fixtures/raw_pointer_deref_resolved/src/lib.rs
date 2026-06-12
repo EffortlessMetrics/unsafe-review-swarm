@@ -2,14 +2,20 @@
 #[derive(Clone, Copy)]
 pub struct Config(pub u32);
 
-/// Return the config value from a shared reference.
+/// Read the config from a raw pointer.
 ///
-/// The PR diff replaced the original raw-pointer deref (which had no
-/// safety contract or guard) with a safe reference parameter.  The
-/// baseline-captured card for the old `unsafe { *ptr }` site is now
-/// absent because the unsafe expression was removed: gap resolved.
-pub fn read_config(config: &Config) -> Config {
-    *config
+/// # Safety
+///
+/// The caller must ensure `ptr` is non-null, properly aligned for
+/// `Config`, and points to an initialized `Config` value that remains
+/// live for the duration of this call.
+///
+/// This diff adds the safety contract above.  The `pub unsafe fn` and the
+/// `*ptr` expression inside are unchanged: the coverage gap resolves
+/// because the caller obligations are now documented, not because the
+/// unsafe code was removed.
+pub unsafe fn read_config(ptr: *const Config) -> Config {
+    *ptr
 }
 
 #[cfg(test)]
@@ -19,6 +25,8 @@ mod tests {
     #[test]
     fn reads_config() {
         let cfg = Config(7);
-        assert_eq!(read_config(&cfg).0, 7);
+        // SAFETY: `cfg` is a valid, aligned, initialized Config on the stack.
+        let result = unsafe { read_config(&cfg) };
+        assert_eq!(result.0, 7);
     }
 }

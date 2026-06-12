@@ -2,8 +2,8 @@ schema_version = "0.1"
 status = "active"
 
 [[entries]]
-card_id = "UR-raw-pointer-deref-resolved-fixture-src-lib-rs-read-config-operation-raw_pointer_deref-deref-c47737c6108c-pointer_validity-c1"
+card_id = "UR-raw-pointer-deref-resolved-fixture-src-lib-rs-read-config-unsafe_fn-unknown-read-config-914e60d77246-unknown-c1"
 owner = "baseline-init"
 reason = "captured by `baseline init`; pre-existing debt, not reviewed as safe"
-evidence = "baseline-init: raw pointer deref with no safety contract or guard; captured as brownfield debt before the resolving PR"
+evidence = "baseline-init: public unsafe fn missing # Safety contract; captured as brownfield debt before the resolving PR"
 review_after = "2027-01-01"

@@ -129,7 +129,7 @@ pub(crate) const SUBSET: &[(&str, &str)] = &[
     ),
     (
         "raw_pointer_deref_resolved",
-        "resolved corpus case: PR removes unsafe raw pointer deref; baseline-captured gap disappears, resolved_cards=1, new_cards=0",
+        "resolved corpus case: PR adds # Safety contract to pub unsafe fn (unsafe retained); baseline-captured gap disappears, resolved_cards=1, new_cards=0",
     ),
 ];
 

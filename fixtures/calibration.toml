@@ -732,7 +732,7 @@ expected_hazard = "pointer_validity"
 [[cases]]
 fixture = "raw_pointer_deref_resolved"
 kind = "negative"
-claim = "resolved corpus case: PR replaces unsafe raw pointer deref with safe reference parameter; baseline-captured gap is absent from AFTER output so resolved_gaps=1, new_gaps=0, worsened_gaps=0"
+claim = "resolved corpus case: PR adds # Safety contract to pub unsafe fn (unsafe retained); baseline-captured contract_missing gap is absent from AFTER output so resolved_gaps=1, new_gaps=0, worsened_gaps=0"
 support_tier = "Raw pointer card slice"
 expected_cards = 0
 
