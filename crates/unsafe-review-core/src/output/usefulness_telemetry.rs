@@ -63,9 +63,16 @@ struct CoverageSlots {
 }
 
 /// Agent readiness histogram derived from CoverageBlock.agent_lsp_readiness per card.
+///
+/// `requires_witness_receipt` counts cards whose class (RequiresLoom/RequiresSanitizer/
+/// RequiresKaniOrCrux) requires an external witness receipt before repair delegation.
+/// These must NOT be counted as `ready` — the telemetry `ready` bucket means
+/// "immediately delegatable to an agent", which is false for receipt-gated cards.
+/// Invariant: ready + requires_witness_receipt + needs_human + unsupported == total_cards.
 #[derive(Serialize)]
 struct AgentReadinessHistogram {
     ready: usize,
+    requires_witness_receipt: usize,
     needs_human: usize,
     unsupported: usize,
 }
@@ -177,6 +184,7 @@ fn build_coverage_slots(output: &AnalyzeOutput) -> CoverageSlots {
 
 fn build_agent_readiness(output: &AnalyzeOutput) -> AgentReadinessHistogram {
     let mut ready = 0usize;
+    let mut requires_witness_receipt = 0usize;
     let mut needs_human = 0usize;
     let mut unsupported = 0usize;
 
@@ -184,6 +192,7 @@ fn build_agent_readiness(output: &AnalyzeOutput) -> AgentReadinessHistogram {
         let block = card.coverage_block();
         match block.agent_lsp_readiness {
             AgentLspReadiness::Ready => ready += 1,
+            AgentLspReadiness::RequiresWitnessReceipt => requires_witness_receipt += 1,
             AgentLspReadiness::NeedsHuman => needs_human += 1,
             AgentLspReadiness::Unsupported => unsupported += 1,
         }
@@ -191,6 +200,7 @@ fn build_agent_readiness(output: &AnalyzeOutput) -> AgentReadinessHistogram {
 
     AgentReadinessHistogram {
         ready,
+        requires_witness_receipt,
         needs_human,
         unsupported,
     }
@@ -380,6 +390,10 @@ mod tests {
         let ready = value["agent_readiness"]["ready"]
             .as_u64()
             .ok_or("agent_readiness.ready not u64")? as usize;
+        let requires_witness_receipt = value["agent_readiness"]["requires_witness_receipt"]
+            .as_u64()
+            .ok_or("agent_readiness.requires_witness_receipt not u64")?
+            as usize;
         let needs_human = value["agent_readiness"]["needs_human"]
             .as_u64()
             .ok_or("agent_readiness.needs_human not u64")? as usize;
@@ -388,9 +402,42 @@ mod tests {
             .ok_or("agent_readiness.unsupported not u64")? as usize;
 
         assert_eq!(
-            ready + needs_human + unsupported,
+            ready + requires_witness_receipt + needs_human + unsupported,
             expected_total,
-            "agent_readiness histogram must sum to total_cards ({expected_total}); got ready={ready}, needs_human={needs_human}, unsupported={unsupported}"
+            "agent_readiness histogram must sum to total_cards ({expected_total}); got ready={ready}, requires_witness_receipt={requires_witness_receipt}, needs_human={needs_human}, unsupported={unsupported}"
+        );
+        Ok(())
+    }
+
+    /// Drift-lock: static_mut/requires_loom card must NOT be counted `ready` in
+    /// telemetry (issue #1632). The `requires_witness_receipt` bucket must be > 0
+    /// and `ready` must be 0 for the static_mut_global_state fixture.
+    #[test]
+    fn usefulness_telemetry_requires_loom_card_not_counted_ready() -> Result<(), String> {
+        let output = fixture_output("static_mut_global_state")?;
+        assert_eq!(
+            output.summary.cards, 1,
+            "static_mut_global_state fixture must have exactly 1 card"
+        );
+
+        let text = render(&output);
+        let value = parse_json(&text)?;
+
+        let ready = value["agent_readiness"]["ready"]
+            .as_u64()
+            .ok_or("agent_readiness.ready not u64")? as usize;
+        let requires_witness_receipt = value["agent_readiness"]["requires_witness_receipt"]
+            .as_u64()
+            .ok_or("agent_readiness.requires_witness_receipt not u64")?
+            as usize;
+
+        assert_eq!(
+            ready, 0,
+            "requires_loom card must NOT be counted in agent_readiness.ready (was over-counted before #1632 fix)"
+        );
+        assert_eq!(
+            requires_witness_receipt, 1,
+            "requires_loom card must be counted in agent_readiness.requires_witness_receipt"
         );
         Ok(())
     }

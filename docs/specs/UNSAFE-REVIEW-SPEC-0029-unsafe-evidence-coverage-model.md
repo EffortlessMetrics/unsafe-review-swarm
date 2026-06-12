@@ -48,7 +48,7 @@ manual_context           present | absent             (manual-candidate overlay 
 baseline_state           new | worsened | inherited | resolved | unknown   (per SPEC-0030)
 outcome_movement         improved | regressed | unchanged | unknown        (per saved snapshot)
 comment_plan_status      selected | not_selected | not_eligible
-agent_lsp_readiness      ready | needs_human | unsupported
+agent_lsp_readiness      ready | requires_witness_receipt | needs_human | unsupported
 ```
 
 These reuse existing analyzer evidence (UNSAFE-REVIEW-SPEC-0006 contract and

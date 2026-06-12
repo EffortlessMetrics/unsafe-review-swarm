@@ -121,6 +121,7 @@ impl CommentPlanStatus {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AgentLspReadiness {
     Ready,
+    RequiresWitnessReceipt,
     NeedsHuman,
     Unsupported,
 }
@@ -129,6 +130,7 @@ impl AgentLspReadiness {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::Ready => "ready",
+            Self::RequiresWitnessReceipt => "requires_witness_receipt",
             Self::NeedsHuman => "needs_human",
             Self::Unsupported => "unsupported",
         }
@@ -302,13 +304,16 @@ fn derive_agent_lsp_readiness(card: &ReviewCard) -> AgentLspReadiness {
     // Mirror the agent-readiness state logic from output/agent/readiness.rs
     // without importing that module (this is a domain-level derivation).
     //
-    // Unsupported:   class not actionable, or witness route is Unsupported, or
-    //                class is StaticUnknown/MiriUnsupported without other factors.
-    // NeedsHuman:    operation family requires human review (Ffi, InlineAsm,
-    //                TargetFeature, Unknown) or a HumanDeepReview route exists
-    //                or class is StaticUnknown/MiriUnsupported.
-    // Ready:         actionable, no human-gating factors, specific op family,
-    //                at least one verify command.
+    // Unsupported:            class not actionable, or witness route is Unsupported.
+    // NeedsHuman:             operation family requires human review (Ffi, InlineAsm,
+    //                         TargetFeature, Unknown) or a HumanDeepReview route exists
+    //                         or class is StaticUnknown/MiriUnsupported.
+    // RequiresWitnessReceipt: class is RequiresLoom/RequiresSanitizer/RequiresKaniOrCrux
+    //                         — an external witness receipt is needed before repair
+    //                         delegation is appropriate. Checked after NeedsHuman so
+    //                         that a human-gating factor on those classes still wins.
+    // Ready:                  actionable, no human-gating or receipt-blocking factors,
+    //                         specific op family, at least one verify command.
     use super::ReviewClass;
     use super::operation::OperationFamily;
 
@@ -325,7 +330,8 @@ fn derive_agent_lsp_readiness(card: &ReviewCard) -> AgentLspReadiness {
         return AgentLspReadiness::Unsupported;
     }
 
-    // Human-review-requiring classes/families/routes.
+    // Human-review-requiring classes/families/routes take priority over the
+    // receipt-blocking check below.
     let requires_human = matches!(
         card.class,
         ReviewClass::StaticUnknown | ReviewClass::MiriUnsupported
@@ -342,6 +348,19 @@ fn derive_agent_lsp_readiness(card: &ReviewCard) -> AgentLspReadiness {
 
     if requires_human {
         return AgentLspReadiness::NeedsHuman;
+    }
+
+    // Receipt-blocking classes: an external concurrency/sanitizer/formal-methods
+    // witness receipt is required before an agent can discharge the obligation.
+    // This matches the logic in output/agent/readiness.rs that sets
+    // `requires_witness_receipt` for the same class set.
+    if matches!(
+        card.class,
+        ReviewClass::RequiresLoom
+            | ReviewClass::RequiresSanitizer
+            | ReviewClass::RequiresKaniOrCrux
+    ) {
+        return AgentLspReadiness::RequiresWitnessReceipt;
     }
 
     AgentLspReadiness::Ready
@@ -666,6 +685,51 @@ mod tests {
         assert_eq!(block.agent_lsp_readiness.as_str(), "ready");
     }
 
+    /// Drift-lock: RequiresLoom must map to RequiresWitnessReceipt (issue #1632).
+    ///
+    /// A card that requires an external loom/shuttle witness receipt before repair
+    /// delegation is NOT immediately agent-ready. Reporting it as "ready" would
+    /// over-count the telemetry `agent_readiness.ready` bucket and disagree with
+    /// the comment-plan's per-card `agent_readiness.state = "requires_witness_receipt"`.
+    #[test]
+    fn agent_lsp_readiness_requires_witness_receipt_for_requires_loom_class() {
+        let card = minimal_card(ReviewClass::RequiresLoom);
+        let block = CoverageBlock::derive(&card);
+        assert_eq!(
+            block.agent_lsp_readiness,
+            AgentLspReadiness::RequiresWitnessReceipt,
+            "RequiresLoom must produce RequiresWitnessReceipt, not Ready — revert would re-introduce #1632"
+        );
+        assert_eq!(
+            block.agent_lsp_readiness.as_str(),
+            "requires_witness_receipt"
+        );
+    }
+
+    /// Drift-lock: RequiresSanitizer must map to RequiresWitnessReceipt (issue #1632).
+    #[test]
+    fn agent_lsp_readiness_requires_witness_receipt_for_requires_sanitizer_class() {
+        let card = minimal_card(ReviewClass::RequiresSanitizer);
+        let block = CoverageBlock::derive(&card);
+        assert_eq!(
+            block.agent_lsp_readiness,
+            AgentLspReadiness::RequiresWitnessReceipt,
+            "RequiresSanitizer must produce RequiresWitnessReceipt, not Ready — revert would re-introduce #1632"
+        );
+    }
+
+    /// Drift-lock: RequiresKaniOrCrux must map to RequiresWitnessReceipt (issue #1632).
+    #[test]
+    fn agent_lsp_readiness_requires_witness_receipt_for_requires_kani_or_crux_class() {
+        let card = minimal_card(ReviewClass::RequiresKaniOrCrux);
+        let block = CoverageBlock::derive(&card);
+        assert_eq!(
+            block.agent_lsp_readiness,
+            AgentLspReadiness::RequiresWitnessReceipt,
+            "RequiresKaniOrCrux must produce RequiresWitnessReceipt, not Ready — revert would re-introduce #1632"
+        );
+    }
+
     /// Drift-lock: WitnessMismatch must produce baseline_state=New (issue #1602).
     ///
     /// WitnessMismatch is actionable (a broken receipt is a live, surfaced
@@ -725,6 +789,10 @@ mod tests {
         assert_eq!(CommentPlanStatus::NotEligible.as_str(), "not_eligible");
 
         assert_eq!(AgentLspReadiness::Ready.as_str(), "ready");
+        assert_eq!(
+            AgentLspReadiness::RequiresWitnessReceipt.as_str(),
+            "requires_witness_receipt"
+        );
         assert_eq!(AgentLspReadiness::NeedsHuman.as_str(), "needs_human");
         assert_eq!(AgentLspReadiness::Unsupported.as_str(), "unsupported");
     }

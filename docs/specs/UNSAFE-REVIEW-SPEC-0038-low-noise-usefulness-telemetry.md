@@ -93,6 +93,7 @@ Must sum to `card_inventory.total_cards`.
 | Field | Source | Owning spec |
 |---|---|---|
 | `ready` | cards where `agent_lsp_readiness == Ready` | SPEC-0029 |
+| `requires_witness_receipt` | cards where `agent_lsp_readiness == RequiresWitnessReceipt` (class is RequiresLoom/RequiresSanitizer/RequiresKaniOrCrux — an external witness receipt is needed before repair delegation) | SPEC-0029 |
 | `needs_human` | cards where `agent_lsp_readiness == NeedsHuman` | SPEC-0029 |
 | `unsupported` | cards where `agent_lsp_readiness == Unsupported` | SPEC-0029 |
 
