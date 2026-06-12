@@ -1,0 +1,59 @@
+{
+  "schema_version": "corpus-usefulness-rollup/v1",
+  "generated_at": "2026-06-12T04:00:00Z",
+  "trust_boundary": "Corpus usefulness rollup is diagnostic noise/usefulness characterisation only — not calibrated precision or recall, not a coverage claim, not proof of memory safety, not UB-free, not Miri-clean, not site-execution, not a gate. Aggregated from SPEC-0038 usefulness-telemetry.json projected from ReviewCard truth objects across the listed fixture subset.",
+  "fixture_subset": [
+    {
+      "fixture": "safe_code_no_cards",
+      "rationale": "negative control: safe code produces zero cards",
+      "status": "completed",
+      "elapsed_ms": 0
+    },
+    {
+      "fixture": "raw_pointer_alignment",
+      "rationale": "positive single-gap: raw pointer missing alignment guard",
+      "status": "completed",
+      "elapsed_ms": 0
+    }
+  ],
+  "corpus_totals": {
+    "fixtures_run": 17,
+    "fixtures_completed": 17,
+    "fixtures_failed": 0
+  },
+  "card_inventory": {
+    "total_cards": 0,
+    "actionable_cards": 0,
+    "new_cards": 0,
+    "worsened_cards": 0,
+    "resolved_cards": 0,
+    "inherited_cards": 0
+  },
+  "coverage_slots": {
+    "contract_missing": 0,
+    "contract_weak": 0,
+    "guard_missing": 0,
+    "guard_weak": 0,
+    "test_reach_missing": 0,
+    "test_reach_weak": 0,
+    "witness_receipt_missing": 0
+  },
+  "agent_readiness": {
+    "ready": 0,
+    "requires_witness_receipt": 0,
+    "needs_human": 0,
+    "unsupported": 0
+  },
+  "not_selected_reason_histogram": {},
+  "not_selected_class_histogram": {},
+  "unfulfilled_obligation_count": 0,
+  "scan_cost_range": {
+    "elapsed_ms_min": null,
+    "elapsed_ms_median": null,
+    "elapsed_ms_max": null,
+    "output_bytes_min": null,
+    "output_bytes_median": null,
+    "output_bytes_max": null
+  },
+  "human_summary": "Sample rollup for schema validation only — not generated from live runs. Trust boundary: diagnostic noise/usefulness characterisation only, not calibrated precision or recall, not a gate."
+}

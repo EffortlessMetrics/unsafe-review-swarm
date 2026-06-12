@@ -20,6 +20,7 @@ mod calibration_manifest;
 mod command_args;
 mod commands;
 mod corpus_backstop;
+mod corpus_usefulness;
 mod docs_automation_paths;
 mod dogfood_usefulness;
 mod first_hour;
@@ -453,6 +454,7 @@ const POLICY_FILES: &[&str] = &[
 const WORKFLOW_ALLOWLIST: &str = "policy/workflow-allowlist.toml";
 const WORKFLOW_DIR: &str = ".github/workflows";
 const CORPUS_BACKSTOP_SAMPLE_REPORT: &str = "policy/corpus-backstop-sample-report.json";
+const CORPUS_USEFULNESS_SAMPLE_ROLLUP: &str = "policy/corpus-usefulness-sample-rollup.json";
 const DOC_ARTIFACT_LEDGER: &str = "policy/doc-artifacts.toml";
 const DOCS_AUTOMATION_LEDGER: &str = "policy/docs-automation.toml";
 const CI_LANE_LEDGER: &str = "policy/ci-lane-whitelist.toml";
@@ -838,7 +840,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
     match commands::XtaskCommand::parse(&args)? {
         commands::XtaskCommand::Help => {
             println!(
-                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>"
+                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>"
             );
             Ok(())
         }
@@ -880,6 +882,10 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CorpusBackstop(out) => corpus_backstop::run(out.as_deref()),
         commands::XtaskCommand::CheckCorpusBackstopSchema(path) => {
             corpus_backstop::check_schema(&path)
+        }
+        commands::XtaskCommand::CorpusUsefulness(out) => corpus_usefulness::run(out.as_deref()),
+        commands::XtaskCommand::CheckCorpusUsefulnessSchema(path) => {
+            corpus_usefulness::check_schema(&path)
         }
     }
 }
@@ -963,6 +969,7 @@ fn check_policy() -> Result<(), String> {
     check_ci_lanes()?;
     check_ci_routing_contract()?;
     corpus_backstop::check_schema(Path::new(CORPUS_BACKSTOP_SAMPLE_REPORT))?;
+    corpus_usefulness::check_schema(Path::new(CORPUS_USEFULNESS_SAMPLE_ROLLUP))?;
     println!("check-policy: ok");
     Ok(())
 }

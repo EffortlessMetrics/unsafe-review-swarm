@@ -184,3 +184,10 @@ name = "scheduled corpus backstop"
 path = ".rails/goals/active.toml"
 status = "active"
 owner = "repo-infra"
+
+[[lane]]
+id = "corpus-usefulness-rollup"
+name = "corpus-wide usefulness/noise rollup aggregation"
+path = ".rails/goals/active.toml"
+status = "active"
+owner = "repo-infra"

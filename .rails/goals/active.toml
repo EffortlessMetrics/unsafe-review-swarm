@@ -156,3 +156,16 @@ commands = [
   "cargo test --workspace --locked",
   "cargo run --locked -p xtask -- check-pr",
 ]
+
+[[work_item]]
+id = "corpus-usefulness-rollup"
+status = "active"
+spec = "UNSAFE-REVIEW-SPEC-0039"
+plan = ".rails/goals/active.toml"
+commands = [
+  "cargo fmt --all --check",
+  "cargo clippy --workspace --all-targets --locked -- -D warnings",
+  "cargo test --workspace --locked",
+  "cargo run --locked -p xtask -- corpus-usefulness",
+  "cargo run --locked -p xtask -- check-pr",
+]

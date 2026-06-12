@@ -1,4 +1,4 @@
-# UNSAFE-REVIEW-SPEC-0039: Scheduled Corpus Backstop and External Resource Harness
+# UNSAFE-REVIEW-SPEC-0039: Scheduled Corpus Backstop, Resource Harness, and Usefulness Rollup
 
 Status: proposed
 Owner: repo-infra
@@ -196,3 +196,119 @@ performance SLA claim; not a gate. Peak RSS is measured externally and
 is a rough triage signal, not a calibrated or reproducible memory-usage
 benchmark. Elapsed times reflect CI runner variability and are not a
 performance contract.
+
+---
+
+## Part 2: Corpus Usefulness Rollup
+
+### Purpose
+
+This section extends SPEC-0039 with a corpus-wide usefulness/noise rollup
+that aggregates SPEC-0038 `usefulness-telemetry.json` output across a bounded,
+documented representative subset of local `fixtures/`.
+
+This fills a validation gap: `usefulness-telemetry.json` is emitted per-run
+but was never aggregated, so "is it low-noise across the corpus?" could not be
+answered without manual correlation.
+
+SPEC-0039 is the natural home (not SPEC-0038) because: SPEC-0038 owns the
+per-run telemetry schema; SPEC-0039 already owns the scheduled corpus harness
+pattern and off-PR-path running semantics. This is an additive second section
+of the same spec — not a change to SPEC-0038.
+
+### What runs
+
+`xtask corpus-usefulness` runs `unsafe-review first-pr --root <fixture>
+--diff <fixture>/change.diff --out-dir <tmp>` for each fixture in a curated,
+documented representative subset of `fixtures/`. It reads the emitted
+`usefulness-telemetry.json` from each run and aggregates the SPEC-0038 fields.
+
+The subset is bounded (15-25 fixtures, documented in
+`xtask/src/corpus_usefulness.rs:SUBSET`) and selected to span the noise shapes:
+
+| Noise shape | Example fixture |
+|---|---|
+| Negative control (zero cards) | `safe_code_no_cards`, `adjacent_unchanged_unsafe_fn_no_card` |
+| Single-gap positive | `raw_pointer_alignment` |
+| Witnessed / receipt attached | `raw_pointer_alignment_receipted` |
+| False-positive control | `raw_pointer_alignment_closed_branch_not_guard` |
+| Multi-gap / multi-obligation | `vec_from_raw_parts`, `vec_from_raw_parts_manuallydrop_origin` |
+| Capped / multi-pointer | `copy_nonoverlapping` |
+| Multi-pointer with full guards | `copy_nonoverlapping_slice_range_guard` |
+| Alternate operation families | `box_from_raw`, `drop_in_place_deallocation`, `transmute_bool_disjunct_return_guard` |
+| Human-review-only | `inline_asm_human_review` |
+| FFI boundary | `ffi_missing_boundary_contract`, `ffi_sanitizer_route` |
+| Atomic / agent-ready shape | `atomic_pointer_state_swap` |
+| Contract coverage shape | `documented_private_unsafe_fn` |
+
+### `corpus-usefulness-rollup.json` schema
+
+Schema version: `"corpus-usefulness-rollup/v1"`.
+
+| Field | Type | Description |
+|---|---|---|
+| `schema_version` | string | Always `"corpus-usefulness-rollup/v1"` |
+| `generated_at` | string | ISO-8601 UTC timestamp |
+| `trust_boundary` | string | Fixed advisory boundary — must contain `"not calibrated"` and `"not a gate"` |
+| `fixture_subset` | array | Per-fixture entries: `fixture`, `rationale`, `status`, `elapsed_ms` |
+| `corpus_totals.fixtures_run` | number | Total fixtures attempted |
+| `corpus_totals.fixtures_completed` | number | Fixtures that completed without error |
+| `corpus_totals.fixtures_failed` | number | Fixtures that failed or were skipped |
+| `card_inventory` | object | Corpus totals for `total_cards`, `actionable_cards`, `new_cards`, `worsened_cards`, `resolved_cards`, `inherited_cards` |
+| `coverage_slots` | object | Corpus totals for SPEC-0029 coverage slot fields |
+| `agent_readiness` | object | Corpus histogram for `ready`, `requires_witness_receipt`, `needs_human`, `unsupported` |
+| `not_selected_reason_histogram` | object (BTreeMap) | Corpus histogram of SPEC-0038 not-selected reason codes |
+| `not_selected_class_histogram` | object (BTreeMap) | Corpus histogram of `reason/class` keys |
+| `unfulfilled_obligation_count` | number | Corpus total unfulfilled obligation slots |
+| `scan_cost_range.elapsed_ms_min/median/max` | number \| null | Distribution of CLI-measured elapsed times across completed runs |
+| `scan_cost_range.output_bytes_min/median/max` | number \| null | Distribution of output bytes where telemetry `scan_cost` is present |
+| `human_summary` | string | Single human-readable summary line |
+
+### Trust boundary
+
+Diagnostic noise/usefulness characterisation only.
+
+The rollup is NOT calibrated precision or recall, NOT a coverage claim, NOT a
+memory-safety proof, NOT UB-free, NOT Miri-clean, NOT site-execution, NOT a
+gate. Aggregated from SPEC-0038 `usefulness-telemetry.json` projected from
+ReviewCard truth objects across the listed fixture subset.
+
+### Off-PR-path placement
+
+`corpus-usefulness` is NEVER on the per-PR critical path. Running 15-25
+`first-pr` invocations is too slow for `check-pr`. Only a fast schema check
+on the committed sample rollup (`policy/corpus-usefulness-sample-rollup.json`)
+belongs in `check-pr`, via `check_policy()`.
+
+### Schema validation
+
+`xtask check-corpus-usefulness-schema <path>` validates a
+`corpus-usefulness-rollup.json` against the contract. It checks:
+
+- `schema_version` is `"corpus-usefulness-rollup/v1"`.
+- `generated_at` is a non-empty string.
+- `trust_boundary` contains `"not calibrated"` and `"not a gate"` and does
+  not make positive `UB-free`, `Miri-clean`, `site-execution`, or `proof` claims.
+- `fixture_subset` is a non-empty array of objects with `fixture` and `rationale`.
+- `corpus_totals` is an object with numeric `fixtures_run`, `fixtures_completed`,
+  `fixtures_failed`.
+- `card_inventory` is an object.
+- `agent_readiness` is an object.
+- `scan_cost_range` has `elapsed_ms_min`, `elapsed_ms_median`, `elapsed_ms_max`
+  (each number or null).
+- `human_summary` is a non-empty string.
+
+The sample file `policy/corpus-usefulness-sample-rollup.json` is validated by
+`check-pr` via `check_policy()` without requiring a live run.
+
+### `xtask corpus-usefulness` subcommand
+
+```
+cargo run --locked -p xtask -- corpus-usefulness [--out <path>]
+```
+
+- Default output: `target/corpus-usefulness/corpus-usefulness-rollup.json`
+- Exits 0 even if some fixtures fail; failures are recorded in
+  `fixture_subset[].status = "failed"`.
+- Never used in CI gate; intended for local diagnostic validation and
+  scheduled off-PR harness runs.
