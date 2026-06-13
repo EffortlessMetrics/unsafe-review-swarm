@@ -7542,9 +7542,15 @@ fn repo_max_cards_cap_emits_partial_status_sidecar() -> Result<(), Box<dyn Error
         "operator next_action should guide narrowing scope or raising cap: {next_action}"
     );
     let limitation = operator["partial_report_limitation"].as_str().unwrap_or("");
+    // Bug B fix: capped scans use card-level wording (all files scanned,
+    // card list truncated) instead of the old file-level snapshot wording.
     assert!(
-        limitation.contains("Completed-file snapshot only"),
-        "operator limitation should say partial snapshot scope: {limitation}"
+        limitation.contains("All files scanned"),
+        "operator limitation must say all files were scanned (card-level wording): {limitation}"
+    );
+    assert!(
+        limitation.contains("card list truncated") || limitation.contains("--max-cards"),
+        "operator limitation must describe card-list truncation: {limitation}"
     );
     let boundary = operator["claim_boundary"].as_str().unwrap_or("");
     assert!(

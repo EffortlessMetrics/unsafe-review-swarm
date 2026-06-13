@@ -425,11 +425,15 @@ fn render_pr_summary_build_this_first_lead(out: &mut String, card: Option<&Revie
 /// witness plan, drops the inner H1 since the fragment is embedded under
 /// another heading, and points reviewers at the full advisory bundle
 /// uploaded as a workflow artifact.
+///
+/// The top-card selection uses the same `confirmation_ranked_cards` ordering as
+/// `render_pr_summary` so both surfaces always name the same headline card.
 pub(crate) fn render_github_summary(output: &AnalyzeOutput) -> String {
+    let ranked = confirmation_ranked_cards(output);
     let mut out = String::new();
     out.push_str("## unsafe-review advisory summary\n\n");
     render_pr_summary_header_bullets(&mut out, output);
-    render_pr_summary_top_card(&mut out, output);
+    render_pr_summary_top_card(&mut out, ranked.first().copied());
     render_github_summary_open_next(&mut out);
     out.push_str("---\n\n");
     out.push_str(
@@ -604,9 +608,9 @@ fn render_pr_summary_reviewer_cockpit(out: &mut String, top_card: Option<&Review
     }
 }
 
-fn render_pr_summary_top_card(out: &mut String, output: &AnalyzeOutput) {
+fn render_pr_summary_top_card(out: &mut String, top_card: Option<&ReviewCard>) {
     out.push_str("## Top card\n\n");
-    if let Some(card) = output.cards.first() {
+    if let Some(card) = top_card {
         out.push_str(&format!("- ID: `{}`\n", card.id));
         out.push_str(&format!("- Class: `{}`\n", card.class.as_str()));
         out.push_str(&format!(
@@ -1203,6 +1207,43 @@ mod tests {
         assert!(!rendered.contains("# unsafe-review PR summary"));
         assert!(!rendered.contains("## Card table"));
         assert!(!rendered.contains("## Witness plan"));
+        Ok(())
+    }
+
+    #[test]
+    fn github_summary_uses_ranked_top_card_matching_pr_summary() -> Result<(), String> {
+        use crate::domain::WitnessEvidence;
+
+        let mut output = fixture_output("duplicate_raw_pointer_reads")?;
+        if output.cards.len() < 2 {
+            return Err("duplicate fixture should emit at least two cards".to_string());
+        }
+        // Give cards[0] a runtime receipt verdict so the still-pending cards[1]
+        // ranks first under confirmation_ranked_cards.  Both render_pr_summary
+        // and render_github_summary must name the same ranked headline card.
+        output.cards[0].witness = WitnessEvidence::present("miri receipt imported")
+            .with_runtime_executed(true)
+            .with_verdict(Some("not_reproduced".to_string()));
+        let ranked_id = output.cards[1].id.to_string();
+        let unranked_id = output.cards[0].id.to_string();
+
+        let github = render_github_summary(&output);
+        let pr = render_pr_summary(&output);
+
+        // github-summary must name the ranked card in its Top card section.
+        assert!(
+            github.contains(&format!("- ID: `{ranked_id}`")),
+            "github-summary Top card must name ranked card `{ranked_id}`, got:\n{github}"
+        );
+        assert!(
+            !github.contains(&format!("- ID: `{unranked_id}`")),
+            "github-summary must not name unranked card `{unranked_id}` as top card"
+        );
+        // pr-summary Reviewer cockpit names the same ranked card.
+        assert!(
+            pr.contains(&format!("- Top card: `{ranked_id}`")),
+            "pr-summary cockpit must also name ranked card `{ranked_id}`"
+        );
         Ok(())
     }
 
