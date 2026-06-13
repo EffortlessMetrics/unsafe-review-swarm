@@ -177,10 +177,7 @@ fn analyze_with_receipts(
             None,
         ),
     )?;
-    'files: for rel in &candidate_files {
-        if cards.len() >= max_cards {
-            break;
-        }
+    for rel in &candidate_files {
         emit_repo_status(
             &mut events,
             repo_status(
@@ -209,13 +206,8 @@ fn analyze_with_receipts(
             policy_state: &policy_state,
             identity_counts: &mut identity_counts,
         };
-        let mut reached_max_cards = false;
         for scanned_site in file_result.sites {
             cards.push(card_builder::build_card(&mut build_ctx, scanned_site));
-            if cards.len() >= max_cards {
-                reached_max_cards = true;
-                break;
-            }
         }
         emit_repo_event(
             &mut events,
@@ -241,10 +233,16 @@ fn analyze_with_receipts(
             )),
         )?;
         last_scanned_path = Some(rel.clone());
-        if reached_max_cards {
-            scan_capped = true;
-            break 'files;
-        }
+    }
+    // Apply spread-aware card selection when the cap is set and exceeded.
+    // After scanning all files we know the full card set, so we can guarantee
+    // every source file with cards gets at least one representative card before
+    // the remaining budget is filled by rank.  This prevents the old
+    // alphabetical-prefix truncation from fully blinding late-sorted subsystems
+    // (e.g. bytes_mut.rs, crossbeam-epoch) when an early file exhausts the cap.
+    if cards.len() > max_cards {
+        scan_capped = true;
+        cards = spread_select_cards(cards, max_cards);
     }
     // Finalize per-file timings: present when collected, absent otherwise.
     let final_file_timings = if collect_timings {
@@ -313,6 +311,144 @@ fn sort_cards(cards: &mut [ReviewCard]) {
             .cmp(&right.site.location.file)
             .then(left.site.location.line.cmp(&right.site.location.line))
     });
+}
+
+/// Spread-aware card selection under a budget cap (SPEC-0013 §spread).
+///
+/// When the collected card count exceeds `max_cards`, this two-pass algorithm
+/// guarantees breadth: every source file that produced cards gets at least one
+/// representative card before the remaining budget is filled by rank.  Without
+/// this, a large file early in alphabetical order exhausts the cap and leaves
+/// entire subsystems with zero visibility.
+///
+/// Pass 1 — breadth: for each source file, pick the highest-priority /
+/// highest-confidence card (the "best" card per file), in file-path order, up
+/// to the budget.
+///
+/// Pass 2 — depth: if budget remains, fill from the leftover cards (those not
+/// selected in pass 1) sorted by rank: priority desc, confidence desc, missing
+/// count desc, then file/line asc for stability.
+///
+/// The final emitted list is re-sorted by file/line (the same order as
+/// `sort_cards`) for identity stability — only the SELECTION changes, not the
+/// ordering of what is emitted.
+///
+/// Advisory note: this changes which cards survive the cap, not detection.
+/// `partial: true` + `stop_reason: max_cards` are still set by the caller when
+/// capping occurs.
+fn spread_select_cards(mut all_cards: Vec<ReviewCard>, budget: usize) -> Vec<ReviewCard> {
+    if budget == 0 {
+        return Vec::new();
+    }
+
+    // Rank key for a card: (priority asc, confidence asc, missing-count desc,
+    // file asc, line asc).  Lower tuple = higher importance.  Used for both
+    // the breadth pass (picking the best card per file) and the depth pass
+    // (ordering leftover cards for budget fill).
+    //
+    // Priority: High=0, Medium=1, Low=2 (lower = more urgent).
+    // Confidence: High=0, Medium=1, Low=2, Unknown=3 (lower = more confident).
+    // missing_count: Reversed so more gaps sort earlier.
+    fn card_rank_key(card: &ReviewCard) -> (u8, u8, std::cmp::Reverse<usize>, usize) {
+        let priority_ord = match card.priority {
+            crate::domain::Priority::High => 0u8,
+            crate::domain::Priority::Medium => 1,
+            crate::domain::Priority::Low => 2,
+        };
+        let confidence_ord = match card.confidence {
+            crate::domain::Confidence::High => 0u8,
+            crate::domain::Confidence::Medium => 1,
+            crate::domain::Confidence::Low => 2,
+            crate::domain::Confidence::Unknown => 3,
+        };
+        (
+            priority_ord,
+            confidence_ord,
+            std::cmp::Reverse(card.missing.len()),
+            card.site.location.line,
+        )
+    }
+
+    // Group card indices by file, preserving the order files were first seen
+    // (i.e. discovery order).  This ensures the breadth pass respects the
+    // discovery priority heuristic (source roots before miscellaneous files)
+    // that the workspace discovery layer already encodes.  We use a separate
+    // `file_order` vec to track insertion order and a BTreeMap for O(log n)
+    // lookup, rather than a plain BTreeMap which would impose alphabetical order
+    // and could bypass the discovery-order preference.
+    let mut file_order: Vec<PathBuf> = Vec::new();
+    let mut by_file: BTreeMap<PathBuf, Vec<usize>> = BTreeMap::new();
+    for (idx, card) in all_cards.iter().enumerate() {
+        let file = card.site.location.file.clone();
+        let entry = by_file.entry(file.clone()).or_default();
+        if entry.is_empty() {
+            file_order.push(file);
+        }
+        entry.push(idx);
+    }
+
+    let mut selected_indices: Vec<usize> = Vec::with_capacity(budget);
+    let mut selected_set: BTreeSet<usize> = BTreeSet::new();
+
+    // Pass 1 — breadth: one representative per file, chosen by best rank.
+    // Iterate files in discovery order (not alphabetical) so the source-roots-
+    // first heuristic from workspace discovery is preserved under the cap.
+    for file in &file_order {
+        if selected_indices.len() >= budget {
+            break;
+        }
+        // file_order only contains files that were inserted into by_file, so
+        // by_file.get(file) is always Some here.
+        let Some(file_indices) = by_file.get(file) else {
+            continue;
+        };
+        // Pick the highest-importance card in this file.  file_indices is
+        // non-empty by construction (we only insert into by_file via push, so
+        // each vec has at least one entry).  min_by_key on a non-empty iterator
+        // always returns Some; the else branch is a defensive guard.
+        let Some(best_idx) = file_indices
+            .iter()
+            .copied()
+            .min_by_key(|&i| card_rank_key(&all_cards[i]))
+        else {
+            continue;
+        };
+        selected_indices.push(best_idx);
+        selected_set.insert(best_idx);
+    }
+
+    // Pass 2 — depth: fill remaining budget with the best leftover cards.
+    if selected_indices.len() < budget {
+        // Collect remaining card indices (not already selected in pass 1).
+        let mut remaining: Vec<usize> = (0..all_cards.len())
+            .filter(|i| !selected_set.contains(i))
+            .collect();
+        // Sort by importance so the highest-priority gaps fill first.
+        remaining.sort_by_key(|&i| card_rank_key(&all_cards[i]));
+        for idx in remaining {
+            if selected_indices.len() >= budget {
+                break;
+            }
+            selected_indices.push(idx);
+        }
+    }
+
+    // Bring selected cards to the front of `all_cards` via index-stable swaps,
+    // then truncate.  We sort `selected_indices` ascending first so that at step
+    // k the element at position selected_indices[k] is still the card we want
+    // (all earlier swaps moved cards to positions 0..k, and
+    // selected_indices[k] >= k holds because the indices were de-duplicated
+    // and sorted).
+    selected_indices.sort_unstable();
+    for (dest, src) in selected_indices.iter().enumerate() {
+        all_cards.swap(dest, *src);
+    }
+    all_cards.truncate(selected_indices.len());
+
+    // Re-sort by file/line for identity-stable output order (same contract as
+    // `sort_cards`).  Only the SELECTION changed; the emitted order is stable.
+    sort_cards(&mut all_cards);
+    all_cards
 }
 
 #[allow(
@@ -439,6 +575,7 @@ mod tests {
         CardId, HazardKind, OperationFamily, Priority, ProofPath, ReviewCard, ReviewClass,
         UnsafeSiteKind, WitnessKind, WitnessRoute,
     };
+    use std::collections::BTreeSet;
     use std::fs;
     use std::path::Path;
     use std::path::PathBuf;
@@ -6106,9 +6243,9 @@ evidence = "test fixture"
     }
 
     /// Verify that a capped scan (max_cards=1) still emits per-file timings for
-    /// the files that were scanned before the cap was hit.  The timing data is
-    /// partial in the sense that not all files are present, but it must be
-    /// truthful for the files that were scanned.
+    /// all files that were scanned.  With spread-aware selection all candidate
+    /// files are scanned before the cap selection is applied, so timing data
+    /// reflects every scanned file and must satisfy `timings.len() == files_scanned`.
     /// Drift-lock: drop file_timings emission from repo_status_capped → RED.
     #[test]
     fn per_file_timings_partial_when_scan_capped_at_max_cards() -> Result<(), String> {
@@ -6154,8 +6291,8 @@ evidence = "test fixture"
 
         let status = final_status.ok_or_else(|| "expected a final status event".to_string())?;
         assert!(status.partial, "capped scan must be partial=true");
-        // The cap was hit after scanning the first file.  Timing data must
-        // reflect only the files that were actually scanned.
+        // All candidate files are scanned before spread-aware selection applies.
+        // Timing data must reflect every scanned file.
         let timings = status
             .file_timings
             .as_ref()
@@ -6168,6 +6305,77 @@ evidence = "test fixture"
         assert!(
             !timings.is_empty(),
             "at least one file must have been scanned before the cap"
+        );
+        Ok(())
+    }
+
+    /// Spread-aware cap selection guarantees that every source file with cards
+    /// gets at least one representative card before the remaining budget is
+    /// filled by rank.  The OLD alphabetical-prefix truncation would give ALL
+    /// cards to the first file and zero to later files; the spread selection
+    /// must give one card to each file even when the cap equals the file count.
+    ///
+    /// Setup: two files, each with two unsafe sites, cap = 2.
+    /// Old behaviour: file A gets both cards, file Z gets zero.
+    /// New behaviour: file A gets one card, file Z gets one card.
+    ///
+    /// Drift-lock: revert spread_select_cards → file_z card disappears → RED.
+    #[test]
+    fn spread_aware_cap_gives_representative_card_to_each_file() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-spread-cap")?;
+        fs::create_dir_all(root.join("src")).map_err(|err| format!("create dirs failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"spread-cap-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
+        // File that sorts first alphabetically: two unsafe sites.
+        // With the old cap the budget of 2 would be exhausted here, leaving
+        // src/z_module.rs with zero cards.
+        fs::write(
+            root.join("src/lib.rs"),
+            "pub unsafe fn alpha(ptr: *const u8) -> u8 { unsafe { *ptr } }\n\
+             pub unsafe fn bravo(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+        )
+        .map_err(|err| format!("write src/lib.rs failed: {err}"))?;
+        // File that sorts last alphabetically: two unsafe sites.
+        // The spread pass must ensure at least one of these appears in the output.
+        fs::write(
+            root.join("src/z_module.rs"),
+            "pub unsafe fn zulu(ptr: *const u8) -> u8 { unsafe { *ptr } }\n\
+             pub unsafe fn yankee(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+        )
+        .map_err(|err| format!("write src/z_module.rs failed: {err}"))?;
+
+        let output = analyze(AnalyzeInput {
+            root: root.clone(),
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: Some(2),
+        })?;
+
+        let _ = fs::remove_dir_all(&root);
+
+        assert_eq!(output.cards.len(), 2, "cap of 2 must yield exactly 2 cards");
+        assert_eq!(output.summary.cards, 2, "summary.cards must match");
+
+        let files_represented: BTreeSet<_> = output
+            .cards
+            .iter()
+            .map(|c| c.site.location.file.clone())
+            .collect();
+
+        assert!(
+            files_represented.contains(&PathBuf::from("src/lib.rs")),
+            "spread cap must keep a representative card for src/lib.rs"
+        );
+        assert!(
+            files_represented.contains(&PathBuf::from("src/z_module.rs")),
+            "spread cap must keep a representative card for src/z_module.rs \
+             (previously dropped by alphabetical-prefix truncation)"
         );
         Ok(())
     }
