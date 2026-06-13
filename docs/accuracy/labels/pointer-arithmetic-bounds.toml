@@ -135,3 +135,17 @@ expected_discharge_state = "present"
 expected_witness_route_kinds = ["miri", "cargo-careful"]
 label_source = "fixture_golden"
 rationale = "A same-slice start pointer plus len end-pointer pattern discharges pointer-arithmetic bounds evidence without proving arbitrary provenance."
+
+[[samples]]
+id = "pointer-arithmetic-unsafe-fn-body-bounds-missing"
+fixture = "pointer_arithmetic_unsafe_fn_offset"
+kind = "positive"
+expected_cards = 2
+expected_class = "guard_missing"
+expected_operation_family = "pointer_arithmetic"
+expected_hazard = "bounds"
+expected_obligation_key = "bounds"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "Raw pointer `.add()` inside an `unsafe fn` body must still produce a pointer_arithmetic ReviewCard even though there is no nested `unsafe { }` block."

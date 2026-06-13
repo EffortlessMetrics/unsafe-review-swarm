@@ -411,6 +411,8 @@ required_core_fixtures = [
   "pointer_arithmetic_disjunct_bounds_not_guard",
   "pointer_arithmetic_closed_branch_not_guard",
   "pointer_arithmetic_slice_end",
+  "pointer_arithmetic_safe_method_add_no_cards",
+  "pointer_arithmetic_unsafe_fn_offset",
   "slice_from_raw_parts_mut",
   "slice_from_raw_parts_mut_maybeuninit",
   "slice_from_raw_parts_mut_other_maybeuninit_not_guard",
@@ -4670,6 +4672,23 @@ claim = "pointer arithmetic recognizes slice start plus same-slice len end-point
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
+expected_operation_family = "pointer_arithmetic"
+expected_hazard = "bounds"
+
+[[cases]]
+fixture = "pointer_arithmetic_safe_method_add_no_cards"
+kind = "false_positive_control"
+claim = "pointer arithmetic does not card safe inherent .add() methods outside any unsafe scope"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
+
+[[cases]]
+fixture = "pointer_arithmetic_unsafe_fn_offset"
+kind = "positive"
+claim = "pointer arithmetic cards .add() on a raw pointer inside an unsafe fn body"
+support_tier = "Core operation smoke slice"
+expected_cards = 2
+expected_class = "guard_missing"
 expected_operation_family = "pointer_arithmetic"
 expected_hazard = "bounds"
 

@@ -739,6 +739,8 @@ const FIXTURE_GOLDENS: &[&str] = &[
     "pointer_arithmetic_disjunct_bounds_not_guard",
     "pointer_arithmetic_closed_branch_not_guard",
     "pointer_arithmetic_slice_end",
+    "pointer_arithmetic_safe_method_add_no_cards",
+    "pointer_arithmetic_unsafe_fn_offset",
     "slice_from_raw_parts_mut",
     "slice_from_raw_parts_mut_maybeuninit",
     "slice_from_raw_parts_mut_other_maybeuninit_not_guard",

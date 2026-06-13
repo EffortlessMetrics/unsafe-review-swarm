@@ -1,0 +1,18 @@
+/// Safe newtype whose `add` method performs wrapping addition — not pointer arithmetic.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Interest(u8);
+
+impl Interest {
+    pub const READABLE: Interest = Interest(1);
+    pub const WRITABLE: Interest = Interest(2);
+
+    /// Combine two interests with bitwise OR; no unsafe involved.
+    pub fn add(self, other: Interest) -> Interest {
+        Interest(self.0 | other.0)
+    }
+}
+
+/// Safe free function that calls the safe `Interest::add` — must not produce a card.
+pub fn combined(a: Interest, b: Interest) -> Interest {
+    a.add(b)
+}

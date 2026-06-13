@@ -379,12 +379,14 @@ fn detect_syntax_sites(
 ) -> Vec<DetectedSyntaxSite> {
     let mut sites = Vec::new();
     let unsafe_block_ranges = unsafe_block_ranges(parsed);
+    let unsafe_fn_ranges = unsafe_fn_ranges(parsed);
     let operation_block_ranges = operation_block_ranges(parsed, &unsafe_block_ranges);
     for fact in &parsed.nodes {
         let Some((kind, family)) = detect_syntax_site(
             fact,
             &parsed.text,
             &unsafe_block_ranges,
+            &unsafe_fn_ranges,
             &operation_block_ranges,
             extern_names,
             local_modules,
@@ -595,6 +597,7 @@ fn detect_syntax_site(
     fact: &SyntaxNodeFact,
     source: &str,
     unsafe_block_ranges: &[(usize, usize)],
+    unsafe_fn_ranges: &[(usize, usize)],
     operation_block_ranges: &BTreeSet<(usize, usize)>,
     extern_names: &BTreeSet<String>,
     local_modules: &BTreeSet<String>,
@@ -672,7 +675,23 @@ fn detect_syntax_site(
             Some((UnsafeSiteKind::Operation, family))
         }
         "CALL_EXPR" | "METHOD_CALL_EXPR" | "MACRO_EXPR" => {
-            detect_site(&syntax_detection_text(&compact))
+            let result = detect_site(&syntax_detection_text(&compact));
+            // Gate bare `.add`/`.offset` PointerArithmetic on syntactic unsafe scope.
+            // Raw-pointer arithmetic is only legal inside `unsafe { }` blocks or
+            // `unsafe fn` bodies.  A call site outside both (e.g. a safe bitflag
+            // `.add` combinator) must not produce a card.
+            if matches!(
+                result,
+                Some((
+                    UnsafeSiteKind::Operation,
+                    OperationFamily::PointerArithmetic
+                ))
+            ) && !is_inside_range(fact, unsafe_block_ranges)
+                && !is_inside_range(fact, unsafe_fn_ranges)
+            {
+                return None;
+            }
+            result
         }
         _ => None,
     }
@@ -816,6 +835,20 @@ fn unsafe_block_ranges(parsed: &ParsedSource) -> Vec<(usize, usize)> {
         .iter()
         .filter(|fact| {
             fact.kind == "BLOCK_EXPR" && compact_whitespace(&fact.snippet).starts_with("unsafe {")
+        })
+        .map(|fact| (fact.start, fact.end))
+        .collect()
+}
+
+/// Byte ranges of `unsafe fn` declarations.  Used to determine whether a call
+/// expression is inside an unsafe fn body, where raw-pointer arithmetic is legal
+/// even without a nested `unsafe { }` block.
+fn unsafe_fn_ranges(parsed: &ParsedSource) -> Vec<(usize, usize)> {
+    parsed
+        .nodes
+        .iter()
+        .filter(|fact| {
+            fact.kind == "FN" && compact_whitespace(&fact.snippet).contains("unsafe fn ")
         })
         .map(|fact| (fact.start, fact.end))
         .collect()
