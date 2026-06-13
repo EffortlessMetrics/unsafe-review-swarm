@@ -96,7 +96,11 @@ fn contains_unqualified_call_name(line: &str, name: &str) -> bool {
     while let Some(pos) = cursor.find(name) {
         let absolute = offset + pos;
         let before = line[..absolute].chars().next_back();
-        let starts_on_boundary = before.is_none_or(|ch| !is_ident_continue(ch) && ch != ':');
+        // Reject matches where the preceding char is a method-call receiver dot (`.`),
+        // a path separator (`:`), or any ident-continue char — those indicate the name
+        // is part of a qualified path or a method-call chain, not a bare extern call.
+        let starts_on_boundary =
+            before.is_none_or(|ch| !is_ident_continue(ch) && ch != ':' && ch != '.');
         let after = &line[absolute + name.len()..];
         if starts_on_boundary && call_suffix(after) {
             return true;
@@ -211,6 +215,27 @@ mod tests {
                 &local_modules
             ),
             None
+        );
+    }
+
+    #[test]
+    fn method_receiver_dot_does_not_match_same_named_extern() {
+        // A method call `f.close()` must not match the unqualified extern name `close`
+        // even when `close` is declared in an `extern "C"` block in the same file.
+        let extern_names = BTreeSet::from(["close".to_string()]);
+        let local_modules = BTreeSet::new();
+
+        // Method-call receiver form — must NOT route to FFI.
+        assert_eq!(
+            ffi_boundary_match("unsafe { f.close() }", &extern_names, &local_modules),
+            None,
+            "method-call receiver `.close()` must not match unqualified extern `close`"
+        );
+        // Bare unqualified call — MUST still route to FFI.
+        assert_eq!(
+            ffi_boundary_match("unsafe { close(fd) }", &extern_names, &local_modules),
+            Some(FfiBoundaryApplicability::same_file_extern("close")),
+            "bare call `close(fd)` must still route to FFI"
         );
     }
 }

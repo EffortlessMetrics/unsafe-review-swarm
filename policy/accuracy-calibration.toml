@@ -1201,6 +1201,7 @@ fixtures = [
   "unsafe_fn_call_encode_utf8_remaining_cap",
   "ffi_non_libc_wrapper_call_not_route",
   "ffi_local_libc_module_call_not_route",
+  "ffi_same_named_method_not_route",
   "unchecked_constructor_availability_guard",
   "unchecked_constructor_availability_assert_guard",
   "unchecked_constructor_unavailable_return_guard",
@@ -1218,7 +1219,8 @@ allowed_public_claim = """
 Fixture-pinned generic unsafe function call callee-contract evidence
 distinguishes remaining-capacity and availability guards from missing,
 wrong-receiver, observed-only, closed-branch, comment-only return, and
-FFI-looking local-wrapper controls in the listed fixtures.
+FFI-looking local-wrapper and method-receiver-dot controls in the listed
+fixtures.
 """
 forbidden_claims = [
   "callee contract soundness proof",

@@ -1,0 +1,5 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -19,1 +19,1 @@
++    unsafe { f.close() }

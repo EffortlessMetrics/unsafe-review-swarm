@@ -928,6 +928,7 @@ const FIXTURE_GOLDENS: &[&str] = &[
     "ffi_libc_call_sanitizer_route",
     "ffi_non_libc_wrapper_call_not_route",
     "ffi_local_libc_module_call_not_route",
+    "ffi_same_named_method_not_route",
     "get_unchecked_mut_bounds",
     "get_unchecked_mut_len_guard",
     "get_unchecked_mut_conjunct_len_guard",
