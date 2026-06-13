@@ -386,6 +386,8 @@ required_core_fixtures = [
   "str_from_utf8_unchecked_match_ok_shadowed_not_guard",
   "zeroed_invalid_value",
   "zeroed_valid_u32",
+  "zeroed_definition_no_cards",
+  "zeroed_call_still_cards",
   "inline_asm_human_review",
   "raw_pointer_read_volatile",
   "raw_pointer_read_len_capacity_assert",
@@ -4420,6 +4422,23 @@ claim = "mem::zeroed recognizes a known valid-zero primitive target type"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
+expected_operation_family = "zeroed"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "zeroed_definition_no_cards"
+kind = "false_positive_control"
+claim = "a safe fn zeroed() definition is not carded as a mem::zeroed call"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
+
+[[cases]]
+fixture = "zeroed_call_still_cards"
+kind = "positive"
+claim = "mem::zeroed call inside a function body still produces a review card after definition-header fix"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "unsafe_unreached"
 expected_operation_family = "zeroed"
 expected_hazard = "invalid_value"
 
