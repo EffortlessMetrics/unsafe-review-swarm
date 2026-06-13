@@ -2,6 +2,53 @@ use crate::domain::{ReachEvidence, RelatedTest};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Returns true when `owner` appears in `text` as a whole identifier — i.e. every
+/// occurrence is bounded on both sides by a non-identifier character (or the
+/// start/end of the text).  Used as a cheap prefilter before the per-line check.
+fn text_contains_owner_as_ident(text: &str, owner: &str) -> bool {
+    let owner_bytes = owner.as_bytes();
+    let text_bytes = text.as_bytes();
+    let owner_len = owner_bytes.len();
+    if owner_len == 0 {
+        return false;
+    }
+    let mut start = 0usize;
+    while start + owner_len <= text_bytes.len() {
+        if let Some(pos) = text[start..].find(owner) {
+            let abs = start + pos;
+            if is_ident_boundary(text_bytes, abs, owner_len) {
+                return true;
+            }
+            start = abs + 1;
+        } else {
+            break;
+        }
+    }
+    false
+}
+
+/// Returns true when `owner` appears in `line` as a whole identifier.
+fn line_contains_owner_as_ident(line: &str, owner: &str) -> bool {
+    text_contains_owner_as_ident(line, owner)
+}
+
+/// Returns true when the slice `bytes[pos..pos+len]` is surrounded by
+/// non-identifier chars on both sides (start-of-string and end-of-string count
+/// as non-identifier boundaries).  The identifier-char predicate mirrors
+/// `parse_ident` and `parse_test_name`: `_` or ASCII alphanumeric.
+fn is_ident_boundary(bytes: &[u8], pos: usize, len: usize) -> bool {
+    let before_ok = pos == 0 || !is_ident_char(bytes[pos - 1]);
+    let after_ok = pos + len >= bytes.len() || !is_ident_char(bytes[pos + len]);
+    before_ok && after_ok
+}
+
+/// The identifier-char predicate shared with `parse_ident` (unsafe_impl.rs) and
+/// `parse_test_name`.  A character is part of a Rust identifier when it is `_`
+/// or ASCII alphanumeric.
+fn is_ident_char(b: u8) -> bool {
+    b == b'_' || b.is_ascii_alphanumeric()
+}
+
 pub(crate) fn reach_evidence(
     root: &Path,
     owner: Option<&String>,
@@ -22,7 +69,7 @@ pub(crate) fn reach_evidence(
         let Ok(text) = fs::read_to_string(&abs) else {
             continue;
         };
-        if !text.contains(owner) {
+        if !text_contains_owner_as_ident(&text, owner) {
             continue;
         }
         let mut last_test: Option<(String, usize)> = None;
@@ -33,7 +80,7 @@ pub(crate) fn reach_evidence(
             if let Some(name) = parse_test_name(line) {
                 last_test = Some((name, idx + 1));
             }
-            if line.contains(owner) {
+            if line_contains_owner_as_ident(line, owner) {
                 let (name, line_no) = last_test
                     .clone()
                     .unwrap_or_else(|| (format!("mentions {owner}"), idx + 1));

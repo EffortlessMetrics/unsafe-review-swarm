@@ -475,6 +475,7 @@ required_core_fixtures = [
   "unsafe_impl_send",
   "unsafe_impl_send_generic_owner",
   "unsafe_impl_sync_generic_bound",
+  "unsafe_impl_send_owner_substring_not_reached",
   "unsafe_impl_custom_trait_not_send_sync",
   "unsafe_impl_custom_trait_contract_not_guard",
   "ffi_sanitizer_route",
@@ -5299,6 +5300,16 @@ expected_hazard = "send_sync_invariant"
 fixture = "unsafe_impl_sync_generic_bound"
 kind = "positive"
 claim = "generic unsafe impl Sync with a Send bound is classified as Sync and uses the implemented type owner"
+support_tier = "Witness routing"
+expected_cards = 1
+expected_class = "requires_loom"
+expected_operation_family = "unsafe_impl_send_sync"
+expected_hazard = "send_sync_invariant"
+
+[[cases]]
+fixture = "unsafe_impl_send_owner_substring_not_reached"
+kind = "false_positive_control"
+claim = "substring match of owner name in a longer identifier does not credit test reach for unsafe impl Send"
 support_tier = "Witness routing"
 expected_cards = 1
 expected_class = "requires_loom"
