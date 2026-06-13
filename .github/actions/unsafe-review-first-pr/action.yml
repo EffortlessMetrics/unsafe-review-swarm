@@ -141,6 +141,7 @@ runs:
         BUNDLE_DIR: ${{ inputs.out_dir }}
       run: |
         set -euo pipefail
+        # Required core: artifacts emitted by every supported unsafe-review release.
         for required in \
           review-kit.json \
           cards.json \
@@ -153,13 +154,24 @@ runs:
           manual-candidates.json \
           manual-repair-queue.json \
           tokmd-packets.json \
-          usefulness-telemetry.json \
           lsp.json \
           repair-queue.json \
           unsafe-review-gate.json
         do
           if [ ! -s "${BUNDLE_DIR}/${required}" ]; then
             echo "::error::unsafe-review bundle is missing or empty: ${BUNDLE_DIR}/${required}"
+            exit 1
+          fi
+        done
+        # Optional: artifacts added in newer releases. Verified only if present,
+        # so the action works against the pinned binary version regardless of age
+        # (a too-old pinned binary simply omits these; a present-but-empty file
+        # is still an error).
+        for optional in \
+          usefulness-telemetry.json
+        do
+          if [ -e "${BUNDLE_DIR}/${optional}" ] && [ ! -s "${BUNDLE_DIR}/${optional}" ]; then
+            echo "::error::unsafe-review bundle has present-but-empty: ${BUNDLE_DIR}/${optional}"
             exit 1
           fi
         done

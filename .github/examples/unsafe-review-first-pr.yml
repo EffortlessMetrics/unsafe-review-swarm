@@ -66,6 +66,7 @@ jobs:
       - name: Verify bundle file shape
         run: |
           set -euo pipefail
+          # Required core: emitted by every supported unsafe-review release.
           for required in \
             review-kit.json \
             cards.json \
@@ -78,13 +79,21 @@ jobs:
             manual-candidates.json \
             manual-repair-queue.json \
             tokmd-packets.json \
-            usefulness-telemetry.json \
             lsp.json \
             repair-queue.json \
             unsafe-review-gate.json
           do
             if [ ! -s "${BUNDLE_DIR}/${required}" ]; then
               echo "::error::unsafe-review bundle is missing ${required}"
+              exit 1
+            fi
+          done
+          # Optional: added in newer releases — verified only if present.
+          for optional in \
+            usefulness-telemetry.json
+          do
+            if [ -e "${BUNDLE_DIR}/${optional}" ] && [ ! -s "${BUNDLE_DIR}/${optional}" ]; then
+              echo "::error::unsafe-review bundle has present-but-empty ${optional}"
               exit 1
             fi
           done
