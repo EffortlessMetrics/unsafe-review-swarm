@@ -1324,7 +1324,15 @@ fn file_range_scan_returns_envelope_with_correct_shape() -> Result<(), String> {
     };
     // The fixture card is at src/lib.rs; use a wide range to guarantee overlap.
     let cards = vec![card];
-    let envelope_json = render_range_scan("src/lib.rs".to_string(), 1, 1000, false, &cards, "0.1");
+    let envelope_json = render_range_scan(
+        "src/lib.rs".to_string(),
+        1,
+        1000,
+        false,
+        &cards,
+        "0.1",
+        &std::collections::HashMap::new(),
+    );
     let value = parse_json(&envelope_json)?;
 
     assert_eq!(value["mode"], "file_range_scan");
@@ -1381,6 +1389,7 @@ fn file_range_scan_returns_empty_list_when_no_overlap() -> Result<(), String> {
         false,
         &cards,
         "0.1",
+        &std::collections::HashMap::new(),
     );
     let value = parse_json(&envelope_json)?;
 
@@ -1420,6 +1429,7 @@ fn file_range_scan_changed_only_includes_new_baseline_cards() -> Result<(), Stri
         true, // changed_only
         &cards,
         "0.1",
+        &std::collections::HashMap::new(),
     );
     let value = parse_json(&envelope_json)?;
     assert_eq!(value["changed_only"], true);
@@ -1456,6 +1466,7 @@ fn file_range_scan_changed_only_excludes_inherited_baseline_cards() -> Result<()
         false,
         &cards,
         "0.1",
+        &std::collections::HashMap::new(),
     ))?;
     let with_filter = parse_json(&render_range_scan(
         "src/lib.rs".to_string(),
@@ -1464,6 +1475,7 @@ fn file_range_scan_changed_only_excludes_inherited_baseline_cards() -> Result<()
         true,
         &cards,
         "0.1",
+        &std::collections::HashMap::new(),
     ))?;
     // Both return the same card (it IS new/worsened), confirming the filter is applied.
     assert_eq!(
@@ -1484,7 +1496,15 @@ fn file_range_scan_packets_ordered_by_site_line() -> Result<(), String> {
     // We can't easily mutate cards without cloning, so just pass the same card twice
     // and verify the dedup-by-id logic keeps them sorted.
     let cards = vec![card, card];
-    let envelope_json = render_range_scan("src/lib.rs".to_string(), 1, 1000, false, &cards, "0.1");
+    let envelope_json = render_range_scan(
+        "src/lib.rs".to_string(),
+        1,
+        1000,
+        false,
+        &cards,
+        "0.1",
+        &std::collections::HashMap::new(),
+    );
     let value = parse_json(&envelope_json)?;
     let packets = value["packets"]
         .as_array()

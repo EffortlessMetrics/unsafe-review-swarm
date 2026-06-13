@@ -5,6 +5,71 @@ mod selection;
 pub(crate) use render::render;
 pub use selection::COMMENT_BODY_WORD_LIMIT;
 
+use crate::api::AnalyzeOutput;
+use crate::domain::{CardId, CommentPlanStatus};
+use std::collections::HashMap;
+
+/// Compute the comment-plan selection status for every card in `output`.
+///
+/// Reuses the same eligibility gate (`should_plan_comment`) and budget/dedup
+/// logic as [`model::CommentPlan`] — the two cannot drift because they share
+/// the same `selection` module functions.  The returned map covers every card
+/// in `output.cards` with one of:
+///
+/// - `Selected` — the card was chosen for an inline comment slot.
+/// - `NotSelected` — the card was eligible but displaced by the budget cap or
+///   family/obligation dedup.
+/// - `NotEligible` — the card failed the `should_plan_comment` eligibility
+///   gate (e.g. unchanged site, non-actionable class, unknown family, or low
+///   confidence).
+///
+/// This function is the single source of truth for `comment_plan_status` in the
+/// coverage block (SPEC-0029 / SPEC-0032).  `json::render` and
+/// `agent::render_with_output` call it so that `cards.json` and agent packets
+/// report the same status as `comment-plan.json`.
+pub(crate) fn card_statuses(output: &AnalyzeOutput) -> HashMap<CardId, CommentPlanStatus> {
+    use self::model::comment_budget_key;
+    use self::selection::{importance_rank, should_plan_comment};
+    use std::collections::BTreeSet;
+
+    // Must match MAX_PLANNED_COMMENTS in model.rs — kept in sync by the
+    // fixture_card_goldens drift test: if these diverge, the goldens will
+    // disagree with comment-plan.json.
+    const MAX_PLANNED_COMMENTS: usize = 3;
+
+    let mut statuses: HashMap<CardId, CommentPlanStatus> =
+        HashMap::with_capacity(output.cards.len());
+
+    let (mut eligible, ineligible): (
+        Vec<&crate::domain::ReviewCard>,
+        Vec<&crate::domain::ReviewCard>,
+    ) = output
+        .cards
+        .iter()
+        .partition(|card| should_plan_comment(card));
+    eligible.sort_by(|a, b| importance_rank(a).cmp(&importance_rank(b)));
+
+    let mut selected_budget_keys: BTreeSet<String> = BTreeSet::new();
+    let mut selected_count = 0usize;
+
+    for card in eligible {
+        let budget_key = comment_budget_key(card);
+        if selected_budget_keys.contains(&budget_key) {
+            statuses.insert(card.id.clone(), CommentPlanStatus::NotSelected);
+        } else if selected_count < MAX_PLANNED_COMMENTS {
+            selected_budget_keys.insert(budget_key);
+            selected_count += 1;
+            statuses.insert(card.id.clone(), CommentPlanStatus::Selected);
+        } else {
+            statuses.insert(card.id.clone(), CommentPlanStatus::NotSelected);
+        }
+    }
+    for card in ineligible {
+        statuses.insert(card.id.clone(), CommentPlanStatus::NotEligible);
+    }
+    statuses
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

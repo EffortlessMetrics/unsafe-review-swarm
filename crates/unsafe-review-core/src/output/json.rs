@@ -5,6 +5,7 @@ use crate::domain::{
     WitnessReceiptCoverage, WitnessRoute,
 };
 use crate::output::REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY;
+use crate::output::comment_plan;
 use crate::output::confirmation::ConfirmationCue;
 use crate::util::path_display;
 use serde::Serialize;
@@ -74,6 +75,7 @@ struct JsonProvenance {
 impl<'a> JsonAnalyzeOutput<'a> {
     /// Build from output without provenance (schema 0.1, backward-compatible).
     fn from_plain(output: &'a AnalyzeOutput) -> Self {
+        let statuses = comment_plan::card_statuses(output);
         Self {
             schema_version: SCHEMA_VERSION_PLAIN,
             tool: &output.tool,
@@ -84,7 +86,17 @@ impl<'a> JsonAnalyzeOutput<'a> {
             trust_boundary: TRUST_BOUNDARY,
             root: path_display(&output.root),
             summary: JsonSummary::from(&output.summary),
-            cards: output.cards.iter().map(JsonCard::from).collect(),
+            cards: output
+                .cards
+                .iter()
+                .map(|card| {
+                    let status = statuses
+                        .get(&card.id)
+                        .copied()
+                        .unwrap_or(CommentPlanStatus::NotEligible);
+                    JsonCard::from_with_status(card, status)
+                })
+                .collect(),
             provenance: None,
         }
     }
@@ -101,6 +113,7 @@ impl<'a> JsonAnalyzeOutput<'a> {
             diff_sha256: provenance.diff_sha256.clone(),
             dirty_worktree: provenance.dirty_worktree,
         };
+        let statuses = comment_plan::card_statuses(output);
         Self {
             schema_version: SCHEMA_VERSION_WITH_PROVENANCE,
             tool: &output.tool,
@@ -111,7 +124,17 @@ impl<'a> JsonAnalyzeOutput<'a> {
             trust_boundary: TRUST_BOUNDARY,
             root: path_display(&output.root),
             summary: JsonSummary::from(&output.summary),
-            cards: output.cards.iter().map(JsonCard::from).collect(),
+            cards: output
+                .cards
+                .iter()
+                .map(|card| {
+                    let status = statuses
+                        .get(&card.id)
+                        .copied()
+                        .unwrap_or(CommentPlanStatus::NotEligible);
+                    JsonCard::from_with_status(card, status)
+                })
+                .collect(),
             provenance: Some(json_provenance),
         }
     }
@@ -204,8 +227,16 @@ struct JsonCard<'a> {
     coverage: JsonCoverageBlock,
 }
 
-impl<'a> From<&'a ReviewCard> for JsonCard<'a> {
-    fn from(card: &'a ReviewCard) -> Self {
+impl<'a> JsonCard<'a> {
+    /// Build a `JsonCard` for `card`, overriding `comment_plan_status` with
+    /// the value computed by the comment-plan selection pass (SPEC-0032).
+    ///
+    /// This is the only valid constructor.  Callers must supply the status
+    /// from [`comment_plan::card_statuses`] so that `cards.json` always
+    /// projects the same `comment_plan_status` as `comment-plan.json`.
+    fn from_with_status(card: &'a ReviewCard, comment_plan_status: CommentPlanStatus) -> Self {
+        let mut coverage_block = card.coverage_block();
+        coverage_block.comment_plan_status = comment_plan_status;
         Self {
             id: &card.id.0,
             class_name: card.class.as_str(),
@@ -240,7 +271,7 @@ impl<'a> From<&'a ReviewCard> for JsonCard<'a> {
             next_action: &card.next_action.summary,
             verify_commands: &card.next_action.verify_commands,
             confirmation_cue: ConfirmationCue::from(card),
-            coverage: JsonCoverageBlock::from(card.coverage_block()),
+            coverage: JsonCoverageBlock::from(coverage_block),
         }
     }
 }
@@ -1013,7 +1044,18 @@ pub fn bless_fixture_card_goldens(names: &[&str]) -> Result<Vec<std::path::PathB
             include_unchanged_tests: true,
             max_cards: None,
         })?;
-        let cards: Vec<JsonCard<'_>> = output.cards.iter().map(JsonCard::from).collect();
+        let statuses = crate::output::comment_plan::card_statuses(&output);
+        let cards: Vec<JsonCard<'_>> = output
+            .cards
+            .iter()
+            .map(|card| {
+                let status = statuses
+                    .get(&card.id)
+                    .copied()
+                    .unwrap_or(CommentPlanStatus::NotEligible);
+                JsonCard::from_with_status(card, status)
+            })
+            .collect();
         let path = root.join("expected.cards.json");
         let mut text = serde_json::to_string_pretty(&cards)
             .map_err(|err| format!("serialize {fixture} cards failed: {err}"))?;
@@ -1198,7 +1240,18 @@ mod tests {
             // Serialize the typed Vec<JsonCard> directly so that serde emits
             // keys in struct-field order (not alphabetically as serde_json::Value
             // would after a round-trip through BTreeMap).
-            let cards: Vec<JsonCard<'_>> = output.cards.iter().map(JsonCard::from).collect();
+            let statuses = comment_plan::card_statuses(&output);
+            let cards: Vec<JsonCard<'_>> = output
+                .cards
+                .iter()
+                .map(|card| {
+                    let status = statuses
+                        .get(&card.id)
+                        .copied()
+                        .unwrap_or(CommentPlanStatus::NotEligible);
+                    JsonCard::from_with_status(card, status)
+                })
+                .collect();
             let path = fixture_root(fixture).join("expected.cards.json");
             let mut text = serde_json::to_string_pretty(&cards)
                 .map_err(|err| format!("serialize {fixture} cards failed: {err}"))?;

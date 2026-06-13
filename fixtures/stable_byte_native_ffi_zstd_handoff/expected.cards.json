@@ -245,7 +245,7 @@
       "manual_context": "absent",
       "baseline_state": "new",
       "outcome_movement": "regressed",
-      "comment_plan_status": "not_eligible",
+      "comment_plan_status": "selected",
       "agent_lsp_readiness": "needs_human"
     }
   }

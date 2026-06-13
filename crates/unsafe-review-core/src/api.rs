@@ -560,7 +560,7 @@ pub fn collect_context(output: &AnalyzeOutput, id: &CardId) -> Option<String> {
         .cards
         .iter()
         .find(|card| &card.id == id)
-        .map(agent::render)
+        .map(|card| agent::render_with_output(output, card))
 }
 
 /// Render a `file_range_scan` envelope for SPEC-0033.
@@ -605,6 +605,7 @@ pub fn collect_context_range(
         })
         .collect();
 
+    let statuses = comment_plan::card_statuses(output);
     agent::render_range_scan(
         queried_display,
         line_start,
@@ -612,6 +613,7 @@ pub fn collect_context_range(
         changed_only,
         &file_cards,
         &output.schema_version,
+        &statuses,
     )
 }
 

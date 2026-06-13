@@ -103,7 +103,7 @@ impl From<&AnalyzeOutput> for CommentPlan {
     }
 }
 
-fn comment_budget_key(card: &ReviewCard) -> String {
+pub(super) fn comment_budget_key(card: &ReviewCard) -> String {
     let mut obligations = card
         .obligation_evidence
         .iter()

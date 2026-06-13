@@ -1,4 +1,4 @@
-use crate::domain::ReviewCard;
+use crate::domain::{CommentPlanStatus, ReviewCard};
 use crate::output::REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY;
 use serde::Serialize;
 
@@ -29,8 +29,36 @@ mod repairs;
 #[cfg(test)]
 mod tests;
 
+/// Render a single-card agent packet.
+///
+/// `comment_plan_status` defaults to `NotEligible` because the selection
+/// outcome is only computable from the full `AnalyzeOutput`.  Callers with
+/// output context should use [`render_with_output`] instead.
+///
+/// Used by unit tests in [`super::repair_queue`] and [`tests`] that construct
+/// cards in isolation; production callers use [`render_with_output`].
+#[allow(
+    dead_code,
+    reason = "used by #[cfg(test)] callers in repair_queue.rs and tests.rs that operate on isolated cards; render_with_output is the production path"
+)]
 pub(crate) fn render(card: &ReviewCard) -> String {
     render_pretty(&packet::AgentPacket::from(card))
+}
+
+/// Render a single-card agent packet with the correct `comment_plan_status`.
+///
+/// Computes the comment-plan selection status from `output` via
+/// [`crate::output::comment_plan::card_statuses`] and overrides the coverage
+/// block so the packet projects the same `comment_plan_status` as
+/// `comment-plan.json` and `cards.json` (SPEC-0032).
+pub(crate) fn render_with_output(output: &crate::api::AnalyzeOutput, card: &ReviewCard) -> String {
+    use crate::output::comment_plan;
+    let statuses = comment_plan::card_statuses(output);
+    let status = statuses
+        .get(&card.id)
+        .copied()
+        .unwrap_or(CommentPlanStatus::NotEligible);
+    render_pretty(&packet::AgentPacket::from_with_status(card, status))
 }
 
 /// Render a `file_range_scan` envelope for SPEC-0033.
@@ -39,6 +67,11 @@ pub(crate) fn render(card: &ReviewCard) -> String {
 /// requested file).  Applies line-range and optional `changed_only` filters,
 /// sorts the result deterministically by site line then card id, and wraps the
 /// matching packets in the `file_range_scan` envelope.
+///
+/// `statuses` maps each `CardId` to its comment-plan selection status so that
+/// packets inside the envelope project the same `comment_plan_status` as
+/// `comment-plan.json` and `cards.json` (SPEC-0032).  Callers without output
+/// context may pass an empty map; affected cards will default to `NotEligible`.
 pub(crate) fn render_range_scan<'a>(
     queried_file: String,
     queried_line_start: u32,
@@ -46,6 +79,7 @@ pub(crate) fn render_range_scan<'a>(
     changed_only: bool,
     file_cards: &[&'a ReviewCard],
     analyzed_base: &'a str,
+    statuses: &std::collections::HashMap<crate::domain::CardId, CommentPlanStatus>,
 ) -> String {
     let mut matching: Vec<&'a ReviewCard> = file_cards
         .iter()
@@ -68,6 +102,7 @@ pub(crate) fn render_range_scan<'a>(
         changed_only,
         matching,
         analyzed_base,
+        statuses,
     );
     render_pretty(&envelope)
 }

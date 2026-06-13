@@ -115,9 +115,22 @@ pub(super) struct AgentPacket<'a> {
     stop_conditions: &'static [&'static str],
 }
 
-impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
-    fn from(card: &'a ReviewCard) -> Self {
+impl<'a> AgentPacket<'a> {
+    /// Build a packet for `card`, overriding `comment_plan_status` with the
+    /// value computed by the comment-plan selection pass (SPEC-0032).
+    ///
+    /// Callers that have access to the full `AnalyzeOutput` must supply the
+    /// status from [`comment_plan::card_statuses`] so that the agent packet
+    /// projects the same `comment_plan_status` as `comment-plan.json` and
+    /// `cards.json`.  Callers without output context (e.g. `From<&ReviewCard>`)
+    /// pass `CommentPlanStatus::NotEligible` as the honest default.
+    pub(super) fn from_with_status(
+        card: &'a ReviewCard,
+        comment_plan_status: CommentPlanStatus,
+    ) -> Self {
         let repairs = packet_repair_projection(card);
+        let mut coverage_block = card.coverage_block();
+        coverage_block.comment_plan_status = comment_plan_status;
         Self {
             schema_version: "0.1",
             tool: "unsafe-review",
@@ -162,7 +175,7 @@ impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
             repair_scope: "this card only",
             witness_routes: card.routes.iter().map(AgentWitnessRoute::from).collect(),
             verify_commands: &card.next_action.verify_commands,
-            coverage: AgentCoverageBlock::from(card.coverage_block()),
+            coverage: AgentCoverageBlock::from(coverage_block),
             do_not_do: DO_NOT_DO,
             stop_conditions: &[
                 "the missing evidence is present or explicitly waived with owner and expiry",
@@ -171,6 +184,17 @@ impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
                 "the ReviewCard identity still maps to the same unsafe seam",
             ],
         }
+    }
+}
+
+impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
+    /// Build a packet without output context.
+    ///
+    /// `comment_plan_status` defaults to `NotEligible` because the selection
+    /// outcome is only computable from the full `AnalyzeOutput`.  Callers with
+    /// output context should use [`AgentPacket::from_with_status`] instead.
+    fn from(card: &'a ReviewCard) -> Self {
+        Self::from_with_status(card, CommentPlanStatus::NotEligible)
     }
 }
 

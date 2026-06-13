@@ -6,9 +6,10 @@
 
 use super::packet::AgentPacket;
 use super::{DO_NOT_DO, TRUST_BOUNDARY};
-use crate::domain::ReviewCard;
 use crate::domain::coverage::BaselineState;
+use crate::domain::{CardId, CommentPlanStatus, ReviewCard};
 use serde::Serialize;
+use std::collections::HashMap;
 
 /// The `mode` string stamped on the envelope (SPEC-0033).
 const MODE: &str = "file_range_scan";
@@ -68,8 +69,18 @@ impl<'a> FileRangeScanEnvelope<'a> {
         changed_only: bool,
         cards: Vec<&'a ReviewCard>,
         analyzed_base: &'a str,
+        statuses: &HashMap<CardId, CommentPlanStatus>,
     ) -> Self {
-        let packets = cards.into_iter().map(AgentPacket::from).collect();
+        let packets = cards
+            .into_iter()
+            .map(|card| {
+                let status = statuses
+                    .get(&card.id)
+                    .copied()
+                    .unwrap_or(CommentPlanStatus::NotEligible);
+                AgentPacket::from_with_status(card, status)
+            })
+            .collect();
         Self {
             schema_version: SCHEMA_VERSION,
             tool: "unsafe-review",
