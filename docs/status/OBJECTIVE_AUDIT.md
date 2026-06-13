@@ -61,7 +61,7 @@ The active calibration rail is now recorded in
 `.rails/lanes/accuracy-calibration/implementation-plan.md`,
 `policy/accuracy-calibration.toml`, and
 `docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 40
-fixture-pinned claims, 577 calibration cases, 40 label ledgers, and 575 label
+fixture-pinned claims, 578 calibration cases, 40 label ledgers, and 575 label
 samples. It records zero dogfood-measured, labeled-calibrated, or
 policy-eligible claims. That is intentional: the current report is a
 claim-scoped fixture-pinned proof index, not a global precision/recall result

@@ -430,6 +430,7 @@ required_core_fixtures = [
   "transmute_layout_size_guard",
   "transmute_layout_only_not_guard",
   "transmute_all_obligations_met",
+  "multiline_transmute_all_obligations_met",
   "transmute_layout_conjunct_branch_guard",
   "transmute_layout_disjunct_branch_not_guard",
   "transmute_layout_mismatch_return_guard",
@@ -4852,6 +4853,16 @@ expected_hazard = "invalid_value"
 fixture = "transmute_all_obligations_met"
 kind = "positive"
 claim = "transmute::<u8, bool> with both size_of layout and value <= 1 range assertions discharges both obligations and yields guarded_unwitnessed"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guarded_unwitnessed"
+expected_operation_family = "transmute"
+expected_hazard = "invalid_value"
+
+[[cases]]
+fixture = "multiline_transmute_all_obligations_met"
+kind = "positive"
+claim = "multi-line transmute::<u8, bool> with both size_of layout and value <= 1 range assertions yields guarded_unwitnessed; syntax site wins over incomplete fallback line so guards are credited"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"

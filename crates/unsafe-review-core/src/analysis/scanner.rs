@@ -8,7 +8,8 @@ use super::static_mut::{is_static_mut_item, parse_static_mut_name};
 use super::syntax::{ParsedSource, SyntaxNodeFact};
 use super::target_feature::is_target_feature_attribute;
 use super::transmute_operation::{
-    is_incomplete_multiline_transmute_copy, transmute_operation_family,
+    is_incomplete_multiline_transmute, is_incomplete_multiline_transmute_copy,
+    transmute_operation_family,
 };
 use super::unsafe_impl::{parse_impl_owner, parse_impl_trait_name};
 use super::unwrap_operation::unwrap_operation_family;

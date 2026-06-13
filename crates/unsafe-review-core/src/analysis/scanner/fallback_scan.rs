@@ -1,7 +1,7 @@
 use super::{
-    ScannedSite, detect_site, is_incomplete_multiline_transmute_copy, line_for_text_detection,
-    scan_site, site_key, syntax_operation_covers_fallback, syntax_scan::SyntaxSiteIndex,
-    syntax_site_covers_fallback,
+    ScannedSite, detect_site, is_incomplete_multiline_transmute,
+    is_incomplete_multiline_transmute_copy, line_for_text_detection, scan_site, site_key,
+    syntax_operation_covers_fallback, syntax_scan::SyntaxSiteIndex, syntax_site_covers_fallback,
 };
 use crate::domain::{OperationFamily, UnsafeSiteKind};
 use crate::input::diff::DiffIndex;
@@ -77,6 +77,10 @@ fn fallback_is_shadowed_by_syntax(input: FallbackShadowInput<'_>) -> bool {
         || (*input.kind == UnsafeSiteKind::Operation
             && *input.family == OperationFamily::Transmute
             && is_incomplete_multiline_transmute_copy(input.detection_trimmed)
+            && syntax_operation_covers_fallback(input.syntax_sites, input.line_no, input.family))
+        || (*input.kind == UnsafeSiteKind::Operation
+            && *input.family == OperationFamily::Transmute
+            && is_incomplete_multiline_transmute(input.detection_trimmed)
             && syntax_operation_covers_fallback(input.syntax_sites, input.line_no, input.family))
         || (*input.kind == UnsafeSiteKind::UnsafeBlock
             && *input.family == OperationFamily::Unknown
