@@ -366,6 +366,168 @@ fn cargo_bin_policy_violation_exits_1_not_2() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// Bug A regression: a capped repo scan must report stop_reason=max_cards and exit 0
+/// even when `--timeout-seconds` is supplied.  Before the fix, the timed_out()
+/// guard could fire on the terminal capped event (stop_reason=MaxCards) if the
+/// timeout clock elapsed by the time that event arrived, causing the scan to be
+/// mislabelled as stop_reason=timeout and exit 2.
+#[test]
+fn repo_capped_scan_reports_max_cards_not_timeout() -> Result<(), Box<dyn Error>> {
+    // Build a temp fixture with two unsafe files so --max-cards=1 stops early.
+    let temp = TempDir::new("unsafe-review-cli-capped-timeout-e2e")?;
+    let scan_root = temp.path().join("fixture");
+    fs::create_dir_all(scan_root.join("src"))?;
+    fs::write(
+        scan_root.join("Cargo.toml"),
+        "[package]\nname = \"capped-timeout-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+    )?;
+    fs::write(
+        scan_root.join("src/lib.rs"),
+        "pub unsafe fn alpha(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+    )?;
+    fs::write(
+        scan_root.join("src/beta.rs"),
+        "pub unsafe fn beta(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+    )?;
+
+    let report_path = temp.path().join("repo.json");
+    let status_path = temp.path().join("repo.json.status.json");
+
+    // A capped scan must exit 0 (not 2), even with --timeout-seconds supplied.
+    let output = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("repo")
+        .arg("--root")
+        .arg(&scan_root)
+        .arg("--format")
+        .arg("json")
+        .arg("--out")
+        .arg(&report_path)
+        .arg("--max-cards")
+        .arg("1")
+        .arg("--timeout-seconds")
+        .arg("300")
+        .output()?;
+
+    assert!(
+        output.status.success(),
+        "capped scan must exit 0 (not tool-error 2): status={:?}\nstderr:\n{}\nstdout:\n{}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stderr),
+        String::from_utf8_lossy(&output.stdout),
+    );
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "capped scan must exit 0, not 1 or 2"
+    );
+
+    // Status sidecar must carry stop_reason=max_cards, not timeout.
+    assert!(
+        status_path.exists(),
+        "capped scan must write a status sidecar"
+    );
+    let status_json = fs::read_to_string(&status_path)?;
+    let status: Value = serde_json::from_str(&status_json)?;
+    assert_eq!(
+        status["stop_reason"], "max_cards",
+        "capped scan stop_reason must be max_cards, not timeout or error: {}",
+        status_json
+    );
+    assert_eq!(
+        status["phase"], "complete",
+        "capped scan phase must be complete: {status_json}"
+    );
+    assert_eq!(
+        status["operator"]["state"], "capped",
+        "capped scan operator state must be capped: {status_json}"
+    );
+    assert_eq!(
+        status["operator"]["downstream_consumable"], true,
+        "capped scan must be downstream-consumable: {status_json}"
+    );
+
+    Ok(())
+}
+
+/// Bug B regression: the capped arm of the repo-scan operator guidance must
+/// describe card-level truncation (all files scanned, card list capped), not
+/// file-level truncation (which only applies to genuinely file-truncated paths).
+/// Under `--max-cards`, all files ARE scanned — only the card list is trimmed.
+#[test]
+fn repo_capped_scan_operator_json_uses_card_level_wording() -> Result<(), Box<dyn Error>> {
+    // Build a temp fixture with two unsafe files; cap at 1 card.
+    let temp = TempDir::new("unsafe-review-cli-capped-wording-e2e")?;
+    let scan_root = temp.path().join("fixture");
+    fs::create_dir_all(scan_root.join("src"))?;
+    fs::write(
+        scan_root.join("Cargo.toml"),
+        "[package]\nname = \"capped-wording-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+    )?;
+    fs::write(
+        scan_root.join("src/lib.rs"),
+        "pub unsafe fn alpha(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+    )?;
+    fs::write(
+        scan_root.join("src/beta.rs"),
+        "pub unsafe fn beta(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+    )?;
+
+    let report_path = temp.path().join("repo.json");
+    let status_path = temp.path().join("repo.json.status.json");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("repo")
+        .arg("--root")
+        .arg(&scan_root)
+        .arg("--format")
+        .arg("json")
+        .arg("--out")
+        .arg(&report_path)
+        .arg("--max-cards")
+        .arg("1")
+        .output()?;
+
+    assert!(
+        output.status.success(),
+        "capped scan must exit 0: status={:?}\nstderr:\n{}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    assert!(
+        status_path.exists(),
+        "capped scan must write a status sidecar"
+    );
+    let status_json = fs::read_to_string(&status_path)?;
+    let status: Value = serde_json::from_str(&status_json)?;
+
+    let limitation = status["operator"]["partial_report_limitation"]
+        .as_str()
+        .unwrap_or("");
+    // Card-level wording: all files were scanned; the cap applies to the card list.
+    assert!(
+        limitation.contains("All files scanned"),
+        "capped operator limitation must say all files were scanned (card-level, not file-level): {limitation}"
+    );
+    assert!(
+        limitation.contains("card list truncated") || limitation.contains("--max-cards"),
+        "capped operator limitation must describe card list truncation: {limitation}"
+    );
+    assert!(
+        limitation.contains("cap=1"),
+        "capped operator limitation must embed the configured cap value: {limitation}"
+    );
+    // Must NOT use the old file-level snapshot wording.
+    assert!(
+        !limitation.contains("Completed-file snapshot only"),
+        "capped operator limitation must not use file-level snapshot wording: {limitation}"
+    );
+
+    Ok(())
+}
+
 fn assert_contains(haystack: &str, needle: &str) {
     assert!(
         haystack.contains(needle),

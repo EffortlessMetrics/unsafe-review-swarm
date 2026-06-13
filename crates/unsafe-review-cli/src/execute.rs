@@ -668,6 +668,13 @@ impl RepoStatusReporter {
     }
 
     fn timed_out(&self, status: &RepoScanStatus) -> bool {
+        // A capped scan (stop_reason == MaxCards) is a terminal success, not a
+        // timeout, even if the timeout clock has elapsed by the time the final
+        // capped event arrives.  Only treat a non-terminal, non-capped status as
+        // timed-out to avoid misreporting a successful max-cards run as timeout.
+        if status.stop_reason == RepoStopReason::MaxCards {
+            return false;
+        }
         !status.completed
             && self
                 .timeout
@@ -1077,17 +1084,29 @@ fn repo_status_operator_json(
     // and terminated states do not.  This is routing metadata only — it is not a
     // memory-safety, UB-free, Miri-clean, site-execution, calibrated, or proof claim.
     let downstream_consumable = matches!(state, "complete" | "capped");
-    let partial_report_limitation = match (state, partial_report_available) {
+    // `partial_report_limitation` uses card-level wording for the capped arm
+    // (all files were scanned; only the card list is truncated to `--max-cards`)
+    // and file-level wording only for genuinely file-truncated paths.
+    let partial_report_limitation: String = match (state, partial_report_available) {
         ("complete", _) => {
-            "No partial report is retained after a successful scan; use the final report for the recorded scan scope."
+            "No partial report is retained after a successful scan; use the final report for the recorded scan scope.".to_string()
         }
-        ("capped", _) => "Completed-file snapshot only; not complete repo posture.",
+        ("capped", _) => {
+            // All files were scanned; the card list was truncated at the cap.
+            // This is not file-level truncation — no files were skipped.
+            match cap {
+                Some(n) => format!(
+                    "All files scanned; card list truncated to --max-cards (cap={n})."
+                ),
+                None => "All files scanned; card list truncated to --max-cards cap.".to_string(),
+            }
+        }
         ("in_progress", _) => {
-            "No partial report is retained; the scan has not yet produced output."
+            "No partial report is retained; the scan has not yet produced output.".to_string()
         }
-        (_, true) => "Completed-file snapshot only; not complete repo posture.",
+        (_, true) => "Completed-file snapshot only; not complete repo posture.".to_string(),
         _ => {
-            "No completed-file partial report was retained; the status sidecar is the durable incomplete-scan artifact."
+            "No completed-file partial report was retained; the status sidecar is the durable incomplete-scan artifact.".to_string()
         }
     };
     let next_action = match (state, partial_report_available) {
@@ -3415,11 +3434,13 @@ fn print_candidate_help() {
 #[cfg(test)]
 mod tests {
     use super::{
-        RepoScanScopeMetadata, render_repo_scan_incomplete_status, resolve_diff_path,
-        writable_status, yes_no,
+        RepoScanScopeMetadata, render_repo_scan_incomplete_status, render_repo_scan_status,
+        repo_status_operator_json, resolve_diff_path, writable_status, yes_no,
     };
     use std::path::{Path, PathBuf};
-    use unsafe_review_core::{DiscoveryOptions, RepoStopReason};
+    use unsafe_review_core::{
+        DiscoveryOptions, PerFileScanStats, RepoScanPhase, RepoScanStatus, RepoStopReason,
+    };
 
     fn test_scan_scope() -> RepoScanScopeMetadata {
         RepoScanScopeMetadata::new(Path::new("/tmp/repo"), &DiscoveryOptions::repo_defaults())
@@ -3500,5 +3521,117 @@ mod tests {
         assert_eq!(yes_no(false), "no");
         assert_eq!(writable_status(true), "writable");
         assert_eq!(writable_status(false), "not writable");
+    }
+
+    /// Bug A regression: `repo_status_operator_json` for the "capped" state must
+    /// use card-level wording (all files scanned, card list truncated) rather than
+    /// file-level truncation wording.  The cap value must appear in the limitation.
+    #[test]
+    fn capped_operator_json_uses_card_level_wording() {
+        let op = repo_status_operator_json("capped", None, Some(3));
+        let limitation = op["partial_report_limitation"].as_str().unwrap_or("");
+        assert!(
+            limitation.contains("All files scanned"),
+            "capped limitation must say all files were scanned (not file-level truncation): {limitation}"
+        );
+        assert!(
+            limitation.contains("card list truncated"),
+            "capped limitation must say card list was truncated: {limitation}"
+        );
+        assert!(
+            limitation.contains("cap=3") || limitation.contains("3"),
+            "capped limitation must include the cap value: {limitation}"
+        );
+        assert!(
+            !limitation.contains("Completed-file snapshot only"),
+            "capped limitation must not use file-level snapshot wording: {limitation}"
+        );
+        // downstream_consumable must remain true for capped scans.
+        assert_eq!(
+            op["downstream_consumable"], true,
+            "capped scan must remain downstream-consumable"
+        );
+    }
+
+    /// Bug A regression: a capped-success status (stop_reason=MaxCards) must not be
+    /// treated as a timeout by `render_repo_scan_status`, even if the timeout clock
+    /// has elapsed.  This covers the `timed_out()` guard on the MaxCards terminal state.
+    ///
+    /// We verify via the rendered JSON that a MaxCards status produces
+    /// state="capped" (not "failed") and stop_reason="max_cards" (not "timeout").
+    #[test]
+    fn capped_status_json_is_not_labelled_as_timeout() -> Result<(), String> {
+        let scope = test_scan_scope();
+        let status = RepoScanStatus {
+            schema_version: "repo-scan-status/v1".to_string(),
+            phase: RepoScanPhase::Complete,
+            elapsed_ms: 5000,
+            files_discovered: 10,
+            files_scanned: 5,
+            cards_found: 1,
+            last_path: None,
+            completed: false,
+            partial: true,
+            stop_reason: RepoStopReason::MaxCards,
+            cap: Some(1),
+            file_timings: None,
+            output_bytes: None,
+        };
+        let rendered = render_repo_scan_status(&status, &scope)?;
+        let value: serde_json::Value = serde_json::from_str(&rendered)
+            .map_err(|err| format!("parse capped status failed: {err}"))?;
+        assert_eq!(
+            value["stop_reason"], "max_cards",
+            "capped status must carry stop_reason=max_cards, not timeout"
+        );
+        assert_eq!(
+            value["operator"]["state"], "capped",
+            "capped status operator state must be 'capped', not 'failed'"
+        );
+        assert_eq!(
+            value["operator"]["downstream_consumable"], true,
+            "capped scan must be downstream-consumable"
+        );
+        let limitation = value["operator"]["partial_report_limitation"]
+            .as_str()
+            .unwrap_or("");
+        assert!(
+            limitation.contains("All files scanned"),
+            "capped limitation must use card-level wording: {limitation}"
+        );
+        Ok(())
+    }
+
+    /// Verify that `render_repo_scan_status` on a capped status with cap=N embeds
+    /// the actual cap value in the operator limitation string.
+    #[test]
+    fn capped_operator_limitation_embeds_cap_value() -> Result<(), String> {
+        let scope = test_scan_scope();
+        let status = RepoScanStatus {
+            schema_version: "repo-scan-status/v1".to_string(),
+            phase: RepoScanPhase::Complete,
+            elapsed_ms: 100,
+            files_discovered: 4,
+            files_scanned: 4,
+            cards_found: 7,
+            last_path: None,
+            completed: false,
+            partial: true,
+            stop_reason: RepoStopReason::MaxCards,
+            cap: Some(7),
+            file_timings: Some(Vec::<PerFileScanStats>::new()),
+            output_bytes: None,
+        };
+        let rendered = render_repo_scan_status(&status, &scope)?;
+        let value: serde_json::Value = serde_json::from_str(&rendered)
+            .map_err(|err| format!("parse capped status failed: {err}"))?;
+        let limitation = value["operator"]["partial_report_limitation"]
+            .as_str()
+            .unwrap_or("");
+        assert!(
+            limitation.contains("cap=7") || limitation.contains("7"),
+            "limitation must embed the cap value 7: {limitation}"
+        );
+        Ok(())
     }
 }
