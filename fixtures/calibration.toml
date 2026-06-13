@@ -292,6 +292,7 @@ required_core_fixtures = [
   "ptr_copy_slice_range_shadowed_dst_path_not_guard",
   "ptr_copy_slice_range_shadowed_dst_not_guard",
   "ptr_copy_other_len_not_guard",
+  "multiline_ptr_copy",
   "ptr_replace_value",
   "copy_nonoverlapping",
   "copy_nonoverlapping_slice_range_guard",
@@ -386,6 +387,8 @@ required_core_fixtures = [
   "str_from_utf8_unchecked_match_ok_shadowed_not_guard",
   "zeroed_invalid_value",
   "zeroed_valid_u32",
+  "zeroed_definition_no_cards",
+  "zeroed_call_still_cards",
   "inline_asm_human_review",
   "raw_pointer_read_volatile",
   "raw_pointer_read_len_capacity_assert",
@@ -411,6 +414,8 @@ required_core_fixtures = [
   "pointer_arithmetic_disjunct_bounds_not_guard",
   "pointer_arithmetic_closed_branch_not_guard",
   "pointer_arithmetic_slice_end",
+  "pointer_arithmetic_safe_method_add_no_cards",
+  "pointer_arithmetic_unsafe_fn_offset",
   "slice_from_raw_parts_mut",
   "slice_from_raw_parts_mut_maybeuninit",
   "slice_from_raw_parts_mut_other_maybeuninit_not_guard",
@@ -482,6 +487,8 @@ required_core_fixtures = [
   "unsafe_impl_send_generic_owner",
   "unsafe_impl_sync_generic_bound",
   "unsafe_impl_send_owner_substring_not_reached",
+  "reach_production_ref_in_test_file_not_reached",
+  "reach_owner_called_in_cfg_test_reached",
   "unsafe_impl_custom_trait_not_send_sync",
   "unsafe_impl_custom_trait_contract_not_guard",
   "ffi_sanitizer_route",
@@ -547,6 +554,7 @@ required_core_fixtures = [
   "macro_rules_owner_inference",
   "nested_unsafe_operation_call_dedupe",
   "adjacent_unchanged_unsafe_fn_no_card",
+  "unsafe_fn_pointer_field_no_cards",
   "js_buffer_reentry_sync_compression",
   "js_buffer_reentry_async_helper_capture",
   "js_buffer_reentry_node_fs_rab_scalar_write",
@@ -3937,6 +3945,16 @@ expected_operation_family = "ptr_copy"
 expected_hazard = "bounds"
 
 [[cases]]
+fixture = "multiline_ptr_copy"
+kind = "positive"
+claim = "multi-line ptr::copy call split across lines yields the full call snippet; syntax site wins over the truncated fallback opener line so the card snippet is complete"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "bounds"
+
+[[cases]]
 fixture = "ptr_replace_value"
 kind = "positive"
 claim = "ptr::replace reports read-write pointer and drop-ownership obligations instead of a generic unsafe function call"
@@ -4427,6 +4445,23 @@ expected_operation_family = "zeroed"
 expected_hazard = "invalid_value"
 
 [[cases]]
+fixture = "zeroed_definition_no_cards"
+kind = "false_positive_control"
+claim = "a safe fn zeroed() definition is not carded as a mem::zeroed call"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
+
+[[cases]]
+fixture = "zeroed_call_still_cards"
+kind = "positive"
+claim = "mem::zeroed call inside a function body still produces a review card after definition-header fix"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "unsafe_unreached"
+expected_operation_family = "zeroed"
+expected_hazard = "invalid_value"
+
+[[cases]]
 fixture = "inline_asm_human_review"
 kind = "positive"
 claim = "inline asm reports assembly/target hazards and routes to human review instead of a generic unsafe function call"
@@ -4673,6 +4708,23 @@ claim = "pointer arithmetic recognizes slice start plus same-slice len end-point
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
+expected_operation_family = "pointer_arithmetic"
+expected_hazard = "bounds"
+
+[[cases]]
+fixture = "pointer_arithmetic_safe_method_add_no_cards"
+kind = "false_positive_control"
+claim = "pointer arithmetic does not card safe inherent .add() methods outside any unsafe scope"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
+
+[[cases]]
+fixture = "pointer_arithmetic_unsafe_fn_offset"
+kind = "positive"
+claim = "pointer arithmetic cards .add() on a raw pointer inside an unsafe fn body"
+support_tier = "Core operation smoke slice"
+expected_cards = 2
+expected_class = "guard_missing"
 expected_operation_family = "pointer_arithmetic"
 expected_hazard = "bounds"
 
@@ -5387,6 +5439,26 @@ expected_operation_family = "unsafe_impl_send_sync"
 expected_hazard = "send_sync_invariant"
 
 [[cases]]
+fixture = "reach_production_ref_in_test_file_not_reached"
+kind = "false_positive_control"
+claim = "owner mentioned only in production code above an inline test module must NOT credit test reach"
+support_tier = "Witness routing"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+
+[[cases]]
+fixture = "reach_owner_called_in_cfg_test_reached"
+kind = "positive"
+claim = "owner mentioned inside a #[cfg(test)] mod tests block credits test reach"
+support_tier = "Witness routing"
+expected_cards = 1
+expected_class = "requires_loom"
+expected_operation_family = "unsafe_impl_send_sync"
+expected_hazard = "send_sync_invariant"
+
+[[cases]]
 fixture = "unsafe_impl_custom_trait_not_send_sync"
 kind = "false_positive_control"
 claim = "custom unsafe trait impls do not receive Send/Sync concurrency witness routing"
@@ -6008,6 +6080,13 @@ expected_hazard = "pointer_validity"
 fixture = "adjacent_unchanged_unsafe_fn_no_card"
 kind = "false_positive_control"
 claim = "adjacent unchanged unsafe declarations do not emit cards when a neighboring safe function changes"
+support_tier = "Diff unsafe site inventory"
+expected_cards = 0
+
+[[cases]]
+fixture = "unsafe_fn_pointer_field_no_cards"
+kind = "false_positive_control"
+claim = "an unsafe fn-pointer type in a struct field position does not produce a ReviewCard"
 support_tier = "Diff unsafe site inventory"
 expected_cards = 0
 

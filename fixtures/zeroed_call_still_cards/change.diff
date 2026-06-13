@@ -1,0 +1,8 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,4 @@
++pub fn make_zeroed_value() -> u8 {
++    // SAFETY: zero is a valid bit pattern for u8.
++    unsafe { core::mem::zeroed::<u8>() }
++}

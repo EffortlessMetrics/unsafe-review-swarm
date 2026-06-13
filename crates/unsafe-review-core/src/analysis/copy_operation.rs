@@ -13,6 +13,28 @@ pub(super) fn copy_operation_family(line: &str) -> Option<OperationFamily> {
     None
 }
 
+/// Returns `true` when `line` is the first physical line of a multi-line
+/// `ptr::copy`, `copy_nonoverlapping`, or `ptr::replace` call whose arguments
+/// continue on subsequent lines.  The open-paren ends the line and there is no
+/// matching close-paren, so the fallback scanner would claim a truncated snippet.
+/// The syntax site (which spans the full call) should win instead.
+pub(super) fn is_incomplete_multiline_copy(line: &str) -> bool {
+    let compact = compact_whitespace(line);
+    // Opener ends with the call name + open-paren, args are on later lines —
+    // so compact text ends with `(` and contains no `)`.
+    let ends_with_opener = compact.ends_with("ptr::copy(")
+        || compact.ends_with("core::ptr::copy(")
+        || compact.ends_with("std::ptr::copy(")
+        || compact.ends_with("copy_nonoverlapping(")
+        || compact.ends_with("ptr::copy_nonoverlapping(")
+        || compact.ends_with("core::ptr::copy_nonoverlapping(")
+        || compact.ends_with("std::ptr::copy_nonoverlapping(")
+        || compact.ends_with("ptr::replace(")
+        || compact.ends_with("core::ptr::replace(")
+        || compact.ends_with("std::ptr::replace(");
+    ends_with_opener && !compact.contains(')')
+}
+
 fn is_ptr_copy_call(line: &str) -> bool {
     let compact = compact_whitespace(line);
     !compact.contains("copy_nonoverlapping")

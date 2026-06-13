@@ -1,0 +1,222 @@
+[
+  {
+    "id": "UR-pointer-arithmetic-unsafe-fn-offset-src-lib-rs-advance-unsafe_fn-unknown-advance-bb1f3d9fee88-unknown-c1",
+    "class": "unsafe_unreached",
+    "priority": "medium",
+    "confidence": "medium",
+    "proof_path": "human_review_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 5,
+      "column": 1,
+      "kind": "unsafe_fn",
+      "owner": "advance",
+      "visibility": "public",
+      "public_api_surface": true,
+      "snippet": "pub unsafe fn advance(ptr: *const u8, i: usize) -> *const u8 {"
+    },
+    "operation": "pub unsafe fn advance(ptr: *const u8, i: usize) -> *const u8 {",
+    "operation_family": "unknown",
+    "hazards": [
+      "unknown"
+    ],
+    "obligations": [
+      "unsafe contract could not be inferred from this syntax shape"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "unknown",
+        "description": "unsafe contract could not be inferred from this syntax shape",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `# Safety` documentation was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `advance` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `# Safety` documentation was detected",
+    "discharge": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration",
+    "reach": "No static test mention of owner `advance` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or identify a focused test path that reaches the safe wrapper around this unsafe seam.",
+    "verify_commands": [],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `unsafe_unreached` ReviewCard for `pub unsafe fn advance(ptr: *const u8, i: usize) -> *const u8 {`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+      },
+      "minimal_repro": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "steps": [
+          "Confirm ReviewCard `UR-pointer-arithmetic-unsafe-fn-offset-src-lib-rs-advance-unsafe_fn-unknown-advance-bb1f3d9fee88-unknown-c1` still maps to `pub unsafe fn advance(ptr: *const u8, i: usize) -> *const u8 {` at `src/lib.rs:5:1` before upgrading confidence.",
+          "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+          "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "present",
+      "guard_coverage": "present",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "not_eligible",
+      "agent_lsp_readiness": "needs_human"
+    }
+  },
+  {
+    "id": "UR-pointer-arithmetic-unsafe-fn-offset-src-lib-rs-advance-operation-pointer_arithmetic-add-f011e5c2d12e-same_allocation-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "proof_path": "source_route_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 6,
+      "column": 5,
+      "kind": "operation",
+      "owner": "advance",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "ptr.add(i)"
+    },
+    "operation": "ptr.add(i)",
+    "operation_family": "pointer_arithmetic",
+    "hazards": [
+      "same_allocation",
+      "bounds",
+      "aliasing_or_provenance"
+    ],
+    "obligations": [
+      "pointer arithmetic stays in-bounds or one-past inside the same allocation"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "bounds",
+        "description": "pointer arithmetic stays in-bounds or one-past inside the same allocation",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `# Safety` documentation was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No length or bounds guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `advance` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `# Safety` documentation was detected",
+    "discharge": "No visible local guard detected",
+    "reach": "No static test mention of owner `advance` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test advance",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test advance",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose the local guard that discharges the `pointer_arithmetic` safety obligation.",
+    "verify_commands": [
+      "cargo +nightly miri test advance",
+      "cargo +nightly careful test advance"
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `ptr.add(i)`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test advance",
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test advance` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test advance",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-pointer-arithmetic-unsafe-fn-offset-src-lib-rs-advance-operation-pointer_arithmetic-add-f011e5c2d12e-same_allocation-c1` still maps to `ptr.add(i)` at `src/lib.rs:6:5` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test advance` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo +nightly miri test advance` first, then attach a matching receipt if it confirms the route",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "present",
+      "guard_coverage": "missing",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "selected",
+      "agent_lsp_readiness": "ready"
+    }
+  }
+]

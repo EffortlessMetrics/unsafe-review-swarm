@@ -635,6 +635,7 @@ const FIXTURE_GOLDENS: &[&str] = &[
     "ptr_copy_slice_range_shadowed_dst_path_not_guard",
     "ptr_copy_slice_range_shadowed_dst_not_guard",
     "ptr_copy_other_len_not_guard",
+    "multiline_ptr_copy",
     "ptr_replace_value",
     "copy_nonoverlapping",
     "copy_nonoverlapping_slice_range_guard",
@@ -739,6 +740,8 @@ const FIXTURE_GOLDENS: &[&str] = &[
     "pointer_arithmetic_disjunct_bounds_not_guard",
     "pointer_arithmetic_closed_branch_not_guard",
     "pointer_arithmetic_slice_end",
+    "pointer_arithmetic_safe_method_add_no_cards",
+    "pointer_arithmetic_unsafe_fn_offset",
     "slice_from_raw_parts_mut",
     "slice_from_raw_parts_mut_maybeuninit",
     "slice_from_raw_parts_mut_other_maybeuninit_not_guard",
@@ -1012,6 +1015,7 @@ const FIXTURE_GOLDENS: &[&str] = &[
     "static_lifetime_mut_ref_not_static_mut",
     "pin_new_unchecked",
     "unsafe_fn_unknown_family_no_card",
+    "unsafe_fn_pointer_field_no_cards",
 ];
 
 /// Regenerate `expected.cards.json` for each named fixture (or all

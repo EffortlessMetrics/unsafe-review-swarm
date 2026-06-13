@@ -1,0 +1,142 @@
+[
+  {
+    "id": "UR-multiline-ptr-copy-src-lib-rs-shift-left-operation-ptr_copy-copy-5c4c0ea20879-pointer_validity-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "proof_path": "source_route_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 11,
+      "column": 9,
+      "kind": "operation",
+      "owner": "shift_left",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "core::ptr::copy( src, dst, count, )"
+    },
+    "operation": "core::ptr::copy( src, dst, count, )",
+    "operation_family": "ptr_copy",
+    "hazards": [
+      "pointer_validity",
+      "bounds",
+      "initialized_memory"
+    ],
+    "obligations": [
+      "both ranges are valid for count elements",
+      "source range is initialized for count elements"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "valid-range",
+        "description": "both ranges are valid for count elements",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No length or bounds guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `shift_left`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "initialized",
+        "description": "source range is initialized for count elements",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `shift_left`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "No visible local guard detected",
+    "reach": "1 related test file(s) mention owner `shift_left`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test shift_left",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test shift_left",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose local guards for these `ptr_copy` safety obligations: (1) both ranges are valid for count elements, (2) source range is initialized for count elements.",
+    "verify_commands": [
+      "cargo +nightly miri test shift_left",
+      "cargo +nightly careful test shift_left"
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `core::ptr::copy( src, dst, count, )`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test shift_left",
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test shift_left` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test shift_left",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-multiline-ptr-copy-src-lib-rs-shift-left-operation-ptr_copy-copy-5c4c0ea20879-pointer_validity-c1` still maps to `core::ptr::copy( src, dst, count, )` at `src/lib.rs:11:9` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test shift_left` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo +nightly miri test shift_left` first, then attach a matching receipt if it confirms the route",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "present",
+      "guard_coverage": "missing",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "selected",
+      "agent_lsp_readiness": "ready"
+    }
+  }
+]
