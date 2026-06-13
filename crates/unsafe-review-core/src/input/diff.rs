@@ -127,11 +127,16 @@ pub(crate) fn parse_unified_diff(input: &str) -> DiffIndex {
 }
 
 fn parse_new_start(header: &str) -> Option<usize> {
-    // @@ -old,count +new,count @@
-    let mut parts = header.split_whitespace();
-    let _at = parts.next()?;
-    let _old = parts.next()?;
-    let new = parts.next()?;
+    // Unified:  @@ -old,count +new,count @@
+    // Combined: @@@ -p1,count -p2,count +new,count @@@
+    //
+    // Locate the first whitespace token whose first character is `+` followed
+    // by a digit.  This is position-independent so it handles both unified and
+    // combined (N-way merge) hunk headers without hardcoding which slot the
+    // `+` range occupies.
+    let new = header
+        .split_whitespace()
+        .find(|t| t.starts_with('+') && t[1..].starts_with(|c: char| c.is_ascii_digit()))?;
     let new = new.trim_start_matches('+');
     let start = new.split(',').next()?;
     start.parse::<usize>().ok()
@@ -354,6 +359,73 @@ diff --git a/src/second.rs b/src/second.rs
 
         assert!(index.contains_file(&path));
         assert_eq!(index.changed_lines[&path], BTreeSet::from([1, 2]));
+    }
+
+    #[test]
+    fn parse_combined_diff_seeds_new_line_from_plus_range() {
+        // Combined (three-way merge) diff headers have the form:
+        //   @@@ -p1_start,p1_count -p2_start,p2_count +new_start,new_count @@@
+        // The `+` range is NOT the third token (that is the second `-` range).
+        // Verify that new_line is seeded from the `+` range so added lines
+        // land at the correct new-file coordinate instead of being dropped.
+        //
+        // The parser operates on the new-file coordinate.  In a combined diff
+        // the leading ` ` (context) and `+` (added) markers still work for the
+        // parser's purposes: context lines advance new_line, `+`-prefixed lines
+        // record at new_line and advance it.  We use a plain `+` added line
+        // here to exercise the recording path with a verified coordinate.
+        let diff = concat!(
+            "diff --cc src/lib.rs\n",
+            "index aaa,bbb..ccc 100644\n",
+            "--- a/src/lib.rs\n",
+            "+++ b/src/lib.rs\n",
+            "@@@ -10,4 -10,4 +10,5 @@@ fn demo()\n",
+            " context\n",
+            "+unsafe { ptr.read() }\n",
+        );
+        let path = PathBuf::from("src/lib.rs");
+        let index = parse_unified_diff(diff);
+
+        // new_line starts at 10 (seeded from `+10,5`).
+        // ` context` is a context line → new_line advances to 11.
+        // `+unsafe { ptr.read() }` is recorded at 11, new_line → 12.
+        assert!(index.contains_file(&path));
+        assert!(
+            index.changed_lines[&path].contains(&11),
+            "expected added line at coordinate 11, got {:?}",
+            index.changed_lines[&path],
+        );
+        // With the bug (new_line stale at 0), the line would land at 1 instead.
+        assert!(
+            !index.changed_lines[&path].contains(&1),
+            "coordinate 1 indicates new_line was not seeded from the + range",
+        );
+    }
+
+    #[test]
+    fn parse_new_start_finds_plus_range_in_combined_header() {
+        // Direct unit test for the parse_new_start helper with combined headers.
+        assert_eq!(
+            parse_new_start("@@@ -10,4 -10,4 +10,5 @@@"),
+            Some(10),
+            "combined header should seed from the + range",
+        );
+        assert_eq!(
+            parse_new_start("@@@ -1,3 -2,4 +5,7 @@@"),
+            Some(5),
+            "combined header: new-start is the + range, not a - range",
+        );
+        // Unified header must still parse identically.
+        assert_eq!(
+            parse_new_start("@@ -8,7 +8,8 @@ fn demo()"),
+            Some(8),
+            "unified header must still parse correctly",
+        );
+        assert_eq!(
+            parse_new_start("@@ -42 +42 @@ fn main()"),
+            Some(42),
+            "single-line unified header must still parse correctly",
+        );
     }
 
     fn diff_line_strategy() -> impl Strategy<Value = DiffLine> {
