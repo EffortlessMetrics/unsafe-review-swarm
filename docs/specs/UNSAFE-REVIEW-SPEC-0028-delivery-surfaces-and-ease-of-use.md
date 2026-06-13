@@ -211,6 +211,25 @@ claims (any LLM-authored text in a child spec fills bounded, identity-anchored
 slots with a forbidden-claims check, never free-write), or enable comment
 posting, witness execution, source edits, or blocking policy by default.
 
+## Rigor is the product
+
+On real code, a "false-positive feel" is often disagreement with *intentional*
+rigor rather than a misclassification. Three common cases:
+
+- `comment ≠ guard` — a `// SAFETY:` annotation does not discharge a
+  guard-level obligation; cards that reflect this are correct, not noisy.
+- Restricted-visibility (`pub(crate)`, `pub(super)`) unsafe fns still owe a
+  documented contract; per-declaration owner cards for these are by design.
+- Per-declaration `unsafe fn` owner cards are emitted for each declaration;
+  this is the correct coverage unit.
+
+Before "fixing" perceived noise, distinguish a **true false positive** (a card
+on genuinely-discharged unsafe, where all obligations are met and the evidence
+engine missed the evidence) from a request to **weaken a correct stance** (the
+card is accurate, but stricter than the reviewer expected). Weakening rigor to
+reduce perceived noise erodes the instrument; such changes are product-stance
+decisions requiring deliberate review, not routine bug fixes.
+
 ## Trust boundary
 
 Ease of use must not erode honesty. Each surface ships the boundary it projects

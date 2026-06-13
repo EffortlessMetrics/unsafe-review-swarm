@@ -152,3 +152,12 @@ inertia. Candidates this lane surfaced:
 Everything here is a characterization on a controlled corpus — explicitly
 **not** a zero-false-positive, calibrated precision/recall, or safety-proof
 claim.
+
+## Real validation beats synthetic; run per release
+
+Fixtures pass by construction and `check-pr` is a dev-tree gate only. The
+**live Action smoke** (installing the published binary from crates.io and
+running it against a real diff) and the **real-crate dogfood run** are what
+surface framing issues, selection gaps, and version-skew problems that
+controlled fixtures cannot reach. Both should be run each release cycle before
+promotion to the public repo.

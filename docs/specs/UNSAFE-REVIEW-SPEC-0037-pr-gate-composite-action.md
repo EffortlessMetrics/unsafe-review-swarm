@@ -212,7 +212,21 @@ The action may fail for the following reasons:
   `.github/actions/unsafe-review-first-pr`, triggers on `workflow_dispatch`,
   and asserts that `bundle_dir` and `gate_status` are set.
 
-## 11. CI proof
+## 11. Version-skew rule
+
+The action installs the **pinned published** crates.io version (the `version`
+input, default `0.3.6`). Its required-artifact verify must therefore match what
+**that version** emits — not the dev-tree tip.
+
+Concrete rule: bundle artifacts added to the dev tree after the pinned published
+release must be verified **only if present** (`if-present` / `test -f`), not
+hard-required. Hard-requiring a new artifact causes the action to fail for
+callers on the old published version until a new release ships the artifact.
+
+The live smoke test catches this skew. Shipping dev-tree improvements to action
+users requires a new release — the fix is a release, not a weaker verify.
+
+## 12. CI proof
 
 ```bash
 cargo run --locked -p xtask -- check-docs
@@ -220,7 +234,7 @@ cargo run --locked -p xtask -- check-spec-status
 cargo run --locked -p xtask -- check-pr
 ```
 
-## 12. Lifecycle status
+## 13. Lifecycle status
 
 Accepted (2026-06-13). All criteria met:
 
