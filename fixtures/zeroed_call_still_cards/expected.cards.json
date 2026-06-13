@@ -1,0 +1,117 @@
+[
+  {
+    "id": "UR-zeroed-call-still-cards-src-lib-rs-make-zeroed-value-operation-zeroed-u8-8035c528bc61-invalid_value-c1",
+    "class": "unsafe_unreached",
+    "priority": "medium",
+    "confidence": "medium",
+    "proof_path": "helper_gated",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 3,
+      "column": 5,
+      "kind": "operation",
+      "owner": "make_zeroed_value",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { core::mem::zeroed::<u8>() }"
+    },
+    "operation": "unsafe { core::mem::zeroed::<u8>() }",
+    "operation_family": "zeroed",
+    "hazards": [
+      "invalid_value",
+      "layout_or_repr",
+      "aliasing_or_provenance"
+    ],
+    "obligations": [
+      "all-zero bit pattern is a valid value for the target type"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "valid-zero",
+        "description": "all-zero bit pattern is a valid value for the target type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Known valid-zero target type evidence was detected before zeroed"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `make_zeroed_value` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "All inferred safety obligations have visible local discharge evidence",
+    "reach": "No static test mention of owner `make_zeroed_value` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test make_zeroed_value",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test make_zeroed_value",
+        "required": false
+      }
+    ],
+    "missing": [
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or identify a focused test path that reaches the safe wrapper around this unsafe seam.",
+    "verify_commands": [
+      "cargo +nightly miri test make_zeroed_value",
+      "cargo +nightly careful test make_zeroed_value"
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `unsafe_unreached` ReviewCard for `unsafe { core::mem::zeroed::<u8>() }`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test make_zeroed_value",
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test make_zeroed_value` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test make_zeroed_value",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-zeroed-call-still-cards-src-lib-rs-make-zeroed-value-operation-zeroed-u8-8035c528bc61-invalid_value-c1` still maps to `unsafe { core::mem::zeroed::<u8>() }` at `src/lib.rs:3:5` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test make_zeroed_value` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo +nightly miri test make_zeroed_value` first, then attach a matching receipt if it confirms the route",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "present",
+      "guard_coverage": "present",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "not_eligible",
+      "agent_lsp_readiness": "ready"
+    }
+  }
+]
