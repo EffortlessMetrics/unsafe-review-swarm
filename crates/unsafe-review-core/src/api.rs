@@ -6,6 +6,7 @@ use crate::output::{
     policy_report, receipt_audit, repair_queue, sarif, usefulness_telemetry, witness_plan,
 };
 use crate::util::path_display;
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -252,6 +253,11 @@ pub struct AnalyzeOutput {
     pub policy: PolicyMode,
     pub summary: Summary,
     pub cards: Vec<ReviewCard>,
+    /// On a diff-scoped run, the set of candidate files that were scanned.
+    /// Empty for full-scan (repo-mode) runs.  Used to distinguish "baseline
+    /// card resolved because we scanned its file and it is gone" from "baseline
+    /// card not present because its file was out of diff scope" (SPEC-0030).
+    pub diff_scoped_files: BTreeSet<PathBuf>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

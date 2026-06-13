@@ -2530,6 +2530,7 @@ mod tests {
                 ..Default::default()
             },
             cards: Vec::new(),
+            diff_scoped_files: std::collections::BTreeSet::new(),
         };
         let check = CheckOptions {
             root: Path::new("fixtures/safe_code_no_cards").to_path_buf(),

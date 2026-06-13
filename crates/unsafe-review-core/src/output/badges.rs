@@ -88,6 +88,7 @@ mod tests {
     use crate::api::{
         AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, PolicyMode, Scope, Summary,
     };
+    use std::collections::BTreeSet;
     use std::path::PathBuf;
 
     #[test]
@@ -175,6 +176,7 @@ mod tests {
                 ..Summary::default()
             },
             cards: Vec::new(),
+            diff_scoped_files: BTreeSet::new(),
         };
         let (main, plus) = render(&output);
         let main = parse_json(&main)?;
@@ -237,6 +239,7 @@ mod tests {
                 ..Summary::default()
             },
             cards: Vec::new(),
+            diff_scoped_files: BTreeSet::new(),
         };
         let (main, plus) = render(&output);
         let main = parse_json(&main)?;
@@ -291,6 +294,7 @@ mod tests {
                 ..Summary::default()
             },
             cards: Vec::new(),
+            diff_scoped_files: BTreeSet::new(),
         };
         let (main, _plus) = render(&output);
         let main = parse_json(&main)?;
@@ -327,6 +331,7 @@ mod tests {
                 ..Summary::default()
             },
             cards: Vec::new(),
+            diff_scoped_files: BTreeSet::new(),
         };
         let (main, _plus) = render(&output);
         let main = parse_json(&main)?;
@@ -364,6 +369,7 @@ mod tests {
                 ..Summary::default()
             },
             cards: Vec::new(),
+            diff_scoped_files: BTreeSet::new(),
         };
         let (main, plus) = render(&output);
         let main = parse_json(&main)?;
@@ -401,6 +407,7 @@ mod tests {
                 ..Summary::default()
             },
             cards: Vec::new(),
+            diff_scoped_files: BTreeSet::new(),
         };
         let (main, plus) = render(&output);
         assert_badge_endpoint_contract("unsafe-review", "unsafe_review", &main)?;

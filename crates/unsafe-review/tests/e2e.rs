@@ -7970,3 +7970,100 @@ impl Drop for TempDir {
         let _ = fs::remove_dir_all(&self.path);
     }
 }
+
+// SPEC-0030 §diff-scope: on a diff-scoped run, baseline cards whose file was NOT in the
+// candidate set must be counted as `inherited`, not `resolved`.
+//
+// This test builds a two-file repo, captures a full baseline (both files), then runs a
+// diff-scoped check where only `src/a.rs` is in the diff.  The `src/b.rs` card must NOT
+// appear as `resolved_gaps=1` — it was never scanned, so the PR cannot claim it was fixed.
+//
+// Expected shape: resolved_gaps=0, inherited_gaps=4 (2 per file, 2 files), new_gaps=0.
+#[test]
+fn diff_scoped_run_does_not_count_unscanned_baseline_cards_as_resolved()
+-> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-scope-guard-e2e")?;
+    let root = temp.path().join("two-file-repo");
+    fs::create_dir_all(root.join("src"))?;
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"two-file-repo\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+    )?;
+    // Two files each with a raw pointer deref — both will generate cards on a full scan.
+    fs::write(
+        root.join("src/a.rs"),
+        "pub unsafe fn op_a(ptr: *const u32) -> u32 {\n    // Safety: caller guarantees ptr is valid\n    unsafe { *ptr }\n}\n",
+    )?;
+    fs::write(
+        root.join("src/b.rs"),
+        "pub unsafe fn op_b(ptr: *const u64) -> u64 {\n    // Safety: caller guarantees ptr is valid\n    unsafe { *ptr }\n}\n",
+    )?;
+
+    // Capture a full-repo baseline so both cards are tracked.
+    let out_dir = TempDir::new("unsafe-review-scope-guard-baseline")?;
+    let out_ledger = out_dir.path().join("baseline.toml");
+    run_success([
+        os("baseline"),
+        os("init"),
+        os("--root"),
+        root.as_os_str().to_os_string(),
+        os("--out"),
+        out_ledger.as_os_str().to_os_string(),
+    ])?;
+
+    // Copy the generated baseline into the repo's policy directory.
+    let policy_dir = root.join("policy");
+    fs::create_dir_all(&policy_dir)?;
+    fs::copy(&out_ledger, policy_dir.join("unsafe-review-baseline.toml"))?;
+
+    // A diff that touches only src/a.rs (adding an innocuous comment — no unsafe change,
+    // so the file is in scope but the card stays BaselineKnown, not new).
+    let diff_text = "\
+diff --git a/src/a.rs b/src/a.rs\n\
+--- a/src/a.rs\n\
++++ b/src/a.rs\n\
+@@ -1,4 +1,5 @@\n\
++// reviewed in this PR\n\
+ pub unsafe fn op_a(ptr: *const u32) -> u32 {\n\
+     // Safety: caller guarantees ptr is valid\n\
+     unsafe { *ptr }\n\
+ }\n";
+
+    // Diff-scoped check: only src/a.rs is a candidate file.
+    let out = run_success_with_stdin(
+        [
+            os("check"),
+            os("--root"),
+            root.as_os_str().to_os_string(),
+            os("--diff"),
+            os("-"),
+            os("--format"),
+            os("json"),
+        ],
+        diff_text,
+    )?;
+    let value = parse_json(&stdout_text(&out)?)?;
+
+    // SPEC-0030 scope guard: the b.rs card was not scanned and must NOT be resolved.
+    assert_eq!(
+        value["summary"]["resolved_gaps"], 0,
+        "b.rs card must not be counted as resolved — its file was out of diff scope; got: {}",
+        value["summary"]
+    );
+    // Each file has 2 cards (one `unsafe_fn` context + one `raw_pointer_deref` operation).
+    // All 4 baseline IDs are inherited:
+    //   - 2 from a.rs: appeared as BaselineKnown in the scan (file was in scope, still present)
+    //   - 2 from b.rs: out-of-scope (file not in diff); counted as inherited, NOT resolved
+    assert_eq!(
+        value["summary"]["inherited_gaps"], 4,
+        "all 4 baseline cards must be inherited (2 from a.rs scan + 2 from b.rs out-of-scope); got: {}",
+        value["summary"]
+    );
+    assert_eq!(
+        value["summary"]["new_gaps"], 0,
+        "no new gaps expected: the diff only adds a comment to an already-baselined file; got: {}",
+        value["summary"]
+    );
+
+    Ok(())
+}

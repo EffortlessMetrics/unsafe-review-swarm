@@ -2,6 +2,7 @@ use crate::api::AnalyzeOutput;
 use crate::domain::ReviewClass;
 use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
 use crate::policy::{LedgerEntry as PolicyLedgerRecord, LedgerKind, load_ledger_entries};
+use crate::util::slug;
 use serde::Serialize;
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -121,9 +122,26 @@ fn evaluate_with_date(output: &AnalyzeOutput, audit_date: &str) -> Result<Policy
         .iter()
         .map(|card| card.id.0.clone())
         .collect::<BTreeSet<_>>();
+    // On a diff-scoped run, only count a baseline entry as resolved if its file was
+    // in the scanned candidate set.  If the file was not scanned, the baseline card
+    // is absent because the PR didn't touch that file — not because the gap was fixed.
+    // (SPEC-0030 §diff-scope constraint; mirrors the summary.rs resolved_count logic.)
     let resolved_baseline = baseline_entries
         .into_iter()
         .filter(|entry| !current_ids.contains(&entry.card_id))
+        .filter(|entry| {
+            if output.diff_scoped_files.is_empty() {
+                // Full scan: all unmatched baseline entries are resolved.
+                true
+            } else {
+                // Diff-scoped: only count as resolved if the card's file was scanned.
+                output.diff_scoped_files.iter().any(|path| {
+                    let file_str = path.to_string_lossy().replace(['/', '\\'], "_");
+                    let file_slug = slug(&file_str);
+                    entry.card_id.contains(&format!("-{file_slug}-"))
+                })
+            }
+        })
         .collect::<Vec<_>>();
     let expired_suppressions = suppression_entries
         .into_iter()

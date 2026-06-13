@@ -230,6 +230,7 @@ fn analyze_with_receipts(
                 &cards,
                 policy_state.baseline_ids(),
                 &policy_state,
+                &candidate_files,
             )),
         )?;
         last_scanned_path = Some(rel.clone());
@@ -251,6 +252,11 @@ fn analyze_with_receipts(
         None
     };
     sort_cards(&mut cards);
+    let diff_scoped_files_set: BTreeSet<PathBuf> = if !repo_mode && diff_supplied {
+        candidate_files.iter().cloned().collect()
+    } else {
+        BTreeSet::new()
+    };
     let summary = summarize(
         all_rust_files.len(),
         changed_files,
@@ -260,6 +266,7 @@ fn analyze_with_receipts(
         &input.scope,
         policy_state.baseline_ids(),
         &policy_state,
+        &candidate_files,
     );
     let output = AnalyzeOutput {
         schema_version: "0.1".to_string(),
@@ -270,6 +277,7 @@ fn analyze_with_receipts(
         policy: input.policy.clone(),
         summary,
         cards,
+        diff_scoped_files: diff_scoped_files_set,
     };
     // Emit a final status event.  A capped scan emits a partial status that
     // carries stop_reason=max_cards and cap=N so consumers and the gate
@@ -464,7 +472,15 @@ fn partial_analyze_output(
     cards: &[ReviewCard],
     baseline_ids: &BTreeSet<String>,
     policy_state: &PolicyState,
+    candidate_files: &[PathBuf],
 ) -> AnalyzeOutput {
+    let repo_mode = matches!(input.scope, Scope::Repo) || matches!(input.mode, AnalysisMode::Repo);
+    let diff_supplied = !matches!(input.diff, DiffSource::NoneRepoScan);
+    let diff_scoped_files_set: BTreeSet<PathBuf> = if !repo_mode && diff_supplied {
+        candidate_files.iter().cloned().collect()
+    } else {
+        BTreeSet::new()
+    };
     let mut cards = cards.to_vec();
     sort_cards(&mut cards);
     let summary = summarize(
@@ -476,6 +492,7 @@ fn partial_analyze_output(
         &input.scope,
         baseline_ids,
         policy_state,
+        candidate_files,
     );
     AnalyzeOutput {
         schema_version: "0.1".to_string(),
@@ -486,6 +503,7 @@ fn partial_analyze_output(
         policy: input.policy.clone(),
         summary,
         cards,
+        diff_scoped_files: diff_scoped_files_set,
     }
 }
 

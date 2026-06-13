@@ -2,7 +2,9 @@ use crate::api::{Scope, Summary};
 use crate::domain::coverage::CoverageBlock;
 use crate::domain::{ReviewCard, ReviewClass};
 use crate::policy::{PolicyState, SnapshotCoverage};
+use crate::util::slug;
 use std::collections::BTreeSet;
+use std::path::PathBuf;
 
 /// Summarize card counts and compute SPEC-0030 movement fields.
 ///
@@ -15,11 +17,14 @@ use std::collections::BTreeSet;
 ///   Precedence: worsened > improved > inherited.  A card is only counted improved if it
 ///   is not already counted worsened.  An improved card is still advisory, still open, and
 ///   still present — it is NOT resolved, NOT safe, NOT UB-free, and NOT Miri-clean.
-/// - `resolved_gaps`: baseline ledger entries whose card is no longer present.
-/// - `inherited_gaps`: cards classified `BaselineKnown` (matched baseline, still open).
+/// - `resolved_gaps`: baseline ledger entries whose card is no longer present **and whose
+///   file was in the scanned candidate set**.  On a diff-scoped run a baseline card whose
+///   file was not scanned is counted as `inherited` (out-of-scope), not `resolved`.
+/// - `inherited_gaps`: cards classified `BaselineKnown` (matched baseline, still open),
+///   plus out-of-scope baseline IDs on a diff-scoped run.
 #[allow(
     clippy::too_many_arguments,
-    reason = "file stats + cards + scope + policy are all needed together; extracting a struct would obscure call sites without simplifying the logic"
+    reason = "file stats + cards + scope + policy + scanned-files are all needed together; extracting a struct would obscure call sites without simplifying the logic"
 )]
 pub(super) fn summarize(
     rust_files: usize,
@@ -30,6 +35,7 @@ pub(super) fn summarize(
     scope: &Scope,
     baseline_ids: &BTreeSet<String>,
     policy_state: &PolicyState,
+    scanned_files: &[PathBuf],
 ) -> Summary {
     let diff_scoped = matches!(scope, Scope::Diff);
     let current_ids = cards
@@ -80,11 +86,50 @@ pub(super) fn summarize(
             _ => {}
         }
     }
-    // resolved_gaps = baseline IDs that have no current card.
-    summary.resolved_gaps = baseline_ids
-        .iter()
-        .filter(|id| !current_ids.contains(id.as_str()))
-        .count();
+    // resolved_gaps = baseline IDs that have no current card AND whose file was in scope.
+    //
+    // On a diff-scoped run, only candidate files are scanned.  A baseline card whose file
+    // was not touched by the diff is absent from `current_ids` not because the gap was
+    // fixed, but because we never scanned that file.  Counting it as `resolved` would be
+    // wrong — the PR is judged only on what it changed (SPEC-0030 §diff-scope constraint).
+    // Such out-of-scope IDs are counted as `inherited` instead.
+    //
+    // When `scanned_files` is empty (full repo scan or repo-mode) every unmatched baseline
+    // ID is resolved — the whole codebase was scanned.
+    //
+    // The file slug matching mirrors the card identity scheme: path separators are collapsed
+    // to underscores, then `slug()` lowercases and collapses non-alphanumeric runs to dashes.
+    // Each card ID embeds the file slug at position 2 (zero-indexed), flanked by `-` delimiters.
+    let (resolved_count, extra_inherited) = {
+        let unmatched = baseline_ids
+            .iter()
+            .filter(|id| !current_ids.contains(id.as_str()));
+        if scanned_files.is_empty() {
+            // Full scan: every unmatched baseline ID is resolved, no extra inherited.
+            (unmatched.count(), 0usize)
+        } else {
+            // Diff-scoped: split unmatched IDs by whether their file was in the candidate set.
+            let mut resolved = 0usize;
+            let mut extra_inh = 0usize;
+            for id in unmatched {
+                let in_scope = scanned_files.iter().any(|path| {
+                    let file_str = path.to_string_lossy().replace(['/', '\\'], "_");
+                    let file_slug = slug(&file_str);
+                    id.contains(&format!("-{file_slug}-"))
+                });
+                if in_scope {
+                    resolved += 1;
+                } else {
+                    extra_inh += 1;
+                }
+            }
+            (resolved, extra_inh)
+        }
+    };
+    summary.resolved_gaps = resolved_count;
+    // Out-of-scope baseline IDs are inherited: the PR didn't touch those files,
+    // so we cannot say whether those gaps are still present or resolved.
+    summary.inherited_gaps += extra_inherited;
     summary.worsened_gaps = worsened;
     summary.improved_gaps = improved;
     summary
