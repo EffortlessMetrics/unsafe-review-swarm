@@ -9,3 +9,4 @@ normative behavior specs; use [`../specs/`](../specs/) for product contracts.
 - [Bounded agent repair workflow](agent-repair-workflow.md)
 - [Agent packet examples](agent-packet-examples.md)
 - [Agentic development case studies](agentic-development-case-studies.md)
+- [Using unsafe-review with a coding agent](using-unsafe-review-with-agents.md)

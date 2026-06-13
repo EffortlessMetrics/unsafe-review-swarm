@@ -27,6 +27,8 @@ The generated per-label usefulness count rollup lives in
 `cargo run --locked -p xtask -- dogfood-usefulness`.
 Card-scoped agent repair dry runs follow the
 [`agent repair experiment protocol`](agent-repair-experiments.md).
+A narrative summary of real-world findings across the seven dogfood crates
+lives in [`REAL_WORLD_FINDINGS.md`](REAL_WORLD_FINDINGS.md).
 
 Snapshot reports:
 

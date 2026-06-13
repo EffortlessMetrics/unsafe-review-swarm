@@ -30,6 +30,8 @@
 | Implementation plans | PR-sized sequence and proof commands | `plans/` |
 | Active lane | current dogfood-calibrated evidence loop | `docs/status/DOGFOOD_CALIBRATED_EVIDENCE_LANE.md` |
 | Dogfood index | selected real-crate dogfood targets, usefulness notes, and recorded outcome movement | `docs/dogfood/index.md`, `docs/dogfood/index.json`, `docs/dogfood/usefulness-notes.md` |
+| Dogfood narrative | narrative summary of real-world findings across the seven dogfood crates: what fired, what did not, corrections, and open gaps | `docs/dogfood/REAL_WORLD_FINDINGS.md` |
+| Agent integration guide | using unsafe-review with a coding agent: bounded-card model, packet fields, readiness routing, do-not-do rules, and receipt discipline | `docs/explanation/using-unsafe-review-with-agents.md` |
 | Fuzzing | manual analyzer robustness harness and input contract | `docs/FUZZING.md` |
 | Support summary | concise support posture front panel | `docs/status/SUPPORT_SUMMARY.md` |
 | Support tiers | detailed product claim to proof ledger | `docs/status/SUPPORT_TIERS.md` |
