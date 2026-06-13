@@ -174,6 +174,60 @@ unsafe-review first-pr \
   --out-dir target/unsafe-review-fixture
 ```
 
+## Read-only external repo scan and the witness boundary
+
+You can run `unsafe-review` against any Rust repository you have checked out
+locally. The tool is read-only: it never edits source, never posts comments, and
+never runs witness tools.
+
+**Step 1 — scan the external repo:**
+
+```bash
+unsafe-review pr --root /path/to/external/repo
+```
+
+Or, to diff against a specific base commit:
+
+```bash
+unsafe-review first-pr \
+  --root /path/to/external/repo \
+  --base HEAD~20
+```
+
+This writes the advisory bundle under
+`/path/to/external/repo/target/unsafe-review/` (or use `--out-dir` to redirect
+it). The output is advisory findings — not proof of unsafety.
+
+**Step 2 — understand the advisory boundary:**
+
+A card means:
+
+```text
+This unsafe-adjacent change is missing a safety contract, guard, test, or witness.
+```
+
+It does not mean:
+
+```text
+This code is UB.
+Miri found a bug.
+The code is memory-unsafe.
+```
+
+A no-card result does not mean the repo is safe, UB-free, or Miri-clean.
+
+**Step 3 — attach a witness receipt only if you have external evidence:**
+
+A witness receipt is a SEPARATE, explicit attachment. It records metadata from
+an external tool run (Miri, `cargo-careful`, a sanitizer, Loom, Shuttle, Kani,
+or Crux) that you ran yourself. `unsafe-review` does not run these tools by
+default and does not claim they ran unless a receipt is attached.
+
+To attach a receipt after running a witness tool externally, use
+`unsafe-review receipt import` (see `CLI.md` for the receipt format). Without
+an attached receipt, every card and every no-card result is advisory only — no
+Miri-clean or UB-free claim is warranted.
+
 ## After the first hour
 
 The CLI walkthrough is the maintainer surface. After the first hour, common

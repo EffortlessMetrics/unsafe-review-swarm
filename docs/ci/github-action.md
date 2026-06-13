@@ -35,6 +35,8 @@ jobs:
           fetch-depth: 100
           persist-credentials: false
 
+      - uses: Swatinem/rust-cache@v2
+
       - uses: EffortlessMetrics/unsafe-review@v1
         id: ur
         with:

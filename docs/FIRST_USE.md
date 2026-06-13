@@ -55,7 +55,28 @@ target/unsafe-review/manual-repair-queue.json
 target/unsafe-review/tokmd-packets.json
 target/unsafe-review/usefulness-telemetry.json
 target/unsafe-review/repair-queue.json
+target/unsafe-review/unsafe-review-gate.json
 ```
+
+**Bundle quick-reference** — what each file is for:
+
+| File | Purpose | Who reads it |
+|---|---|---|
+| `review-kit.json` | Review handoff packet with bounded card queue | ub-review / orchestrators |
+| `cards.json` | Full ReviewCard list | Programmatic tooling / CI |
+| `pr-summary.md` | Reviewer front panel: top card, missing evidence, next action | Human reviewer |
+| `github-summary.md` | Bounded job-summary fragment written to `$GITHUB_STEP_SUMMARY` | GitHub Actions UI |
+| `cards.sarif` | SARIF projection for GitHub code scanning | Code scanning / CI artifact consumers |
+| `comment-plan.json` | Bounded comment plan (advisory; not posted) | ub-review / downstream comment poster |
+| `witness-plan.md` | External witness routes per card (Miri, cargo-careful, sanitizers, Loom, …) | Reviewer / witness operator |
+| `receipt-audit.md` | Saved receipt metadata summary matched against current cards | Reviewer checking prior witness records |
+| `manual-candidates.json` | Cards recommended for manual review | Reviewer / triager |
+| `manual-repair-queue.json` | Manual repair queue sidecar | Agent / repair workflow |
+| `tokmd-packets.json` | Formatting input sidecar for comment rendering | ub-review / comment formatter |
+| `usefulness-telemetry.json` | Operational diagnostic telemetry (SPEC-0038) | ub-review / cost monitoring |
+| `lsp.json` | Saved LSP projection: diagnostics, hovers, command payloads | Editor adapter / developer tooling |
+| `repair-queue.json` | Repair queue with bucket reasons | Agent / repair workflow |
+| `unsafe-review-gate.json` | Advisory gate manifest: coverage movement, gate status (SPEC-0034) | ub-review / CI orchestrator |
 
 The default policy is advisory. The bundle is artifact-only: it does not run
 witness tools, post comments, edit source, or enforce blocking policy. A finding
@@ -166,6 +187,17 @@ unsafe-review context <card-id> --json
 The packet is copy-only. It includes missing evidence, allowed repairs,
 do-not-do rules, verify commands, stop conditions, and the trust boundary. It
 does not edit source.
+
+You can also zoom into a specific file range instead of using a card id — useful
+when integrating with an editor or LSP workflow or when you want targeted context
+for a known unsafe location before finding its card id:
+
+```bash
+unsafe-review context --file src/ffi.rs --lines 42-55 --json
+```
+
+`--file` and `--lines` are mutually exclusive with a card id: use one or the
+other. `--lines` requires `--file`; the format is always `--lines A-B`.
 
 ## Preview Editor Data
 

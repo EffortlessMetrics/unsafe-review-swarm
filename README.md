@@ -203,7 +203,7 @@ unsafe-review first-pr \
 
 | If you need to... | Start with... | Typical output |
 |---|---|---|
-| Review a PR | `unsafe-review check --base origin/main` | ReviewCards and PR summary |
+| Review a PR | `unsafe-review pr` (auto-detects base) | ReviewCards and PR summary |
 | Feed CI artifacts | `--format json`, `--format sarif`, `--format pr-summary` | Uploaded advisory artifacts |
 | Explain one finding | `unsafe-review explain <card-id>` | Human-readable contract gap |
 | Inspect support posture | `unsafe-review support` | Experimental / advisory / deferred boundaries |
