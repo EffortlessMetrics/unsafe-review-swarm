@@ -86,7 +86,7 @@ fn detect_site(line: &str) -> Option<(UnsafeSiteKind, OperationFamily)> {
             _ => (UnsafeSiteKind::UnsafeImpl, OperationFamily::Unknown),
         });
     }
-    if line.contains("unsafe fn") {
+    if line.contains("unsafe fn") && line_contains_unsafe_fn_declaration(line) {
         return Some((UnsafeSiteKind::UnsafeFn, OperationFamily::Unknown));
     }
     if line.contains("unsafe trait") {
@@ -186,6 +186,43 @@ fn detect_site(line: &str) -> Option<(UnsafeSiteKind, OperationFamily)> {
         return Some((UnsafeSiteKind::UnsafeBlock, OperationFamily::Unknown));
     }
     None
+}
+
+/// Returns `true` when `line` contains an `unsafe fn` that is a named function
+/// declaration (e.g. `unsafe fn foo(` or `pub unsafe fn bar<T>(`), and `false`
+/// when the only `unsafe fn` occurrence is a fn-pointer type in field or type
+/// position (e.g. `call: unsafe fn(*mut u8),`).
+///
+/// A named declaration always has an identifier character immediately after the
+/// whitespace that follows `fn`.  A fn-pointer type has `(` directly there.
+fn line_contains_unsafe_fn_declaration(line: &str) -> bool {
+    let mut cursor = line;
+    while let Some(pos) = cursor.find("unsafe fn") {
+        let before = cursor[..pos].chars().next_back();
+        let after = &cursor[pos + "unsafe fn".len()..];
+        // `unsafe` must start on an identifier boundary.
+        let starts_on_boundary = before.is_none_or(|ch| !is_ident_continue(ch));
+        // `fn` must end on an identifier boundary (the char after is not ident).
+        let fn_end_char = after.chars().next();
+        let ends_on_boundary = fn_end_char.is_none_or(|ch| !is_ident_continue(ch));
+        if starts_on_boundary && ends_on_boundary {
+            // Look at what follows `unsafe fn` after optional whitespace.
+            let rest = after.trim_start_matches([' ', '\t']);
+            let next_ch = rest.chars().next();
+            // A named declaration starts with an identifier character (letter or `_`).
+            // A fn-pointer type starts with `(`.
+            if next_ch.is_some_and(|ch| ch == '_' || ch.is_ascii_alphabetic()) {
+                return true;
+            }
+            // Not a declaration at this occurrence; keep scanning.
+        }
+        let skip = after
+            .char_indices()
+            .next()
+            .map_or(after.len(), |(_, ch)| ch.len_utf8());
+        cursor = &after[skip..];
+    }
+    false
 }
 
 fn is_extern_boundary(line: &str) -> bool {
@@ -379,12 +416,14 @@ fn detect_syntax_sites(
 ) -> Vec<DetectedSyntaxSite> {
     let mut sites = Vec::new();
     let unsafe_block_ranges = unsafe_block_ranges(parsed);
+    let unsafe_fn_ranges = unsafe_fn_ranges(parsed);
     let operation_block_ranges = operation_block_ranges(parsed, &unsafe_block_ranges);
     for fact in &parsed.nodes {
         let Some((kind, family)) = detect_syntax_site(
             fact,
             &parsed.text,
             &unsafe_block_ranges,
+            &unsafe_fn_ranges,
             &operation_block_ranges,
             extern_names,
             local_modules,
@@ -595,6 +634,7 @@ fn detect_syntax_site(
     fact: &SyntaxNodeFact,
     source: &str,
     unsafe_block_ranges: &[(usize, usize)],
+    unsafe_fn_ranges: &[(usize, usize)],
     operation_block_ranges: &BTreeSet<(usize, usize)>,
     extern_names: &BTreeSet<String>,
     local_modules: &BTreeSet<String>,
@@ -672,7 +712,23 @@ fn detect_syntax_site(
             Some((UnsafeSiteKind::Operation, family))
         }
         "CALL_EXPR" | "METHOD_CALL_EXPR" | "MACRO_EXPR" => {
-            detect_site(&syntax_detection_text(&compact))
+            let result = detect_site(&syntax_detection_text(&compact));
+            // Gate bare `.add`/`.offset` PointerArithmetic on syntactic unsafe scope.
+            // Raw-pointer arithmetic is only legal inside `unsafe { }` blocks or
+            // `unsafe fn` bodies.  A call site outside both (e.g. a safe bitflag
+            // `.add` combinator) must not produce a card.
+            if matches!(
+                result,
+                Some((
+                    UnsafeSiteKind::Operation,
+                    OperationFamily::PointerArithmetic
+                ))
+            ) && !is_inside_range(fact, unsafe_block_ranges)
+                && !is_inside_range(fact, unsafe_fn_ranges)
+            {
+                return None;
+            }
+            result
         }
         _ => None,
     }
@@ -816,6 +872,20 @@ fn unsafe_block_ranges(parsed: &ParsedSource) -> Vec<(usize, usize)> {
         .iter()
         .filter(|fact| {
             fact.kind == "BLOCK_EXPR" && compact_whitespace(&fact.snippet).starts_with("unsafe {")
+        })
+        .map(|fact| (fact.start, fact.end))
+        .collect()
+}
+
+/// Byte ranges of `unsafe fn` declarations.  Used to determine whether a call
+/// expression is inside an unsafe fn body, where raw-pointer arithmetic is legal
+/// even without a nested `unsafe { }` block.
+fn unsafe_fn_ranges(parsed: &ParsedSource) -> Vec<(usize, usize)> {
+    parsed
+        .nodes
+        .iter()
+        .filter(|fact| {
+            fact.kind == "FN" && compact_whitespace(&fact.snippet).contains("unsafe fn ")
         })
         .map(|fact| (fact.start, fact.end))
         .collect()
@@ -2124,6 +2194,42 @@ impl<T> Tagged<T> {\n\
             &UnsafeSiteKind::Operation,
             "pub unsafe { *ptr }"
         ));
+    }
+
+    #[test]
+    fn text_detection_does_not_card_unsafe_fn_pointer_type_in_field_position() {
+        // Fn-pointer types: `unsafe fn(` — no identifier after `fn`, must NOT card.
+        assert_eq!(
+            detect_site("call: unsafe fn(*mut u8),"),
+            None,
+            "fn-pointer type in a field should not be detected as an unsafe fn site"
+        );
+        assert_eq!(
+            detect_site("    handler: unsafe fn(usize) -> bool,"),
+            None,
+            "fn-pointer type as a struct field should not be detected as an unsafe fn site"
+        );
+        assert_eq!(
+            detect_site("    f: Option<unsafe fn(*mut u8)>,"),
+            None,
+            "fn-pointer type inside Option should not be detected as an unsafe fn site"
+        );
+        // Named declarations: `unsafe fn foo(` — identifier after `fn`, MUST card.
+        assert_eq!(
+            detect_site("pub unsafe fn caller_must_uphold(ptr: *const u8) -> usize {"),
+            Some((UnsafeSiteKind::UnsafeFn, OperationFamily::Unknown)),
+            "named unsafe fn declaration must still be detected"
+        );
+        assert_eq!(
+            detect_site("unsafe fn internal_helper() {"),
+            Some((UnsafeSiteKind::UnsafeFn, OperationFamily::Unknown)),
+            "private named unsafe fn declaration must still be detected"
+        );
+        assert_eq!(
+            detect_site("pub(crate) unsafe fn restricted(ptr: *mut u8) {"),
+            Some((UnsafeSiteKind::UnsafeFn, OperationFamily::Unknown)),
+            "restricted-visibility named unsafe fn declaration must still be detected"
+        );
     }
 
     fn unique_temp_dir() -> Result<PathBuf, String> {
