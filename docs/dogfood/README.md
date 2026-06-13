@@ -32,6 +32,7 @@ lives in [`REAL_WORLD_FINDINGS.md`](REAL_WORLD_FINDINGS.md).
 
 Snapshot reports:
 
+- [2026-06-13 post-fix card-correctness validation](reports/2026-06-13-post-fix-card-correctness-validation.md)
 - [2026-05-26 post-burst analyzer snapshot](reports/2026-05-26-post-burst.md)
 - [2026-05-26 arrayvec Vec::set_len rerun](reports/2026-05-26-arrayvec-vec-set-len-rerun.md)
 - [2026-05-26 crossbeam atomic pointer rerun](reports/2026-05-26-crossbeam-atomic-pointer-rerun.md)
