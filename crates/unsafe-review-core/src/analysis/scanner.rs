@@ -176,6 +176,13 @@ fn detect_site(line: &str) -> Option<(UnsafeSiteKind, OperationFamily)> {
     if line.contains("asm!") {
         return Some((UnsafeSiteKind::Operation, OperationFamily::InlineAsm));
     }
+    // A ref-wrapped deref (`unsafe { &mut *ptr }`, `unsafe { &*ptr }`) is a
+    // raw-pointer dereference.  Check this BEFORE the generic call-wrapper test so
+    // that `unsafe { &mut *self.value.get() }` is classified as `raw_pointer_deref`
+    // and NOT as `unsafe_fn_call` (the `.get()` parens would otherwise match).
+    if unsafe_block_content_is_ref_deref(line) {
+        return Some((UnsafeSiteKind::Operation, OperationFamily::RawPointerDeref));
+    }
     if unsafe_block_contains_call(line) {
         return Some((UnsafeSiteKind::Operation, OperationFamily::UnsafeFnCall));
     }
@@ -326,6 +333,36 @@ fn unsafe_block_contains_call(line: &str) -> bool {
         return false;
     };
     after_open.contains('(') && after_open.contains(')')
+}
+
+/// Returns true when the first expression inside a top-level unsafe block is a
+/// **ref-wrapped** raw-pointer dereference: `unsafe { &*ptr }`, `unsafe { &mut *ptr }`,
+/// `unsafe { &mut *self.value.get() }`, etc.
+///
+/// Bare derefs (`unsafe { *ptr }`) are intentionally excluded: those are already
+/// correctly handled by the syntax scanner's `PREFIX_EXPR` path and do not need a
+/// fallback card.  This function is only for the ref-wrapped forms that confuse the
+/// generic `unsafe_block_contains_call` test via the method-call parentheses.
+///
+/// "Top-level" means the `unsafe` keyword appears at the start of the trimmed text,
+/// so that nested forms like `f(unsafe { &mut *ptr })` are handled exclusively by
+/// the syntax scanner and do not produce a spurious fallback card.
+fn unsafe_block_content_is_ref_deref(line: &str) -> bool {
+    // Only handle blocks where `unsafe` is the start of the statement; nested
+    // `f(unsafe { ... })` forms are correctly classified by the syntax scanner.
+    if !line.starts_with("unsafe") {
+        return false;
+    }
+    let Some(after_unsafe) = unsafe_keyword_tail(line) else {
+        return false;
+    };
+    let Some((_before_block, after_open)) = after_unsafe.split_once('{') else {
+        return false;
+    };
+    // Only the ref-wrapped forms: content must start with `&` (optionally followed by
+    // `mut`) and then have a single `*` deref.  Bare `*ptr` content is excluded.
+    let content = after_open.trim_start();
+    content.starts_with('&') && is_raw_pointer_deref(content)
 }
 
 fn unsafe_keyword_tail(line: &str) -> Option<&str> {
@@ -738,8 +775,36 @@ fn is_unknown_unsafe_block(compact: &str) -> bool {
         )
 }
 
+/// Returns true when `compact` is a raw-pointer dereference expression, optionally
+/// wrapped in a shared or mutable borrow (`&*expr`, `&mut *expr`).
+///
+/// Accepts:
+/// - `*expr`          (bare deref)
+/// - `&*expr`         (shared borrow of deref, no space between `&` and `*`)
+/// - `& *expr`        (shared borrow of deref, space — produced by compact_whitespace)
+/// - `&mut *expr`     (mutable borrow of deref, the common UnsafeCell pattern)
+/// - `& mut *expr`    (mutable-borrow-of-deref with spaces — produced by compact_whitespace)
+///
+/// Rejects:
+/// - `**expr`         (double deref — different hazard, handled separately)
+/// - `&mut expr`      (borrow of call result with no leading `*` — stays unsafe_fn_call)
+/// - `&expr`          (plain borrow with no deref — stays unsafe_fn_call)
 fn is_raw_pointer_deref(compact: &str) -> bool {
-    compact.starts_with('*') && !compact.starts_with("**")
+    // Strip an optional borrow prefix (&, &mut, or spaced variants) to obtain the
+    // inner expression, then verify the very next character is a single `*` (deref),
+    // never `**` (double-deref, a distinct hazard).
+    let after_borrow = compact
+        .strip_prefix("&mut ")
+        .or_else(|| compact.strip_prefix("& mut "))
+        .or_else(|| compact.strip_prefix("& "));
+    let inner = match after_borrow {
+        Some(rest) => rest,
+        None => {
+            // Handle `&*expr` (no space between `&` and `*`) and bare `*expr`.
+            compact.strip_prefix('&').unwrap_or(compact)
+        }
+    };
+    inner.starts_with('*') && !inner.starts_with("**")
 }
 
 fn prefix_deref_is_assignment_target(fact: &SyntaxNodeFact, source: &str) -> bool {

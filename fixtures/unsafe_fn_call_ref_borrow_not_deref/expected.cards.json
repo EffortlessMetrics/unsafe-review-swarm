@@ -1,0 +1,211 @@
+[
+  {
+    "id": "UR-unsafe-fn-call-ref-borrow-not-deref-src-lib-rs-get-slot-value-unsafe_fn-unknown-get-slot-value-e0eeb1d4da06-unknown-c1",
+    "class": "unsafe_unreached",
+    "priority": "medium",
+    "confidence": "medium",
+    "proof_path": "human_review_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 17,
+      "column": 5,
+      "kind": "unsafe_fn",
+      "owner": "get_slot_value",
+      "visibility": "public",
+      "public_api_surface": true,
+      "snippet": "pub unsafe fn get_slot_value(&self) -> u32 {"
+    },
+    "operation": "pub unsafe fn get_slot_value(&self) -> u32 {",
+    "operation_family": "unknown",
+    "hazards": [
+      "unknown"
+    ],
+    "obligations": [
+      "unsafe contract could not be inferred from this syntax shape"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "unknown",
+        "description": "unsafe contract could not be inferred from this syntax shape",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `# Safety` documentation was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `get_slot_value` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `# Safety` documentation was detected",
+    "discharge": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration",
+    "reach": "No static test mention of owner `get_slot_value` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or identify a focused test path that reaches the safe wrapper around this unsafe seam.",
+    "verify_commands": [],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `unsafe_unreached` ReviewCard for `pub unsafe fn get_slot_value(&self) -> u32 {`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+      },
+      "minimal_repro": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "steps": [
+          "Confirm ReviewCard `UR-unsafe-fn-call-ref-borrow-not-deref-src-lib-rs-get-slot-value-unsafe_fn-unknown-get-slot-value-e0eeb1d4da06-unknown-c1` still maps to `pub unsafe fn get_slot_value(&self) -> u32 {` at `src/lib.rs:17:5` before upgrading confidence.",
+          "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+          "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "present",
+      "guard_coverage": "present",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "not_eligible",
+      "agent_lsp_readiness": "needs_human"
+    }
+  },
+  {
+    "id": "UR-unsafe-fn-call-ref-borrow-not-deref-src-lib-rs-read-slot-operation-unsafe_fn_call-get-slot-value-1ece27d09a6a-unknown-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "proof_path": "human_review_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 26,
+      "column": 5,
+      "kind": "operation",
+      "owner": "read_slot",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { slot.get_slot_value() }"
+    },
+    "operation": "unsafe { slot.get_slot_value() }",
+    "operation_family": "unsafe_fn_call",
+    "hazards": [
+      "unknown"
+    ],
+    "obligations": [
+      "callee safety preconditions are satisfied"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "callee-contract",
+        "description": "callee safety preconditions are satisfied",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_slot` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "No visible local guard detected",
+    "reach": "No static test mention of owner `read_slot` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Review the `unsafe_fn_call` callee contract manually and add obligation-specific guard evidence for this call.",
+    "verify_commands": [],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe { slot.get_slot_value() }`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+      },
+      "minimal_repro": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "steps": [
+          "Confirm ReviewCard `UR-unsafe-fn-call-ref-borrow-not-deref-src-lib-rs-read-slot-operation-unsafe_fn_call-get-slot-value-1ece27d09a6a-unknown-c1` still maps to `unsafe { slot.get_slot_value() }` at `src/lib.rs:26:5` before upgrading confidence.",
+          "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+          "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "present",
+      "guard_coverage": "missing",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "selected",
+      "agent_lsp_readiness": "needs_human"
+    }
+  }
+]

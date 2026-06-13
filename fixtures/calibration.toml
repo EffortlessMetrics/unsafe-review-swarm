@@ -584,6 +584,9 @@ required_core_fixtures = [
   "panic_from_safe_js_non_js_signed_no_card",
   "comment_alignment_not_guard",
   "unsafe_fn_unknown_family_no_card",
+  "raw_pointer_deref_through_unsafecell_get",
+  "raw_pointer_deref_ref_wrapped_cast",
+  "unsafe_fn_call_ref_borrow_not_deref",
 ]
 
 [[cases]]
@@ -6326,4 +6329,34 @@ support_tier = "Diff unsafe site inventory"
 expected_cards = 1
 expected_class = "contract_missing"
 expected_operation_family = "unknown"
+expected_hazard = "unknown"
+
+[[cases]]
+fixture = "raw_pointer_deref_through_unsafecell_get"
+kind = "positive"
+claim = "UnsafeCell::get() raw pointer deref wrapped in &mut / & is classified as raw_pointer_deref, not unsafe_fn_call"
+support_tier = "Raw pointer card slice"
+expected_cards = 2
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_deref"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_deref_ref_wrapped_cast"
+kind = "positive"
+claim = "cast-then-deref wrapped in &mut (e.g. &mut *(p as *mut T)) is classified as raw_pointer_deref, not unsafe_fn_call"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_deref"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "unsafe_fn_call_ref_borrow_not_deref"
+kind = "false_positive_control"
+claim = "unsafe block calling an unsafe fn (no raw pointer dereference) stays unsafe_fn_call; the ref-wrapped-deref fix does not fire"
+support_tier = "Core operation smoke slice"
+expected_cards = 2
+expected_class = "guard_missing"
+expected_operation_family = "unsafe_fn_call"
 expected_hazard = "unknown"
