@@ -43,7 +43,15 @@ inputs:
       unsafe-review crate version to install from crates.io. Pin this to a
       known-good version to prevent silent breakage on new releases.
     required: false
-    default: "0.3.5"
+    default: "0.3.6"
+  fetch_depth:
+    description: >
+      Depth passed to `git fetch --depth` when fetching the base ref. The
+      default of 100 covers typical PR histories. Increase this for
+      repositories with very long histories or shallow clones that fail to
+      find the common ancestor.
+    required: false
+    default: "100"
   out_dir:
     description: >
       Directory for the advisory bundle output. The caller may pass this to an
@@ -66,8 +74,8 @@ outputs:
       upload step. The bundle contains review-kit.json, cards.json,
       pr-summary.md, github-summary.md, cards.sarif, comment-plan.json,
       witness-plan.md, receipt-audit.md, manual-candidates.json,
-      manual-repair-queue.json, tokmd-packets.json, lsp.json,
-      repair-queue.json, and unsafe-review-gate.json.
+      manual-repair-queue.json, tokmd-packets.json, usefulness-telemetry.json,
+      lsp.json, repair-queue.json, and unsafe-review-gate.json.
     value: ${{ steps.set-outputs.outputs.bundle_dir }}
   gate_status:
     description: >
@@ -86,8 +94,9 @@ runs:
       shell: bash
       env:
         BASE_REF: ${{ inputs.base_ref }}
+        FETCH_DEPTH: ${{ inputs.fetch_depth }}
       run: |
-        git fetch --no-tags --depth=100 origin \
+        git fetch --no-tags --depth="${FETCH_DEPTH}" origin \
           "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
 
     - name: Install unsafe-review from crates.io
@@ -144,6 +153,7 @@ runs:
           manual-candidates.json \
           manual-repair-queue.json \
           tokmd-packets.json \
+          usefulness-telemetry.json \
           lsp.json \
           repair-queue.json \
           unsafe-review-gate.json

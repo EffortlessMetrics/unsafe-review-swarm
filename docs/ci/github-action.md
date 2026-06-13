@@ -11,7 +11,7 @@ Add `unsafe-review` PR coverage to any Rust repository in two steps.
     persist-credentials: false
 - uses: EffortlessMetrics/unsafe-review@v1
   with:
-    version: "0.3.5"
+    version: "0.3.6"
 ```
 
 That is the full integration. The action installs `unsafe-review` from
@@ -38,7 +38,7 @@ jobs:
       - uses: EffortlessMetrics/unsafe-review@v1
         id: ur
         with:
-          version: "0.3.5"
+          version: "0.3.6"
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -56,7 +56,8 @@ anything.
 | Input | Default | Description |
 |---|---|---|
 | `base_ref` | repo default branch | Base ref to diff against |
-| `version` | `0.3.5` | `unsafe-review` version from crates.io |
+| `version` | `0.3.6` | `unsafe-review` version from crates.io |
+| `fetch_depth` | `100` | Depth passed to `git fetch --depth` when fetching the base ref. Increase for repositories with very long histories. |
 | `out_dir` | `target/unsafe-review` | Bundle output directory |
 | `fail_on_new_debt` | `false` | When `true`, fail the job on new or worsened coverage gaps (never on inherited gaps). Advisory by default. |
 
@@ -72,20 +73,21 @@ anything.
 The bundle at `bundle_dir` contains:
 
 ```text
-review-kit.json          — review handoff packet with bounded card queue
-cards.json               — ReviewCard list
-pr-summary.md            — maintainer cockpit view
-github-summary.md        — bounded job-summary fragment (already written to $GITHUB_STEP_SUMMARY)
-cards.sarif              — SARIF projection for GitHub code scanning
-comment-plan.json        — plan-only comment budget (not posted)
-witness-plan.md          — external witness routes per card
-receipt-audit.md         — saved receipt metadata summary
-manual-candidates.json   — manual review candidates
-manual-repair-queue.json — manual repair queue sidecar
-tokmd-packets.json       — formatting input sidecar
-lsp.json                 — saved LSP projection
-repair-queue.json        — repair queue with bucket reasons
-unsafe-review-gate.json  — advisory gate manifest (SPEC-0034)
+review-kit.json            — review handoff packet with bounded card queue
+cards.json                 — ReviewCard list
+pr-summary.md              — maintainer cockpit view
+github-summary.md          — bounded job-summary fragment (already written to $GITHUB_STEP_SUMMARY)
+cards.sarif                — SARIF projection for GitHub code scanning
+comment-plan.json          — plan-only comment budget (not posted)
+witness-plan.md            — external witness routes per card
+receipt-audit.md           — saved receipt metadata summary
+manual-candidates.json     — manual review candidates
+manual-repair-queue.json   — manual repair queue sidecar
+tokmd-packets.json         — formatting input sidecar
+usefulness-telemetry.json  — operational diagnostic telemetry (SPEC-0038)
+lsp.json                   — saved LSP projection
+repair-queue.json          — repair queue with bucket reasons
+unsafe-review-gate.json    — advisory gate manifest (SPEC-0034)
 ```
 
 ## What the bundle means

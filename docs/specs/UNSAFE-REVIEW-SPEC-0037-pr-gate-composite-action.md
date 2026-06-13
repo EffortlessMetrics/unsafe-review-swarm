@@ -80,7 +80,8 @@ runs.
 | Input | Required | Default | Description |
 |---|---|---|---|
 | `base_ref` | no | `${{ github.event.repository.default_branch }}` | Base ref to diff against (e.g. `main`) |
-| `version` | no | `0.3.5` | `unsafe-review` crate version to install from crates.io |
+| `version` | no | `0.3.6` | `unsafe-review` crate version to install from crates.io |
+| `fetch_depth` | no | `100` | Depth passed to `git fetch --depth` when fetching the base ref. Increase this for repositories with very long histories or shallow clones that fail to find the common ancestor. |
 | `out_dir` | no | `target/unsafe-review` | Directory for the advisory bundle output |
 | `fail_on_new_debt` | no | `false` | When `true`, exit non-zero if new or worsened coverage gaps are found (maps to exit 1; inherited gaps never fail). Advisory by default — callers must set this explicitly to change the default. |
 
@@ -119,6 +120,7 @@ receipt-audit.md
 manual-candidates.json
 manual-repair-queue.json
 tokmd-packets.json
+usefulness-telemetry.json
 lsp.json
 repair-queue.json
 unsafe-review-gate.json

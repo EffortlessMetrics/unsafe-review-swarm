@@ -169,3 +169,15 @@ commands = [
   "cargo run --locked -p xtask -- corpus-usefulness",
   "cargo run --locked -p xtask -- check-pr",
 ]
+
+[[work_item]]
+id = "adoption-readiness"
+status = "active"
+spec = "UNSAFE-REVIEW-SPEC-0037"
+plan = ".rails/goals/active.toml"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1648"
+commands = [
+  "cargo fmt --all --check",
+  "cargo clippy --workspace --all-targets --locked -- -D warnings",
+  "cargo run --locked -p xtask -- check-pr",
+]
