@@ -10,6 +10,13 @@ pub(super) fn is_incomplete_multiline_transmute_copy(line: &str) -> bool {
     compact.ends_with("transmute_copy::<")
 }
 
+pub(super) fn is_incomplete_multiline_transmute(line: &str) -> bool {
+    let compact = compact_whitespace(line);
+    // Ends with `transmute::<` but NOT `transmute_copy::<` — the copy variant is
+    // handled by its own predicate and must not be double-counted here.
+    compact.ends_with("transmute::<") && !compact.ends_with("transmute_copy::<")
+}
+
 fn contains_call_name(line: &str, name: &str) -> bool {
     let mut cursor = line;
     while let Some(pos) = cursor.find(name) {

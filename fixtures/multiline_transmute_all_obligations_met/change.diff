@@ -1,0 +1,33 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,27 @@
++/// Probe: a multiline transmute::<> call that provides both layout evidence
++/// (size_of equality assertion) AND valid-value evidence (assert that the value
++/// is in-range). The call is split across lines to exercise the multiline shadow
++/// path. The tool should classify this as guarded_unwitnessed — same as the
++/// single-line transmute_all_obligations_met fixture.
++pub fn byte_to_bool_both_guards(value: u8) -> bool {
++    assert_eq!(core::mem::size_of::<u8>(), core::mem::size_of::<bool>());
++    assert!(value <= 1);
++    // SAFETY: size + bool-domain checked
++    unsafe { core::mem::transmute::<
++            u8,
++            bool,
++        >(value) }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::byte_to_bool_both_guards;
++
++    #[test]
++    fn probe_both_guards_true() {
++        assert!(byte_to_bool_both_guards(1));
++    }
++
++    #[test]
++    fn probe_both_guards_false() {
++        assert!(!byte_to_bool_both_guards(0));
++    }
++}

@@ -327,6 +327,45 @@ fn subcommand_help_is_command_specific() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[test]
+fn cargo_bin_policy_violation_exits_1_not_2() -> Result<(), Box<dyn Error>> {
+    // Exit-code contract: cargo-unsafe-review must exit 1 for policy violations
+    // (no-new-debt) and exit 2 only for tool errors. Before the fix, the binary
+    // mapped every RunFailure to exit 2, making policy failures indistinguishable
+    // from crashes in CI scripts.
+    let fixture = fixture_root("raw_pointer_alignment");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("check")
+        .arg("--root")
+        .arg(&fixture)
+        .arg("--diff")
+        .arg(fixture.join("change.diff"))
+        .arg("--format")
+        .arg("json")
+        .arg("--policy")
+        .arg("no-new-debt")
+        .output()?;
+
+    assert!(
+        !output.status.success(),
+        "no-new-debt violation must exit non-zero"
+    );
+    assert_eq!(
+        output.status.code(),
+        Some(1),
+        "no-new-debt violation must exit 1 (policy), not 2 (tool error)"
+    );
+    let stderr = String::from_utf8(output.stderr)?;
+    assert!(
+        stderr.contains("policy:"),
+        "stderr must carry the 'policy:' category prefix: {stderr}"
+    );
+
+    Ok(())
+}
+
 fn assert_contains(haystack: &str, needle: &str) {
     assert!(
         haystack.contains(needle),

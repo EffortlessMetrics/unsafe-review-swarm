@@ -51,6 +51,10 @@ impl TransmuteCallContext {
             let argument_end = matching_call_argument_end(after_open)?;
             let argument = &after_open[..argument_end];
             if let Some((source_type, destination_type)) = split_top_level_pair(arguments) {
+                // Turbofish trailing commas (`transmute::<u8, bool,>`) are valid
+                // Rust syntax; strip them so type comparisons remain exact.
+                let source_type = source_type.trim_end_matches(',').trim();
+                let destination_type = destination_type.trim_end_matches(',').trim();
                 return Some(Self {
                     before_call,
                     source_type: source_type.to_string(),
