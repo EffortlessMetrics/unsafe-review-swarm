@@ -127,8 +127,19 @@ fn detects_new_len_shrink(before_call: &str, receiver: &str, set_len_argument: &
 }
 
 fn new_len_checked_against_len(before_call: &str, receiver: &str) -> bool {
-    (before_call.contains("new_len<=") || before_call.contains("new_len<"))
-        && before_call.contains(&format!("{receiver}.len()"))
+    let receiver_len = format!("{receiver}.len()");
+    // Require a JOINED predicate that actually bounds new_len against the same
+    // receiver's .len(), not an independent occurrence of new_len< anywhere
+    // near an unrelated .len() call.  Mirror the discipline used by
+    // has_set_len_capacity_relation and has_len_cap_bound_guard.
+    let new_len_lte_len = format!("new_len<={receiver_len}");
+    let new_len_lt_len = format!("new_len<{receiver_len}");
+    let len_gt_new_len = format!("{receiver_len}>new_len");
+    let len_gte_new_len = format!("{receiver_len}>=new_len");
+    before_call.contains(&new_len_lte_len)
+        || before_call.contains(&new_len_lt_len)
+        || before_call.contains(&len_gt_new_len)
+        || before_call.contains(&len_gte_new_len)
 }
 
 fn new_len_derived_from_subtraction(before_call: &str, receiver: &str) -> bool {

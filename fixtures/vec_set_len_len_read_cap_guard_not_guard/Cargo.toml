@@ -1,0 +1,5 @@
+[package]
+name = "vec-set-len-len-read-cap-guard-not-guard"
+version = "0.0.0"
+edition = "2024"
+publish = false
