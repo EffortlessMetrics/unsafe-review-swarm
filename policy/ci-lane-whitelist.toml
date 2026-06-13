@@ -111,6 +111,16 @@ status = "advisory"
 review_after = "2026-07-01"
 
 [[lane]]
+id = "action-smoke"
+owner = "repo-infra / ci"
+intent = "Prove the unsafe-review-first-pr composite action runs end-to-end and sets its bundle_dir and gate_status outputs against this repo"
+proof_obligation = "workflow runs on workflow_dispatch only, checks out the repo with full history, runs the local composite action against base_ref main, and asserts bundle_dir and gate_status outputs are non-empty; an empty or zero-card diff is acceptable — the smoke proves the action runs, not that it finds cards; never a required PR gate, never triggers on pull_request or push, no write permissions"
+cost_estimate = "medium"
+trigger_policy = "workflow_dispatch only"
+status = "advisory"
+review_after = "2026-08-12"
+
+[[lane]]
 id = "corpus-backstop"
 owner = "repo-infra"
 intent = "Run the fixture corpus on a weekly schedule to collect wall time, output size, and external peak RSS as a resource triage backstop"

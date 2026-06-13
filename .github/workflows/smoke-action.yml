@@ -1,0 +1,64 @@
+name: smoke-action
+
+# Live end-to-end smoke test for the unsafe-review-first-pr composite action.
+#
+# Advisory posture: manual-only (workflow_dispatch), never a required PR gate,
+# never triggered on pull_request or push. Proves the composite action runs
+# end-to-end and sets its bundle_dir and gate_status outputs. An empty or
+# zero-card diff is acceptable — the smoke proves the action RUNS and SETS its
+# outputs, not that it finds cards.
+#
+# DIAGNOSTIC / ADVISORY ONLY — not a performance SLA, not a coverage claim,
+# not memory-safety proof, not UB-free status, not Miri-clean status, and
+# not site-execution proof. Static unsafe contract review only.
+#
+# See docs/specs/UNSAFE-REVIEW-SPEC-0037-pr-gate-composite-action.md §10 + §12
+# for the acceptance checklist this workflow closes.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: smoke composite action (advisory, non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Run composite action against this repo
+        id: unsafe_review
+        uses: ./.github/actions/unsafe-review-first-pr
+        with:
+          base_ref: main
+
+      - name: Assert outputs are set
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle_dir="${{ steps.unsafe_review.outputs.bundle_dir }}"
+          gate_status="${{ steps.unsafe_review.outputs.gate_status }}"
+
+          if [ -z "${bundle_dir}" ]; then
+            echo "::error::smoke assertion failed: bundle_dir output is empty"
+            exit 1
+          fi
+          if [ -z "${gate_status}" ]; then
+            echo "::error::smoke assertion failed: gate_status output is empty"
+            exit 1
+          fi
+
+          echo "smoke assertion passed"
+          echo "bundle_dir=${bundle_dir}" >> "${GITHUB_STEP_SUMMARY}"
+          echo "gate_status=${gate_status}" >> "${GITHUB_STEP_SUMMARY}"

@@ -95,6 +95,18 @@ created = "2026-06-01"
 review_after = "2026-07-01"
 
 [[workflow]]
+id = "workflow-0009"
+path = ".github/workflows/smoke-action.yml"
+permissions = "contents: read"
+actions = [
+  "actions/checkout@v6",
+  "./.github/actions/unsafe-review-first-pr",
+]
+reason = "Manual-only live end-to-end smoke test for the unsafe-review-first-pr composite action. Triggered by workflow_dispatch only — never on pull_request or push. Checks out the repo with full history, runs the local composite action against base_ref main, and asserts that bundle_dir and gate_status outputs are set. Closes SPEC-0037 section 12 acceptance gap. Advisory only — not a required PR gate, no write permissions, no witness execution, no source edits, no comment posting, no memory-safety or UB-free claims."
+created = "2026-06-12"
+review_after = "2026-08-12"
+
+[[workflow]]
 id = "workflow-0008"
 path = ".github/workflows/corpus-backstop.yml"
 permissions = "contents: read"
