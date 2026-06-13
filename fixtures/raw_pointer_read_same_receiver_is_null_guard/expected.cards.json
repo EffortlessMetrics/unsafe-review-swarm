@@ -1,0 +1,218 @@
+[
+  {
+    "id": "UR-raw-pointer-read-same-receiver-is-null-guard-fixture-src-lib-rs-read-checked-operation-raw_pointer_read-raw-pointer-read-984ce34effbf-pointer_validity-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "proof_path": "source_route_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 5,
+      "column": 9,
+      "kind": "operation",
+      "owner": "read_checked",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "Some(unsafe { a.read() })"
+    },
+    "operation": "Some(unsafe { a.read() })",
+    "operation_family": "raw_pointer_read",
+    "hazards": [
+      "pointer_validity",
+      "alignment",
+      "initialized_memory",
+      "same_allocation"
+    ],
+    "obligations": [
+      "pointer is live and dereferenceable for the accessed type",
+      "buffer has enough bytes for the accessed type",
+      "pointer is aligned for the accessed type",
+      "memory is initialized for the accessed type",
+      "access remains inside one live allocation"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "pointer-live",
+        "description": "pointer is live and dereferenceable for the accessed type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Nullability guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `read_checked`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "bounds",
+        "description": "buffer has enough bytes for the accessed type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No length or bounds guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `read_checked`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "alignment",
+        "description": "pointer is aligned for the accessed type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No alignment guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `read_checked`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "initialized",
+        "description": "memory is initialized for the accessed type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `read_checked`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "allocation",
+        "description": "access remains inside one live allocation",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file(s) mention owner `read_checked`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "Some inferred safety obligations are missing local guard evidence",
+    "reach": "1 related test file(s) mention owner `read_checked`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test read_checked",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test read_checked",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose local guards for these `raw_pointer_read` safety obligations: (1) buffer has enough bytes for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
+    "verify_commands": [
+      "cargo +nightly miri test read_checked",
+      "cargo +nightly careful test read_checked"
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `Some(unsafe { a.read() })`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test read_checked",
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test read_checked` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test read_checked",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-raw-pointer-read-same-receiver-is-null-guard-fixture-src-lib-rs-read-checked-operation-raw_pointer_read-raw-pointer-read-984ce34effbf-pointer_validity-c1` still maps to `Some(unsafe { a.read() })` at `src/lib.rs:5:9` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test read_checked` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo +nightly miri test read_checked` first, then attach a matching receipt if it confirms the route",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "present",
+      "guard_coverage": "missing",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "not_eligible",
+      "agent_lsp_readiness": "ready"
+    }
+  }
+]

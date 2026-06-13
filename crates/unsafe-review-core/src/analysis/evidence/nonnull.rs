@@ -4,8 +4,9 @@ use super::{
     any_compact_if_condition, any_marker_occurrence, any_marker_tail,
     branch_still_open_at_operation, code_before_operation, compact_code,
     condition_has_top_level_conjunct, condition_has_top_level_disjunct, contains_executable_return,
-    contains_simple_assignment_to, ends_with_some_pattern, match_some_branch_after_marker,
-    matching_code_block_end, receiver_before_marker, strip_block_comments_and_literals,
+    contains_simple_assignment_to, ends_with_some_pattern, is_receiver_path_char,
+    match_some_branch_after_marker, matching_code_block_end, receiver_before_marker,
+    strip_block_comments_and_literals,
 };
 
 pub(super) fn has_nullability_guard(site: &ScannedSite, lower: &str) -> bool {
@@ -18,6 +19,17 @@ pub(super) fn has_nullability_guard(site: &ScannedSite, lower: &str) -> bool {
         let guard_compact = compact_code(&strip_block_comments_and_literals(&guard_scope));
         let context = NonNullPointerContext::new(&guard_compact, arg);
         return context.has_nullability_guard();
+    }
+    // For raw-pointer deref families (`.read()`, `.write()`, `*ptr`, free-fn
+    // forms) require a same-receiver, position-aware null check.  The bare
+    // substring scan below is intentionally bypassed: an unrelated
+    // `b.is_null()` near `a.read()` must not discharge `a`'s pointer-live
+    // obligation.
+    if let Some(receiver) = raw_pointer_deref_receiver(&site.operation.expression) {
+        let guard_scope = code_before_operation(lower, &site.operation.expression)
+            .unwrap_or_else(|| lower.to_string());
+        let guard_compact = compact_code(&strip_block_comments_and_literals(&guard_scope));
+        return RawPointerNullContext::new(&guard_compact, receiver).has_null_guard();
     }
     stripped.contains("is_null") || compact.contains("nonnull::new(")
 }
@@ -139,6 +151,55 @@ impl<'a> NonNullPointerContext<'a> {
     }
 }
 
+/// Same-receiver null-check context for raw-pointer deref families.
+///
+/// Mirrors the early-return and open-branch patterns of [`NonNullPointerContext`]
+/// but keyed on the raw-pointer receiver (e.g. `a` in `a.read()`) rather than
+/// the argument of `NonNull::new_unchecked`.
+struct RawPointerNullContext<'a> {
+    compact: &'a str,
+    receiver: String,
+}
+
+impl<'a> RawPointerNullContext<'a> {
+    fn new(compact: &'a str, receiver: String) -> Self {
+        Self { compact, receiver }
+    }
+
+    fn has_null_guard(&self) -> bool {
+        self.has_null_early_return_guard() || self.has_non_null_open_branch_guard()
+    }
+
+    fn has_null_early_return_guard(&self) -> bool {
+        let predicate = format!("{}.is_null()", self.receiver);
+        any_compact_if_condition(self.compact, |condition, after_guard| {
+            condition_has_top_level_disjunct(condition, &predicate)
+                && self.returning_after_guard_preserves_freshness(after_guard)
+        })
+    }
+
+    fn has_non_null_open_branch_guard(&self) -> bool {
+        let predicate = format!("!{}.is_null()", self.receiver);
+        any_compact_if_condition(self.compact, |condition, after_guard| {
+            condition_has_top_level_conjunct(condition, &predicate)
+                && branch_still_open_at_operation(after_guard)
+                && self.receiver_stays_fresh_after(after_guard)
+        })
+    }
+
+    fn returning_after_guard_preserves_freshness(&self, after_guard: &str) -> bool {
+        let (guard_body, after_guard_body) = matching_code_block_end(after_guard)
+            .map_or((after_guard, ""), |body_end| {
+                (&after_guard[..body_end], &after_guard[body_end + 1..])
+            });
+        contains_executable_return(guard_body) && self.receiver_stays_fresh_after(after_guard_body)
+    }
+
+    fn receiver_stays_fresh_after(&self, text: &str) -> bool {
+        !contains_simple_assignment_to(text, &self.receiver)
+    }
+}
+
 fn stale_assignment_targets(arg: &str) -> Vec<String> {
     let mut targets = vec![arg.to_string()];
     for marker in [".as_ptr()", ".as_mut_ptr()", ".cast::<", ".cast()"] {
@@ -171,4 +232,78 @@ fn nonnull_new_unchecked_argument(expression: &str) -> Option<String> {
     }
     let arg = rest[..end].trim();
     (!arg.is_empty()).then(|| arg.to_string())
+}
+
+/// Extract the raw-pointer receiver from a raw-pointer deref expression.
+///
+/// Handles method-call forms (`.read()`, `.write()`, `.cast::<T>()` chains),
+/// deref form (`*ptr`), and free-function forms (`ptr::read(ptr, ...)`).
+/// Returns `None` for expressions that are not recognized raw-pointer deref
+/// forms so the caller can fall back to other discharge paths.
+fn raw_pointer_deref_receiver(expression: &str) -> Option<String> {
+    let compact = compact_code(&expression.to_ascii_lowercase());
+    // Method-call forms: receiver before the operation marker.
+    for marker in &[
+        ".cast::<",
+        ".read(",
+        ".read_volatile(",
+        ".write(",
+        ".write_volatile(",
+        ".replace(",
+    ] {
+        if let Some(receiver) = receiver_before_marker(&compact, marker) {
+            return Some(receiver.to_string());
+        }
+    }
+    // Deref form: `*ptr` — expression starts with `*` followed by a simple
+    // receiver path.  Parenthesised operands like `*(ptr.add(n))` are excluded.
+    if let Some(receiver) = deref_expression_receiver(&compact) {
+        return Some(receiver);
+    }
+    // Free-function forms: `ptr::read(ptr)`, `ptr::write(ptr, val)`, etc.
+    for marker in &[
+        "::read(",
+        "::read_volatile(",
+        "::write(",
+        "::write_volatile(",
+        "::replace(",
+    ] {
+        if let Some(arg) = free_fn_first_arg(&compact, marker) {
+            return Some(arg);
+        }
+    }
+    None
+}
+
+/// Extract the identifier from a deref expression such as `*ptr` or `*self.ptr`.
+fn deref_expression_receiver(compact: &str) -> Option<String> {
+    let rest = compact.strip_prefix('*')?;
+    if rest.starts_with('(') {
+        return None;
+    }
+    let receiver: String = rest
+        .chars()
+        .take_while(|ch| is_receiver_path_char(*ch))
+        .collect();
+    (!receiver.is_empty()).then_some(receiver)
+}
+
+/// Extract the first simple-path argument from a free-function call marker.
+fn free_fn_first_arg(compact: &str, marker: &str) -> Option<String> {
+    let pos = compact.find(marker)?;
+    let after_open = &compact[pos + marker.len()..];
+    let arg: String = after_open
+        .chars()
+        .take_while(|ch| is_receiver_path_char(*ch))
+        .collect();
+    if arg.is_empty() {
+        return None;
+    }
+    let after_arg = &after_open[arg.len()..];
+    let next = after_arg.chars().next();
+    if next.is_none_or(|ch| ch == ',' || ch == ')') {
+        Some(arg)
+    } else {
+        None
+    }
 }

@@ -1,0 +1,11 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,9 @@
++pub fn read_checked(a: *const u32) -> Option<u32> {
++    if !a.is_null() {
++        Some(unsafe { a.read() })
++    } else {
++        None
++    }
++}

@@ -1,0 +1,8 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,6 @@
++pub fn read_two(a: *const u32, b: *const u32) -> u32 {
++    let _b = b.is_null();
++    unsafe { a.read() }
++}
