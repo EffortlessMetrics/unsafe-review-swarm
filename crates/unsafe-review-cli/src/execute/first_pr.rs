@@ -2413,6 +2413,7 @@ fn artifact_kind(path: &str) -> &'static str {
         "tokmd-packets.json" => "tokmd_packets",
         "lsp.json" => "saved_lsp",
         "repair-queue.json" => "repair_queue",
+        "usefulness-telemetry.json" => "usefulness_telemetry",
         _ => "unknown",
     }
 }
@@ -2440,6 +2441,7 @@ fn artifact_schema_version(path: &str) -> Option<&'static str> {
         "manual-repair-queue.json" => Some("manual-repair-queue/v1"),
         "tokmd-packets.json" => Some("tokmd-packets/v1"),
         "cards.sarif" => Some("2.1.0"),
+        "usefulness-telemetry.json" => Some("usefulness-telemetry/v1"),
         _ => None,
     }
 }
@@ -2489,6 +2491,24 @@ mod tests {
         assert_eq!(
             context_command(root, &card_id),
             "unsafe-review context --root \"C:/Code/Rust With Spaces/unsafe-review\" UR-fixture-src-lib-rs-owner-operation-read-hash-hazard-c1 --json"
+        );
+    }
+
+    #[test]
+    fn usefulness_telemetry_artifact_is_classified_not_unknown() {
+        // Regression: usefulness-telemetry.json (SPEC-0038) must be a known
+        // review-kit artifact, or check-first-pr-artifacts rejects the bundle
+        // with an unknown kind. Producer kind/format/schema must match the
+        // xtask expectation (advisory_artifacts::expected_review_kit_*).
+        assert_eq!(
+            artifact_kind("usefulness-telemetry.json"),
+            "usefulness_telemetry"
+        );
+        assert_ne!(artifact_kind("usefulness-telemetry.json"), "unknown");
+        assert_eq!(artifact_format("usefulness-telemetry.json"), "json");
+        assert_eq!(
+            artifact_schema_version("usefulness-telemetry.json"),
+            Some("usefulness-telemetry/v1")
         );
     }
 
