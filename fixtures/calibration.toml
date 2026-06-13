@@ -292,6 +292,7 @@ required_core_fixtures = [
   "ptr_copy_slice_range_shadowed_dst_path_not_guard",
   "ptr_copy_slice_range_shadowed_dst_not_guard",
   "ptr_copy_other_len_not_guard",
+  "multiline_ptr_copy",
   "ptr_replace_value",
   "copy_nonoverlapping",
   "copy_nonoverlapping_slice_range_guard",
@@ -3927,6 +3928,16 @@ expected_hazard = "bounds"
 fixture = "ptr_copy_other_len_not_guard"
 kind = "false_positive_control"
 claim = "ptr::copy does not accept an unrelated slice length assertion as source/destination range evidence"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "bounds"
+
+[[cases]]
+fixture = "multiline_ptr_copy"
+kind = "positive"
+claim = "multi-line ptr::copy call split across lines yields the full call snippet; syntax site wins over the truncated fallback opener line so the card snippet is complete"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"

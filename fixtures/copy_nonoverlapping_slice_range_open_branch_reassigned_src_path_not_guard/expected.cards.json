@@ -1,6 +1,6 @@
 [
   {
-    "id": "UR-copy-nonoverlapping-slice-range-open-branch-reassigned-src-path-not-guard-src-lib-rs-copy-checked-operation-copy_nonoverlapping-copy-nonoverlapping-5e9259a1a866-pointer_validity-c1",
+    "id": "UR-copy-nonoverlapping-slice-range-open-branch-reassigned-src-path-not-guard-src-lib-rs-copy-checked-operation-copy_nonoverlapping-copy-nonoverlapping-5a661a29fe60-pointer_validity-c1",
     "class": "guard_missing",
     "priority": "high",
     "confidence": "medium",
@@ -13,9 +13,9 @@
       "owner": "copy_checked",
       "visibility": "private",
       "public_api_surface": false,
-      "snippet": "core::ptr::copy_nonoverlapping("
+      "snippet": "core::ptr::copy_nonoverlapping( buffers.src.as_ptr(), buffers.dst.as_mut_ptr(), count, )"
     },
-    "operation": "core::ptr::copy_nonoverlapping(",
+    "operation": "core::ptr::copy_nonoverlapping( buffers.src.as_ptr(), buffers.dst.as_mut_ptr(), count, )",
     "operation_family": "copy_nonoverlapping",
     "hazards": [
       "pointer_validity",
@@ -104,7 +104,7 @@
       "cargo +nightly careful test copy_checked"
     ],
     "confirmation_cue": {
-      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `core::ptr::copy_nonoverlapping(`; confirm with external evidence before treating it as observed runtime behavior",
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `core::ptr::copy_nonoverlapping( buffers.src.as_ptr(), buffers.dst.as_mut_ptr(), count, )`; confirm with external evidence before treating it as observed runtime behavior",
       "build_this_first": {
         "kind": "verify_command",
         "command": "cargo +nightly miri test copy_checked",
@@ -116,7 +116,7 @@
         "command": "cargo +nightly miri test copy_checked",
         "route_kind": "miri",
         "steps": [
-          "Confirm ReviewCard `UR-copy-nonoverlapping-slice-range-open-branch-reassigned-src-path-not-guard-src-lib-rs-copy-checked-operation-copy_nonoverlapping-copy-nonoverlapping-5e9259a1a866-pointer_validity-c1` still maps to `core::ptr::copy_nonoverlapping(` at `src/lib.rs:12:17` before upgrading confidence.",
+          "Confirm ReviewCard `UR-copy-nonoverlapping-slice-range-open-branch-reassigned-src-path-not-guard-src-lib-rs-copy-checked-operation-copy_nonoverlapping-copy-nonoverlapping-5a661a29fe60-pointer_validity-c1` still maps to `core::ptr::copy_nonoverlapping( buffers.src.as_ptr(), buffers.dst.as_mut_ptr(), count, )` at `src/lib.rs:12:17` before upgrading confidence.",
           "Build/run `cargo +nightly miri test copy_checked` as the smallest available command for this card.",
           "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
         ],

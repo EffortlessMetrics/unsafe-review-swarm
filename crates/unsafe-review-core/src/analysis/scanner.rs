@@ -1,5 +1,5 @@
 use super::atomic_pointer_state::is_atomic_pointer_state_transition;
-use super::copy_operation::copy_operation_family;
+use super::copy_operation::{copy_operation_family, is_incomplete_multiline_copy};
 use super::ffi_boundary::ffi_boundary_applicability;
 use super::maybeuninit_operation::maybeuninit_operation_family;
 use super::nonnull_operation::nonnull_operation_family;

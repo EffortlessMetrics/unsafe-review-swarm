@@ -669,6 +669,7 @@ fixtures = [
   "ptr_copy_slice_range_shadowed_dst_path_not_guard",
   "ptr_copy_slice_range_shadowed_dst_not_guard",
   "ptr_copy_other_len_not_guard",
+  "multiline_ptr_copy",
 ]
 dogfood_targets = []
 label_ledgers = [
@@ -680,7 +681,8 @@ Fixture-pinned ptr::copy valid-range evidence distinguishes same-call source and
 destination length evidence from stale, partial, closed-branch, comment-only,
 compound-stale-count, shadowed-count, shadowed-receiver, stale-receiver-path, shadowed-receiver-path, and unrelated-length
 controls in the listed fixtures, while initialized-memory remains a separate
-missing obligation.
+missing obligation. Includes a multiline ptr::copy control that verifies the
+snippet is not truncated to the call opener when arguments span multiple lines.
 """
 forbidden_claims = [
   "broad ptr::copy soundness",

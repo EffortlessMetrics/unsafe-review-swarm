@@ -595,3 +595,16 @@ expected_obligation_key = "valid-range"
 expected_discharge_state = "missing"
 label_source = "fixture_golden"
 rationale = "A length check over unrelated state does not discharge source or destination valid-range evidence."
+
+[[samples]]
+id = "ptr-copy-multiline-missing-valid-range"
+fixture = "multiline_ptr_copy"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "ptr_copy"
+expected_hazard = "bounds"
+expected_obligation_key = "valid-range"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A multiline ptr::copy call without range evidence yields a guard_missing card with the full snippet; the syntax site wins over the truncated fallback opener line."

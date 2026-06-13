@@ -635,6 +635,7 @@ const FIXTURE_GOLDENS: &[&str] = &[
     "ptr_copy_slice_range_shadowed_dst_path_not_guard",
     "ptr_copy_slice_range_shadowed_dst_not_guard",
     "ptr_copy_other_len_not_guard",
+    "multiline_ptr_copy",
     "ptr_replace_value",
     "copy_nonoverlapping",
     "copy_nonoverlapping_slice_range_guard",
