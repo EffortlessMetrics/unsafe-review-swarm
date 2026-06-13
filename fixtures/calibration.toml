@@ -140,6 +140,7 @@ required_core_fixtures = [
   "vec_set_len_post_init_not_guard",
   "vec_set_len_unrelated_initialization_not_guard",
   "vec_set_len_cap_not_len_not_guard",
+  "vec_set_len_len_read_cap_guard_not_guard",
   "vec_set_len_len_and_cap_guard",
   "drop_in_place_deallocation",
   "drop_in_place_box_origin",
@@ -1948,6 +1949,16 @@ expected_hazard = "initialized_memory"
 fixture = "vec_set_len_cap_not_len_not_guard"
 kind = "false_positive_control"
 claim = "Vec::set_len guarded only by new_len <= capacity discharges the capacity obligation but not initialized; card stays guard_missing"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "vec_set_len"
+expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "vec_set_len_len_read_cap_guard_not_guard"
+kind = "false_positive_control"
+claim = "Vec::set_len with a benign .len() read plus a capacity-only guard must not be credited as shrink evidence; initialized_memory card stays guard_missing"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
