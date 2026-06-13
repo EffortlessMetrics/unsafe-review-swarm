@@ -1,0 +1,5 @@
+[package]
+name = "unsafe-fn-pointer-field-no-cards"
+version = "0.0.0"
+edition = "2024"
+publish = false

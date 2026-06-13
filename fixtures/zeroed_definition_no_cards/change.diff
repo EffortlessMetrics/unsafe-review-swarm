@@ -1,0 +1,9 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,5 @@
++/// Allocates a zero-initialised byte buffer of the given length.
++/// The body is safe: `vec![0; len]` never invokes `mem::zeroed`.
++pub fn zeroed(len: usize) -> Vec<u8> {
++    vec![0; len]
++}

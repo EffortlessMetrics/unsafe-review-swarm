@@ -1,0 +1,5 @@
+[package]
+name = "reach-owner-called-in-cfg-test-reached"
+version = "0.0.0"
+edition = "2024"
+publish = false

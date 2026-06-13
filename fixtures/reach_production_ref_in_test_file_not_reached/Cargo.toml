@@ -1,0 +1,5 @@
+[package]
+name = "reach-production-ref-in-test-file-not-reached"
+version = "0.0.0"
+edition = "2024"
+publish = false
