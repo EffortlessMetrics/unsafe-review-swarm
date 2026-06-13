@@ -1,6 +1,6 @@
 # UNSAFE-REVIEW-SPEC-0037: PR-gate composite GitHub Action
 
-Status: proposed
+Status: accepted
 Owner: repo-infra / ci
 Created: 2026-06-12
 
@@ -221,10 +221,14 @@ cargo run --locked -p xtask -- check-pr
 
 ## 12. Lifecycle status
 
-Proposed. Move to accepted when:
+Accepted (2026-06-13). All criteria met:
 
 - The composite action is wired and the example caller workflow exists
 - `docs/ci/github-action.md` documents the two-line adoption snippet
 - `check-spec-status` passes with this spec listed
-- A live end-to-end smoke test (follow-up) has run once against the published
-  binary
+- A live end-to-end smoke test has run green via `smoke-action.yml`
+  (`workflow_dispatch`, run 27456120005 on `main`, against the published
+  binary): the action produced the bundle, appended the job summary, and set
+  its `bundle_dir` and `gate_status` outputs. The smoke verify is version-skew
+  resilient — newer bundle artifacts (e.g. `usefulness-telemetry.json`) are
+  checked only if the pinned binary emits them.
