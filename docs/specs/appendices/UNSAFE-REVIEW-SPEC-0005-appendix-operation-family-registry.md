@@ -54,9 +54,10 @@ Zero-card controls are not operation-family rows and must not introduce a
 synthetic `ReviewCard` family. Fixture goldens `safe_code_no_cards`,
 `safe_reference_deref_no_cards`, `imports_not_unsafe_operations`,
 `cfg_target_feature_not_operation`, `static_lifetime_mut_ref_not_static_mut`,
-and `adjacent_unchanged_unsafe_fn_no_card` pin safe Rust, safe reference
-derefs, import-only text, cfg predicates, `'static mut` reference type text, and
-unchanged adjacent unsafe declarations as no-card cases.
+and `adjacent_unchanged_unsafe_fn_no_card` and `unsafe_fn_pointer_field_no_cards`
+pin safe Rust, safe reference derefs, import-only text, cfg predicates, `'static
+mut` reference type text, unchanged adjacent unsafe declarations, and
+`unsafe fn(...)` fn-pointer types in field/type position as no-card cases.
 
 ## Precedence
 

@@ -386,6 +386,8 @@ required_core_fixtures = [
   "str_from_utf8_unchecked_match_ok_shadowed_not_guard",
   "zeroed_invalid_value",
   "zeroed_valid_u32",
+  "zeroed_definition_no_cards",
+  "zeroed_call_still_cards",
   "inline_asm_human_review",
   "raw_pointer_read_volatile",
   "raw_pointer_read_len_capacity_assert",
@@ -549,6 +551,7 @@ required_core_fixtures = [
   "macro_rules_owner_inference",
   "nested_unsafe_operation_call_dedupe",
   "adjacent_unchanged_unsafe_fn_no_card",
+  "unsafe_fn_pointer_field_no_cards",
   "js_buffer_reentry_sync_compression",
   "js_buffer_reentry_async_helper_capture",
   "js_buffer_reentry_node_fs_rab_scalar_write",
@@ -4426,6 +4429,23 @@ expected_operation_family = "zeroed"
 expected_hazard = "invalid_value"
 
 [[cases]]
+fixture = "zeroed_definition_no_cards"
+kind = "false_positive_control"
+claim = "a safe fn zeroed() definition is not carded as a mem::zeroed call"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
+
+[[cases]]
+fixture = "zeroed_call_still_cards"
+kind = "positive"
+claim = "mem::zeroed call inside a function body still produces a review card after definition-header fix"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "unsafe_unreached"
+expected_operation_family = "zeroed"
+expected_hazard = "invalid_value"
+
+[[cases]]
 fixture = "inline_asm_human_review"
 kind = "positive"
 claim = "inline asm reports assembly/target hazards and routes to human review instead of a generic unsafe function call"
@@ -6027,6 +6047,13 @@ expected_hazard = "pointer_validity"
 fixture = "adjacent_unchanged_unsafe_fn_no_card"
 kind = "false_positive_control"
 claim = "adjacent unchanged unsafe declarations do not emit cards when a neighboring safe function changes"
+support_tier = "Diff unsafe site inventory"
+expected_cards = 0
+
+[[cases]]
+fixture = "unsafe_fn_pointer_field_no_cards"
+kind = "false_positive_control"
+claim = "an unsafe fn-pointer type in a struct field position does not produce a ReviewCard"
 support_tier = "Diff unsafe site inventory"
 expected_cards = 0
 

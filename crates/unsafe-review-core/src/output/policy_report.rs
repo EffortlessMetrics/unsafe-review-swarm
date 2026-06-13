@@ -175,19 +175,17 @@ fn evaluate_with_date(output: &AnalyzeOutput, audit_date: &str) -> Result<Policy
         .collect::<Vec<_>>();
     let summary = PolicyReportSummary {
         cards: output.cards.len(),
-        new_gaps: cards
-            .iter()
-            .filter(|card| card.policy_status == "new_gap")
-            .count(),
-        // Project movement counts from the analyzed Summary (which computes them with snapshot
-        // comparison); these are always 0 until a baseline-init coverage snapshot is present.
+        // Project ALL five movement counts from the canonical analyzed Summary so that
+        // policy_report stays single-truth with output.summary (SPEC-0030).  The canonical
+        // Summary is diff-scope-aware: on a diff-scoped run it excludes out-of-scope baseline
+        // IDs from resolved_gaps and folds them into inherited_gaps.  Re-deriving them here
+        // from the card set and the local resolved_baseline Vec diverges for those out-of-scope
+        // IDs (output audit #1687 findings 7+8).
+        new_gaps: output.summary.new_gaps,
         worsened_gaps: output.summary.worsened_gaps,
         improved_gaps: output.summary.improved_gaps,
-        resolved_baseline: resolved_baseline.len(),
-        inherited_gaps: cards
-            .iter()
-            .filter(|card| card.policy_status == "baseline_known")
-            .count(),
+        resolved_baseline: output.summary.resolved_gaps,
+        inherited_gaps: output.summary.inherited_gaps,
         baseline_known: cards
             .iter()
             .filter(|card| card.policy_status == "baseline_known")
@@ -812,6 +810,159 @@ review_after = "2026-08-01"
             "WitnessMismatch must map to PolicyStatus::NewGap — revert is_actionable() to break this"
         );
         assert_eq!(status.as_str(), "new_gap");
+    }
+
+    /// Drift-lock: on a diff-scoped run with an out-of-scope baseline card, all five
+    /// movement counts in `policy_report.summary` must equal `output.summary.*`
+    /// (output audit #1687 findings 7+8).
+    ///
+    /// Setup: a two-file repo where both files have unsafe code; a full-repo baseline
+    /// covers both cards.  A diff-scoped run touches only `src/a.rs`.  The `src/b.rs`
+    /// card is out-of-scope — must be counted as `inherited` (not `resolved`) in both
+    /// `output.summary` and `policy_report.summary`.  Before this fix, `policy_report`
+    /// re-derived `inherited_gaps` from the card set (only counting `BaselineKnown` cards
+    /// that appeared in the scan) and `resolved_baseline` from a locally-constructed Vec
+    /// that used the same diff-scope filter but was a separate re-derivation — both could
+    /// diverge from `output.summary` in multi-file diff-scoped scenarios.
+    #[test]
+    fn policy_report_movement_counts_match_canonical_summary_on_diff_scoped_run()
+    -> Result<(), String> {
+        // --- Build a two-file repo ---
+        let root = unique_temp_dir("unsafe-review-policy-drift-lock")?;
+        fs::create_dir_all(root.join("src")).map_err(|err| format!("create src failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"two-file-repo\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
+        // Both files have a raw-pointer deref so each generates a card on a full scan.
+        fs::write(
+            root.join("src/a.rs"),
+            "pub unsafe fn op_a(ptr: *const u32) -> u32 {\n    unsafe { *ptr }\n}\n",
+        )
+        .map_err(|err| format!("write a.rs failed: {err}"))?;
+        fs::write(
+            root.join("src/b.rs"),
+            "pub unsafe fn op_b(ptr: *const u64) -> u64 {\n    unsafe { *ptr }\n}\n",
+        )
+        .map_err(|err| format!("write b.rs failed: {err}"))?;
+
+        // --- Full-repo scan to discover card IDs ---
+        let full = analyze(AnalyzeInput {
+            root: root.clone(),
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: None,
+        })?;
+        if full.cards.len() < 2 {
+            fs::remove_dir_all(&root).map_err(|err| format!("cleanup failed: {err}"))?;
+            return Err(format!(
+                "expected at least 2 cards on full scan; got {}",
+                full.cards.len()
+            ));
+        }
+
+        // --- Write a baseline covering ALL cards from both files ---
+        let policy = root.join("policy");
+        fs::create_dir_all(&policy).map_err(|err| format!("create policy dir failed: {err}"))?;
+        let entries = full
+            .cards
+            .iter()
+            .map(|card| {
+                format!(
+                    "[[entries]]\ncard_id = \"{}\"\nowner = \"core/policy\"\nreason = \"accepted\"\nevidence = \"fixture\"\nreview_after = \"2027-01-01\"\n",
+                    card.id.0
+                )
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        fs::write(
+            policy.join("unsafe-review-baseline.toml"),
+            format!("schema_version = \"0.1\"\nstatus = \"active\"\n\n{entries}"),
+        )
+        .map_err(|err| format!("write baseline failed: {err}"))?;
+
+        // --- Diff-scoped run: diff touches only src/a.rs (innocuous comment) ---
+        let diff_text = "\
+diff --git a/src/a.rs b/src/a.rs\n\
+--- a/src/a.rs\n\
++++ b/src/a.rs\n\
+@@ -1,3 +1,4 @@\n\
++// reviewed in this PR\n\
+ pub unsafe fn op_a(ptr: *const u32) -> u32 {\n\
+     unsafe { *ptr }\n\
+ }\n";
+
+        let output = analyze(AnalyzeInput {
+            root: root.clone(),
+            scope: Scope::Diff,
+            diff: DiffSource::Text(diff_text.to_string()),
+            mode: AnalysisMode::Draft,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: None,
+        })?;
+
+        let report = evaluate_with_date(&output, "2026-05-18")?;
+        fs::remove_dir_all(&root).map_err(|err| format!("cleanup failed: {err}"))?;
+
+        // SPEC-0030 §diff-scope-constraint: b.rs was not scanned, so the b.rs card must be
+        // counted as inherited (not resolved) in both the canonical Summary and the policy report.
+        assert_eq!(
+            output.summary.resolved_gaps, 0,
+            "canonical summary: b.rs card must not be resolved (out of diff scope); summary={:?}",
+            output.summary
+        );
+        // All baseline cards are inherited: a.rs card appeared as BaselineKnown (scanned,
+        // still present) + b.rs card is out-of-scope (not scanned, counted as inherited).
+        let expected_inherited = output.summary.inherited_gaps;
+        assert!(
+            expected_inherited >= 2,
+            "canonical summary must have at least 2 inherited_gaps; got {expected_inherited}"
+        );
+
+        // Drift-lock: policy_report movement counts must equal canonical output.summary.*
+        assert_eq!(
+            report.summary.new_gaps, output.summary.new_gaps,
+            "drift: policy_report.new_gaps ({}) != output.summary.new_gaps ({})",
+            report.summary.new_gaps, output.summary.new_gaps
+        );
+        assert_eq!(
+            report.summary.worsened_gaps, output.summary.worsened_gaps,
+            "drift: policy_report.worsened_gaps ({}) != output.summary.worsened_gaps ({})",
+            report.summary.worsened_gaps, output.summary.worsened_gaps
+        );
+        assert_eq!(
+            report.summary.improved_gaps, output.summary.improved_gaps,
+            "drift: policy_report.improved_gaps ({}) != output.summary.improved_gaps ({})",
+            report.summary.improved_gaps, output.summary.improved_gaps
+        );
+        assert_eq!(
+            report.summary.resolved_baseline, output.summary.resolved_gaps,
+            "drift: policy_report.resolved_baseline ({}) != output.summary.resolved_gaps ({})",
+            report.summary.resolved_baseline, output.summary.resolved_gaps
+        );
+        assert_eq!(
+            report.summary.inherited_gaps, output.summary.inherited_gaps,
+            "drift: policy_report.inherited_gaps ({}) != output.summary.inherited_gaps ({}); \
+             without the fix, re-derived inherited_gaps would miss the out-of-scope b.rs card",
+            report.summary.inherited_gaps, output.summary.inherited_gaps
+        );
+        // Concrete values — these are the pre-fix failure mode:
+        // old code: inherited_gaps=1 (only the a.rs BaselineKnown card);
+        // correct:  inherited_gaps=2 (a.rs BaselineKnown + b.rs out-of-scope)
+        assert_eq!(
+            report.summary.resolved_baseline, 0,
+            "policy_report.resolved_baseline must be 0: b.rs is out of diff scope, not resolved"
+        );
+        assert_eq!(
+            report.summary.inherited_gaps, expected_inherited,
+            "policy_report.inherited_gaps must match canonical summary ({expected_inherited})"
+        );
+        Ok(())
     }
 
     fn fixture_path(name: &str) -> PathBuf {
