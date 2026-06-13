@@ -60,7 +60,8 @@ callers.
 
 The action installs the `unsafe-review` CLI from crates.io using
 `cargo install --locked --version <pin>`. A pinned version input (default
-`0.3.5`) prevents silent breakage on new releases.
+`0.3.6`, the latest published crates.io version) prevents silent breakage on
+new releases.
 
 Binary acquisition decision: `cargo install` from crates.io is the MVP path
 because the `unsafe-review` crate is published to crates.io and no
