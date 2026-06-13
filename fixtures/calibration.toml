@@ -482,6 +482,8 @@ required_core_fixtures = [
   "unsafe_impl_send_generic_owner",
   "unsafe_impl_sync_generic_bound",
   "unsafe_impl_send_owner_substring_not_reached",
+  "reach_production_ref_in_test_file_not_reached",
+  "reach_owner_called_in_cfg_test_reached",
   "unsafe_impl_custom_trait_not_send_sync",
   "unsafe_impl_custom_trait_contract_not_guard",
   "ffi_sanitizer_route",
@@ -5377,6 +5379,26 @@ expected_hazard = "send_sync_invariant"
 fixture = "unsafe_impl_send_owner_substring_not_reached"
 kind = "false_positive_control"
 claim = "substring match of owner name in a longer identifier does not credit test reach for unsafe impl Send"
+support_tier = "Witness routing"
+expected_cards = 1
+expected_class = "requires_loom"
+expected_operation_family = "unsafe_impl_send_sync"
+expected_hazard = "send_sync_invariant"
+
+[[cases]]
+fixture = "reach_production_ref_in_test_file_not_reached"
+kind = "false_positive_control"
+claim = "owner mentioned only in production code above an inline test module must NOT credit test reach"
+support_tier = "Witness routing"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+
+[[cases]]
+fixture = "reach_owner_called_in_cfg_test_reached"
+kind = "positive"
+claim = "owner mentioned inside a #[cfg(test)] mod tests block credits test reach"
 support_tier = "Witness routing"
 expected_cards = 1
 expected_class = "requires_loom"
