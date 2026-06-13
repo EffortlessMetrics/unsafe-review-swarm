@@ -3,6 +3,7 @@ mod render;
 mod selection;
 
 pub(crate) use render::render;
+pub use selection::COMMENT_BODY_WORD_LIMIT;
 
 #[cfg(test)]
 mod tests {
@@ -158,12 +159,6 @@ mod tests {
                 .contains(
                     "Build/run this first: Build/run `cargo +nightly miri test read_header` first"
                 )
-        );
-        assert!(
-            value["comments"][0]["body"]
-                .as_str()
-                .unwrap_or("")
-                .contains("Minimal repro cue: confirm ReviewCard")
         );
         assert!(
             value["comments"][0]["body"]
@@ -694,6 +689,51 @@ mod tests {
             "family C is excluded because the budget was taken by the higher-importance family D card"
         );
 
+        Ok(())
+    }
+
+    /// Invariant: every comment body emitted by the core renderer fits within
+    /// [`COMMENT_BODY_WORD_LIMIT`] words, so the producer never generates a body
+    /// that the `check-first-pr-artifacts` gate would reject.
+    ///
+    /// Checked against the fixtures that are known to produce comment-plan
+    /// candidates (changed, actionable, high-signal cards).  The 242-word case
+    /// from `raw_pointer_alignment` is the concrete regression case.
+    #[test]
+    fn comment_body_word_count_never_exceeds_limit() -> Result<(), String> {
+        // Fixtures known to produce comment-plan candidates.
+        let fixtures = &[
+            "raw_pointer_alignment",
+            "copy_nonoverlapping",
+            "vec_set_len",
+            "transmute_unchecked",
+            "get_unchecked",
+            "box_from_raw",
+        ];
+        for &fixture in fixtures {
+            let output = match fixture_output(fixture) {
+                Ok(o) => o,
+                // Skip fixtures that are not found in this workspace layout.
+                Err(_) => continue,
+            };
+            let plan_json = render(&output);
+            let plan: serde_json::Value = serde_json::from_str(&plan_json)
+                .map_err(|err| format!("JSON parse for fixture `{fixture}`: {err}"))?;
+            let comments = plan["comments"]
+                .as_array()
+                .map(Vec::as_slice)
+                .unwrap_or(&[]);
+            for (idx, comment) in comments.iter().enumerate() {
+                let body = comment["body"].as_str().unwrap_or("");
+                let word_count = body.split_whitespace().count();
+                if word_count > selection::COMMENT_BODY_WORD_LIMIT {
+                    return Err(format!(
+                        "fixture `{fixture}` comment[{idx}] body has {word_count} words; limit is {} — body:\n{body}",
+                        selection::COMMENT_BODY_WORD_LIMIT
+                    ));
+                }
+            }
+        }
         Ok(())
     }
 

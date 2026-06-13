@@ -1,9 +1,7 @@
 use crate::domain::coverage::{Coverage, WitnessReceiptCoverage};
 use crate::domain::{Confidence, OperationFamily, Priority, ReviewCard, ReviewClass};
 use crate::output::REVIEWCARD_TRUST_BOUNDARY;
-use crate::output::confirmation::{
-    build_this_first, confirmation_step, hypothesis_to_confirm, minimal_repro_comment,
-};
+use crate::output::confirmation::{build_this_first, confirmation_step, hypothesis_to_confirm};
 
 /// Importance rank used to select the best candidates within the comment-plan
 /// budget (SPEC-0022 §5, SPEC-0032).
@@ -76,6 +74,13 @@ fn gap_severity_rank(card: &ReviewCard) -> u8 {
 }
 
 const PLAN_BOUNDARY: &str = "Plan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision.";
+
+/// Maximum word count for a comment-plan comment body.
+///
+/// This bound is enforced by the producer (`comment_body`) and cross-checked by the
+/// xtask `check-first-pr-artifacts` gate. Single-sourced here so producer and gate
+/// cannot drift. Word count is computed by `str::split_whitespace().count()`.
+pub const COMMENT_BODY_WORD_LIMIT: usize = 220;
 
 #[derive(Clone, Copy)]
 pub(super) struct ReviewBudgetReason {
@@ -305,6 +310,18 @@ pub(super) fn actionability(card: &ReviewCard) -> &'static str {
     }
 }
 
+/// Render the inline comment body for a planned comment.
+///
+/// The body is bounded to [`COMMENT_BODY_WORD_LIMIT`] words so the producer
+/// never emits a body the `check-first-pr-artifacts` gate would reject.
+///
+/// Sections are ordered by essentialness. The required sections — `Next
+/// action` and `Trust boundary` — are always present. The `Minimal repro cue`
+/// and `Witness route` sections are omitted from the body because their
+/// information is already carried by the structured fields (`minimal_repro`,
+/// `witness_routes`) in the surrounding JSON object and by `Build/run this
+/// first` and `Verify command`. Dropping them saves ~50 words without losing
+/// any actionable guidance or trust-boundary wording.
 pub(super) fn comment_body(card: &ReviewCard) -> String {
     let mut body = String::new();
     body.push_str(&format!(
@@ -325,20 +342,9 @@ pub(super) fn comment_body(card: &ReviewCard) -> String {
         build_this_first(card).summary
     ));
     body.push_str(&format!(
-        "Minimal repro cue: {}.\n\n",
-        minimal_repro_comment(card)
-    ));
-    body.push_str(&format!(
         "Confirmation step: {}\n\n",
         confirmation_step(card)
     ));
-    if let Some(route) = card.routes.first() {
-        body.push_str(&format!(
-            "Witness route: `{}` because {}.\n\n",
-            route.kind.as_str(),
-            route.reason
-        ));
-    }
     if let Some(command) = card.next_action.verify_commands.first() {
         body.push_str(&format!("Verify command: `{command}`\n\n"));
     }

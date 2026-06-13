@@ -13,6 +13,8 @@ mod output;
 mod policy;
 mod util;
 
+pub use output::comment_plan::COMMENT_BODY_WORD_LIMIT;
+
 pub use api::{
     AnalysisMode, AnalyzeInput, AnalyzeOutput, BaselineInitResult, DiffSource, DiscoveryOptions,
     FILE_TIMINGS_CAP, OutcomeReport, PerFileScanStats, PolicyMode, PolicyReport, Provenance,

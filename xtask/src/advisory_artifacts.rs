@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path};
 
+use unsafe_review_core::COMMENT_BODY_WORD_LIMIT as COMMENT_PLAN_BODY_WORD_LIMIT;
+
 struct AdvisoryArtifactSummary {
     card_ids: BTreeSet<String>,
     card_order: Vec<String>,
@@ -170,7 +172,6 @@ struct ManualCandidateEvidenceProjection {
     limitation: Option<String>,
 }
 
-const COMMENT_PLAN_BODY_WORD_LIMIT: usize = 220;
 const COMMENT_PLAN_REVIEW_BUDGET: usize = 3;
 const MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
 const MANUAL_CANDIDATE_GITHUB_QUEUE_LIMIT: usize = 1;
@@ -7035,12 +7036,6 @@ fn require_comment_body_card_projection(
             expected_build_first.summary
         ));
     }
-    let expected_minimal_repro = expected_comment_minimal_repro_body(card);
-    if !body.contains(&expected_minimal_repro) {
-        return Err(format!(
-            "{context} body must project structured minimal_repro cue `{expected_minimal_repro}`"
-        ));
-    }
     if let Some(command) = card.verify_commands.first() {
         let expected = format!("Confirmation step: build/run `{command}` first");
         if !body.contains(&expected) {
@@ -7049,14 +7044,10 @@ fn require_comment_body_card_projection(
             ));
         }
     }
-    if let Some(route) = card.witness_routes.first() {
-        let expected = format!("Witness route: `{}` because {}.", route.kind, route.reason);
-        if !body.contains(&expected) {
-            return Err(format!(
-                "{context} body must project ReviewCard witness route `{expected}`"
-            ));
-        }
-    }
+    // Note: `Minimal repro cue` and `Witness route` sections are intentionally
+    // omitted from the body (their content is carried by the structured
+    // `minimal_repro` and `witness_routes` JSON fields). Removing them keeps the
+    // body within COMMENT_PLAN_BODY_WORD_LIMIT without dropping required guidance.
     if let Some(command) = card.verify_commands.first() {
         let expected = format!("Verify command: `{command}`");
         if !body.contains(&expected) {
@@ -7769,25 +7760,6 @@ fn expected_comment_minimal_repro(card: &CardProjection) -> CommentMinimalReproP
         ],
         limitation: MINIMAL_REPRO_LIMITATION,
     }
-}
-
-fn expected_comment_minimal_repro_body(card: &CardProjection) -> String {
-    if let Some(command) = card.verify_commands.first() {
-        return format!(
-            "Minimal repro cue: confirm ReviewCard `{}` still maps to this site, then build/run `{command}`; attach a receipt only for the same route and identity; cue was not executed.",
-            card.id
-        );
-    }
-    if let Some(route) = card.witness_routes.first() {
-        return format!(
-            "Minimal repro cue: confirm ReviewCard `{}` still maps to this site, then use the `{}` witness route; attach a receipt only for the same route and identity; cue was not executed.",
-            card.id, route.kind
-        );
-    }
-    format!(
-        "Minimal repro cue: confirm ReviewCard `{}` still maps to this site, then derive a focused repro with `unsafe-review explain`; keep it advisory without external evidence; cue was not executed.",
-        card.id
-    )
 }
 
 fn require_not_selected_card_projection(
