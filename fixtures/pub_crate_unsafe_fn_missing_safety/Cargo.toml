@@ -1,0 +1,5 @@
+[package]
+name = "pub-crate-unsafe-fn-missing-safety"
+version = "0.0.0"
+edition = "2024"
+publish = false

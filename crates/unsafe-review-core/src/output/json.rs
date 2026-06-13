@@ -437,6 +437,7 @@ const FIXTURE_GOLDENS: &[&str] = &[
     "public_unsafe_fn_safety_colon_docs",
     "public_unsafe_trait_missing_safety",
     "public_unsafe_fn_safety_comment_not_docs",
+    "pub_crate_unsafe_fn_missing_safety",
     "documented_private_unsafe_fn",
     "local_safety_colon_comment",
     "private_unsafe_helper_safety_comment",

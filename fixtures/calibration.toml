@@ -32,6 +32,7 @@ required_core_fixtures = [
   "split_public_unsafe_fn_missing_safety",
   "public_unsafe_fn_with_safety_docs",
   "public_unsafe_fn_safety_colon_docs",
+  "pub_crate_unsafe_fn_missing_safety",
   "documented_private_unsafe_fn",
   "private_unsafe_helper_safety_comment",
   "local_safety_colon_comment",
@@ -870,6 +871,16 @@ claim = "public unsafe fn with Safety: colon docs but no witness emits a guarded
 support_tier = "Contract evidence mining"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+
+[[cases]]
+fixture = "pub_crate_unsafe_fn_missing_safety"
+kind = "positive"
+claim = "pub(crate) unsafe fn missing # Safety docs emits a contract_missing card with public_api_surface=false"
+support_tier = "Contract evidence mining"
+expected_cards = 1
+expected_class = "contract_missing"
 expected_operation_family = "unknown"
 expected_hazard = "unknown"
 

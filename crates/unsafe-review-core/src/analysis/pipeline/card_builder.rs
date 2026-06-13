@@ -41,6 +41,8 @@ pub(super) fn build_card(
     if !operation_skips_safety_contract(&scanned_site.operation.family) && !contract.present {
         let contract_missing_message = if scanned_site.site.public_api_surface {
             "Missing public `# Safety` documentation for unsafe API"
+        } else if scanned_site.site.visibility == "restricted" {
+            "Missing `# Safety` documentation for restricted-visibility unsafe fn (in-crate callers need the contract)"
         } else {
             "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment"
         };
@@ -117,6 +119,7 @@ pub(super) fn build_card(
             &class,
             scanned_site.operation.family.as_str(),
             scanned_site.site.public_api_surface,
+            &scanned_site.site.visibility,
             &routes,
             &obligation_evidence,
         )

@@ -318,6 +318,39 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "restricted-visibility-unsafe-fn-framing"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "unknown"
+hazard = "unknown"
+support_tier = "Contract evidence mining"
+fixtures = [
+  "pub_crate_unsafe_fn_missing_safety",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/restricted-visibility-unsafe-fn-framing.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned restricted-visibility framing: pub(crate)/pub(super)/pub(in …)
+unsafe fns are reported with public_api_surface=false and a next-action that
+names in-crate callers rather than the public API surface. The contract gap is
+still flagged; only the public-API framing is corrected. Whether pub(crate)
+unsafe fns require a weaker or no safety-doc obligation is a model question
+outside this fixture scope.
+"""
+forbidden_claims = [
+  "public API surface proof",
+  "Clippy missing_safety_doc equivalence",
+  "pub(crate) unsafe fns are safe without # Safety docs",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "raw-pointer-write-initialized-evidence"
 status = "fixture_pinned"
 kind = "evidence_precision"

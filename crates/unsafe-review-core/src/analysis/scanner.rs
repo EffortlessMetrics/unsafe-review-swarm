@@ -900,20 +900,28 @@ fn site_key(
 }
 
 fn visibility_for_snippet(snippet: &str) -> &'static str {
-    if is_public_surface(snippet) {
+    let compact = compact_whitespace(snippet);
+    if is_restricted_pub_visibility(&compact) {
+        // pub(crate), pub(super), pub(in path) — visible within the crate or
+        // module but not part of the public API surface.
+        "restricted"
+    } else if compact.starts_with("pub ") || compact.contains(" pub ") {
         "public"
     } else {
         "private"
     }
 }
 
-fn is_public_surface(snippet: &str) -> bool {
-    let compact = compact_whitespace(snippet);
-    starts_with_pub_visibility(&compact) || compact.contains(" pub ") || compact.contains(" pub(")
-}
-
-fn starts_with_pub_visibility(compact: &str) -> bool {
-    compact.starts_with("pub ") || compact.starts_with("pub(")
+/// Returns `true` for `pub(crate)`, `pub(super)`, and `pub(in …)` qualifiers.
+/// These restrict visibility below the crate boundary and are NOT public API —
+/// Clippy's `missing_safety_doc` lint only fires for unrestricted `pub`.
+fn is_restricted_pub_visibility(compact: &str) -> bool {
+    compact.starts_with("pub(crate)")
+        || compact.starts_with("pub(super)")
+        || compact.starts_with("pub(in ")
+        || compact.contains(" pub(crate)")
+        || compact.contains(" pub(super)")
+        || compact.contains(" pub(in ")
 }
 
 fn is_public_api_surface(kind: &UnsafeSiteKind, snippet: &str) -> bool {
@@ -927,7 +935,12 @@ fn is_public_api_surface(kind: &UnsafeSiteKind, snippet: &str) -> bool {
     ) {
         return false;
     }
-    is_public_surface(snippet)
+    // Only unrestricted `pub` is the public API surface.  `pub(crate)`,
+    // `pub(super)`, and `pub(in …)` are restricted-visibility and must not be
+    // reported as public API.
+    let compact = compact_whitespace(snippet);
+    !is_restricted_pub_visibility(&compact)
+        && (compact.starts_with("pub ") || compact.contains(" pub "))
 }
 
 #[cfg(test)]
@@ -1827,33 +1840,53 @@ impl<T> Tagged<T> {\n\
 
     #[test]
     fn scan_file_keeps_public_surface_on_unsafe_api_not_operations() -> Result<(), String> {
+        // This test uses `pub unsafe fn` (unrestricted) for the public-API check,
+        // and confirms that `pub(crate)` sets visibility="restricted" /
+        // public_api_surface=false, and that inner operations are never public API.
         let root = unique_temp_dir()?;
         fs::create_dir_all(root.join("src"))
             .map_err(|err| format!("create temp src failed: {err}"))?;
         fs::write(
             root.join("src/lib.rs"),
-            "pub(crate) unsafe fn expose(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n\nunsafe impl Send for LocalType {}\n\nstruct LocalType;\n",
+            "pub unsafe fn expose(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n\npub(crate) unsafe fn internal(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n\nunsafe impl Send for LocalType {}\n\nstruct LocalType;\n",
         )
         .map_err(|err| format!("write temp source failed: {err}"))?;
 
         let sites = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?.sites;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+
+        // Unrestricted `pub unsafe fn` → public API surface.
         let public_fn = sites
             .iter()
-            .find(|site| site.site.kind == UnsafeSiteKind::UnsafeFn)
-            .ok_or_else(|| format!("expected unsafe function site: {sites:#?}"))?;
-        assert_eq!(public_fn.site.owner.as_deref(), Some("expose"));
+            .find(|site| {
+                site.site.kind == UnsafeSiteKind::UnsafeFn
+                    && site.site.owner.as_deref() == Some("expose")
+            })
+            .ok_or_else(|| format!("expected public unsafe fn site: {sites:#?}"))?;
         assert_eq!(public_fn.site.visibility, "public");
         assert!(public_fn.site.public_api_surface);
 
-        let deref = sites
+        // `pub(crate) unsafe fn` → restricted visibility, NOT public API surface.
+        let restricted_fn = sites
             .iter()
-            .find(|site| site.operation.family == OperationFamily::RawPointerDeref)
-            .ok_or_else(|| format!("expected raw pointer deref site: {sites:#?}"))?;
-        assert_eq!(deref.site.owner.as_deref(), Some("expose"));
-        assert!(!deref.site.public_api_surface);
+            .find(|site| {
+                site.site.kind == UnsafeSiteKind::UnsafeFn
+                    && site.site.owner.as_deref() == Some("internal")
+            })
+            .ok_or_else(|| format!("expected pub(crate) unsafe fn site: {sites:#?}"))?;
+        assert_eq!(restricted_fn.site.visibility, "restricted");
+        assert!(!restricted_fn.site.public_api_surface);
 
+        // Inner raw-pointer deref operations are never public API surface.
+        for deref in sites
+            .iter()
+            .filter(|site| site.operation.family == OperationFamily::RawPointerDeref)
+        {
+            assert!(!deref.site.public_api_surface);
+        }
+
+        // `unsafe impl Send` (no `pub`) → private, not public API surface.
         let unsafe_impl = sites
             .iter()
             .find(|site| site.site.kind == UnsafeSiteKind::UnsafeImplSend)
@@ -2043,30 +2076,52 @@ impl<T> Tagged<T> {\n\
     }
 
     #[test]
-    fn restricted_visibility_counts_as_public_surface() {
+    fn restricted_visibility_is_not_public_surface() {
+        // pub(crate), pub(super), pub(in…) are restricted — not public API.
         for snippet in [
             "pub(crate) unsafe fn expose() {}",
             "pub(super) unsafe trait Token {}",
             "pub(in crate::ffi) unsafe fn expose() {}",
         ] {
-            assert_eq!(visibility_for_snippet(snippet), "public");
-            assert!(is_public_surface(snippet));
+            assert_eq!(visibility_for_snippet(snippet), "restricted");
         }
     }
 
     #[test]
-    fn unsafe_api_surface_includes_restricted_pub_items() {
-        assert!(is_public_api_surface(
+    fn unrestricted_pub_is_public_surface() {
+        for snippet in ["pub unsafe fn expose() {}", "pub unsafe trait Token {}"] {
+            assert_eq!(visibility_for_snippet(snippet), "public");
+        }
+    }
+
+    #[test]
+    fn unsafe_api_surface_excludes_restricted_pub_items() {
+        // Restricted-visibility items are NOT public API surface.
+        assert!(!is_public_api_surface(
             &UnsafeSiteKind::UnsafeFn,
             "pub(crate) unsafe fn expose() {}"
         ));
-        assert!(is_public_api_surface(
+        assert!(!is_public_api_surface(
             &UnsafeSiteKind::UnsafeTrait,
             "pub(super) unsafe trait Token {}"
         ));
+        // Unrestricted pub IS public API surface.
+        assert!(is_public_api_surface(
+            &UnsafeSiteKind::UnsafeFn,
+            "pub unsafe fn expose() {}"
+        ));
+        assert!(is_public_api_surface(
+            &UnsafeSiteKind::UnsafeTrait,
+            "pub unsafe trait Token {}"
+        ));
+        // Non-fn/trait kinds are never public API surface.
         assert!(!is_public_api_surface(
             &UnsafeSiteKind::Operation,
             "pub(crate) unsafe { *ptr }"
+        ));
+        assert!(!is_public_api_surface(
+            &UnsafeSiteKind::Operation,
+            "pub unsafe { *ptr }"
         ));
     }
 

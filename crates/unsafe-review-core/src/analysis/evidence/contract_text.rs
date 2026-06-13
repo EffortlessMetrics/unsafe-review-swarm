@@ -11,6 +11,13 @@ pub(crate) fn contract_evidence(site: &ScannedSite) -> ContractEvidence {
             "Public unsafe API is missing nearby `# Safety` documentation",
         );
     }
+    if site.site.visibility == "restricted" {
+        // pub(crate)/pub(super)/pub(in …) — not public API but still callable
+        // by in-crate callers; a missing contract is a real gap.
+        return ContractEvidence::missing_with(
+            "Restricted-visibility unsafe fn is missing nearby `# Safety` documentation for in-crate callers",
+        );
+    }
     if let Some(summary) = safety_comment_summary(&context, &site.site.snippet) {
         return ContractEvidence::present(summary);
     }

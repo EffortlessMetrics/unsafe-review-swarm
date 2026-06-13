@@ -1,0 +1,29 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "restricted-visibility-unsafe-fn-framing"
+operation_family = "unknown"
+hazard = "unknown"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned ReviewCard
+visibility framing behavior; they are not a proof of memory safety, not UB-free status,
+not a Miri result, not Miri-clean status, not site execution evidence,
+not calibrated precision or recall, not witness adequacy, not policy readiness.
+The public_api_surface=false result for pub(crate) is a framing correction, not a
+proof that pub(crate) unsafe fns are safe to leave undocumented.
+"""
+
+[[samples]]
+id = "pub-crate-unsafe-fn-not-public-api-surface"
+fixture = "pub_crate_unsafe_fn_missing_safety"
+kind = "positive"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+expected_obligation_key = "unknown"
+expected_contract_state = "missing"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A pub(crate) unsafe fn is not public API — pub(crate)/pub(super)/pub(in…) are restricted-visibility forms that Clippy's missing_safety_doc does not require docs for. The card is still emitted (the contract gap is real), but public_api_surface=false and the next-action names in-crate callers, not the public API surface."

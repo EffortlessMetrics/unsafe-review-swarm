@@ -871,7 +871,8 @@ mod tests {
             (ReviewClass::WitnessMismatch, "matching receipt"),
             (ReviewClass::StaticUnknown, "witness route"),
         ] {
-            let summary = next_action_summary(&class, "raw_pointer_read", false, &[], &[]);
+            let summary =
+                next_action_summary(&class, "raw_pointer_read", false, "private", &[], &[]);
             assert!(
                 summary.contains(expected),
                 "`{}` next action `{summary}` should mention `{expected}`",
@@ -887,6 +888,7 @@ mod tests {
             &ReviewClass::GuardedUnwitnessed,
             "unknown",
             false,
+            "private",
             &human_route,
             &[],
         );
@@ -904,6 +906,7 @@ mod tests {
             &ReviewClass::GuardedUnwitnessed,
             "raw_pointer_read",
             false,
+            "private",
             &miri_careful_routes,
             &[],
         );
@@ -920,6 +923,7 @@ mod tests {
             &ReviewClass::GuardMissing,
             "inline_asm",
             false,
+            "private",
             &human_route,
             &[],
         );
@@ -938,6 +942,7 @@ mod tests {
             &ReviewClass::GuardMissing,
             "pin_unchecked",
             false,
+            "private",
             &human_route,
             &[],
         );
@@ -957,6 +962,7 @@ mod tests {
             &ReviewClass::GuardMissing,
             "unsafe_fn_call",
             false,
+            "private",
             &human_route,
             &[],
         );

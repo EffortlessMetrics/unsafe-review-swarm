@@ -4,12 +4,19 @@ pub(super) fn next_action_summary(
     class: &ReviewClass,
     operation: &str,
     public_api_surface: bool,
+    visibility: &str,
     routes: &[WitnessRoute],
     obligation_evidence: &[ObligationEvidence],
 ) -> String {
     match class {
         ReviewClass::ContractMissing if public_api_surface => {
             "Add a precise public `# Safety` section that names the required caller obligations."
+                .to_string()
+        }
+        ReviewClass::ContractMissing if visibility == "restricted" => {
+            // pub(crate)/pub(super)/pub(in …): not public API, but in-crate
+            // callers still need the unsafe contract documented.
+            "Document the unsafe contract for in-crate callers with a `# Safety` section or `SAFETY:` comment naming the required conditions."
                 .to_string()
         }
         ReviewClass::ContractMissing => "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.".to_string(),

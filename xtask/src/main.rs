@@ -6505,9 +6505,9 @@ fn check_fixture_site_metadata(
     }
 
     let visibility = required_json_object_str(site, "visibility", path, idx)?;
-    if !matches!(visibility, "public" | "private") {
+    if !matches!(visibility, "public" | "restricted" | "private") {
         return Err(format!(
-            "{card_context} site.visibility `{visibility}` must be `public` or `private`"
+            "{card_context} site.visibility `{visibility}` must be `public`, `restricted`, or `private`"
         ));
     }
 
