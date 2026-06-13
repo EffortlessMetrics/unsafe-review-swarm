@@ -1012,6 +1012,7 @@ const FIXTURE_GOLDENS: &[&str] = &[
     "static_lifetime_mut_ref_not_static_mut",
     "pin_new_unchecked",
     "unsafe_fn_unknown_family_no_card",
+    "unsafe_fn_pointer_field_no_cards",
 ];
 
 /// Regenerate `expected.cards.json` for each named fixture (or all

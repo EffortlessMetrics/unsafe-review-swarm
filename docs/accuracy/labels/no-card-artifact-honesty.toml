@@ -57,3 +57,11 @@ kind = "false_positive_control"
 expected_cards = 0
 label_source = "fixture_golden"
 rationale = "An unchanged adjacent unsafe declaration should not become a ReviewCard for a neighboring safe edit."
+
+[[samples]]
+id = "unsafe-fn-pointer-type-in-field-emits-no-cards"
+fixture = "unsafe_fn_pointer_field_no_cards"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "A struct field whose type is an `unsafe fn(...)` fn-pointer is not an unsafe fn declaration and must not produce a ReviewCard."

@@ -547,6 +547,7 @@ required_core_fixtures = [
   "macro_rules_owner_inference",
   "nested_unsafe_operation_call_dedupe",
   "adjacent_unchanged_unsafe_fn_no_card",
+  "unsafe_fn_pointer_field_no_cards",
   "js_buffer_reentry_sync_compression",
   "js_buffer_reentry_async_helper_capture",
   "js_buffer_reentry_node_fs_rab_scalar_write",
@@ -6005,6 +6006,13 @@ expected_hazard = "pointer_validity"
 fixture = "adjacent_unchanged_unsafe_fn_no_card"
 kind = "false_positive_control"
 claim = "adjacent unchanged unsafe declarations do not emit cards when a neighboring safe function changes"
+support_tier = "Diff unsafe site inventory"
+expected_cards = 0
+
+[[cases]]
+fixture = "unsafe_fn_pointer_field_no_cards"
+kind = "false_positive_control"
+claim = "an unsafe fn-pointer type in a struct field position does not produce a ReviewCard"
 support_tier = "Diff unsafe site inventory"
 expected_cards = 0
 
