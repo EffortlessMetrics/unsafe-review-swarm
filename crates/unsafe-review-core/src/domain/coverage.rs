@@ -363,6 +363,16 @@ fn derive_agent_lsp_readiness(card: &ReviewCard) -> AgentLspReadiness {
         return AgentLspReadiness::RequiresWitnessReceipt;
     }
 
+    // All-witness-missing short-circuit: mirrors the canonical builder check in
+    // output/agent/readiness.rs (lines 17-23). A `guarded_unwitnessed` card
+    // whose only `missing` entries are witness receipts is NOT agent-ready —
+    // the remaining work is an external receipt, not an automatic source repair.
+    // Without this check the coverage block, telemetry histogram, and LSP
+    // disagree with the agent packet for the same card (single-truth drift).
+    if !card.missing.is_empty() && card.missing.iter().all(|m| m.kind == "witness") {
+        return AgentLspReadiness::RequiresWitnessReceipt;
+    }
+
     AgentLspReadiness::Ready
 }
 
@@ -727,6 +737,35 @@ mod tests {
             block.agent_lsp_readiness,
             AgentLspReadiness::RequiresWitnessReceipt,
             "RequiresKaniOrCrux must produce RequiresWitnessReceipt, not Ready — revert would re-introduce #1632"
+        );
+    }
+
+    /// Drift-lock: a guarded_unwitnessed card whose only missing entries are witness
+    /// receipts must produce RequiresWitnessReceipt, not Ready (single-truth parity
+    /// with output/agent/readiness.rs lines 17-23).
+    ///
+    /// Without this check the coverage block / LSP / telemetry histogram disagrees
+    /// with the agent packet for the same card — the same class of drift that was
+    /// fixed in #1632 for the Loom/Sanitizer/KaniOrCrux classes.
+    #[test]
+    fn agent_lsp_readiness_requires_witness_receipt_when_only_missing_is_witness() {
+        use crate::domain::MissingEvidence;
+        let mut card = minimal_card(ReviewClass::GuardedUnwitnessed);
+        card.discharge = DischargeEvidence::present("bounds check");
+        card.missing = vec![MissingEvidence {
+            kind: "witness".to_string(),
+            message: "no imported witness receipt was found".to_string(),
+        }];
+        let block = CoverageBlock::derive(&card);
+        assert_eq!(
+            block.agent_lsp_readiness,
+            AgentLspReadiness::RequiresWitnessReceipt,
+            "guarded_unwitnessed card with only witness-kind missing entries must produce \
+             RequiresWitnessReceipt — revert to break parity with agent packet builder"
+        );
+        assert_eq!(
+            block.agent_lsp_readiness.as_str(),
+            "requires_witness_receipt"
         );
     }
 
