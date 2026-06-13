@@ -5,8 +5,15 @@ fn main() {
     if args.get(1).is_some_and(|arg| arg == "unsafe-review") {
         let _removed = args.remove(1);
     }
-    if let Err(err) = unsafe_review_cli::run(args) {
-        eprintln!("cargo-unsafe-review: {err}");
-        std::process::exit(2);
+    match unsafe_review_cli::run(args) {
+        Ok(()) => {}
+        Err(unsafe_review_cli::RunFailure::PolicyViolation(msg)) => {
+            eprintln!("cargo-unsafe-review: policy: {msg}");
+            std::process::exit(1);
+        }
+        Err(unsafe_review_cli::RunFailure::Tool(msg)) => {
+            eprintln!("cargo-unsafe-review: {msg}");
+            std::process::exit(2);
+        }
     }
 }
