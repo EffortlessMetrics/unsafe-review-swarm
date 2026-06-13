@@ -1,0 +1,25 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,20 @@
++#[derive(Clone, Copy)]
++pub struct Header(pub u32);
++
++pub fn read_header(ptr: *const Header) -> Header {
++    // SAFETY: fixture deliberately checks alignment only after the deref.
++    let header = unsafe { *ptr };
++    if !ptr.is_aligned() {
++        core::hint::black_box(());
++    }
++    header
++}
++
++#[cfg(test)]
++mod tests {
++    use super::read_header;
++
++    #[test]
++    fn mentions_read_header() {
++        let _ = stringify!(read_header);
++    }
++}

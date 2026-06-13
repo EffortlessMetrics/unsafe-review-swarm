@@ -7,8 +7,6 @@ use super::{
 use crate::analysis::scanner::ScannedSite;
 
 pub(super) fn has_alignment_guard(site: &ScannedSite, lower: &str) -> bool {
-    let stripped = strip_block_comments_and_literals(lower);
-    let compact = compact_code(&stripped);
     if let Some(receiver) = raw_pointer_alignment_receiver(&site.operation.expression) {
         let guard_scope = code_before_operation(lower, &site.operation.expression)
             .unwrap_or_else(|| lower.to_string());
@@ -16,13 +14,7 @@ pub(super) fn has_alignment_guard(site: &ScannedSite, lower: &str) -> bool {
         return RawPointerAlignmentApplicability::new(&guard_compact, &receiver)
             .has_same_receiver_alignment_evidence();
     }
-    stripped.contains("is_aligned")
-        || stripped.contains("align_offset")
-        || stripped.contains("addr() %")
-        || stripped.contains("as usize %")
-        || compact.contains("addr()%")
-        || compact.contains("asusize)%")
-        || compact.contains("asusize%")
+    false
 }
 
 struct RawPointerAlignmentApplicability<'a> {
@@ -170,7 +162,73 @@ fn raw_pointer_alignment_receiver(expression: &str) -> Option<String> {
     if let Some(receiver) = receiver_before_marker(&compact, ".write_volatile(") {
         return Some(receiver.to_string());
     }
+    // Deref form: `*ptr` — the expression starts with `*` followed by receiver path chars.
+    if let Some(receiver) = deref_expression_receiver(&compact) {
+        return Some(receiver);
+    }
+    // Free-fn forms: `core::ptr::read(ptr)`, `ptr::read_volatile(ptr, ...)`, etc.
+    // These use `::read(` / `::write(` not `.read(`, so the method-receiver path above does not
+    // match them.  Extract the first argument of the call as the receiver.
+    for marker in &[
+        "::read(",
+        "::read_volatile(",
+        "::write(",
+        "::write_volatile(",
+    ] {
+        if let Some(arg) = free_fn_first_arg(&compact, marker) {
+            return Some(arg);
+        }
+    }
     None
+}
+
+/// Extract the raw-pointer identifier from a deref expression such as `*ptr` or `*self.ptr`.
+/// Returns `None` when the expression does not start with `*` or the operand is not a plain
+/// receiver path (e.g. `*(complex_expr)` is excluded so we do not produce a mis-anchored
+/// receiver).
+fn deref_expression_receiver(compact: &str) -> Option<String> {
+    let rest = compact.strip_prefix('*')?;
+    // Only accept simple receiver-path identifiers (letters, digits, `_`, `.`, `:`).
+    // Reject parenthesised expressions like `*(ptr.add(n))` where extracting a receiver
+    // would be unreliable.
+    if rest.starts_with('(') {
+        return None;
+    }
+    let receiver: String = rest
+        .chars()
+        .take_while(|ch| is_receiver_path_char(*ch))
+        .collect();
+    if receiver.is_empty() {
+        return None;
+    }
+    Some(receiver)
+}
+
+/// Given a compact (whitespace-free) expression, find the free-function call marker
+/// (e.g. `::read(`) and return the first argument — the pointer operand — as a
+/// receiver string.  Only simple receiver-path arguments are accepted; complex
+/// expressions inside the parens are excluded so we do not produce mis-anchored
+/// receivers.
+fn free_fn_first_arg(compact: &str, marker: &str) -> Option<String> {
+    let pos = compact.find(marker)?;
+    let after_open = &compact[pos + marker.len()..];
+    // Extract chars that form a valid receiver path.
+    let arg: String = after_open
+        .chars()
+        .take_while(|ch| is_receiver_path_char(*ch))
+        .collect();
+    if arg.is_empty() {
+        return None;
+    }
+    // The argument must be followed by `,`, `)`, or end-of-string to confirm it is a
+    // simple identifier and not a prefix of a more complex expression.
+    let after_arg = &after_open[arg.len()..];
+    let next = after_arg.chars().next();
+    if next.is_none_or(|ch| ch == ',' || ch == ')') {
+        Some(arg)
+    } else {
+        None
+    }
 }
 
 #[cfg(test)]

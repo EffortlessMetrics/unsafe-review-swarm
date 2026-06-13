@@ -1,0 +1,24 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,20 @@
++#[derive(Clone, Copy)]
++pub struct Header(pub u32);
++
++pub fn read_header(ptr: *const Header) -> Header {
++    // SAFETY: fixture intentionally uses a stray align_offset on a different pointer
++    // so that unsafe-review cannot discharge the alignment obligation.
++    let other: *const Header = core::ptr::null();
++    let _offset = other.align_offset(core::mem::align_of::<Header>());
++    unsafe { core::ptr::read(ptr) }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::read_header;
++
++    #[test]
++    fn mentions_read_header() {
++        let _ = stringify!(read_header);
++    }
++}
