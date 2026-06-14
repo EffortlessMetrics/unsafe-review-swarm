@@ -198,3 +198,17 @@ prevention.
 author-assumption encoder. Fresh-crate runs are the independent adversarial check.
 Treat them as required validation, not optional signal, before each release
 promotion.
+
+## Release cadence: done is not delivered
+
+Validated work should ship promptly. Do not let the staged-but-unshipped pile grow
+until the staging cost (rebase, re-proof, drift from main) exceeds the benefit of
+further batching. Validation increases trust but also raises the release bar —
+each additional proof round makes the release surface larger and harder to hold.
+The operative principle: **release before hardening the next rail.**
+
+This is a cadence principle, not a release decision. It is advisory: the specific
+release timing is an owner call. The anti-pattern it guards against is "let it
+bake one more session" as a default, applied reflexively rather than because a
+specific known gap warrants the delay.
+

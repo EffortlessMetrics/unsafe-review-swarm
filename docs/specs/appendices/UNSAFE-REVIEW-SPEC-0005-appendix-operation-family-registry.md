@@ -146,3 +146,55 @@ promotion. The fixture suite encodes author assumptions — it is blind to assum
 author did not know they made (see CLAUDE.md fixture doctrine note). Adversarial negative
 controls and fresh-crate dogfood are the verification layer that fixture-suite blindness
 cannot supply.
+
+## Failure-mode taxonomy
+
+Every detector and surface must be classified against the following failure-mode
+taxonomy. Each mode has a stable ID for cross-referencing in review comments,
+issue titles, and the detector-discipline control plane. New detectors declare
+which modes apply; new surfaces declare FM8/FM9 applicability. Negative-control
+fixtures are required for each applicable mode before promotion.
+
+| ID | Name | Description | Applicable to |
+|---|---|---|---|
+| **FM1** | unsafe-scope | Fires in safe context: same-named call or expression outside any `unsafe { }` block and not inside an `unsafe fn` body | detectors |
+| **FM2** | definition-vs-call | Matches a `fn NAME(` definition header rather than a call site | text-path detectors |
+| **FM3** | same-receiver/origin | Admits discharge evidence from an unrelated guard (different pointer, receiver, index, slot, or destination) | evidence detectors |
+| **FM4** | multiline truncation | Truncates a multi-line call to the opening line only, missing arguments that determine the operation's shape | detectors with multi-line patterns |
+| **FM5** | path/word-boundary anchoring (incl. string/comment masking) | Matches a path segment or keyword inside a string literal, doc comment, or at a wrong segment position (e.g. `registry_ptr::read_entry` matched as `std::ptr`) | path-based text detectors |
+| **FM6** | reach-as-mention (naming is not doing) | Credits a `stringify!`, bare `use`, or `fn` header as test reach rather than requiring a call-shaped pattern | reach/evidence detectors |
+| **FM7** | debug-only guard | Credits `debug_assert!` or `debug_assert_eq!` as a runtime guard — but these are elided in release builds and do not constitute release evidence | evidence detectors |
+| **FM8** | project-vs-re-derive | A surface re-derives or hard-codes a value the pipeline already computed (e.g. `unsafe_sites = cards.len()`, per-card movement status, agent-readiness), producing a second truth that can diverge | output surfaces |
+| **FM9** | severity/level divergence | Two surfaces projecting from the same card report different severity, class, or readiness (e.g. comment-plan says `requires_witness_receipt`; telemetry counts the card as `ready`) | output surfaces |
+
+### Classification requirement
+
+Each registry row's "known limits" column SHOULD note which failure modes the
+detector has explicitly defended against (e.g. "FM1: safe-context gate; FM2:
+definition-rejection; FM3: same-origin discipline"). A row with no FM
+classification carries implicit FM1–FM7 risk in its text-path components.
+
+Each output surface in the pipeline SHOULD document its FM8/FM9 posture: does it
+project from the canonical field, or does it re-derive? If it re-derives, a
+negative-control fixture or test must pin the agreement.
+
+### Relationship to D1–D5
+
+D1–D5 (the detector-discipline obligations above) are the *checks* a detector
+applies at runtime. FM1–FM9 are the *failure modes* those checks defend against.
+The mapping:
+
+| D-check | Defends against FM |
+|---|---|
+| D1: unsafe-scope gate | FM1 |
+| D2: definition-vs-call gate | FM2 |
+| D3: same-receiver/origin | FM3 |
+| D4: string/comment masking | FM5 (comment/string half) |
+| D5: path-segment anchoring | FM5 (path half) |
+| reach-as-mention (§ Second-arc synthesis) | FM6 |
+| debug-assert recognition | FM7 |
+| project-from-card doctrine | FM8 |
+| single-derivation discipline | FM9 |
+
+FM4 (multiline truncation) is detected at the call-shape level before D-checks
+apply and must be addressed in the pattern extractor, not the discipline gate.

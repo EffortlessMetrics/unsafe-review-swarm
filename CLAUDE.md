@@ -25,6 +25,14 @@ cargo test --workspace --locked
 cargo run --locked -p xtask -- check-pr        # docs/policy/fixtures/calibration/dogfood/spec gates
 ```
 
+**Gate order matters.** The required CI gate runs `cargo fmt --all --check`,
+then `cargo clippy --workspace --all-targets --locked -- -D warnings`,
+then `cargo test --workspace --locked`,
+then `cargo run -p xtask -- check-pr` — in that order. `check-pr` does NOT run
+fmt or clippy. Verify the full sequence locally before pushing, or a
+fmt/clippy-only failure costs a CI round-trip.
+
+
 Run a single test (most coverage lives in per-crate `tests/e2e.rs` files that drive the built binary against `fixtures/`):
 
 ```bash
@@ -47,6 +55,32 @@ Fuzzing is manual, not part of the PR gate: `cargo fuzz run analyze` (see `docs/
 CI has exactly one required check: the deterministic core gate (the command sequence above). An advisory ub-review LLM lane rides along in the same job and never blocks the merge. Do not turn advisory unsafe-review findings into default CI failures; read `docs/specs/UNSAFE-REVIEW-SPEC-0024-ci-design.md` before editing CI, workflows, or PR-artifact surfaces.
 
 Commit subjects follow `area: summary` (e.g. `cli:`, `analysis:`, `docs(specs):`, `sync:`, `ci:`), lowercase, imperative.
+
+## Anti-goals and anti-patterns
+
+The following are active constraints, not just omissions. Violating them is a
+product-stance violation, not just a style issue:
+
+- **No full-semantic / type-aware default path.** The analyzer is syntax-first and
+  build-free by choice. Do not add a default path that requires target-repo type
+  resolution, MIR, or `cargo build` success. Optional semantic enrichment is
+  considered case-by-case.
+- **No broad analyzer breadth expansion without dogfood evidence.** New detectors
+  require fixture proof AND a fresh-crate dogfood pass before promotion. Do not add
+  a new operation family based on fixture-green alone.
+- **No default comment-posting or blocking.** unsafe-review is advisory. Default
+  blocking and automatic comment posting remain non-defaults; any posting is
+  explicit opt-in.
+- **No suppressing or deleting evidence to reduce noise.** Group and rank at the
+  surfacing layer (comment-plan, PR-summary budget, ub-review pass). The evidence
+  layer (`ReviewCard`) must remain complete. Deleting a correct card to quiet the
+  output is a product-integrity violation.
+- **No silent stance or semantic changes.** Product stances (what counts as a
+  guard, what counts as test reach, what counts as a discharge) are owner-decided
+  and recorded. Do not silently change a stance as a "fix." Escalate and ledger it.
+- **No proof / UB-free / Miri-clean / site-execution / calibrated claims on any
+  surface.** Every output surface is advisory. The claim-boundary gate enforces
+  this; add no prose that asserts the tool proves, guarantees, or certifies.
 
 ## Lint posture (matters when writing code)
 

@@ -459,6 +459,166 @@ items; evidence-packets on escalations (not raw diffs).
 
 ---
 
+## 15. The two agent failure modes: the organizing frame for the rails
+
+Every safeguard in this doctrine maps to one of two predictable agent failure
+modes. Naming them explicitly makes the whole apparatus legible:
+
+**Agents overclaim.** An agent will confidently assert facts it cannot verify,
+report a green gate as proof of correctness, bless goldens that mask regressions,
+or produce output that drifts across the trust boundary. Overclaiming is not
+laziness — it is the natural output of a generation process that is not internally
+checked.
+
+**Agents miss context.** An agent will act on incomplete information: a stale
+spec, a diff that does not include the file that matters, a symbol it named but
+did not read, a detector that fires without checking scope. Missing context is
+also natural — agents act on what they are given, not on what they were not
+given.
+
+The whole spine of this doctrine is two defenses against these two failures:
+
+**Anti-overclaim apparatus:**
+- claim-boundary gates (no proof / UB-free / Miri-clean / site-execution claims
+  on any output surface)
+- distrust your own green / wholesale-bless verification (§15.a below)
+- adversarial verify passes (different-angle review, plan-refuter, fact-check)
+- the trust boundary hardwired into every spec and gate
+
+**Anti-miss-context apparatus:**
+- the detector-discipline contract (D1–D5) — forces each detector to explicitly
+  check scope, receiver, call-vs-definition, span type; context that would be
+  implicit in a type-aware analyzer must be explicit here
+- repo-preflight and issue-factcheck agents — cheap independent reads before an
+  expensive build starts
+- the controller owning the seams: base freshness, calibration, gate sequence,
+  worktree hygiene
+
+When a new safeguard is proposed, identify which failure mode it defends against.
+If it defends against neither, it is not load-bearing.
+
+### 15.a Wholesale-bless verification (anti-overclaim)
+
+A green `check-pr` plus a confident agent report is not proof. A mass
+`UPDATE_GOLDENS=1` / `bless-goldens` run that touches many goldens simultaneously
+is a yellow flag: the controller must reconstruct *why* the mass change is a
+correct mass-correction — from the source diff, not from the green — before
+treating it as valid.
+
+Two failure modes:
+
+- **Correct mass-correction** (e.g. stringify-vs-call stance change affecting 238
+  fixtures) — green after bless is correct because the stance was deliberate and
+  documented.
+- **Laundered regression** — a change that breaks a property the fixtures were
+  meant to catch; bless silences the failure instead of fixing it.
+
+The controller's job is to distinguish the two. Ask: "what property did the old
+goldens prove, and does the new golden still prove it?" If the answer requires
+reading the diff rather than trusting the green, that is the right instinct. The
+explanation is the proof; the green is the precondition.
+
+### 15.b Agents are reliable; seams are fragile (anti-miss-context)
+
+Across ~40 implementer PRs in the card-correctness session, the failures were not
+wrong logic inside an agent but coordination seams between them:
+
+- stale-base diffs (the agent built against a commit that had already moved)
+- calibration merge conflicts on the shared `policy/calibration.toml`
+- `cargo fmt` not run inside `check-pr` (the gate passes while a fmt-only push
+  would fail in CI)
+- a worktree leaking state onto the main checkout
+
+The controller's value is owning the seams — verifying base freshness,
+serializing calibration merges, running the full gate sequence, auditing worktree
+hygiene — not implementation. Implementation is the cheap part; seam integrity is
+the scarce part.
+
+### 15.c Serialize against forced serialization
+
+When shared registry files (one `policy/calibration.toml`, count snapshots,
+badge files) make parallel fixture PRs always conflict at merge, the right
+response is to serialize the merges deliberately — slower wall-clock, sane
+context — and fix the structure (per-fixture registration files, issue #1712)
+rather than trying to out-muscle the conflicts with rebase loops.
+
+Operational rule: when N parallel PRs all need to touch the same file, serialize
+the merges; do not parallelize the queue. The wall-clock cost of serialization is
+a one-time tax; the context cost of repeated rebase conflicts is recurring.
+
+### 15.d The verification ladder (anti-overclaim: stop trusting a single green check)
+
+Trust is a ladder. Each rung catches what the rung below is blind to. No single
+green check is proof; the ladder is how you stop believing any one of them.
+
+| Rung | What it proves | What it is blind to |
+|---|---|---|
+| **fixture green** | the cases the author imagined | assumptions the author did not know they were making |
+| **check-pr green** | gates + calibration consistency | `cargo fmt` + `cargo clippy`; whether the GOLDENS themselves are correct |
+| **claim-boundary clean** | no forbidden wording on any surface | wrong logic with clean wording |
+| **reconstruct-the-argument** (on a wholesale bless) | the mass change is a correct mass-correction, not a laundered regression | nothing — but it is manual and judgment-bound |
+| **dogfood (real crate, known)** | behavior on real code in the corpus | what that specific crate does not exercise |
+| **fresh crate (never-seen)** | the FP class is actually gone on unseen code | the next unhunted class |
+
+Operational rule: after any mass golden bless, claim that it is correct only after
+completing the reconstruct-the-argument rung. After any behavior change, claim it
+is correct only after completing at least the dogfood rung. The fixture suite and
+the gate alone are insufficient.
+
+This is the operational answer to "agents overclaim": the ladder is how you stop
+believing a single green check.
+
+---
+
+---
+
+## 16. The orchestrator role: judgment, not generation
+
+### The orchestrator is not a tech lead
+
+The orchestrator is closer to a PM or Director of Technology than to a senior IC.
+Its job is:
+
+- **scope** — what is in this PR, what is not, where the boundary is
+- **sequencing** — what runs first, what waits, what is blocked
+- **risk** — what could go wrong, what the fallback is
+- **decisions** — which of two plausible approaches is the right one
+- **escalation** — when to stop and ask the owner rather than guessing
+- **resource allocation** — which model tier, which agent, which parallel vs. serial
+- **verification** — did this actually prove what we need it to prove
+- **saying no / not now** — declining scope creep, deferring non-critical work
+
+The orchestrator does NOT write the hard parts. It does not implement the
+detector, author the fixture, or draft the spec body. Those are generation tasks,
+and generation is effectively unlimited. Judgment is the scarce, load-bearing
+resource.
+
+### Generation is unlimited; judgment is scarce
+
+This is the asymmetry the whole doctrine is designed around. A coding agent can
+generate a correct implementation with high probability given an accurate spec and
+a clear acceptance criterion. Generating the implementation is cheap. What is
+scarce:
+
+- Knowing which of two correct implementations is right for this product
+- Deciding that a green gate proves the wrong property
+- Recognizing that an agent's confident assertion is an overclaim
+- Determining whether a stance question should be autonomously resolved or
+  escalated to the owner
+- Choosing what to do when a spec and the live repo disagree
+
+The orchestrator's finite attention must be spent almost entirely on judgment
+calls. All generation is offloaded to agents. When the orchestrator finds itself
+drafting implementation details, that is a misallocation: it is doing generation
+work that an agent could do, while depleting the attention budget available for
+the judgment work that only the orchestrator can do.
+
+Corollary: a brief should carry goal, non-goals, guardrails, assumptions to check,
+and proof commands — not a step-by-step implementation recipe. The recipe is
+generation; the guardrails are judgment.
+
+---
+
 ## This-repo mapping
 
 | Generic piece | This repository |

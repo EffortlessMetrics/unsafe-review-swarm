@@ -197,6 +197,79 @@ Mitigations:
 
 ---
 
+## Second-arc synthesis
+
+The following principles emerged from the owner-decided stance program
+(#1705–1718) and the reflections that followed. They complement the root-cause
+analysis above rather than repeating it.
+
+### “Check the context before you credit” is a fractal
+
+The same principle holds at four scales in this tool:
+
+- **User’s code** — the analyzer requires contextual evidence before crediting a
+  guard: a length check does not discharge alignment, a `SAFETY` comment names an
+  obligation but is not a guard, and a call-shaped reach pattern is required
+  before test coverage counts.
+- **The detector** — each detector must earn scope-gate, receiver-anchor, and
+  call-vs-definition discipline; crediting a pattern hit without that context is a
+  false positive.
+- **The fix** — the 28+ correctness fixes in this session all added context
+  discipline: scope checks, binding-identity tests, definition-rejection guards.
+  Each fix was “require more context before firing.”
+- **The control plane** — each detector must declare its obligations (which
+  disciplines it applies) and discharge them with evidence (fixture-encoded
+  negative controls). The SPEC-0005 appendix is the detector’s own SAFETY comment.
+
+One idea recursing from top to bottom: credit nothing without context.
+
+### The fixture parable: the tool committed its own product error
+
+The fixture suite “exercised” detector reach by naming functions
+(`stringify!(owner)`) or importing them (`use crate::target`) — naming without
+calling. This is the same error the tool exists to catch: naming an obligation
+(a `SAFETY` comment, a `use` statement, a function header) is not discharging it.
+A mention is not test reach; a call-shaped pattern is required.
+
+The owner’s call-shaped-reach decision exposed 238 fixtures that named without
+calling. The failure mode is cognitively natural — natural enough to capture the
+authors of the detector — which is the strongest evidence the discipline is worth
+enforcing. A tool’s correctness test suite can commit the tool’s own canonical
+error. Fresh-crate dogfood is the independent adversarial check that the fixture
+suite cannot supply.
+
+### The single-truth bugs were one structural smell: surfaces re-derived
+
+The single-truth bugs across the session shared a structure: a surface
+re-derived or hard-coded a value the pipeline already computed
+(`unsafe_sites = cards.len()`, per-card movement status, policy-report movement,
+agent-readiness). Each re-derivation introduced an independent failure point that
+drifted from the ReviewCard truth.
+
+The rule this enforces: **surfaces should project, never re-derive.** If a value
+is computed in the pipeline, every surface that needs it reads it from the
+canonical source. A surface that re-computes a value from a proxy (like counting
+cards as a proxy for sites) will eventually disagree with the pipeline, and both
+will look plausible.
+
+### Build-free was vindicated as discipline, not rescue
+
+The 28 correctness fixes disciplined a sound design. The syntax-first, build-free
+analyzer was not a design that needed to be rescued by adding type resolution; it
+was a deliberately light design that needed its discipline tax paid. The fixes
+added scope gates, binding-identity checks, and call-vs-definition guards — all
+properties expressible in syntax, all achievable without departing from the
+build-free constraint.
+
+The distinction matters for future work:
+
+- A design you must rescue is wrong.
+- A design you must discipline is right but unfinished.
+
+Semantic-light is the correct axis for this tool’s analyzer, not an interim
+compromise. When a detector has the discipline right, it is complete; when it
+does not, the fix is to add the discipline, not to add type resolution.
+
 ## Cross-references
 
 - Detector discipline D1–D5 encoded in:
@@ -209,3 +282,5 @@ Mitigations:
 - Capstone validation summary in: `docs/status/VALIDATION_CLOSEOUT.md`
 - ADR for the syntax-first detection proposal:
   `docs/adr/UNSAFE-REVIEW-ADR-0009-syntax-first-detection.md`
+- Second-arc synthesis and product principles:
+  `docs/PRINCIPLES.md`

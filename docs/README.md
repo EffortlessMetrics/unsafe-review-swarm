@@ -4,6 +4,7 @@
 |---|---|---|
 | Adoption front door | one-page newcomer routing to all five delivery surfaces | `docs/START-HERE.md` |
 | Mission / vision | product purpose and end state | `docs/MISSION.md`, `docs/VISION.md` |
+| Product principles | settled design values: restraint, advisory-by-design, evidence not proof, single truth, group-not-delete, naming-vs-doing, detector-discipline symmetry | `docs/PRINCIPLES.md` |
 | Roadmap | release direction | `docs/ROADMAP.md` |
 | Find/fix workflow | end-to-end UB-risk review seam workflow from first-pr through explain, agent packet, witness receipt, and outcome comparison | `docs/FIND_AND_FIX_UB.md` |
 | First-use guide | install and first useful local run from crates.io | `docs/FIRST_USE.md` |
