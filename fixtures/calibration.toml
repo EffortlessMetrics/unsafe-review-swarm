@@ -503,6 +503,8 @@ required_core_fixtures = [
   "unsafe_impl_send_owner_substring_not_reached",
   "reach_production_ref_in_test_file_not_reached",
   "reach_owner_called_in_cfg_test_reached",
+  "reach_bare_mention_no_call_not_reach",
+  "reach_self_named_test_not_reach",
   "unsafe_impl_custom_trait_not_send_sync",
   "unsafe_impl_custom_trait_contract_not_guard",
   "ffi_sanitizer_route",
@@ -924,10 +926,10 @@ expected_hazard = "unknown"
 [[cases]]
 fixture = "public_unsafe_fn_with_safety_docs"
 kind = "positive"
-claim = "public unsafe fn with # Safety docs but no witness emits a guarded_unwitnessed card"
+claim = "public unsafe fn with # Safety docs but no call-shaped test reach emits an unsafe_unreached card"
 support_tier = "Contract evidence mining"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "unknown"
 expected_hazard = "unknown"
 
@@ -954,10 +956,10 @@ expected_hazard = "unknown"
 [[cases]]
 fixture = "documented_private_unsafe_fn"
 kind = "positive"
-claim = "documented private unsafe fn with SAFETY comment but no witness emits a guarded_unwitnessed card"
+claim = "documented private unsafe fn with SAFETY comment but no call-shaped test reach emits an unsafe_unreached card"
 support_tier = "Contract evidence mining"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "unknown"
 expected_hazard = "unknown"
 
@@ -1057,7 +1059,7 @@ kind = "positive"
 claim = "MaybeUninit::assume_init recognizes same-slot write evidence in an open branch containing the assume_init operation"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "maybe_uninit_assume_init"
 expected_hazard = "initialized_memory"
 
@@ -1067,7 +1069,7 @@ kind = "positive"
 claim = "MaybeUninit::assume_init_read recognizes same-slot write evidence in an open branch containing the assume_init_read operation"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "maybe_uninit_assume_init"
 expected_hazard = "initialized_memory"
 
@@ -1077,7 +1079,7 @@ kind = "positive"
 claim = "MaybeUninit::assume_init_ref recognizes same-slot write evidence in an open branch containing the assume_init_ref operation"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "maybe_uninit_assume_init"
 expected_hazard = "initialized_memory"
 
@@ -1087,7 +1089,7 @@ kind = "positive"
 claim = "MaybeUninit::assume_init_mut recognizes same-slot write evidence in an open branch containing the assume_init_mut operation"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "maybe_uninit_assume_init"
 expected_hazard = "initialized_memory"
 
@@ -1097,7 +1099,7 @@ kind = "positive"
 claim = "MaybeUninit::assume_init_drop recognizes same-slot write evidence in an open branch containing the assume_init_drop operation"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "maybe_uninit_assume_init"
 expected_hazard = "initialized_memory"
 
@@ -1107,7 +1109,7 @@ kind = "positive"
 claim = "MaybeUninit::assume_init recognizes same-slot MaybeUninit::new evidence in an open branch containing the assume_init operation"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "maybe_uninit_assume_init"
 expected_hazard = "initialized_memory"
 
@@ -1117,7 +1119,7 @@ kind = "positive"
 claim = "MaybeUninit::assume_init_read recognizes same-slot MaybeUninit::new evidence in an open branch containing the assume_init_read operation"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "maybe_uninit_assume_init"
 expected_hazard = "initialized_memory"
 
@@ -1127,7 +1129,7 @@ kind = "positive"
 claim = "MaybeUninit::assume_init_ref recognizes same-slot MaybeUninit::new evidence in an open branch containing the assume_init_ref operation"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "maybe_uninit_assume_init"
 expected_hazard = "initialized_memory"
 
@@ -1137,7 +1139,7 @@ kind = "positive"
 claim = "MaybeUninit::assume_init_mut recognizes same-slot MaybeUninit::new evidence in an open branch containing the assume_init_mut operation"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "maybe_uninit_assume_init"
 expected_hazard = "initialized_memory"
 
@@ -1147,7 +1149,7 @@ kind = "positive"
 claim = "MaybeUninit::assume_init_drop recognizes same-slot MaybeUninit::new evidence in an open branch containing the assume_init_drop operation"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "maybe_uninit_assume_init"
 expected_hazard = "initialized_memory"
 
@@ -5590,6 +5592,26 @@ expected_operation_family = "unsafe_impl_send_sync"
 expected_hazard = "send_sync_invariant"
 
 [[cases]]
+fixture = "reach_bare_mention_no_call_not_reach"
+kind = "false_positive_control"
+claim = "a bare identifier mention of the owner inside test scope with no call/constructor shape must NOT credit test reach"
+support_tier = "Witness routing"
+expected_cards = 1
+expected_class = "requires_loom"
+expected_operation_family = "unsafe_impl_send_sync"
+expected_hazard = "send_sync_invariant"
+
+[[cases]]
+fixture = "reach_self_named_test_not_reach"
+kind = "false_positive_control"
+claim = "a test function whose name matches the owner (fn owner()) must NOT self-credit reach"
+support_tier = "Witness routing"
+expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "unknown"
+expected_hazard = "unknown"
+
+[[cases]]
 fixture = "unsafe_impl_custom_trait_not_send_sync"
 kind = "false_positive_control"
 claim = "custom unsafe trait impls do not receive Send/Sync concurrency witness routing"
@@ -5762,7 +5784,7 @@ kind = "positive"
 claim = "documented target-feature declarations are caller-contract sites and do not require local attribute guard evidence"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "target_feature"
 expected_hazard = "target_feature"
 
@@ -5902,7 +5924,7 @@ kind = "positive"
 claim = "NonNull::new guard evidence discharges the non-null obligation for NonNull::new_unchecked"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "nonnull_unchecked"
 expected_hazard = "pointer_validity"
 
@@ -5962,7 +5984,7 @@ kind = "positive"
 claim = "if-let NonNull::new evidence discharges the non-null obligation for NonNull::new_unchecked"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "nonnull_unchecked"
 expected_hazard = "pointer_validity"
 
@@ -5982,7 +6004,7 @@ kind = "positive"
 claim = "let-else NonNull::new evidence discharges the non-null obligation for NonNull::new_unchecked"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "nonnull_unchecked"
 expected_hazard = "pointer_validity"
 
@@ -5992,7 +6014,7 @@ kind = "positive"
 claim = "match NonNull::new Some-arm evidence discharges the non-null obligation for NonNull::new_unchecked"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "nonnull_unchecked"
 expected_hazard = "pointer_validity"
 
@@ -6032,7 +6054,7 @@ kind = "positive"
 claim = "same-pointer is_null evidence in a top-level disjunction with an early return discharges the non-null obligation after the guard"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "nonnull_unchecked"
 expected_hazard = "pointer_validity"
 
@@ -6072,7 +6094,7 @@ kind = "positive"
 claim = "same-pointer non-null open-branch evidence discharges the non-null obligation for NonNull::new_unchecked"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "nonnull_unchecked"
 expected_hazard = "pointer_validity"
 
@@ -6082,7 +6104,7 @@ kind = "positive"
 claim = "same-pointer non-null evidence in a top-level conjunction discharges the non-null obligation inside the open branch"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "nonnull_unchecked"
 expected_hazard = "pointer_validity"
 

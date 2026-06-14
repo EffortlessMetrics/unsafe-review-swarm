@@ -422,7 +422,14 @@ mod tests {
             Case {
                 fixture: "nonnull_other_guard_not_evidence",
                 operation_family: "nonnull_unchecked",
-                buckets: &["repairable_by_guard", "requires_witness_receipt"],
+                // The fixture's test scope only imports and mentions the owner via
+                // `use` and `stringify!` — no call shape — so reach is now missing
+                // and `repairable_by_test` appears in the bucket list.
+                buckets: &[
+                    "repairable_by_guard",
+                    "repairable_by_test",
+                    "requires_witness_receipt",
+                ],
                 ready: true,
                 state: "ready_for_agent",
             },
@@ -465,8 +472,11 @@ mod tests {
             Case {
                 fixture: "inline_asm_human_review",
                 operation_family: "inline_asm",
+                // The fixture's test scope uses `stringify!(pause_once)` — a bare mention,
+                // not a call shape — so reach is missing and `repairable_by_test` appears.
                 buckets: &[
                     "repairable_by_guard",
+                    "repairable_by_test",
                     "requires_witness_receipt",
                     "requires_human_review",
                     "do_not_auto_repair",

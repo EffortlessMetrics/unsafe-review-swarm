@@ -15,14 +15,14 @@ id = "documented-private-unsafe-fn-contract-present"
 fixture = "documented_private_unsafe_fn"
 kind = "positive"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "unsafe_unreached"
 expected_operation_family = "unknown"
 expected_hazard = "unknown"
 expected_obligation_key = "unknown"
 expected_contract_state = "present"
 expected_discharge_state = "present"
 label_source = "fixture_golden"
-rationale = "A private unsafe fn with a local safety comment has a contract but no witness receipt; the guarded_unwitnessed card is actionable in all scopes."
+rationale = "A private unsafe fn with a local safety comment has a contract but its test only uses stringify! (not a call shape); with call-shape enforcement the card becomes unsafe_unreached."
 
 [[samples]]
 id = "private-unsafe-helper-safety-comment-contract-only"

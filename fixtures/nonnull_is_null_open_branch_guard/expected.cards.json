@@ -1,10 +1,10 @@
 [
   {
     "id": "UR-nonnull-is-null-open-branch-guard-fixture-src-lib-rs-expose-nonnull-if-non-null-operation-nonnull_unchecked-nonnull-unchecked-eee16b5e2cd1-pointer_validity-c1",
-    "class": "guarded_unwitnessed",
+    "class": "unsafe_unreached",
     "priority": "medium",
     "confidence": "medium",
-    "proof_path": "observable_red_green",
+    "proof_path": "helper_gated",
     "site": {
       "file": "src/lib.rs",
       "line": 6,
@@ -38,9 +38,9 @@
           "summary": "Nullability guard code was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `expose_nonnull_if_non_null`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `expose_nonnull_if_non_null` was found"
         },
         "witness": {
           "present": false,
@@ -51,7 +51,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "All inferred safety obligations have visible local discharge evidence",
-    "reach": "1 related test file(s) mention owner `expose_nonnull_if_non_null`",
+    "reach": "No static test mention of owner `expose_nonnull_if_non_null` was found",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -68,15 +68,16 @@
       }
     ],
     "missing": [
+      "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Attach a focused Miri or cargo-careful witness receipt or mark the static limitation explicitly.",
+    "next_action": "Add or identify a focused test path that reaches the safe wrapper around this unsafe seam.",
     "verify_commands": [
       "cargo +nightly miri test expose_nonnull_if_non_null",
       "cargo +nightly careful test expose_nonnull_if_non_null"
     ],
     "confirmation_cue": {
-      "hypothesis_to_confirm": "static `guarded_unwitnessed` ReviewCard for `Some(unsafe { NonNull::new_unchecked(ptr) })`; confirm with external evidence before treating it as observed runtime behavior",
+      "hypothesis_to_confirm": "static `unsafe_unreached` ReviewCard for `Some(unsafe { NonNull::new_unchecked(ptr) })`; confirm with external evidence before treating it as observed runtime behavior",
       "build_this_first": {
         "kind": "verify_command",
         "command": "cargo +nightly miri test expose_nonnull_if_non_null",
@@ -108,7 +109,7 @@
       "baseline_state": "new",
       "outcome_movement": "regressed",
       "comment_plan_status": "not_eligible",
-      "agent_lsp_readiness": "requires_witness_receipt"
+      "agent_lsp_readiness": "ready"
     }
   }
 ]
