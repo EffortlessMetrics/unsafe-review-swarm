@@ -417,6 +417,21 @@ fn validate_strength_for_tool(tool: &str, strength: &str) -> Result<(), String> 
             "external-integration-test receipt strength must be `site_reached`".to_string(),
         );
     }
+    // loom/shuttle/kani/crux receipts cannot claim `site_reached` via a
+    // hand-authored template: the tool-output import adapters
+    // (`from_concurrency_output`, `from_proof_output`) only produce `ran`
+    // strength; a hand-authored `site_reached` claim for these tools cannot
+    // carry verifiable tool provenance, so it is rejected here. Use
+    // `external-integration-test` with `site_reached` for integration-level
+    // site-reach evidence, or import a tool-output receipt (`ran`) via the
+    // appropriate adapter.
+    if matches!(tool, "loom" | "shuttle" | "kani" | "crux") && strength == "site_reached" {
+        return Err(format!(
+            "receipt tool `{tool}` does not support `site_reached` strength in a hand-authored receipt; \
+             the tool-output import adapters only produce `ran` strength, which carries verifiable tool provenance; \
+             use `external-integration-test` with `site_reached` for integration-level reach evidence"
+        ));
+    }
     Ok(())
 }
 
@@ -1520,6 +1535,178 @@ mod tests {
                 .unwrap_or_default()
                 .contains("proof receipt command")
         );
+    }
+
+    // ── Part 2: formal-tool site_reached provenance gate ─────────────────────
+
+    #[test]
+    fn validate_strength_for_tool_rejects_loom_site_reached() {
+        // A hand-authored loom receipt with site_reached must be rejected:
+        // the import adapter only produces `ran`; a hand-authored `site_reached`
+        // claim cannot carry verifiable tool provenance.
+        let mut receipt = fixture_receipt();
+        receipt.tool = "loom".to_string();
+        receipt.strength = "site_reached".to_string();
+
+        let err = receipt.validate().err().unwrap_or_default();
+        assert!(
+            err.contains("loom") && err.contains("site_reached"),
+            "expected rejection of loom+site_reached, got: {err}"
+        );
+        assert!(
+            err.contains("verifiable tool provenance"),
+            "error should mention verifiable tool provenance: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_strength_for_tool_rejects_shuttle_site_reached() {
+        let mut receipt = fixture_receipt();
+        receipt.tool = "shuttle".to_string();
+        receipt.strength = "site_reached".to_string();
+
+        let err = receipt.validate().err().unwrap_or_default();
+        assert!(
+            err.contains("shuttle") && err.contains("site_reached"),
+            "expected rejection of shuttle+site_reached, got: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_strength_for_tool_rejects_kani_site_reached() {
+        let mut receipt = fixture_receipt();
+        receipt.tool = "kani".to_string();
+        receipt.strength = "site_reached".to_string();
+
+        let err = receipt.validate().err().unwrap_or_default();
+        assert!(
+            err.contains("kani") && err.contains("site_reached"),
+            "expected rejection of kani+site_reached, got: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_strength_for_tool_rejects_crux_site_reached() {
+        let mut receipt = fixture_receipt();
+        receipt.tool = "crux".to_string();
+        receipt.strength = "site_reached".to_string();
+
+        let err = receipt.validate().err().unwrap_or_default();
+        assert!(
+            err.contains("crux") && err.contains("site_reached"),
+            "expected rejection of crux+site_reached, got: {err}"
+        );
+    }
+
+    #[test]
+    fn validate_strength_for_tool_accepts_formal_tools_with_ran_strength() -> Result<(), String> {
+        // Tool-provenance receipts from import adapters produce `ran`;
+        // these must remain valid.
+        for tool in ["loom", "shuttle", "kani", "crux"] {
+            let mut receipt = fixture_receipt();
+            receipt.tool = tool.to_string();
+            receipt.strength = "ran".to_string();
+            receipt
+                .validate()
+                .map_err(|err| format!("unexpected rejection of {tool}+ran: {err}"))?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn validate_strength_for_tool_accepts_external_integration_site_reached_unchanged()
+    -> Result<(), String> {
+        // external-integration-test+site_reached is the existing allowed path
+        // and must not be broken by the formal-tool gate.
+        let mut receipt = fixture_receipt();
+        receipt.tool = "external-integration-test".to_string();
+        receipt.strength = "site_reached".to_string();
+        receipt.command = Some("bun test test/js/sab-copy-to-unshared.test.ts".to_string());
+        receipt.command_hash = receipt.command.as_deref().map(WitnessReceipt::command_hash);
+        receipt.validate()
+    }
+
+    // ── Part 1: sanitizer runtime result semantics ────────────────────────────
+
+    #[test]
+    fn sanitizer_receipt_observed_failure_imports_as_confirmed_not_clearing_obligation()
+    -> Result<(), String> {
+        // A sanitizer runtime run that fires: verdict must be `confirmed`.
+        // A `confirmed` verdict means the site was witnessed AND the hazard
+        // reproduced. It is NOT a safety claim and does not clear the safety
+        // obligation.
+        let receipt = WitnessReceipt::from_sanitizer_output(SanitizerReceiptInput {
+            card_id: "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                .to_string(),
+            tool: "asan".to_string(),
+            output: "==42==ERROR: AddressSanitizer: heap-buffer-overflow on address\n==42==    #0 0x... in fn\n".to_string(),
+            author: "core/fixtures".to_string(),
+            recorded_at: "2026-05-18T00:00:00Z".to_string(),
+            expires_at: "2026-08-18".to_string(),
+            command: "ASAN_OPTIONS=abort_on_error=0 ./target/debug/my-program".to_string(),
+            limitations: vec!["fixture only".to_string()],
+            allow_runtime: true,
+        })?;
+
+        assert_eq!(
+            receipt.verdict.as_deref(),
+            Some("confirmed"),
+            "observed sanitizer failure must import as `confirmed`"
+        );
+        // The summary must NOT claim safety or say the obligation is cleared.
+        let summary = receipt.summary.as_deref().unwrap_or("");
+        assert!(
+            summary.contains("signal observed"),
+            "summary should note the observed signal, got: {summary}"
+        );
+        assert!(
+            !summary.to_ascii_lowercase().contains("safe"),
+            "summary must not claim safety, got: {summary}"
+        );
+        // The strength is `ran` (not `site_reached`) because the import
+        // adapter does not claim precise site reach.
+        assert_eq!(receipt.strength, "ran");
+        // Limitations must note this is not a safety claim.
+        let limitations = receipt.limitations.as_deref().unwrap_or(&[]);
+        assert!(
+            limitations
+                .iter()
+                .any(|item| item.contains("runtime witness mode")),
+            "limitations should mention runtime witness mode: {limitations:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn sanitizer_pass_satisfies_witness_coverage_with_not_reproduced_verdict() -> Result<(), String>
+    {
+        // A clean sanitizer run must import as `not_reproduced`.
+        // `not_reproduced` means no signal was observed in this run —
+        // it is NOT a safety claim.
+        let receipt = WitnessReceipt::from_sanitizer_output(SanitizerReceiptInput {
+            card_id: "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                .to_string(),
+            tool: "tsan".to_string(),
+            output: "running 1 test\ntest my_test ... ok\n\ntest result: ok. 1 passed; 0 failed; finished in 0.01s\n".to_string(),
+            author: "core/fixtures".to_string(),
+            recorded_at: "2026-05-18T00:00:00Z".to_string(),
+            expires_at: "2026-08-18".to_string(),
+            command: "RUSTFLAGS='-Z sanitizer=thread' cargo +nightly test my_test".to_string(),
+            limitations: vec!["fixture only".to_string()],
+            allow_runtime: false,
+        })?;
+
+        // A `not_reproduced` verdict satisfies witness coverage (present=true
+        // when imported) while preserving result semantics: no signal this run.
+        assert_eq!(
+            receipt.verdict.as_deref(),
+            Some("not_reproduced"),
+            "clean sanitizer run must import as `not_reproduced`"
+        );
+        assert_eq!(receipt.strength, "ran");
+        // The strength satisfies `imports_witness_evidence` (tool != eit,
+        // strength == "ran") so a ReceiptIndex will set present=true.
+        Ok(())
     }
 
     #[test]

@@ -2040,6 +2040,344 @@ mod tests {
 }"#
     }
 
+    // ── Receipt result-semantics integration tests ────────────────────────────
+
+    #[test]
+    fn receipt_index_carries_confirmed_verdict_into_witness_evidence() -> Result<(), String> {
+        // A sanitizer receipt with verdict="confirmed" (failure observed at site)
+        // must be carried through the ReceiptIndex into WitnessEvidence so every
+        // downstream surface can distinguish "site witnessed + failure" from
+        // "site witnessed + no signal".
+        let root = unique_temp_dir("unsafe-review-confirmed-receipt-index")?;
+        let receipts = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipts).map_err(|err| format!("create receipt dir failed: {err}"))?;
+        let card_id =
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+        fs::write(
+            receipts.join("asan.json"),
+            format!(
+                r#"{{
+  "schema_version": "0.1",
+  "card_id": "{card_id}",
+  "tool": "asan",
+  "strength": "ran",
+  "author": "core/fixtures",
+  "recorded_at": "2025-12-18T00:00:00Z",
+  "expires_at": "2026-08-18",
+  "verdict": "confirmed",
+  "summary": "asan runtime run: sanitizer signal observed"
+}}"#
+            ),
+        )
+        .map_err(|err| format!("write receipt failed: {err}"))?;
+
+        let index = ReceiptIndex::load_with_date(&root, "2026-05-18")?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+
+        let evidence = index.witness_evidence_for(
+            &CardId(card_id.to_string()),
+            &routes_for(WitnessKind::AddressSanitizer),
+        );
+        // A `confirmed` sanitizer receipt satisfies witness coverage: the site
+        // was reached and the sanitizer fired. It does NOT clear the safety
+        // obligation; it increases urgency.
+        assert!(
+            evidence.present,
+            "confirmed sanitizer receipt must satisfy witness coverage (present=true)"
+        );
+        assert!(evidence.runtime_executed);
+        assert_eq!(
+            evidence.verdict.as_deref(),
+            Some("confirmed"),
+            "confirmed verdict must be preserved in WitnessEvidence"
+        );
+        assert_eq!(
+            evidence.confirmation_state(),
+            "confirmed",
+            "confirmation_state must reflect the confirmed verdict"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_index_carries_not_reproduced_verdict_from_sanitizer_pass() -> Result<(), String> {
+        // A clean sanitizer run must produce `not_reproduced` and satisfy
+        // witness coverage. `not_reproduced` is a single-run observation,
+        // not a safety claim.
+        let root = unique_temp_dir("unsafe-review-not-reproduced-sanitizer")?;
+        let receipts = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipts).map_err(|err| format!("create receipt dir failed: {err}"))?;
+        let card_id =
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+        fs::write(
+            receipts.join("tsan.json"),
+            format!(
+                r#"{{
+  "schema_version": "0.1",
+  "card_id": "{card_id}",
+  "tool": "tsan",
+  "strength": "ran",
+  "author": "core/fixtures",
+  "recorded_at": "2025-12-18T00:00:00Z",
+  "expires_at": "2026-08-18",
+  "verdict": "not_reproduced",
+  "summary": "tsan runtime run: clean runtime run, no sanitizer signal observed"
+}}"#
+            ),
+        )
+        .map_err(|err| format!("write receipt failed: {err}"))?;
+
+        let index = ReceiptIndex::load_with_date(&root, "2026-05-18")?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+
+        let evidence = index.witness_evidence_for(
+            &CardId(card_id.to_string()),
+            &routes_for(WitnessKind::ThreadSanitizer),
+        );
+        // A `not_reproduced` receipt satisfies witness coverage. It is a
+        // single-run observation, not a safety claim.
+        assert!(
+            evidence.present,
+            "not_reproduced sanitizer receipt must satisfy witness coverage"
+        );
+        assert!(evidence.runtime_executed);
+        assert_eq!(evidence.verdict.as_deref(), Some("not_reproduced"));
+        assert_eq!(evidence.confirmation_state(), "not_reproduced");
+        Ok(())
+    }
+
+    #[test]
+    fn hand_authored_formal_tool_site_reached_is_rejected_at_load() -> Result<(), String> {
+        // A hand-authored loom receipt claiming site_reached must be rejected
+        // at load time: the import adapters only produce `ran`, so `site_reached`
+        // for loom/shuttle/kani/crux cannot carry verifiable tool provenance.
+        for tool in ["loom", "shuttle", "kani", "crux"] {
+            let root = unique_temp_dir(&format!("unsafe-review-formal-tool-site-reached-{tool}"))?;
+            let receipts_dir = root.join(".unsafe-review").join("receipts");
+            fs::create_dir_all(&receipts_dir)
+                .map_err(|err| format!("create receipt dir failed: {err}"))?;
+            let card_id = "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+            fs::write(
+                receipts_dir.join("formal.json"),
+                format!(
+                    r#"{{
+  "schema_version": "0.1",
+  "card_id": "{card_id}",
+  "tool": "{tool}",
+  "strength": "site_reached",
+  "author": "core/fixtures",
+  "recorded_at": "2026-05-18T00:00:00Z",
+  "expires_at": "2026-08-18"
+}}"#
+                ),
+            )
+            .map_err(|err| format!("write {tool} site_reached receipt failed: {err}"))?;
+
+            let result = ReceiptIndex::load(&root);
+            fs::remove_dir_all(&root)
+                .map_err(|err| format!("remove temp root for {tool} failed: {err}"))?;
+
+            let err = result.err().unwrap_or_default();
+            assert!(
+                err.contains(tool) && err.contains("site_reached"),
+                "expected rejection of {tool}+site_reached at load time, got: {err}"
+            );
+            assert!(
+                err.contains("verifiable tool provenance"),
+                "{tool}+site_reached rejection must mention verifiable tool provenance: {err}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn tool_provenance_formal_tool_ran_is_accepted_at_load() -> Result<(), String> {
+        // A receipt with loom/shuttle/kani/crux at `ran` strength (the only
+        // strength the import adapters produce) must be accepted at load time.
+        for tool in ["loom", "shuttle", "kani", "crux"] {
+            let root = unique_temp_dir(&format!("unsafe-review-formal-tool-ran-accepted-{tool}"))?;
+            let receipts_dir = root.join(".unsafe-review").join("receipts");
+            fs::create_dir_all(&receipts_dir)
+                .map_err(|err| format!("create receipt dir failed: {err}"))?;
+            let card_id = "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+            fs::write(
+                receipts_dir.join("formal.json"),
+                format!(
+                    r#"{{
+  "schema_version": "0.1",
+  "card_id": "{card_id}",
+  "tool": "{tool}",
+  "strength": "ran",
+  "author": "core/fixtures",
+  "recorded_at": "2026-05-18T00:00:00Z",
+  "expires_at": "2026-08-18"
+}}"#
+                ),
+            )
+            .map_err(|err| format!("write {tool} ran receipt failed: {err}"))?;
+
+            let result = ReceiptIndex::load(&root);
+            fs::remove_dir_all(&root)
+                .map_err(|err| format!("remove temp root for {tool} failed: {err}"))?;
+
+            result.map_err(|err| format!("unexpected rejection of {tool}+ran: {err}"))?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn confirmed_verdict_receipt_preserves_card_priority_and_marks_witnessed() -> Result<(), String>
+    {
+        // A `confirmed` receipt: the site was witnessed and the sanitizer fired.
+        // The card should become `guarded_and_witnessed` (site was witnessed) but
+        // priority must NOT be downgraded to Low — the observed failure increases
+        // urgency. The safety obligation is NOT cleared; it is preserved.
+        let root = copy_fixture_to_temp(
+            "box_from_raw_box_origin",
+            "unsafe-review-confirmed-receipt-priority",
+        )?;
+        let output = analyze_fixture_root(&root)?;
+        let card = output
+            .cards
+            .first()
+            .ok_or_else(|| "fixture produced no card".to_string())?;
+        // Confirm the baseline: without a receipt, the card is guarded_unwitnessed
+        // with medium priority.
+        assert_eq!(
+            card.class.as_str(),
+            "guarded_unwitnessed",
+            "baseline class must be guarded_unwitnessed"
+        );
+        assert_eq!(
+            card.priority.as_str(),
+            "medium",
+            "baseline priority must be medium"
+        );
+        let card_id = card.id.0.clone();
+
+        // Write a miri receipt with `confirmed` verdict for this card.
+        let receipt_dir = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipt_dir)
+            .map_err(|err| format!("create receipt dir failed: {err}"))?;
+        fs::write(
+            receipt_dir.join("miri-confirmed.json"),
+            format!(
+                r#"{{
+  "schema_version": "0.1",
+  "card_id": "{card_id}",
+  "tool": "miri",
+  "strength": "ran",
+  "author": "core/fixtures",
+  "recorded_at": "2025-12-18T00:00:00Z",
+  "expires_at": "2026-08-18",
+  "verdict": "confirmed",
+  "summary": "miri run: UB hypothesis reproduced"
+}}"#
+            ),
+        )
+        .map_err(|err| format!("write confirmed receipt failed: {err}"))?;
+
+        // Analyze WITH the receipt loaded.
+        let output_with_receipt = pipeline::analyze(analyze_input(&root))?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+
+        let card_with_receipt = output_with_receipt
+            .cards
+            .first()
+            .ok_or_else(|| "fixture produced no card after receipt import".to_string())?;
+        // The card becomes `guarded_and_witnessed` because the site was witnessed.
+        assert_eq!(
+            card_with_receipt.class.as_str(),
+            "guarded_and_witnessed",
+            "confirmed receipt must upgrade card to guarded_and_witnessed"
+        );
+        // Priority must NOT be lowered: a `confirmed` verdict means the hazard
+        // reproduced and the safety obligation is not cleared.
+        assert_eq!(
+            card_with_receipt.priority.as_str(),
+            "medium",
+            "confirmed receipt must preserve priority (not lower to low)"
+        );
+        // The witness evidence must carry the `confirmed` verdict through.
+        assert_eq!(
+            card_with_receipt.witness.verdict.as_deref(),
+            Some("confirmed"),
+            "confirmed verdict must be present in card witness evidence"
+        );
+        assert_eq!(
+            card_with_receipt.witness.confirmation_state(),
+            "confirmed",
+            "confirmation_state must be 'confirmed'"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn not_reproduced_verdict_receipt_lowers_priority_and_marks_witnessed() -> Result<(), String> {
+        // A `not_reproduced` receipt: the site was witnessed and no signal was
+        // observed in this run. Priority is lowered to Low as before.
+        let root = copy_fixture_to_temp(
+            "box_from_raw_box_origin",
+            "unsafe-review-not-reproduced-priority",
+        )?;
+        let card_id = {
+            let output = analyze_fixture_root(&root)?;
+            output
+                .cards
+                .first()
+                .ok_or_else(|| "fixture produced no card".to_string())?
+                .id
+                .0
+                .clone()
+        };
+
+        let receipt_dir = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipt_dir)
+            .map_err(|err| format!("create receipt dir failed: {err}"))?;
+        fs::write(
+            receipt_dir.join("miri-not-reproduced.json"),
+            format!(
+                r#"{{
+  "schema_version": "0.1",
+  "card_id": "{card_id}",
+  "tool": "miri",
+  "strength": "ran",
+  "author": "core/fixtures",
+  "recorded_at": "2025-12-18T00:00:00Z",
+  "expires_at": "2026-08-18",
+  "verdict": "not_reproduced",
+  "summary": "miri run: no UB observed in this run — not a safety claim"
+}}"#
+            ),
+        )
+        .map_err(|err| format!("write not_reproduced receipt failed: {err}"))?;
+
+        let output_with_receipt = pipeline::analyze(analyze_input(&root))?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+
+        let card = output_with_receipt
+            .cards
+            .first()
+            .ok_or_else(|| "fixture produced no card after receipt import".to_string())?;
+        assert_eq!(
+            card.class.as_str(),
+            "guarded_and_witnessed",
+            "not_reproduced receipt must upgrade card to guarded_and_witnessed"
+        );
+        // Priority IS lowered for not_reproduced (and absent verdict / inconclusive).
+        assert_eq!(
+            card.priority.as_str(),
+            "low",
+            "not_reproduced receipt must lower priority to low"
+        );
+        assert_eq!(card.witness.verdict.as_deref(), Some("not_reproduced"));
+        Ok(())
+    }
+
     fn routes_for(kind: WitnessKind) -> Vec<WitnessRoute> {
         vec![WitnessRoute {
             kind,

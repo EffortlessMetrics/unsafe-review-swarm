@@ -74,7 +74,16 @@ pub(super) fn build_card(
         }
         if class == ReviewClass::GuardedUnwitnessed {
             class = ReviewClass::GuardedAndWitnessed;
-            priority = Priority::Low;
+            // A `confirmed` verdict means the runtime witness observed a
+            // failure at the site. That preserves the safety obligation and
+            // increases urgency: do NOT lower priority. The site was
+            // witnessed (hence `GuardedAndWitnessed`), but the observed
+            // failure is evidence the unsafe code triggered the hazard — not
+            // that it is safe. All other verdicts (absent / `not_reproduced`
+            // / `inconclusive`) lower priority to Low as before.
+            if witness_evidence.verdict.as_deref() != Some("confirmed") {
+                priority = Priority::Low;
+            }
         }
     } else if class == ReviewClass::GuardedUnwitnessed
         && ctx.receipt_index.has_tool_mismatch_for(&id, &routes)
