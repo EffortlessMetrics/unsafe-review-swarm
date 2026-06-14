@@ -1197,6 +1197,7 @@ mod tests {
         assert!(markdown.contains("# unsafe-review outcome"));
         assert!(markdown.contains("## Reviewer delta"));
         assert!(markdown.contains("- New cards: 1"));
+        assert!(markdown.contains("- Unchanged cards: 0"));
         assert!(markdown.contains("- Receipt movement: 0 improved, 0 regressed"));
         assert!(markdown.contains("Top remaining gaps"));
         assert!(markdown.contains("## Movement reasons"));
@@ -1532,6 +1533,47 @@ mod tests {
             "No new, resolved, improved, or regressed ReviewCards in these saved snapshots."
         ));
         assert!(!markdown.contains("All clear"));
+        Ok(())
+    }
+
+    #[test]
+    fn outcome_markdown_unchanged_count_matches_json_reviewer_delta() -> Result<(), String> {
+        let before = snapshot_json(&[
+            card("UR-a-c1", "guard_missing", "high", &["guard"]),
+            card("UR-b-c1", "guard_missing", "high", &["guard"]),
+        ]);
+        let after = snapshot_json(&[
+            card("UR-a-c1", "guard_missing", "high", &["guard"]),
+            card("UR-b-c1", "guard_missing", "high", &["guard"]),
+            card("UR-c-c1", "contract_missing", "high", &["contract"]),
+        ]);
+
+        let report = compare_json(&before, &after)?;
+
+        assert_eq!(report.summary.unchanged, 2, "summary unchanged should be 2");
+        assert_eq!(
+            report.reviewer_delta.unchanged_cards, 2,
+            "reviewer_delta.unchanged_cards should match summary.unchanged"
+        );
+
+        let json = render_json(&report);
+        let value: serde_json::Value =
+            serde_json::from_str(&json).map_err(|err| format!("parse JSON failed: {err}"))?;
+        let json_unchanged = value["reviewer_delta"]["unchanged_cards"]
+            .as_u64()
+            .ok_or("reviewer_delta.unchanged_cards must be a number in JSON")?
+            as usize;
+        assert_eq!(
+            json_unchanged, 2,
+            "JSON reviewer_delta.unchanged_cards should be 2"
+        );
+
+        let markdown = render_markdown(&report);
+        let expected_line = format!("- Unchanged cards: {json_unchanged}");
+        assert!(
+            markdown.contains(&expected_line),
+            "markdown Reviewer delta section must include '{expected_line}' to match JSON reviewer_delta.unchanged_cards; got:\n{markdown}"
+        );
         Ok(())
     }
 
