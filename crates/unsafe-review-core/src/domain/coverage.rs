@@ -1,4 +1,5 @@
-use super::{ReviewCard, ReviewClass, WitnessKind};
+use super::operation::OperationFamily;
+use super::{Confidence, ReviewCard, ReviewClass, WitnessKind};
 
 /// Coverage level for contract, guard, and test-reach slots.
 ///
@@ -300,80 +301,248 @@ fn derive_outcome_movement(baseline_state: BaselineState) -> OutcomeMovement {
     }
 }
 
-fn derive_agent_lsp_readiness(card: &ReviewCard) -> AgentLspReadiness {
-    // Mirror the agent-readiness state logic from output/agent/readiness.rs
-    // without importing that module (this is a domain-level derivation).
-    //
-    // Unsupported:            class not actionable, or witness route is Unsupported.
-    // NeedsHuman:             operation family requires human review (Ffi, InlineAsm,
-    //                         TargetFeature, Unknown) or a HumanDeepReview route exists
-    //                         or class is StaticUnknown/MiriUnsupported.
-    // RequiresWitnessReceipt: class is RequiresLoom/RequiresSanitizer/RequiresKaniOrCrux
-    //                         — an external witness receipt is needed before repair
-    //                         delegation is appropriate. Checked after NeedsHuman so
-    //                         that a human-gating factor on those classes still wins.
-    // Ready:                  actionable, no human-gating or receipt-blocking factors,
-    //                         specific op family, at least one verify command.
-    use super::ReviewClass;
-    use super::operation::OperationFamily;
+/// Output of the single shared readiness computation, used by both the agent
+/// packet (`output/agent/readiness.rs`) and the coverage block
+/// (`derive_agent_lsp_readiness`).  Keeping both callers on this one function
+/// is the enforcement point: the two surfaces CANNOT diverge because they
+/// share exactly one code path.
+pub(crate) struct AgentReadinessResult {
+    /// Closed-vocabulary readiness state.
+    pub(crate) state: AgentLspReadiness,
+    /// Human-readable reasons explaining the state (used by the agent packet's
+    /// `agent_readiness.reasons` field; ignored by the coverage block).
+    pub(crate) reasons: Vec<String>,
+}
 
+/// Compute agent readiness for `card`, encoding ALL gates used by both
+/// the agent-packet surface (`output/agent/readiness.rs`) and the
+/// coverage block (`coverage.agent_lsp_readiness`).
+///
+/// `has_card_scoped_repairs` must be supplied by the caller:
+/// - The agent packet computes it via `output/agent/repairs::build(card)`.
+/// - The coverage block computes it via [`domain_has_card_scoped_repairs`].
+///
+/// Both callers pass their respective value into this function so that the
+/// derived state is identical, resolving the single-truth drift described in
+/// output audit #1687 (findings 3+4).
+///
+/// Gate order matches `output/agent/readiness.rs` exactly:
+/// 1. Class not actionable → `Unsupported`
+/// 2. No missing evidence → `Unsupported`
+/// 3. All missing is witness → `RequiresWitnessReceipt`
+/// 4. RequiresSanitizer / RequiresKaniOrCrux / RequiresLoom class → sets witness-receipt flag
+/// 5. StaticUnknown / MiriUnsupported class → sets human-review flag
+/// 6. Unknown / Ffi / InlineAsm / TargetFeature family → sets human-review flag
+/// 7. HumanDeepReview route → sets human-review flag
+/// 8. Unsupported route → `Unsupported`
+/// 9. Low/Unknown confidence → accumulates unsupported reason
+/// 10. No card-scoped repair → accumulates unsupported reason
+/// 11. No verify command → accumulates unsupported reason
+/// 12. Resolve: empty reasons → `Ready`; human flag → `NeedsHuman`;
+///     receipt flag → `RequiresWitnessReceipt`; else → `Unsupported`
+pub(crate) fn compute_agent_lsp_readiness(
+    card: &ReviewCard,
+    has_card_scoped_repairs: bool,
+) -> AgentReadinessResult {
+    let mut reasons: Vec<String> = Vec::new();
+
+    // Gate 1: class must be actionable.
     if !card.class.is_actionable() {
-        return AgentLspReadiness::Unsupported;
+        reasons.push(format!(
+            "card class `{}` is not an open actionable repair target",
+            card.class.as_str()
+        ));
+        return AgentReadinessResult {
+            state: AgentLspReadiness::Unsupported,
+            reasons,
+        };
     }
 
-    // An Unsupported witness route hard-gates.
-    if card
-        .routes
-        .iter()
-        .any(|route| matches!(route.kind, WitnessKind::Unsupported))
-    {
-        return AgentLspReadiness::Unsupported;
+    // Gate 2: card must have at least one missing evidence entry.
+    if card.missing.is_empty() {
+        reasons.push("card has no missing evidence to repair".to_string());
+        return AgentReadinessResult {
+            state: AgentLspReadiness::Unsupported,
+            reasons,
+        };
     }
 
-    // Human-review-requiring classes/families/routes take priority over the
-    // receipt-blocking check below.
-    let requires_human = matches!(
+    // Gate 3: if every missing entry is a witness receipt, the remaining work
+    // is an external receipt — not an automatic source repair.
+    if card.missing.iter().all(|m| m.kind == "witness") {
+        reasons.push(
+            "remaining work is an external witness receipt, not an automatic source repair"
+                .to_string(),
+        );
+        return AgentReadinessResult {
+            state: AgentLspReadiness::RequiresWitnessReceipt,
+            reasons,
+        };
+    }
+
+    // Flags accumulated by gates 4-7; resolved at gate 12.
+    let mut requires_human_review = false;
+    let mut requires_witness_receipt = false;
+
+    // Gate 4: receipt-blocking classes.
+    if matches!(
+        card.class,
+        ReviewClass::RequiresSanitizer
+            | ReviewClass::RequiresKaniOrCrux
+            | ReviewClass::RequiresLoom
+    ) {
+        reasons.push(format!(
+            "card class `{}` requires an external witness receipt before repair delegation",
+            card.class.as_str()
+        ));
+        requires_witness_receipt = true;
+    }
+
+    // Gate 5: human-review-requiring classes.
+    if matches!(
         card.class,
         ReviewClass::StaticUnknown | ReviewClass::MiriUnsupported
-    ) || matches!(
+    ) {
+        reasons.push(format!(
+            "card class `{}` requires human review before repair delegation",
+            card.class.as_str()
+        ));
+        requires_human_review = true;
+    }
+
+    // Gate 6: human-review-requiring operation families.
+    if matches!(
         card.operation.family,
         OperationFamily::Unknown
             | OperationFamily::Ffi
             | OperationFamily::InlineAsm
             | OperationFamily::TargetFeature
-    ) || card
+    ) {
+        reasons.push(format!(
+            "operation family `{}` is not safe for automatic repair delegation",
+            card.operation.family.as_str()
+        ));
+        requires_human_review = true;
+    }
+
+    // Gate 7: HumanDeepReview witness route.
+    if card
         .routes
         .iter()
-        .any(|route| matches!(route.kind, WitnessKind::HumanDeepReview));
-
-    if requires_human {
-        return AgentLspReadiness::NeedsHuman;
+        .any(|route| matches!(route.kind, WitnessKind::HumanDeepReview))
+    {
+        reasons.push("witness route requires human deep review".to_string());
+        requires_human_review = true;
     }
 
-    // Receipt-blocking classes: an external concurrency/sanitizer/formal-methods
-    // witness receipt is required before an agent can discharge the obligation.
-    // This matches the logic in output/agent/readiness.rs that sets
-    // `requires_witness_receipt` for the same class set.
-    if matches!(
-        card.class,
-        ReviewClass::RequiresLoom
-            | ReviewClass::RequiresSanitizer
-            | ReviewClass::RequiresKaniOrCrux
-    ) {
-        return AgentLspReadiness::RequiresWitnessReceipt;
+    // Gate 8: Unsupported witness route hard-gates immediately.
+    if card
+        .routes
+        .iter()
+        .any(|route| matches!(route.kind, WitnessKind::Unsupported))
+    {
+        reasons.push("witness route is unsupported for bounded agent repair".to_string());
+        return AgentReadinessResult {
+            state: AgentLspReadiness::Unsupported,
+            reasons,
+        };
     }
 
-    // All-witness-missing short-circuit: mirrors the canonical builder check in
-    // output/agent/readiness.rs (lines 17-23). A `guarded_unwitnessed` card
-    // whose only `missing` entries are witness receipts is NOT agent-ready —
-    // the remaining work is an external receipt, not an automatic source repair.
-    // Without this check the coverage block, telemetry histogram, and LSP
-    // disagree with the agent packet for the same card (single-truth drift).
-    if !card.missing.is_empty() && card.missing.iter().all(|m| m.kind == "witness") {
-        return AgentLspReadiness::RequiresWitnessReceipt;
+    // Gate 9: confidence must be Medium or High.
+    if !matches!(card.confidence, Confidence::High | Confidence::Medium) {
+        reasons.push(format!(
+            "card confidence `{}` is too weak for bounded repair delegation",
+            card.confidence.as_str()
+        ));
     }
 
-    AgentLspReadiness::Ready
+    // Gate 10: at least one card-scoped repair must be available.
+    if !has_card_scoped_repairs {
+        reasons.push("no card-scoped allowed repair is available".to_string());
+    }
+
+    // Gate 11: at least one verify command must be available.
+    if card.next_action.verify_commands.is_empty() {
+        reasons.push("no verify command is available for this card".to_string());
+    }
+
+    // Gate 12: resolve to a readiness state.
+    if reasons.is_empty() {
+        AgentReadinessResult {
+            state: AgentLspReadiness::Ready,
+            reasons: vec![
+                "specific operation family".to_string(),
+                "card-scoped allowed repairs".to_string(),
+                "verify commands available".to_string(),
+                "medium-or-high confidence".to_string(),
+            ],
+        }
+    } else if requires_human_review {
+        AgentReadinessResult {
+            state: AgentLspReadiness::NeedsHuman,
+            reasons,
+        }
+    } else if requires_witness_receipt {
+        AgentReadinessResult {
+            state: AgentLspReadiness::RequiresWitnessReceipt,
+            reasons,
+        }
+    } else {
+        AgentReadinessResult {
+            state: AgentLspReadiness::Unsupported,
+            reasons,
+        }
+    }
+}
+
+/// Approximate whether `card` has card-scoped allowed repairs, using only
+/// domain-level card fields (no output-layer imports).
+///
+/// Mirrors the computation in `output/agent/repairs::build` that sets
+/// `has_card_scoped_repairs`.  Two categories of repairs are considered:
+///
+/// 1. **Card-missing repairs** (`output/agent/repairs/card_missing.rs`): added
+///    when `card.missing` contains any entry with kind `"contract"`, `"reach"`,
+///    `"test"`, or `"witness"`.
+///
+/// 2. **Operation-level repairs** (`output/agent/repairs/operation.rs`): added
+///    when the operation family has specific repair actions AND at least one
+///    `obligation_evidence` entry has `discharge.present = false`.
+///
+/// This function is intentionally conservative: it prefers `true` over `false`
+/// to avoid falsely marking cards as unsupported in domain-only contexts where
+/// the full repair-build pass is not available.  The agent-packet path supplies
+/// the exact value from `repairs::build`, so domain-derived `agent_lsp_readiness`
+/// stays as correct as the available information allows.
+fn domain_has_card_scoped_repairs(card: &ReviewCard) -> bool {
+    // Category 1: card_missing repairs (kinds that card_missing.rs handles).
+    let card_missing_repairs = card
+        .missing
+        .iter()
+        .any(|m| matches!(m.kind.as_str(), "contract" | "reach" | "test" | "witness"));
+
+    // Category 2: operation-level repairs (family has a specific path AND at
+    // least one obligation is undischarged).
+    let operation_repairs = !matches!(
+        card.operation.family,
+        OperationFamily::Unknown
+            | OperationFamily::Ffi
+            | OperationFamily::InlineAsm
+            | OperationFamily::TargetFeature
+    ) && card
+        .obligation_evidence
+        .iter()
+        .any(|e| !e.discharge.present);
+
+    card_missing_repairs || operation_repairs
+}
+
+fn derive_agent_lsp_readiness(card: &ReviewCard) -> AgentLspReadiness {
+    // Delegate to the single shared function, computing has_card_scoped_repairs
+    // from domain-level card fields.  The agent-packet path uses the exact value
+    // from `output/agent/repairs::build`; coverage-only callers use this
+    // domain approximation.
+    compute_agent_lsp_readiness(card, domain_has_card_scoped_repairs(card)).state
 }
 
 #[cfg(test)]
@@ -383,12 +552,21 @@ mod tests {
         ManualContext, OutcomeMovement, WitnessReceiptCoverage,
     };
     use crate::domain::{
-        CardId, Confidence, ContractEvidence, DischargeEvidence, HazardKind, NextAction,
-        OperationFamily, Priority, ProofPath, ReachEvidence, ReviewCard, ReviewClass,
+        CardId, Confidence, ContractEvidence, DischargeEvidence, HazardKind, MissingEvidence,
+        NextAction, OperationFamily, Priority, ProofPath, ReachEvidence, ReviewCard, ReviewClass,
         SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind, WitnessEvidence, WitnessKind,
         WitnessRoute,
     };
 
+    /// Minimal card for coverage-block tests.
+    ///
+    /// `missing` contains one `"contract"`-kind entry so that:
+    ///   - Gate 2 of `compute_agent_lsp_readiness` (empty-missing → Unsupported) is satisfied.
+    ///   - Gate 3 (all-missing-is-witness → RequiresWitnessReceipt) does not fire.
+    ///   - Gate 10 (has_card_scoped_repairs) is satisfied via the `"contract"` kind, which
+    ///     `domain_has_card_scoped_repairs` matches through `card_missing_repairs`.
+    ///
+    /// Tests that need a specific `missing` state must override `card.missing` explicitly.
     fn minimal_card(class: ReviewClass) -> ReviewCard {
         ReviewCard {
             id: CardId("UR-test-c1".to_string()),
@@ -423,7 +601,10 @@ mod tests {
                 summary: "no tests".to_string(),
             },
             witness: WitnessEvidence::missing(),
-            missing: vec![],
+            missing: vec![MissingEvidence {
+                kind: "contract".to_string(),
+                message: "no safety contract was found".to_string(),
+            }],
             routes: vec![WitnessRoute {
                 kind: WitnessKind::Miri,
                 reason: "test".to_string(),

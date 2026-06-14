@@ -1186,6 +1186,143 @@ fn agent_packet_includes_coverage_block() -> Result<(), String> {
     Ok(())
 }
 
+/// Drift-lock: `coverage.agent_lsp_readiness` must equal `agent_readiness.state`
+/// (mapped) in the agent packet.
+///
+/// Exercises the gate cases listed in output audit #1687 findings 3+4:
+/// empty-missing → unsupported, low-confidence → unsupported, no-verify-commands
+/// → unsupported, all-witness-missing → requires_witness_receipt, ready.
+/// After the collapse to a single shared function, divergence is structurally
+/// impossible for the agent packet (packet.rs overrides the coverage block with
+/// the exact repair-projection state), but this test is a regression guard so
+/// future refactors cannot re-introduce the split.
+#[test]
+fn agent_packet_coverage_agent_lsp_readiness_matches_agent_readiness_state() -> Result<(), String> {
+    use crate::domain::{
+        CardId, Confidence, ContractEvidence, DischargeEvidence, HazardKind, MissingEvidence,
+        NextAction, OperationFamily, Priority, ProofPath, ReachEvidence, ReviewCard, ReviewClass,
+        SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind, WitnessEvidence, WitnessKind,
+        WitnessRoute,
+    };
+
+    fn base_card() -> ReviewCard {
+        ReviewCard {
+            id: CardId("UR-drift-lock-c1".to_string()),
+            class: ReviewClass::GuardMissing,
+            priority: Priority::Medium,
+            confidence: Confidence::Medium,
+            proof_path: ProofPath::SourceRouteOnly,
+            site: UnsafeSite {
+                location: SourceLocation {
+                    file: "src/lib.rs".into(),
+                    line: 1,
+                    column: 1,
+                },
+                kind: UnsafeSiteKind::Operation,
+                owner: Some("owner".to_string()),
+                visibility: "private".to_string(),
+                public_api_surface: false,
+                changed: true,
+                snippet: "unsafe { *ptr }".to_string(),
+            },
+            operation: UnsafeOperation {
+                expression: "unsafe { *ptr }".to_string(),
+                family: OperationFamily::RawPointerDeref,
+            },
+            hazards: vec![HazardKind::PointerValidity],
+            obligations: vec![],
+            obligation_evidence: vec![],
+            contract: ContractEvidence::missing(),
+            discharge: DischargeEvidence::missing(),
+            reach: ReachEvidence {
+                state: "missing".to_string(),
+                summary: "no tests".to_string(),
+            },
+            witness: WitnessEvidence::missing(),
+            missing: vec![MissingEvidence {
+                kind: "contract".to_string(),
+                message: "no safety contract".to_string(),
+            }],
+            routes: vec![WitnessRoute {
+                kind: WitnessKind::Miri,
+                reason: "test".to_string(),
+                command: Some("cargo miri test".to_string()),
+                required: false,
+            }],
+            next_action: NextAction {
+                summary: "add guard".to_string(),
+                verify_commands: vec!["cargo miri test".to_string()],
+            },
+            related_tests: vec![],
+        }
+    }
+
+    /// Assert that `coverage.agent_lsp_readiness == agent_readiness.state` (mapped)
+    /// in the rendered agent packet for `card`.
+    fn check(label: &str, card: &ReviewCard) -> Result<(), String> {
+        // Map agent_readiness.state → the string used in coverage.agent_lsp_readiness.
+        const READY_COVERAGE: &str = "ready";
+        const NEEDS_HUMAN_COVERAGE: &str = "needs_human";
+        const REQUIRES_RECEIPT_COVERAGE: &str = "requires_witness_receipt";
+        const UNSUPPORTED_COVERAGE: &str = "unsupported";
+
+        let value = parse_json(&render(card))?;
+        let agent_state = value["agent_readiness"]["state"]
+            .as_str()
+            .ok_or_else(|| format!("{label}: agent_readiness.state missing"))?;
+        let coverage_readiness = value["coverage"]["agent_lsp_readiness"]
+            .as_str()
+            .ok_or_else(|| format!("{label}: coverage.agent_lsp_readiness missing"))?;
+
+        // Map agent_readiness.state to the expected coverage string.
+        let expected_coverage = match agent_state {
+            "ready_for_agent" => READY_COVERAGE,
+            "requires_human_review" => NEEDS_HUMAN_COVERAGE,
+            "requires_witness_receipt" => REQUIRES_RECEIPT_COVERAGE,
+            _ => UNSUPPORTED_COVERAGE,
+        };
+
+        if coverage_readiness != expected_coverage {
+            return Err(format!(
+                "{label}: coverage.agent_lsp_readiness={coverage_readiness:?} \
+                 != expected {expected_coverage:?} \
+                 (agent_readiness.state={agent_state:?})"
+            ));
+        }
+        Ok(())
+    }
+
+    // Case 1: ready card (non-empty missing, has scoped repairs, medium confidence,
+    // verify commands present).
+    let ready_card = base_card();
+    check("ready", &ready_card)?;
+
+    // Case 2: empty-missing → unsupported.
+    let mut empty_missing = base_card();
+    empty_missing.missing.clear();
+    check("empty-missing", &empty_missing)?;
+
+    // Case 3: low-confidence → unsupported.
+    let mut low_conf = base_card();
+    low_conf.confidence = Confidence::Low;
+    check("low-confidence", &low_conf)?;
+
+    // Case 4: no verify commands → unsupported.
+    let mut no_verify = base_card();
+    no_verify.next_action.verify_commands.clear();
+    check("no-verify-commands", &no_verify)?;
+
+    // Case 5: all-witness missing → requires_witness_receipt.
+    let mut all_witness = base_card();
+    all_witness.missing = vec![MissingEvidence {
+        kind: "witness".to_string(),
+        message: "no receipt".to_string(),
+    }];
+    check("all-witness-missing", &all_witness)?;
+
+    Ok(())
+}
+
 fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../fixtures")

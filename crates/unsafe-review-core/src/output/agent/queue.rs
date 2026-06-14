@@ -88,6 +88,20 @@ fn allowed_repairs(card: &ReviewCard) -> AllowedRepairs {
     repairs::build(card)
 }
 
+/// Return `true` when `card` has at least one card-scoped allowed repair, as
+/// determined by the same logic as `repairs::build`.
+///
+/// Exposed `pub(crate)` so that callers outside this module (e.g. `json.rs`)
+/// can compute the exact same `has_card_scoped_repairs` value that
+/// `packet_repair_projection` uses, and pass it to
+/// `crate::domain::coverage::compute_agent_lsp_readiness`.  This is the
+/// mechanism that makes `coverage.agent_lsp_readiness` in `cards.json`
+/// identical to `agent_readiness.state` in the agent packet (output audit
+/// #1687 findings 3+4).
+pub(crate) fn card_has_scoped_repairs(card: &ReviewCard) -> bool {
+    repairs::build(card).has_card_scoped_repairs
+}
+
 fn repair_queue(card: &ReviewCard, readiness: &AgentReadiness) -> AgentRepairQueue {
     let mut buckets = Vec::new();
     if has_missing_kind(card, "contract") {
