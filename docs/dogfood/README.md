@@ -32,6 +32,7 @@ lives in [`REAL_WORLD_FINDINGS.md`](REAL_WORLD_FINDINGS.md).
 
 Snapshot reports:
 
+- [2026-06-14 stance-change validation (#1705-1718)](reports/2026-06-14-stance-change-validation.md)
 - [2026-06-13 fresh-crate capstone validation](reports/2026-06-13-fresh-crate-capstone-validation.md)
 - [2026-06-13 post-fix card-correctness validation](reports/2026-06-13-post-fix-card-correctness-validation.md)
 - [2026-05-26 post-burst analyzer snapshot](reports/2026-05-26-post-burst.md)
