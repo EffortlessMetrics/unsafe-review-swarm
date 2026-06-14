@@ -2,7 +2,10 @@ use super::context::{AgentContext, AgentSourceContext};
 use super::evidence::{
     AgentMissingEvidence, AgentObligationEvidence, AgentSafetyContract, AgentWitnessRoute,
 };
-use super::queue::{AgentReadiness, AgentRepairQueue, packet_repair_projection};
+use super::queue::{
+    AgentReadiness, AgentRepairQueue, READY_FOR_AGENT, REQUIRES_HUMAN_REVIEW,
+    REQUIRES_WITNESS_RECEIPT, packet_repair_projection,
+};
 use super::{DO_NOT_DO, TRUST_BOUNDARY};
 use crate::domain::{
     AgentLspReadiness, BaselineState, CommentPlanStatus, Coverage, CoverageBlock, ManualContext,
@@ -10,6 +13,20 @@ use crate::domain::{
 };
 use crate::output::confirmation::ConfirmationCue;
 use serde::Serialize;
+
+/// Map an `agent_readiness.state` string back to the domain [`AgentLspReadiness`]
+/// enum so that `coverage.agent_lsp_readiness` in the agent packet is derived
+/// from the SAME readiness computation as `agent_readiness.state` (output audit
+/// #1687, findings 3+4 — guarantees identity when `has_card_scoped_repairs` is
+/// available from the repair projection).
+fn agent_state_to_lsp_readiness(state: &'static str) -> AgentLspReadiness {
+    match state {
+        READY_FOR_AGENT => AgentLspReadiness::Ready,
+        REQUIRES_HUMAN_REVIEW => AgentLspReadiness::NeedsHuman,
+        REQUIRES_WITNESS_RECEIPT => AgentLspReadiness::RequiresWitnessReceipt,
+        _ => AgentLspReadiness::Unsupported,
+    }
+}
 
 /// Machine-readable per-card coverage block (SPEC-0029) projected into the
 /// agent context packet.
@@ -131,6 +148,13 @@ impl<'a> AgentPacket<'a> {
         let repairs = packet_repair_projection(card);
         let mut coverage_block = card.coverage_block();
         coverage_block.comment_plan_status = comment_plan_status;
+        // Guarantee: coverage.agent_lsp_readiness == agent_readiness.state
+        // (output audit #1687, findings 3+4).  The repair projection already
+        // computed the authoritative readiness state via `compute_agent_lsp_readiness`
+        // with the exact `has_card_scoped_repairs` value.  Override the coverage
+        // block slot so both fields in the agent packet agree unconditionally.
+        coverage_block.agent_lsp_readiness =
+            agent_state_to_lsp_readiness(repairs.agent_readiness.state);
         Self {
             schema_version: "0.1",
             tool: "unsafe-review",

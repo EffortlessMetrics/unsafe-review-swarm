@@ -2,7 +2,7 @@ use crate::domain::{CommentPlanStatus, ReviewCard};
 use crate::output::REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY;
 use serde::Serialize;
 
-pub(crate) use queue::{AgentQueueProjection, AgentReadiness};
+pub(crate) use queue::{AgentQueueProjection, AgentReadiness, card_has_scoped_repairs};
 
 pub(crate) const DO_NOT_DO: &[&str] = &[
     "do not widen unsafe code without reducing the missing evidence",

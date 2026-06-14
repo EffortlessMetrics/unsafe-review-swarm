@@ -1,10 +1,12 @@
 use crate::api::{AnalyzeOutput, Provenance, Scope, Summary};
+use crate::domain::coverage::compute_agent_lsp_readiness;
 use crate::domain::{
     AgentLspReadiness, BaselineState, CommentPlanStatus, Coverage, CoverageBlock, EvidenceState,
     ManualContext, ObligationEvidence, OperationFamily, OutcomeMovement, ReviewCard,
     WitnessReceiptCoverage, WitnessRoute,
 };
 use crate::output::REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY;
+use crate::output::agent::card_has_scoped_repairs;
 use crate::output::comment_plan;
 use crate::output::confirmation::ConfirmationCue;
 use crate::util::path_display;
@@ -237,6 +239,12 @@ impl<'a> JsonCard<'a> {
     fn from_with_status(card: &'a ReviewCard, comment_plan_status: CommentPlanStatus) -> Self {
         let mut coverage_block = card.coverage_block();
         coverage_block.comment_plan_status = comment_plan_status;
+        // Guarantee: cards.json coverage.agent_lsp_readiness uses the exact
+        // has_card_scoped_repairs value (output audit #1687, findings 3+4).
+        // Both cards.json and the agent packet now call compute_agent_lsp_readiness
+        // with the same has_card_scoped_repairs so neither surface can diverge.
+        coverage_block.agent_lsp_readiness =
+            compute_agent_lsp_readiness(card, card_has_scoped_repairs(card)).state;
         Self {
             id: &card.id.0,
             class_name: card.class.as_str(),
