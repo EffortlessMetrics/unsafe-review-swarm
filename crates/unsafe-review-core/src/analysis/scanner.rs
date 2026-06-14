@@ -101,6 +101,20 @@ fn detect_site(line: &str) -> Option<(UnsafeSiteKind, OperationFamily)> {
     if is_import_item(line) {
         return None;
     }
+    // Guard: skip all bare-name call-site detectors when the line is a function
+    // DEFINITION header.  A header like `pub fn set_len(` or `fn assume_init(`
+    // has the target name immediately preceded by `fn `, which makes every
+    // `contains_call_name` / `call_suffix` test match a *definition*, not a call.
+    // This single guard replaces per-detector workarounds (the analogous guard in
+    // `zeroed_operation.rs` becomes redundant but is preserved for stability).
+    //
+    // We still let `unsafe fn` declarations fall through the earlier branch above
+    // (line 89), so this guard fires only for SAFE (or const/async) fn headers.
+    // `unsafe { }` blocks, `unsafe impl`, and `extern` boundaries are already
+    // returned before we reach this point.
+    if is_fn_definition_header(line) {
+        return None;
+    }
     if let Some(family) = detect_operation_family(line) {
         return Some((UnsafeSiteKind::Operation, family));
     }
@@ -330,6 +344,48 @@ fn is_import_item(line: &str) -> bool {
     trimmed.starts_with("use ")
         || trimmed.starts_with("pub use ")
         || (trimmed.starts_with("pub(") && trimmed.contains(" use "))
+}
+
+/// Returns `true` when `line` is a function **definition** header — i.e. the
+/// line declares a function name (safe, const, async, or extern-ABI variants)
+/// rather than calling one.  The test looks for the `fn` keyword (standalone,
+/// bounded on both sides by non-identifier characters) followed, after optional
+/// whitespace, by an identifier character (the function name).
+///
+/// Examples that return `true`:
+/// - `pub fn set_len(new_len: usize) {`
+/// - `fn assume_init(self) -> T {`
+/// - `const fn from_raw_parts(data: *const T, len: usize) -> &[T] {`
+/// - `async fn from_utf8_unchecked(bytes: &[u8]) -> &str {`
+/// - `pub(crate) unsafe fn zeroed() -> T {` — safe definitions only (unsafe fn
+///   declarations are caught earlier in `detect_site` and never reach this guard,
+///   but even if they did this would correctly identify them as definitions).
+///
+/// Examples that return `false`:
+/// - `let x = mem::zeroed();` (no `fn` keyword)
+/// - `v.set_len(n);` (no `fn` keyword)
+/// - `let f: unsafe fn(*mut u8) = ptr::write;` (fn-pointer type, not a def)
+fn is_fn_definition_header(line: &str) -> bool {
+    let mut cursor = line;
+    while let Some(pos) = cursor.find("fn ") {
+        let before = cursor[..pos].chars().next_back();
+        // `fn` must be a standalone keyword — not part of a longer identifier.
+        let starts_on_boundary = before.is_none_or(|ch| !is_ident_continue(ch));
+        if starts_on_boundary {
+            // What follows `fn ` (after optional whitespace) must be an identifier
+            // character — that means this is a definition `fn name(`, not a
+            // fn-pointer type `fn(*mut u8)`.
+            let rest = &cursor[pos + "fn ".len()..];
+            let next_ch = rest.trim_start_matches([' ', '\t']).chars().next();
+            if next_ch.is_some_and(|ch| ch == '_' || ch.is_ascii_alphabetic()) {
+                return true;
+            }
+        }
+        // Advance past this occurrence and keep scanning.
+        let after = &cursor[pos + 1..];
+        cursor = after;
+    }
+    false
 }
 
 fn detect_operation_family(line: &str) -> Option<OperationFamily> {

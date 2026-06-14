@@ -104,6 +104,7 @@ required_core_fixtures = [
   "maybeuninit_assume_init_ref",
   "maybeuninit_assume_init_mut",
   "maybeuninit_assume_init_drop",
+  "assume_init_definition_no_cards",
   "vec_set_len",
   "vec_set_len_comment_not_guard",
   "vec_set_len_initialized_loop",
@@ -145,6 +146,7 @@ required_core_fixtures = [
   "vec_set_len_cap_not_len_not_guard",
   "vec_set_len_len_read_cap_guard_not_guard",
   "vec_set_len_len_and_cap_guard",
+  "set_len_definition_no_cards",
   "drop_in_place_deallocation",
   "drop_in_place_box_origin",
   "drop_in_place_reassigned_origin_not_guard",
@@ -385,6 +387,7 @@ required_core_fixtures = [
   "str_from_utf8_unchecked_let_else_ok_shadowed_not_guard",
   "str_from_utf8_unchecked_match_ok_reassigned_not_guard",
   "str_from_utf8_unchecked_match_ok_shadowed_not_guard",
+  "from_utf8_unchecked_definition_no_cards",
   "zeroed_invalid_value",
   "zeroed_valid_u32",
   "zeroed_definition_no_cards",
@@ -419,6 +422,7 @@ required_core_fixtures = [
   "slice_from_raw_parts_mut",
   "slice_from_raw_parts_mut_maybeuninit",
   "slice_from_raw_parts_mut_other_maybeuninit_not_guard",
+  "slice_from_raw_parts_definition_no_cards",
   "vec_from_raw_parts",
   "vec_from_raw_parts_capacity_guard",
   "vec_from_raw_parts_capacity_assert_guard",
@@ -1615,6 +1619,13 @@ expected_operation_family = "maybe_uninit_assume_init"
 expected_hazard = "initialized_memory"
 
 [[cases]]
+fixture = "assume_init_definition_no_cards"
+kind = "false_positive_control"
+claim = "a safe fn assume_init() definition header is not carded as a MaybeUninit::assume_init call"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
+
+[[cases]]
 fixture = "vec_set_len"
 kind = "positive"
 claim = "Vec::set_len reports missing initialized-range and capacity evidence"
@@ -2023,6 +2034,13 @@ expected_cards = 1
 expected_class = "guarded_unwitnessed"
 expected_operation_family = "vec_set_len"
 expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "set_len_definition_no_cards"
+kind = "false_positive_control"
+claim = "a safe fn set_len() definition header is not carded as a Vec::set_len call"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
 
 [[cases]]
 fixture = "drop_in_place_deallocation"
@@ -4425,6 +4443,13 @@ expected_operation_family = "str_from_utf8_unchecked"
 expected_hazard = "invalid_value"
 
 [[cases]]
+fixture = "from_utf8_unchecked_definition_no_cards"
+kind = "false_positive_control"
+claim = "a safe fn from_utf8_unchecked() definition header is not carded as a str::from_utf8_unchecked call"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
+
+[[cases]]
 fixture = "zeroed_invalid_value"
 kind = "positive"
 claim = "mem::zeroed reports valid-zero obligations instead of a generic unsafe function call"
@@ -4757,6 +4782,13 @@ expected_cards = 1
 expected_class = "guard_missing"
 expected_operation_family = "slice_from_raw_parts"
 expected_hazard = "initialized_memory"
+
+[[cases]]
+fixture = "slice_from_raw_parts_definition_no_cards"
+kind = "false_positive_control"
+claim = "a safe fn from_raw_parts() definition header is not carded as a slice::from_raw_parts call"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
 
 [[cases]]
 fixture = "vec_from_raw_parts"
