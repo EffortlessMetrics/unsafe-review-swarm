@@ -27,8 +27,8 @@ use unsafe_review_core::{
     compare_outcome_json, discover_repo_files, evaluate_policy_report,
     evaluate_policy_report_from_output, lint_manual_candidate_text, load_manual_candidates,
     manual_candidate_implementer_handoff, new_manual_candidate_skeleton, read_manual_candidate,
-    render_badge_jsons, render_comment_plan, render_gate_manifest, render_github_summary,
-    render_human, render_json, render_json_with_provenance, render_lsp,
+    render_badge_jsons, render_comment_plan, render_gate_manifest, render_gate_manifest_repo,
+    render_github_summary, render_human, render_json, render_json_with_provenance, render_lsp,
     render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
     render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
     render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,
@@ -310,6 +310,31 @@ fn run_repo_check(options: RepoOptions) -> Result<(), crate::RunFailure> {
         if let Err(err) = reporter.record_final_output_bytes(output_bytes) {
             eprintln!(
                 "unsafe-review repo: warning: failed to update output_bytes in status sidecar: {err}"
+            );
+        }
+        // Emit the gate manifest (SPEC-0034 parity with first-pr).
+        // The manifest goes in the same directory as the main report, named
+        // `unsafe-review-gate.json`.  The `cards` artifact pointer is the
+        // basename of the report file so consumers can locate the ReviewCard
+        // dataset relative to the manifest.  Errors are non-fatal: the report
+        // is already written; we surface the warning but do not fail the run.
+        // The manifest is advisory posture only — not a merge verdict, not
+        // proof, not UB-free/Miri-clean/site-execution.
+        let report_filename = path
+            .file_name()
+            .map(|n| n.to_string_lossy().replace('\\', "/"))
+            .unwrap_or_else(|| path.to_string_lossy().replace('\\', "/"));
+        let gate_manifest_path = path
+            .parent()
+            .map(|dir| dir.join(GATE_MANIFEST_ARTIFACT))
+            .unwrap_or_else(|| std::path::PathBuf::from(GATE_MANIFEST_ARTIFACT));
+        if let Err(err) = write_artifact(
+            &gate_manifest_path,
+            render_gate_manifest_repo(&output, &report_filename),
+        ) {
+            eprintln!(
+                "unsafe-review repo: warning: failed to write {}: {err}",
+                gate_manifest_path.display()
             );
         }
     } else {

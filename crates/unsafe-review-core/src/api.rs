@@ -479,6 +479,24 @@ pub fn render_gate_manifest(output: &AnalyzeOutput) -> String {
     gate_manifest::render(output)
 }
 
+/// Render `unsafe-review-gate.json` for a `repo` run (SPEC-0034 parity).
+///
+/// Repo mode writes a single output file rather than a bundle directory, so
+/// the first-pr-specific artifact pointers (`pr_summary`, `sarif`, `lsp`, …)
+/// are absent — they were not emitted and must not be faked (SPEC-0034:
+/// "Missing optional artifacts are omitted, not faked.").
+///
+/// `report_filename` is the basename of the `--out` file (e.g. `"repo.json"`);
+/// it becomes the `artifacts.cards` pointer so downstream consumers can locate
+/// the ReviewCard dataset relative to the manifest.
+///
+/// The `status` field is always `"advisory"` — the manifest carries posture,
+/// never a merge verdict, not proof, not UB-free, not Miri-clean, not a
+/// site-execution claim.
+pub fn render_gate_manifest_repo(output: &AnalyzeOutput, report_filename: &str) -> String {
+    gate_manifest::render_repo(output, report_filename)
+}
+
 /// Render the `usefulness-telemetry.json` low-noise usefulness telemetry artifact (SPEC-0038).
 ///
 /// This is a pure projection from `AnalyzeOutput` — no new analysis.
