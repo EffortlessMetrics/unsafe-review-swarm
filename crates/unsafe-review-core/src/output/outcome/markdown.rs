@@ -34,6 +34,10 @@ pub(super) fn render_markdown(report: &OutcomeReport) -> String {
         report.reviewer_delta.regressed_cards
     ));
     out.push_str(&format!(
+        "- Unchanged cards: {}\n",
+        report.reviewer_delta.unchanged_cards
+    ));
+    out.push_str(&format!(
         "- Receipt movement: {} improved, {} regressed\n",
         report.reviewer_delta.receipt_movement.improved,
         report.reviewer_delta.receipt_movement.regressed
