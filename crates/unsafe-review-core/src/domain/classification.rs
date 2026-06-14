@@ -52,6 +52,56 @@ impl ReviewClass {
                 | Self::StaticUnknown
         )
     }
+
+    /// Return the SARIF result level for this class.
+    ///
+    /// The mapping is the single severity language for all surfaces — SARIF
+    /// `level` and LSP diagnostic `severity` both derive from this table via
+    /// [`Self::lsp_severity`].  Priority is a ranking/budget signal only and
+    /// must NOT drive severity.
+    ///
+    /// Advisory boundary: "warning" means "needs attention" for this advisory
+    /// tool, not a merge-blocking verdict.
+    pub fn sarif_level(&self) -> &'static str {
+        match self {
+            // Non-actionable — evidence present or administratively closed.
+            Self::GuardedAndWitnessed | Self::BaselineKnown | Self::Suppressed => "none",
+            // Partially-resolved — has some evidence but not a full witness chain.
+            Self::GuardedUnwitnessed | Self::UnsafeUnreached | Self::StaticUnknown => "note",
+            // Actionable — evidence missing or receipt mismatched.
+            Self::ContractMissing
+            | Self::GuardMissing
+            | Self::ReachableUnwitnessed
+            | Self::WitnessMismatch
+            | Self::RequiresLoom
+            | Self::RequiresSanitizer
+            | Self::RequiresKaniOrCrux
+            | Self::MiriUnsupported => "warning",
+        }
+    }
+
+    /// Return the LSP `DiagnosticSeverity` integer for this class.
+    ///
+    /// The LSP protocol defines: 1=Error, 2=Warning, 3=Information, 4=Hint.
+    /// unsafe-review is advisory and never emits Error (1); the mapping is:
+    ///
+    /// | SARIF level | LSP severity | Meaning                          |
+    /// |-------------|--------------|----------------------------------|
+    /// | `warning`   | 2 (Warning)  | actionable — evidence missing    |
+    /// | `note`      | 3 (Information) | partial — some evidence present |
+    /// | `none`      | 4 (Hint)     | non-actionable — closed/suppressed |
+    ///
+    /// Priority is a ranking/ordering signal only and must NOT affect this
+    /// value.  Both this method and [`Self::sarif_level`] derive from the same
+    /// class table to keep SARIF and LSP in agreement.
+    pub fn lsp_severity(&self) -> usize {
+        match self.sarif_level() {
+            "warning" => 2,
+            "note" => 3,
+            // "none" and anything unexpected — informational hint, lowest severity.
+            _ => 4,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -206,6 +256,105 @@ mod tests {
 
         for (path, expected) in cases {
             assert_eq!(path.as_str(), expected);
+        }
+    }
+
+    /// Drift-lock: pin the complete class→(sarif_level, lsp_severity) table.
+    ///
+    /// If a class changes bucket (e.g. from "warning" to "note"), this test
+    /// breaks intentionally — the owner must decide the new severity mapping
+    /// and update both this table and the doc comment on `sarif_level`.
+    ///
+    /// Advisory boundary: "warning" means the card needs attention, NOT that it
+    /// blocks a merge.  unsafe-review never emits LSP severity 1 (Error).
+    #[test]
+    fn severity_table_is_pinned_for_every_class() {
+        // (class, sarif_level, lsp_severity)
+        // lsp: 2=Warning, 3=Information, 4=Hint
+        let cases: &[(ReviewClass, &str, usize)] = &[
+            // Non-actionable — closed / administratively resolved.
+            (ReviewClass::GuardedAndWitnessed, "none", 4),
+            (ReviewClass::BaselineKnown, "none", 4),
+            (ReviewClass::Suppressed, "none", 4),
+            // Partially-resolved — some evidence present but not a full chain.
+            (ReviewClass::GuardedUnwitnessed, "note", 3),
+            (ReviewClass::UnsafeUnreached, "note", 3),
+            (ReviewClass::StaticUnknown, "note", 3),
+            // Actionable — evidence missing or receipt mismatched.
+            (ReviewClass::ContractMissing, "warning", 2),
+            (ReviewClass::GuardMissing, "warning", 2),
+            (ReviewClass::ReachableUnwitnessed, "warning", 2),
+            (ReviewClass::WitnessMismatch, "warning", 2),
+            (ReviewClass::RequiresLoom, "warning", 2),
+            (ReviewClass::RequiresSanitizer, "warning", 2),
+            (ReviewClass::RequiresKaniOrCrux, "warning", 2),
+            (ReviewClass::MiriUnsupported, "warning", 2),
+        ];
+
+        for (class, expected_sarif, expected_lsp) in cases {
+            assert_eq!(
+                class.sarif_level(),
+                *expected_sarif,
+                "sarif_level mismatch for {}",
+                class.as_str()
+            );
+            assert_eq!(
+                class.lsp_severity(),
+                *expected_lsp,
+                "lsp_severity mismatch for {}",
+                class.as_str()
+            );
+        }
+    }
+
+    /// Drift-lock: SARIF level and LSP severity must be consistent signals for
+    /// every class.  Specifically:
+    /// - "warning" → lsp 2 (Warning),
+    /// - "note"    → lsp 3 (Information),
+    /// - "none"    → lsp 4 (Hint).
+    ///
+    /// If these diverge, `severity_table_is_pinned_for_every_class` also fails,
+    /// but this test gives a targeted error message naming the broken mapping.
+    #[test]
+    fn sarif_level_and_lsp_severity_are_consistent_for_every_class() {
+        let all_classes = [
+            ReviewClass::GuardedAndWitnessed,
+            ReviewClass::GuardedUnwitnessed,
+            ReviewClass::ContractMissing,
+            ReviewClass::GuardMissing,
+            ReviewClass::ReachableUnwitnessed,
+            ReviewClass::UnsafeUnreached,
+            ReviewClass::WitnessMismatch,
+            ReviewClass::RequiresLoom,
+            ReviewClass::RequiresSanitizer,
+            ReviewClass::RequiresKaniOrCrux,
+            ReviewClass::MiriUnsupported,
+            ReviewClass::StaticUnknown,
+            ReviewClass::BaselineKnown,
+            ReviewClass::Suppressed,
+        ];
+
+        for class in &all_classes {
+            let sarif = class.sarif_level();
+            let lsp = class.lsp_severity();
+            // Advisory: lsp 1 (Error) must never appear — no blocking verdict.
+            assert!(
+                lsp >= 2,
+                "class {} produced lsp_severity {lsp} — unsafe-review must never emit Error (1)",
+                class.as_str()
+            );
+            // Consistency: the lsp bucket must match the sarif bucket.
+            let expected_lsp = match sarif {
+                "warning" => 2,
+                "note" => 3,
+                _ => 4,
+            };
+            assert_eq!(
+                lsp,
+                expected_lsp,
+                "class {} has sarif_level={sarif} but lsp_severity={lsp} (expected {expected_lsp})",
+                class.as_str()
+            );
         }
     }
 }

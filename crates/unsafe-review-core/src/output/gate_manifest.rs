@@ -34,6 +34,69 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
     }
 }
 
+/// Render the gate manifest for a `repo` run.
+///
+/// Repo mode writes a single output file (named by `--out`); there is no
+/// bundle directory, so the first-pr artifact pointers (`pr_summary`, `sarif`,
+/// `lsp`, `comment_plan`, `repair_queue`, `receipt_audit`, `review_kit`,
+/// `policy_report`) are absent — they were not emitted and must not be faked
+/// (SPEC-0034: "Missing optional artifacts are omitted, not faked.").
+///
+/// The `report_filename` parameter is the basename of the `--out` file
+/// (e.g. `"repo.json"`); it is recorded as the `cards` artifact pointer so
+/// `ub-review` can locate the ReviewCard dataset relative to the manifest.
+///
+/// The manifest is advisory posture only — not a merge verdict, not proof,
+/// not UB-free/Miri-clean/site-execution.  The `status` field is always
+/// `"advisory"`.
+pub(crate) fn render_repo(output: &AnalyzeOutput, report_filename: &str) -> String {
+    let manifest = GateManifestRepo {
+        schema_version: GATE_SCHEMA_VERSION,
+        dialect: "unsafe-review",
+        status: "advisory",
+        summary: GateMovementSummary::from(&output.summary),
+        artifacts: GateArtifactsRepo {
+            cards: report_filename.to_owned(),
+        },
+        trust_boundary: GATE_MANIFEST_TRUST_BOUNDARY,
+        tool: "unsafe-review",
+        tool_version: env!("CARGO_PKG_VERSION"),
+    };
+    match serde_json::to_string_pretty(&manifest) {
+        Ok(mut text) => {
+            text.push('\n');
+            text
+        }
+        Err(err) => {
+            format!("{{\n  \"error\": \"gate manifest serialization failed: {err}\"\n}}\n")
+        }
+    }
+}
+
+/// Gate manifest for a `repo` run — only the artifacts repo mode actually writes.
+#[derive(Serialize)]
+struct GateManifestRepo {
+    schema_version: &'static str,
+    dialect: &'static str,
+    status: &'static str,
+    summary: GateMovementSummary,
+    artifacts: GateArtifactsRepo,
+    trust_boundary: &'static str,
+    tool: &'static str,
+    tool_version: &'static str,
+}
+
+/// Relative artifact pointers for a `repo` run.
+///
+/// Only the main ReviewCard output file is recorded here; first-pr-specific
+/// artifacts (`pr_summary`, `sarif`, `lsp`, …) are absent because repo mode
+/// does not emit them.
+#[derive(Serialize)]
+struct GateArtifactsRepo {
+    /// Basename of the `--out` file — the ReviewCard dataset for this run.
+    cards: String,
+}
+
 #[derive(Serialize)]
 struct GateManifest {
     schema_version: &'static str,

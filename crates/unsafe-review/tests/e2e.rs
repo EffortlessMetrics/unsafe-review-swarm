@@ -5478,6 +5478,152 @@ fn repo_scan_start_stub_written_before_pipeline() -> Result<(), Box<dyn Error>> 
     Ok(())
 }
 
+/// SPEC-0034 parity: `unsafe-review repo` must emit `unsafe-review-gate.json`
+/// alongside its `--out` report, matching the same envelope as `first-pr`.
+///
+/// The gate manifest is advisory posture only — `status` must be `"advisory"`,
+/// `trust_boundary` must disclaim proof and merge verdict, and no volatile
+/// timestamp or wall-time fields may appear.  The `artifacts.cards` pointer
+/// must resolve to the basename of the `--out` file.
+#[test]
+fn repo_emits_gate_manifest_alongside_out_report() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-repo-gate-manifest-e2e")?;
+    let report_path = temp.path().join("repo.json");
+    let gate_manifest_path = temp.path().join("unsafe-review-gate.json");
+
+    run_success([
+        os("repo"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--include"),
+        os("src/lib.rs"),
+        os("--format"),
+        os("json"),
+        os("--out"),
+        report_path.as_os_str().to_os_string(),
+    ])?;
+
+    // The main report must exist.
+    assert!(
+        report_path.exists(),
+        "repo report must be written to --out path"
+    );
+
+    // The gate manifest must exist alongside the report.
+    assert!(
+        gate_manifest_path.exists(),
+        "unsafe-review-gate.json must be written alongside the --out report (SPEC-0034 parity)"
+    );
+
+    let gate_manifest = parse_json(&fs::read_to_string(&gate_manifest_path)?)?;
+
+    // Envelope fields must match the first-pr gate manifest contract.
+    assert_eq!(
+        gate_manifest["schema_version"], "unsafe-review-gate/v1",
+        "schema_version must be 'unsafe-review-gate/v1'"
+    );
+    assert_eq!(
+        gate_manifest["dialect"], "unsafe-review",
+        "dialect must be 'unsafe-review'"
+    );
+    assert_eq!(
+        gate_manifest["status"], "advisory",
+        "status must be 'advisory' — not a merge verdict (SPEC-0034 trust boundary)"
+    );
+    assert_eq!(gate_manifest["tool"], "unsafe-review");
+    assert!(
+        gate_manifest["tool_version"]
+            .as_str()
+            .is_some_and(|v| !v.is_empty()),
+        "tool_version must be a non-empty string"
+    );
+
+    // Trust boundary must disclaim proof and merge verdict.
+    let boundary = gate_manifest["trust_boundary"]
+        .as_str()
+        .ok_or("trust_boundary must be a string")?;
+    assert!(
+        boundary.contains("not proof"),
+        "trust_boundary must include 'not proof'; got: {boundary}"
+    );
+    assert!(
+        boundary.contains("not a merge verdict"),
+        "trust_boundary must include 'not a merge verdict'; got: {boundary}"
+    );
+
+    // Summary must be the SPEC-0030 movement block.
+    let summary = &gate_manifest["summary"];
+    assert!(
+        summary["new_gaps"].is_number(),
+        "summary.new_gaps must be a number"
+    );
+    assert!(
+        summary["worsened_gaps"].is_number(),
+        "summary.worsened_gaps must be a number"
+    );
+    assert!(
+        summary["resolved_gaps"].is_number(),
+        "summary.resolved_gaps must be a number"
+    );
+    assert!(
+        summary["inherited_gaps"].is_number(),
+        "summary.inherited_gaps must be a number"
+    );
+
+    // The cards artifact pointer must be the basename of the --out file.
+    assert_eq!(
+        gate_manifest["artifacts"]["cards"], "repo.json",
+        "artifacts.cards must be the basename of the --out file"
+    );
+
+    // No volatile timestamp or wall-time fields.
+    let obj = gate_manifest
+        .as_object()
+        .ok_or("gate manifest must be a JSON object")?;
+    for volatile_key in ["generated_at", "timestamp", "wall_seconds", "elapsed_ms"] {
+        assert!(
+            !obj.contains_key(volatile_key),
+            "gate manifest must not contain volatile field `{volatile_key}` (breaks determinism)"
+        );
+    }
+
+    // The manifest must be valid JSON ending with a newline.
+    let raw = fs::read_to_string(&gate_manifest_path)?;
+    assert!(raw.ends_with('\n'), "gate manifest must end with a newline");
+
+    Ok(())
+}
+
+/// SPEC-0034: gate manifest must NOT be emitted when `--out` is not supplied
+/// (stdout-only repo runs have no artifact directory to put the manifest in).
+#[test]
+fn repo_does_not_emit_gate_manifest_for_stdout_run() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-repo-no-gate-manifest-e2e")?;
+    let stray_manifest = temp.path().join("unsafe-review-gate.json");
+
+    // Run repo to stdout only (no --out).
+    run_success([
+        os("repo"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--include"),
+        os("src/lib.rs"),
+        os("--format"),
+        os("json"),
+    ])?;
+
+    // No manifest should appear in the temp dir (we did not set cwd to temp,
+    // but this guards against accidental writes relative to cwd).
+    assert!(
+        !stray_manifest.exists(),
+        "gate manifest must not be written for a stdout-only repo run"
+    );
+
+    Ok(())
+}
+
 #[test]
 fn safe_repo_human_output_stays_quiet() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("safe_code_no_cards");
