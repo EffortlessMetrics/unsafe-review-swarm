@@ -5,10 +5,10 @@ use crate::domain::{
     ManualContext, ObligationEvidence, OperationFamily, OutcomeMovement, ReviewCard,
     WitnessReceiptCoverage, WitnessRoute,
 };
-use crate::output::REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY;
 use crate::output::agent::card_has_scoped_repairs;
 use crate::output::comment_plan;
 use crate::output::confirmation::ConfirmationCue;
+use crate::output::{REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY, UNKNOWN_OWNER};
 use crate::util::path_display;
 use serde::Serialize;
 
@@ -362,7 +362,7 @@ impl<'a> From<&'a ReviewCard> for JsonSite<'a> {
             line: card.site.location.line,
             column: card.site.location.column,
             kind: card.site.kind.as_str(),
-            owner: card.site.owner.as_deref().unwrap_or("unknown"),
+            owner: card.site.owner.as_deref().unwrap_or(UNKNOWN_OWNER),
             visibility: &card.site.visibility,
             public_api_surface: card.site.public_api_surface,
             snippet: &card.site.snippet,
@@ -1413,6 +1413,65 @@ mod tests {
         assert!(
             ts.contains('T'),
             "generated_at must contain T separator: {ts}"
+        );
+        Ok(())
+    }
+
+    /// Drift-lock: `site.owner = None` renders as `UNKNOWN_OWNER` ("unknown") on every surface
+    /// (cards.json, agent packet, markdown sink-cluster), so consumers joining cards across
+    /// surfaces see the identical string.  Previously json used "unknown", agent used "", and
+    /// markdown used "(unknown owner)".
+    #[test]
+    fn owner_none_placeholder_is_identical_across_json_agent_and_markdown_surfaces()
+    -> Result<(), String> {
+        let mut output = fixture_output("raw_pointer_alignment")?;
+        let card = output
+            .cards
+            .first_mut()
+            .ok_or_else(|| "fixture should emit one card".to_string())?;
+        // Force owner to None so we exercise the placeholder path on every surface.
+        card.site.owner = None;
+
+        // Surface 1: cards.json
+        let json_value = parse_json(&render(&output))?;
+        let json_owner = json_value["cards"][0]["site"]["owner"]
+            .as_str()
+            .ok_or("cards.json site.owner must be a string")?;
+
+        // Surface 2: agent packet
+        let card = output.cards.first().ok_or("fixture should emit one card")?;
+        let agent_value = parse_json(&crate::output::agent::render(card))?;
+        let agent_context_owner = agent_value["context"]["owner"]
+            .as_str()
+            .ok_or("agent packet context.owner must be a string")?;
+        let agent_source_owner = agent_value["source_context"]["unsafe_site"]["owner"]
+            .as_str()
+            .ok_or("agent packet source_context.unsafe_site.owner must be a string")?;
+
+        // All three must equal UNKNOWN_OWNER.
+        assert_eq!(
+            json_owner,
+            crate::output::UNKNOWN_OWNER,
+            "cards.json owner placeholder must be UNKNOWN_OWNER"
+        );
+        assert_eq!(
+            agent_context_owner,
+            crate::output::UNKNOWN_OWNER,
+            "agent context owner placeholder must be UNKNOWN_OWNER"
+        );
+        assert_eq!(
+            agent_source_owner,
+            crate::output::UNKNOWN_OWNER,
+            "agent source_context.unsafe_site owner placeholder must be UNKNOWN_OWNER"
+        );
+        // All three are equal to each other.
+        assert_eq!(
+            json_owner, agent_context_owner,
+            "cards.json and agent context owner placeholder must be identical"
+        );
+        assert_eq!(
+            json_owner, agent_source_owner,
+            "cards.json and agent source_context owner placeholder must be identical"
         );
         Ok(())
     }

@@ -15,6 +15,10 @@ pub(crate) mod sarif;
 pub(crate) mod usefulness_telemetry;
 pub(crate) mod witness_plan;
 
+/// Canonical placeholder emitted on every surface when `site.owner` is `None`.
+/// All projection surfaces (JSON, agent packets, markdown) must use this constant
+/// so that consumers joining cards across surfaces see the identical string.
+pub(crate) const UNKNOWN_OWNER: &str = "unknown";
 pub(crate) const NO_CHANGED_GAPS_MESSAGE: &str = "No changed unsafe-review gaps were found.";
 pub(crate) const NO_CHANGED_GAPS_LIMITATION: &str =
     "This does not prove the repo safe, UB-free, Miri-clean, or that any unsafe site executed.";

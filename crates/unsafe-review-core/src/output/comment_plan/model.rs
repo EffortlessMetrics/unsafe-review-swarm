@@ -80,6 +80,12 @@ impl From<&AnalyzeOutput> for CommentPlan {
             ));
         }
 
+        // Compute before moving comments/not_selected into the struct literal.
+        let no_changed_gaps =
+            (comments.is_empty() && not_selected.is_empty()).then_some(NoChangedGaps {
+                message: NO_CHANGED_GAPS_MESSAGE,
+                limitation: NO_CHANGED_GAPS_LIMITATION,
+            });
         Self {
             schema_version: output.schema_version.clone(),
             tool: output.tool.clone(),
@@ -94,10 +100,7 @@ impl From<&AnalyzeOutput> for CommentPlan {
             },
             comments,
             not_selected,
-            no_changed_gaps: (output.summary.open_actionable_gaps == 0).then_some(NoChangedGaps {
-                message: NO_CHANGED_GAPS_MESSAGE,
-                limitation: NO_CHANGED_GAPS_LIMITATION,
-            }),
+            no_changed_gaps,
             trust_boundary: TRUST_BOUNDARY,
         }
     }

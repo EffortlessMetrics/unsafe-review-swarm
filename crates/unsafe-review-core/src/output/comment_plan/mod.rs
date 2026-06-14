@@ -802,6 +802,55 @@ mod tests {
         Ok(())
     }
 
+    /// Drift-lock: `no_changed_gaps` must NOT be emitted when `not_selected` is non-empty,
+    /// even if zero comments were selected.  Previously it was gated on
+    /// `open_actionable_gaps == 0`, which fired when cards existed but were all
+    /// filtered out of inline comments (e.g. low-relevance FFI cards), contradicting
+    /// the non-empty `not_selected` list in the same comment-plan.json.
+    ///
+    /// The `ffi_sanitizer_route` fixture produces one card that goes into `not_selected`
+    /// (low relevance, no inline comment) — exactly the scenario that was broken.
+    #[test]
+    fn no_changed_gaps_not_emitted_when_not_selected_is_nonempty() -> Result<(), String> {
+        // This fixture has a card but it is filtered to not_selected (low relevance).
+        let output = fixture_output("ffi_sanitizer_route")?;
+        let value = parse_json(&render(&output))?;
+
+        assert_eq!(
+            value["comments"].as_array().map_or(1, Vec::len),
+            0,
+            "fixture should emit no inline comments"
+        );
+        assert_eq!(
+            value["not_selected"].as_array().map_or(0, Vec::len),
+            1,
+            "fixture should put the card in not_selected"
+        );
+        assert!(
+            value.get("no_changed_gaps").is_none() || value["no_changed_gaps"].is_null(),
+            "no_changed_gaps must not be emitted when not_selected is non-empty; got: {:?}",
+            value.get("no_changed_gaps")
+        );
+        Ok(())
+    }
+
+    /// Drift-lock: `no_changed_gaps` IS emitted only when there are truly no cards at all
+    /// (both comments and not_selected are empty), matching the human/witness surface semantics.
+    #[test]
+    fn no_changed_gaps_emitted_only_when_no_cards_at_all() -> Result<(), String> {
+        let output = fixture_output("safe_code_no_cards")?;
+        let value = parse_json(&render(&output))?;
+
+        assert_eq!(value["comments"].as_array().map_or(1, Vec::len), 0);
+        assert!(value.get("not_selected").is_none());
+        assert_eq!(value["no_changed_gaps"]["message"], NO_CHANGED_GAPS_MESSAGE);
+        assert_eq!(
+            value["no_changed_gaps"]["limitation"],
+            NO_CHANGED_GAPS_LIMITATION
+        );
+        Ok(())
+    }
+
     fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures")

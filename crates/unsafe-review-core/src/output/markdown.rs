@@ -5,7 +5,7 @@ use crate::output::confirmation::{
     build_this_first, confirmation_step, hypothesis_to_confirm, minimal_repro,
 };
 use crate::output::{
-    NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE, REVIEWCARD_TRUST_BOUNDARY,
+    NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE, REVIEWCARD_TRUST_BOUNDARY, UNKNOWN_OWNER,
 };
 use crate::output::{agent, repair_queue};
 use crate::util::path_display;
@@ -213,7 +213,7 @@ fn related_sink_clusters(output: &AnalyzeOutput) -> Vec<RelatedSinkCluster> {
             .site
             .owner
             .as_deref()
-            .unwrap_or("(unknown owner)")
+            .unwrap_or(UNKNOWN_OWNER)
             .to_string();
         grouped.entry((file, owner)).or_default().push(card);
     }
@@ -299,7 +299,7 @@ fn render_backtick_string_list(values: &[String], limit: usize) -> String {
 fn diff_primary_route(card: &ReviewCard) -> &str {
     card.routes
         .first()
-        .map_or("human", |route| route.kind.as_str())
+        .map_or(DEFAULT_REVIEW_ROUTE, |route| route.kind.as_str())
 }
 
 fn repo_primary_route(card: &ReviewCard) -> &str {
@@ -1323,6 +1323,45 @@ mod tests {
             }
         }
 
+        Ok(())
+    }
+
+    /// Drift-lock: a routeless card renders the same fallback route label on both the
+    /// diff markdown table (`diff_primary_route`) and the repo-posture table
+    /// (`repo_primary_route`).  Previously diff fell back to `"human"` while repo used
+    /// the shared `DEFAULT_REVIEW_ROUTE` const (`"human-deep-review"`).
+    #[test]
+    fn diff_and_repo_route_fallback_are_identical_for_routeless_card() -> Result<(), String> {
+        let mut output = fixture_output("raw_pointer_alignment")?;
+        let card = output
+            .cards
+            .first_mut()
+            .ok_or_else(|| "fixture should emit one card".to_string())?;
+        // Strip all routes so both helpers reach their fallback branch.
+        card.routes.clear();
+
+        // Diff table — look for the Route column entry in the card row.
+        let diff_rendered = render(&output);
+        // Repo table — same card rendered in repo scope.
+        let mut repo_output = output.clone();
+        repo_output.scope = Scope::Repo;
+        let repo_rendered = render(&repo_output);
+
+        // Both should contain DEFAULT_REVIEW_ROUTE ("human-deep-review") as the route.
+        assert!(
+            diff_rendered.contains(DEFAULT_REVIEW_ROUTE),
+            "diff markdown route column must fall back to DEFAULT_REVIEW_ROUTE ({DEFAULT_REVIEW_ROUTE:?}) for a routeless card; rendered:\n{diff_rendered}"
+        );
+        assert!(
+            repo_rendered.contains(DEFAULT_REVIEW_ROUTE),
+            "repo-posture markdown route column must fall back to DEFAULT_REVIEW_ROUTE ({DEFAULT_REVIEW_ROUTE:?}) for a routeless card"
+        );
+        // Explicitly verify neither surface falls back to the old "human" string
+        // (which would be a regression to the pre-fix behavior).
+        assert!(
+            !diff_rendered.contains("| `human` |"),
+            "diff markdown must not use bare 'human' fallback for routeless card"
+        );
         Ok(())
     }
 

@@ -1,4 +1,5 @@
 use crate::domain::{RelatedTest, ReviewCard};
+use crate::output::UNKNOWN_OWNER;
 use crate::util::path_display;
 use serde::Serialize;
 
@@ -25,7 +26,7 @@ impl<'a> From<&'a ReviewCard> for AgentContext<'a> {
             file: path_display(&card.site.location.file),
             line: card.site.location.line,
             column: card.site.location.column,
-            owner: card.site.owner.as_deref().unwrap_or(""),
+            owner: card.site.owner.as_deref().unwrap_or(UNKNOWN_OWNER),
             site_kind: card.site.kind.as_str(),
             operation_family: card.operation.family.as_str(),
             proof_path: card.proof_path.as_str(),
@@ -99,7 +100,7 @@ impl<'a> From<&'a ReviewCard> for AgentSourceSite<'a> {
             file: path_display(&card.site.location.file),
             line: card.site.location.line,
             column: card.site.location.column,
-            owner: card.site.owner.as_deref().unwrap_or(""),
+            owner: card.site.owner.as_deref().unwrap_or(UNKNOWN_OWNER),
             snippet: &card.site.snippet,
         }
     }
