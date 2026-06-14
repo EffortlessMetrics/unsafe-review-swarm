@@ -86,3 +86,63 @@ whose tail segment spells `ptr` (e.g. `registry_ptr::read_entry`) is not matched
 
 - Each registry row must reference at least one fixture calibration case before promotion.
 - Any support-tier claim for a row must map to a dogfood note or explicit "fixture-only" limitation.
+
+## Detector discipline obligations
+
+Every bare-name or path-based detector — whether implemented via the `ra_ap_syntax` AST
+path or the substring-fallback text path — MUST enforce the following five disciplines
+before emitting a ReviewCard. These disciplines encode the lessons of a 28-card
+correctness session (fixes #1672–#1707) in which almost all false positives traced back
+to a detector missing one of these checks.
+
+### D1: Unsafe-scope gate (F1)
+
+A detected call or expression must be inside an unsafe scope: an `unsafe { }` block, or
+the body of an `unsafe fn`. A same-named safe-context call (no enclosing unsafe block,
+not inside an unsafe fn body) is not the stdlib unsafe operation and must not produce a
+card. Evidence: `*_safe_method_*_no_cards` fixture family; fixes #1699.
+
+### D2: Definition-vs-call gate (F2)
+
+A bare-name text match must reject function *definition* headers (`fn NAME(`) and only
+accept call-site uses. A substring match on `get_unchecked(` must not fire on a line
+like `fn get_unchecked(` — a definition does not invoke the unsafe contract. Evidence:
+`*_no_card` definition-control fixtures; fix #1697.
+
+### D3: Same-receiver / same-origin discipline (F3)
+
+Guard and discharge evidence discharges only the same pointer, receiver, index, slot, or
+destination it constraints. An unrelated-length guard on a different pointer does not
+discharge bounds for a raw-pointer read; a guard on slot A does not discharge slot B; a
+bounds check on `src` does not discharge `dst`. The binding must be traceable back to the
+same origin as the operation being discharged. Evidence: `*_other_*_not_guard` and
+`*_same_origin_*_guard` fixture pairs; fix #1702.
+
+### D4: String and comment masking
+
+Detectors must not fire on text that appears exclusively inside a string literal or a
+comment. A path like `// ptr::read(foo)` in a doc comment must not yield a card; neither
+must `"get_unchecked"` as a string argument. The AST path handles this naturally for
+syntax-backed families; the fallback text path must verify the match is not inside a
+comment or string span.
+
+### D5: Word / segment-anchored path matching (F3 path-anchoring)
+
+Path-based pattern matches must be word-boundary or segment-anchored. A call path whose
+*tail segment* spells a module name (e.g. `registry_ptr::read_entry`) must not be matched
+as `std::ptr`. Match on the full path prefix or verify the module segment is at the
+correct position. Evidence: `ptr_read_path_segment_not_raw`; fix #1703.
+
+### Applicability
+
+Not every discipline applies to every family (e.g. D1 does not apply to
+`unsafe_impl_send_sync` which is detected at the item level, not the call level). The
+registry row's "known limits" column names which disciplines are inapplicable and why.
+
+### Negative-control requirement
+
+New detectors SHOULD ship negative-control fixtures for each applicable discipline before
+promotion. The fixture suite encodes author assumptions — it is blind to assumptions the
+author did not know they made (see CLAUDE.md fixture doctrine note). Adversarial negative
+controls and fresh-crate dogfood are the verification layer that fixture-suite blindness
+cannot supply.

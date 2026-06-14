@@ -161,3 +161,37 @@ running it against a real diff) and the **real-crate dogfood run** are what
 surface framing issues, selection gaps, and version-skew problems that
 controlled fixtures cannot reach. Both should be run each release cycle before
 promotion to the public repo.
+
+## Card-correctness session learnings (2026-06-14)
+
+A 28-card correctness session (#1672–#1707) over the fixture suite and fresh-crate
+dogfood surfaced a set of systemic lessons that are encoded in the doc system.
+Key facts for future validation passes:
+
+**Green CI can prove the wrong property.** At the start of the session, 600+
+fixture tests were green. The fixture suite was blind to the largest class of
+false positive — detectors firing in safe-context code — because every wave-1
+fixture placed the operation inside `unsafe { }`. Green CI proved the fixtures
+passed; it did not prove the detectors were correct on real code. The capstone
+dogfood run (#1700, five fresh crates: `smallvec`, `arrayvec`, `memchr`,
+`hashbrown`, `bytes`) confirmed that all identified FP classes were gone on
+unseen code after the mechanism-level fixes.
+
+**The bug class is the type-of-a-type-free tax.** The fallback text/substring
+detection path — which operates on compacted whitespace strings rather than AST
+nodes — lacks the scope, type, and binding information that the `ra_ap_syntax`
+path carries for free. Almost all false positives in the session traced to the
+text path missing one of five disciplines (scope gate, definition-vs-call,
+same-origin discharge, string/comment masking, path-segment anchoring). These
+disciplines are now encoded in the SPEC-0005 appendix as D1–D5.
+
+**Collapse-to-root: ~30 instances -> ~5 root fixes.** Rather than patching 28+
+instances individually, a white-box audit identified the five mechanism classes
+above. Fixing the mechanisms at the dispatch/evidence level cleared all instances
+simultaneously and left fixture-encoded negative controls for regression
+prevention.
+
+**Fresh-crate dogfood is the required pre-release step.** The fixture suite is an
+author-assumption encoder. Fresh-crate runs are the independent adversarial check.
+Treat them as required validation, not optional signal, before each release
+promotion.

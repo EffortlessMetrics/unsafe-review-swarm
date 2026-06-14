@@ -95,6 +95,8 @@ Stability posture: stable-only Rust, no `rustc_private`/MIR. The analyzer is sou
 - `docs/dogfood/corpus.toml` + `index.json`/`index.md` — evidence from running against real crates and PR diffs; validated by `check-dogfood`.
 - `policy/*.toml` — allowlist ledgers (no-panic, non-Rust files, executables, workflows, network, etc.) validated by `check-policy`. Adding e.g. a new workflow file requires a ledger entry.
 
+**Fixture-suite blindness.** A fixture suite encodes the author's assumptions, so it is blind to assumptions the author did not know they were making. The wave-1 fixtures for every new detector historically placed operations inside `unsafe { }` blocks — correct by the spec, but masking the possibility that a detector would fire on safe-context code entirely. Real-crate dogfood on fresh, unseen code is the check that fixture suites cannot supply: it exercises paths the author never thought to encode as a test case. New detectors need real-context adversarial negative controls (code that resembles the target pattern but is in safe context, inside a comment, or is a function definition), and a fresh-crate dogfood run is the required pre-release validation step before promotion.
+
 ### Documentation system (gated, not optional)
 
 Specs in `docs/specs/` define behavior; ADRs in `docs/adr/` record decisions; `docs/status/SUPPORT_TIERS.md` is the claim-to-proof ledger and `SUPPORT_SUMMARY.md` the posture summary. `check-docs` and `check-support-tiers` enforce required docs, front-door wording, and that every claimed tier names its proof. Behavior changes typically need spec/status updates to pass `check-pr`. Do not invent missing claims — if proof is missing, the claim stays advisory/experimental.

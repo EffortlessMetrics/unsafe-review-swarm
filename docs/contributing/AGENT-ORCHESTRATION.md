@@ -389,6 +389,76 @@ Two corollaries learned the hard way:
 
 ---
 
+## 13. Black-box / white-box pairing and collapse-to-root
+
+Two complementary investigation modes compose into an efficient improvement loop
+for any analyzer class (detector correctness, false-positive reduction,
+evidence-precision):
+
+**Black-box dogfood** — run the shipped tool against real, unseen crates and
+review the output against your own expectations. This surfaces *instances* of a
+problem: "card A on crate X looks like a false positive," "card B on crate Y is
+missing." It finds the symptom.
+
+**White-box detector audit** — given the symptom, read the detector code with the
+failing case in hand and ask: what mechanism caused this? Is there a more general
+class of case the detector fails on? This finds the systemic *root cause*.
+
+The pairing matters: black-box alone finds isolated instances and prompts
+instance-level fixes. White-box alone finds code paths but not real-world
+triggers. Pairing finds the class, which lets you fix the mechanism rather than
+each instance.
+
+**Collapse-to-root** is the application of this pairing: when N findings share a
+mechanism, fix the mechanism, not the instances. In practice this means:
+
+1. Run dogfood, note the symptoms.
+2. Audit the detector for the mechanism.
+3. Name the root cause as a discipline or property (see SPEC-0005 appendix).
+4. Write one fix at the mechanism level.
+5. Add negative-control fixtures that would catch the class before any future
+   regression.
+
+Example from this project: ~30 false-positive instances across the fixture suite
+collapsed to ~5 root mechanisms (scope gate, definition-vs-call, same-origin
+discharge, string/comment masking, path-segment anchoring). Fixing the mechanisms
+cleared all instances simultaneously and left fixture-encoded regression guards.
+
+The controller-context is scarce when doing large fixture batches. The monolithic
+`policy/calibration.toml` serializes fixture PRs — parallel fixture additions
+collide on the file. The operational mitigation is to serialize fixture PRs in the
+controller (one merge before the next begins), or to have the controller register
+the new entry at merge rather than baking it into the PR diff.
+
+---
+
+## 14. The clearly-correct / stance partition (autonomy contract)
+
+Not all findings in an improvement pass are equally certain. The autonomy contract
+separates findings into two buckets:
+
+**Clearly-correct fixes** — the detector is demonstrably wrong for this case: it
+fires on safe-context code, on function definitions, on string/comment text, or on
+a different binding than the one it should be checking. A cheap agent can and
+should ship these without owner input, because the fix has no product-stance
+implication.
+
+**Stance decisions** — the fix requires a product judgment: "should a guard on X
+discharge obligation Y even in this context?" or "should the tool be stricter
+here, or is this an intentional advisory stance?" These cannot be autonomously
+resolved. File them with evidence, propose the recommended stance, and escalate.
+
+The operational rule: default to the more conservative (retain the card) stance
+when unsure which bucket a finding belongs in. Evidence: a session in which the
+owner ratified all five escalated stance recommendations and the clearly-correct
+fixes were shipped in parallel without owner roundtrips.
+
+This partition is reusable for any correctness improvement loop, not just unsafe
+analysis. Autonomous throughput on clearly-correct items; human decision on stance
+items; evidence-packets on escalations (not raw diffs).
+
+---
+
 ## This-repo mapping
 
 | Generic piece | This repository |

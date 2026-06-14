@@ -13,3 +13,4 @@ ADRs record durable architecture choices.
 
 - [ADR 0007: Editor extension is a thin read-only adapter](UNSAFE-REVIEW-ADR-0007-editor-extension-is-thin-adapter.md)
 - [ADR 0008: Resource measurement placement](UNSAFE-REVIEW-ADR-0008-resource-measurement-placement.md)
+- [ADR 0009: Syntax-first detection](UNSAFE-REVIEW-ADR-0009-syntax-first-detection.md)

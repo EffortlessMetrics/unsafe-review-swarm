@@ -211,6 +211,34 @@ claims (any LLM-authored text in a child spec fills bounded, identity-anchored
 slots with a forbidden-claims check, never free-write), or enable comment
 posting, witness execution, source edits, or blocking policy by default.
 
+## Surfacing is not suppression
+
+**Rigor-vs-noise is a presentation problem, not a detection one.**
+
+When a correct card feels noisy, the answer is to group, rank, and budget the
+presentation — not to delete the evidence to make the tool feel quieter.
+
+The evidence layer (`ReviewCard`) is complete and is the single truth. Every card
+that reflects a genuine obligation gap belongs there, including cards a reviewer
+might disagree with. The surfacing layer (comment-plan, PR-summary, LSP hover,
+ub-review group/rank pass, usefulness-telemetry budget) is where cards are
+selected, deduped, prioritized, and filtered for the audience and budget.
+
+The seam:
+
+- **EVIDENCE layer** — `ReviewCard`, its coverage block, and the cards-per-diff
+  collection. This layer must be complete. Do not suppress or omit a correct card
+  to reduce perceived noise; that destroys the instrument.
+- **SURFACING layer** — comment-plan (SPEC-0032), PR-summary, LSP packet
+  (SPEC-0033), ub-review group/rank/budget decisions, usefulness-telemetry
+  histograms. This layer applies audience-specific budgets, relevance ranking, and
+  grouping to select what a *particular consumer* sees in a *particular context*.
+
+The owner-settled stance: a card that correctly names a missing contract or guard
+stays in the evidence layer even if a reviewer's workflow treats comments as noise.
+The instrument's job is honest coverage, not validation of existing practice.
+Grouping and ranking reduce cognitive load; suppression reduces integrity.
+
 ## Rigor is the product
 
 On real code, a "false-positive feel" is often disagreement with *intentional*
