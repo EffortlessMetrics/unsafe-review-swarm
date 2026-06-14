@@ -457,6 +457,7 @@ fn agent_lsp_readiness_str(readiness: AgentLspReadiness) -> &'static str {
 /// both a non-test `pub fn` and the test module below.
 const FIXTURE_GOLDENS: &[&str] = &[
     "raw_pointer_alignment",
+    "raw_pointer_alignment_debug_assert_only_not_guard",
     "raw_pointer_alignment_receipted",
     "raw_pointer_alignment_is_aligned_guard",
     "raw_pointer_alignment_post_check_not_guard",
@@ -585,6 +586,7 @@ const FIXTURE_GOLDENS: &[&str] = &[
     "raw_pointer_write_unaligned",
     "raw_pointer_write_other_len_not_guard",
     "raw_pointer_write_same_origin_bounds_guard",
+    "raw_pointer_bounds_debug_assert_only_not_guard",
     "raw_pointer_write_bytes",
     "raw_pointer_write_bool_bytes_guard",
     "raw_pointer_write_bool_reassigned_byte_not_guard",

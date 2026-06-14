@@ -1,6 +1,7 @@
 use super::{
     branch_still_open_at_operation, compact_code, contains_executable_return,
     is_receiver_path_char, matching_code_block_end, strip_block_comments_and_literals,
+    text_contains_runtime_assert,
 };
 
 pub(super) fn has_encode_utf8_remaining_capacity_evidence(lower: &str) -> bool {
@@ -77,14 +78,15 @@ impl<'a> UncheckedConstructorAvailabilityContext<'a> {
     }
 
     fn has_availability_assertion(&self) -> bool {
+        // Only `assert!` is a release-runtime guard; `debug_assert!` is compiled out in release
+        // builds and cannot satisfy a runtime precondition obligation.
+        // `text_contains_runtime_assert` guards against `assert!(` matching inside `debug_assert!`.
         [
             format!("assert!({})", self.predicate),
             format!("assert!({},", self.predicate),
-            format!("debug_assert!({})", self.predicate),
-            format!("debug_assert!({},", self.predicate),
         ]
         .iter()
-        .any(|pattern| self.before_call.contains(pattern))
+        .any(|pattern| text_contains_runtime_assert(self.before_call, pattern))
     }
 
     fn has_open_availability_branch(&self) -> bool {

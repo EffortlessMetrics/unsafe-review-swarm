@@ -1,7 +1,45 @@
-use super::{is_receiver_path_char, is_simple_identifier};
+use super::{is_receiver_path_char, is_runtime_assert_at, is_simple_identifier};
 
 pub(super) fn has_fresh_guard_pattern(before_call: &str, pattern: &str, argument: &str) -> bool {
     has_fresh_guard_pattern_for_identifiers(before_call, pattern, &[argument])
+}
+
+/// Like [`has_fresh_guard_pattern`] but requires the pattern to appear at a runtime-assert
+/// boundary (i.e., NOT inside a `debug_assert*` call).  Use this when `pattern` starts with
+/// `"assert!("` to prevent `debug_assert!(...)` from being credited as a release-runtime guard.
+pub(super) fn has_fresh_runtime_assert_pattern(
+    before_call: &str,
+    pattern: &str,
+    argument: &str,
+) -> bool {
+    has_fresh_runtime_assert_pattern_for_identifiers(before_call, pattern, &[argument])
+}
+
+/// Like [`has_fresh_guard_pattern_for_identifiers`] but adds a runtime-assert boundary check
+/// so that matches inside `debug_assert*` calls are skipped.
+pub(super) fn has_fresh_runtime_assert_pattern_for_identifiers(
+    before_call: &str,
+    pattern: &str,
+    identifiers: &[&str],
+) -> bool {
+    let mut search_from = 0;
+    while let Some(offset) = before_call[search_from..].find(pattern) {
+        let pattern_start = search_from + offset;
+        if is_runtime_assert_at(before_call, pattern_start) {
+            let after_pattern = &before_call[pattern_start + pattern.len()..];
+            let after_guard = if pattern.ends_with(';') {
+                after_pattern
+            } else {
+                let statement_end = after_pattern.find(';').unwrap_or(after_pattern.len());
+                &after_pattern[statement_end..]
+            };
+            if !has_assignment_to_any_identifier(after_guard, identifiers) {
+                return true;
+            }
+        }
+        search_from = pattern_start + pattern.len();
+    }
+    false
 }
 
 pub(super) fn has_fresh_guard_pattern_for_identifiers(

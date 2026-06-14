@@ -11,18 +11,18 @@ ReviewCard bounds evidence behavior for pointer arithmetic; they are not a proof
 """
 
 [[samples]]
-id = "pointer-arithmetic-num-ctrl-bytes-bounds-present"
+id = "pointer-arithmetic-num-ctrl-bytes-debug-assert-bounds-missing"
 fixture = "pointer_arithmetic_num_ctrl_bytes_guard"
-kind = "positive"
+kind = "false_positive_control"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "guard_missing"
 expected_operation_family = "pointer_arithmetic"
 expected_hazard = "bounds"
 expected_obligation_key = "bounds"
-expected_discharge_state = "present"
+expected_discharge_state = "missing"
 expected_witness_route_kinds = ["miri", "cargo-careful"]
 label_source = "fixture_golden"
-rationale = "An index < num_ctrl_bytes guard discharges pointer-arithmetic bounds evidence without importing a witness receipt."
+rationale = "debug_assert!(index < self.num_ctrl_bytes()) is compiled out in release builds and cannot satisfy a runtime bounds obligation; the bounds discharge must remain missing."
 
 [[samples]]
 id = "pointer-arithmetic-other-offset-bounds-missing"

@@ -1,9 +1,9 @@
 use super::{
     any_compact_if_condition, branch_still_open_at_operation, code_before_operation,
     condition_has_top_level_conjunct, condition_has_top_level_disjunct, contains_executable_return,
-    has_u8_bool_value_guard, matching_call_argument_end, matching_code_block_end,
-    matching_generic_argument_end, source_value_identifier, split_top_level_pair,
-    strip_block_comments_and_literals,
+    has_u8_bool_value_guard, is_runtime_assert_at, matching_call_argument_end,
+    matching_code_block_end, matching_generic_argument_end, source_value_identifier,
+    split_top_level_pair, strip_block_comments_and_literals,
 };
 
 pub(super) fn has_transmute_layout_size_evidence(lower: &str, expression: &str) -> bool {
@@ -147,16 +147,17 @@ fn has_size_of_equality(compact: &str, left_type: &str, right_type: &str) -> boo
 }
 
 fn has_size_assert_eq(compact: &str, left: &str, right: &str) -> bool {
+    // Only `assert_eq!` is a release-runtime guard; `debug_assert_eq!` is compiled out in
+    // release builds and cannot satisfy a runtime layout obligation.
     has_applicable_size_pattern(compact, &format!("assert_eq!({left},{right}"))
-        || has_applicable_size_pattern(compact, &format!("debug_assert_eq!({left},{right}"))
 }
 
 fn has_size_assert(compact: &str, predicate: &str) -> bool {
+    // Only `assert!` is a release-runtime guard; `debug_assert!` is compiled out in release
+    // builds and cannot satisfy a runtime layout obligation.
     [
         format!("assert!({predicate})"),
         format!("assert!({predicate},"),
-        format!("debug_assert!({predicate})"),
-        format!("debug_assert!({predicate},"),
     ]
     .iter()
     .any(|pattern| has_applicable_size_pattern(compact, pattern))
@@ -188,7 +189,11 @@ fn has_applicable_size_pattern(compact: &str, pattern: &str) -> bool {
     let mut search_from = 0usize;
     while let Some(offset) = compact[search_from..].find(pattern) {
         let pattern_start = search_from + offset;
-        if evidence_scope_reaches_operation(compact, pattern_start) {
+        // `is_runtime_assert_at` prevents `assert!(` or `assert_eq!(` matched inside
+        // `debug_assert!(` / `debug_assert_eq!(` from being credited as a runtime guard.
+        if is_runtime_assert_at(compact, pattern_start)
+            && evidence_scope_reaches_operation(compact, pattern_start)
+        {
             return true;
         }
         search_from = pattern_start + pattern.len();

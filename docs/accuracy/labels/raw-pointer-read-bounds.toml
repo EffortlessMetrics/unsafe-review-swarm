@@ -11,19 +11,19 @@ ReviewCard bounds evidence behavior; they are not a proof of memory safety, not 
 """
 
 [[samples]]
-id = "raw-pointer-read-len-capacity-assert-present"
+id = "raw-pointer-read-len-capacity-debug-assert-eq-missing"
 fixture = "raw_pointer_read_len_capacity_assert"
-kind = "positive"
+kind = "false_positive_control"
 expected_cards = 1
 expected_class = "guard_missing"
 expected_operation_family = "raw_pointer_read"
 expected_hazard = "pointer_validity"
 expected_obligation_key = "bounds"
 expected_contract_state = "present"
-expected_discharge_state = "present"
+expected_discharge_state = "missing"
 expected_witness_route_kinds = ["miri", "cargo-careful"]
 label_source = "fixture_golden"
-rationale = "A same-origin len/capacity equality assertion discharges the raw pointer read bounds obligation."
+rationale = "debug_assert_eq!(values.len(), values.capacity()) is compiled out in release builds and cannot satisfy a runtime bounds obligation; discharge must remain missing."
 
 [[samples]]
 id = "raw-pointer-read-assert-shadowed-origin-missing"

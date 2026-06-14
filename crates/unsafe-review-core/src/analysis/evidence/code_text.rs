@@ -81,6 +81,46 @@ pub(super) fn compact_code(lower: &str) -> String {
         .collect()
 }
 
+/// Returns `true` when `text[pos..]` starts with `"assert!("` and the match is NOT part of a
+/// `debug_assert!(` call.  A `debug_assert!(` ends with `assert!(`, so without this guard,
+/// searching for `"assert!("` would spuriously match inside `debug_assert!(`.
+///
+/// `debug_assert*` macros are compiled out in release builds and cannot satisfy a runtime guard
+/// obligation; this helper enforces that boundary so callers never accidentally credit them.
+pub(super) fn is_runtime_assert_at(text: &str, pos: usize) -> bool {
+    // If the character immediately before `assert!` is `_`, we are inside `debug_assert!` or a
+    // similar macro that strips the call in release mode.
+    if pos > 0
+        && text
+            .as_bytes()
+            .get(pos - 1)
+            .is_some_and(|prev| prev.is_ascii_alphanumeric() || *prev == b'_')
+    {
+        return false;
+    }
+    true
+}
+
+/// Returns `true` when `pattern` appears in `text` at a position where it is a runtime assert,
+/// i.e. NOT inside a `debug_assert*` call.
+///
+/// Use this instead of `text.contains(pattern)` whenever `pattern` starts with `"assert!("` to
+/// prevent `debug_assert!(...)` from being credited as a release-runtime guard.
+pub(super) fn text_contains_runtime_assert(text: &str, pattern: &str) -> bool {
+    let mut cursor = text;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(pattern) {
+        let abs_pos = offset + pos;
+        if is_runtime_assert_at(text, abs_pos) {
+            return true;
+        }
+        let next = pos + pattern.len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::{contains_executable_return, strip_block_comments_and_literals};

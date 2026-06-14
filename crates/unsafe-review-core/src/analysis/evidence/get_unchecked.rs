@@ -1,6 +1,7 @@
 use super::{
-    any_compact_if_condition, any_marker_tail, branch_still_open_at_operation, compact_code,
-    condition_has_top_level_conjunct, contains_assignment_to_target, contains_executable_return,
+    any_compact_if_condition, any_marker_occurrence, any_marker_tail,
+    branch_still_open_at_operation, compact_code, condition_has_top_level_conjunct,
+    contains_assignment_to_target, contains_executable_return, is_runtime_assert_at,
     match_some_branch_after_marker, matching_call_argument_end, matching_code_block_end,
     receiver_before_marker, strip_block_comments_and_literals,
 };
@@ -98,9 +99,16 @@ impl<'a> GetUncheckedBoundsApplicability<'a> {
     }
 
     fn assertion_marker_preserves_applicability(&self, marker: &str) -> bool {
-        any_marker_tail(self.before_operation, marker, |after_assertion| {
-            self.target_stays_fresh_after(after_assertion)
-        })
+        // Use `any_marker_occurrence` (position-aware) so we can apply `is_runtime_assert_at`
+        // to skip matches that fall inside `debug_assert!(`, which is compiled out in release.
+        any_marker_occurrence(
+            self.before_operation,
+            marker,
+            |marker_start, after_assertion| {
+                is_runtime_assert_at(self.before_operation, marker_start)
+                    && self.target_stays_fresh_after(after_assertion)
+            },
+        )
     }
 
     fn returning_marker_preserves_applicability(&self, marker: &str) -> bool {
@@ -148,7 +156,9 @@ fn has_get_unchecked_bounds_assertion(
     context: &GetUncheckedBoundsApplicability<'_>,
     predicate: &str,
 ) -> bool {
-    ["assert!(", "debug_assert!("].into_iter().any(|prefix| {
+    // Only `assert!` is a release-runtime guard; `debug_assert!` is compiled out in release
+    // builds and cannot satisfy a runtime bounds obligation.
+    ["assert!("].into_iter().any(|prefix| {
         let marker = format!("{prefix}{predicate}");
         context.assertion_marker_preserves_applicability(&marker)
     })

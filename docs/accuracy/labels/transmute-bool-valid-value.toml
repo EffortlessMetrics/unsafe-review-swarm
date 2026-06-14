@@ -357,9 +357,9 @@ label_source = "fixture_golden"
 rationale = "A bare transmute_copy from referenced `u8` to `bool` does not prove destination validity."
 
 [[samples]]
-id = "transmute-copy-bool-layout-only-missing-valid-value"
+id = "transmute-copy-bool-debug-assert-layout-not-discharge-valid-value"
 fixture = "transmute_copy_layout_size_guard"
-kind = "positive"
+kind = "false_positive_control"
 expected_cards = 1
 expected_class = "guard_missing"
 expected_operation_family = "transmute"
@@ -369,7 +369,7 @@ expected_contract_state = "present"
 expected_discharge_state = "missing"
 expected_witness_route_kinds = ["miri", "cargo-careful"]
 label_source = "fixture_golden"
-rationale = "A transmute_copy layout-size guard does not discharge the referenced bool valid-value obligation."
+rationale = "debug_assert_eq! is compiled out in release builds and neither discharges layout nor the valid-value obligation; both remain missing."
 
 [[samples]]
 id = "transmute-copy-bool-comment-not-valid-value"
@@ -492,17 +492,17 @@ label_source = "fixture_golden"
 rationale = "A transmute_copy layout mismatch predicate that appears only in a conjunctive early-return branch can still fall through with mismatched layout and must not discharge layout evidence."
 
 [[samples]]
-id = "transmute-copy-bool-domain-guard-present"
+id = "transmute-copy-bool-domain-guard-valid-value-present-layout-debug-assert-missing"
 fixture = "transmute_copy_bool_valid_value_guard"
-kind = "positive"
+kind = "false_positive_control"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "guard_missing"
 expected_operation_family = "transmute"
 expected_hazard = "invalid_value"
 expected_obligation_key = "valid-value"
 expected_discharge_state = "present"
 label_source = "fixture_golden"
-rationale = "A dominating referenced-byte bool-domain guard discharges transmute_copy valid-value evidence."
+rationale = "A dominating assert! bool-domain guard discharges transmute_copy valid-value evidence, but debug_assert_eq! for layout is compiled out in release builds; layout remains missing so the card class is guard_missing, not guarded_unwitnessed."
 
 [[samples]]
 id = "transmute-copy-bool-conjunct-branch-guard-present"
@@ -533,17 +533,17 @@ label_source = "fixture_golden"
 rationale = "A referenced-byte bool-domain predicate that appears only in a disjunctive open branch can admit invalid bytes and must not discharge transmute_copy valid-value evidence."
 
 [[samples]]
-id = "transmute-copy-bool-invalid-return-guard-present"
+id = "transmute-copy-bool-invalid-return-valid-value-present-layout-debug-assert-missing"
 fixture = "transmute_copy_bool_invalid_return_guard"
-kind = "positive"
+kind = "false_positive_control"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "guard_missing"
 expected_operation_family = "transmute"
 expected_hazard = "invalid_value"
 expected_obligation_key = "valid-value"
 expected_discharge_state = "present"
 label_source = "fixture_golden"
-rationale = "An early return on invalid referenced-byte values discharges transmute_copy valid-value evidence."
+rationale = "An early return on invalid referenced-byte values discharges transmute_copy valid-value evidence, but debug_assert_eq! for layout is compiled out in release builds; layout remains missing so the card class is guard_missing, not guarded_unwitnessed."
 
 [[samples]]
 id = "transmute-copy-bool-invalid-return-comment-not-valid-value"

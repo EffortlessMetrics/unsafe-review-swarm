@@ -1,9 +1,9 @@
 use super::{
     any_compact_if_condition, branch_still_open_at_operation, compact_code,
     condition_has_top_level_conjunct, condition_has_top_level_disjunct,
-    contains_assignment_to_target, contains_executable_return, matching_call_argument_end,
-    matching_code_block_end, receiver_before_marker, split_top_level_arguments,
-    strip_block_comments_and_literals,
+    contains_assignment_to_target, contains_executable_return, is_runtime_assert_at,
+    matching_call_argument_end, matching_code_block_end, receiver_before_marker,
+    split_top_level_arguments, strip_block_comments_and_literals,
 };
 
 pub(super) fn has_copy_slice_range_evidence(expression: &str, before_call: &str) -> bool {
@@ -125,15 +125,20 @@ fn has_slice_count_assertion_guard(
     predicate: &str,
     target: &CopyRangeBoundTarget,
 ) -> bool {
-    ["assert!(", "debug_assert!("].into_iter().any(|prefix| {
-        let mut search_from = 0;
-        while let Some(offset) = before_call[search_from..].find(prefix) {
-            let call_start = search_from + offset + prefix.len();
-            let after_prefix = &before_call[call_start..];
-            let Some(call_end) = matching_call_argument_end(after_prefix) else {
-                search_from = call_start;
-                continue;
-            };
+    // Only `assert!` is a release-runtime guard; `debug_assert!` is compiled out in release
+    // builds and cannot satisfy a runtime bounds obligation.  `is_runtime_assert_at` ensures
+    // that `assert!(` found inside `debug_assert!(` is not credited as a runtime guard.
+    let prefix = "assert!(";
+    let mut search_from = 0;
+    while let Some(offset) = before_call[search_from..].find(prefix) {
+        let abs_pos = search_from + offset;
+        let call_start = abs_pos + prefix.len();
+        let after_prefix = &before_call[call_start..];
+        let Some(call_end) = matching_call_argument_end(after_prefix) else {
+            search_from = call_start;
+            continue;
+        };
+        if is_runtime_assert_at(before_call, abs_pos) {
             let args = split_top_level_arguments(&after_prefix[..call_end]);
             let after_call = &after_prefix[call_end..];
             let statement_end = after_call.find(';').unwrap_or(after_call.len());
@@ -145,10 +150,10 @@ fn has_slice_count_assertion_guard(
             {
                 return true;
             }
-            search_from = call_start + call_end;
         }
-        false
-    })
+        search_from = call_start + call_end;
+    }
+    false
 }
 
 fn has_open_slice_count_branch_guard(

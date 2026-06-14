@@ -13,7 +13,17 @@ pub(super) fn alignment_discharge_state(site: &ScannedSite, lower: &str) -> Evid
         EvidenceState::present("bool raw write alignment evidence was detected")
     } else if has_alignment_guard(site, lower) {
         EvidenceState::present("Alignment guard code was detected")
+    } else if has_debug_assert_hint(lower) {
+        EvidenceState::missing(
+            "`debug_assert!` documents the intended invariant in debug builds, \
+             but it is not release-runtime guard evidence. \
+             Add an executable guard, witness receipt, or focused test reach.",
+        )
     } else {
         EvidenceState::missing("No alignment guard code was detected")
     }
+}
+
+fn has_debug_assert_hint(lower: &str) -> bool {
+    lower.contains("debug_assert!(") || lower.contains("debug_assert_eq!(") || lower.contains("debug_assert_ne!(")
 }

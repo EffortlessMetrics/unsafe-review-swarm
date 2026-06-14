@@ -37,7 +37,7 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No length or bounds guard code was detected"
+          "summary": "`debug_assert!` documents the intended invariant in debug builds, but it is not release-runtime guard evidence. Add an executable guard, witness receipt, or focused test reach."
         },
         "reach": {
           "present": true,

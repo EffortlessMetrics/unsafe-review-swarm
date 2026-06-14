@@ -1,10 +1,10 @@
 [
   {
     "id": "UR-pointer-arithmetic-num-ctrl-bytes-guard-fixture-src-lib-rs-ctrl-operation-pointer_arithmetic-add-378819c9cbad-same_allocation-c1",
-    "class": "guarded_unwitnessed",
-    "priority": "medium",
+    "class": "guard_missing",
+    "priority": "high",
     "confidence": "medium",
-    "proof_path": "observable_red_green",
+    "proof_path": "source_route_only",
     "site": {
       "file": "src/lib.rs",
       "line": 18,
@@ -35,9 +35,9 @@
           "summary": "Nearby `SAFETY:` comment was detected"
         },
         "discharge": {
-          "present": true,
-          "state": "present",
-          "summary": "Length or bounds guard code was detected"
+          "present": false,
+          "state": "missing",
+          "summary": "`debug_assert!` documents the intended invariant in debug builds, but it is not release-runtime guard evidence. Add an executable guard, witness receipt, or focused test reach."
         },
         "reach": {
           "present": true,
@@ -52,7 +52,7 @@
       }
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
-    "discharge": "All inferred safety obligations have visible local discharge evidence",
+    "discharge": "No visible local guard detected",
     "reach": "1 related test file(s) mention owner `ctrl`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
@@ -70,15 +70,16 @@
       }
     ],
     "missing": [
+      "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Attach a focused Miri or cargo-careful witness receipt or mark the static limitation explicitly.",
+    "next_action": "Add or expose the local guard that discharges the `pointer_arithmetic` safety obligation.",
     "verify_commands": [
       "cargo +nightly miri test ctrl",
       "cargo +nightly careful test ctrl"
     ],
     "confirmation_cue": {
-      "hypothesis_to_confirm": "static `guarded_unwitnessed` ReviewCard for `unsafe { self.ctrl.add(index) }`; confirm with external evidence before treating it as observed runtime behavior",
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe { self.ctrl.add(index) }`; confirm with external evidence before treating it as observed runtime behavior",
       "build_this_first": {
         "kind": "verify_command",
         "command": "cargo +nightly miri test ctrl",
@@ -103,14 +104,14 @@
     },
     "coverage": {
       "contract_coverage": "present",
-      "guard_coverage": "present",
+      "guard_coverage": "missing",
       "test_reach_coverage": "missing",
       "witness_receipt_coverage": "missing",
       "manual_context": "absent",
       "baseline_state": "new",
       "outcome_movement": "regressed",
-      "comment_plan_status": "not_eligible",
-      "agent_lsp_readiness": "requires_witness_receipt"
+      "comment_plan_status": "selected",
+      "agent_lsp_readiness": "ready"
     }
   }
 ]

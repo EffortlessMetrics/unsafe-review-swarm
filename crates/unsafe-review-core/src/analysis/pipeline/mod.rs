@@ -4893,16 +4893,13 @@ pub fn read_at(offset: i32) -> Result<usize, ()> {
 
     #[test]
     fn transmute_copy_bool_value_observation_is_not_guard_evidence() -> Result<(), String> {
+        // Fixtures whose layout obligation is discharged by a real `assert_eq!` (release-runtime).
+        // valid-value is still missing because the value-domain guard is absent or inapplicable.
         for fixture in [
-            "transmute_copy_layout_size_guard",
             "transmute_copy_bool_comment_not_guard",
-            "transmute_copy_bool_other_value_not_guard",
-            "transmute_copy_bool_prior_guarded_call_not_guard",
             "transmute_copy_bool_disjunct_branch_not_guard",
             "transmute_copy_bool_conjunct_return_not_guard",
-            "transmute_copy_bool_value_observed_not_guard",
             "transmute_copy_bool_closed_if_observed_not_guard",
-            "transmute_copy_bool_invalid_return_comment_not_guard",
             "transmute_copy_bool_guard_then_reassigned_not_guard",
             "transmute_copy_bool_guard_then_compound_reassigned_not_guard",
             "transmute_copy_bool_guard_then_shadowed_not_guard",
@@ -4920,15 +4917,41 @@ pub fn read_at(offset: i32) -> Result<usize, ()> {
                 "{fixture} must not resolve this card's guard prompt"
             );
         }
+        // Fixtures that use only `debug_assert_eq!` for the layout obligation.  `debug_assert_eq!`
+        // is compiled out in release builds and cannot satisfy a runtime layout obligation, so both
+        // layout and valid-value obligations remain missing.
+        for fixture in [
+            "transmute_copy_layout_size_guard",
+            "transmute_copy_bool_other_value_not_guard",
+            "transmute_copy_bool_prior_guarded_call_not_guard",
+            "transmute_copy_bool_value_observed_not_guard",
+            "transmute_copy_bool_invalid_return_comment_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+            assert_eq!(card.operation.family, OperationFamily::Transmute);
+            assert_eq!(card.class, ReviewClass::GuardMissing);
+            assert!(
+                !obligation_discharge_present(card, "layout"),
+                "{fixture}: debug_assert_eq! must NOT discharge the layout obligation"
+            );
+            assert!(!obligation_discharge_present(card, "valid-value"));
+            assert!(
+                card.missing.iter().any(|missing| missing.kind == "guard"),
+                "{fixture} must not resolve this card's guard prompt"
+            );
+        }
         Ok(())
     }
 
     #[test]
     fn transmute_copy_bool_value_domain_guards_are_discharged() -> Result<(), String> {
+        // Fixtures whose layout obligation is discharged by a real `assert_eq!` and whose
+        // valid-value obligation is also discharged — fully guarded, awaiting witness only.
         for fixture in [
-            "transmute_copy_bool_valid_value_guard",
             "transmute_copy_bool_conjunct_branch_guard",
-            "transmute_copy_bool_invalid_return_guard",
             "transmute_copy_bool_disjunct_return_guard",
         ] {
             let output = fixture_output(fixture)?;
@@ -4943,6 +4966,25 @@ pub fn read_at(offset: i32) -> Result<usize, ()> {
                 card.missing.iter().all(|missing| missing.kind != "guard"),
                 "{fixture} should resolve the local valid-value guard prompt"
             );
+        }
+        // Fixtures whose layout obligation uses only `debug_assert_eq!` — layout obligation
+        // remains missing, so the class is `guard_missing` despite a valid-value guard being
+        // present.  `debug_assert_eq!` is compiled out in release builds.
+        for fixture in [
+            "transmute_copy_bool_valid_value_guard",
+            "transmute_copy_bool_invalid_return_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+            assert_eq!(card.operation.family, OperationFamily::Transmute);
+            assert_eq!(card.class, ReviewClass::GuardMissing);
+            assert!(
+                !obligation_discharge_present(card, "layout"),
+                "{fixture}: debug_assert_eq! must NOT discharge the layout obligation"
+            );
+            assert!(obligation_discharge_present(card, "valid-value"));
         }
         Ok(())
     }
@@ -5005,14 +5047,17 @@ pub fn read_at(offset: i32) -> Result<usize, ()> {
     }
 
     #[test]
-    fn pointer_arithmetic_num_ctrl_bytes_guard_is_discharged() -> Result<(), String> {
+    fn pointer_arithmetic_num_ctrl_bytes_debug_assert_not_credited() -> Result<(), String> {
+        // The fixture uses only `debug_assert!(index < self.num_ctrl_bytes())` as its bounds guard.
+        // `debug_assert!` is compiled out in release builds and cannot satisfy a runtime bounds
+        // obligation, so the card class must be `guard_missing` with discharge absent.
         let output = fixture_output("pointer_arithmetic_num_ctrl_bytes_guard")?;
         let card = single_card("pointer_arithmetic_num_ctrl_bytes_guard", &output)?;
 
         assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
         assert_eq!(card.operation.family, OperationFamily::PointerArithmetic);
-        assert_eq!(card.class, ReviewClass::GuardedUnwitnessed);
-        assert!(card.discharge.present);
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert!(!card.discharge.present);
         assert!(card.id.0.contains("add"));
         Ok(())
     }

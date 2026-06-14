@@ -1,6 +1,6 @@
 use super::{
     branch_still_open_at_operation, compact_code, compact_if_guards, contains_executable_return,
-    contains_simple_assignment_to, is_simple_identifier, let_binding_name,
+    contains_simple_assignment_to, is_runtime_assert_at, is_simple_identifier, let_binding_name,
     matching_call_argument_end, matching_code_block_end, receiver_before_marker,
     split_top_level_pair, strip_block_comments_and_literals,
 };
@@ -183,11 +183,16 @@ fn has_origin_len_size_guard(compact: &str, origin: &str) -> bool {
 }
 
 fn has_origin_len_size_assertion_guard(compact: &str, len: &str, origin: &str) -> bool {
-    ["assert!(", "debug_assert!("].into_iter().any(|prefix| {
-        let mut cursor = compact;
-        let mut offset = 0usize;
-        while let Some(pos) = cursor.find(prefix) {
-            let statement_start = offset + pos + prefix.len();
+    // Only `assert!` is a release-runtime guard; `debug_assert!` is compiled out in release
+    // builds and cannot satisfy a runtime bounds obligation.  `is_runtime_assert_at` ensures
+    // that `assert!(` found inside `debug_assert!(` is not credited as a runtime guard.
+    let prefix = "assert!(";
+    let mut cursor = compact;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(prefix) {
+        let abs_pos = offset + pos;
+        let statement_start = abs_pos + prefix.len();
+        if is_runtime_assert_at(compact, abs_pos) {
             let after_prefix = &compact[statement_start..];
             let statement_end = after_prefix.find(';').unwrap_or(after_prefix.len());
             let statement = &after_prefix[..statement_end];
@@ -197,12 +202,12 @@ fn has_origin_len_size_assertion_guard(compact: &str, len: &str, origin: &str) -
             {
                 return true;
             }
-            let next = pos + prefix.len();
-            offset += next;
-            cursor = &cursor[next..];
         }
-        false
-    })
+        let next = pos + prefix.len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
 }
 
 fn has_origin_len_size_open_positive_branch_guard(compact: &str, len: &str, origin: &str) -> bool {
@@ -261,34 +266,35 @@ fn has_origin_len_capacity_assertion_guard(
     cap: &str,
     origin: &str,
 ) -> bool {
-    [
-        ("assert_eq!(", false),
-        ("debug_assert_eq!(", false),
-        ("assert!(", true),
-        ("debug_assert!(", true),
-    ]
-    .into_iter()
-    .any(|(prefix, requires_operator)| {
-        let mut cursor = compact;
-        let mut offset = 0usize;
-        while let Some(pos) = cursor.find(prefix) {
-            let statement_start = offset + pos + prefix.len();
-            let after_prefix = &compact[statement_start..];
-            let statement_end = after_prefix.find(';').unwrap_or(after_prefix.len());
-            let statement = &after_prefix[..statement_end];
-            let after_statement = &after_prefix[statement_end..];
-            if origin_len_capacity_condition_matches(statement, len, capacity, cap)
-                && (!requires_operator || statement.contains("=="))
-                && !contains_simple_assignment_to(after_statement, origin)
-            {
-                return true;
+    // Only `assert_eq!` and `assert!` are release-runtime guards; `debug_assert*` variants are
+    // compiled out in release builds and cannot satisfy a runtime bounds obligation.
+    // `is_runtime_assert_at` guards against `assert!(` matching inside `debug_assert!(`.
+    [("assert_eq!(", false), ("assert!(", true)]
+        .into_iter()
+        .any(|(prefix, requires_operator)| {
+            let mut cursor = compact;
+            let mut offset = 0usize;
+            while let Some(pos) = cursor.find(prefix) {
+                let abs_pos = offset + pos;
+                let statement_start = abs_pos + prefix.len();
+                if is_runtime_assert_at(compact, abs_pos) {
+                    let after_prefix = &compact[statement_start..];
+                    let statement_end = after_prefix.find(';').unwrap_or(after_prefix.len());
+                    let statement = &after_prefix[..statement_end];
+                    let after_statement = &after_prefix[statement_end..];
+                    if origin_len_capacity_condition_matches(statement, len, capacity, cap)
+                        && (!requires_operator || statement.contains("=="))
+                        && !contains_simple_assignment_to(after_statement, origin)
+                    {
+                        return true;
+                    }
+                }
+                let next = pos + prefix.len();
+                offset += next;
+                cursor = &cursor[next..];
             }
-            let next = pos + prefix.len();
-            offset += next;
-            cursor = &cursor[next..];
-        }
-        false
-    })
+            false
+        })
 }
 
 fn has_origin_len_capacity_open_positive_branch_guard(

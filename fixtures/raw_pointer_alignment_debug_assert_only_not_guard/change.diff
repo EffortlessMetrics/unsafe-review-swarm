@@ -1,0 +1,30 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,23 @@
++pub struct Header(u32);
++
++/// Reads a `Header` from `bytes`, with only a `debug_assert_eq!` alignment
++/// check that is compiled out in release builds.  unsafe-review must not
++/// credit the `debug_assert_eq!` as a runtime alignment guard and must emit a
++/// `guard_missing` card.
++pub fn read_header(bytes: &[u8]) -> Header {
++    assert!(bytes.len() >= core::mem::size_of::<Header>());
++    let ptr = bytes.as_ptr();
++    debug_assert_eq!(ptr.align_offset(core::mem::align_of::<Header>()), 0);
++    // SAFETY: length is checked above, but this fixture intentionally uses
++    // only debug_assert_eq! for alignment; no release-runtime alignment guard
++    // is present.
++    unsafe { ptr.cast::<Header>().read() }
++}
++
++#[cfg(test)]
++mod tests {
++    use super::read_header;
++
++    #[test]
++    fn reads_header() {
++        let bytes = [0_u8; 8];
++        let _header = read_header(&bytes);
++    }
++}

@@ -1,7 +1,7 @@
 use super::{
     branch_still_open_at_operation, code_before_operation, compact_code, compact_if_guards,
     contains_executable_return, contains_receiver_fragment, contains_simple_assignment_to,
-    is_receiver_path_char, matching_code_block_end, receiver_before_marker,
+    is_receiver_path_char, is_runtime_assert_at, matching_code_block_end, receiver_before_marker,
     strip_block_comments_and_literals,
 };
 use crate::analysis::scanner::ScannedSite;
@@ -42,11 +42,16 @@ fn has_same_receiver_alignment_condition_guard(compact: &str, receiver: &str) ->
 }
 
 fn has_alignment_assertion_guard(compact: &str, receiver: &str) -> bool {
-    ["assert!(", "debug_assert!("].into_iter().any(|prefix| {
-        let mut cursor = compact;
-        let mut offset = 0usize;
-        while let Some(pos) = cursor.find(prefix) {
-            let statement_start = offset + pos + prefix.len();
+    // Only `assert!` is a release-runtime guard; `debug_assert!` is compiled out in release
+    // builds and cannot satisfy a runtime alignment obligation.  `is_runtime_assert_at` ensures
+    // that `assert!(` found inside `debug_assert!(` is not credited as a runtime guard.
+    let prefix = "assert!(";
+    let mut cursor = compact;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(prefix) {
+        let abs_pos = offset + pos;
+        let statement_start = abs_pos + prefix.len();
+        if is_runtime_assert_at(compact, abs_pos) {
             let after_prefix = &compact[statement_start..];
             let statement_end = after_prefix.find(';').unwrap_or(after_prefix.len());
             let statement = &after_prefix[..statement_end];
@@ -56,12 +61,12 @@ fn has_alignment_assertion_guard(compact: &str, receiver: &str) -> bool {
             {
                 return true;
             }
-            let next = pos + prefix.len();
-            offset += next;
-            cursor = &cursor[next..];
         }
-        false
-    })
+        let next = pos + prefix.len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
 }
 
 fn has_alignment_open_positive_branch_guard(compact: &str, receiver: &str) -> bool {

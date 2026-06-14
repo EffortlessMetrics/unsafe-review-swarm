@@ -1,6 +1,6 @@
 use super::{
     branch_still_open_at_operation, compact_code, compact_contains_identifier,
-    strip_block_comments_and_literals,
+    is_runtime_assert_at, strip_block_comments_and_literals,
 };
 
 pub(super) fn has_length_or_bounds_guard(lower: &str) -> bool {
@@ -12,23 +12,28 @@ pub(super) fn has_length_or_bounds_guard(lower: &str) -> bool {
 }
 
 fn has_bounds_assertion_guard(compact: &str) -> bool {
-    ["assert!(", "debug_assert!("].into_iter().any(|prefix| {
-        let mut cursor = compact;
-        let mut offset = 0usize;
-        while let Some(pos) = cursor.find(prefix) {
-            let statement_start = offset + pos + prefix.len();
+    // Only `assert!` is a release-runtime guard; `debug_assert!` is compiled out in release
+    // builds and cannot satisfy a runtime bounds obligation.  `is_runtime_assert_at` ensures
+    // that `assert!(` found inside `debug_assert!(` is not credited as a runtime guard.
+    let prefix = "assert!(";
+    let mut cursor = compact;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(prefix) {
+        let abs_pos = offset + pos;
+        let statement_start = abs_pos + prefix.len();
+        if is_runtime_assert_at(compact, abs_pos) {
             let after_prefix = &compact[statement_start..];
             let statement_end = after_prefix.find(';').unwrap_or(after_prefix.len());
             let statement = &after_prefix[..statement_end];
             if has_bounds_condition(statement) {
                 return true;
             }
-            let next = pos + prefix.len();
-            offset += next;
-            cursor = &cursor[next..];
         }
-        false
-    })
+        let next = pos + prefix.len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
 }
 
 fn has_bounds_open_positive_branch_guard(compact: &str) -> bool {
@@ -102,9 +107,9 @@ fn operand_mentions_bounds(operand: &str) -> bool {
 
 fn has_len_capacity_equality_guard(lower: &str) -> bool {
     let compact = compact_code(lower);
-    let has_equality = compact.contains("==")
-        || compact.contains("assert_eq!(")
-        || compact.contains("debug_assert_eq!(");
+    // Only `assert_eq!` is a release-runtime guard; `debug_assert_eq!` is compiled out in
+    // release builds and cannot satisfy a runtime bounds obligation.
+    let has_equality = compact.contains("==") || compact.contains("assert_eq!(");
     has_equality
         && compact.contains("len")
         && (compact.contains("capacity") || contains_word(&compact, "cap"))

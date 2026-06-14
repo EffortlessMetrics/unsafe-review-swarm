@@ -3,6 +3,7 @@ status = "experimental"
 
 required_core_fixtures = [
   "raw_pointer_alignment",
+  "raw_pointer_alignment_debug_assert_only_not_guard",
   "raw_pointer_alignment_receipted",
   "witness_mismatch_tool",
   "align_of_only_not_guard",
@@ -417,6 +418,7 @@ required_core_fixtures = [
   "raw_pointer_write_same_origin_bounds_guard",
   "raw_pointer_read_unrelated_is_null_not_guard",
   "raw_pointer_read_same_receiver_is_null_guard",
+  "raw_pointer_bounds_debug_assert_only_not_guard",
   "pointer_arithmetic_num_ctrl_bytes_guard",
   "pointer_arithmetic_other_offset_not_guard",
   "pointer_arithmetic_reassigned_offset_not_guard",
@@ -618,6 +620,16 @@ required_core_fixtures = [
 fixture = "raw_pointer_alignment"
 kind = "positive"
 claim = "raw pointer read with length evidence still reports missing alignment guard evidence"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read"
+expected_hazard = "alignment"
+
+[[cases]]
+fixture = "raw_pointer_alignment_debug_assert_only_not_guard"
+kind = "false_positive_control"
+claim = "raw pointer read does not credit debug_assert_eq!(ptr.align_offset(..), 0) as an alignment guard; debug_assert_eq! is compiled out in release builds, so alignment obligation stays missing"
 support_tier = "Raw pointer card slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -4553,8 +4565,8 @@ expected_hazard = "inline_asm"
 
 [[cases]]
 fixture = "raw_pointer_read_len_capacity_assert"
-kind = "positive"
-claim = "raw pointer read recognizes len/capacity equality assertions as bounds evidence"
+kind = "false_positive_control"
+claim = "raw pointer read does not credit debug_assert_eq! for bounds; debug_assert_eq!(values.len(), values.capacity()) is compiled out in release builds and cannot satisfy the bounds obligation"
 support_tier = "Raw pointer card slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -4722,6 +4734,16 @@ expected_operation_family = "raw_pointer_read"
 expected_hazard = "pointer_validity"
 
 [[cases]]
+fixture = "raw_pointer_bounds_debug_assert_only_not_guard"
+kind = "false_positive_control"
+claim = "raw pointer write does not credit debug_assert!(!buf.is_empty()) as a runtime bounds guard; debug_assert! is compiled out in release builds, so the bounds obligation stays missing"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
+
+[[cases]]
 fixture = "raw_pointer_read_volatile"
 kind = "positive"
 claim = "method-form read_volatile reports raw pointer read obligations instead of a generic unsafe function call"
@@ -4740,11 +4762,11 @@ expected_cards = 0
 
 [[cases]]
 fixture = "pointer_arithmetic_num_ctrl_bytes_guard"
-kind = "positive"
-claim = "pointer arithmetic recognizes index < num_ctrl_bytes as bounds guard evidence"
+kind = "false_positive_control"
+claim = "pointer arithmetic does not credit debug_assert!(index < num_ctrl_bytes) as a runtime bounds guard; debug_assert! is compiled out in release builds"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "guard_missing"
 expected_operation_family = "pointer_arithmetic"
 expected_hazard = "bounds"
 
@@ -5311,8 +5333,8 @@ expected_hazard = "invalid_value"
 
 [[cases]]
 fixture = "transmute_copy_layout_size_guard"
-kind = "positive"
-claim = "transmute_copy::<u8, bool> recognizes explicit size_of layout evidence while keeping valid-value evidence missing"
+kind = "false_positive_control"
+claim = "transmute_copy::<u8, bool> does not credit debug_assert_eq! for layout; debug_assert_eq!(size_of::<u8>(), size_of::<bool>()) is compiled out in release builds, so layout obligation remains missing"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
@@ -5371,11 +5393,11 @@ expected_hazard = "invalid_value"
 
 [[cases]]
 fixture = "transmute_copy_bool_valid_value_guard"
-kind = "positive"
-claim = "transmute_copy::<u8, bool> recognizes explicit size_of layout evidence and referenced u8 bool-domain evidence while keeping witness evidence missing"
+kind = "false_positive_control"
+claim = "transmute_copy::<u8, bool> does not credit debug_assert_eq! for layout even when valid-value assert! is present; debug_assert_eq! is compiled out in release builds, so layout obligation stays missing"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "guard_missing"
 expected_operation_family = "transmute"
 expected_hazard = "invalid_value"
 
@@ -5431,11 +5453,11 @@ expected_hazard = "invalid_value"
 
 [[cases]]
 fixture = "transmute_copy_bool_invalid_return_guard"
-kind = "positive"
-claim = "transmute_copy::<u8, bool> recognizes explicit size_of layout evidence and referenced u8 invalid-byte early-return evidence while keeping witness evidence missing"
+kind = "false_positive_control"
+claim = "transmute_copy::<u8, bool> does not credit debug_assert_eq! for layout even when a valid-value early-return guard is present; debug_assert_eq! is compiled out in release builds, so layout obligation stays missing"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
+expected_class = "guard_missing"
 expected_operation_family = "transmute"
 expected_hazard = "invalid_value"
 

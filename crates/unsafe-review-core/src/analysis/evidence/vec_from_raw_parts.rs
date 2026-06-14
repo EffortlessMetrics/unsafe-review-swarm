@@ -1,6 +1,6 @@
 use super::{
     branch_still_open_at_operation, compact_code, contains_executable_return,
-    contains_simple_assignment_to, is_simple_identifier, let_binding_name,
+    contains_simple_assignment_to, is_runtime_assert_at, is_simple_identifier, let_binding_name,
     matching_call_argument_end, matching_code_block_end, receiver_before_marker,
     split_top_level_arguments, strip_block_comments_and_literals,
 };
@@ -124,11 +124,11 @@ fn has_len_cap_bound_guard(before_call: &str, len: &str, cap: &str) -> bool {
 }
 
 fn has_len_cap_bound_predicate(before_call: &str, predicate: &str, len: &str, cap: &str) -> bool {
+    // Only `assert!` is a release-runtime guard; `debug_assert!` is compiled out in release
+    // builds and cannot satisfy a runtime capacity obligation.
     [
         format!("assert!({predicate})"),
         format!("assert!({predicate},"),
-        format!("debug_assert!({predicate})"),
-        format!("debug_assert!({predicate},"),
     ]
     .iter()
     .any(|pattern| has_fresh_len_cap_guard_pattern(before_call, pattern, len, cap))
@@ -139,11 +139,14 @@ fn has_fresh_len_cap_guard_pattern(before_call: &str, pattern: &str, len: &str, 
     let mut search_from = 0;
     while let Some(offset) = before_call[search_from..].find(pattern) {
         let pattern_start = search_from + offset;
-        let after_pattern = &before_call[pattern_start + pattern.len()..];
-        let statement_end = after_pattern.find(';').unwrap_or(after_pattern.len());
-        let after_guard = &after_pattern[statement_end..];
-        if !has_len_cap_assignment(after_guard, len, cap) {
-            return true;
+        // Only count the match if it is at a runtime-assert boundary (not inside debug_assert!).
+        if is_runtime_assert_at(before_call, pattern_start) {
+            let after_pattern = &before_call[pattern_start + pattern.len()..];
+            let statement_end = after_pattern.find(';').unwrap_or(after_pattern.len());
+            let after_guard = &after_pattern[statement_end..];
+            if !has_len_cap_assignment(after_guard, len, cap) {
+                return true;
+            }
         }
         search_from = pattern_start + pattern.len();
     }

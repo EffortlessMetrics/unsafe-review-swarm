@@ -1,21 +1,21 @@
 [
   {
-    "id": "UR-raw-pointer-read-len-capacity-assert-fixture-src-lib-rs-read-full-array-operation-raw_pointer_read-read-296f785356f2-pointer_validity-c1",
+    "id": "UR-raw-pointer-alignment-debug-assert-only-not-guard-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
     "class": "guard_missing",
     "priority": "high",
     "confidence": "medium",
     "proof_path": "source_route_only",
     "site": {
       "file": "src/lib.rs",
-      "line": 25,
+      "line": 14,
       "column": 5,
       "kind": "operation",
-      "owner": "read_full_array",
+      "owner": "read_header",
       "visibility": "private",
       "public_api_surface": false,
-      "snippet": "unsafe { core::ptr::read(ptr as *const [T; CAP]) }"
+      "snippet": "unsafe { ptr.cast::<Header>().read() }"
     },
-    "operation": "unsafe { core::ptr::read(ptr as *const [T; CAP]) }",
+    "operation": "unsafe { ptr.cast::<Header>().read() }",
     "operation_family": "raw_pointer_read",
     "hazards": [
       "pointer_validity",
@@ -47,7 +47,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `read_full_array`"
+          "summary": "1 related test file(s) mention owner `read_header`"
         },
         "witness": {
           "present": false,
@@ -64,14 +64,14 @@
           "summary": "Nearby `SAFETY:` comment was detected"
         },
         "discharge": {
-          "present": false,
-          "state": "missing",
-          "summary": "`debug_assert!` documents the intended invariant in debug builds, but it is not release-runtime guard evidence. Add an executable guard, witness receipt, or focused test reach."
+          "present": true,
+          "state": "present",
+          "summary": "Length or bounds guard code was detected"
         },
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `read_full_array`"
+          "summary": "1 related test file(s) mention owner `read_header`"
         },
         "witness": {
           "present": false,
@@ -95,7 +95,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `read_full_array`"
+          "summary": "1 related test file(s) mention owner `read_header`"
         },
         "witness": {
           "present": false,
@@ -119,7 +119,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `read_full_array`"
+          "summary": "1 related test file(s) mention owner `read_header`"
         },
         "witness": {
           "present": false,
@@ -143,7 +143,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `read_full_array`"
+          "summary": "1 related test file(s) mention owner `read_header`"
         },
         "witness": {
           "present": false,
@@ -153,20 +153,20 @@
       }
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
-    "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `read_full_array`",
+    "discharge": "Some inferred safety obligations are missing local guard evidence",
+    "reach": "1 related test file(s) mention owner `read_header`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
         "kind": "miri",
         "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
-        "command": "cargo +nightly miri test read_full_array",
+        "command": "cargo +nightly miri test read_header",
         "required": false
       },
       {
         "kind": "cargo-careful",
         "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
-        "command": "cargo +nightly careful test read_full_array",
+        "command": "cargo +nightly careful test read_header",
         "required": false
       }
     ],
@@ -174,31 +174,31 @@
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) buffer has enough bytes for the accessed type, (3) pointer is aligned for the accessed type, (4) memory is initialized for the accessed type, (5) access remains inside one live allocation.",
+    "next_action": "Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
     "verify_commands": [
-      "cargo +nightly miri test read_full_array",
-      "cargo +nightly careful test read_full_array"
+      "cargo +nightly miri test read_header",
+      "cargo +nightly careful test read_header"
     ],
     "confirmation_cue": {
-      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe { core::ptr::read(ptr as *const [T; CAP]) }`; confirm with external evidence before treating it as observed runtime behavior",
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe { ptr.cast::<Header>().read() }`; confirm with external evidence before treating it as observed runtime behavior",
       "build_this_first": {
         "kind": "verify_command",
-        "command": "cargo +nightly miri test read_full_array",
+        "command": "cargo +nightly miri test read_header",
         "route_kind": "miri",
-        "summary": "Build/run `cargo +nightly miri test read_full_array` first for this card; attach a matching receipt only if it confirms the route"
+        "summary": "Build/run `cargo +nightly miri test read_header` first for this card; attach a matching receipt only if it confirms the route"
       },
       "minimal_repro": {
         "kind": "verify_command",
-        "command": "cargo +nightly miri test read_full_array",
+        "command": "cargo +nightly miri test read_header",
         "route_kind": "miri",
         "steps": [
-          "Confirm ReviewCard `UR-raw-pointer-read-len-capacity-assert-fixture-src-lib-rs-read-full-array-operation-raw_pointer_read-read-296f785356f2-pointer_validity-c1` still maps to `unsafe { core::ptr::read(ptr as *const [T; CAP]) }` at `src/lib.rs:25:5` before upgrading confidence.",
-          "Build/run `cargo +nightly miri test read_full_array` as the smallest available command for this card.",
+          "Confirm ReviewCard `UR-raw-pointer-alignment-debug-assert-only-not-guard-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1` still maps to `unsafe { ptr.cast::<Header>().read() }` at `src/lib.rs:14:5` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test read_header` as the smallest available command for this card.",
           "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
         ],
         "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
       },
-      "confirmation_step": "build/run `cargo +nightly miri test read_full_array` first, then attach a matching receipt if it confirms the route",
+      "confirmation_step": "build/run `cargo +nightly miri test read_header` first, then attach a matching receipt if it confirms the route",
       "runtime_executed": false,
       "confirmation_state": "pending",
       "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."

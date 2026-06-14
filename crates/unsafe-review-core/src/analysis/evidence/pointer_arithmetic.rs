@@ -1,6 +1,7 @@
 use super::{
     branch_still_open_at_operation, compact_code, contains_simple_assignment_to,
-    matching_call_argument_end, receiver_before_marker, strip_block_comments_and_literals,
+    is_runtime_assert_at, matching_call_argument_end, receiver_before_marker,
+    strip_block_comments_and_literals,
 };
 
 pub(super) fn has_pointer_arithmetic_bounds_guard(expression: &str, lower: &str) -> bool {
@@ -65,11 +66,16 @@ impl<'a> PointerArithmeticBoundsApplicability<'a> {
 fn has_pointer_arithmetic_bounds_assertion(
     context: &PointerArithmeticBoundsApplicability<'_>,
 ) -> bool {
-    ["assert!(", "debug_assert!("].into_iter().any(|prefix| {
-        let mut cursor = context.before_operation;
-        let mut offset = 0usize;
-        while let Some(pos) = cursor.find(prefix) {
-            let statement_start = offset + pos + prefix.len();
+    // Only `assert!` is a release-runtime guard; `debug_assert!` is compiled out in release
+    // builds and cannot satisfy a runtime bounds obligation.  `is_runtime_assert_at` ensures
+    // that `assert!(` found inside `debug_assert!(` is not credited as a runtime guard.
+    let prefix = "assert!(";
+    let mut cursor = context.before_operation;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(prefix) {
+        let abs_pos = offset + pos;
+        let statement_start = abs_pos + prefix.len();
+        if is_runtime_assert_at(context.before_operation, abs_pos) {
             let after_prefix = &context.before_operation[statement_start..];
             let statement_end = after_prefix.find(';').unwrap_or(after_prefix.len());
             let statement = &after_prefix[..statement_end];
@@ -79,12 +85,12 @@ fn has_pointer_arithmetic_bounds_assertion(
             {
                 return true;
             }
-            let next = pos + prefix.len();
-            offset += next;
-            cursor = &cursor[next..];
         }
-        false
-    })
+        let next = pos + prefix.len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
 }
 
 fn has_pointer_arithmetic_bounds_open_branch(
@@ -230,13 +236,19 @@ mod tests {
 
     #[test]
     fn pointer_arithmetic_bounds_guard_uses_same_offset() {
+        // `assert!` is a release-runtime guard and discharges the obligation.
         assert!(has_pointer_arithmetic_bounds_guard(
             "unsafe { self.ctrl.add(index) }",
-            "debug_assert!(index < self.num_ctrl_bytes()); unsafe { self.ctrl.add(index) }",
+            "assert!(index < self.num_ctrl_bytes()); unsafe { self.ctrl.add(index) }",
         ));
         assert!(!has_pointer_arithmetic_bounds_guard(
             "unsafe { self.ctrl.add(index) }",
-            "debug_assert!(other < self.num_ctrl_bytes()); unsafe { self.ctrl.add(index) }",
+            "assert!(other < self.num_ctrl_bytes()); unsafe { self.ctrl.add(index) }",
+        ));
+        // `debug_assert!` is compiled out in release builds and does not discharge.
+        assert!(!has_pointer_arithmetic_bounds_guard(
+            "unsafe { self.ctrl.add(index) }",
+            "debug_assert!(index < self.num_ctrl_bytes()); unsafe { self.ctrl.add(index) }",
         ));
     }
 
@@ -244,7 +256,7 @@ mod tests {
     fn pointer_arithmetic_bounds_guard_rejects_stale_offset() {
         assert!(!has_pointer_arithmetic_bounds_guard(
             "unsafe { self.ctrl.add(index) }",
-            "debug_assert!(index < self.num_ctrl_bytes()); index = fallback; unsafe { self.ctrl.add(index) }",
+            "assert!(index < self.num_ctrl_bytes()); index = fallback; unsafe { self.ctrl.add(index) }",
         ));
     }
 
@@ -252,11 +264,11 @@ mod tests {
     fn pointer_arithmetic_bounds_guard_rejects_stale_bound_identifier() {
         assert!(!has_pointer_arithmetic_bounds_guard(
             "unsafe { self.ctrl.add(index) }",
-            "let mut len = self.num_ctrl_bytes(); debug_assert!(index < len); len = 0; unsafe { self.ctrl.add(index) }",
+            "let mut len = self.num_ctrl_bytes(); assert!(index < len); len = 0; unsafe { self.ctrl.add(index) }",
         ));
         assert!(has_pointer_arithmetic_bounds_guard(
             "unsafe { self.ctrl.add(index) }",
-            "let len = self.num_ctrl_bytes(); debug_assert!(index < len); unsafe { self.ctrl.add(index) }",
+            "let len = self.num_ctrl_bytes(); assert!(index < len); unsafe { self.ctrl.add(index) }",
         ));
     }
 

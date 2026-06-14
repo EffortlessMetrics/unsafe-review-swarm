@@ -1,9 +1,10 @@
 use super::{
     code_context_through_site, compact_code, contains_executable_return, contains_receiver_path,
     contains_simple_assignment_to, has_assignment_to_any_identifier,
-    has_fresh_guard_pattern_for_identifiers, has_open_positive_branch_guard_for_identifiers,
-    is_receiver_path_char, is_simple_identifier, let_binding_name, matching_call_argument_end,
-    matching_code_block_end, strip_block_comments_and_literals,
+    has_fresh_runtime_assert_pattern_for_identifiers,
+    has_open_positive_branch_guard_for_identifiers, is_receiver_path_char, is_simple_identifier,
+    let_binding_name, matching_call_argument_end, matching_code_block_end,
+    strip_block_comments_and_literals,
 };
 use crate::analysis::scanner::ScannedSite;
 use crate::domain::{EvidenceState, OperationFamily};
@@ -758,15 +759,17 @@ fn has_set_len_capacity_predicate_guard(
     receiver: &str,
 ) -> bool {
     let stale_identifiers = set_len_capacity_stale_identifiers(new_len, capacity, receiver);
+    // Only `assert!` is a release-runtime guard; `debug_assert!` is compiled out in release
+    // builds and cannot satisfy a runtime capacity obligation.
+    // `has_fresh_runtime_assert_pattern_for_identifiers` ensures `assert!(` inside
+    // `debug_assert!(` is not credited as a runtime guard.
     [
         format!("assert!({predicate})"),
         format!("assert!({predicate},"),
-        format!("debug_assert!({predicate})"),
-        format!("debug_assert!({predicate},"),
     ]
     .iter()
     .any(|pattern| {
-        has_fresh_guard_pattern_for_identifiers(before_call, pattern, &stale_identifiers)
+        has_fresh_runtime_assert_pattern_for_identifiers(before_call, pattern, &stale_identifiers)
     }) || has_open_positive_branch_guard_for_identifiers(before_call, predicate, &stale_identifiers)
 }
 

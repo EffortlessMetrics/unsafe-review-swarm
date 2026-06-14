@@ -1,7 +1,7 @@
 use super::{
     any_compact_if_condition, branch_still_open_at_operation, condition_has_top_level_conjunct,
     condition_has_top_level_disjunct, contains_executable_return, has_assignment_to_identifier,
-    has_fresh_guard_pattern, matching_code_block_end,
+    has_fresh_runtime_assert_pattern, matching_code_block_end,
 };
 
 pub(super) fn has_u8_bool_value_guard(before_call: &str, argument: &str) -> bool {
@@ -48,11 +48,11 @@ impl<'a> U8BoolValueApplicability<'a> {
     }
 
     fn has_value_predicate_guard(&self, predicate: &str) -> bool {
+        // Only `assert!` is a release-runtime guard; `debug_assert!` is compiled out in release
+        // builds and cannot satisfy a runtime valid-value obligation.
         [
             format!("assert!({predicate})"),
             format!("assert!({predicate},"),
-            format!("debug_assert!({predicate})"),
-            format!("debug_assert!({predicate},"),
         ]
         .iter()
         .any(|pattern| self.has_fresh_assertion_guard(pattern))
@@ -60,7 +60,9 @@ impl<'a> U8BoolValueApplicability<'a> {
     }
 
     fn has_fresh_assertion_guard(&self, pattern: &str) -> bool {
-        has_fresh_guard_pattern(self.before_call, pattern, self.same_source_value_target)
+        // Use `has_fresh_runtime_assert_pattern` so that `assert!(` found inside `debug_assert!(`
+        // is not credited as a release-runtime guard.
+        has_fresh_runtime_assert_pattern(self.before_call, pattern, self.same_source_value_target)
     }
 
     fn has_open_positive_branch_guard(&self, predicate: &str) -> bool {
