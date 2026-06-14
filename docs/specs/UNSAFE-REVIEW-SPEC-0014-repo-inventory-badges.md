@@ -101,6 +101,12 @@ miri_unsupported
 static_unknown
 ```
 
+`unsafe_sites` is the count of unsafe seams discovered by the scanner before
+any `max_cards` cap is applied.  On uncapped runs `unsafe_sites == cards`; on
+capped runs `unsafe_sites >= cards` because spread-selection reduces the card
+output but not the raw site count.  This field is advisory and heuristic — it
+does not prove memory safety, UB-freedom, Miri-clean status, or site-execution.
+
 For diff-backed runs, `changed_files` and `changed_non_rust_files` summarize
 the input diff breadth so mixed-language PRs can show non-Rust scale without
 creating non-Rust ReviewCards or changing the Rust scan candidates.

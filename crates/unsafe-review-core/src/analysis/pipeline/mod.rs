@@ -235,6 +235,11 @@ fn analyze_with_receipts(
         )?;
         last_scanned_path = Some(rel.clone());
     }
+    // Record the total number of unsafe seams discovered before any cap is applied.
+    // This is the value projected as summary.unsafe_sites so that field is distinct
+    // from summary.cards when spread_select_cards reduces the card set below the
+    // full scan count.  On uncapped runs unsafe_sites == cards.
+    let scanned_sites = cards.len();
     // Apply spread-aware card selection when the cap is set and exceeded.
     // After scanning all files we know the full card set, so we can guarantee
     // every source file with cards gets at least one representative card before
@@ -262,6 +267,7 @@ fn analyze_with_receipts(
         changed_files,
         changed_rust_files,
         changed_non_rust_files,
+        scanned_sites,
         &cards,
         &input.scope,
         policy_state.baseline_ids(),
@@ -485,11 +491,15 @@ fn partial_analyze_output(
     };
     let mut cards = cards.to_vec();
     sort_cards(&mut cards);
+    // For partial events the card slice has not yet been capped, so scanned_sites
+    // equals cards.len() — every site found so far has a corresponding card.
+    let scanned_sites = cards.len();
     let summary = summarize(
         rust_files,
         changed_files,
         changed_rust_files,
         changed_non_rust_files,
+        scanned_sites,
         &cards,
         &input.scope,
         baseline_ids,
@@ -6516,6 +6526,77 @@ evidence = "test fixture"
             files_represented.contains(&PathBuf::from("src/z_module.rs")),
             "spread cap must keep a representative card for src/z_module.rs \
              (previously dropped by alphabetical-prefix truncation)"
+        );
+        Ok(())
+    }
+
+    /// Verify that `summary.unsafe_sites` reflects the total number of unsafe
+    /// seams found by the scanner **before** the `max_cards` cap is applied,
+    /// so the field is distinct from `summary.cards` on a capped scan.
+    ///
+    /// Setup: two files each with two unsafe sites → 4 scanned sites total.
+    /// Cap = 1 → summary.cards == 1, summary.unsafe_sites == 4.
+    ///
+    /// Drift-lock: restore `unsafe_sites: cards.len()` in summary.rs → RED.
+    #[test]
+    fn summary_unsafe_sites_counts_pre_cap_sites_distinct_from_cards() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-sites-distinct")?;
+        fs::create_dir_all(root.join("src")).map_err(|err| format!("create dirs failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"sites-distinct-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
+        // Two unsafe sites in lib.rs
+        fs::write(
+            root.join("src/lib.rs"),
+            "pub unsafe fn alpha(ptr: *const u8) -> u8 { unsafe { *ptr } }\n\
+             pub unsafe fn bravo(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+        )
+        .map_err(|err| format!("write src/lib.rs failed: {err}"))?;
+        // Two more unsafe sites in a second file
+        fs::write(
+            root.join("src/z_module.rs"),
+            "pub unsafe fn zulu(ptr: *const u8) -> u8 { unsafe { *ptr } }\n\
+             pub unsafe fn yankee(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+        )
+        .map_err(|err| format!("write src/z_module.rs failed: {err}"))?;
+
+        let output = analyze(AnalyzeInput {
+            root: root.clone(),
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: Some(1),
+        })?;
+
+        let _ = fs::remove_dir_all(&root);
+
+        // The cap limits cards but must NOT hide the total site count.
+        // Each `pub unsafe fn` declaration and the `unsafe { *ptr }` block inside it
+        // are two distinct sites, so 4 functions × 2 = 8 scanned sites total.
+        assert_eq!(
+            output.cards.len(),
+            1,
+            "cap of 1 must yield exactly 1 card in output.cards"
+        );
+        assert_eq!(
+            output.summary.cards, 1,
+            "summary.cards must equal output.cards.len() after capping"
+        );
+        assert!(
+            output.summary.unsafe_sites > output.summary.cards,
+            "on a capped scan unsafe_sites ({}) must exceed cards ({})",
+            output.summary.unsafe_sites,
+            output.summary.cards
+        );
+        assert!(
+            output.summary.unsafe_sites >= 4,
+            "summary.unsafe_sites ({}) must reflect all scanned sites before the cap \
+             (at least 4 unsafe fn/block seams across 4 functions)",
+            output.summary.unsafe_sites
         );
         Ok(())
     }

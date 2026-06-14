@@ -8,6 +8,11 @@ use std::path::PathBuf;
 
 /// Summarize card counts and compute SPEC-0030 movement fields.
 ///
+/// `scanned_sites` is the number of unsafe seams the scanner found in scope,
+/// counted **before** any `max_cards` spread-selection cap is applied.  This
+/// value is projected as `summary.unsafe_sites` so the field is distinct from
+/// `cards` when the card set was capped.  On uncapped runs the two are equal.
+///
 /// **Movement definitions (SPEC-0030)**:
 /// - `new_gaps`: open actionable cards not in the baseline ledger, constrained to
 ///   changed-line sites on a diff-scoped run.
@@ -31,6 +36,7 @@ pub(super) fn summarize(
     changed_files: usize,
     changed_rust_files: usize,
     changed_non_rust_files: usize,
+    scanned_sites: usize,
     cards: &[ReviewCard],
     scope: &Scope,
     baseline_ids: &BTreeSet<String>,
@@ -47,7 +53,7 @@ pub(super) fn summarize(
         changed_files,
         changed_rust_files,
         changed_non_rust_files,
-        unsafe_sites: cards.len(),
+        unsafe_sites: scanned_sites,
         cards: cards.len(),
         ..Summary::default()
     };
