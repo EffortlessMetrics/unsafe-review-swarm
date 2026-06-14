@@ -158,6 +158,16 @@ const NOT_SELECTED_UNKNOWN_FAMILY_REASON: ReviewBudgetReason = ReviewBudgetReaso
     code: "human_deep_review_only",
     message: "operation family unknown",
 };
+/// Applied to an owner/Unknown-family card when a more-specific operation card
+/// from the same changed region is already present. Replaces the generic
+/// `human_deep_review_only` reason for that sub-case so reviewers understand
+/// the owner card is grouped behind the operation card, not simply excluded for
+/// being unknown.
+pub(super) const NOT_SELECTED_COVERED_BY_OPERATION_CARD_REASON: ReviewBudgetReason =
+    ReviewBudgetReason {
+        code: "covered_by_specific_operation_card",
+        message: "owner-contract obligation covered by a more-specific operation card at the same region",
+    };
 const NOT_SELECTED_CONFIDENCE_REASON: ReviewBudgetReason = ReviewBudgetReason {
     code: "lower_relevance",
     message: "confidence below inline comment threshold",
@@ -195,6 +205,31 @@ pub(super) fn non_selection_reason(card: &ReviewCard) -> ReviewBudgetReason {
     } else {
         NOT_SELECTED_POLICY_FALLBACK_REASON
     }
+}
+
+/// Determine whether an owner/Unknown-family card's changed region is already
+/// covered by at least one specific (non-Unknown-family) card in `all_cards`.
+///
+/// "Same region" is defined as the same file. Owner cards (`unsafe fn` sites)
+/// span an entire function body and the specific operation cards they generate
+/// are located inside that function, so file-level co-location is the right
+/// granularity for grouping.
+///
+/// This function is used only for the `not_selected` non-selection reason; it
+/// does not change card identity, evidence counts, or structured artifacts.
+pub(super) fn owner_card_covered_by_specific_operation(
+    owner_card: &ReviewCard,
+    all_cards: &[ReviewCard],
+) -> bool {
+    if !matches!(owner_card.operation.family, OperationFamily::Unknown) {
+        return false;
+    }
+    let owner_file = &owner_card.site.location.file;
+    all_cards.iter().any(|other| {
+        !matches!(other.operation.family, OperationFamily::Unknown)
+            && other.site.changed
+            && &other.site.location.file == owner_file
+    })
 }
 
 /// Derive the primary coverage gap for a card (SPEC-0032).

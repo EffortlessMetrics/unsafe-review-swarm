@@ -13,9 +13,10 @@ use serde::Serialize;
 use std::collections::BTreeSet;
 
 use super::selection::{
-    MAX_COMMENT_BUDGET_REASON, OPERATION_FAMILY_BUDGET_REASON, ReviewBudgetReason, actionability,
-    comment_body, coverage_gap, importance_rank, non_selection_reason, relevance, selection_reason,
-    should_plan_comment,
+    MAX_COMMENT_BUDGET_REASON, NOT_SELECTED_COVERED_BY_OPERATION_CARD_REASON,
+    OPERATION_FAMILY_BUDGET_REASON, ReviewBudgetReason, actionability, comment_body, coverage_gap,
+    importance_rank, non_selection_reason, owner_card_covered_by_specific_operation, relevance,
+    selection_reason, should_plan_comment,
 };
 
 const MAX_PLANNED_COMMENTS: usize = 3;
@@ -74,10 +75,12 @@ impl From<&AnalyzeOutput> for CommentPlan {
             }
         }
         for card in ineligible {
-            not_selected.push(NotSelectedCard::from_reason(
-                card,
-                non_selection_reason(card),
-            ));
+            let reason = if owner_card_covered_by_specific_operation(card, &output.cards) {
+                NOT_SELECTED_COVERED_BY_OPERATION_CARD_REASON
+            } else {
+                non_selection_reason(card)
+            };
+            not_selected.push(NotSelectedCard::from_reason(card, reason));
         }
 
         // Compute before moving comments/not_selected into the struct literal.
