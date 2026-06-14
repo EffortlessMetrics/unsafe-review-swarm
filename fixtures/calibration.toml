@@ -154,6 +154,8 @@ required_core_fixtures = [
   "drop_in_place_reassigned_origin_not_guard",
   "atomic_pointer_state_swap",
   "atomic_pointer_state_fetch_ops",
+  "atomic_pointer_state_swap_not_same_call",
+  "atomic_pointer_state_fetch_not_same_call",
   "unwrap_unchecked_result",
   "unwrap_unchecked_infallible_result",
   "unwrap_unchecked_other_infallible_not_guard",
@@ -2110,6 +2112,20 @@ expected_cards = 3
 expected_class = "requires_loom"
 expected_operation_family = "atomic_pointer_state"
 expected_hazard = "atomic_ordering"
+
+[[cases]]
+fixture = "atomic_pointer_state_swap_not_same_call"
+kind = "false_positive_control"
+claim = "swap + ptr::null_mut + Ordering:: co-occurring on a line but in different sub-expressions does not produce an atomic_pointer_state card (F3-1 same-call binding)"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
+
+[[cases]]
+fixture = "atomic_pointer_state_fetch_not_same_call"
+kind = "false_positive_control"
+claim = "from_ptr( and fetch_or( co-occurring on a line but as separate sub-expressions does not produce an atomic_pointer_state card (F3-2 same-call binding)"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
 
 [[cases]]
 fixture = "unwrap_unchecked_result"
