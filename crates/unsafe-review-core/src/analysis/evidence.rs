@@ -5728,6 +5728,108 @@ fn reaches_read_one_in_integration_test() {
         assert!(related_tests.is_empty());
     }
 
+    #[test]
+    fn reach_evidence_bare_comment_mention_in_cfg_test_not_credited() -> Result<(), String> {
+        // Negative-control: owner mentioned only in a comment inside #[cfg(test)]
+        // block must NOT credit test reach (call-shape requirement).
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src")).map_err(|err| err.to_string())?;
+        fs::write(
+            root.join("src/lib.rs"),
+            r#"
+pub struct Collector { ptr: *mut u8 }
+unsafe impl Send for Collector {}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn check_zero() {
+        // Collector would be useful here, but it is never called.
+        assert_eq!(0, 0);
+    }
+}
+"#,
+        )
+        .map_err(|err| err.to_string())?;
+        let owner = "Collector".to_string();
+
+        let (reach, related_tests) = reach_evidence(&root, Some(&owner));
+
+        fs::remove_dir_all(&root).map_err(|err| err.to_string())?;
+        assert_eq!(
+            reach.state, "unreached",
+            "bare comment mention must NOT credit reach"
+        );
+        assert!(related_tests.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn reach_evidence_self_named_test_fn_not_credited() -> Result<(), String> {
+        // Negative-control: a #[test] fn whose name equals the owner must NOT
+        // self-credit reach (self-reach exclusion).
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src")).map_err(|err| err.to_string())?;
+        fs::write(
+            root.join("src/lib.rs"),
+            r#"
+pub unsafe fn collector(ptr: *mut u8) -> *mut u8 { ptr }
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn collector() {
+        assert_eq!(1 + 1, 2);
+    }
+}
+"#,
+        )
+        .map_err(|err| err.to_string())?;
+        let owner = "collector".to_string();
+
+        let (reach, related_tests) = reach_evidence(&root, Some(&owner));
+
+        fs::remove_dir_all(&root).map_err(|err| err.to_string())?;
+        assert_eq!(
+            reach.state, "unreached",
+            "self-named test fn must NOT self-credit reach"
+        );
+        assert!(related_tests.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn reach_evidence_call_in_cfg_test_credited() -> Result<(), String> {
+        // Positive-control: owner called as a function inside #[cfg(test)] block
+        // must credit test reach.
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src")).map_err(|err| err.to_string())?;
+        fs::write(
+            root.join("src/lib.rs"),
+            r#"
+pub fn compute(x: u32) -> u32 { x }
+
+#[cfg(test)]
+mod tests {
+    use super::compute;
+    #[test]
+    fn calls_compute() {
+        let _ = compute(42);
+    }
+}
+"#,
+        )
+        .map_err(|err| err.to_string())?;
+        let owner = "compute".to_string();
+
+        let (reach, related_tests) = reach_evidence(&root, Some(&owner));
+
+        fs::remove_dir_all(&root).map_err(|err| err.to_string())?;
+        assert_eq!(reach.state, "owner_reached", "call must credit reach");
+        assert!(!related_tests.is_empty());
+        Ok(())
+    }
+
     fn unique_temp_dir() -> Result<PathBuf, String> {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)

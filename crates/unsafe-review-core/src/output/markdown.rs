@@ -1,6 +1,6 @@
 use crate::api::AnalyzeOutput;
 use crate::api::Scope;
-use crate::domain::ReviewCard;
+use crate::domain::{OperationFamily, ReviewCard};
 use crate::output::confirmation::{
     build_this_first, confirmation_step, hypothesis_to_confirm, minimal_repro,
 };
@@ -700,11 +700,29 @@ fn render_minimal_repro_cue(out: &mut String, card: &ReviewCard, label: &str, in
 
 fn render_pr_summary_card_table(out: &mut String, ranked_cards: &[&ReviewCard]) {
     out.push_str("## Card table\n\n");
+
+    // Split into specific-operation cards and owner-contract (Unknown-family) cards.
+    // Owner cards are grouped into a summary line to keep the table focused on
+    // actionable operation cards. All cards remain in cards.json and in evidence
+    // counts; this is a presentation-only grouping.
+    let specific_cards: Vec<&&ReviewCard> = ranked_cards
+        .iter()
+        .filter(|card| !matches!(card.operation.family, OperationFamily::Unknown))
+        .collect();
+    let owner_cards: Vec<&&ReviewCard> = ranked_cards
+        .iter()
+        .filter(|card| matches!(card.operation.family, OperationFamily::Unknown))
+        .collect();
+
+    if specific_cards.is_empty() && owner_cards.is_empty() {
+        return;
+    }
+
     out.push_str(
         "| ID | Class | Proof path | Location | Operation family | Operation | Missing evidence | Route | Next action | Confirmation state |\n",
     );
     out.push_str("|---|---|---|---|---|---|---|---|---|---|\n");
-    for card in ranked_cards {
+    for card in &specific_cards {
         let route = repo_primary_route(card);
         out.push_str(&format!(
             "| `{}` | `{}` | `{}` | {} | `{}` | `{}` | {} | `{}` | {} | {} |\n",
@@ -724,6 +742,39 @@ fn render_pr_summary_card_table(out: &mut String, ranked_cards: &[&ReviewCard]) 
             confirmation_state_label(card)
         ));
     }
+
+    // Render owner-contract cards as a grouped summary row so the table stays
+    // focused on the actionable operation cards. The full list is in cards.json.
+    if !owner_cards.is_empty() {
+        let unsafe_fn_count = owner_cards.len();
+        let location_list: Vec<String> = owner_cards
+            .iter()
+            .map(|card| {
+                format!(
+                    "{}:{}",
+                    path_display(&card.site.location.file),
+                    card.site.location.line
+                )
+            })
+            .collect();
+        let location_summary = if location_list.len() <= 3 {
+            location_list.join(", ")
+        } else {
+            format!(
+                "{} and {} more",
+                location_list[..3].join(", "),
+                location_list.len() - 3
+            )
+        };
+        out.push_str(&format!(
+            "| (grouped) | owner_contract | — | {} | `unknown` | {} owner-contract obligation{} across {} `unsafe fn` {} — see `cards.json` for full list | — | — | — | — |\n",
+            md_cell(&location_summary),
+            unsafe_fn_count,
+            if unsafe_fn_count == 1 { "" } else { "s" },
+            unsafe_fn_count,
+            if unsafe_fn_count == 1 { "site" } else { "sites" },
+        ));
+    }
 }
 
 fn render_pr_summary_witness_plan(out: &mut String, ranked_cards: &[&ReviewCard]) {
@@ -732,7 +783,19 @@ fn render_pr_summary_witness_plan(out: &mut String, ranked_cards: &[&ReviewCard]
         out.push_str("No witness route is recommended because no review cards were emitted.\n\n");
         return;
     }
-    for card in ranked_cards {
+
+    // Split into specific-operation cards and owner-contract (Unknown-family) cards.
+    // Owner cards are grouped into a summary entry. Their full details are in cards.json.
+    let specific_cards: Vec<&&ReviewCard> = ranked_cards
+        .iter()
+        .filter(|card| !matches!(card.operation.family, OperationFamily::Unknown))
+        .collect();
+    let owner_cards: Vec<&&ReviewCard> = ranked_cards
+        .iter()
+        .filter(|card| matches!(card.operation.family, OperationFamily::Unknown))
+        .collect();
+
+    for card in &specific_cards {
         out.push_str(&format!(
             "- `{}` hypothesis: {}\n",
             card.id,
@@ -770,6 +833,22 @@ fn render_pr_summary_witness_plan(out: &mut String, ranked_cards: &[&ReviewCard]
             out.push_str("  - Route: no witness route was selected; route this to human review.\n");
         }
     }
+
+    // Group owner-contract cards into a single summary entry so the witness plan
+    // stays focused on executable witness routes. Full details are in cards.json.
+    if !owner_cards.is_empty() {
+        out.push_str(&format!(
+            "- (grouped) {} owner-contract obligation{} across {} `unsafe fn` {} — see `cards.json` for full list\n",
+            owner_cards.len(),
+            if owner_cards.len() == 1 { "" } else { "s" },
+            owner_cards.len(),
+            if owner_cards.len() == 1 { "site" } else { "sites" },
+        ));
+        out.push_str(
+            "  - Route: `human-deep-review` — add a `# Safety` section naming caller obligations for each site.\n",
+        );
+    }
+
     out.push('\n');
 }
 
@@ -1362,6 +1441,120 @@ mod tests {
             !diff_rendered.contains("| `human` |"),
             "diff markdown must not use bare 'human' fallback for routeless card"
         );
+        Ok(())
+    }
+
+    /// PR summary groups owner cards (Unknown-family) into a summary line in the
+    /// card table and witness plan, rather than listing each one individually.
+    /// The operation cards are still listed individually. cards.json is untouched.
+    ///
+    /// The `attributed_unsafe_fn_no_duplicate` fixture produces both an owner card
+    /// (Unknown-family) and a specific operation card (RawPointerWrite) so both
+    /// grouping and individual listing can be validated in the same render.
+    #[test]
+    fn pr_summary_groups_owner_cards_in_card_table_and_witness_plan() -> Result<(), String> {
+        let output = fixture_output("attributed_unsafe_fn_no_duplicate")?;
+        let rendered = render_pr_summary(&output);
+
+        // Operation card is listed individually in the card table.
+        assert!(
+            rendered.contains("| `raw_pointer_write` |"),
+            "operation card must be listed individually in the card table; rendered:\n{rendered}"
+        );
+
+        // Owner card is NOT listed individually — it is grouped. The owner card's
+        // card ID must not appear as a standalone table row (it appears in the
+        // grouped summary row instead). We check the owner card ID is absent as
+        // an individual row entry rather than checking for the family name, which
+        // legitimately appears in the grouped row.
+        let owner_card_id = output
+            .cards
+            .iter()
+            .find(|c| matches!(c.operation.family, OperationFamily::Unknown))
+            .map(|c| c.id.to_string())
+            .ok_or_else(|| "fixture must have an owner card".to_string())?;
+        assert!(
+            !rendered.contains(&format!("| `{owner_card_id}` |")),
+            "owner card must not appear as an individual table row; rendered:\n{rendered}"
+        );
+
+        // The grouped summary line must be present in the card table.
+        assert!(
+            rendered.contains("owner-contract obligation"),
+            "card table must contain grouped owner-contract summary line; rendered:\n{rendered}"
+        );
+        assert!(
+            rendered.contains("see `cards.json` for full list"),
+            "grouped row must reference cards.json; rendered:\n{rendered}"
+        );
+
+        // The witness plan must show the grouped owner-contract entry.
+        assert!(
+            rendered.contains("(grouped)"),
+            "witness plan must contain grouped owner card entry; rendered:\n{rendered}"
+        );
+        assert!(
+            rendered.contains("human-deep-review"),
+            "grouped owner entry must reference human-deep-review route; rendered:\n{rendered}"
+        );
+
+        // The count of cards in the summary header is unchanged (all cards still counted).
+        let owner_count = output
+            .cards
+            .iter()
+            .filter(|c| matches!(c.operation.family, OperationFamily::Unknown))
+            .count();
+        assert!(
+            owner_count > 0,
+            "fixture must produce at least one owner card for this test to be meaningful"
+        );
+
+        Ok(())
+    }
+
+    /// Guardrail: owner cards are still present in cards.json and in the evidence
+    /// count — they are not deleted by the grouping. Only the pr-summary card table
+    /// and witness plan presentation changes.
+    #[test]
+    fn pr_summary_grouping_does_not_delete_owner_cards_from_output() -> Result<(), String> {
+        let output = fixture_output("attributed_unsafe_fn_no_duplicate")?;
+
+        let owner_cards: Vec<_> = output
+            .cards
+            .iter()
+            .filter(|c| matches!(c.operation.family, OperationFamily::Unknown))
+            .collect();
+        let operation_cards: Vec<_> = output
+            .cards
+            .iter()
+            .filter(|c| !matches!(c.operation.family, OperationFamily::Unknown))
+            .collect();
+
+        assert!(
+            !owner_cards.is_empty(),
+            "fixture must produce at least one owner card"
+        );
+        assert!(
+            !operation_cards.is_empty(),
+            "fixture must produce at least one specific operation card"
+        );
+
+        // All cards are still present in output.cards (the structured artifact source).
+        assert_eq!(
+            output.cards.len(),
+            owner_cards.len() + operation_cards.len(),
+            "all cards must remain in output.cards; none deleted by grouping"
+        );
+
+        // The pr-summary is presentation-only: it groups the human display but
+        // does not remove cards from the structured output.
+        let rendered = render_pr_summary(&output);
+        // The operation card is still individually described in the cockpit (top card).
+        assert!(
+            rendered.contains("raw_pointer_write"),
+            "operation card family must appear in pr-summary cockpit; rendered:\n{rendered}"
+        );
+
         Ok(())
     }
 

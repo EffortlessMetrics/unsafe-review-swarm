@@ -38,9 +38,9 @@
           "summary": "No length or bounds guard code was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `pick_after_shadowed_let_else_get_index`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `pick_after_shadowed_let_else_get_index` was found"
         },
         "witness": {
           "present": false,
@@ -51,7 +51,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `pick_after_shadowed_let_else_get_index`",
+    "reach": "No static test mention of owner `pick_after_shadowed_let_else_get_index` was found",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -69,6 +69,7 @@
     ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
     "next_action": "Add or expose the local guard that discharges the `get_unchecked` safety obligation.",

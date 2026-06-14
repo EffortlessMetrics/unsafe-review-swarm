@@ -1,7 +1,7 @@
 [
   {
     "id": "UR-documented-private-unsafe-fn-fixture-src-lib-rs-private-ctrl-unsafe_fn-unknown-private-ctrl-4f79c7b2ab4a-unknown-c1",
-    "class": "guarded_unwitnessed",
+    "class": "unsafe_unreached",
     "priority": "medium",
     "confidence": "medium",
     "proof_path": "human_review_only",
@@ -38,9 +38,9 @@
           "summary": "Documented private unsafe declaration is a caller-contract site; local guard evidence is not expected at the declaration"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `private_ctrl`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `private_ctrl` was found"
         },
         "witness": {
           "present": false,
@@ -51,7 +51,7 @@
     ],
     "contract": "Nearby `# Safety` documentation was detected",
     "discharge": "Documented private unsafe declaration is a caller-contract site; local guard evidence is not expected at the declaration",
-    "reach": "1 related test file(s) mention owner `private_ctrl`",
+    "reach": "No static test mention of owner `private_ctrl` was found",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -62,12 +62,13 @@
       }
     ],
     "missing": [
+      "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Attach a human deep-review witness receipt or mark the static limitation explicitly.",
+    "next_action": "Add or identify a focused test path that reaches the safe wrapper around this unsafe seam.",
     "verify_commands": [],
     "confirmation_cue": {
-      "hypothesis_to_confirm": "static `guarded_unwitnessed` ReviewCard for `unsafe fn private_ctrl(base: *const u8, index: usize) -> *const u8 {`; confirm with external evidence before treating it as observed runtime behavior",
+      "hypothesis_to_confirm": "static `unsafe_unreached` ReviewCard for `unsafe fn private_ctrl(base: *const u8, index: usize) -> *const u8 {`; confirm with external evidence before treating it as observed runtime behavior",
       "build_this_first": {
         "kind": "witness_route",
         "command": null,
@@ -99,7 +100,7 @@
       "baseline_state": "new",
       "outcome_movement": "regressed",
       "comment_plan_status": "not_eligible",
-      "agent_lsp_readiness": "requires_witness_receipt"
+      "agent_lsp_readiness": "needs_human"
     }
   }
 ]

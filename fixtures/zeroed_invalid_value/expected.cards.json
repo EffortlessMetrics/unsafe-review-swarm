@@ -40,9 +40,9 @@
           "summary": "No obligation-specific guard code was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `invalid_zeroed_nonnull`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `invalid_zeroed_nonnull` was found"
         },
         "witness": {
           "present": false,
@@ -53,7 +53,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `invalid_zeroed_nonnull`",
+    "reach": "No static test mention of owner `invalid_zeroed_nonnull` was found",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -71,6 +71,7 @@
     ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
     "next_action": "Add or expose the local guard that discharges the `zeroed` safety obligation.",

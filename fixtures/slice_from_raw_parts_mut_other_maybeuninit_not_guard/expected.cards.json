@@ -45,9 +45,9 @@
           "summary": "No nullability guard code was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `expose_mut`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `expose_mut` was found"
         },
         "witness": {
           "present": false,
@@ -69,9 +69,9 @@
           "summary": "No alignment guard code was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `expose_mut`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `expose_mut` was found"
         },
         "witness": {
           "present": false,
@@ -93,9 +93,9 @@
           "summary": "No obligation-specific guard code was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `expose_mut`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `expose_mut` was found"
         },
         "witness": {
           "present": false,
@@ -117,9 +117,9 @@
           "summary": "No obligation-specific guard code was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `expose_mut`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `expose_mut` was found"
         },
         "witness": {
           "present": false,
@@ -130,7 +130,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `expose_mut`",
+    "reach": "No static test mention of owner `expose_mut` was found",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -148,6 +148,7 @@
     ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
     "next_action": "Add or expose local guards for these `slice_from_raw_parts` safety obligations: (1) pointer is valid for `len` elements, (2) pointer is aligned for the element type, (3) memory range is initialized, (4) range fits in one allocation.",

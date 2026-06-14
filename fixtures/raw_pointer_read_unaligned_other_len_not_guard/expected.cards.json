@@ -43,9 +43,9 @@
           "summary": "No nullability guard code was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `read_header`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_header` was found"
         },
         "witness": {
           "present": false,
@@ -67,9 +67,9 @@
           "summary": "No length or bounds guard code was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `read_header`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_header` was found"
         },
         "witness": {
           "present": false,
@@ -91,9 +91,9 @@
           "summary": "No obligation-specific guard code was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `read_header`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_header` was found"
         },
         "witness": {
           "present": false,
@@ -115,9 +115,9 @@
           "summary": "No obligation-specific guard code was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `read_header`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_header` was found"
         },
         "witness": {
           "present": false,
@@ -128,7 +128,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `read_header`",
+    "reach": "No static test mention of owner `read_header` was found",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -146,6 +146,7 @@
     ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
     "next_action": "Add or expose local guards for these `raw_pointer_read_unaligned` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) buffer has enough bytes for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",

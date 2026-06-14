@@ -834,6 +834,82 @@ mod tests {
         Ok(())
     }
 
+    /// Owner card whose changed region is covered by a specific operation card gets
+    /// the `covered_by_specific_operation_card` reason instead of the generic
+    /// `human_deep_review_only` reason. The owner card is still present in `not_selected`
+    /// (and therefore in `cards.json` and evidence counts) — it is never deleted.
+    ///
+    /// The `attributed_unsafe_fn_no_duplicate` fixture produces both an owner card
+    /// (Unknown-family, `unsafe fn write_one`) and a specific operation card
+    /// (RawPointerWrite, `core::ptr::write`) in the same file — the exact scenario
+    /// where the richer reason should appear.
+    #[test]
+    fn comment_plan_owner_card_covered_by_operation_card_gets_specific_reason() -> Result<(), String>
+    {
+        let output = fixture_output("attributed_unsafe_fn_no_duplicate")?;
+        let value = parse_json(&render(&output))?;
+
+        // The operation card (raw_pointer_write) is eligible and should be selected.
+        let comments = value["comments"]
+            .as_array()
+            .ok_or_else(|| "comments should be an array".to_string())?;
+        assert!(
+            comments
+                .iter()
+                .any(|c| c["operation_family"] == "raw_pointer_write"),
+            "operation card (raw_pointer_write) must be selected; got: {value}"
+        );
+
+        // The owner card (unknown family) must appear in not_selected.
+        let not_selected = value["not_selected"]
+            .as_array()
+            .ok_or_else(|| "not_selected should be an array".to_string())?;
+        let owner_entry = not_selected
+            .iter()
+            .find(|c| c["operation_family"] == "unknown")
+            .ok_or_else(|| {
+                format!("owner card (unknown family) must be in not_selected; got: {value}")
+            })?;
+        assert_eq!(
+            owner_entry["reason_code"], "covered_by_specific_operation_card",
+            "owner card covered by operation card must get the specific reason code; got: {}",
+            owner_entry["reason_code"]
+        );
+        assert_eq!(
+            owner_entry["reason"],
+            "owner-contract obligation covered by a more-specific operation card at the same region",
+        );
+        Ok(())
+    }
+
+    /// Guardrail: owner card NOT covered by a specific operation card on the same
+    /// file still gets the generic `human_deep_review_only` / `operation family unknown`
+    /// reason (not the new covered reason).
+    #[test]
+    fn comment_plan_uncovered_owner_card_keeps_generic_unknown_family_reason() -> Result<(), String>
+    {
+        let output = fixture_output("public_unsafe_fn_missing_safety")?;
+        let value = parse_json(&render(&output))?;
+
+        // This fixture has only the owner card (no specific operation card).
+        let not_selected = value["not_selected"]
+            .as_array()
+            .ok_or_else(|| "not_selected should be an array".to_string())?;
+        let owner_entry = not_selected
+            .iter()
+            .find(|c| c["operation_family"] == "unknown")
+            .ok_or_else(|| {
+                "owner card must be in not_selected for public_unsafe_fn_missing_safety".to_string()
+            })?;
+        assert_eq!(
+            owner_entry["reason_code"], "human_deep_review_only",
+            "owner card without a covering operation card must keep the generic reason; got: {}",
+            owner_entry["reason_code"]
+        );
+        assert_eq!(owner_entry["reason"], "operation family unknown");
+        Ok(())
+    }
+
     /// Drift-lock: `no_changed_gaps` IS emitted only when there are truly no cards at all
     /// (both comments and not_selected are empty), matching the human/witness surface semantics.
     #[test]

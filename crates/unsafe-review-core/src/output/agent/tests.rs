@@ -103,7 +103,7 @@ fn agent_packet_is_parseable_bounded_and_card_sourced() -> Result<(), String> {
     );
     assert_eq!(
         value["source_context"]["related_tests"][0]["name"],
-        "read_header"
+        "reads_header"
     );
     assert!(
         serde_json::to_string(&value["source_context"]["limits"])

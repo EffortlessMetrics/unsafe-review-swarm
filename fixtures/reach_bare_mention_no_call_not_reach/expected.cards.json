@@ -1,0 +1,117 @@
+[
+  {
+    "id": "UR-reach-bare-mention-no-call-not-reach-src-lib-rs-collector-unsafe_impl_send-unsafe_impl_send_sync-unsafe-impl-send-sync-d827dc12f017-send_sync_invariant-c1",
+    "class": "requires_loom",
+    "priority": "high",
+    "confidence": "medium",
+    "proof_path": "mutation_miri_model",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 10,
+      "column": 1,
+      "kind": "unsafe_impl_send",
+      "owner": "Collector",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe impl Send for Collector {}"
+    },
+    "operation": "unsafe impl Send for Collector {}",
+    "operation_family": "unsafe_impl_send_sync",
+    "hazards": [
+      "send_sync_invariant",
+      "atomic_ordering"
+    ],
+    "obligations": [
+      "internal mutation and aliasing invariants uphold Send/Sync contract"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "thread-safety",
+        "description": "internal mutation and aliasing invariants uphold Send/Sync contract",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `Collector` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "No visible local guard detected",
+    "reach": "No static test mention of owner `Collector` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "loom",
+        "reason": "Concurrency or shared-mutable-state hazard; interleaving model is a better first witness than Miri alone",
+        "command": "cargo test Collector_loom -- --nocapture",
+        "required": false
+      },
+      {
+        "kind": "shuttle",
+        "reason": "Shuttle can explore scheduler interleavings for focused concurrency invariants",
+        "command": "cargo test Collector_shuttle -- --nocapture",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or update a Loom/Shuttle model for the changed concurrency invariant.",
+    "verify_commands": [
+      "cargo test Collector_loom -- --nocapture",
+      "cargo test Collector_shuttle -- --nocapture"
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `requires_loom` ReviewCard for `unsafe impl Send for Collector {}`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo test Collector_loom -- --nocapture",
+        "route_kind": "loom",
+        "summary": "Build/run `cargo test Collector_loom -- --nocapture` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo test Collector_loom -- --nocapture",
+        "route_kind": "loom",
+        "steps": [
+          "Confirm ReviewCard `UR-reach-bare-mention-no-call-not-reach-src-lib-rs-collector-unsafe_impl_send-unsafe_impl_send_sync-unsafe-impl-send-sync-d827dc12f017-send_sync_invariant-c1` still maps to `unsafe impl Send for Collector {}` at `src/lib.rs:10:1` before upgrading confidence.",
+          "Build/run `cargo test Collector_loom -- --nocapture` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo test Collector_loom -- --nocapture` first, then attach a matching receipt if it confirms the route",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "present",
+      "guard_coverage": "missing",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "selected",
+      "agent_lsp_readiness": "requires_witness_receipt"
+    }
+  }
+]
