@@ -25,5 +25,7 @@ pub(super) fn alignment_discharge_state(site: &ScannedSite, lower: &str) -> Evid
 }
 
 fn has_debug_assert_hint(lower: &str) -> bool {
-    lower.contains("debug_assert!(") || lower.contains("debug_assert_eq!(") || lower.contains("debug_assert_ne!(")
+    lower.contains("debug_assert!(")
+        || lower.contains("debug_assert_eq!(")
+        || lower.contains("debug_assert_ne!(")
 }
