@@ -1,0 +1,27 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,22 @@
++/// A safe buffer type with a safe `set_len` method that does bounds-checked truncation.
++/// Calling this method outside any unsafe scope must not produce a ReviewCard.
++pub struct SafeBuffer {
++    data: Vec<u8>,
++}
++
++impl SafeBuffer {
++    pub fn new(capacity: usize) -> Self {
++        SafeBuffer {
++            data: Vec::with_capacity(capacity),
++        }
++    }
++
++    /// Safe `set_len` that only shrinks — no unsafe involved.
++    pub fn set_len(&mut self, new_len: usize) {
++        self.data.truncate(new_len);
++    }
++}
++
++/// Safe caller that invokes the safe `SafeBuffer::set_len` — must not produce a card.
++pub fn shrink(buf: &mut SafeBuffer, len: usize) {
++    buf.set_len(len);
++}

@@ -1,0 +1,26 @@
+/// A safe counter type with a safe `zeroed` constructor that returns a zero-valued instance.
+/// Calling this constructor outside any unsafe scope must not produce a ReviewCard.
+#[derive(Debug, Default, PartialEq, Eq)]
+pub struct Counter {
+    value: u64,
+}
+
+impl Counter {
+    /// Safe `zeroed` constructor — returns a counter at zero, no unsafe involved.
+    pub fn zeroed() -> Self {
+        Counter { value: 0 }
+    }
+
+    pub fn increment(&mut self) {
+        self.value += 1;
+    }
+
+    pub fn get(&self) -> u64 {
+        self.value
+    }
+}
+
+/// Safe caller that invokes the safe `Counter::zeroed` — must not produce a card.
+pub fn new_counter() -> Counter {
+    Counter::zeroed()
+}

@@ -1600,6 +1600,11 @@ fixtures = [
   "adjacent_unchanged_unsafe_fn_no_card",
   "unsafe_fn_pointer_field_no_cards",
   "pointer_arithmetic_safe_method_add_no_cards",
+  "set_len_safe_method_no_cards",
+  "from_raw_parts_safe_ctor_no_cards",
+  "assume_init_safe_method_no_cards",
+  "from_utf8_unchecked_safe_wrapper_no_cards",
+  "zeroed_safe_wrapper_no_cards",
 ]
 dogfood_targets = []
 label_ledgers = [
@@ -1608,8 +1613,8 @@ label_ledgers = [
 labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned no-card behavior for the listed safe, import-only, cfg-only,
-reference-type, unchanged-adjacent, and fn-pointer-type fixtures emits zero
-ReviewCards without saying the repo is safe.
+reference-type, unchanged-adjacent, fn-pointer-type, and safe-method-call
+fixtures emits zero ReviewCards without saying the repo is safe.
 """
 forbidden_claims = [
   "all clear",

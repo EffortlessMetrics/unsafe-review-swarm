@@ -1,0 +1,27 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,22 @@
++/// A safe view type with a safe `from_raw_parts` constructor that takes typed references.
++/// Calling this constructor outside any unsafe scope must not produce a ReviewCard.
++#[derive(Debug)]
++pub struct View<'a> {
++    data: &'a [u8],
++    offset: usize,
++}
++
++impl<'a> View<'a> {
++    /// Safe constructor — takes a slice reference, not a raw pointer.
++    pub fn from_raw_parts(data: &'a [u8], offset: usize) -> Self {
++        View { data, offset }
++    }
++
++    pub fn len(&self) -> usize {
++        self.data.len().saturating_sub(self.offset)
++    }
++}
++
++/// Safe caller that invokes the safe `View::from_raw_parts` — must not produce a card.
++pub fn view_of(data: &[u8]) -> View<'_> {
++    View::from_raw_parts(data, 0)
++}

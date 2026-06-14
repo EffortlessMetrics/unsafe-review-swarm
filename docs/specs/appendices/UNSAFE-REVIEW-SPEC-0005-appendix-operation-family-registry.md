@@ -2,7 +2,7 @@
 
 Status: accepted
 Owner: core/spec
-Updated: 2026-06-03
+Updated: 2026-06-13
 Normative owner: ../UNSAFE-REVIEW-SPEC-0005-hazard-taxonomy-and-obligations.md
 
 This appendix provides the canonical operation-family table referenced by Spec 0005 for promoted or fixture-backed rows. It is intentionally scoped to the current `ReviewCard` registry and must not invent operation names, hazards, evidence lanes, or witness claims that the implementation does not emit.
@@ -58,11 +58,14 @@ and `adjacent_unchanged_unsafe_fn_no_card` and `unsafe_fn_pointer_field_no_cards
 pin safe Rust, safe reference derefs, import-only text, cfg predicates, `'static
 mut` reference type text, unchanged adjacent unsafe declarations, and
 `unsafe fn(...)` fn-pointer types in field/type position as no-card cases.
-`adjacent_unchanged_unsafe_fn_no_card`, and
-`pointer_arithmetic_safe_method_add_no_cards` pin safe Rust, safe reference
-derefs, import-only text, cfg predicates, `'static mut` reference type text,
-unchanged adjacent unsafe declarations, and safe inherent `.add()` methods
-outside any unsafe scope as no-card cases.
+The following fixtures pin safe inherent method/constructor calls with the same
+name as stdlib unsafe operations when called outside any unsafe scope (no unsafe
+block and not inside an unsafe fn body) as no-card cases: pointer_arithmetic_safe_method_add_no_cards,
+set_len_safe_method_no_cards, from_raw_parts_safe_ctor_no_cards,
+assume_init_safe_method_no_cards, from_utf8_unchecked_safe_wrapper_no_cards,
+and zeroed_safe_wrapper_no_cards.  These controls verify the F1 bare-name scope
+gate: a same-named call in safe context is not the stdlib operation and must not
+produce a ReviewCard.
 
 ## Precedence
 

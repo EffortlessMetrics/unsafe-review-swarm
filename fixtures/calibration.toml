@@ -105,6 +105,7 @@ required_core_fixtures = [
   "maybeuninit_assume_init_mut",
   "maybeuninit_assume_init_drop",
   "assume_init_definition_no_cards",
+  "assume_init_safe_method_no_cards",
   "vec_set_len",
   "vec_set_len_comment_not_guard",
   "vec_set_len_initialized_loop",
@@ -147,6 +148,7 @@ required_core_fixtures = [
   "vec_set_len_len_read_cap_guard_not_guard",
   "vec_set_len_len_and_cap_guard",
   "set_len_definition_no_cards",
+  "set_len_safe_method_no_cards",
   "drop_in_place_deallocation",
   "drop_in_place_box_origin",
   "drop_in_place_reassigned_origin_not_guard",
@@ -388,9 +390,11 @@ required_core_fixtures = [
   "str_from_utf8_unchecked_match_ok_reassigned_not_guard",
   "str_from_utf8_unchecked_match_ok_shadowed_not_guard",
   "from_utf8_unchecked_definition_no_cards",
+  "from_utf8_unchecked_safe_wrapper_no_cards",
   "zeroed_invalid_value",
   "zeroed_valid_u32",
   "zeroed_definition_no_cards",
+  "zeroed_safe_wrapper_no_cards",
   "zeroed_call_still_cards",
   "inline_asm_human_review",
   "raw_pointer_read_volatile",
@@ -423,6 +427,7 @@ required_core_fixtures = [
   "slice_from_raw_parts_mut_maybeuninit",
   "slice_from_raw_parts_mut_other_maybeuninit_not_guard",
   "slice_from_raw_parts_definition_no_cards",
+  "from_raw_parts_safe_ctor_no_cards",
   "vec_from_raw_parts",
   "vec_from_raw_parts_capacity_guard",
   "vec_from_raw_parts_capacity_assert_guard",
@@ -1626,6 +1631,13 @@ support_tier = "Core operation smoke slice"
 expected_cards = 0
 
 [[cases]]
+fixture = "assume_init_safe_method_no_cards"
+kind = "false_positive_control"
+claim = "a safe inherent assume_init() method called outside any unsafe scope is not carded as MaybeUninit::assume_init"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
+
+[[cases]]
 fixture = "vec_set_len"
 kind = "positive"
 claim = "Vec::set_len reports missing initialized-range and capacity evidence"
@@ -2039,6 +2051,13 @@ expected_hazard = "initialized_memory"
 fixture = "set_len_definition_no_cards"
 kind = "false_positive_control"
 claim = "a safe fn set_len() definition header is not carded as a Vec::set_len call"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
+
+[[cases]]
+fixture = "set_len_safe_method_no_cards"
+kind = "false_positive_control"
+claim = "a safe inherent set_len() method called outside any unsafe scope is not carded as Vec::set_len"
 support_tier = "Core operation smoke slice"
 expected_cards = 0
 
@@ -4450,6 +4469,13 @@ support_tier = "Core operation smoke slice"
 expected_cards = 0
 
 [[cases]]
+fixture = "from_utf8_unchecked_safe_wrapper_no_cards"
+kind = "false_positive_control"
+claim = "a safe inherent from_utf8_unchecked() method called outside any unsafe scope is not carded as str::from_utf8_unchecked"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
+
+[[cases]]
 fixture = "zeroed_invalid_value"
 kind = "positive"
 claim = "mem::zeroed reports valid-zero obligations instead of a generic unsafe function call"
@@ -4473,6 +4499,13 @@ expected_hazard = "invalid_value"
 fixture = "zeroed_definition_no_cards"
 kind = "false_positive_control"
 claim = "a safe fn zeroed() definition is not carded as a mem::zeroed call"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
+
+[[cases]]
+fixture = "zeroed_safe_wrapper_no_cards"
+kind = "false_positive_control"
+claim = "a safe inherent zeroed() method called outside any unsafe scope is not carded as mem::zeroed"
 support_tier = "Core operation smoke slice"
 expected_cards = 0
 
@@ -4787,6 +4820,13 @@ expected_hazard = "initialized_memory"
 fixture = "slice_from_raw_parts_definition_no_cards"
 kind = "false_positive_control"
 claim = "a safe fn from_raw_parts() definition header is not carded as a slice::from_raw_parts call"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
+
+[[cases]]
+fixture = "from_raw_parts_safe_ctor_no_cards"
+kind = "false_positive_control"
+claim = "a safe inherent from_raw_parts() constructor called outside any unsafe scope is not carded as slice::from_raw_parts"
 support_tier = "Core operation smoke slice"
 expected_cards = 0
 

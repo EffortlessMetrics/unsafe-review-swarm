@@ -73,3 +73,43 @@ kind = "false_positive_control"
 expected_cards = 0
 label_source = "fixture_golden"
 rationale = "A safe inherent `.add()` method on a non-pointer newtype called outside any unsafe scope is not pointer arithmetic and must not produce a ReviewCard."
+
+[[samples]]
+id = "safe-set-len-method-outside-unsafe-scope-emits-no-cards"
+fixture = "set_len_safe_method_no_cards"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "A safe inherent `set_len()` method called outside any unsafe scope is not Vec::set_len and must not produce a ReviewCard."
+
+[[samples]]
+id = "safe-from-raw-parts-ctor-outside-unsafe-scope-emits-no-cards"
+fixture = "from_raw_parts_safe_ctor_no_cards"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "A safe inherent `from_raw_parts()` constructor called outside any unsafe scope is not slice::from_raw_parts and must not produce a ReviewCard."
+
+[[samples]]
+id = "safe-assume-init-method-outside-unsafe-scope-emits-no-cards"
+fixture = "assume_init_safe_method_no_cards"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "A safe inherent `assume_init()` method called outside any unsafe scope is not MaybeUninit::assume_init and must not produce a ReviewCard."
+
+[[samples]]
+id = "safe-from-utf8-unchecked-method-outside-unsafe-scope-emits-no-cards"
+fixture = "from_utf8_unchecked_safe_wrapper_no_cards"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "A safe inherent `from_utf8_unchecked()` method called outside any unsafe scope is not str::from_utf8_unchecked and must not produce a ReviewCard."
+
+[[samples]]
+id = "safe-zeroed-method-outside-unsafe-scope-emits-no-cards"
+fixture = "zeroed_safe_wrapper_no_cards"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "A safe inherent `zeroed()` constructor called outside any unsafe scope is not mem::zeroed and must not produce a ReviewCard."

@@ -31,11 +31,28 @@ pub(super) fn sites(
         let Some((kind, family)) = detect_site(detection_trimmed) else {
             continue;
         };
-        // Gate bare `.add`/`.offset` PointerArithmetic on syntactic unsafe scope.
-        // Raw-pointer arithmetic is only legal inside `unsafe { }` blocks or `unsafe fn`
-        // bodies; a match outside that scope is a false positive (e.g. safe bitflag `.add`).
+        // Gate bare-name call-site families on syntactic unsafe scope.
+        // These operations are only legal inside `unsafe { }` blocks or `unsafe fn`
+        // bodies by Rust's rules.  A same-named call outside both is a safe method
+        // and must not produce a ReviewCard (mirrors the scanner.rs CALL_EXPR arm gate).
+        //
+        // Families covered:
+        // - PointerArithmetic     (.add/.offset/.sub on raw pointers)
+        // - VecSetLen             (vec.set_len(n))
+        // - SliceFromRawParts     (slice::from_raw_parts / _mut)
+        // - MaybeUninitAssumeInit (assume_init and variants)
+        // - StrFromUtf8Unchecked  (str::from_utf8_unchecked)
+        // - Zeroed                (mem::zeroed)
         if kind == UnsafeSiteKind::Operation
-            && family == OperationFamily::PointerArithmetic
+            && matches!(
+                family,
+                OperationFamily::PointerArithmetic
+                    | OperationFamily::VecSetLen
+                    | OperationFamily::SliceFromRawParts
+                    | OperationFamily::MaybeUninitAssumeInit
+                    | OperationFamily::StrFromUtf8Unchecked
+                    | OperationFamily::Zeroed
+            )
             && !in_unsafe_block[idx]
             && !line_is_in_unsafe_fn(lines, idx)
         {

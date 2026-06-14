@@ -1,0 +1,5 @@
+[package]
+name = "from-raw-parts-safe-ctor-no-cards"
+version = "0.0.0"
+edition = "2024"
+publish = false

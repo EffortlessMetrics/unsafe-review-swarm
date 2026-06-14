@@ -806,15 +806,29 @@ fn detect_syntax_site(
         }
         "CALL_EXPR" | "METHOD_CALL_EXPR" | "MACRO_EXPR" => {
             let result = detect_site(&syntax_detection_text(&compact));
-            // Gate bare `.add`/`.offset` PointerArithmetic on syntactic unsafe scope.
-            // Raw-pointer arithmetic is only legal inside `unsafe { }` blocks or
-            // `unsafe fn` bodies.  A call site outside both (e.g. a safe bitflag
-            // `.add` combinator) must not produce a card.
+            // Gate bare-name call-site families on syntactic unsafe scope.
+            // These operations are only legal inside `unsafe { }` blocks or `unsafe fn`
+            // bodies by Rust's rules.  A same-named call outside both is a safe method
+            // (e.g. a bitflag `.add`, a custom `set_len`, a wrapper `from_raw_parts`)
+            // and must not produce a ReviewCard.
+            //
+            // Families covered (mirrors #1693's PointerArithmetic gate):
+            // - PointerArithmetic     (.add/.offset/.sub on raw pointers)
+            // - VecSetLen             (vec.set_len(n))
+            // - SliceFromRawParts     (slice::from_raw_parts / _mut)
+            // - MaybeUninitAssumeInit (assume_init and variants)
+            // - StrFromUtf8Unchecked  (str::from_utf8_unchecked)
+            // - Zeroed                (mem::zeroed)
             if matches!(
                 result,
                 Some((
                     UnsafeSiteKind::Operation,
                     OperationFamily::PointerArithmetic
+                        | OperationFamily::VecSetLen
+                        | OperationFamily::SliceFromRawParts
+                        | OperationFamily::MaybeUninitAssumeInit
+                        | OperationFamily::StrFromUtf8Unchecked
+                        | OperationFamily::Zeroed,
                 ))
             ) && !is_inside_range(fact, unsafe_block_ranges)
                 && !is_inside_range(fact, unsafe_fn_ranges)

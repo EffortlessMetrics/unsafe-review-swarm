@@ -1,0 +1,32 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,27 @@
++/// A safe initializer type with a safe `assume_init` method that validates state.
++/// Calling this method outside any unsafe scope must not produce a ReviewCard.
++pub struct Initializer {
++    value: Option<u32>,
++}
++
++impl Initializer {
++    pub fn new() -> Self {
++        Initializer { value: None }
++    }
++
++    pub fn write(&mut self, v: u32) {
++        self.value = Some(v);
++    }
++
++    /// Safe `assume_init` that panics if the value has not been written — no unsafe involved.
++    pub fn assume_init(self) -> u32 {
++        self.value
++            .unwrap_or_else(|| panic!("assume_init called before write"))
++    }
++}
++
++/// Safe caller that invokes the safe `Initializer::assume_init` — must not produce a card.
++pub fn init_value() -> u32 {
++    let mut init = Initializer::new();
++    init.write(42);
++    init.assume_init()
++}
