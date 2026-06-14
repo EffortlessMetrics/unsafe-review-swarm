@@ -27,14 +27,28 @@ fn open_actionable_count(summary: &Summary) -> usize {
     }
 }
 
-/// Return the evidence-quality count for the `unsafe-review+` badge (SPEC-0031).
+/// Return the baseline-movement-aware evidence-quality count for the `unsafe-review+` badge
+/// (SPEC-0031).
 ///
-/// `contract_missing + guard_missing + guarded_unwitnessed` already excludes
-/// `BaselineKnown` cards (which are reclassified before those counters are incremented),
-/// so the count is inherently baseline-aware when a baseline is present and falls back
-/// to the raw total when no baseline exists.
+/// `contract_missing + guard_missing + guarded_unwitnessed` counts only NEW (non-baseline)
+/// cards by class — `BaselineKnown` cards fall through the class match and are not
+/// incremented in those buckets.  However, `worsened_gaps` are `BaselineKnown` cards whose
+/// evidence-quality slots regressed versus the saved snapshot.  A worsened baseline card
+/// the main badge counts as a movement-relevant gap must also be reflected in the plus count.
+///
+/// When a recorded baseline is present, add `worsened_gaps` to the slot-bucket total so the
+/// plus badge and the main badge use compatible movement semantics.  When no baseline exists
+/// fall back to the raw slot-bucket total (the "no floor set yet" reading).
 fn evidence_quality_count(summary: &Summary) -> usize {
-    summary.contract_missing + summary.guard_missing + summary.guarded_unwitnessed
+    let slot_gaps = summary.contract_missing + summary.guard_missing + summary.guarded_unwitnessed;
+    if has_baseline(summary) {
+        // `worsened_gaps` are BaselineKnown cards whose evidence-quality regressed; they are
+        // not included in the slot-bucket counters above.  Adding them here makes the plus
+        // badge movement-compatible with the main badge (SPEC-0031 §counts-are-baseline-aware).
+        slot_gaps + summary.worsened_gaps
+    } else {
+        slot_gaps
+    }
 }
 
 /// A recorded baseline floor is present when at least one card is inherited (still open,
@@ -274,7 +288,13 @@ mod tests {
         Ok(())
     }
 
-    /// SPEC-0031: when worsened_gaps > 0 (coverage regression), those count in the baseline-aware badge.
+    /// SPEC-0031: when worsened_gaps > 0 (coverage regression), those count in the baseline-aware
+    /// badge for both the main badge and the plus badge.
+    ///
+    /// Worsened baseline cards are `BaselineKnown` class so they do not appear in the
+    /// `contract_missing` / `guard_missing` / `guarded_unwitnessed` slot-bucket counters.
+    /// The plus badge must add `worsened_gaps` explicitly to be movement-compatible with the
+    /// main badge (bug #1687: plus badge was not baseline-movement-aware before this fix).
     #[test]
     fn baseline_aware_badge_includes_worsened_gaps() -> Result<(), String> {
         let output = AnalyzeOutput {
@@ -299,15 +319,89 @@ mod tests {
             diff_scoped_files: BTreeSet::new(),
             coverage_snapshot: BTreeMap::new(),
         };
-        let (main, _plus) = render(&output);
+        let (main, plus) = render(&output);
         let main = parse_json(&main)?;
+        let plus = parse_json(&plus)?;
 
         // Main badge = new_gaps + worsened_gaps = 2 + 1 = 3
         assert_eq!(
             main["message"], "3",
             "baseline-present badge must include worsened_gaps in the count"
         );
+        // Plus badge = (contract_missing + guard_missing + guarded_unwitnessed) + worsened_gaps
+        //            = (1 + 1 + 0) + 1 = 3
+        // Worsened baseline cards are BaselineKnown and do not appear in the slot buckets;
+        // adding worsened_gaps makes the plus badge movement-compatible with the main badge.
+        assert_eq!(
+            plus["message"], "3",
+            "plus badge must include worsened_gaps to be movement-compatible with main badge (bug #1687)"
+        );
         assert_shields_endpoint_fields_only(&main)?;
+        assert_shields_endpoint_fields_only(&plus)?;
+        Ok(())
+    }
+
+    /// SPEC-0031 bug #1687: plus badge brownfield scenario — worsened baseline card must not
+    /// be silently dropped from the plus badge count.
+    ///
+    /// A brownfield repo with a baseline floor that has inherited debt plus a worsened card
+    /// should show the worsened card in BOTH badges consistently.  Before the fix the plus
+    /// badge counted only slot-bucket classes and silently dropped worsened BaselineKnown cards.
+    #[test]
+    fn plus_badge_brownfield_worsened_not_silently_dropped() -> Result<(), String> {
+        let output = AnalyzeOutput {
+            schema_version: "0.1".to_string(),
+            tool: "unsafe-review".to_string(),
+            root: PathBuf::from("."),
+            scope: Scope::Repo,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            summary: Summary {
+                // 0 new open-actionable cards; 1 inherited baseline card that worsened
+                open_actionable_gaps: 0,
+                new_gaps: 0,
+                worsened_gaps: 1,
+                inherited_gaps: 4,
+                resolved_gaps: 0,
+                // Slot-bucket counters are 0 because the only actionable concern is a worsened
+                // BaselineKnown card (class BaselineKnown does not increment these counters).
+                contract_missing: 0,
+                guard_missing: 0,
+                guarded_unwitnessed: 0,
+                ..Summary::default()
+            },
+            cards: Vec::new(),
+            diff_scoped_files: BTreeSet::new(),
+            coverage_snapshot: BTreeMap::new(),
+        };
+        let (main, plus) = render(&output);
+        let main = parse_json(&main)?;
+        let plus = parse_json(&plus)?;
+
+        // Main badge: baseline present, so new_gaps + worsened_gaps = 0 + 1 = 1.
+        assert_eq!(
+            main["message"], "1",
+            "main badge must count worsened_gaps when baseline is present"
+        );
+        // Plus badge MUST also show 1, not 0.
+        // Before the fix this would return "0" (silent drop) because worsened BaselineKnown
+        // cards were not included in the slot-bucket counters.
+        assert_eq!(
+            plus["message"], "1",
+            "plus badge must not silently drop worsened baseline cards (bug #1687)"
+        );
+        assert_shields_endpoint_fields_only(&main)?;
+        assert_shields_endpoint_fields_only(&plus)?;
+        assert_badge_endpoint_contract(
+            "unsafe-review",
+            "unsafe_review",
+            &serde_json::to_string(&main).map_err(|e| e.to_string())?,
+        )?;
+        assert_badge_endpoint_contract(
+            "unsafe-review+",
+            "unsafe_review_plus",
+            &serde_json::to_string(&plus).map_err(|e| e.to_string())?,
+        )?;
         Ok(())
     }
 
