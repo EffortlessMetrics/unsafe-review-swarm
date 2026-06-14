@@ -3,7 +3,7 @@ use crate::domain::{ReviewCard, ReviewClass, WitnessRoute};
 use crate::output::REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY;
 use crate::util::path_display;
 use serde::Serialize;
-use std::collections::BTreeSet;
+use std::collections::BTreeMap;
 
 const SARIF_SCHEMA: &str =
     "https://docs.oasis-open.org/sarif/sarif/v2.1.0/cs01/schemas/sarif-schema-2.1.0.json";
@@ -243,23 +243,67 @@ impl From<&WitnessRoute> for SarifWitnessRoute {
 }
 
 fn sarif_rules(output: &AnalyzeOutput) -> Vec<SarifRule> {
-    let mut classes = BTreeSet::new();
+    // Collect one rule per distinct class string; use BTreeMap to deduplicate
+    // while preserving the class-aware description for each id.
+    let mut classes: BTreeMap<&'static str, &'static str> = BTreeMap::new();
     for card in &output.cards {
-        classes.insert(card.class.as_str());
+        classes
+            .entry(card.class.as_str())
+            .or_insert_with(|| sarif_rule_description(&card.class));
     }
     classes
         .into_iter()
-        .map(|id| SarifRule {
+        .map(|(id, description)| SarifRule {
             id,
             short_description: SarifText {
                 text: format!("unsafe-review {id}"),
             },
             full_description: SarifText {
-                text: "Review-card finding for missing unsafe contract evidence.".to_string(),
+                text: description.to_string(),
             },
             help_uri: "https://github.com/EffortlessMetrics/unsafe-review",
         })
         .collect()
+}
+
+/// Return a rule-level description that matches the class's own evidence state.
+/// Actionable classes (missing evidence) get missing-evidence wording; closed
+/// classes (evidence present, baselined, or suppressed) get descriptions that
+/// do not contradict the card's own evidence.  No proof, UB-free, or
+/// Miri-clean claims — advisory boundary is always preserved.
+fn sarif_rule_description(class: &ReviewClass) -> &'static str {
+    match class {
+        // Non-actionable: evidence is present or the card is administratively closed.
+        ReviewClass::GuardedAndWitnessed => {
+            "Review-card finding: unsafe code has a safety contract, guard, and witness receipt."
+        }
+        ReviewClass::BaselineKnown => {
+            "Review-card finding: unsafe code is tracked in the baseline; gap is inherited, not new."
+        }
+        ReviewClass::Suppressed => {
+            "Review-card finding: unsafe code is suppressed by the policy ledger; review the suppression entry."
+        }
+        // Actionable: evidence is missing or incomplete — keep the missing-evidence wording.
+        ReviewClass::ContractMissing => "Review-card finding for missing unsafe contract evidence.",
+        ReviewClass::GuardMissing => "Review-card finding for missing unsafe contract evidence.",
+        ReviewClass::ReachableUnwitnessed => {
+            "Review-card finding for missing unsafe contract evidence."
+        }
+        ReviewClass::GuardedUnwitnessed => {
+            "Review-card finding for missing unsafe contract evidence."
+        }
+        ReviewClass::UnsafeUnreached => "Review-card finding for missing unsafe contract evidence.",
+        ReviewClass::WitnessMismatch => "Review-card finding for missing unsafe contract evidence.",
+        ReviewClass::RequiresLoom => "Review-card finding for missing unsafe contract evidence.",
+        ReviewClass::RequiresSanitizer => {
+            "Review-card finding for missing unsafe contract evidence."
+        }
+        ReviewClass::RequiresKaniOrCrux => {
+            "Review-card finding for missing unsafe contract evidence."
+        }
+        ReviewClass::MiriUnsupported => "Review-card finding for missing unsafe contract evidence.",
+        ReviewClass::StaticUnknown => "Review-card finding for missing unsafe contract evidence.",
+    }
 }
 
 fn sarif_level(class: &ReviewClass) -> &'static str {
@@ -395,6 +439,96 @@ mod tests {
             assert_eq!(class.as_str(), expected_rule_id);
             assert_eq!(sarif_level(&class), expected_level);
         }
+    }
+
+    /// Verify that non-actionable classes carry descriptions that do NOT
+    /// say "missing evidence", while actionable classes retain that wording.
+    /// This is the regression guard for output-audit finding #1687 (finding 2).
+    #[test]
+    fn sarif_rule_description_is_class_aware_not_always_missing_evidence() {
+        // Non-actionable: GuardedAndWitnessed — evidence IS present.
+        let desc = sarif_rule_description(&ReviewClass::GuardedAndWitnessed);
+        assert!(
+            !desc.contains("missing"),
+            "GuardedAndWitnessed rule must not say 'missing': {desc}"
+        );
+        assert!(
+            desc.contains("contract") || desc.contains("witness"),
+            "GuardedAndWitnessed rule description should mention contract or witness: {desc}"
+        );
+
+        // Non-actionable: BaselineKnown — gap is baselined, not new.
+        let desc = sarif_rule_description(&ReviewClass::BaselineKnown);
+        assert!(
+            !desc.contains("missing"),
+            "BaselineKnown rule must not say 'missing': {desc}"
+        );
+        assert!(
+            desc.contains("baseline") || desc.contains("inherited"),
+            "BaselineKnown rule description should mention baseline or inherited: {desc}"
+        );
+
+        // Non-actionable: Suppressed — suppressed by policy ledger.
+        let desc = sarif_rule_description(&ReviewClass::Suppressed);
+        assert!(
+            !desc.contains("missing"),
+            "Suppressed rule must not say 'missing': {desc}"
+        );
+        assert!(
+            desc.contains("suppressed") || desc.contains("policy"),
+            "Suppressed rule description should mention suppressed or policy: {desc}"
+        );
+
+        // Actionable: GuardMissing — evidence IS missing.
+        let desc = sarif_rule_description(&ReviewClass::GuardMissing);
+        assert!(
+            desc.contains("missing"),
+            "GuardMissing rule must still say 'missing': {desc}"
+        );
+
+        // Actionable: ContractMissing — evidence IS missing.
+        let desc = sarif_rule_description(&ReviewClass::ContractMissing);
+        assert!(
+            desc.contains("missing"),
+            "ContractMissing rule must still say 'missing': {desc}"
+        );
+    }
+
+    /// Integration test: a baseline_known card in the SARIF output must carry
+    /// a rule description that does NOT say "missing evidence".
+    #[test]
+    fn sarif_baseline_known_rule_description_does_not_say_missing_evidence() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_deref_brownfield_inherited")?;
+        // Ensure the fixture actually produced a baseline_known card.
+        assert!(
+            output
+                .cards
+                .iter()
+                .any(|c| c.class == ReviewClass::BaselineKnown),
+            "expected at least one baseline_known card from fixture"
+        );
+        let value = parse_json(&render(&output))?;
+
+        // Find the rule for baseline_known in the tool.driver.rules array.
+        let rules = value["runs"][0]["tool"]["driver"]["rules"]
+            .as_array()
+            .ok_or("rules must be an array")?;
+        let baseline_rule = rules
+            .iter()
+            .find(|r| r["id"] == "baseline_known")
+            .ok_or("expected a rule with id baseline_known")?;
+        let full_desc = baseline_rule["fullDescription"]["text"]
+            .as_str()
+            .unwrap_or("");
+        assert!(
+            !full_desc.contains("missing"),
+            "baseline_known rule fullDescription must not say 'missing': {full_desc}"
+        );
+        assert!(
+            full_desc.contains("baseline") || full_desc.contains("inherited"),
+            "baseline_known rule fullDescription should mention baseline or inherited: {full_desc}"
+        );
+        Ok(())
     }
 
     fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
