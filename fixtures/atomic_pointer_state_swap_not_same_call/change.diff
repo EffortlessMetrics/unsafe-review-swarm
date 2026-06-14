@@ -1,0 +1,11 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,7 @@
++// F3-1 negative control: `swap`, `ptr::null_mut`, and `Ordering::` all appear
++// on the same diff line, but they belong to separate sub-expressions — not to
++// the same `swap(...)` call.  The old line-co-occurrence heuristic would have
++// flagged this as atomic_pointer_state; the same-call binding fix must not.
++pub fn not_same_call(v: &mut [u8], i: usize, j: usize) {
++    let _n: *mut u8 = core::ptr::null_mut(); let _o = core::sync::atomic::Ordering::Relaxed; v.swap(i, j);
++}
