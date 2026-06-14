@@ -450,3 +450,68 @@ purpose = "PR diff for socket address layout conversions, zeroed values, transmu
 command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/mio-pr1388-root --diff target/dogfood-work/mio-pr1388.raw.patch --format json --max-cards 60 --out target/dogfood-work/mio-pr1388.after-local-safety-colon.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/mio-pr1388.after-local-safety-colon.json"]
+
+[[targets]]
+id = "bumpalo-capped"
+crate = "bumpalo"
+repository = "fitzgen/bumpalo"
+kind = "repo-snapshot"
+status = "active"
+commit = "300040d66d1fb35b96ba6529b6f1ff0e0ea075bc"
+root = "target/dogfood-work/bumpalo"
+purpose = "capped repo snapshot for pointer arithmetic, slice construction, str_from_utf8_unchecked, unsafe fn call, and unsafe impl review cards"
+command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/bumpalo --format json --max-cards 50 --out target/dogfood-work/bumpalo.fresh.json"
+artifact_status = "local_untracked"
+artifacts = ["target/dogfood-work/bumpalo.fresh.json"]
+
+[[targets]]
+id = "slab-capped"
+crate = "slab"
+repository = "tokio-rs/slab"
+kind = "repo-snapshot"
+status = "active"
+commit = "a1e4346070a48c936d808de75191dee5d01e433c"
+root = "target/dogfood-work/slab"
+purpose = "capped repo snapshot for pointer arithmetic, unsafe fn call, and unsafe impl review cards"
+command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/slab --format json --max-cards 50 --out target/dogfood-work/slab.fresh.json"
+artifact_status = "local_untracked"
+artifacts = ["target/dogfood-work/slab.fresh.json"]
+
+[[targets]]
+id = "bytemuck-capped"
+crate = "bytemuck"
+repository = "Lokathor/bytemuck"
+kind = "repo-snapshot"
+status = "active"
+commit = "164cedda0eae131bc6cb67902599f4ec253642ca"
+root = "target/dogfood-work/bytemuck"
+purpose = "capped repo snapshot for MaybeUninit assume_init, unsafe fn call, unsafe impl, and raw pointer dereference review cards"
+command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/bytemuck --format json --max-cards 50 --out target/dogfood-work/bytemuck.fresh.json"
+artifact_status = "local_untracked"
+artifacts = ["target/dogfood-work/bytemuck.fresh.json"]
+
+[[targets]]
+id = "once_cell-capped"
+crate = "once_cell"
+repository = "matklad/once_cell"
+kind = "repo-snapshot"
+status = "active"
+commit = "80fe900b21f6d76c1a2ed74d3343e8a3a88c46d0"
+root = "target/dogfood-work/once_cell"
+purpose = "capped repo snapshot for unsafe fn call, raw pointer dereference, and unsafe impl review cards including witness-receipt-routing cases"
+command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/once_cell --format json --max-cards 50 --out target/dogfood-work/once_cell.fresh.json"
+artifact_status = "local_untracked"
+artifacts = ["target/dogfood-work/once_cell.fresh.json"]
+
+[[targets]]
+id = "parking_lot-capped"
+crate = "parking_lot"
+repository = "Amanieu/parking_lot"
+kind = "repo-snapshot"
+status = "active"
+commit = "d20d71e5a8955ec1d2a53e3659142a505476bb3d"
+root = "target/dogfood-work/parking_lot"
+purpose = "capped repo snapshot for unsafe fn call, unsafe impl, raw pointer dereference, and pointer arithmetic review cards"
+command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/parking_lot --format json --max-cards 50 --out target/dogfood-work/parking_lot.fresh.json"
+artifact_status = "local_untracked"
+artifacts = ["target/dogfood-work/parking_lot.fresh.json"]

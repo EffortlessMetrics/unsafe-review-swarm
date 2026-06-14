@@ -5,14 +5,14 @@
   "manifest": "docs/dogfood/corpus.toml",
   "trust_boundary": "Dogfood corpus records are static unsafe contract review evidence, not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless an exact witness receipt is attached.",
   "summary": {
-    "repositories": 7,
-    "targets": 32,
-    "repo_snapshots": 7,
+    "repositories": 12,
+    "targets": 37,
+    "repo_snapshots": 12,
     "pr_diffs": 23,
     "fixture_controls": 2,
     "checked_in_scan_outputs": 0,
     "artifact_statuses": {
-      "local_untracked": 32
+      "local_untracked": 37
     }
   },
   "repositories": [
@@ -57,6 +57,36 @@
       "snapshot_targets": ["mio-capped"],
       "pr_diff_targets": ["mio-pr1388"],
       "primary_exercise": "Unsafe function call contracts, Vec::set_len, zeroed values, pointer operations, socket address layout conversions, and unsafe Send/Sync route cards"
+    },
+    {
+      "repository": "fitzgen/bumpalo",
+      "snapshot_targets": ["bumpalo-capped"],
+      "pr_diff_targets": [],
+      "primary_exercise": "Pointer arithmetic, slice construction, str_from_utf8_unchecked, unsafe fn call, and unsafe impl review cards; fresh-crate capstone validation"
+    },
+    {
+      "repository": "tokio-rs/slab",
+      "snapshot_targets": ["slab-capped"],
+      "pr_diff_targets": [],
+      "primary_exercise": "Pointer arithmetic, unsafe fn call, and unsafe impl review cards; fresh-crate capstone validation"
+    },
+    {
+      "repository": "Lokathor/bytemuck",
+      "snapshot_targets": ["bytemuck-capped"],
+      "pr_diff_targets": [],
+      "primary_exercise": "MaybeUninit assume_init, unsafe fn call, unsafe impl, and raw pointer dereference review cards; fresh-crate capstone validation"
+    },
+    {
+      "repository": "matklad/once_cell",
+      "snapshot_targets": ["once_cell-capped"],
+      "pr_diff_targets": [],
+      "primary_exercise": "Unsafe fn call, raw pointer dereference, and unsafe impl review cards including witness-receipt-routing cases; fresh-crate capstone validation"
+    },
+    {
+      "repository": "Amanieu/parking_lot",
+      "snapshot_targets": ["parking_lot-capped"],
+      "pr_diff_targets": [],
+      "primary_exercise": "Unsafe fn call, unsafe impl, raw pointer dereference, and pointer arithmetic review cards; fresh-crate capstone validation"
     }
   ],
   "recorded_outcomes": [

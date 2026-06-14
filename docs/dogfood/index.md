@@ -27,9 +27,9 @@ local artifact is needed.
 
 | Measure | Count |
 |---|---:|
-| Repositories | 7 |
-| Total targets | 32 |
-| Capped repo snapshots | 7 |
+| Repositories | 12 |
+| Total targets | 37 |
+| Capped repo snapshots | 12 |
 | PR diff targets | 23 |
 | Fixture control targets | 2 |
 | Checked-in scan outputs | 0 |
@@ -79,6 +79,11 @@ Selected real-crate targets:
 | `tokio-rs/bytes` | 1 | 1 | `Vec::from_raw_parts`, slice construction, ownership-transfer review cards |
 | `crossbeam-rs/crossbeam` | 1 | 2 | Unsafe Send/Sync, atomics, raw pointer, ownership-transfer, strict-provenance Miri cfg cards, and atomic pointer state transitions |
 | `tokio-rs/mio` | 1 | 1 | Unsafe function call contracts, `Vec::set_len`, zeroed values, pointer operations, socket address layout conversions, and unsafe Send/Sync route cards |
+| `fitzgen/bumpalo` | 1 | 0 | Pointer arithmetic, slice construction, `str_from_utf8_unchecked`, unsafe fn call, and unsafe impl cards; fresh-crate capstone |
+| `tokio-rs/slab` | 1 | 0 | Pointer arithmetic, unsafe fn call, and unsafe impl cards; fresh-crate capstone |
+| `Lokathor/bytemuck` | 1 | 0 | `MaybeUninit` assume_init, unsafe fn call, unsafe impl, and raw pointer dereference cards; fresh-crate capstone |
+| `matklad/once_cell` | 1 | 0 | Unsafe fn call, raw pointer dereference, and unsafe impl cards including witness-receipt-routing cases; fresh-crate capstone |
+| `Amanieu/parking_lot` | 1 | 0 | Unsafe fn call, unsafe impl, raw pointer dereference, and pointer arithmetic cards; fresh-crate capstone |
 
 ## Recorded Outcome Movement
 
@@ -97,6 +102,11 @@ Selected real-crate targets:
 - `bytes-capped`
 - `crossbeam-capped`
 - `mio-capped`
+- `bumpalo-capped`
+- `slab-capped`
+- `bytemuck-capped`
+- `once_cell-capped`
+- `parking_lot-capped`
 
 ### PR Diffs
 
