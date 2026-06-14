@@ -163,7 +163,8 @@ fn detect_site(line: &str) -> Option<(UnsafeSiteKind, OperationFamily)> {
     if contains_call_name(line, "new_unchecked") {
         return Some((UnsafeSiteKind::Operation, OperationFamily::UnsafeFnCall));
     }
-    if line.contains(".read_unaligned()") || line.contains("ptr::read_unaligned") {
+    if line.contains(".read_unaligned()") || line_contains_anchored_ptr_path(line, "read_unaligned")
+    {
         return Some((
             UnsafeSiteKind::Operation,
             OperationFamily::RawPointerReadUnaligned,
@@ -175,7 +176,10 @@ fn detect_site(line: &str) -> Option<(UnsafeSiteKind, OperationFamily)> {
             OperationFamily::RawPointerWriteUnaligned,
         ));
     }
-    if line.contains(".read()") || line.contains(".read_volatile(") || line.contains("ptr::read") {
+    if line.contains(".read()")
+        || line.contains(".read_volatile(")
+        || line_contains_anchored_ptr_path(line, "read")
+    {
         return Some((UnsafeSiteKind::Operation, OperationFamily::RawPointerRead));
     }
     if is_raw_pointer_write(line) {
@@ -740,6 +744,12 @@ fn detect_syntax_site(
         return None;
     }
     let declaration = declaration_prefix(&compact);
+    // String/comment-masked variant used by the FFI guard so that extern
+    // names or `libc::` tokens inside string literals or comments within an
+    // unsafe block do not trigger a false FFI card.  Only computed for
+    // BLOCK_EXPR nodes (the kind that reaches the FFI guard), and lazily —
+    // the closure is only invoked when the guard is evaluated.
+    let masked_compact_for_ffi = || syntax_detection_text(&compact);
     match fact.kind.as_str() {
         "FN" if declaration.contains("unsafe fn") => {
             Some((UnsafeSiteKind::UnsafeFn, OperationFamily::Unknown))
@@ -777,7 +787,17 @@ fn detect_syntax_site(
         "BLOCK_EXPR"
             if compact.starts_with("unsafe {")
                 && !operation_block_ranges.contains(&(fact.start, fact.end))
-                && ffi_boundary_applicability(&compact, extern_names, local_modules) =>
+                && ffi_boundary_applicability(
+                    // Run through the string/comment masker so that extern
+                    // names or `libc::` tokens inside string literals or
+                    // block comments within an unsafe block do not card as
+                    // FFI calls.  The CALL_EXPR arm already does this via
+                    // `syntax_detection_text`; this makes the FFI arm
+                    // consistent.
+                    &masked_compact_for_ffi(),
+                    extern_names,
+                    local_modules,
+                ) =>
         {
             Some((UnsafeSiteKind::FfiCall, OperationFamily::Ffi))
         }
@@ -954,9 +974,12 @@ fn source_line_at(source: &str, offset: usize) -> Option<&str> {
 }
 
 fn is_raw_pointer_write(line: &str) -> bool {
-    line.contains("ptr::write")
-        || line.contains("ptr::write_volatile")
-        || line.contains("ptr::write_bytes")
+    // `ptr::write*` forms: anchored so that an alias segment ending in `ptr`
+    // (e.g. `registry_ptr::write_entry`) does not match.
+    line_contains_anchored_ptr_path(line, "write")
+        || line_contains_anchored_ptr_path(line, "write_volatile")
+        || line_contains_anchored_ptr_path(line, "write_bytes")
+        // Method-call forms are already anchored by the preceding `.`:
         || line.contains(".write_volatile(")
         || line.contains("ptr.write(")
         || line.contains("ptr.write_volatile(")
@@ -973,7 +996,9 @@ fn is_raw_pointer_write(line: &str) -> bool {
 }
 
 fn is_raw_pointer_write_unaligned(line: &str) -> bool {
-    line.contains("ptr::write_unaligned") || line.contains(".write_unaligned(")
+    // `ptr::write_unaligned` is anchored via `line_contains_anchored_ptr_path`
+    // to reject alias segments like `foo_ptr::write_unaligned`.
+    line_contains_anchored_ptr_path(line, "write_unaligned") || line.contains(".write_unaligned(")
 }
 
 fn assignment_operator_start(text: &str) -> Option<usize> {
@@ -999,6 +1024,37 @@ fn assignment_operator_start(text: &str) -> Option<usize> {
 
 fn starts_with_assignment_operator(text: &str) -> bool {
     assignment_operator_start(text).is_some_and(|idx| idx == 0)
+}
+
+/// Returns `true` when `line` contains the literal text `ptr::<suffix>` where
+/// `ptr` is a genuine path segment — not an extended identifier whose tail
+/// happens to spell `ptr`, such as `registry_ptr::read_entry`.
+///
+/// Concretely: the character immediately before `ptr` must not be an
+/// ident-continue char (`[a-zA-Z0-9_]`).  A preceding `:` (e.g. in
+/// `std::ptr::read` or `core::ptr::read`) is permitted because it indicates
+/// a valid qualified path, not an extended identifier.  This is intentionally
+/// narrower than the FFI boundary check, which also rejects `:` to prevent
+/// inner path segments from matching the `libc::` prefix.
+fn line_contains_anchored_ptr_path(line: &str, suffix: &str) -> bool {
+    let needle = format!("ptr::{suffix}");
+    let mut cursor = line;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(needle.as_str()) {
+        let absolute = offset + pos;
+        let before = line[..absolute].chars().next_back();
+        // Reject only ident-continue chars: these turn `ptr` into the tail of
+        // a longer identifier (e.g. `registry_ptr`).  Colons are allowed so
+        // that `std::ptr::read` and `core::ptr::read` still match.
+        let starts_on_boundary = before.is_none_or(|ch| !is_ident_continue(ch));
+        if starts_on_boundary {
+            return true;
+        }
+        let skip = pos + needle.len();
+        offset += skip;
+        cursor = &cursor[skip..];
+    }
+    false
 }
 
 fn unsafe_block_ranges(parsed: &ParsedSource) -> Vec<(usize, usize)> {

@@ -95,6 +95,20 @@ label_source = "fixture_golden"
 rationale = "An inherent method call via a method-receiver dot should keep generic unsafe-call review even when a same-named extern declaration exists in the same file; the dot boundary is not a valid unqualified extern name boundary."
 
 [[samples]]
+id = "inner-libc-path-segment-not-ffi-boundary"
+fixture = "ffi_inner_libc_path_not_route"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+expected_obligation_key = "callee-contract"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["human-deep-review"]
+label_source = "fixture_golden"
+rationale = "A qualified path where `libc` is an inner segment (e.g. something::libc::call) should keep generic unsafe-call review instead of routing to the foreign-libc FFI boundary; the preceding `::` means `libc` is not the path root."
+
+[[samples]]
 id = "unchecked-constructor-availability-guard-present"
 fixture = "unchecked_constructor_availability_guard"
 kind = "positive"

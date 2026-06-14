@@ -118,7 +118,13 @@ fn matching_call_path_prefix(line: &str, prefix: &str) -> Option<String> {
     while let Some(pos) = cursor.find(prefix) {
         let absolute = offset + pos;
         let before = line[..absolute].chars().next_back();
-        let starts_on_boundary = before.is_none_or(|ch| !is_ident_continue(ch));
+        // Reject ident-continue chars, path separators (`:`), and member
+        // access (`.`) before the prefix so that an inner path segment such
+        // as `something::libc::` does not match as a top-level libc prefix.
+        // This mirrors the `contains_call_path` / `contains_unqualified_call_name`
+        // boundary checks.
+        let starts_on_boundary =
+            before.is_none_or(|ch| !is_ident_continue(ch) && ch != ':' && ch != '.');
         let after_prefix = &line[absolute + prefix.len()..];
         if starts_on_boundary && call_path_suffix(after_prefix) {
             let path_end = after_prefix.find('(').unwrap_or(after_prefix.len());
@@ -215,6 +221,35 @@ mod tests {
                 &local_modules
             ),
             None
+        );
+    }
+
+    #[test]
+    fn inner_path_segment_libc_does_not_match_as_prefix() {
+        // `something::libc::call()` — `libc` is an inner segment, not the root.
+        // The boundary check must reject the `:` preceding `libc::`.
+        let extern_names = BTreeSet::new();
+        let local_modules = BTreeSet::new();
+
+        // Inner segment: must NOT route to FFI.
+        assert_eq!(
+            ffi_boundary_match(
+                "unsafe { something::libc::strlen(ptr) }",
+                &extern_names,
+                &local_modules
+            ),
+            None,
+            "inner-segment `something::libc::strlen` must not route to FFI"
+        );
+        // Top-level path: MUST still route to FFI.
+        assert_eq!(
+            ffi_boundary_match(
+                "unsafe { libc::strlen(ptr) }",
+                &extern_names,
+                &local_modules
+            ),
+            Some(FfiBoundaryApplicability::known_foreign_path("libc::strlen")),
+            "top-level `libc::strlen` must still route to FFI"
         );
     }
 

@@ -515,6 +515,9 @@ required_core_fixtures = [
   "ffi_non_libc_wrapper_call_not_route",
   "ffi_local_libc_module_call_not_route",
   "ffi_same_named_method_not_route",
+  "ffi_inner_libc_path_not_route",
+  "ffi_token_in_string_not_route",
+  "ptr_read_path_segment_not_raw",
   "safe_code_no_cards",
   "safe_reference_deref_no_cards",
   "imports_not_unsafe_operations",
@@ -4729,6 +4732,13 @@ expected_operation_family = "raw_pointer_read"
 expected_hazard = "pointer_validity"
 
 [[cases]]
+fixture = "ptr_read_path_segment_not_raw"
+kind = "false_positive_control"
+claim = "a call path whose alias segment ends in `ptr` (e.g. registry_ptr::read_entry) is not carded as a raw-pointer read"
+support_tier = "Raw pointer card slice"
+expected_cards = 0
+
+[[cases]]
 fixture = "pointer_arithmetic_num_ctrl_bytes_guard"
 kind = "positive"
 claim = "pointer arithmetic recognizes index < num_ctrl_bytes as bounds guard evidence"
@@ -5697,6 +5707,25 @@ support_tier = "Witness routing"
 expected_cards = 1
 expected_class = "guard_missing"
 expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+
+[[cases]]
+fixture = "ffi_inner_libc_path_not_route"
+kind = "false_positive_control"
+claim = "a qualified path where libc is an inner segment (something::libc::call) is not routed to the foreign-libc FFI boundary"
+support_tier = "Witness routing"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"
+
+[[cases]]
+fixture = "ffi_token_in_string_not_route"
+kind = "false_positive_control"
+claim = "a libc:: token inside a string literal within an unsafe block does not route to the FFI boundary"
+support_tier = "Witness routing"
+expected_cards = 1
+expected_class = "guard_missing"
 expected_hazard = "unknown"
 
 [[cases]]

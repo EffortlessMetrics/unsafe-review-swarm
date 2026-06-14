@@ -113,3 +113,11 @@ kind = "false_positive_control"
 expected_cards = 0
 label_source = "fixture_golden"
 rationale = "A safe inherent `zeroed()` constructor called outside any unsafe scope is not mem::zeroed and must not produce a ReviewCard."
+
+[[samples]]
+id = "path-alias-ending-in-ptr-not-raw-pointer-read"
+fixture = "ptr_read_path_segment_not_raw"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "A call path alias whose name ends in `ptr` (e.g. registry_ptr::read_entry) is not a std::ptr module call and must not produce a raw-pointer-read ReviewCard."

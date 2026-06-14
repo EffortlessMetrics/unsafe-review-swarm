@@ -1240,6 +1240,7 @@ fixtures = [
   "ffi_non_libc_wrapper_call_not_route",
   "ffi_local_libc_module_call_not_route",
   "ffi_same_named_method_not_route",
+  "ffi_inner_libc_path_not_route",
   "unchecked_constructor_availability_guard",
   "unchecked_constructor_availability_assert_guard",
   "unchecked_constructor_unavailable_return_guard",
@@ -1641,6 +1642,7 @@ fixtures = [
   "assume_init_safe_method_no_cards",
   "from_utf8_unchecked_safe_wrapper_no_cards",
   "zeroed_safe_wrapper_no_cards",
+  "ptr_read_path_segment_not_raw",
 ]
 dogfood_targets = []
 label_ledgers = [
