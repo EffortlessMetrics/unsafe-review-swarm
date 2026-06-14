@@ -1,10 +1,10 @@
 [
   {
     "id": "UR-maybeuninit-assume-init-drop-open-branch-write-guard-fixture-src-lib-rs-drop-write-inside-branch-operation-maybe_uninit_assume_init-assume-init-drop-b64953565cb3-initialized_memory-c1",
-    "class": "guarded_unwitnessed",
+    "class": "unsafe_unreached",
     "priority": "medium",
     "confidence": "medium",
-    "proof_path": "observable_red_green",
+    "proof_path": "helper_gated",
     "site": {
       "file": "src/lib.rs",
       "line": 8,
@@ -39,9 +39,9 @@
           "summary": "MaybeUninit initialization evidence was detected before assume_init"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `drop_write_inside_branch`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `drop_write_inside_branch` was found"
         },
         "witness": {
           "present": false,
@@ -52,7 +52,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "All inferred safety obligations have visible local discharge evidence",
-    "reach": "1 related test file(s) mention owner `drop_write_inside_branch`",
+    "reach": "No static test mention of owner `drop_write_inside_branch` was found",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -69,15 +69,16 @@
       }
     ],
     "missing": [
+      "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Attach a focused Miri or cargo-careful witness receipt or mark the static limitation explicitly.",
+    "next_action": "Add or identify a focused test path that reaches the safe wrapper around this unsafe seam.",
     "verify_commands": [
       "cargo +nightly miri test drop_write_inside_branch",
       "cargo +nightly careful test drop_write_inside_branch"
     ],
     "confirmation_cue": {
-      "hypothesis_to_confirm": "static `guarded_unwitnessed` ReviewCard for `unsafe { slot.assume_init_drop() };`; confirm with external evidence before treating it as observed runtime behavior",
+      "hypothesis_to_confirm": "static `unsafe_unreached` ReviewCard for `unsafe { slot.assume_init_drop() };`; confirm with external evidence before treating it as observed runtime behavior",
       "build_this_first": {
         "kind": "verify_command",
         "command": "cargo +nightly miri test drop_write_inside_branch",
@@ -109,7 +110,7 @@
       "baseline_state": "new",
       "outcome_movement": "regressed",
       "comment_plan_status": "not_eligible",
-      "agent_lsp_readiness": "requires_witness_receipt"
+      "agent_lsp_readiness": "ready"
     }
   }
 ]
