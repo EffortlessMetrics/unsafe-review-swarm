@@ -177,13 +177,16 @@ dogfood run (#1700, five fresh crates: `smallvec`, `arrayvec`, `memchr`,
 `hashbrown`, `bytes`) confirmed that all identified FP classes were gone on
 unseen code after the mechanism-level fixes.
 
-**The bug class is the type-of-a-type-free tax.** The fallback text/substring
-detection path — which operates on compacted whitespace strings rather than AST
-nodes — lacks the scope, type, and binding information that the `ra_ap_syntax`
-path carries for free. Almost all false positives in the session traced to the
-text path missing one of five disciplines (scope gate, definition-vs-call,
-same-origin discharge, string/comment masking, path-segment anchoring). These
-disciplines are now encoded in the SPEC-0005 appendix as D1–D5.
+**The bug class is the syntax-first discipline tax on the fallback text path.**
+unsafe-review is syntax-first and build-free: it analyzes syntax, tokens, and diff
+hunks without performing target-repo type or trait resolution at scan time. That is
+a feature (fast, portable, works on incomplete PRs), but it carries a discipline
+tax — the fallback text/substring detection path must explicitly re-derive every
+structural property the `ra_ap_syntax` AST path encodes for free (scope,
+call-vs-definition, binding identity, span type). Almost all false positives in the
+session traced to the text path missing one of five disciplines (scope gate,
+definition-vs-call, same-origin discharge, string/comment masking, path-segment
+anchoring). These disciplines are now encoded in the SPEC-0005 appendix as D1–D5.
 
 **Collapse-to-root: ~30 instances -> ~5 root fixes.** Rather than patching 28+
 instances individually, a white-box audit identified the five mechanism classes

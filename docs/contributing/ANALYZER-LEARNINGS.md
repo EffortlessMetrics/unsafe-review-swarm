@@ -21,9 +21,41 @@ audited with the real-world cases in hand.
 
 ---
 
-## The bug class: the type-free tax on fallback detection
+## The bug class: the syntax-first discipline tax on fallback detection
 
-`unsafe-review`'s detection pipeline has two layers:
+Three layers to keep distinct when reasoning about unsafe-review's analyzer:
+
+1. **unsafe-review's own implementation** — strongly-typed Rust (`ReviewCard`,
+   `HazardKind`, `ObligationKind`, etc.). These types are load-bearing and always
+   present.
+2. **The scanned repo's types** — exist in principle, but may be unavailable at
+   scan time: a broken PR, missing deps, a huge monorepo in a fast CI lane, or a
+   dependency that requires network access. unsafe-review does NOT require a
+   successful `cargo build` of the target repo to run.
+3. **The analyzer's view of the target** — syntax, tokens, unsafe-syntax patterns,
+   diff hunks, comments. NOT resolved types, NOT trait bindings, NOT MIR. This is
+   intentional: it keeps the tool fast, portable, and usable on incomplete PRs.
+
+unsafe-review is strongly-typed Rust analyzing strongly-typed Rust source. What it
+deliberately avoids by default is **target-repo semantic/type resolution at scan
+time** — no `rustc` type-check pass, no MIR, no trait resolution, no
+macro-expanded project model, no full call graph of the target codebase. The right
+terms are **syntax-first**, **semantic-light**, and **build-free target analysis**.
+"Type-free" is a misnomer and should not be used.
+
+`ra_ap_syntax` gives structured *syntax* — call-expr nodes, unsafe fn bodies,
+comment trivia, binding spans — but NOT type or trait resolution. The path forward
+is "syntax-first with detector discipline; optional semantic enrichment only where
+it demonstrably pays," not "text search forever" and not "become a type checker."
+
+This is a **feature** (fast, works on incomplete PRs, portable, build-free,
+advisory) with a **tax** (every detector must earn scope / call-vs-definition /
+same-receiver / comment-string-masking / word-boundary / call-shaped-reach
+discipline that a type-aware analyzer would get partly for free from resolved
+bindings). The 28 fixes in this session were paying down that tax while keeping
+the advantages.
+
+unsafe-review's detection pipeline has two code paths:
 
 1. **Syntax path** — AST-backed via `ra_ap_syntax`, which carries scope
    information, node type, binding identity, and call-vs-definition for free.

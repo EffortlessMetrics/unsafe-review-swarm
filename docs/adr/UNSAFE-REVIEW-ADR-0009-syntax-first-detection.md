@@ -11,6 +11,40 @@ Linked docs:
 Linked PRs:
 - context: #1672–#1707 (card-correctness session that motivated this proposal)
 
+## Decision
+
+unsafe-review stays **syntax-first and build-free by default.** It analyzes
+syntax, tokens, unsafe-syntax patterns, diff hunks, and comments of the *target*
+repository without performing target-repo type resolution, trait resolution, MIR
+analysis, or macro expansion at scan time. This is a deliberate design choice, not
+a limitation to be papered over.
+
+What this means precisely:
+
+- unsafe-review's own implementation is strongly-typed Rust (`ReviewCard`,
+  `HazardKind`, `ObligationKind`, etc.) — it is not "type-free."
+- The scanned repo's types exist in the Rust source but are not resolved by the
+  analyzer at scan time. The tool does not require a successful `cargo build` of
+  the target repo.
+- The analyzer's view of the target is: structured syntax via `ra_ap_syntax` (AST
+  nodes — call-expr, unsafe fn body, comment trivia, binding spans) for the
+  primary path; substring matching on compacted whitespace for the fallback path.
+  Neither path performs `rustc` type-check, MIR traversal, or trait resolution.
+
+This posture is called **syntax-first** (AST is primary), **semantic-light** (no
+full semantic model of the target), and **build-free** (no mandatory compilation
+of the target). Substring/text matching is a **bounded, explicit, tested last
+resort** — not the preferred detection path.
+
+This ADR governs the AST-first dispatch change. It does NOT make full target-repo
+type resolution mandatory for any path (PR, IDE, or agent). Optional semantic
+enrichment MAY be added later (e.g., a `--semantic` flag or `--lsp-enrich` mode)
+but MUST clearly label its evidence source (syntax-derived vs. semantic-derived) in
+every output surface that claims enrichment, to preserve the trust boundary and
+allow callers to understand what kind of evidence backs each card.
+
+---
+
 ## Problem
 
 The current detector architecture has two code paths for recognizing unsafe
