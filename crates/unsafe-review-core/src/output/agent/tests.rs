@@ -1469,6 +1469,7 @@ fn file_range_scan_returns_envelope_with_correct_shape() -> Result<(), String> {
         &cards,
         "0.1",
         &std::collections::HashMap::new(),
+        &std::collections::BTreeMap::new(),
     );
     let value = parse_json(&envelope_json)?;
 
@@ -1527,6 +1528,7 @@ fn file_range_scan_returns_empty_list_when_no_overlap() -> Result<(), String> {
         &cards,
         "0.1",
         &std::collections::HashMap::new(),
+        &std::collections::BTreeMap::new(),
     );
     let value = parse_json(&envelope_json)?;
 
@@ -1567,6 +1569,7 @@ fn file_range_scan_changed_only_includes_new_baseline_cards() -> Result<(), Stri
         &cards,
         "0.1",
         &std::collections::HashMap::new(),
+        &std::collections::BTreeMap::new(),
     );
     let value = parse_json(&envelope_json)?;
     assert_eq!(value["changed_only"], true);
@@ -1604,6 +1607,7 @@ fn file_range_scan_changed_only_excludes_inherited_baseline_cards() -> Result<()
         &cards,
         "0.1",
         &std::collections::HashMap::new(),
+        &std::collections::BTreeMap::new(),
     ))?;
     let with_filter = parse_json(&render_range_scan(
         "src/lib.rs".to_string(),
@@ -1613,6 +1617,7 @@ fn file_range_scan_changed_only_excludes_inherited_baseline_cards() -> Result<()
         &cards,
         "0.1",
         &std::collections::HashMap::new(),
+        &std::collections::BTreeMap::new(),
     ))?;
     // Both return the same card (it IS new/worsened), confirming the filter is applied.
     assert_eq!(
@@ -1641,6 +1646,7 @@ fn file_range_scan_packets_ordered_by_site_line() -> Result<(), String> {
         &cards,
         "0.1",
         &std::collections::HashMap::new(),
+        &std::collections::BTreeMap::new(),
     );
     let value = parse_json(&envelope_json)?;
     let packets = value["packets"]

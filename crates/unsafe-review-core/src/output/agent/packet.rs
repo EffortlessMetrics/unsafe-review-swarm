@@ -12,6 +12,7 @@ use crate::domain::{
     OutcomeMovement, ReviewCard, WitnessReceiptCoverage,
 };
 use crate::output::confirmation::ConfirmationCue;
+use crate::policy::SnapshotCoverage;
 use serde::Serialize;
 
 /// Map an `agent_readiness.state` string back to the domain [`AgentLspReadiness`]
@@ -141,13 +142,28 @@ impl<'a> AgentPacket<'a> {
     /// projects the same `comment_plan_status` as `comment-plan.json` and
     /// `cards.json`.  Callers without output context (e.g. `From<&ReviewCard>`)
     /// pass `CommentPlanStatus::NotEligible` as the honest default.
+    ///
+    /// `snapshot` is the per-card coverage snapshot from `AnalyzeOutput.coverage_snapshot`,
+    /// used to project `baseline_state`/`outcome_movement` from the same slot-level comparison
+    /// the summary uses (SPEC-0030 §single-truth, output audit #1687).
     pub(super) fn from_with_status(
         card: &'a ReviewCard,
         comment_plan_status: CommentPlanStatus,
+        snapshot: Option<&SnapshotCoverage>,
     ) -> Self {
         let repairs = packet_repair_projection(card);
         let mut coverage_block = card.coverage_block();
         coverage_block.comment_plan_status = comment_plan_status;
+        // Apply snapshot-level movement so per-card baseline_state/outcome_movement
+        // agree with summary.worsened_gaps / summary.improved_gaps (SPEC-0030 §single-truth).
+        if let Some(snap) = snapshot {
+            coverage_block.apply_snapshot_slots(
+                &snap.contract_coverage,
+                &snap.guard_coverage,
+                &snap.test_reach_coverage,
+                &snap.witness_receipt_coverage,
+            );
+        }
         // Guarantee: coverage.agent_lsp_readiness == agent_readiness.state
         // (output audit #1687, findings 3+4).  The repair projection already
         // computed the authoritative readiness state via `compute_agent_lsp_readiness`
@@ -215,10 +231,11 @@ impl<'a> From<&'a ReviewCard> for AgentPacket<'a> {
     /// Build a packet without output context.
     ///
     /// `comment_plan_status` defaults to `NotEligible` because the selection
-    /// outcome is only computable from the full `AnalyzeOutput`.  Callers with
-    /// output context should use [`AgentPacket::from_with_status`] instead.
+    /// outcome is only computable from the full `AnalyzeOutput`.  `snapshot` is
+    /// `None` because the coverage snapshot is only available through `AnalyzeOutput`.
+    /// Callers with output context should use [`AgentPacket::from_with_status`] instead.
     fn from(card: &'a ReviewCard) -> Self {
-        Self::from_with_status(card, CommentPlanStatus::NotEligible)
+        Self::from_with_status(card, CommentPlanStatus::NotEligible, None)
     }
 }
 

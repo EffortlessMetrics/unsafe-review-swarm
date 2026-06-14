@@ -8,8 +8,9 @@ use super::packet::AgentPacket;
 use super::{DO_NOT_DO, TRUST_BOUNDARY};
 use crate::domain::coverage::BaselineState;
 use crate::domain::{CardId, CommentPlanStatus, ReviewCard};
+use crate::policy::SnapshotCoverage;
 use serde::Serialize;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 /// The `mode` string stamped on the envelope (SPEC-0033).
 const MODE: &str = "file_range_scan";
@@ -62,6 +63,10 @@ pub(super) struct FileRangeScanEnvelope<'a> {
 }
 
 impl<'a> FileRangeScanEnvelope<'a> {
+    #[allow(
+        clippy::too_many_arguments,
+        reason = "file range + cards + base + statuses + snapshot are all needed together; extracting a struct would add churn at call sites without simplifying the logic"
+    )]
     pub(super) fn build(
         queried_file: String,
         queried_line_start: u32,
@@ -70,6 +75,7 @@ impl<'a> FileRangeScanEnvelope<'a> {
         cards: Vec<&'a ReviewCard>,
         analyzed_base: &'a str,
         statuses: &HashMap<CardId, CommentPlanStatus>,
+        coverage_snapshot: &BTreeMap<String, SnapshotCoverage>,
     ) -> Self {
         let packets = cards
             .into_iter()
@@ -78,7 +84,8 @@ impl<'a> FileRangeScanEnvelope<'a> {
                     .get(&card.id)
                     .copied()
                     .unwrap_or(CommentPlanStatus::NotEligible);
-                AgentPacket::from_with_status(card, status)
+                let snapshot = coverage_snapshot.get(&card.id.0);
+                AgentPacket::from_with_status(card, status, snapshot)
             })
             .collect();
         Self {
@@ -113,7 +120,24 @@ pub(crate) fn site_overlaps_range(card: &ReviewCard, line_start: u32, line_end: 
 
 /// Return `true` when the card is in a baseline state that counts as
 /// "new or worsened" — the two states SPEC-0030 uses to flag changed lines.
-pub(crate) fn is_new_or_worsened(card: &ReviewCard) -> bool {
-    let state = card.coverage_block().baseline_state;
-    matches!(state, BaselineState::New | BaselineState::Worsened)
+///
+/// The `coverage_snapshot` is used to detect worsened cards that require a
+/// slot-level comparison against the saved baseline snapshot (SPEC-0030 §single-truth).
+pub(crate) fn is_new_or_worsened(
+    card: &ReviewCard,
+    coverage_snapshot: &BTreeMap<String, SnapshotCoverage>,
+) -> bool {
+    let mut block = card.coverage_block();
+    if let Some(snap) = coverage_snapshot.get(&card.id.0) {
+        block.apply_snapshot_slots(
+            &snap.contract_coverage,
+            &snap.guard_coverage,
+            &snap.test_reach_coverage,
+            &snap.witness_receipt_coverage,
+        );
+    }
+    matches!(
+        block.baseline_state,
+        BaselineState::New | BaselineState::Worsened
+    )
 }

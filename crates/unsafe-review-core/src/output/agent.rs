@@ -1,6 +1,8 @@
 use crate::domain::{CommentPlanStatus, ReviewCard};
 use crate::output::REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY;
+use crate::policy::SnapshotCoverage;
 use serde::Serialize;
+use std::collections::BTreeMap;
 
 pub(crate) use queue::{AgentQueueProjection, AgentReadiness, card_has_scoped_repairs};
 
@@ -58,7 +60,10 @@ pub(crate) fn render_with_output(output: &crate::api::AnalyzeOutput, card: &Revi
         .get(&card.id)
         .copied()
         .unwrap_or(CommentPlanStatus::NotEligible);
-    render_pretty(&packet::AgentPacket::from_with_status(card, status))
+    let snapshot = output.coverage_snapshot.get(&card.id.0);
+    render_pretty(&packet::AgentPacket::from_with_status(
+        card, status, snapshot,
+    ))
 }
 
 /// Render a `file_range_scan` envelope for SPEC-0033.
@@ -72,6 +77,10 @@ pub(crate) fn render_with_output(output: &crate::api::AnalyzeOutput, card: &Revi
 /// packets inside the envelope project the same `comment_plan_status` as
 /// `comment-plan.json` and `cards.json` (SPEC-0032).  Callers without output
 /// context may pass an empty map; affected cards will default to `NotEligible`.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "file range + cards + base + statuses + snapshot are all needed together; extracting a struct would add churn at all call sites without simplifying the logic"
+)]
 pub(crate) fn render_range_scan<'a>(
     queried_file: String,
     queried_line_start: u32,
@@ -80,12 +89,13 @@ pub(crate) fn render_range_scan<'a>(
     file_cards: &[&'a ReviewCard],
     analyzed_base: &'a str,
     statuses: &std::collections::HashMap<crate::domain::CardId, CommentPlanStatus>,
+    coverage_snapshot: &'a BTreeMap<String, SnapshotCoverage>,
 ) -> String {
     let mut matching: Vec<&'a ReviewCard> = file_cards
         .iter()
         .copied()
         .filter(|card| range_scan::site_overlaps_range(card, queried_line_start, queried_line_end))
-        .filter(|card| !changed_only || range_scan::is_new_or_worsened(card))
+        .filter(|card| !changed_only || range_scan::is_new_or_worsened(card, coverage_snapshot))
         .collect();
     // Deterministic order: ascending site line then card id.
     matching.sort_by(|a, b| {
@@ -103,6 +113,7 @@ pub(crate) fn render_range_scan<'a>(
         matching,
         analyzed_base,
         statuses,
+        coverage_snapshot,
     );
     render_pretty(&envelope)
 }

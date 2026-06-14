@@ -1,0 +1,20 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -4,14 +4,7 @@
+ /// Read config from a raw pointer.
+ ///
+-/// # Safety
+-///
+-/// The caller must ensure `ptr` is non-null, properly aligned for `Config`,
+-/// points to an initialized `Config` value that remains live for this call,
+-/// and that the access stays within one allocation.
+-///
+-/// This PR removes the safety contract — an evidence regression.
+-pub fn write_config(ptr: *mut Config, value: Config) {
+-    // SAFETY: caller guarantees the invariants documented in the function-level
+-    // # Safety section.
++/// Caller must ensure the pointer is valid and properly aligned.
++pub fn write_config(ptr: *mut Config, value: Config) {
+     unsafe { *ptr = value }
+ }

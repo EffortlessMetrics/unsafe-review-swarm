@@ -200,12 +200,14 @@ impl CoverageBlock {
     ///
     /// `Worsened` and `Resolved` cannot be derived from the card alone: `worsened` requires a
     /// saved coverage snapshot and `resolved` applies to baseline entries with no current card.
-    /// Both default to `Unknown` at card level; they are surfaced in the `Summary` movement
-    /// counts and the policy report, not on individual cards.
+    /// `Resolved` defaults to `Unknown` at card level (it has no card).  `Worsened` and `Improved`
+    /// are promoted after derivation via [`CoverageBlock::apply_snapshot_movement`], which output
+    /// renderers call using the snapshot stored in `AnalyzeOutput.coverage_snapshot`.
     ///
     /// **outcome_movement**: derived from `baseline_state` per SPEC-0030.
     ///
-    /// - `Inherited` baseline → `Unchanged` (gap persists but was not introduced by this change).
+    /// - `Inherited` baseline → `Unchanged` initially; upgraded to `Improved` or `Worsened` (with
+    ///   `baseline_state → Worsened`) by `apply_snapshot_movement` if a slot comparison warrants it.
     /// - `New` baseline → `Regressed` (the change introduced this gap).
     /// - All other states → `Unknown`.
     ///
@@ -227,6 +229,72 @@ impl CoverageBlock {
             comment_plan_status: CommentPlanStatus::NotEligible,
             agent_lsp_readiness: derive_agent_lsp_readiness(card),
         }
+    }
+
+    /// Upgrade `baseline_state` and `outcome_movement` from snapshot-level slot comparison
+    /// (SPEC-0030 §single-truth).
+    ///
+    /// Called by output renderers that have access to the coverage snapshot
+    /// (`AnalyzeOutput.coverage_snapshot`).  The snapshot slot values are the four
+    /// string-encoded coverage fields stored in `SnapshotCoverage`:
+    /// `contract`, `guard`, `test_reach`, `witness_receipt` — each `"present"`, `"weak"`, or
+    /// `"missing"`.
+    ///
+    /// This function replicates the slot-ordinal comparison from
+    /// `SnapshotCoverage::is_worsened_by` / `is_improved_by` (`policy/mod.rs`) using the
+    /// same ordinal: `present=2 > weak=1 > missing=0`.  Keeping the logic inline avoids a
+    /// `domain → policy` circular dependency while guaranteeing a single derivation rule.
+    ///
+    /// Precedence: worsened > improved (mirrors `summarize` in `pipeline/summary.rs`).
+    ///
+    /// Only has effect when `baseline_state == Inherited` (the card is `BaselineKnown`).
+    /// Cards that are `New`, `Unknown`, etc. are not affected.
+    pub fn apply_snapshot_slots(
+        &mut self,
+        snap_contract: &str,
+        snap_guard: &str,
+        snap_test_reach: &str,
+        snap_witness_receipt: &str,
+    ) {
+        if self.baseline_state != BaselineState::Inherited {
+            return;
+        }
+        let ordinal = |s: &str| -> u8 {
+            match s {
+                "present" => 2,
+                "weak" => 1,
+                _ => 0,
+            }
+        };
+        let cur_contract = ordinal(self.contract_coverage.as_str());
+        let cur_guard = ordinal(self.guard_coverage.as_str());
+        let cur_test_reach = ordinal(self.test_reach_coverage.as_str());
+        let cur_witness = ordinal(self.witness_receipt_coverage.as_str());
+
+        let snap_contract_ord = ordinal(snap_contract);
+        let snap_guard_ord = ordinal(snap_guard);
+        let snap_test_reach_ord = ordinal(snap_test_reach);
+        let snap_witness_ord = ordinal(snap_witness_receipt);
+
+        let is_worsened = cur_contract < snap_contract_ord
+            || cur_guard < snap_guard_ord
+            || cur_test_reach < snap_test_reach_ord
+            || cur_witness < snap_witness_ord;
+
+        let any_higher = cur_contract > snap_contract_ord
+            || cur_guard > snap_guard_ord
+            || cur_test_reach > snap_test_reach_ord
+            || cur_witness > snap_witness_ord;
+        let is_improved = any_higher && !is_worsened;
+
+        if is_worsened {
+            self.baseline_state = BaselineState::Worsened;
+            self.outcome_movement = OutcomeMovement::Regressed;
+        } else if is_improved {
+            // baseline_state stays Inherited (card is still open, still present).
+            self.outcome_movement = OutcomeMovement::Improved;
+        }
+        // else: unchanged — no update needed
     }
 }
 

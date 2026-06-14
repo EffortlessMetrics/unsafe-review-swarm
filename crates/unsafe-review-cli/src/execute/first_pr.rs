@@ -2531,6 +2531,7 @@ mod tests {
             },
             cards: Vec::new(),
             diff_scoped_files: std::collections::BTreeSet::new(),
+            coverage_snapshot: std::collections::BTreeMap::new(),
         };
         let check = CheckOptions {
             root: Path::new("fixtures/safe_code_no_cards").to_path_buf(),

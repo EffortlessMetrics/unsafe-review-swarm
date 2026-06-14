@@ -268,6 +268,7 @@ fn analyze_with_receipts(
         &policy_state,
         &candidate_files,
     );
+    let coverage_snapshot = policy_state.coverage_snapshot.clone();
     let output = AnalyzeOutput {
         schema_version: "0.1".to_string(),
         tool: "unsafe-review".to_string(),
@@ -278,6 +279,7 @@ fn analyze_with_receipts(
         summary,
         cards,
         diff_scoped_files: diff_scoped_files_set,
+        coverage_snapshot,
     };
     // Emit a final status event.  A capped scan emits a partial status that
     // carries stop_reason=max_cards and cap=N so consumers and the gate
@@ -504,6 +506,7 @@ fn partial_analyze_output(
         summary,
         cards,
         diff_scoped_files: diff_scoped_files_set,
+        coverage_snapshot: policy_state.coverage_snapshot.clone(),
     }
 }
 

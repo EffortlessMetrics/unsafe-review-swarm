@@ -9,6 +9,7 @@ use crate::output::agent::card_has_scoped_repairs;
 use crate::output::comment_plan;
 use crate::output::confirmation::ConfirmationCue;
 use crate::output::{REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY, UNKNOWN_OWNER};
+use crate::policy::SnapshotCoverage;
 use crate::util::path_display;
 use serde::Serialize;
 
@@ -96,7 +97,8 @@ impl<'a> JsonAnalyzeOutput<'a> {
                         .get(&card.id)
                         .copied()
                         .unwrap_or(CommentPlanStatus::NotEligible);
-                    JsonCard::from_with_status(card, status)
+                    let snapshot = output.coverage_snapshot.get(&card.id.0);
+                    JsonCard::from_with_status(card, status, snapshot)
                 })
                 .collect(),
             provenance: None,
@@ -134,7 +136,8 @@ impl<'a> JsonAnalyzeOutput<'a> {
                         .get(&card.id)
                         .copied()
                         .unwrap_or(CommentPlanStatus::NotEligible);
-                    JsonCard::from_with_status(card, status)
+                    let snapshot = output.coverage_snapshot.get(&card.id.0);
+                    JsonCard::from_with_status(card, status, snapshot)
                 })
                 .collect(),
             provenance: Some(json_provenance),
@@ -233,12 +236,30 @@ impl<'a> JsonCard<'a> {
     /// Build a `JsonCard` for `card`, overriding `comment_plan_status` with
     /// the value computed by the comment-plan selection pass (SPEC-0032).
     ///
+    /// `snapshot` is the per-card coverage snapshot from `AnalyzeOutput.coverage_snapshot`,
+    /// used to project `baseline_state`/`outcome_movement` from the same slot-level comparison
+    /// the summary uses (SPEC-0030 §single-truth, output audit #1687).
+    ///
     /// This is the only valid constructor.  Callers must supply the status
     /// from [`comment_plan::card_statuses`] so that `cards.json` always
     /// projects the same `comment_plan_status` as `comment-plan.json`.
-    fn from_with_status(card: &'a ReviewCard, comment_plan_status: CommentPlanStatus) -> Self {
+    fn from_with_status(
+        card: &'a ReviewCard,
+        comment_plan_status: CommentPlanStatus,
+        snapshot: Option<&SnapshotCoverage>,
+    ) -> Self {
         let mut coverage_block = card.coverage_block();
         coverage_block.comment_plan_status = comment_plan_status;
+        // Apply snapshot-level movement so per-card baseline_state/outcome_movement
+        // agree with summary.worsened_gaps / summary.improved_gaps (SPEC-0030 §single-truth).
+        if let Some(snap) = snapshot {
+            coverage_block.apply_snapshot_slots(
+                &snap.contract_coverage,
+                &snap.guard_coverage,
+                &snap.test_reach_coverage,
+                &snap.witness_receipt_coverage,
+            );
+        }
         // Guarantee: cards.json coverage.agent_lsp_readiness uses the exact
         // has_card_scoped_repairs value (output audit #1687, findings 3+4).
         // Both cards.json and the agent packet now call compute_agent_lsp_readiness
@@ -1078,7 +1099,8 @@ pub fn bless_fixture_card_goldens(names: &[&str]) -> Result<Vec<std::path::PathB
                     .get(&card.id)
                     .copied()
                     .unwrap_or(CommentPlanStatus::NotEligible);
-                JsonCard::from_with_status(card, status)
+                let snapshot = output.coverage_snapshot.get(&card.id.0);
+                JsonCard::from_with_status(card, status, snapshot)
             })
             .collect();
         let path = root.join("expected.cards.json");
@@ -1274,7 +1296,8 @@ mod tests {
                         .get(&card.id)
                         .copied()
                         .unwrap_or(CommentPlanStatus::NotEligible);
-                    JsonCard::from_with_status(card, status)
+                    let snapshot = output.coverage_snapshot.get(&card.id.0);
+                    JsonCard::from_with_status(card, status, snapshot)
                 })
                 .collect();
             let path = fixture_root(fixture).join("expected.cards.json");

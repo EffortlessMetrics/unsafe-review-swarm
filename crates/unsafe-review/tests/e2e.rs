@@ -8100,6 +8100,124 @@ fn coverage_improved_baseline_shows_improved_gap_shape() -> Result<(), Box<dyn E
     Ok(())
 }
 
+// SPEC-0030: per-card coverage.baseline_state/outcome_movement must agree with
+// summary.worsened_gaps.  This fixture ships a baseline ledger + snapshot recording
+// contract_coverage="present"; the current source has no # Safety doc →
+// contract_coverage is now "missing".  The card must report baseline_state="worsened"
+// and outcome_movement="regressed", and the summary must count worsened_gaps=1.
+//
+// The card is still `baseline_known`, still advisory, still open.  This is NOT
+// a resolution, NOT safety proof, NOT UB-free, NOT Miri-clean.  The signal is
+// "evidence coverage worsened for a retained baseline site."
+#[test]
+fn coverage_worsened_baseline_shows_worsened_gap_shape() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_deref_coverage_worsened");
+
+    // The fixture ships with a baseline ledger (card is baseline_known) and a
+    // baseline snapshot recording contract_coverage="present".  The current
+    // source removed the `# Safety` doc → contract_coverage is now "missing".
+    let advisory = run_success([
+        os("check"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let advisory = parse_json(&stdout_text(&advisory)?)?;
+    assert_eq!(
+        advisory["summary"]["worsened_gaps"], 1,
+        "worsened_gaps must be 1: contract slot regressed from present to missing"
+    );
+    assert_eq!(
+        advisory["summary"]["improved_gaps"], 0,
+        "improved_gaps must be 0: no slot advanced"
+    );
+    assert_eq!(
+        advisory["summary"]["resolved_gaps"], 0,
+        "resolved_gaps must be 0: card is still present (site not removed)"
+    );
+    assert_eq!(
+        advisory["summary"]["new_gaps"], 0,
+        "new_gaps must be 0: site is baseline_known"
+    );
+    assert_eq!(
+        advisory["summary"]["inherited_gaps"], 1,
+        "inherited_gaps must be 1: baseline_known card still open"
+    );
+    assert_eq!(
+        advisory["summary"]["open_actionable_gaps"], 0,
+        "open_actionable_gaps must be 0: baseline_known is not actionable"
+    );
+    // Card must still be baseline_known — NOT a new gap, NOT resolved.
+    assert_eq!(advisory["cards"][0]["class"], "baseline_known");
+
+    // SPEC-0030 single-truth: per-card coverage must agree with summary.
+    // baseline_state must be "worsened" (contract slot regressed present→missing).
+    assert_eq!(
+        advisory["cards"][0]["coverage"]["baseline_state"], "worsened",
+        "per-card baseline_state must be 'worsened' to agree with summary.worsened_gaps=1"
+    );
+    assert_eq!(
+        advisory["cards"][0]["coverage"]["outcome_movement"], "regressed",
+        "per-card outcome_movement must be 'regressed' when contract slot worsened"
+    );
+
+    // Usefulness telemetry must record worsened_cards=1.
+    let out_dir = TempDir::new("unsafe-review-coverage-worsened-e2e")?;
+    run_success([
+        os("first-pr"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--out-dir"),
+        out_dir.path().as_os_str().to_os_string(),
+    ])?;
+    let telemetry_path = out_dir.path().join("usefulness-telemetry.json");
+    let telemetry = parse_json(&fs::read_to_string(&telemetry_path)?)?;
+    assert_eq!(
+        telemetry["card_inventory"]["worsened_cards"], 1,
+        "telemetry must record worsened_cards=1"
+    );
+    assert_eq!(telemetry["card_inventory"]["improved_cards"], 0);
+    assert_eq!(telemetry["card_inventory"]["new_cards"], 0);
+    assert_eq!(telemetry["card_inventory"]["resolved_cards"], 0);
+
+    // PR summary must surface the negative movement signal.
+    let pr_summary = fs::read_to_string(out_dir.path().join("pr-summary.md"))?;
+    assert!(
+        pr_summary.contains("1 worsened"),
+        "pr-summary must surface worsened_gaps=1 as negative movement; got: {}",
+        &pr_summary[..pr_summary.len().min(600)]
+    );
+
+    // no-new-debt exits 1 for worsened gaps (same as new gaps): a worsened
+    // card means evidence coverage regressed on a baseline site, which is a
+    // policy signal worth surfacing as an advisory failure.
+    let violation = run_failure([
+        os("check"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+        os("--policy"),
+        os("no-new-debt"),
+    ])?;
+    let violation_json = parse_json(&stdout_text(&violation)?)?;
+    assert_eq!(violation_json["policy"], "no-new-debt");
+    assert_eq!(
+        violation_json["summary"]["new_gaps"], 0,
+        "new_gaps must be 0: worsened card is not a new gap"
+    );
+    assert_eq!(violation_json["summary"]["worsened_gaps"], 1);
+
+    Ok(())
+}
+
 struct TempDir {
     path: PathBuf,
 }

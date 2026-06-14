@@ -10,8 +10,11 @@ use std::path::Path;
 ///
 /// Ordinal: `Present`(2) > `Weak`(1) > `Missing`(0).  A card is worsened when ANY
 /// slot has a strictly lower ordinal than the snapshot value.
+///
+/// This type is exposed through [`crate::api::AnalyzeOutput::coverage_snapshot`] so that
+/// output renderers outside `unsafe-review-core` can project per-card movement.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct SnapshotCoverage {
+pub struct SnapshotCoverage {
     /// "present", "weak", or "missing"
     pub(crate) contract_coverage: String,
     /// "present", "weak", or "missing"

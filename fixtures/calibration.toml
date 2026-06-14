@@ -20,6 +20,7 @@ required_core_fixtures = [
   "raw_pointer_deref",
   "raw_pointer_deref_brownfield_inherited",
   "raw_pointer_deref_coverage_improved",
+  "raw_pointer_deref_coverage_worsened",
   "raw_pointer_deref_resolved",
   "raw_pointer_deref_alignment_post_check_not_guard",
   "raw_pointer_deref_free_fn_stray_align_not_guard",
@@ -796,6 +797,16 @@ support_tier = "Raw pointer card slice"
 expected_cards = 1
 expected_class = "baseline_known"
 expected_operation_family = "raw_pointer_deref"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_deref_coverage_worsened"
+kind = "positive"
+claim = "coverage-worsened movement: baseline-known raw pointer write card whose contract slot was present in the snapshot; PR removes the # Safety doc → contract_coverage moves present→missing; worsened_gaps=1, improved_gaps=0, resolved_gaps=0; card is still baseline_known, still advisory, still open — NOT resolved, NOT safe"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "baseline_known"
+expected_operation_family = "raw_pointer_write"
 expected_hazard = "pointer_validity"
 
 [[cases]]

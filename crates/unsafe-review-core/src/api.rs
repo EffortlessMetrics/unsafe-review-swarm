@@ -5,8 +5,9 @@ use crate::output::{
     agent, badges, comment_plan, confirmation, gate_manifest, human, json, lsp, markdown, outcome,
     policy_report, receipt_audit, repair_queue, sarif, usefulness_telemetry, witness_plan,
 };
+use crate::policy::SnapshotCoverage;
 use crate::util::path_display;
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -258,6 +259,12 @@ pub struct AnalyzeOutput {
     /// card resolved because we scanned its file and it is gone" from "baseline
     /// card not present because its file was out of diff scope" (SPEC-0030).
     pub diff_scoped_files: BTreeSet<PathBuf>,
+    /// Per-card coverage snapshot loaded from `policy/unsafe-review-baseline-snapshot.toml`.
+    ///
+    /// Output renderers use this to project the per-card `baseline_state`/`outcome_movement`
+    /// from the same slot-level comparison the summary uses (SPEC-0030 §single-truth).
+    /// Empty when no snapshot file exists (no worsened/improved projection possible).
+    pub coverage_snapshot: BTreeMap<String, SnapshotCoverage>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -632,6 +639,7 @@ pub fn collect_context_range(
         &file_cards,
         &output.schema_version,
         &statuses,
+        &output.coverage_snapshot,
     )
 }
 

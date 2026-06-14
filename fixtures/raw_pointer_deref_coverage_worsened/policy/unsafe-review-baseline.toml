@@ -1,0 +1,9 @@
+schema_version = "0.1"
+status = "active"
+
+[[entries]]
+card_id = "UR-raw-pointer-deref-coverage-worsened-fixture-src-lib-rs-write-config-operation-raw_pointer_write-raw-pointer-write-15bafa2f85e2-pointer_validity-c1"
+owner = "baseline-init"
+reason = "captured by `baseline init`; pre-existing debt, not reviewed as safe"
+evidence = "baseline-init: raw pointer write; captured at a point when the safety contract was present"
+review_after = "2027-01-01"
