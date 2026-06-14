@@ -410,6 +410,9 @@ required_core_fixtures = [
   "raw_pointer_read_typed_shadowed_origin_not_guard",
   "raw_pointer_read_other_len_not_guard",
   "raw_pointer_read_reassigned_origin_not_guard",
+  "raw_pointer_read_unaligned_other_len_not_guard",
+  "raw_pointer_write_other_len_not_guard",
+  "raw_pointer_write_same_origin_bounds_guard",
   "raw_pointer_read_unrelated_is_null_not_guard",
   "raw_pointer_read_same_receiver_is_null_guard",
   "pointer_arithmetic_num_ctrl_bytes_guard",
@@ -4647,6 +4650,36 @@ support_tier = "Raw pointer card slice"
 expected_cards = 1
 expected_class = "guard_missing"
 expected_operation_family = "raw_pointer_read"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_read_unaligned_other_len_not_guard"
+kind = "false_positive_control"
+claim = "an unrelated slice length guard must not discharge the bounds obligation for read_unaligned from a different pointer (F3-7)"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read_unaligned"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_write_other_len_not_guard"
+kind = "false_positive_control"
+claim = "an unrelated slice length guard must not discharge the bounds obligation for a raw pointer write (F3-6)"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
+
+[[cases]]
+fixture = "raw_pointer_write_same_origin_bounds_guard"
+kind = "positive"
+claim = "a same-origin size assertion discharges the bounds obligation for a raw pointer write when the pointer traces back to the guarded slice"
+support_tier = "Raw pointer card slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
 expected_hazard = "pointer_validity"
 
 [[cases]]

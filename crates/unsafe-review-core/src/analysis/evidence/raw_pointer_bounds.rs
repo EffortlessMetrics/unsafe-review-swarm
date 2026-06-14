@@ -1,8 +1,8 @@
 use super::{
     branch_still_open_at_operation, compact_code, compact_if_guards, contains_executable_return,
-    contains_simple_assignment_to, has_length_or_bounds_guard, is_simple_identifier,
-    let_binding_name, matching_call_argument_end, matching_code_block_end, receiver_before_marker,
-    strip_block_comments_and_literals,
+    contains_simple_assignment_to, is_simple_identifier, let_binding_name,
+    matching_call_argument_end, matching_code_block_end, receiver_before_marker,
+    split_top_level_pair, strip_block_comments_and_literals,
 };
 
 pub(super) fn has_raw_pointer_read_bounds_evidence(
@@ -11,12 +11,73 @@ pub(super) fn has_raw_pointer_read_bounds_evidence(
 ) -> bool {
     let compact_expression = compact_code(&expression.to_ascii_lowercase());
     let before_operation = strip_block_comments_and_literals(before_operation);
+    // When the read-pointer receiver shape cannot be parsed, do not fall back to the
+    // unscoped length guard: a co-located length comparison on an unrelated variable
+    // would wrongly discharge the bounds obligation (F3-7).
     let Some(pointer) = raw_pointer_read_pointer_receiver(&compact_expression) else {
-        return has_length_or_bounds_guard(&before_operation);
+        return false;
     };
     let before_operation = compact_code(&before_operation);
     RawPointerReadBoundsApplicability::new(&before_operation, pointer)
         .is_some_and(|context| context.has_same_origin_bounds_evidence())
+}
+
+/// Same-origin bounds evidence for a plain `ptr.write(value)` or free-fn write call.
+///
+/// The bounds obligation is discharged only when the length/size guard provably constrains
+/// the SAME slice origin as the write destination — never a co-located unrelated comparison
+/// (F3-6 same-destination scoping).
+pub(super) fn has_raw_pointer_write_bounds_evidence(
+    expression: &str,
+    before_operation: &str,
+) -> bool {
+    let compact_expression = compact_code(&expression.to_ascii_lowercase());
+    let before_operation = strip_block_comments_and_literals(before_operation);
+    // When the write-destination pointer shape cannot be parsed, do not fall back to
+    // the unscoped length guard: a co-located length comparison on an unrelated variable
+    // would wrongly discharge the bounds obligation (F3-6).
+    let Some(pointer) = raw_pointer_write_destination(&compact_expression) else {
+        return false;
+    };
+    let before_operation = compact_code(&before_operation);
+    RawPointerReadBoundsApplicability::new(&before_operation, pointer)
+        .is_some_and(|context| context.has_same_origin_bounds_evidence())
+}
+
+fn raw_pointer_write_destination(compact_expression: &str) -> Option<&str> {
+    if let Some(receiver) = receiver_before_marker(compact_expression, ".write(") {
+        return Some(receiver);
+    }
+    if let Some(receiver) = receiver_before_marker(compact_expression, ".write_volatile(") {
+        return Some(receiver);
+    }
+    raw_pointer_write_function_argument(compact_expression)
+}
+
+fn raw_pointer_write_function_argument(compact_expression: &str) -> Option<&str> {
+    // Try each free-function write form; more specific markers first so that
+    // `ptr::write_unaligned(` does not accidentally match `ptr::write(`.
+    // Write forms are two-argument: `ptr::write(destination, value)` — only the
+    // first argument (the destination pointer) is relevant for same-origin tracing.
+    for marker in &[
+        "ptr::write_unaligned(",
+        "ptr::write_volatile(",
+        "ptr::write(",
+    ] {
+        if let Some(call_pos) = compact_expression.find(marker) {
+            let after_marker = &compact_expression[call_pos + marker.len()..];
+            let argument_end = matching_call_argument_end(after_marker)?;
+            let all_args = &after_marker[..argument_end];
+            // Take only the first argument (before the first top-level comma).
+            let first_arg = split_top_level_pair(all_args).map_or(all_args, |(first, _rest)| first);
+            let argument = first_arg
+                .split_once("as*")
+                .map_or(first_arg, |(argument, _)| argument)
+                .trim();
+            return (!argument.is_empty()).then_some(argument);
+        }
+    }
+    None
 }
 
 fn raw_pointer_read_pointer_receiver(compact_expression: &str) -> Option<&str> {
@@ -33,15 +94,19 @@ fn raw_pointer_read_pointer_receiver(compact_expression: &str) -> Option<&str> {
 }
 
 fn raw_pointer_read_function_argument(compact_expression: &str) -> Option<&str> {
-    let marker = "ptr::read(";
-    let call_pos = compact_expression.find(marker)? + marker.len();
-    let after_marker = &compact_expression[call_pos..];
-    let argument_end = matching_call_argument_end(after_marker)?;
-    let argument = after_marker[..argument_end]
-        .split_once("as*")
-        .map_or(&after_marker[..argument_end], |(argument, _)| argument)
-        .trim();
-    (!argument.is_empty()).then_some(argument)
+    // Try each free-function read form; the first match wins.
+    for marker in &["ptr::read_unaligned(", "ptr::read_volatile(", "ptr::read("] {
+        if let Some(call_pos) = compact_expression.find(marker) {
+            let after_marker = &compact_expression[call_pos + marker.len()..];
+            let argument_end = matching_call_argument_end(after_marker)?;
+            let argument = after_marker[..argument_end]
+                .split_once("as*")
+                .map_or(&after_marker[..argument_end], |(argument, _)| argument)
+                .trim();
+            return (!argument.is_empty()).then_some(argument);
+        }
+    }
+    None
 }
 
 fn pointer_origin_receiver_before(before_operation: &str, pointer: &str) -> Option<String> {

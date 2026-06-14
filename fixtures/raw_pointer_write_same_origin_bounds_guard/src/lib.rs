@@ -1,0 +1,21 @@
+pub struct Header(u32);
+
+pub fn write_header(buf: &mut [u8], value: Header) {
+    assert!(buf.len() >= core::mem::size_of::<Header>());
+    let ptr = buf.as_mut_ptr().cast::<Header>();
+    // SAFETY: fixture validates that a same-origin size assertion discharges
+    // the bounds obligation for a raw pointer write when the pointer traces
+    // back to the guarded slice.
+    unsafe { ptr.write(value) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::write_header;
+
+    #[test]
+    fn writes_header() {
+        let mut buf = [0_u8; 8];
+        write_header(&mut buf, Header(42));
+    }
+}

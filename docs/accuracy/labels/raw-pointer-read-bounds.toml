@@ -189,3 +189,18 @@ expected_discharge_state = "missing"
 expected_witness_route_kinds = ["miri", "cargo-careful"]
 label_source = "fixture_golden"
 rationale = "Bounds evidence for an earlier pointer origin becomes stale after the pointer is reassigned."
+
+[[samples]]
+id = "raw-pointer-read-unaligned-other-len-missing"
+fixture = "raw_pointer_read_unaligned_other_len_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_read_unaligned"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "bounds"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A length guard for an unrelated slice must not discharge the bounds obligation for a read_unaligned from a different pointer (F3-7 same-origin discipline)."

@@ -187,6 +187,7 @@ fixtures = [
   "raw_pointer_read_typed_shadowed_origin_not_guard",
   "raw_pointer_read_other_len_not_guard",
   "raw_pointer_read_reassigned_origin_not_guard",
+  "raw_pointer_read_unaligned_other_len_not_guard",
 ]
 dogfood_targets = []
 label_ledgers = [
@@ -196,11 +197,46 @@ labeled_reports = []
 allowed_public_claim = """
 Fixture-pinned raw pointer read bounds evidence distinguishes same-origin
 len/capacity assertions, typed casts, and open length branches from observed
-branches, shadowed origins, unrelated lengths, and reassigned origins in the
-listed fixtures.
+branches, shadowed origins, unrelated lengths, reassigned origins, and
+unrelated-length read_unaligned/read_volatile controls in the listed fixtures.
 """
 forbidden_claims = [
   "broad raw pointer read soundness",
+  "pointer liveness proof",
+  "alignment proof",
+  "initialized-memory proof",
+  "same-allocation proof",
+  "witness execution proof",
+  "Miri-clean",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
+id = "raw-pointer-write-bounds-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "raw_pointer_write"
+hazard = "pointer_validity"
+support_tier = "Raw pointer card slice"
+fixtures = [
+  "raw_pointer_write_same_origin_bounds_guard",
+  "raw_pointer_write_other_len_not_guard",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/raw-pointer-write-bounds-evidence.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned raw pointer write bounds evidence distinguishes same-origin
+size assertions (which discharge the obligation) from unrelated-slice length
+guards (which must not discharge) in the listed fixtures.
+"""
+forbidden_claims = [
+  "broad raw pointer write soundness",
   "pointer liveness proof",
   "alignment proof",
   "initialized-memory proof",

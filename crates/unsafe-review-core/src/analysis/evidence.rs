@@ -93,7 +93,9 @@ use self::option_state::{ends_with_some_pattern, is_some_binding, match_some_bra
 use self::ownership_discharge::ownership_discharge_state;
 use self::pointer_arithmetic::has_pointer_arithmetic_bounds_guard;
 use self::pointer_live_discharge::pointer_live_discharge_state;
-use self::raw_pointer_bounds::has_raw_pointer_read_bounds_evidence;
+use self::raw_pointer_bounds::{
+    has_raw_pointer_read_bounds_evidence, has_raw_pointer_write_bounds_evidence,
+};
 pub(crate) use self::reach_scan::reach_evidence;
 use self::receiver_path::{
     contains_receiver_fragment, contains_receiver_path, is_receiver_path_char,

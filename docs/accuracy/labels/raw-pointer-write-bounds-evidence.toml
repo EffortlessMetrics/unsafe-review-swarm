@@ -1,0 +1,39 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "raw-pointer-write-bounds-evidence"
+operation_family = "raw_pointer_write"
+hazard = "pointer_validity"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = "Static unsafe contract review only. These labels describe fixture-pinned ReviewCard bounds evidence behavior for raw pointer writes; they are not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not calibrated precision or recall, not witness adequacy, and not policy readiness."
+
+
+[[samples]]
+id = "raw-pointer-write-same-origin-bounds-present"
+fixture = "raw_pointer_write_same_origin_bounds_guard"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "bounds"
+expected_contract_state = "present"
+expected_discharge_state = "present"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A same-origin size assertion discharges the raw pointer write bounds obligation when the pointer traces back to the guarded slice."
+
+[[samples]]
+id = "raw-pointer-write-other-len-missing"
+fixture = "raw_pointer_write_other_len_not_guard"
+kind = "false_positive_control"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "raw_pointer_write"
+expected_hazard = "pointer_validity"
+expected_obligation_key = "bounds"
+expected_contract_state = "present"
+expected_discharge_state = "missing"
+expected_witness_route_kinds = ["miri", "cargo-careful"]
+label_source = "fixture_golden"
+rationale = "A length guard for an unrelated slice must not discharge the bounds obligation for a raw pointer write to a different destination."
