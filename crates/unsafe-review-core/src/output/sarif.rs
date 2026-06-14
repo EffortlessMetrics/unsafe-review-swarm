@@ -122,7 +122,7 @@ impl From<&ReviewCard> for SarifResult {
     fn from(card: &ReviewCard) -> Self {
         Self {
             rule_id: card.class.as_str(),
-            level: sarif_level(&card.class),
+            level: card.class.sarif_level(),
             message: SarifText {
                 text: format!("{}: {}", card.class.as_str(), card.next_action.summary),
             },
@@ -306,25 +306,6 @@ fn sarif_rule_description(class: &ReviewClass) -> &'static str {
     }
 }
 
-fn sarif_level(class: &ReviewClass) -> &'static str {
-    match class {
-        ReviewClass::ContractMissing
-        | ReviewClass::GuardMissing
-        | ReviewClass::ReachableUnwitnessed
-        | ReviewClass::RequiresLoom
-        | ReviewClass::RequiresSanitizer
-        | ReviewClass::RequiresKaniOrCrux
-        | ReviewClass::MiriUnsupported
-        | ReviewClass::WitnessMismatch => "warning",
-        ReviewClass::GuardedAndWitnessed | ReviewClass::BaselineKnown | ReviewClass::Suppressed => {
-            "none"
-        }
-        ReviewClass::GuardedUnwitnessed
-        | ReviewClass::UnsafeUnreached
-        | ReviewClass::StaticUnknown => "note",
-    }
-}
-
 fn scope_label(output: &AnalyzeOutput) -> &'static str {
     match output.scope {
         crate::api::Scope::Diff => "diff",
@@ -437,7 +418,7 @@ mod tests {
 
         for (class, expected_rule_id, expected_level) in cases {
             assert_eq!(class.as_str(), expected_rule_id);
-            assert_eq!(sarif_level(&class), expected_level);
+            assert_eq!(class.sarif_level(), expected_level);
         }
     }
 

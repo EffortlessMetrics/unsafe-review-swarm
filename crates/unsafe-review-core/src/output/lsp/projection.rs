@@ -389,12 +389,16 @@ fn position_for(card: &ReviewCard) -> LspPosition {
     }
 }
 
+/// Return the LSP `DiagnosticSeverity` integer derived from the card's class.
+///
+/// Severity encodes "what kind of review concern is this?" and must agree
+/// with the SARIF `level` emitted by the same card (both derive from
+/// [`ReviewClass::lsp_severity`] / [`ReviewClass::sarif_level`]).
+///
+/// Priority is a ranking/ordering/budget signal only and is intentionally
+/// NOT used here.
 fn severity_for(card: &ReviewCard) -> usize {
-    if matches!(card.priority, Priority::High) {
-        2
-    } else {
-        3
-    }
+    card.class.lsp_severity()
 }
 
 fn status_for(output: &AnalyzeOutput) -> LspStatus {
