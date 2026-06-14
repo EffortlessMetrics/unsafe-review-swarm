@@ -430,8 +430,8 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
                 && action["payload"]["kind"] == "unsafe-review.related_test"
                 && action["payload"]["card_id"].as_str() == Some(card_id)
                 && action["payload"]["file"] == "src/lib.rs"
-                && action["payload"]["line"] == 3
-                && action["payload"]["name"] == "read_header"
+                && action["payload"]["line"] == 16
+                && action["payload"]["name"] == "reads_header"
         })
     }));
     assert!(lsp["code_actions"].as_array().is_some_and(|actions| {
@@ -532,7 +532,7 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
     );
     assert_eq!(
         packet["source_context"]["related_tests"][0]["name"],
-        "read_header"
+        "reads_header"
     );
     assert!(packet["witness_routes"].is_array());
     assert_eq!(packet["agent_readiness"]["ready"], true);

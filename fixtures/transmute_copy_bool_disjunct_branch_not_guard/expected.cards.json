@@ -41,9 +41,9 @@
           "summary": "Transmute layout size evidence was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `copy_byte_to_bool_disjunct`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `copy_byte_to_bool_disjunct` was found"
         },
         "witness": {
           "present": false,
@@ -65,9 +65,9 @@
           "summary": "No obligation-specific guard code was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `copy_byte_to_bool_disjunct`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `copy_byte_to_bool_disjunct` was found"
         },
         "witness": {
           "present": false,
@@ -78,7 +78,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "Some inferred safety obligations are missing local guard evidence",
-    "reach": "1 related test file(s) mention owner `copy_byte_to_bool_disjunct`",
+    "reach": "No static test mention of owner `copy_byte_to_bool_disjunct` was found",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -96,6 +96,7 @@
     ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
     "next_action": "Add or expose the local guard that discharges the `transmute` safety obligation.",

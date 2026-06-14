@@ -1,0 +1,17 @@
+// Negative-control (self-reach): the test function name matches the owner name.
+// The test body does NOT call the owner.  A function definition whose name
+// equals the owner must NOT self-credit reach.
+
+pub unsafe fn collector(ptr: *mut u8) -> *mut u8 {
+    // SAFETY: caller must guarantee ptr is valid for read and write.
+    ptr
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn collector() {
+        // This test is named after the owner but never invokes it.
+        assert_eq!(1 + 1, 2);
+    }
+}

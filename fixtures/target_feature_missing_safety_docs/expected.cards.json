@@ -38,9 +38,9 @@
           "summary": "No obligation-specific guard code was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `find_raw`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `find_raw` was found"
         },
         "witness": {
           "present": false,
@@ -51,7 +51,7 @@
     ],
     "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `find_raw`",
+    "reach": "No static test mention of owner `find_raw` was found",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -64,6 +64,7 @@
     "missing": [
       "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
       "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
     "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",

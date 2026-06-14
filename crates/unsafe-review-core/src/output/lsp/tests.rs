@@ -232,8 +232,8 @@ fn lsp_projection_is_parseable_and_read_only() -> Result<(), String> {
                 && action["payload"]["kind"] == "unsafe-review.related_test"
                 && action["payload"]["card_id"] == value["diagnostics"][0]["card_id"]
                 && action["payload"]["file"] == "src/lib.rs"
-                && action["payload"]["line"] == 3
-                && action["payload"]["name"] == "read_header"
+                && action["payload"]["line"] == 16
+                && action["payload"]["name"] == "reads_header"
         })
     }));
     assert!(value["code_actions"].as_array().is_some_and(|actions| {

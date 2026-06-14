@@ -2,6 +2,84 @@ use crate::domain::{ReachEvidence, RelatedTest};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// Returns true when `line` contains the owner in a **call or use shape**.
+///
+/// Accepted shapes (all require the owner to appear as a whole identifier):
+/// - `owner(` — free call or tuple-struct constructor
+/// - `.owner(` — method call
+/// - `::owner(` — qualified call
+/// - `owner!` — macro invocation
+/// - `owner {` — struct literal / record constructor
+///
+/// A bare identifier (in a comment, a type position, or an unrelated token) is
+/// NOT sufficient.  This is the owner-decided rule: "bare static mention is not
+/// reach; a call inside test scope can be reach."
+///
+/// Self-reach exclusion: a function *definition* (`fn owner(` or `fn owner {`)
+/// does NOT count, because the owner appears only as the function's own name,
+/// not as a call site.
+fn line_has_owner_call_shape(line: &str, owner: &str) -> bool {
+    if owner.is_empty() {
+        return false;
+    }
+    let owner_bytes = owner.as_bytes();
+    let line_bytes = line.as_bytes();
+    let owner_len = owner_bytes.len();
+    let mut start = 0usize;
+    while start + owner_len <= line_bytes.len() {
+        let Some(pos) = line[start..].find(owner) else {
+            break;
+        };
+        let abs = start + pos;
+        if is_ident_boundary(line_bytes, abs, owner_len) {
+            // Check what immediately follows the owner identifier (skip whitespace).
+            let after_pos = abs + owner_len;
+            // Find the first non-whitespace byte at or after after_pos.
+            let next_non_ws = line_bytes[after_pos..]
+                .iter()
+                .position(|&b| b != b' ' && b != b'\t')
+                .map(|p| after_pos + p);
+            let call_suffix = next_non_ws.map(|p| line_bytes[p]);
+            // `(` — free/tuple/qualified call, `!` — macro, `{` — struct literal.
+            if matches!(call_suffix, Some(b'(' | b'!' | b'{')) {
+                // Self-reach exclusion: `fn owner(` / `fn owner {` is a function
+                // definition, not a call site.  The keyword `fn` must not appear
+                // immediately before the owner (with only whitespace between).
+                if is_fn_definition(line_bytes, abs) {
+                    start = abs + 1;
+                    continue;
+                }
+                return true;
+            }
+        }
+        start = abs + 1;
+    }
+    false
+}
+
+/// Returns true when `owner` at byte position `abs` in `line_bytes` is
+/// preceded only by `fn` (with any amount of whitespace between them).
+/// This is the syntactic marker that the owner appears as a function *name*
+/// (a definition site), not a call site.
+fn is_fn_definition(line_bytes: &[u8], abs: usize) -> bool {
+    // Walk backwards past whitespace.
+    let mut i = abs.saturating_sub(1);
+    while i > 0 && (line_bytes[i] == b' ' || line_bytes[i] == b'\t') {
+        i = i.saturating_sub(1);
+    }
+    // i now points at the last non-whitespace byte before the owner.
+    // Check if bytes [i-1..=i] spell "fn" (or the very start of a "fn" keyword).
+    if i >= 1 && line_bytes[i] == b'n' && line_bytes[i - 1] == b'f' {
+        // Make sure this `fn` is itself whole-identifier-bounded.
+        let fn_start = i - 1;
+        let before_fn_ok = fn_start == 0 || !is_ident_char(line_bytes[fn_start - 1]);
+        // After the `n` must be whitespace (already confirmed: we walked past WS).
+        before_fn_ok
+    } else {
+        false
+    }
+}
+
 /// Returns true when `owner` appears in `text` as a whole identifier — i.e. every
 /// occurrence is bounded on both sides by a non-identifier character (or the
 /// start/end of the text).  Used as a cheap prefilter before the per-line check.
@@ -25,11 +103,6 @@ fn text_contains_owner_as_ident(text: &str, owner: &str) -> bool {
         }
     }
     false
-}
-
-/// Returns true when `owner` appears in `line` as a whole identifier.
-fn line_contains_owner_as_ident(line: &str, owner: &str) -> bool {
-    text_contains_owner_as_ident(line, owner)
 }
 
 /// Returns true when the slice `bytes[pos..pos+len]` is surrounded by
@@ -122,11 +195,12 @@ fn reach_in_mixed_file(text: &str, owner: &str) -> Option<(String, usize)> {
             last_test = Some((name, line_no));
         }
 
-        // Credit the owner mention only when we are inside a test scope.
-        if test_depth > 0 && line_contains_owner_as_ident(line, owner) {
+        // Credit reach only when we are inside a test scope AND the line has a
+        // call/use shape (not a bare mention or a comment).
+        if test_depth > 0 && line_has_owner_call_shape(line, owner) {
             let (name, ln) = last_test
                 .clone()
-                .unwrap_or_else(|| (format!("mentions {owner}"), line_no));
+                .unwrap_or_else(|| (format!("calls {owner}"), line_no));
             return Some((name, ln));
         }
     }
@@ -172,10 +246,10 @@ pub(crate) fn reach_evidence(
                 if let Some(name) = parse_test_name(line) {
                     last_test = Some((name, line_no));
                 }
-                if line_contains_owner_as_ident(line, owner) {
+                if line_has_owner_call_shape(line, owner) {
                     let (name, ln) = last_test
                         .clone()
-                        .unwrap_or_else(|| (format!("mentions {owner}"), line_no));
+                        .unwrap_or_else(|| (format!("calls {owner}"), line_no));
                     result = Some((name, ln));
                     break;
                 }

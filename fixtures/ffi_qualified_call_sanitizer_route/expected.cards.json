@@ -40,9 +40,9 @@
           "summary": "No obligation-specific guard code was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `len`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `len` was found"
         },
         "witness": {
           "present": false,
@@ -64,9 +64,9 @@
           "summary": "No obligation-specific guard code was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `len`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `len` was found"
         },
         "witness": {
           "present": false,
@@ -77,7 +77,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `len`",
+    "reach": "No static test mention of owner `len` was found",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -101,6 +101,7 @@
     ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
     "next_action": "Use sanitizer/cargo-careful or an explicit FFI boundary contract; Miri may not exercise this seam.",
