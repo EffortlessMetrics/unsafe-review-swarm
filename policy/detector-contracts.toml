@@ -1,0 +1,11 @@
+schema_version = "1.0"
+policy = "detector-contracts"
+owner = "core / analysis"
+status = "empty"
+
+# Detector-discipline contract ledger. Schema defined in
+# UNSAFE-REVIEW-SPEC-0040. Each future [[contract]] entry declares which D1–D5
+# discipline obligations (UNSAFE-REVIEW-SPEC-0005 appendix) a detector requires,
+# plus its positive/negative control fixtures and projecting surfaces. The
+# validating gate (check-detector-contracts) and POLICY_FILES registration land
+# in a later control-plane PR; this scaffold is intentionally empty (no entries).

@@ -47,7 +47,8 @@ Specs define behavior. They do not carry the PR queue.
 36. [PR-gate composite GitHub Action](UNSAFE-REVIEW-SPEC-0037-pr-gate-composite-action.md)
 37. [Low-noise usefulness telemetry](UNSAFE-REVIEW-SPEC-0038-low-noise-usefulness-telemetry.md)
 38. [Scheduled corpus backstop](UNSAFE-REVIEW-SPEC-0039-scheduled-corpus-backstop.md)
-39. [Syntax-first dispatch architecture](UNSAFE-REVIEW-SPEC-0041-syntax-first-dispatch-architecture.md)
+39. [Detector-contracts ledger](UNSAFE-REVIEW-SPEC-0040-detector-contracts-ledger.md)
+40. [Syntax-first dispatch architecture](UNSAFE-REVIEW-SPEC-0041-syntax-first-dispatch-architecture.md)
 
 
 ## Appendices
