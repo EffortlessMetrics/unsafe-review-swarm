@@ -7,9 +7,9 @@ status = "partial"
 # UNSAFE-REVIEW-SPEC-0040. Each [[contract]] entry declares which D1-D5
 # discipline obligations (UNSAFE-REVIEW-SPEC-0005 appendix) a detector requires,
 # plus its positive/negative control fixtures and projecting surfaces. The
-# validating gate (check-detector-contracts) is informational in this phase;
-# findings print but do not fail the gate. Enforcement for registered families
-# flips on once negative controls are confirmed for every entry.
+# validating gate (check-detector-contracts) is enforcing: structural violations
+# and empty negative_fixtures without a documented gap (proof_gap + owner +
+# review_after) fail check-pr.
 
 [[contract]]
 operation_family = "get_unchecked"

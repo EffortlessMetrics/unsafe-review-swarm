@@ -986,23 +986,35 @@ fn check_policy() -> Result<(), String> {
     Ok(())
 }
 
-/// Informational gate: validates ledger shape of `policy/detector-contracts.toml`.
-/// Always returns Ok — findings are printed but never fail the gate in this phase.
-fn check_detector_contracts() -> Result<(), String> {
-    let path = DETECTOR_CONTRACTS_LEDGER;
-    let value = parse_toml_file(Path::new(path))?;
-    require_toml_string(&value, "schema_version", path)?;
+/// Report from a pure gate-evaluation function.
+///
+/// Tracked findings are documented gaps (owner + review_after present) that pass with a warning.
+/// Blocking findings are structural errors or undocumented gaps that fail the gate.
+struct GateReport {
+    tracked: Vec<String>,
+    blocking: Vec<String>,
+}
+
+/// Pure (no file I/O) evaluation of a parsed detector-contracts ledger value.
+///
+/// Blocking findings: malformed schema, missing/empty identity, duplicate id, empty required
+/// arrays (obligations/surfaces), non-array where array required, missing required scalars.
+/// The negative_fixtures gap is blocking unless the contract carries non-empty `proof_gap` AND
+/// non-empty `owner` AND non-empty `review_after` — in that case it is a tracked exception.
+fn evaluate_detector_contracts(value: &toml::Value, path: &str) -> Result<GateReport, String> {
+    let mut report = GateReport {
+        tracked: Vec::new(),
+        blocking: Vec::new(),
+    };
 
     // [[contract]] key is absent in the empty scaffold — treat as zero entries.
     let Some(contracts_val) = value.get("contract") else {
-        println!("check-detector-contracts: ok (0 contracts, 0 findings)");
-        return Ok(());
+        return Ok(report);
     };
     let contracts = contracts_val
         .as_array()
         .ok_or_else(|| format!("{path} `contract` must be an array"))?;
 
-    let mut findings: Vec<String> = Vec::new();
     let mut seen_ids: Vec<String> = Vec::new();
 
     for (idx, entry) in contracts.iter().enumerate() {
@@ -1010,76 +1022,114 @@ fn check_detector_contracts() -> Result<(), String> {
             .as_table()
             .ok_or_else(|| format!("{path} contract[{idx}] must be a table"))?;
 
-        // Hard-require identity field `id`; use operation_family as the identity per spec.
+        // Hard-require identity field; use operation_family as the identity per spec.
         let id = match table.get("operation_family").and_then(toml::Value::as_str) {
             Some(s) if !s.trim().is_empty() => s.to_string(),
             _ => {
-                findings.push(format!(
+                report.blocking.push(format!(
                     "{path} contract[{idx}]: missing or empty `operation_family`"
                 ));
                 format!("<contract[{idx}]>")
             }
         };
 
-        // Duplicate id check (informational).
+        // Duplicate id check — blocking.
         if seen_ids.contains(&id) {
-            findings.push(format!(
+            report.blocking.push(format!(
                 "{path} contract `{id}`: duplicate operation_family"
             ));
         } else {
             seen_ids.push(id.clone());
         }
 
-        // Soft-check obligations (array — per-entry field).
+        // obligations: required non-empty array — blocking.
         match entry.get("obligations") {
             None => {
-                findings.push(format!("contract `{id}`: no obligations declared"));
+                report
+                    .blocking
+                    .push(format!("contract `{id}`: no obligations declared"));
             }
             Some(arr_val) => match arr_val.as_array() {
-                None => findings.push(format!("contract `{id}`: `obligations` must be an array")),
+                None => report
+                    .blocking
+                    .push(format!("contract `{id}`: `obligations` must be an array")),
                 Some(arr) if arr.is_empty() => {
-                    findings.push(format!("contract `{id}`: obligations array is empty"));
+                    report
+                        .blocking
+                        .push(format!("contract `{id}`: obligations array is empty"));
                 }
                 _ => {}
             },
         }
 
-        // Soft-check negative_fixtures (array).
-        match entry.get("negative_fixtures") {
-            None => {
-                findings.push(format!("contract `{id}`: no negative_fixtures"));
-            }
+        // negative_fixtures: empty/absent is blocking UNLESS proof_gap + owner + review_after
+        // are all non-empty — then it is a tracked exception.
+        let neg_gap = match entry.get("negative_fixtures") {
+            None => true,
             Some(arr_val) => match arr_val.as_array() {
                 None => {
-                    findings.push(format!(
+                    report.blocking.push(format!(
                         "contract `{id}`: `negative_fixtures` must be an array"
                     ));
+                    false // already reported as blocking (wrong type)
                 }
-                Some(arr) if arr.is_empty() => {
-                    findings.push(format!("contract `{id}`: no negative_fixtures"));
-                }
-                _ => {}
+                Some(arr) => arr.is_empty(),
             },
+        };
+        if neg_gap {
+            let proof_gap = table
+                .get("proof_gap")
+                .and_then(toml::Value::as_str)
+                .map(|s| s.trim())
+                .unwrap_or("")
+                .to_string();
+            let owner = table
+                .get("owner")
+                .and_then(toml::Value::as_str)
+                .map(|s| s.trim())
+                .unwrap_or("")
+                .to_string();
+            let review_after = table
+                .get("review_after")
+                .and_then(toml::Value::as_str)
+                .map(|s| s.trim())
+                .unwrap_or("")
+                .to_string();
+            if !proof_gap.is_empty() && !owner.is_empty() && !review_after.is_empty() {
+                report.tracked.push(format!(
+                    "contract `{id}`: no negative_fixtures (tracked exception — owner: {owner}, review_after: {review_after})"
+                ));
+            } else {
+                report.blocking.push(format!(
+                    "contract `{id}`: no negative_fixtures (add fixtures or document gap with proof_gap + owner + review_after)"
+                ));
+            }
         }
 
-        // Soft-check surfaces (array).
+        // surfaces: required non-empty array — blocking.
         match entry.get("surfaces") {
             None => {
-                findings.push(format!("contract `{id}`: no surfaces declared"));
+                report
+                    .blocking
+                    .push(format!("contract `{id}`: no surfaces declared"));
             }
             Some(arr_val) => match arr_val.as_array() {
                 None => {
-                    findings.push(format!("contract `{id}`: `surfaces` must be an array"));
+                    report
+                        .blocking
+                        .push(format!("contract `{id}`: `surfaces` must be an array"));
                 }
                 Some(arr) if arr.is_empty() => {
-                    findings.push(format!("contract `{id}`: surfaces array is empty"));
+                    report
+                        .blocking
+                        .push(format!("contract `{id}`: surfaces array is empty"));
                 }
                 _ => {}
             },
         }
     }
 
-    // Handle optional [[exception]] entries.
+    // Handle optional [[exception]] entries — structural errors are blocking.
     if let Some(exceptions_val) = value.get("exception") {
         let exceptions = exceptions_val
             .as_array()
@@ -1092,37 +1142,77 @@ fn check_detector_contracts() -> Result<(), String> {
             let exc_id = match table.get("id").and_then(toml::Value::as_str) {
                 Some(s) if !s.trim().is_empty() => s.to_string(),
                 _ => {
-                    findings.push(format!("{path} exception[{idx}]: missing or empty `id`"));
+                    report
+                        .blocking
+                        .push(format!("{path} exception[{idx}]: missing or empty `id`"));
                     format!("<exception[{idx}]>")
                 }
             };
             if seen_exc_ids.contains(&exc_id) {
-                findings.push(format!("{path} exception `{exc_id}`: duplicate id"));
+                report
+                    .blocking
+                    .push(format!("{path} exception `{exc_id}`: duplicate id"));
             } else {
                 seen_exc_ids.push(exc_id);
             }
         }
     }
 
-    for f in &findings {
-        println!("{f}");
-    }
-    println!(
-        "check-detector-contracts: ok ({} contracts, {} findings)",
-        contracts.len(),
-        findings.len()
-    );
-    Ok(())
+    Ok(report)
 }
 
-/// Informational gate: validates ledger shape of `policy/stance-decisions.toml`.
-/// Always returns Ok — findings are printed but never fail the gate in this phase.
-fn check_stance_decisions() -> Result<(), String> {
-    let path = STANCE_DECISIONS_LEDGER;
+/// Enforcing gate: validates ledger shape of `policy/detector-contracts.toml`.
+///
+/// Structural violations (malformed TOML, missing identity, duplicate id, empty required arrays)
+/// and undocumented negative-fixture gaps are blocking — they fail check-pr. A contract that
+/// lacks negative_fixtures passes only when it carries a non-empty `proof_gap`, `owner`, and
+/// `review_after` (the documented-gap path), which is printed as a tracked exception.
+fn check_detector_contracts() -> Result<(), String> {
+    let path = DETECTOR_CONTRACTS_LEDGER;
     let value = parse_toml_file(Path::new(path))?;
     require_toml_string(&value, "schema_version", path)?;
 
-    // [[stance]] may be absent if ledger is somehow empty — guard with .get().
+    let num_contracts = value
+        .get("contract")
+        .and_then(toml::Value::as_array)
+        .map(|v| v.len())
+        .unwrap_or(0);
+
+    let report = evaluate_detector_contracts(&value, path)?;
+
+    for f in &report.tracked {
+        println!("{f} (tracked exception)");
+    }
+    for f in &report.blocking {
+        println!("{f}");
+    }
+
+    if report.blocking.is_empty() {
+        println!(
+            "check-detector-contracts: ok ({num_contracts} contracts, {} tracked exception(s))",
+            report.tracked.len()
+        );
+        Ok(())
+    } else {
+        Err(format!(
+            "check-detector-contracts: {} blocking finding(s)",
+            report.blocking.len()
+        ))
+    }
+}
+
+/// Pure (no file I/O) evaluation of a parsed stance-decisions ledger value.
+///
+/// Blocking findings: malformed schema, missing/empty identity, duplicate id, missing required
+/// scalars (summary/rationale/owner/linked_spec), missing or empty linked_tests array.
+/// A non-empty `proof_gap` is a tracked exception iff the stance also carries non-empty `owner`
+/// AND non-empty `review_after`; otherwise it is a blocking finding.
+fn evaluate_stance_decisions(value: &toml::Value, path: &str) -> Result<GateReport, String> {
+    let mut report = GateReport {
+        tracked: Vec::new(),
+        blocking: Vec::new(),
+    };
+
     let stances: &[toml::Value] = match value.get("stance") {
         None => &[],
         Some(v) => v
@@ -1130,7 +1220,6 @@ fn check_stance_decisions() -> Result<(), String> {
             .ok_or_else(|| format!("{path} `stance` must be an array"))?,
     };
 
-    let mut findings: Vec<String> = Vec::new();
     let mut seen_ids: Vec<String> = Vec::new();
 
     for (idx, entry) in stances.iter().enumerate() {
@@ -1138,76 +1227,144 @@ fn check_stance_decisions() -> Result<(), String> {
             .as_table()
             .ok_or_else(|| format!("{path} stance[{idx}] must be a table"))?;
 
-        // Hard-require identity field `id`.
+        // Hard-require identity field `id` — blocking.
         let id = match table.get("id").and_then(toml::Value::as_str) {
             Some(s) if !s.trim().is_empty() => s.to_string(),
             _ => {
-                findings.push(format!("{path} stance[{idx}]: missing or empty `id`"));
+                report
+                    .blocking
+                    .push(format!("{path} stance[{idx}]: missing or empty `id`"));
                 format!("<stance[{idx}]>")
             }
         };
 
-        // Duplicate id check (informational).
+        // Duplicate id — blocking.
         if seen_ids.contains(&id) {
-            findings.push(format!("stance `{id}`: duplicate id"));
+            report.blocking.push(format!("stance `{id}`: duplicate id"));
         } else {
             seen_ids.push(id.clone());
         }
 
-        // Soft-check required descriptive fields.
+        // Required descriptive fields — blocking.
         for key in &["summary", "rationale", "owner", "linked_spec"] {
             match table.get(*key).and_then(toml::Value::as_str) {
-                None => findings.push(format!("stance `{id}`: missing `{key}`")),
+                None => report
+                    .blocking
+                    .push(format!("stance `{id}`: missing `{key}`")),
                 Some(s) if s.trim().is_empty() => {
-                    findings.push(format!("stance `{id}`: `{key}` is empty"));
+                    report
+                        .blocking
+                        .push(format!("stance `{id}`: `{key}` is empty"));
                 }
                 _ => {}
             }
         }
 
-        // Soft-check linked_tests (array).
+        // linked_tests: required non-empty array — blocking.
         match table.get("linked_tests") {
             None => {
-                findings.push(format!("stance `{id}`: missing `linked_tests`"));
+                report
+                    .blocking
+                    .push(format!("stance `{id}`: missing `linked_tests`"));
             }
             Some(arr_val) => match arr_val.as_array() {
-                None => findings.push(format!("stance `{id}`: `linked_tests` must be an array")),
+                None => report
+                    .blocking
+                    .push(format!("stance `{id}`: `linked_tests` must be an array")),
                 Some(arr) if arr.is_empty() => {
-                    findings.push(format!("stance `{id}`: `linked_tests` is empty"));
+                    report
+                        .blocking
+                        .push(format!("stance `{id}`: `linked_tests` is empty"));
                 }
                 _ => {}
             },
         }
 
-        // Soft-check proof_gap: if present and non-empty, emit a finding.
+        // proof_gap: tracked exception iff owner + review_after are also non-empty; else blocking.
         if let Some(gap_str) = table
             .get("proof_gap")
             .and_then(toml::Value::as_str)
             .filter(|s| !s.trim().is_empty())
         {
-            findings.push(format!("stance `{id}`: proof_gap: {gap_str}"));
+            let owner = table
+                .get("owner")
+                .and_then(toml::Value::as_str)
+                .map(|s| s.trim())
+                .unwrap_or("")
+                .to_string();
+            let review_after = table
+                .get("review_after")
+                .and_then(toml::Value::as_str)
+                .map(|s| s.trim())
+                .unwrap_or("")
+                .to_string();
+            if !owner.is_empty() && !review_after.is_empty() {
+                report.tracked.push(format!(
+                    "stance `{id}`: proof_gap — {gap_str} (owner: {owner}, review_after: {review_after})"
+                ));
+            } else {
+                report.blocking.push(format!(
+                    "stance `{id}`: proof_gap requires non-empty owner + review_after to be a tracked exception"
+                ));
+            }
         }
     }
 
-    for f in &findings {
-        println!("{f}");
-    }
-    println!(
-        "check-stance-decisions: ok ({} stances, {} findings)",
-        stances.len(),
-        findings.len()
-    );
-    Ok(())
+    Ok(report)
 }
 
-/// Informational gate: validates ledger shape of `policy/spec-coverage.toml`.
-/// Always returns Ok — findings are printed but never fail the gate in this phase.
-fn check_spec_coverage() -> Result<(), String> {
-    let path = SPEC_COVERAGE_LEDGER;
+/// Enforcing gate: validates ledger shape of `policy/stance-decisions.toml`.
+///
+/// Structural violations and undocumented proof gaps are blocking. A stance with a non-empty
+/// `proof_gap` passes only when it also carries non-empty `owner` and `review_after` (the
+/// documented-gap path), which is printed as a tracked exception. There is no tracked-exception
+/// path for stances that are missing required fields.
+fn check_stance_decisions() -> Result<(), String> {
+    let path = STANCE_DECISIONS_LEDGER;
     let value = parse_toml_file(Path::new(path))?;
     require_toml_string(&value, "schema_version", path)?;
 
-    // [[field]] may be absent if ledger is empty — guard with .get().
+    let num_stances = value
+        .get("stance")
+        .and_then(toml::Value::as_array)
+        .map(|v| v.len())
+        .unwrap_or(0);
+
+    let report = evaluate_stance_decisions(&value, path)?;
+
+    for f in &report.tracked {
+        println!("{f} (tracked exception)");
+    }
+    for f in &report.blocking {
+        println!("{f}");
+    }
+
+    if report.blocking.is_empty() {
+        println!(
+            "check-stance-decisions: ok ({num_stances} stances, {} tracked exception(s))",
+            report.tracked.len()
+        );
+        Ok(())
+    } else {
+        Err(format!(
+            "check-stance-decisions: {} blocking finding(s)",
+            report.blocking.len()
+        ))
+    }
+}
+
+/// Pure (no file I/O) evaluation of a parsed spec-coverage ledger value.
+///
+/// Blocking findings: malformed schema, missing/empty identity, duplicate name, missing required
+/// scalars (canonical_source), missing or empty surfaces array, and single_truth=false (always
+/// blocking — a single-truth violation is a defect to fix, not a gap to ledger; there is no
+/// tracked-exception path for spec-coverage).
+fn evaluate_spec_coverage(value: &toml::Value, path: &str) -> Result<GateReport, String> {
+    let mut report = GateReport {
+        tracked: Vec::new(),
+        blocking: Vec::new(),
+    };
+
     let fields: &[toml::Value] = match value.get("field") {
         None => &[],
         Some(v) => v
@@ -1215,7 +1372,6 @@ fn check_spec_coverage() -> Result<(), String> {
             .ok_or_else(|| format!("{path} `field` must be an array"))?,
     };
 
-    let mut findings: Vec<String> = Vec::new();
     let mut seen_names: Vec<String> = Vec::new();
 
     for (idx, entry) in fields.iter().enumerate() {
@@ -1223,64 +1379,106 @@ fn check_spec_coverage() -> Result<(), String> {
             .as_table()
             .ok_or_else(|| format!("{path} field[{idx}] must be a table"))?;
 
-        // Hard-require identity field `name`.
+        // Hard-require identity field `name` — blocking.
         let name = match table.get("name").and_then(toml::Value::as_str) {
             Some(s) if !s.trim().is_empty() => s.to_string(),
             _ => {
-                findings.push(format!("{path} field[{idx}]: missing or empty `name`"));
+                report
+                    .blocking
+                    .push(format!("{path} field[{idx}]: missing or empty `name`"));
                 format!("<field[{idx}]>")
             }
         };
 
-        // Duplicate name check (informational).
+        // Duplicate name — blocking.
         if seen_names.contains(&name) {
-            findings.push(format!("field `{name}`: duplicate name"));
+            report
+                .blocking
+                .push(format!("field `{name}`: duplicate name"));
         } else {
             seen_names.push(name.clone());
         }
 
-        // Soft-check canonical_source.
+        // canonical_source: required non-empty scalar — blocking.
         match table.get("canonical_source").and_then(toml::Value::as_str) {
-            None => findings.push(format!("field `{name}`: missing `canonical_source`")),
+            None => report
+                .blocking
+                .push(format!("field `{name}`: missing `canonical_source`")),
             Some(s) if s.trim().is_empty() => {
-                findings.push(format!("field `{name}`: `canonical_source` is empty"));
+                report
+                    .blocking
+                    .push(format!("field `{name}`: `canonical_source` is empty"));
             }
             _ => {}
         }
 
-        // Soft-check surfaces (array).
+        // surfaces: required non-empty array — blocking.
         match table.get("surfaces") {
             None => {
-                findings.push(format!("field `{name}`: missing `surfaces`"));
+                report
+                    .blocking
+                    .push(format!("field `{name}`: missing `surfaces`"));
             }
             Some(arr_val) => match arr_val.as_array() {
-                None => findings.push(format!("field `{name}`: `surfaces` must be an array")),
+                None => report
+                    .blocking
+                    .push(format!("field `{name}`: `surfaces` must be an array")),
                 Some(arr) if arr.is_empty() => {
-                    findings.push(format!("field `{name}`: `surfaces` is empty"));
+                    report
+                        .blocking
+                        .push(format!("field `{name}`: `surfaces` is empty"));
                 }
                 _ => {}
             },
         }
 
-        // single_truth == false → informational finding (NOT a gate failure).
+        // single_truth=false is always blocking — a single-truth violation is a defect, not a gap.
+        // There is no tracked-exception path for spec-coverage.
         if let Some(false) = table.get("single_truth").and_then(toml::Value::as_bool) {
             let note = table
                 .get("note")
                 .and_then(toml::Value::as_str)
                 .unwrap_or("");
-            findings.push(format!("field `{name}`: single_truth=false ({note})"));
+            report
+                .blocking
+                .push(format!("field `{name}`: single_truth=false ({note})"));
         }
     }
 
-    for f in &findings {
+    Ok(report)
+}
+
+/// Enforcing gate: validates ledger shape of `policy/spec-coverage.toml`.
+///
+/// Structural violations and single_truth=false fields are always blocking — a single-truth
+/// violation is a defect to fix, not a gap to ledger. There is no tracked-exception path
+/// for spec-coverage findings.
+fn check_spec_coverage() -> Result<(), String> {
+    let path = SPEC_COVERAGE_LEDGER;
+    let value = parse_toml_file(Path::new(path))?;
+    require_toml_string(&value, "schema_version", path)?;
+
+    let num_fields = value
+        .get("field")
+        .and_then(toml::Value::as_array)
+        .map(|v| v.len())
+        .unwrap_or(0);
+
+    let report = evaluate_spec_coverage(&value, path)?;
+
+    for f in &report.blocking {
         println!("{f}");
     }
-    println!(
-        "check-spec-coverage: ok ({} fields, {} findings)",
-        fields.len(),
-        findings.len()
-    );
-    Ok(())
+
+    if report.blocking.is_empty() {
+        println!("check-spec-coverage: ok ({num_fields} fields, 0 blocking finding(s))");
+        Ok(())
+    } else {
+        Err(format!(
+            "check-spec-coverage: {} blocking finding(s)",
+            report.blocking.len()
+        ))
+    }
 }
 
 fn check_ci_routing_contract() -> Result<(), String> {
@@ -24364,5 +24562,299 @@ This artifact is static unsafe contract review. It routes reviewers to credible 
         ));
         assert!(!has_session_state_marker("rescued data is advisory"));
         assert!(!has_session_state_marker("no markers here"));
+    }
+
+    // --- evaluate_detector_contracts ---
+
+    #[test]
+    fn detector_contracts_clean_contract_passes() -> Result<(), String> {
+        let toml: toml::Value = r#"
+schema_version = "1.0"
+[[contract]]
+operation_family = "transmute"
+obligations = ["D1", "D2"]
+positive_fixtures = ["transmute_basic"]
+negative_fixtures = ["transmute_safe_no_card"]
+surfaces = ["json"]
+evidence = "fixture coverage"
+review_after = "2027-01-01"
+"#
+        .parse::<toml::Table>()
+        .map_err(|e| e.to_string())
+        .map(toml::Value::Table)?;
+
+        let report = evaluate_detector_contracts(&toml, "test")?;
+        assert!(
+            report.blocking.is_empty(),
+            "expected no blocking findings, got: {:?}",
+            report.blocking
+        );
+        assert!(report.tracked.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn detector_contracts_empty_negative_fixtures_no_proof_gap_is_blocking() -> Result<(), String> {
+        let toml: toml::Value = r#"
+schema_version = "1.0"
+[[contract]]
+operation_family = "transmute"
+obligations = ["D1"]
+positive_fixtures = ["transmute_basic"]
+negative_fixtures = []
+surfaces = ["json"]
+evidence = "fixture coverage"
+review_after = "2027-01-01"
+"#
+        .parse::<toml::Table>()
+        .map_err(|e| e.to_string())
+        .map(toml::Value::Table)?;
+
+        let report = evaluate_detector_contracts(&toml, "test")?;
+        assert!(
+            !report.blocking.is_empty(),
+            "expected blocking finding for empty negative_fixtures without proof_gap"
+        );
+        assert!(report.tracked.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn detector_contracts_empty_negative_fixtures_with_documented_gap_is_tracked()
+    -> Result<(), String> {
+        let toml: toml::Value = r#"
+schema_version = "1.0"
+[[contract]]
+operation_family = "new_family"
+obligations = ["D1"]
+positive_fixtures = ["new_family_basic"]
+negative_fixtures = []
+surfaces = ["json"]
+evidence = "positive only"
+review_after = "2027-01-01"
+proof_gap = "negative controls not yet written"
+owner = "core / analysis"
+"#
+        .parse::<toml::Table>()
+        .map_err(|e| e.to_string())
+        .map(toml::Value::Table)?;
+
+        let report = evaluate_detector_contracts(&toml, "test")?;
+        assert!(
+            report.blocking.is_empty(),
+            "expected no blocking findings with documented gap, got: {:?}",
+            report.blocking
+        );
+        assert!(
+            !report.tracked.is_empty(),
+            "expected tracked exception for documented gap"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn detector_contracts_empty_negative_fixtures_partial_gap_fields_is_blocking()
+    -> Result<(), String> {
+        // proof_gap present but owner is missing — must block
+        let toml: toml::Value = r#"
+schema_version = "1.0"
+[[contract]]
+operation_family = "new_family"
+obligations = ["D1"]
+positive_fixtures = ["new_family_basic"]
+negative_fixtures = []
+surfaces = ["json"]
+evidence = "positive only"
+review_after = "2027-01-01"
+proof_gap = "negative controls not yet written"
+"#
+        .parse::<toml::Table>()
+        .map_err(|e| e.to_string())
+        .map(toml::Value::Table)?;
+
+        let report = evaluate_detector_contracts(&toml, "test")?;
+        assert!(
+            !report.blocking.is_empty(),
+            "expected blocking finding when proof_gap present but owner missing"
+        );
+        Ok(())
+    }
+
+    // --- evaluate_stance_decisions ---
+
+    #[test]
+    fn stance_decisions_clean_stance_passes() -> Result<(), String> {
+        let toml: toml::Value = r#"
+schema_version = "1.0"
+[[stance]]
+id = "debug-assert-not-guard"
+summary = "debug_assert does not discharge a guard obligation"
+rationale = "compiled out in release"
+owner = "core / analysis"
+linked_spec = "UNSAFE-REVIEW-SPEC-0006"
+linked_tests = ["some::module::test_fn"]
+review_after = "2027-01-01"
+"#
+        .parse::<toml::Table>()
+        .map_err(|e| e.to_string())
+        .map(toml::Value::Table)?;
+
+        let report = evaluate_stance_decisions(&toml, "test")?;
+        assert!(
+            report.blocking.is_empty(),
+            "expected no blocking findings, got: {:?}",
+            report.blocking
+        );
+        assert!(report.tracked.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn stance_decisions_proof_gap_with_owner_and_review_after_is_tracked() -> Result<(), String> {
+        let toml: toml::Value = r#"
+schema_version = "1.0"
+[[stance]]
+id = "some-stance"
+summary = "summary text"
+rationale = "rationale text"
+owner = "core / analysis"
+linked_spec = "UNSAFE-REVIEW-SPEC-0006"
+linked_tests = ["some::test"]
+proof_gap = "no dedicated unit test yet"
+review_after = "2026-09-15"
+"#
+        .parse::<toml::Table>()
+        .map_err(|e| e.to_string())
+        .map(toml::Value::Table)?;
+
+        let report = evaluate_stance_decisions(&toml, "test")?;
+        assert!(
+            report.blocking.is_empty(),
+            "expected no blocking findings with documented proof_gap, got: {:?}",
+            report.blocking
+        );
+        assert!(
+            !report.tracked.is_empty(),
+            "expected tracked exception for proof_gap with owner + review_after"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn stance_decisions_proof_gap_without_owner_is_blocking() -> Result<(), String> {
+        let toml: toml::Value = r#"
+schema_version = "1.0"
+[[stance]]
+id = "some-stance"
+summary = "summary text"
+rationale = "rationale text"
+owner = "core / analysis"
+linked_spec = "UNSAFE-REVIEW-SPEC-0006"
+linked_tests = ["some::test"]
+proof_gap = "no dedicated unit test yet"
+"#
+        .parse::<toml::Table>()
+        .map_err(|e| e.to_string())
+        .map(toml::Value::Table)?;
+
+        let report = evaluate_stance_decisions(&toml, "test")?;
+        assert!(
+            !report.blocking.is_empty(),
+            "expected blocking finding for proof_gap without review_after"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn stance_decisions_missing_required_field_is_blocking() -> Result<(), String> {
+        // missing `owner` field
+        let toml: toml::Value = r#"
+schema_version = "1.0"
+[[stance]]
+id = "incomplete-stance"
+summary = "summary text"
+rationale = "rationale text"
+linked_spec = "UNSAFE-REVIEW-SPEC-0006"
+linked_tests = ["some::test"]
+"#
+        .parse::<toml::Table>()
+        .map_err(|e| e.to_string())
+        .map(toml::Value::Table)?;
+
+        let report = evaluate_stance_decisions(&toml, "test")?;
+        assert!(
+            !report.blocking.is_empty(),
+            "expected blocking finding for missing required field"
+        );
+        Ok(())
+    }
+
+    // --- evaluate_spec_coverage ---
+
+    #[test]
+    fn spec_coverage_clean_field_passes() -> Result<(), String> {
+        let toml: toml::Value = r#"
+schema_version = "1.0"
+[[field]]
+name = "severity"
+canonical_source = "domain/classification.rs"
+surfaces = ["json", "sarif"]
+single_truth = true
+"#
+        .parse::<toml::Table>()
+        .map_err(|e| e.to_string())
+        .map(toml::Value::Table)?;
+
+        let report = evaluate_spec_coverage(&toml, "test")?;
+        assert!(
+            report.blocking.is_empty(),
+            "expected no blocking findings, got: {:?}",
+            report.blocking
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn spec_coverage_single_truth_false_is_blocking() -> Result<(), String> {
+        let toml: toml::Value = r#"
+schema_version = "1.0"
+[[field]]
+name = "severity"
+canonical_source = "domain/classification.rs"
+surfaces = ["json"]
+single_truth = false
+note = "two places compute it"
+"#
+        .parse::<toml::Table>()
+        .map_err(|e| e.to_string())
+        .map(toml::Value::Table)?;
+
+        let report = evaluate_spec_coverage(&toml, "test")?;
+        assert!(
+            !report.blocking.is_empty(),
+            "expected blocking finding for single_truth=false"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn spec_coverage_missing_canonical_source_is_blocking() -> Result<(), String> {
+        let toml: toml::Value = r#"
+schema_version = "1.0"
+[[field]]
+name = "severity"
+surfaces = ["json"]
+single_truth = true
+"#
+        .parse::<toml::Table>()
+        .map_err(|e| e.to_string())
+        .map(toml::Value::Table)?;
+
+        let report = evaluate_spec_coverage(&toml, "test")?;
+        assert!(
+            !report.blocking.is_empty(),
+            "expected blocking finding for missing canonical_source"
+        );
+        Ok(())
     }
 }

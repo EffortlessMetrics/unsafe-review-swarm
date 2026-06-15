@@ -13,6 +13,18 @@ comments, edit source, or block by default.
 
 ### Changed
 
+- The three control-plane discipline gates (`check-detector-contracts`,
+  `check-stance-decisions`, `check-spec-coverage`) are now **enforcing** in
+  `check-pr`. Structural violations (malformed schema, missing identity, empty
+  required arrays, duplicate ids) and undocumented gaps fail the gate.
+  Documented exceptions — a missing negative-fixture acknowledged with
+  `proof_gap + owner + review_after` on a contract entry, or a stance
+  `proof_gap` paired with `owner + review_after` — pass as tracked warnings.
+  `single_truth=false` in spec-coverage is always blocking with no exception
+  path. All current ledger entries are clean on main; this is a forward-
+  enforcement flip only. Advisory; does not change the tool's runtime output
+  or claims.
+
 - `policy report` `baseline_state` column now projects the canonical 5-value
   coverage-movement vocabulary (`new`, `worsened`, `inherited`, `resolved`,
   `unknown`) from `CoverageBlock::derive` with snapshot-slot movement applied —

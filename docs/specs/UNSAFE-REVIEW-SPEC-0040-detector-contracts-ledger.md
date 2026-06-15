@@ -1,6 +1,6 @@
 # UNSAFE-REVIEW-SPEC-0040: detector-contracts ledger
 
-Status: proposed
+Status: accepted
 Owner: core / analysis
 Created: 2026-06-15
 
@@ -155,25 +155,48 @@ and resolving this exception.
 exception must be re-evaluated. Expired exceptions without renewal will fail
 the future enforcement gate once that gate is active.
 
-## Future gate: `check-detector-contracts`
+## Gate: `check-detector-contracts`
 
-The `check-detector-contracts` xtask gate validates the ledger. It will be
-introduced in PR-5 of the control-plane lane, wired into `check-pr`.
+The `check-detector-contracts` xtask gate validates the ledger. It is wired
+into `check-pr` and is now **enforcing** — structural violations and
+undocumented gaps fail the gate.
 
-**Phase 1 (informational) — current scaffold state:** the gate passes on an
-empty ledger. It validates only the file header shape, schema version, and
-that `[[contract]]` entries (if any) conform to the required field set.
+### What the gate checks
 
-**Phase 2 (partial enforcement) — PR-6 and later:** once high-risk families
-are registered, the gate enforces for the registered set:
+**Blocking findings (always fail):**
 
-- Every `[[contract]]` entry must have a non-empty `negative_fixtures` array.
-- Every `[[exception]]` entry must have a non-expired `review_after` date.
-- Every `operation_family` value must match a variant returned by
-  `OperationFamily::as_str()`.
-- Every obligation identifier must be in `["D1", "D2", "D3", "D4", "D5"]`.
-- Untracked exceptions (an obligation silently omitted without a corresponding
-  `[[exception]]` entry) will fail the gate.
+- Malformed TOML or missing `schema_version`.
+- Missing or empty `operation_family` in a `[[contract]]` entry.
+- Duplicate `operation_family` values.
+- Missing or empty `obligations` array.
+- Empty `negative_fixtures` array (or absent) without a documented gap.
+- Missing or empty `surfaces` array.
+- Missing or empty `id` in a `[[exception]]` entry.
+- Duplicate `id` values in `[[exception]]` entries.
+
+**Documented-gap path (tracked exceptions, not blocking):**
+
+A contract that lacks negative controls may acknowledge the gap by adding
+three optional fields to the `[[contract]]` entry:
+
+```toml
+proof_gap  = "<explanation of the gap>"
+owner      = "<team or individual responsible>"
+review_after = "<ISO-8601 date>"
+```
+
+All three must be non-empty. When present, the gate prints the finding as a
+tracked exception (suffix: `(tracked exception)`) and does not fail. If any
+of the three fields is missing or empty, the gap is blocking.
+
+This documented-gap path is distinct from the whole-contract `[[exception]]`
+opt-out. Use `[[exception]]` for an obligation that is structurally
+inapplicable to a family. Use `proof_gap + owner + review_after` on a
+`[[contract]]` entry when negative controls are temporarily absent.
+
+**Tracked exceptions do not change the advisory posture of findings.** They
+record that a discipline gap is acknowledged and owned, not that the detector
+is correct or complete.
 
 The gate validates **process discipline and ledger shape only**. It does not
 validate that the detector is correct, that it finds all unsafe operations, or
@@ -206,28 +229,24 @@ baselines — project from the same card. The detector-contracts ledger records
 which discipline obligations constrain card emission for each family; it does
 not introduce a second truth surface.
 
-## Scaffold state
+## Current ledger state
 
-The current `policy/detector-contracts.toml` file is intentionally empty: no
-`[[contract]]` entries are registered. The file carries only the header block
-and a human-readable comment. This empty state passes the gate (once the gate
-exists), which is born informational on the scaffold.
-
-Families will be registered in PR-6 of the control-plane lane, starting with
-the highest-risk families: `get_unchecked`, `copy_nonoverlapping`, `ptr_copy`,
-`transmute`, `zeroed`, `vec_set_len`, `ffi`, `unsafe_fn_call`, and
-`stable_byte_source_getter_reentry`. Enforcement for the registered set flips
-on once entries exist and their negative controls are confirmed present.
+`policy/detector-contracts.toml` carries 11 registered families as of the
+control-plane PR-C enforcement flip. All 11 entries have non-empty
+`negative_fixtures` arrays, so the gate passes clean on current main. The
+gate is now enforcing: any future contract entry with an empty
+`negative_fixtures` must carry `proof_gap + owner + review_after` or the gate
+fails.
 
 ## Implementation tracking
 
 - SPEC-0041: documents the dispatch architecture this ledger complements.
   Status: proposed.
-- SPEC-0040 (this spec): defines the ledger schema. Status: proposed.
-- PR-3 (control-plane lane): `policy/stance-decisions.toml`. Status: planned.
-- PR-5 (control-plane lane): xtask gates, including `check-detector-contracts`.
-  Status: planned.
-- PR-6 (control-plane lane): register high-risk families, flip enforcement.
-  Status: planned.
+- SPEC-0040 (this spec): defines the ledger schema. Status: accepted.
+- PR-3 (control-plane lane): `policy/stance-decisions.toml`. Status: merged.
+- PR-5 (control-plane lane): xtask gates born informational. Status: merged.
+- PR-6 (control-plane lane): high-risk families registered. Status: merged.
+- PR-C (control-plane lane): enforcement flip — gates now block on structural
+  violations and undocumented gaps. Status: merged (this PR).
 
 See `.rails/lanes/control-plane/implementation-plan.md` for the full sequence.
