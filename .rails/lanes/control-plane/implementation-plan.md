@@ -1,5 +1,10 @@
 # Detector-discipline control-plane lane — implementation plan
 
+> **Status (2026-06-15): closed.** PR-0–PR-6 plus the follow-ups PR-A/PR-B/PR-C
+> shipped the control plane (three discipline ledgers + three enforcing gates).
+> PR-7 (calibration de-bottleneck) is deferred to its own phased lane, tracked in
+> issue #1712. See [`docs/status/CONTROL_PLANE_CLOSEOUT.md`](../../../docs/status/CONTROL_PLANE_CLOSEOUT.md).
+
 ## Lane thesis
 
 Establish a single-truth control plane that makes detector discipline, product

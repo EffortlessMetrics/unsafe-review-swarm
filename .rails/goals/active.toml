@@ -184,7 +184,7 @@ commands = [
 
 [[work_item]]
 id = "detector-discipline-control-plane"
-status = "active"
+status = "done"
 plan = ".rails/lanes/control-plane/implementation-plan.md"
 commands = [
   "cargo run --locked -p xtask -- check-goals",
