@@ -126,3 +126,10 @@ kind = "spec"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-0039-scheduled-corpus-backstop.md"
 status = "proposed"
 owner = "repo-infra"
+
+[[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0041"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0041-syntax-first-dispatch-architecture.md"
+status = "proposed"
+owner = "core / analysis"

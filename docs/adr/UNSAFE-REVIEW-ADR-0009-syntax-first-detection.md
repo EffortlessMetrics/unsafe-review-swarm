@@ -1,7 +1,7 @@
 # UNSAFE-REVIEW-ADR-0009: Syntax-first detection — make the AST path primary, the text fallback bounded and explicit
 
-Status: proposed
-Date: 2026-06-14
+Status: active
+Date: 2026-06-15
 Owner: core/architecture
 Linked specs:
 - ../specs/UNSAFE-REVIEW-SPEC-0005-hazard-taxonomy-and-obligations.md
@@ -173,3 +173,9 @@ proposes a gate that fails if a detector lacks negative controls for its applica
 disciplines. This is complementary to this ADR, not an alternative: the gate
 prevents the class from regrowing via missing fixtures; this ADR prevents the
 class from existing in the first place via the architecture.
+
+---
+
+Implementation of the detector-discipline spec (SPEC-0040), the dispatch architecture
+spec (SPEC-0041), and the associated ledger and gate are tracked by the control-plane
+lane (`detector-discipline-control-plane` in `.rails/index.toml`).
