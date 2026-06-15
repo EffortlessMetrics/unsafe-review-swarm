@@ -920,7 +920,7 @@ checksum = "7df058c713841ad818f1dc5d3fd88063241cc61f49f5fbea4b951e8cf5a8d71d"
 
 [[package]]
 name = "unsafe-review"
-version = "0.3.6"
+version = "0.3.7"
 dependencies = [
  "serde_json",
  "unsafe-review-cli",
@@ -929,7 +929,7 @@ dependencies = [
 
 [[package]]
 name = "unsafe-review-cli"
-version = "0.3.6"
+version = "0.3.7"
 dependencies = [
  "serde_json",
  "signal-hook",
@@ -940,7 +940,7 @@ dependencies = [
 
 [[package]]
 name = "unsafe-review-core"
-version = "0.3.6"
+version = "0.3.7"
 dependencies = [
  "globset",
  "ignore",

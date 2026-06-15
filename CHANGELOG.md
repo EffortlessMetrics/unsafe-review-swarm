@@ -11,6 +11,140 @@ comments, edit source, or block by default.
 
 ## Unreleased
 
+## 0.3.7 - 2026-06-14
+
+0.3.7 — adoption, telemetry, and real-code low-noise improvements. It makes
+`unsafe-review` easy to adopt and measured in use, tightens how findings are
+framed and ranked on real code, and delivers a batch of evidence-discipline
+correctness fixes across all output surfaces. It adds no analyzer breadth and
+no new claim: it remains advisory static unsafe-coverage evidence, not a proof,
+not a policy gate, and not a substitute for code review.
+
+### Added
+
+- Composite **GitHub Action** (`unsafe-review-first-pr`) for two-line CI
+  adoption: wraps `first-pr`, uploads the review kit, appends the step summary,
+  and exposes the gate manifest. Advisory by default — no automatic
+  comment-posting, no blocking, no inherited-fail. Includes `fetch_depth`
+  input, version-skew hardening, and live-smoke validation.
+  ([#1628](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1628),
+  [#1660](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1660),
+  [#1661](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1661),
+  [#1662](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1662),
+  [#1663](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1663),
+  [#1664](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1664))
+- **`unsafe-review pr`** zero-config subcommand with repo/base autodetect:
+  runs `first-pr` without requiring explicit repo or diff path flags; no
+  silent full-repo scan, no ambiguous default blocking.
+  ([#1629](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1629))
+- Adoption front-door **`docs/START-HERE.md`** and outward-facing docs:
+  real-world dogfood narrative and agent-integration guide.
+  ([#1635](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1635),
+  [#1669](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1669))
+- **Scheduled full-corpus backstop + external RSS harness** (SPEC-0039):
+  resource measurement lives on the scheduled/bench path, not in-tool;
+  ADR-0008 amended to ratify external-first peak-RSS posture.
+  ([#1627](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1627),
+  [#1631](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1631))
+- **Usefulness telemetry** projected from `ReviewCard`: cards/PR,
+  new/worsened/resolved/inherited, selected vs not-selected reasons,
+  agent-ready vs human-only, `scan_cost` (elapsed_ms/output_bytes),
+  not-selected-class histogram, unfulfilled-obligation count. Telemetry
+  is a usage/subset signal — not calibrated precision/recall.
+  ([#1630](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1630),
+  [#1634](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1634),
+  [#1647](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1647))
+- `unsafe-review-gate.json` emitted from `repo` mode (SPEC-0034 parity).
+  ([#1705](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1705))
+- Per-card **coverage-movement projection** from the summary (worsened,
+  resolved, inherited, unchanged counts per card).
+  ([#1716](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1716))
+- `unsafe-review+` badge is now **baseline-movement-aware**: reflects
+  resolved/worsened delta, not just card count.
+  ([#1717](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1717))
+
+### Changed
+
+- **SARIF level and LSP severity derived from card class** (single-source
+  truth): no more LSP severity-1 for low-class cards; SARIF rule description
+  is class-aware instead of always "missing safety contract."
+  ([#1706](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1706),
+  [#1713](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1713))
+- **Owner cards grouped in human surfaces** (PR summary, human CLI) while kept
+  in artifacts, counts, and SARIF: reduces surface noise without suppressing
+  evidence.
+  ([#1710](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1710))
+- **`agent_lsp_readiness` and agent-packet readiness** derived from card class
+  and `RequiresWitnessReceipt`: all output surfaces now agree on agent
+  readiness; coverage no longer claims "agent-ready" while the comment plan
+  says `requires_witness_receipt`.
+  ([#1633](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1633),
+  [#1632](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1632))
+- **Comment-plan importance ranking**: top-N selected by priority → gap-severity
+  → confidence → file/line (not file order); bounded comment body (220 words,
+  single-sourced constant).
+  ([#1645](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1645),
+  [#1646](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1646))
+- **Receipt formal-tool provenance**: `site_reached` strength now requires
+  tool provenance in the receipt; receipt records tool name and input hash.
+  ([#1707](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1707))
+- **Outcome markdown** includes unchanged cards to match JSON parity.
+  ([#1708](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1708))
+- `summary.unsafe_sites` is now the real pre-cap site count, not a
+  post-selection estimate.
+  ([#1718](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1718))
+- Policy-report movement counts projected from the canonical summary.
+- `comment_plan_status` populated from comment-plan selection results.
+- GitHub-summary top-card ranked to match PR-summary (single-truth surface).
+- Exit-code mapping: `cargo-unsafe-review` exits 1 on policy violation,
+  2 on tool error.
+  ([#1559](https://github.com/EffortlessMetrics/unsafe-review/issues/1559))
+- `cli`: distinguish capped-success from timeout in repo-scan status output.
+
+### Fixed
+
+- **`debug_assert` does not discharge runtime guard obligations**: a
+  `debug_assert!` is not a runtime guard — it is stripped in release builds.
+  ([#1715](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1715))
+- **Test reach requires call-shaped owner use**: bare name mentions in
+  non-call positions (type annotations, comments) no longer count as test
+  ownership; self-reach rejected.
+  ([#1709](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1709))
+- **`pub(crate)`/`pub(super)` visibility** miscategorization fixed: these
+  are not public-API unsafe exposure.
+  ([#1666](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1666))
+- **Spread-aware card selection**: a `--max-cards` cap no longer blinds whole
+  subsystems by concentrating budget on one file.
+  ([#1667](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1667))
+- Bare-name unsafe-op detectors gated on `unsafe { }` scope (F1 root fix):
+  detectors no longer fire on safe-context or definition-only occurrences.
+- `&mut *expr` / `&*expr` classified as `raw_pointer_deref`, not
+  `unsafe_pointer_cast`.
+- `fn zeroed()` definition no longer carded as a zeroed call.
+- Raw-pointer alignment guard anchored to receiver/position (not any guard
+  in scope); same-receiver null-check required for pointer-load discharge.
+- `set_len` discharge requires joined `new_len <= recv.len()` predicate.
+- Atomic-pointer-state tokens bound to the same call, not line-proximity.
+- Reach-scan owner matched on identifier boundaries (not raw substring).
+- Combined-diff `@@@` header `+` range seeds `new_line` correctly.
+- Input: combined-diff `@@@` headers now seed new-line numbers from the
+  `+` range correctly.
+- FFI unqualified-name boundary: method-receiver dot no longer triggers an
+  FFI detection.
+- Resolved/inherited movement scoped to diff-touched files only.
+- Syntax site wins for multiline `ptr::copy` and plain `transmute`.
+
+### Framing and evidence discipline
+
+The stance/projection program (#1705–#1718) corrects systematic output
+framing errors found during real-code validation. These are not new
+detections: they are consistency fixes so every surface — JSON, SARIF, LSP,
+PR summary, outcome markdown, badges, comment plans, agent packets — projects
+from the same `ReviewCard` truth object with evidence-disciplined framing.
+No proof, UB-free, Miri-clean, or calibrated-precision claim is added.
+Dogfood validation of these fixes (#1700, #1720) showed measurable noise
+reduction on 5 fresh real crates.
+
 ## 0.3.6 - 2026-06-11
 
 0.3.6 is the CLI-truthfulness and evidence-intake patch. It makes the command
