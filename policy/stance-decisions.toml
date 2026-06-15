@@ -1,0 +1,159 @@
+schema_version = "1.0"
+policy = "stance-decisions"
+owner = "core / analysis"
+
+# Settled product stances are owner decisions; a future `check-stance-decisions`
+# gate (later control-plane PR) will fail if a stance loses its linked test or
+# spec, preventing silent stance drift; schema per the control-plane lane plan.
+
+[[stance]]
+id = "debug-assert-not-runtime-guard"
+summary = "debug_assert! does NOT discharge a runtime guard, bounds, or alignment obligation."
+rationale = """
+debug_assert!(...) is compiled out in release builds (controlled by
+#[cfg(debug_assertions)]). Crediting it as a runtime guard obligation would give
+false assurance: the check exists only in debug mode and vanishes in production.
+The discharge logic in alignment_discharge.rs and bounds_discharge.rs explicitly
+classifies debug_assert! as advisory-only evidence (EvidenceState::missing with
+an explanatory message) rather than EvidenceState::present. The helper
+is_runtime_assert_at in code_text.rs enforces the same boundary wherever assert!
+patterns are scanned: it rejects any match whose preceding character is _ (i.e.
+debug_assert!) so callers never accidentally credit stripped macros. This stance
+rejects debug_assert as guard discharge without asserting that the surrounding
+code is UB-free or Miri-clean; it records what the tool does NOT credit.
+"""
+owner = "core / analysis"
+linked_spec = "UNSAFE-REVIEW-SPEC-0006"
+# is_runtime_assert_at and text_contains_runtime_assert in code_text.rs are
+# helper functions without their own dedicated #[test] fn. The stance is enforced
+# via the pipeline integration test below and via fixture-calibration entries for
+# raw_pointer_alignment_debug_assert_only_not_guard and
+# raw_pointer_bounds_debug_assert_only_not_guard in fixtures/calibration.toml.
+linked_tests = [
+  "unsafe_review_core::analysis::pipeline::tests::pointer_arithmetic_num_ctrl_bytes_debug_assert_not_credited",
+]
+proof_gap = "no dedicated unit test for is_runtime_assert_at / text_contains_runtime_assert; stance validated through the pipeline integration test above and the raw_pointer_alignment_debug_assert_only_not_guard / raw_pointer_bounds_debug_assert_only_not_guard fixture-calibration entries"
+review_after = "2026-09-15"
+
+[[stance]]
+id = "safety-comment-not-guard"
+summary = "A SAFETY comment is informational, not an executable guard."
+rationale = """
+A // SAFETY: ... or /* SAFETY: ... */ comment documents the author's reasoning
+but is not compiled code. It does not constitute an executable guard, a runtime
+check, or a witness receipt. The contract_evidence function in contract_text.rs
+records safety-comment presence as ContractEvidence (informational) and not as
+a guard discharge. This stance rejects safety comments as obligation discharge
+without asserting that any site lacking one is unsound; it records what the tool
+classifies as insufficient evidence for guard discharge.
+"""
+owner = "core / analysis"
+linked_spec = "UNSAFE-REVIEW-SPEC-0006"
+linked_tests = [
+  "unsafe_review_core::analysis::evidence::contract_text::tests::safety_comment_summary_accepts_line_comments_near_site",
+]
+review_after = "2026-12-15"
+
+[[stance]]
+id = "static-mention-not-test-reach"
+summary = "Test reach requires a call-shaped owner use; a bare static mention or self-named test fn is rejected."
+rationale = """
+A bare mention of the owner name in a comment, string, or test-fn identifier
+does not constitute test reach. reach_evidence (reach_scan.rs) requires a
+call-shaped use of the owner (line_has_owner_call_shape returns true) AND
+excludes self-reach: a test fn whose name equals the owner is a
+definition-header match, not a call site (is_fn_definition returns true for
+that line). This stance rejects static mentions and self-reach as reach evidence
+without asserting that the owner function is tested; it records what call-shape
+the tool requires before crediting reach.
+"""
+owner = "core / analysis"
+linked_spec = "UNSAFE-REVIEW-SPEC-0007"
+linked_tests = [
+  "unsafe_review_core::analysis::evidence::tests::reach_evidence_bare_comment_mention_in_cfg_test_not_credited",
+  "unsafe_review_core::analysis::evidence::tests::reach_evidence_self_named_test_fn_not_credited",
+]
+review_after = "2026-12-15"
+
+[[stance]]
+id = "receipt-not-proof"
+summary = "Formal-tool site_reached requires verifiable tool provenance; hand-authored loom/shuttle/kani/crux site_reached is rejected at load."
+rationale = """
+A witness receipt asserting site_reached via a formal tool (kani, shuttle, crux,
+loom) must carry verifiable tool provenance — a machine-generated signature or
+equivalent artifact header the tool writes automatically. A hand-authored TOML
+that asserts site_reached = true for a formal tool cannot be verified and is
+rejected at receipt-load time. This stance does not claim that a genuine receipt
+proves the site is UB-free or Miri-clean; it records the minimum provenance
+requirement the tool enforces for formal-tool reach claims.
+"""
+owner = "core / analysis"
+linked_spec = "UNSAFE-REVIEW-SPEC-0009"
+linked_tests = [
+  "unsafe_review_core::analysis::receipts::tests::hand_authored_formal_tool_site_reached_is_rejected_at_load",
+]
+review_after = "2026-12-15"
+
+[[stance]]
+id = "owner-cards-grouped-not-hidden"
+summary = "Owner cards are grouped and ranked in human surfaces but are KEPT in cards.json and evidence counts."
+rationale = """
+When an owner card (unsafe fn contract obligation) is covered by a more-specific
+operation card at the same region, it receives reason_code
+covered_by_specific_operation_card in the comment-plan not_selected list and is
+deprioritised in human-facing output. It is never deleted from cards.json or
+excluded from unsafe_sites counts. This stance rejects silent owner-card removal;
+the card remains part of the single ReviewCard truth object and all downstream
+projections that derive from it. Output surfaces may group or rank owner cards
+differently, but the evidence layer must remain complete.
+"""
+owner = "core / analysis"
+linked_spec = "UNSAFE-REVIEW-SPEC-0032"
+# No dedicated unit test exists that asserts owner cards are retained in
+# cards.json counts. The comment_plan integration test below exercises the
+# covered_by_specific_operation_card reason path and validates that the owner
+# card appears in not_selected (not deleted). Fixture-level validation is
+# provided by attributed_unsafe_fn_no_duplicate via the comment-plan path.
+linked_tests = [
+  "unsafe_review_core::output::comment_plan::tests::comment_plan_owner_card_covered_by_operation_card_gets_specific_reason",
+]
+proof_gap = "no dedicated unit test asserts that owner cards are kept in cards.json counts; the linked test validates not_selected presence and reason_code only; a future test should assert the json card-count invariant"
+review_after = "2026-09-15"
+
+[[stance]]
+id = "severity-from-card-class"
+summary = "SARIF level and LSP severity derive from card class; no LSP severity-1 for low-class cards."
+rationale = """
+SARIF ruleSeverity and LSP DiagnosticSeverity are computed solely from the
+ReviewCard's ReviewClass field. Low-class cards (e.g. NeedsReview) must not
+receive LSP severity 1 (Error); the mapping table is pinned so that the
+SARIF-level and LSP-severity assignments remain stable across releases. This
+stance rejects ad-hoc severity overrides and out-of-band severity escalation;
+it does not assert that any severity assignment reflects the true risk of the
+underlying unsafe code.
+"""
+owner = "core / analysis"
+linked_spec = "UNSAFE-REVIEW-SPEC-0011"
+linked_tests = [
+  "unsafe_review_core::domain::classification::tests::sarif_level_and_lsp_severity_are_consistent_for_every_class",
+  "unsafe_review_core::domain::classification::tests::severity_table_is_pinned_for_every_class",
+]
+review_after = "2026-12-15"
+
+[[stance]]
+id = "unsafe-sites-pre-cap-count"
+summary = "summary.unsafe_sites is the real pre-max_cards-cap site count, not the capped card count."
+rationale = """
+When a scan is capped by max_cards, the cards slice is truncated but
+summary.unsafe_sites must reflect the true number of distinct unsafe sites found
+before the cap was applied. Reporting the capped count would silently undercount
+scope and mislead consumers about the real unsafe surface. This stance rejects
+post-cap counts in summary.unsafe_sites; it does not assert that the pre-cap
+count is a complete enumeration of all unsafe code in the repository.
+"""
+owner = "core / analysis"
+linked_spec = "UNSAFE-REVIEW-SPEC-0014"
+linked_tests = [
+  "unsafe_review_core::analysis::pipeline::tests::summary_unsafe_sites_counts_pre_cap_sites_distinct_from_cards",
+]
+review_after = "2026-12-15"
