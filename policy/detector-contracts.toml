@@ -76,10 +76,12 @@ positive_fixtures = [
   "zeroed_valid_u32",
   "zeroed_call_still_cards",
 ]
-negative_fixtures = []
-proof_gap = "no negative-control fixture for zeroed family; follow-up needed to add _not_guard controls covering safe-context (D1), definition header (D2), unrelated-origin (D3), comment masking (D4), and path-segment (D5) discipline checks"
+negative_fixtures = [
+  "zeroed_definition_no_cards",
+  "zeroed_safe_wrapper_no_cards",
+]
 surfaces = ["json", "sarif", "human", "agent"]
-evidence = "Positive fixtures confirm invalid-value and valid-type detection. No negative-control fixtures exist for this family; advisory posture unchanged. Follow-up required before enforcement gate activates."
+evidence = "Positive fixtures confirm invalid-value and valid-type detection. Negative controls confirm definition-header rejection (D2 discipline: a safe fn zeroed() definition header is not carded as a mem::zeroed call) and safe-context rejection (D1 discipline: a safe inherent zeroed() method called outside any unsafe scope is not carded as mem::zeroed). Advisory heuristic only."
 review_after = "2026-09-15"
 
 [[contract]]
@@ -129,10 +131,11 @@ positive_fixtures = [
   "ffi_call_sanitizer_route",
   "ffi_qualified_call_sanitizer_route",
 ]
-negative_fixtures = []
-proof_gap = "no negative-control fixture is calibrated under the ffi operation_family; the existing not-route fixtures (ffi_same_named_method_not_route, ffi_non_libc_wrapper_call_not_route, ffi_local_libc_module_call_not_route, ffi_inner_libc_path_not_route, ffi_token_in_string_not_route) are all calibrated as unsafe_fn_call, not ffi, because routing does not occur for those patterns; follow-up needed to add dedicated ffi negative-control fixtures"
+negative_fixtures = [
+  "ffi_safe_wrapper_only_no_cards",
+]
 surfaces = ["json", "sarif", "human", "agent"]
-evidence = "Sanitizer-route and missing-boundary-contract discharge paths confirmed positive. Negative controls are absent for the ffi family specifically; not-route fixtures fall under unsafe_fn_call in calibration. Advisory posture unchanged."
+evidence = "Sanitizer-route and missing-boundary-contract discharge paths confirmed positive. The ffi_safe_wrapper_only_no_cards negative control confirms D1 context discipline: adding only safe code to a file that already has a preexisting unsafe extern C declaration produces zero ReviewCards, proving the detector requires the extern block or unsafe FFI call to appear in the changed lines. The existing not-route fixtures (ffi_same_named_method_not_route, ffi_non_libc_wrapper_call_not_route, ffi_local_libc_module_call_not_route, ffi_inner_libc_path_not_route, ffi_token_in_string_not_route) are correctly calibrated under unsafe_fn_call and are not cross-claimed here. Advisory heuristic only."
 review_after = "2026-09-15"
 
 [[contract]]

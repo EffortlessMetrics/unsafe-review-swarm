@@ -522,6 +522,7 @@ required_core_fixtures = [
   "ffi_same_named_method_not_route",
   "ffi_inner_libc_path_not_route",
   "ffi_token_in_string_not_route",
+  "ffi_safe_wrapper_only_no_cards",
   "ptr_read_path_segment_not_raw",
   "safe_code_no_cards",
   "safe_reference_deref_no_cards",
@@ -5782,6 +5783,13 @@ support_tier = "Witness routing"
 expected_cards = 1
 expected_class = "guard_missing"
 expected_hazard = "unknown"
+
+[[cases]]
+fixture = "ffi_safe_wrapper_only_no_cards"
+kind = "false_positive_control"
+claim = "adding only safe code to a file with a preexisting unsafe extern C declaration produces zero FFI ReviewCards"
+support_tier = "Witness routing"
+expected_cards = 0
 
 [[cases]]
 fixture = "safe_code_no_cards"

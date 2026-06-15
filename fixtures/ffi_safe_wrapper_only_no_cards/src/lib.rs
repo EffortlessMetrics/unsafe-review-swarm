@@ -1,0 +1,12 @@
+// Preexisting FFI declaration — not in the diff; only in the unchanged file context.
+unsafe extern "C" {
+    fn strlen(ptr: *const u8) -> usize;
+}
+
+/// Safe helper added in this change — no unsafe block, no FFI call.
+/// Proving the discipline: the FFI detector fires only on changed lines
+/// containing an extern block or an unsafe block calling a foreign function;
+/// a safe addition to a file that already declares FFI does not produce a card.
+pub fn description() -> &'static str {
+    "safe-only change in ffi-adjacent file"
+}

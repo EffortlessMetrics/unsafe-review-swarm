@@ -1,0 +1,11 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -7,0 +7,6 @@
++/// Safe helper added in this change — no unsafe block, no FFI call.
++/// Proving the discipline: the FFI detector fires only on changed lines
++/// containing an extern block or an unsafe block calling a foreign function;
++/// a safe addition to a file that already declares FFI does not produce a card.
++pub fn description() -> &'static str {
++    "safe-only change in ffi-adjacent file"
++}
