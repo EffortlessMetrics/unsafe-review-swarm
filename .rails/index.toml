@@ -205,3 +205,10 @@ name = "action surface correctness for adopters"
 path = ".rails/goals/active.toml"
 status = "active"
 owner = "repo-infra / ci"
+
+[[lane]]
+id = "detector-discipline-control-plane"
+name = "detector-discipline control plane"
+path = ".rails/lanes/control-plane/implementation-plan.md"
+status = "active"
+owner = "repo-infra"
