@@ -1,0 +1,60 @@
+schema_version = "1.0"
+policy = "spec-coverage"
+owner = "core / analysis"
+
+# The ReviewCard is the single truth object; surfaces PROJECT pipeline truth,
+# they do not recompute it. A future `check-spec-coverage` gate (later
+# control-plane PR) will fail if a field's canonical source is missing or a
+# surface recomputes it, locking the single-truth invariant.
+
+[[field]]
+name = "severity"
+canonical_source = "domain/classification.rs::ReviewClass::sarif_level / ::lsp_severity"
+surfaces = ["sarif", "lsp", "json"]
+single_truth = true
+
+[[field]]
+name = "priority"
+canonical_source = "domain/review_card.rs::ReviewCard.priority (set by analysis/pipeline/card_builder.rs)"
+surfaces = ["sarif", "json", "agent", "comment_plan", "repair_queue", "outcome", "lsp"]
+single_truth = true
+
+[[field]]
+name = "coverage_movement"
+canonical_source = "domain/coverage.rs::CoverageBlock::derive -> derive_outcome_movement"
+surfaces = ["json", "agent"]
+single_truth = true
+note = "policy_report does not project outcome_movement; it projects baseline_state only via its own derivation (see baseline_state entry)"
+
+[[field]]
+name = "baseline_state"
+canonical_source = "domain/coverage.rs::CoverageBlock::derive -> derive_baseline_state"
+surfaces = ["json", "agent", "policy_report"]
+single_truth = false
+note = "policy_report.rs uses policy_baseline_state(policy_status(&card.class)) — a separate derivation from card.class with a different vocabulary (new_gap/inherited/suppressed/non_actionable) rather than projecting CoverageBlock::derive. The json and agent surfaces route through CoverageBlock; policy_report is a partial recomputation and a candidate for the check-spec-coverage gate to flag."
+
+[[field]]
+name = "agent_readiness"
+canonical_source = "domain/coverage.rs::compute_agent_lsp_readiness"
+surfaces = ["json", "agent"]
+single_truth = true
+note = "shared fn enforces parity across coverage block + agent packet; lsp does not expose per-card agent_readiness via compute_agent_lsp_readiness"
+
+[[field]]
+name = "comment_plan_status"
+canonical_source = "output/comment_plan/mod.rs::card_statuses"
+surfaces = ["json", "agent", "comment_plan"]
+single_truth = true
+
+[[field]]
+name = "unsafe_sites"
+canonical_source = "analysis/pipeline/summary.rs::summarize (scanned_sites, pre-cap)"
+surfaces = ["json"]
+single_truth = true
+
+[[field]]
+name = "receipt_status"
+canonical_source = "analysis/receipts.rs::ReceiptAuditReport"
+surfaces = ["receipt_audit"]
+single_truth = true
+note = "audit-time metadata, not a per-card field"
