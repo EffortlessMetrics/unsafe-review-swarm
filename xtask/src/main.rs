@@ -450,7 +450,13 @@ const POLICY_FILES: &[&str] = &[
     "policy/docs-automation.toml",
     "policy/accuracy-calibration.toml",
     "policy/public-surfaces.toml",
+    "policy/detector-contracts.toml",
+    "policy/stance-decisions.toml",
+    "policy/spec-coverage.toml",
 ];
+const DETECTOR_CONTRACTS_LEDGER: &str = "policy/detector-contracts.toml";
+const STANCE_DECISIONS_LEDGER: &str = "policy/stance-decisions.toml";
+const SPEC_COVERAGE_LEDGER: &str = "policy/spec-coverage.toml";
 const WORKFLOW_ALLOWLIST: &str = "policy/workflow-allowlist.toml";
 const WORKFLOW_DIR: &str = ".github/workflows";
 const CORPUS_BACKSTOP_SAMPLE_REPORT: &str = "policy/corpus-backstop-sample-report.json";
@@ -840,7 +846,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
     match commands::XtaskCommand::parse(&args)? {
         commands::XtaskCommand::Help => {
             println!(
-                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>"
+                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-stance-decisions, check-spec-coverage"
             );
             Ok(())
         }
@@ -887,6 +893,9 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckCorpusUsefulnessSchema(path) => {
             corpus_usefulness::check_schema(&path)
         }
+        commands::XtaskCommand::CheckDetectorContracts => check_detector_contracts(),
+        commands::XtaskCommand::CheckStanceDecisions => check_stance_decisions(),
+        commands::XtaskCommand::CheckSpecCoverage => check_spec_coverage(),
     }
 }
 
@@ -970,7 +979,307 @@ fn check_policy() -> Result<(), String> {
     check_ci_routing_contract()?;
     corpus_backstop::check_schema(Path::new(CORPUS_BACKSTOP_SAMPLE_REPORT))?;
     corpus_usefulness::check_schema(Path::new(CORPUS_USEFULNESS_SAMPLE_ROLLUP))?;
+    check_detector_contracts()?;
+    check_stance_decisions()?;
+    check_spec_coverage()?;
     println!("check-policy: ok");
+    Ok(())
+}
+
+/// Informational gate: validates ledger shape of `policy/detector-contracts.toml`.
+/// Always returns Ok — findings are printed but never fail the gate in this phase.
+fn check_detector_contracts() -> Result<(), String> {
+    let path = DETECTOR_CONTRACTS_LEDGER;
+    let value = parse_toml_file(Path::new(path))?;
+    require_toml_string(&value, "schema_version", path)?;
+
+    // [[contract]] key is absent in the empty scaffold — treat as zero entries.
+    let Some(contracts_val) = value.get("contract") else {
+        println!("check-detector-contracts: ok (0 contracts, 0 findings)");
+        return Ok(());
+    };
+    let contracts = contracts_val
+        .as_array()
+        .ok_or_else(|| format!("{path} `contract` must be an array"))?;
+
+    let mut findings: Vec<String> = Vec::new();
+    let mut seen_ids: Vec<String> = Vec::new();
+
+    for (idx, entry) in contracts.iter().enumerate() {
+        let table = entry
+            .as_table()
+            .ok_or_else(|| format!("{path} contract[{idx}] must be a table"))?;
+
+        // Hard-require identity field `id`; use operation_family as the identity per spec.
+        let id = match table.get("operation_family").and_then(toml::Value::as_str) {
+            Some(s) if !s.trim().is_empty() => s.to_string(),
+            _ => {
+                findings.push(format!(
+                    "{path} contract[{idx}]: missing or empty `operation_family`"
+                ));
+                format!("<contract[{idx}]>")
+            }
+        };
+
+        // Duplicate id check (informational).
+        if seen_ids.contains(&id) {
+            findings.push(format!(
+                "{path} contract `{id}`: duplicate operation_family"
+            ));
+        } else {
+            seen_ids.push(id.clone());
+        }
+
+        // Soft-check obligations (array — per-entry field).
+        match entry.get("obligations") {
+            None => {
+                findings.push(format!("contract `{id}`: no obligations declared"));
+            }
+            Some(arr_val) => match arr_val.as_array() {
+                None => findings.push(format!("contract `{id}`: `obligations` must be an array")),
+                Some(arr) if arr.is_empty() => {
+                    findings.push(format!("contract `{id}`: obligations array is empty"));
+                }
+                _ => {}
+            },
+        }
+
+        // Soft-check negative_fixtures (array).
+        match entry.get("negative_fixtures") {
+            None => {
+                findings.push(format!("contract `{id}`: no negative_fixtures"));
+            }
+            Some(arr_val) => match arr_val.as_array() {
+                None => {
+                    findings.push(format!(
+                        "contract `{id}`: `negative_fixtures` must be an array"
+                    ));
+                }
+                Some(arr) if arr.is_empty() => {
+                    findings.push(format!("contract `{id}`: no negative_fixtures"));
+                }
+                _ => {}
+            },
+        }
+
+        // Soft-check surfaces (array).
+        match entry.get("surfaces") {
+            None => {
+                findings.push(format!("contract `{id}`: no surfaces declared"));
+            }
+            Some(arr_val) => match arr_val.as_array() {
+                None => {
+                    findings.push(format!("contract `{id}`: `surfaces` must be an array"));
+                }
+                Some(arr) if arr.is_empty() => {
+                    findings.push(format!("contract `{id}`: surfaces array is empty"));
+                }
+                _ => {}
+            },
+        }
+    }
+
+    // Handle optional [[exception]] entries.
+    if let Some(exceptions_val) = value.get("exception") {
+        let exceptions = exceptions_val
+            .as_array()
+            .ok_or_else(|| format!("{path} `exception` must be an array"))?;
+        let mut seen_exc_ids: Vec<String> = Vec::new();
+        for (idx, exc) in exceptions.iter().enumerate() {
+            let table = exc
+                .as_table()
+                .ok_or_else(|| format!("{path} exception[{idx}] must be a table"))?;
+            let exc_id = match table.get("id").and_then(toml::Value::as_str) {
+                Some(s) if !s.trim().is_empty() => s.to_string(),
+                _ => {
+                    findings.push(format!("{path} exception[{idx}]: missing or empty `id`"));
+                    format!("<exception[{idx}]>")
+                }
+            };
+            if seen_exc_ids.contains(&exc_id) {
+                findings.push(format!("{path} exception `{exc_id}`: duplicate id"));
+            } else {
+                seen_exc_ids.push(exc_id);
+            }
+        }
+    }
+
+    for f in &findings {
+        println!("{f}");
+    }
+    println!(
+        "check-detector-contracts: ok ({} contracts, {} findings)",
+        contracts.len(),
+        findings.len()
+    );
+    Ok(())
+}
+
+/// Informational gate: validates ledger shape of `policy/stance-decisions.toml`.
+/// Always returns Ok — findings are printed but never fail the gate in this phase.
+fn check_stance_decisions() -> Result<(), String> {
+    let path = STANCE_DECISIONS_LEDGER;
+    let value = parse_toml_file(Path::new(path))?;
+    require_toml_string(&value, "schema_version", path)?;
+
+    // [[stance]] may be absent if ledger is somehow empty — guard with .get().
+    let stances: &[toml::Value] = match value.get("stance") {
+        None => &[],
+        Some(v) => v
+            .as_array()
+            .ok_or_else(|| format!("{path} `stance` must be an array"))?,
+    };
+
+    let mut findings: Vec<String> = Vec::new();
+    let mut seen_ids: Vec<String> = Vec::new();
+
+    for (idx, entry) in stances.iter().enumerate() {
+        let table = entry
+            .as_table()
+            .ok_or_else(|| format!("{path} stance[{idx}] must be a table"))?;
+
+        // Hard-require identity field `id`.
+        let id = match table.get("id").and_then(toml::Value::as_str) {
+            Some(s) if !s.trim().is_empty() => s.to_string(),
+            _ => {
+                findings.push(format!("{path} stance[{idx}]: missing or empty `id`"));
+                format!("<stance[{idx}]>")
+            }
+        };
+
+        // Duplicate id check (informational).
+        if seen_ids.contains(&id) {
+            findings.push(format!("stance `{id}`: duplicate id"));
+        } else {
+            seen_ids.push(id.clone());
+        }
+
+        // Soft-check required descriptive fields.
+        for key in &["summary", "rationale", "owner", "linked_spec"] {
+            match table.get(*key).and_then(toml::Value::as_str) {
+                None => findings.push(format!("stance `{id}`: missing `{key}`")),
+                Some(s) if s.trim().is_empty() => {
+                    findings.push(format!("stance `{id}`: `{key}` is empty"));
+                }
+                _ => {}
+            }
+        }
+
+        // Soft-check linked_tests (array).
+        match table.get("linked_tests") {
+            None => {
+                findings.push(format!("stance `{id}`: missing `linked_tests`"));
+            }
+            Some(arr_val) => match arr_val.as_array() {
+                None => findings.push(format!("stance `{id}`: `linked_tests` must be an array")),
+                Some(arr) if arr.is_empty() => {
+                    findings.push(format!("stance `{id}`: `linked_tests` is empty"));
+                }
+                _ => {}
+            },
+        }
+
+        // Soft-check proof_gap: if present and non-empty, emit a finding.
+        if let Some(gap_str) = table
+            .get("proof_gap")
+            .and_then(toml::Value::as_str)
+            .filter(|s| !s.trim().is_empty())
+        {
+            findings.push(format!("stance `{id}`: proof_gap: {gap_str}"));
+        }
+    }
+
+    for f in &findings {
+        println!("{f}");
+    }
+    println!(
+        "check-stance-decisions: ok ({} stances, {} findings)",
+        stances.len(),
+        findings.len()
+    );
+    Ok(())
+}
+
+/// Informational gate: validates ledger shape of `policy/spec-coverage.toml`.
+/// Always returns Ok — findings are printed but never fail the gate in this phase.
+fn check_spec_coverage() -> Result<(), String> {
+    let path = SPEC_COVERAGE_LEDGER;
+    let value = parse_toml_file(Path::new(path))?;
+    require_toml_string(&value, "schema_version", path)?;
+
+    // [[field]] may be absent if ledger is empty — guard with .get().
+    let fields: &[toml::Value] = match value.get("field") {
+        None => &[],
+        Some(v) => v
+            .as_array()
+            .ok_or_else(|| format!("{path} `field` must be an array"))?,
+    };
+
+    let mut findings: Vec<String> = Vec::new();
+    let mut seen_names: Vec<String> = Vec::new();
+
+    for (idx, entry) in fields.iter().enumerate() {
+        let table = entry
+            .as_table()
+            .ok_or_else(|| format!("{path} field[{idx}] must be a table"))?;
+
+        // Hard-require identity field `name`.
+        let name = match table.get("name").and_then(toml::Value::as_str) {
+            Some(s) if !s.trim().is_empty() => s.to_string(),
+            _ => {
+                findings.push(format!("{path} field[{idx}]: missing or empty `name`"));
+                format!("<field[{idx}]>")
+            }
+        };
+
+        // Duplicate name check (informational).
+        if seen_names.contains(&name) {
+            findings.push(format!("field `{name}`: duplicate name"));
+        } else {
+            seen_names.push(name.clone());
+        }
+
+        // Soft-check canonical_source.
+        match table.get("canonical_source").and_then(toml::Value::as_str) {
+            None => findings.push(format!("field `{name}`: missing `canonical_source`")),
+            Some(s) if s.trim().is_empty() => {
+                findings.push(format!("field `{name}`: `canonical_source` is empty"));
+            }
+            _ => {}
+        }
+
+        // Soft-check surfaces (array).
+        match table.get("surfaces") {
+            None => {
+                findings.push(format!("field `{name}`: missing `surfaces`"));
+            }
+            Some(arr_val) => match arr_val.as_array() {
+                None => findings.push(format!("field `{name}`: `surfaces` must be an array")),
+                Some(arr) if arr.is_empty() => {
+                    findings.push(format!("field `{name}`: `surfaces` is empty"));
+                }
+                _ => {}
+            },
+        }
+
+        // single_truth == false → informational finding (NOT a gate failure).
+        if let Some(false) = table.get("single_truth").and_then(toml::Value::as_bool) {
+            let note = table
+                .get("note")
+                .and_then(toml::Value::as_str)
+                .unwrap_or("");
+            findings.push(format!("field `{name}`: single_truth=false ({note})"));
+        }
+    }
+
+    for f in &findings {
+        println!("{f}");
+    }
+    println!(
+        "check-spec-coverage: ok ({} fields, {} findings)",
+        fields.len(),
+        findings.len()
+    );
     Ok(())
 }
 

@@ -30,6 +30,9 @@ pub(crate) enum XtaskCommand {
     CheckCorpusBackstopSchema(PathBuf),
     CorpusUsefulness(Option<PathBuf>),
     CheckCorpusUsefulnessSchema(PathBuf),
+    CheckDetectorContracts,
+    CheckStanceDecisions,
+    CheckSpecCoverage,
 }
 
 impl XtaskCommand {
@@ -105,6 +108,17 @@ impl XtaskCommand {
             Some("check-corpus-usefulness-schema") => Ok(Self::CheckCorpusUsefulnessSchema(
                 command_args::require_subcommand_dir_arg(args, "check-corpus-usefulness-schema")?,
             )),
+            Some("check-detector-contracts") => parse_no_extra(
+                args,
+                "check-detector-contracts",
+                Self::CheckDetectorContracts,
+            ),
+            Some("check-stance-decisions") => {
+                parse_no_extra(args, "check-stance-decisions", Self::CheckStanceDecisions)
+            }
+            Some("check-spec-coverage") => {
+                parse_no_extra(args, "check-spec-coverage", Self::CheckSpecCoverage)
+            }
             Some(other) => Err(format!("unknown xtask command `{other}`")),
         }
     }
