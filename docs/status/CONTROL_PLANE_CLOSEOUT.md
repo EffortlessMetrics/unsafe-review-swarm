@@ -64,26 +64,34 @@ its proof — checked by a gate so a later change cannot silently weaken them.
   vocabulary. The policy classification stays in the separate `policy_status` /
   `policy_reason` fields, so no information was lost.
 
-After PR-C the gates report: `check-detector-contracts` 11 contracts / 0 tracked;
+After PR-C the gates reported: `check-detector-contracts` 11 contracts / 0 tracked;
 `check-spec-coverage` 8 fields / 0 blocking; `check-stance-decisions` 7 stances /
 2 tracked exceptions.
 
+After PR-E (this PR) the gates report: `check-detector-contracts` 11 contracts / 0
+tracked; `check-spec-coverage` 8 fields / 0 blocking; `check-stance-decisions`
+**7 stances / 0 tracked exceptions**.
+
 ## Exceptions that remain (tracked, by design)
 
-Two stance proof-gaps are recorded honestly rather than papered over — the
-control plane applying its own "evidence must be real" rule to itself:
+Both stance proof-gaps that existed after PR-C have now been closed by dedicated
+unit tests (PR-E):
 
-- `debug-assert-not-runtime-guard` — no dedicated unit test for the runtime-assert
-  text predicate; validated via the pipeline integration test plus the
-  `raw_pointer_alignment_debug_assert_only_not_guard` /
-  `raw_pointer_bounds_debug_assert_only_not_guard` fixture-calibration entries.
-- `owner-cards-grouped-not-hidden` — no dedicated unit test asserts owner cards
-  stay in `cards.json` counts; the linked test covers `not_selected` presence and
-  reason code only.
+- `debug-assert-not-runtime-guard` — closed. Dedicated unit tests
+  `runtime_assert_detection_distinguishes_assert_from_debug_assert` and
+  `text_contains_runtime_assert_handles_debug_and_mixed_cases` were added to
+  `crates/unsafe-review-core/src/analysis/evidence/code_text.rs`, directly
+  testing `is_runtime_assert_at` and `text_contains_runtime_assert`. The
+  `proof_gap` entry has been removed from `stance-decisions.toml`.
+- `owner-cards-grouped-not-hidden` — closed. Dedicated unit test
+  `owner_card_is_present_in_cards_json_and_included_in_summary_count` was added
+  to `crates/unsafe-review-core/src/output/json.rs`, asserting that the
+  `attributed_unsafe_fn_no_duplicate` fixture yields a card with
+  `operation_family=="unknown"` in `cards.json` and that `summary.cards` equals
+  `cards.len()`. The `proof_gap` entry has been removed from
+  `stance-decisions.toml`.
 
-Each is a `proof_gap` carrying `owner` (core / analysis) + `review_after`
-(2026-09-15), so the enforcing gate treats it as a tracked exception and the
-review date forces a recheck.
+**0 tracked exceptions remain.**
 
 ## What was deferred — PR-7 (calibration de-bottleneck)
 
@@ -101,9 +109,6 @@ migrate in waves; (4) flip the aggregate to generated-only. No big-bang.
 
 ## Recommended next
 
-- Close the two tracked stance proof-gaps with the dedicated unit tests they name
-  (small; removes the last exceptions and lets those entries drop their
-  `proof_gap`).
 - Start the calibration de-bottleneck as its own phased lane (#1712) — do not
   fold it into another lane's tail.
 

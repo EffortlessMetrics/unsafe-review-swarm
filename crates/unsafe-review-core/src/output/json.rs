@@ -1442,6 +1442,48 @@ mod tests {
         Ok(())
     }
 
+    /// Owner cards (operation_family == "unknown") are kept in cards.json and the summary
+    /// card count includes them — they are never silently dropped or hidden from the JSON
+    /// output (stance: owner-cards-grouped-not-hidden).
+    #[test]
+    fn owner_card_is_present_in_cards_json_and_included_in_summary_count() -> Result<(), String> {
+        // `attributed_unsafe_fn_no_duplicate` produces an owner card
+        // (operation_family == "unknown") alongside a more-specific operation card.
+        let output = fixture_output("attributed_unsafe_fn_no_duplicate")?;
+        let value = parse_json(&render(&output))?;
+
+        let cards = value["cards"]
+            .as_array()
+            .ok_or_else(|| "cards must be a JSON array".to_string())?;
+
+        let has_owner_card = cards
+            .iter()
+            .any(|card| card["operation_family"].as_str() == Some("unknown"));
+        if !has_owner_card {
+            return Err(
+                "attributed_unsafe_fn_no_duplicate: expected a card with operation_family==\"unknown\" \
+                 in cards.json but found none — owner card was silently dropped"
+                    .to_string(),
+            );
+        }
+
+        let summary_count = value["summary"]["cards"]
+            .as_u64()
+            .ok_or_else(|| "summary.cards must be a JSON integer".to_string())?
+            as usize;
+
+        if summary_count != cards.len() {
+            return Err(format!(
+                "summary.cards ({}) must equal cards.len() ({}) — owner card must not be \
+                 hidden from the summary count",
+                summary_count,
+                cards.len()
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Drift-lock: `site.owner = None` renders as `UNKNOWN_OWNER` ("unknown") on every surface
     /// (cards.json, agent packet, markdown sink-cluster), so consumers joining cards across
     /// surfaces see the identical string.  Previously json used "unknown", agent used "", and

@@ -31,8 +31,9 @@ linked_spec = "UNSAFE-REVIEW-SPEC-0006"
 # raw_pointer_bounds_debug_assert_only_not_guard in fixtures/calibration.toml.
 linked_tests = [
   "unsafe_review_core::analysis::pipeline::tests::pointer_arithmetic_num_ctrl_bytes_debug_assert_not_credited",
+  "unsafe_review_core::analysis::evidence::code_text::tests::runtime_assert_detection_distinguishes_assert_from_debug_assert",
+  "unsafe_review_core::analysis::evidence::code_text::tests::text_contains_runtime_assert_handles_debug_and_mixed_cases",
 ]
-proof_gap = "no dedicated unit test for is_runtime_assert_at / text_contains_runtime_assert; stance validated through the pipeline integration test above and the raw_pointer_alignment_debug_assert_only_not_guard / raw_pointer_bounds_debug_assert_only_not_guard fixture-calibration entries"
 review_after = "2026-09-15"
 
 [[stance]]
@@ -116,8 +117,8 @@ linked_spec = "UNSAFE-REVIEW-SPEC-0032"
 # provided by attributed_unsafe_fn_no_duplicate via the comment-plan path.
 linked_tests = [
   "unsafe_review_core::output::comment_plan::tests::comment_plan_owner_card_covered_by_operation_card_gets_specific_reason",
+  "unsafe_review_core::output::json::tests::owner_card_is_present_in_cards_json_and_included_in_summary_count",
 ]
-proof_gap = "no dedicated unit test asserts that owner cards are kept in cards.json counts; the linked test validates not_selected presence and reason_code only; a future test should assert the json card-count invariant"
 review_after = "2026-09-15"
 
 [[stance]]

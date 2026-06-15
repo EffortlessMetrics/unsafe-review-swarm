@@ -123,7 +123,10 @@ pub(super) fn text_contains_runtime_assert(text: &str, pattern: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{contains_executable_return, strip_block_comments_and_literals};
+    use super::{
+        contains_executable_return, is_runtime_assert_at, strip_block_comments_and_literals,
+        text_contains_runtime_assert,
+    };
 
     #[test]
     fn strips_line_comment_text_without_removing_later_code() {
@@ -154,5 +157,45 @@ mod tests {
         assert!(!contains_executable_return("/* return None */"));
         assert!(!contains_executable_return("// return None\nlog();"));
         assert!(!contains_executable_return("let note = \"return None\";"));
+    }
+
+    #[test]
+    fn runtime_assert_detection_distinguishes_assert_from_debug_assert() {
+        // Bare `assert!(` at position 0 is a runtime assert.
+        let bare = "assert!(x.is_aligned());";
+        let pos = bare.find("assert!(").unwrap_or(0);
+        assert!(
+            is_runtime_assert_at(bare, pos),
+            "bare assert!( at pos 0 must be a runtime assert"
+        );
+
+        // `debug_assert!(` — the `assert!(` substring starts after `_`, so not runtime.
+        let debug = "debug_assert!(x.is_aligned());";
+        let pos_debug = debug.find("assert!(").unwrap_or(0);
+        assert!(
+            !is_runtime_assert_at(debug, pos_debug),
+            "assert!( inside debug_assert!( must NOT be a runtime assert"
+        );
+    }
+
+    #[test]
+    fn text_contains_runtime_assert_handles_debug_and_mixed_cases() {
+        // Only debug_assert! — must NOT count as a runtime assert.
+        assert!(
+            !text_contains_runtime_assert("debug_assert!(x.is_aligned());", "assert!("),
+            "debug_assert! alone must not satisfy a runtime-assert search"
+        );
+
+        // Bare assert! — must count.
+        assert!(
+            text_contains_runtime_assert("assert!(x);", "assert!("),
+            "bare assert! must satisfy a runtime-assert search"
+        );
+
+        // Mixed: debug_assert followed by bare assert! — the bare one must be found.
+        assert!(
+            text_contains_runtime_assert("debug_assert!(x); assert!(y);", "assert!("),
+            "bare assert! following debug_assert! must still be found"
+        );
     }
 }

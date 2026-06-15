@@ -13,6 +13,15 @@ comments, edit source, or block by default.
 
 ### Changed
 
+- The two control-plane stance `proof_gap` exceptions recorded after the
+  detector-discipline control-plane lane are now closed by dedicated unit tests.
+  `debug-assert-not-runtime-guard` gains tests for `is_runtime_assert_at` and
+  `text_contains_runtime_assert` in `code_text.rs`; `owner-cards-grouped-not-hidden`
+  gains a test asserting that owner cards (operation_family `unknown`) appear in
+  `cards.json` with correct summary counts. `check-stance-decisions` now reports
+  7 stances / 0 tracked exceptions. Advisory; dev-gate only; no runtime output
+  change.
+
 - The three control-plane discipline gates (`check-detector-contracts`,
   `check-stance-decisions`, `check-spec-coverage`) are now **enforcing** in
   `check-pr`. Structural violations (malformed schema, missing identity, empty
