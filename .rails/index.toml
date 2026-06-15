@@ -226,3 +226,10 @@ name = "detector-discipline control plane"
 path = ".rails/lanes/control-plane/implementation-plan.md"
 status = "active"
 owner = "repo-infra"
+
+[[lane]]
+id = "corpus-validation-system"
+name = "layered corpus validation system"
+path = ".rails/lanes/corpus/implementation-plan.md"
+status = "active"
+owner = "repo-infra"
