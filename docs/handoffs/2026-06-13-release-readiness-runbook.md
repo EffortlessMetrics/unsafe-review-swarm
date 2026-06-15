@@ -184,6 +184,18 @@ The PR body must state: history-preserving import of swarm `main` `ba3440ed`; pr
 
 ### 4.2 **[OWNER]** Publish in dependency order (irreversible)
 
+The primary publish path is the `crates-publish` GitHub Actions workflow
+(`.github/workflows/crates-publish.yml`) on the swarm repo. Dispatch it from
+the Actions tab with `dry_run=false` and `version=0.3.7`. The workflow verifies
+that all three crate versions match the input, then publishes core first, waits
+for the sparse index to expose it (retry loop, up to 10 attempts with 15 s
+sleep), publishes cli, and then publishes the facade with the same retry
+wrapper. The org `CARGO_REGISTRY_TOKEN` secret (EffortlessMetrics org-level,
+selected-repositories scope) must be available to the swarm repo. Before the
+real dispatch, run a dry-run pass (`dry_run=true`) to confirm the file
+manifests. The manual `cargo publish` sequence below is the break-glass
+fallback when the workflow cannot be dispatched.
+
 ```bash
 rtk cargo publish -p unsafe-review-core    # publish FIRST
 rtk cargo publish -p unsafe-review-cli     # after core 0.3.7 is on crates.io

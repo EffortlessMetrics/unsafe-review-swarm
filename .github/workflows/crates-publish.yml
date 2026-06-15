@@ -1,0 +1,166 @@
+name: crates-publish
+
+# Manual, owner-driven crates.io publish workflow.
+#
+# This workflow does NOT trigger on pull requests or push events.
+# Publication is gated behind explicit workflow_dispatch inputs:
+#
+#   - version (required): the workspace version string to publish.
+#   - dry_run (default true): when true, only package and verify core.
+#
+# The workflow must be dispatched from main. Non-dry-run publication
+# requires the CARGO_REGISTRY_TOKEN org secret (selected repositories,
+# EffortlessMetrics org-level) to be available to this repository.
+#
+# Publish order (dependency-first, sparse-index settle between crates):
+#   1. unsafe-review-core  (published first; others depend on it)
+#   2. unsafe-review-cli   (depends on core; waits for sparse-index settle)
+#   3. unsafe-review       (facade; depends on cli + core)
+#
+# Dry-run notes:
+#   - core dry-run succeeds standalone.
+#   - cli/facade dry-runs FAIL on registry resolution because the new
+#     core version does not exist on crates.io yet. The dry-run path runs
+#     `cargo package --list` for cli/facade (file verification) instead of
+#     `cargo publish --dry-run`, which is the documented publish-order caveat.
+#
+# See docs/releases/CRATES_IO_PATCH_RELEASE.md for the full pre-publication
+# checklist.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Workspace version to publish (must match crates/*/Cargo.toml)"
+        required: true
+        type: string
+      dry_run:
+        description: "Dry run: package and verify core, do not publish"
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crates-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: crates.io publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Validate dispatch inputs
+        run: |
+          set -euo pipefail
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "::error::crates-publish must be dispatched from refs/heads/main; got ${GITHUB_REF}"
+            exit 1
+          fi
+
+      - name: Verify workspace version
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          core_ver="$(grep -m1 '^version' crates/unsafe-review-core/Cargo.toml | cut -d'"' -f2)"
+          cli_ver="$(grep -m1 '^version' crates/unsafe-review-cli/Cargo.toml | cut -d'"' -f2)"
+          facade_ver="$(grep -m1 '^version' crates/unsafe-review/Cargo.toml | cut -d'"' -f2)"
+          echo "core=${core_ver}  cli=${cli_ver}  facade=${facade_ver}  input=${INPUT_VERSION}"
+          if [ "${core_ver}" != "${cli_ver}" ] || [ "${core_ver}" != "${facade_ver}" ]; then
+            echo "::error::crate versions are not in sync: core=${core_ver} cli=${cli_ver} facade=${facade_ver}"
+            exit 1
+          fi
+          if [ "${core_ver}" != "${INPUT_VERSION}" ]; then
+            echo "::error::version input (${INPUT_VERSION}) does not match workspace version (${core_ver})"
+            exit 1
+          fi
+
+      - name: Dry run -- verify core package, list cli and facade files
+        if: ${{ inputs.dry_run }}
+        env:
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          echo "--- dry-run: cargo publish -p unsafe-review-core --dry-run ---"
+          cargo publish -p unsafe-review-core --locked --dry-run
+          echo "--- dry-run: cargo package -p unsafe-review-cli --list ---"
+          cargo package -p unsafe-review-cli --locked --list
+          echo "--- dry-run: cargo package -p unsafe-review --list ---"
+          cargo package -p unsafe-review --locked --list
+          {
+            echo "## crates-publish dry run"
+            echo
+            echo "- version: \`${INPUT_VERSION}\`"
+            echo "- unsafe-review-core: dry-run publish succeeded (standalone verification)"
+            echo "- unsafe-review-cli: package file list verified (dry-run publish skipped -- registry resolution requires core to be live first)"
+            echo "- unsafe-review (facade): package file list verified (dry-run publish skipped -- registry resolution requires core and cli to be live first)"
+            echo
+            echo "No upload performed. Re-run with dry_run=false to publish."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Real publish -- core, cli, facade (dependency order, sparse-index settle)
+        if: ${{ !inputs.dry_run }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -z "${CARGO_REGISTRY_TOKEN:-}" ]; then
+            echo "::error::CARGO_REGISTRY_TOKEN secret is not configured"
+            exit 1
+          fi
+
+          echo "--- publishing unsafe-review-core ${INPUT_VERSION} ---"
+          cargo publish -p unsafe-review-core --locked
+
+          echo "--- waiting for sparse index to expose unsafe-review-core ${INPUT_VERSION} ---"
+          cli_published=false
+          for attempt in $(seq 1 10); do
+            echo "attempt ${attempt}/10: cargo publish -p unsafe-review-cli --locked"
+            if cargo publish -p unsafe-review-cli --locked; then
+              cli_published=true
+              break
+            fi
+            echo "cli publish failed (sparse index may not yet expose core ${INPUT_VERSION}); sleeping 15 s"
+            sleep 15
+          done
+          if [ "${cli_published}" != "true" ]; then
+            echo "::error::unsafe-review-cli failed to publish after 10 attempts; check that unsafe-review-core ${INPUT_VERSION} is visible on crates.io"
+            exit 1
+          fi
+
+          echo "--- waiting for sparse index to expose unsafe-review-cli ${INPUT_VERSION} ---"
+          facade_published=false
+          for attempt in $(seq 1 10); do
+            echo "attempt ${attempt}/10: cargo publish -p unsafe-review --locked"
+            if cargo publish -p unsafe-review --locked; then
+              facade_published=true
+              break
+            fi
+            echo "facade publish failed (sparse index may not yet expose cli ${INPUT_VERSION}); sleeping 15 s"
+            sleep 15
+          done
+          if [ "${facade_published}" != "true" ]; then
+            echo "::error::unsafe-review (facade) failed to publish after 10 attempts; check that unsafe-review-cli ${INPUT_VERSION} is visible on crates.io"
+            exit 1
+          fi
+
+          {
+            echo "## crates-publish completed"
+            echo
+            echo "- unsafe-review-core \`${INPUT_VERSION}\`: published"
+            echo "- unsafe-review-cli \`${INPUT_VERSION}\`: published"
+            echo "- unsafe-review (facade) \`${INPUT_VERSION}\`: published"
+            echo
+            echo "> Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not site-execution proof."
+          } >> "$GITHUB_STEP_SUMMARY"

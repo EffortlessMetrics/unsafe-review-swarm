@@ -76,7 +76,31 @@ rtk cargo publish -p unsafe-review --dry-run
 
 For README/image hotfixes, inspect packaged README content before publishing.
 
-## Publish
+## Publishing via the crates-publish action
+
+The primary publish path is the `crates-publish` GitHub Actions workflow
+(`.github/workflows/crates-publish.yml`), dispatched manually from the Actions
+tab on the swarm repo. This workflow is owner-driven, `workflow_dispatch`-only,
+and must be dispatched from `main`. It requires the `CARGO_REGISTRY_TOKEN` org
+secret (EffortlessMetrics org-level, selected-repositories scope).
+
+Typical sequence:
+
+1. Dispatch `crates-publish` with `dry_run=true` and the target version (e.g.
+   `0.3.7`). The workflow verifies that all three crate versions match each
+   other and the input, then runs `cargo publish --dry-run` for core and
+   `cargo package --list` for cli and the facade. Review the step summary and
+   logs to confirm the file manifests are correct.
+2. Once the dry run is clean, dispatch again with `dry_run=false`. The workflow
+   publishes in dependency order (core first, then cli, then facade) with a
+   sparse-index settle retry loop between crates. A `## crates-publish
+   completed` step summary confirms each crate and version when done.
+
+The manual sequence below is the break-glass fallback for cases where the
+workflow cannot be dispatched (e.g. network issues, secret unavailability, or
+emergency hotfix from a local clone).
+
+## Publish (break-glass manual fallback)
 
 Publish dependency crates first when bumping all public crates:
 
