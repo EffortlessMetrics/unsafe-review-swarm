@@ -49,6 +49,7 @@ Specs define behavior. They do not carry the PR queue.
 38. [Scheduled corpus backstop](UNSAFE-REVIEW-SPEC-0039-scheduled-corpus-backstop.md)
 39. [Detector-contracts ledger](UNSAFE-REVIEW-SPEC-0040-detector-contracts-ledger.md)
 40. [Syntax-first dispatch architecture](UNSAFE-REVIEW-SPEC-0041-syntax-first-dispatch-architecture.md)
+41. [Corpus validation taxonomy](UNSAFE-REVIEW-SPEC-0042-corpus-validation-taxonomy.md)
 
 
 ## Appendices
