@@ -185,16 +185,21 @@ The PR body must state: history-preserving import of swarm `main` `ba3440ed`; pr
 ### 4.2 **[OWNER]** Publish in dependency order (irreversible)
 
 The primary publish path is the `crates-publish` GitHub Actions workflow
-(`.github/workflows/crates-publish.yml`) on the swarm repo. Dispatch it from
-the Actions tab with `dry_run=false` and `version=0.3.7`. The workflow verifies
-that all three crate versions match the input, then publishes core first, waits
-for the sparse index to expose it (retry loop, up to 10 attempts with 15 s
-sleep), publishes cli, and then publishes the facade with the same retry
-wrapper. The org `CARGO_REGISTRY_TOKEN` secret (EffortlessMetrics org-level,
-selected-repositories scope) must be available to the swarm repo. Before the
-real dispatch, run a dry-run pass (`dry_run=true`) to confirm the file
-manifests. The manual `cargo publish` sequence below is the break-glass
-fallback when the workflow cannot be dispatched.
+(`.github/workflows/crates-publish.yml`) on the **source/publish repo**
+(`EffortlessMetrics/unsafe-review`) — dispatch it from that repo's Actions tab,
+from `main`, with `dry_run=false` and `version=0.3.7`. Source is correct because
+the 0.3.7 version bump lives on source `main`; the workflow's version-match guard
+fails anywhere the crates are not at the release version (e.g. swarm `main`,
+still 0.3.6). The workflow verifies that all three crate versions match the
+input, then publishes core first, waits for the sparse index to expose it (retry
+loop, up to 10 attempts with 15 s sleep), publishes cli, and then publishes the
+facade with the same retry wrapper. **Prerequisite (org admin, one-time):** the
+org `CARGO_REGISTRY_TOKEN` secret must grant `EffortlessMetrics/unsafe-review`
+access (Org → Settings → Secrets and variables → Actions → `CARGO_REGISTRY_TOKEN`
+→ Repository access); until then the workflow fails at its empty-secret guard.
+Before the real dispatch, run a dry-run pass (`dry_run=true`) to confirm the file
+manifests. The manual `cargo publish` sequence below is the break-glass fallback
+when the workflow cannot be dispatched.
 
 ```bash
 rtk cargo publish -p unsafe-review-core    # publish FIRST

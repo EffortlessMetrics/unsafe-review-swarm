@@ -80,9 +80,20 @@ For README/image hotfixes, inspect packaged README content before publishing.
 
 The primary publish path is the `crates-publish` GitHub Actions workflow
 (`.github/workflows/crates-publish.yml`), dispatched manually from the Actions
-tab on the swarm repo. This workflow is owner-driven, `workflow_dispatch`-only,
-and must be dispatched from `main`. It requires the `CARGO_REGISTRY_TOKEN` org
-secret (EffortlessMetrics org-level, selected-repositories scope).
+tab on the **source/publish repo** (`EffortlessMetrics/unsafe-review`) — not the
+swarm workbench. Publishing runs from source because that is the release repo and
+because the workspace version bump lives on source `main` (the workflow's
+version-match guard only passes where the crates are at the release version).
+This workflow is owner-driven, `workflow_dispatch`-only, and must be dispatched
+from `main`. It requires the `CARGO_REGISTRY_TOKEN` org secret (EffortlessMetrics
+org-level, selected-repositories scope).
+
+**One-time prerequisite (org admin):** the `CARGO_REGISTRY_TOKEN` org secret must
+list `EffortlessMetrics/unsafe-review` under its selected repositories
+(Org → Settings → Secrets and variables → Actions → `CARGO_REGISTRY_TOKEN` →
+Repository access). Until that grant exists the workflow reaches its empty-secret
+guard and fails fast; this is why historical releases used the manual fallback
+below.
 
 Typical sequence:
 
