@@ -1,5 +1,5 @@
 use crate::api::AnalyzeOutput;
-use crate::domain::ReviewClass;
+use crate::domain::{CoverageBlock, ReviewClass};
 use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
 use crate::policy::{LedgerEntry as PolicyLedgerRecord, LedgerKind, load_ledger_entries};
 use crate::util::slug;
@@ -73,7 +73,12 @@ pub struct PolicyReportCard {
     pub proof_path: String,
     pub policy_status: String,
     pub policy_reason: String,
-    /// SPEC-0030 baseline posture: `new_gap`, `inherited`, `non_actionable`, or `suppressed`.
+    /// Canonical SPEC-0030 baseline posture projected from `CoverageBlock::derive` with
+    /// snapshot-slot movement applied — the same value `json` and `agent` surfaces project
+    /// (`new`, `worsened`, `inherited`, `resolved`, or `unknown`).
+    ///
+    /// Policy classification (new_gap / baseline_known / suppressed / non_actionable) is
+    /// carried by `policy_status` and `policy_reason`, not by this field.
     pub baseline_state: String,
     /// Whether the card's unsafe site is on a changed line (diff-scoped attribution, SPEC-0030).
     pub changed_line: bool,
@@ -157,7 +162,20 @@ fn evaluate_with_date(output: &AnalyzeOutput, audit_date: &str) -> Result<Policy
         .iter()
         .map(|card| {
             let status = policy_status(&card.class);
-            let baseline_state = policy_baseline_state(status).to_string();
+            // Project baseline_state from the canonical CoverageBlock, mirroring json.rs
+            // (JsonCard::from_with_status): derive from card, then apply snapshot-slot movement
+            // so that policy_report.baseline_state == json.baseline_state for every card
+            // (SPEC-0030 §single-truth).
+            let mut coverage_block = CoverageBlock::derive(card);
+            if let Some(snap) = output.coverage_snapshot.get(&card.id.0) {
+                coverage_block.apply_snapshot_slots(
+                    &snap.contract_coverage,
+                    &snap.guard_coverage,
+                    &snap.test_reach_coverage,
+                    &snap.witness_receipt_coverage,
+                );
+            }
+            let baseline_state = coverage_block.baseline_state.as_str().to_string();
             PolicyReportCard {
                 card_id: card.id.0.clone(),
                 class_name: card.class.as_str().to_string(),
@@ -466,16 +484,6 @@ fn policy_reason(status: PolicyStatus) -> &'static str {
         PolicyStatus::NonActionable => {
             "ReviewCard class is not actionable under the advisory policy report."
         }
-    }
-}
-
-/// SPEC-0030 baseline posture label for the policy report card (separate from `policy_status`).
-fn policy_baseline_state(status: PolicyStatus) -> &'static str {
-    match status {
-        PolicyStatus::NewGap => "new_gap",
-        PolicyStatus::BaselineKnown => "inherited",
-        PolicyStatus::Suppressed => "suppressed",
-        PolicyStatus::NonActionable => "non_actionable",
     }
 }
 
@@ -961,6 +969,227 @@ diff --git a/src/a.rs b/src/a.rs\n\
         assert_eq!(
             report.summary.inherited_gaps, expected_inherited,
             "policy_report.inherited_gaps must match canonical summary ({expected_inherited})"
+        );
+        Ok(())
+    }
+
+    /// Drift-lock: policy_report.baseline_state must equal json/agent baseline_state for every
+    /// card (canonical unification, SPEC-0030 §single-truth).
+    ///
+    /// Asserts the new canonical 5-value vocabulary (new/worsened/inherited/resolved/unknown):
+    /// - BaselineKnown   → "inherited"   (policy_status = "baseline_known")
+    /// - GuardMissing    → "new"          (policy_status = "new_gap")
+    /// - Suppressed      → "unknown"      (policy_status = "suppressed"; NEW: was "suppressed")
+    /// - GuardedAndWitnessed → "unknown"  (policy_status = "non_actionable"; NEW: was "non_actionable")
+    ///
+    /// This test fails if anyone re-introduces a separate derivation.
+    #[test]
+    fn baseline_state_equals_canonical_coverage_block_for_all_classes() -> Result<(), String> {
+        use crate::api::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, analyze};
+        use crate::domain::coverage::CoverageBlock;
+        use crate::output::json;
+
+        // raw_pointer_alignment produces a GuardMissing (actionable) card → "new"
+        let root = fixture_path("raw_pointer_alignment");
+        let output = analyze(AnalyzeInput {
+            root: root.clone(),
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: None,
+        })?;
+        let report = evaluate_with_date(&output, "2026-05-18")?;
+        let report_card = report
+            .cards
+            .first()
+            .ok_or_else(|| "fixture produced no cards".to_string())?;
+        // Verify canonical projection: GuardMissing → baseline_state="new"
+        assert_eq!(
+            report_card.baseline_state, "new",
+            "GuardMissing (new_gap) card must project baseline_state=\"new\" from CoverageBlock"
+        );
+        assert_eq!(
+            report_card.policy_status, "new_gap",
+            "policy_status must remain \"new_gap\" (classification unchanged)"
+        );
+        // Verify agreement with canonical CoverageBlock (what json/agent project)
+        let source_card = output
+            .cards
+            .first()
+            .ok_or_else(|| "fixture produced no cards".to_string())?;
+        let mut canonical_block = CoverageBlock::derive(source_card);
+        if let Some(snap) = output.coverage_snapshot.get(&source_card.id.0) {
+            canonical_block.apply_snapshot_slots(
+                &snap.contract_coverage,
+                &snap.guard_coverage,
+                &snap.test_reach_coverage,
+                &snap.witness_receipt_coverage,
+            );
+        }
+        assert_eq!(
+            report_card.baseline_state,
+            canonical_block.baseline_state.as_str(),
+            "policy_report.baseline_state must equal CoverageBlock::derive(...).baseline_state"
+        );
+
+        // Also verify via rendered json that the three surfaces agree:
+        let json_text = json::render(&output);
+        let json_val: serde_json::Value =
+            serde_json::from_str(&json_text).map_err(|err| format!("json parse failed: {err}"))?;
+        let json_baseline_state = json_val["cards"][0]["coverage"]["baseline_state"]
+            .as_str()
+            .ok_or_else(|| "json cards[0].coverage.baseline_state missing".to_string())?;
+        assert_eq!(
+            report_card.baseline_state, json_baseline_state,
+            "policy_report.baseline_state ({}) must equal json.cards[0].coverage.baseline_state ({})",
+            report_card.baseline_state, json_baseline_state
+        );
+
+        Ok(())
+    }
+
+    /// Drift-lock: BaselineKnown card projects baseline_state="inherited" and
+    /// policy_status="baseline_known" (classification carried separately).
+    #[test]
+    fn baseline_known_card_projects_inherited_and_policy_status_is_baseline_known()
+    -> Result<(), String> {
+        use crate::api::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, analyze};
+
+        let source = fixture_path("raw_pointer_alignment");
+        let root = unique_temp_dir("unsafe-review-policy-baseline-drift")?;
+        copy_dir(&source, &root)?;
+
+        let first = analyze(AnalyzeInput {
+            root: root.clone(),
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: None,
+        })?;
+        let card_id = first
+            .cards
+            .first()
+            .ok_or_else(|| "fixture produced no card".to_string())?
+            .id
+            .0
+            .clone();
+        let policy = root.join("policy");
+        fs::create_dir_all(&policy).map_err(|err| format!("create policy failed: {err}"))?;
+        fs::write(
+            policy.join("unsafe-review-baseline.toml"),
+            format!(
+                "schema_version = \"0.1\"\nstatus = \"active\"\n\n\
+                 [[entries]]\n\
+                 card_id = \"{card_id}\"\n\
+                 owner = \"core/policy\"\n\
+                 reason = \"accepted current debt\"\n\
+                 evidence = \"fixture\"\n\
+                 review_after = \"2026-08-01\"\n"
+            ),
+        )
+        .map_err(|err| format!("write baseline failed: {err}"))?;
+
+        let output = analyze(AnalyzeInput {
+            root: root.clone(),
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: None,
+        })?;
+        let report = evaluate_with_date(&output, "2026-05-18")?;
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+
+        let card = report
+            .cards
+            .first()
+            .ok_or_else(|| "report produced no cards".to_string())?;
+        // BaselineKnown → canonical baseline_state="inherited"; policy_status="baseline_known"
+        assert_eq!(
+            card.baseline_state, "inherited",
+            "BaselineKnown card must project baseline_state=\"inherited\" (canonical 5-value vocabulary)"
+        );
+        assert_eq!(
+            card.policy_status, "baseline_known",
+            "policy_status must remain \"baseline_known\" (classification unchanged)"
+        );
+        Ok(())
+    }
+
+    /// Drift-lock: Suppressed card projects baseline_state="unknown" (canonical CoverageBlock),
+    /// NOT the old policy-derived "suppressed". Classification remains in policy_status="suppressed".
+    #[test]
+    fn suppressed_card_projects_unknown_baseline_state_and_policy_status_is_suppressed()
+    -> Result<(), String> {
+        use crate::api::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, analyze};
+
+        let source = fixture_path("raw_pointer_alignment");
+        let root = unique_temp_dir("unsafe-review-policy-suppressed-drift")?;
+        copy_dir(&source, &root)?;
+
+        let first = analyze(AnalyzeInput {
+            root: root.clone(),
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: None,
+        })?;
+        let card_id = first
+            .cards
+            .first()
+            .ok_or_else(|| "fixture produced no card".to_string())?
+            .id
+            .0
+            .clone();
+        let policy = root.join("policy");
+        fs::create_dir_all(&policy).map_err(|err| format!("create policy failed: {err}"))?;
+        // Write a suppression (not baseline) entry for the card.
+        fs::write(
+            policy.join("unsafe-review-suppressions.toml"),
+            format!(
+                "schema_version = \"0.1\"\nstatus = \"active\"\n\n\
+                 [[entries]]\n\
+                 card_id = \"{card_id}\"\n\
+                 owner = \"core/policy\"\n\
+                 reason = \"accepted false positive\"\n\
+                 evidence = \"fixture\"\n\
+                 review_after = \"2099-01-01\"\n"
+            ),
+        )
+        .map_err(|err| format!("write suppression failed: {err}"))?;
+
+        let output = analyze(AnalyzeInput {
+            root: root.clone(),
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: None,
+        })?;
+        let report = evaluate_with_date(&output, "2026-05-18")?;
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+
+        let card = report
+            .cards
+            .first()
+            .ok_or_else(|| "report produced no cards".to_string())?;
+        // Suppressed → canonical CoverageBlock.baseline_state = "unknown" (not "suppressed")
+        // Classification stays in policy_status="suppressed"
+        assert_eq!(
+            card.baseline_state, "unknown",
+            "Suppressed card must project baseline_state=\"unknown\" from CoverageBlock (was \"suppressed\" in old derivation)"
+        );
+        assert_eq!(
+            card.policy_status, "suppressed",
+            "policy_status must remain \"suppressed\" so classification is still visible"
         );
         Ok(())
     }

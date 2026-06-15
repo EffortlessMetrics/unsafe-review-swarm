@@ -131,6 +131,26 @@ open gap, ignoring baseline) is removed. Default remains advisory; no blocking.
 identity and changed-line attribution, separated from `suppressed` counts. It
 remains advisory and changes no exit code by itself.
 
+Each card in the policy report carries a `baseline_state` field and a
+`policy_status` field with distinct roles:
+
+- `baseline_state` — the canonical 5-value coverage-movement vocabulary
+  (`new`, `worsened`, `inherited`, `resolved`, `unknown`) projected from
+  `CoverageBlock::derive` with snapshot-slot movement applied. This is the
+  same value the `json` and `agent` surfaces project (SPEC-0030 §single-truth,
+  canonical unification). Advisory only; no proof, UB-free, or Miri-clean claim.
+
+- `policy_status` — the policy-classification vocabulary
+  (`new_gap`, `baseline_known`, `suppressed`, `non_actionable`) that reflects
+  how the card was matched against the baseline and suppression ledgers. This is
+  the field consumers use for policy-enforcement decisions.
+
+A `Suppressed` card has `baseline_state = "unknown"` (CoverageBlock does not
+assign baseline posture to suppressed cards) and `policy_status = "suppressed"`.
+A `NonActionable` card has `baseline_state = "unknown"` and
+`policy_status = "non_actionable"`. The `policy_reason` field carries the
+human-readable explanation for the `policy_status` classification.
+
 ### Resolved and stale baseline entries
 
 When a baseline-known card no longer appears (the unsafe site was removed or

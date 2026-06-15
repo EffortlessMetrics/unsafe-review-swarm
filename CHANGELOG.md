@@ -11,6 +11,16 @@ comments, edit source, or block by default.
 
 ## Unreleased
 
+### Changed
+
+- `policy report` `baseline_state` column now projects the canonical 5-value
+  coverage-movement vocabulary (`new`, `worsened`, `inherited`, `resolved`,
+  `unknown`) from `CoverageBlock::derive` with snapshot-slot movement applied —
+  the same value `cards.json` and the agent packet project (SPEC-0030
+  §single-truth). Policy classification (`new_gap`, `baseline_known`,
+  `suppressed`, `non_actionable`) is carried by the `policy_status` and
+  `policy_reason` fields, which are unchanged. Advisory only.
+
 ## 0.3.7 - 2026-06-14
 
 0.3.7 — adoption, telemetry, and real-code low-noise improvements. It makes
