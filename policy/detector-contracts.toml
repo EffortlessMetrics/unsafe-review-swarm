@@ -1,11 +1,201 @@
 schema_version = "1.0"
 policy = "detector-contracts"
 owner = "core / analysis"
-status = "empty"
+status = "partial"
 
 # Detector-discipline contract ledger. Schema defined in
-# UNSAFE-REVIEW-SPEC-0040. Each future [[contract]] entry declares which D1–D5
+# UNSAFE-REVIEW-SPEC-0040. Each [[contract]] entry declares which D1-D5
 # discipline obligations (UNSAFE-REVIEW-SPEC-0005 appendix) a detector requires,
 # plus its positive/negative control fixtures and projecting surfaces. The
-# validating gate (check-detector-contracts) and POLICY_FILES registration land
-# in a later control-plane PR; this scaffold is intentionally empty (no entries).
+# validating gate (check-detector-contracts) is informational in this phase;
+# findings print but do not fail the gate. Enforcement for registered families
+# flips on once negative controls are confirmed for every entry.
+
+[[contract]]
+operation_family = "get_unchecked"
+obligations = ["D1", "D2", "D3", "D4", "D5"]
+positive_fixtures = [
+  "get_unchecked_mut_bounds",
+  "get_unchecked_mut_len_guard",
+  "get_unchecked_mut_conjunct_len_guard",
+  "get_unchecked_mut_get_probe_guard",
+]
+negative_fixtures = [
+  "get_unchecked_mut_other_len_not_guard",
+  "get_unchecked_mut_post_check_not_guard",
+  "get_unchecked_mut_disjunct_len_not_guard",
+  "get_unchecked_mut_bounds_observed_not_guard",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Fixture suite exercises bounds-guard and len-guard discharge paths (positive); unrelated-len, post-check, disjunctive, and observed-only patterns confirm non-discharge (negative). Advisory heuristic only."
+review_after = "2026-12-15"
+
+[[contract]]
+operation_family = "ptr_copy"
+obligations = ["D1", "D2", "D3", "D4", "D5"]
+positive_fixtures = [
+  "ptr_copy_overlapping",
+  "ptr_copy_slice_range_guard",
+  "multiline_ptr_copy",
+  "ptr_copy_slice_range_early_return_guard",
+]
+negative_fixtures = [
+  "ptr_copy_slice_range_closed_branch_not_guard",
+  "ptr_copy_other_len_not_guard",
+  "ptr_copy_slice_range_reassigned_count_not_guard",
+  "ptr_copy_slice_range_shadowed_src_not_guard",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Slice-range guard discharge confirmed positive; closed-branch, unrelated-len, reassigned-count, and shadowed-src negative controls confirm discipline gates. Advisory heuristic only."
+review_after = "2026-12-15"
+
+[[contract]]
+operation_family = "transmute"
+obligations = ["D1", "D2", "D3", "D4", "D5"]
+positive_fixtures = [
+  "transmute_invalid_value",
+  "transmute_layout_size_guard",
+  "transmute_all_obligations_met",
+  "multiline_transmute_all_obligations_met",
+]
+negative_fixtures = [
+  "transmute_layout_disjunct_branch_not_guard",
+  "transmute_bool_comment_not_guard",
+  "transmute_layout_observed_not_guard",
+  "transmute_layout_closed_branch_not_guard",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Layout-size and value-validity discharge paths confirmed positive; comment masking (D4), disjunctive-branch, observed-only, and closed-branch negative controls confirm discipline gates. Advisory heuristic only."
+review_after = "2026-12-15"
+
+[[contract]]
+operation_family = "zeroed"
+obligations = ["D1", "D2", "D3", "D4", "D5"]
+positive_fixtures = [
+  "zeroed_invalid_value",
+  "zeroed_valid_u32",
+  "zeroed_call_still_cards",
+]
+negative_fixtures = []
+proof_gap = "no negative-control fixture for zeroed family; follow-up needed to add _not_guard controls covering safe-context (D1), definition header (D2), unrelated-origin (D3), comment masking (D4), and path-segment (D5) discipline checks"
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Positive fixtures confirm invalid-value and valid-type detection. No negative-control fixtures exist for this family; advisory posture unchanged. Follow-up required before enforcement gate activates."
+review_after = "2026-09-15"
+
+[[contract]]
+operation_family = "vec_set_len"
+obligations = ["D1", "D2", "D3", "D4", "D5"]
+positive_fixtures = [
+  "vec_set_len",
+  "vec_set_len_with_capacity",
+  "vec_set_len_len_and_cap_guard",
+  "vec_set_len_remaining_capacity_guard",
+]
+negative_fixtures = [
+  "vec_set_len_comment_not_guard",
+  "vec_set_len_cap_not_len_not_guard",
+  "vec_set_len_reassigned_new_len_not_guard",
+  "vec_set_len_shadowed_new_len_not_guard",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Capacity and remaining-capacity discharge paths confirmed positive; comment masking (D4), cap-not-len, reassigned, and shadowed-new-len negative controls confirm discipline gates. Advisory heuristic only."
+review_after = "2026-12-15"
+
+[[contract]]
+operation_family = "unsafe_fn_call"
+obligations = ["D1", "D2", "D3", "D4", "D5"]
+positive_fixtures = [
+  "unsafe_fn_call_wrapper",
+  "multiline_unsafe_fn_call_wrapper",
+  "unsafe_fn_call_encode_utf8_remaining_cap",
+  "unchecked_constructor_availability_guard",
+]
+negative_fixtures = [
+  "ffi_same_named_method_not_route",
+  "unchecked_constructor_other_availability_not_guard",
+  "ffi_non_libc_wrapper_call_not_route",
+  "ffi_local_libc_module_call_not_route",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Wrapper and constructor availability discharge paths confirmed positive; same-named-method, unrelated-availability, and module-scope routing negative controls confirm discipline gates. Note: the ffi_*_not_route negatives are calibrated as unsafe_fn_call, which is the correct family for these non-FFI-routed calls. Advisory heuristic only."
+review_after = "2026-12-15"
+
+[[contract]]
+operation_family = "ffi"
+obligations = ["D1", "D2", "D3", "D4", "D5"]
+positive_fixtures = [
+  "ffi_sanitizer_route",
+  "ffi_missing_boundary_contract",
+  "ffi_call_sanitizer_route",
+  "ffi_qualified_call_sanitizer_route",
+]
+negative_fixtures = []
+proof_gap = "no negative-control fixture is calibrated under the ffi operation_family; the existing not-route fixtures (ffi_same_named_method_not_route, ffi_non_libc_wrapper_call_not_route, ffi_local_libc_module_call_not_route, ffi_inner_libc_path_not_route, ffi_token_in_string_not_route) are all calibrated as unsafe_fn_call, not ffi, because routing does not occur for those patterns; follow-up needed to add dedicated ffi negative-control fixtures"
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Sanitizer-route and missing-boundary-contract discharge paths confirmed positive. Negative controls are absent for the ffi family specifically; not-route fixtures fall under unsafe_fn_call in calibration. Advisory posture unchanged."
+review_after = "2026-09-15"
+
+[[contract]]
+operation_family = "stable_byte_source_getter_reentry"
+obligations = ["D1", "D2", "D3", "D4", "D5"]
+positive_fixtures = [
+  "js_buffer_reentry_sync_compression",
+  "js_buffer_reentry_raw_parts_materialization",
+  "js_buffer_stale_span_slice_index_after_reentry",
+  "js_buffer_stale_span_passed_as_arg_after_reentry",
+]
+negative_fixtures = [
+  "js_buffer_reentry_options_before_capture_no_card",
+  "js_buffer_reentry_recapture_after_reentry_no_card",
+  "js_buffer_stale_span_refetch_before_use_no_card",
+  "js_buffer_stale_span_use_before_reentry_no_card",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Getter-reentry and stale-span positive paths confirmed; options-before-capture, recapture-after-reentry, refetch-before-use, and use-before-reentry negative controls confirm discipline gates. Advisory heuristic only."
+review_after = "2026-12-15"
+
+[[contract]]
+operation_family = "stable_byte_source_rab_async"
+obligations = ["D1", "D2", "D3", "D4", "D5"]
+positive_fixtures = [
+  "js_buffer_reentry_async_helper_capture",
+  "js_buffer_reentry_node_fs_rab_scalar_write",
+  "js_buffer_reentry_node_fs_rab_encoded_write_file",
+]
+negative_fixtures = [
+  "js_buffer_reentry_node_fs_rab_scalar_write_scheduled_before_capture_no_card",
+  "js_buffer_reentry_node_fs_rab_encoded_write_scheduled_before_capture_no_card",
+  "js_buffer_reentry_node_fs_rab_encoded_write_recapture_after_dispatch_no_card",
+  "js_buffer_reentry_async_options_before_capture_no_card",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "RAB-async capture and node:fs-style write positive paths confirmed; scheduled-before-capture and recapture-after-dispatch negative controls confirm discipline gates. Advisory heuristic only."
+review_after = "2026-12-15"
+
+[[contract]]
+operation_family = "stable_byte_source_sab_race"
+obligations = ["D1", "D2", "D3", "D4", "D5"]
+positive_fixtures = [
+  "stable_byte_sab_borrowed_slice",
+  "stable_byte_sab_mysql_blob_rawslice",
+]
+negative_fixtures = [
+  "stable_byte_sab_snapshot_no_card",
+  "stable_byte_sab_mysql_blob_owned_copy_no_card",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "SharedArrayBuffer borrowed-slice and MySQL BLOB raw-slice positive paths confirmed; owned-copy snapshot and owned-copy blob negative controls confirm discipline gates. Advisory heuristic only."
+review_after = "2026-12-15"
+
+[[contract]]
+operation_family = "stable_byte_source_native_ffi_read"
+obligations = ["D1", "D2", "D3", "D4", "D5"]
+positive_fixtures = [
+  "stable_byte_native_ffi_zstd_handoff",
+]
+negative_fixtures = [
+  "stable_byte_native_ffi_zstd_owned_copy_control",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "zstd-style native FFI handoff positive path confirmed; owned-copy-before-handoff negative control confirms discharge gate. Only one positive fixture exists at this time; additional real-crate dogfood evidence needed before promotion. Advisory heuristic only."
+review_after = "2026-12-15"
