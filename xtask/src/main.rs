@@ -28,6 +28,7 @@ mod first_hour;
 mod markdown;
 mod public_badges;
 mod public_surfaces;
+mod real_pr_corpus;
 mod source_sync;
 mod spec_status;
 mod support_tiers;
@@ -454,6 +455,7 @@ const POLICY_FILES: &[&str] = &[
     "policy/detector-contracts.toml",
     "policy/stance-decisions.toml",
     "policy/spec-coverage.toml",
+    "policy/pr-corpus.toml",
 ];
 const DETECTOR_CONTRACTS_LEDGER: &str = "policy/detector-contracts.toml";
 const STANCE_DECISIONS_LEDGER: &str = "policy/stance-decisions.toml";
@@ -847,7 +849,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
     match commands::XtaskCommand::parse(&args)? {
         commands::XtaskCommand::Help => {
             println!(
-                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-stance-decisions, check-spec-coverage, check-fixture-surface-parity, dogfood-exec [--target <id>] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean]"
+                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-stance-decisions, check-spec-coverage, check-fixture-surface-parity, check-real-pr-corpus, dogfood-exec [--target <id>] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean]"
             );
             Ok(())
         }
@@ -859,6 +861,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
             check_fixtures()?;
             check_calibration()?;
             check_fixture_surface_parity()?;
+            real_pr_corpus::check()?;
             check_dogfood()?;
             check_manual_fuzz_harness()?;
             check_tracked_generated_artifacts()?;
@@ -899,6 +902,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckStanceDecisions => check_stance_decisions(),
         commands::XtaskCommand::CheckSpecCoverage => check_spec_coverage(),
         commands::XtaskCommand::CheckFixtureSurfaceParity => check_fixture_surface_parity(),
+        commands::XtaskCommand::CheckRealPrCorpus => real_pr_corpus::check(),
         commands::XtaskCommand::DogfoodExec(raw_args) => {
             let exec_args = dogfood_exec::DogfoodExecArgs::parse(&raw_args)?;
             dogfood_exec::run(&exec_args)
