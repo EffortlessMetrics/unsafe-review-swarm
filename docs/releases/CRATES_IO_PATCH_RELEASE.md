@@ -48,6 +48,8 @@ comment release, or source-editing release.
 
 ## Validation
 
+Before publish, run the corpus-validation subset in [RELEASE_READINESS.md](RELEASE_READINESS.md).
+
 For synchronized public crate bumps:
 
 ```bash
