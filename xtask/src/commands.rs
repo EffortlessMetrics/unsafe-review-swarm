@@ -33,6 +33,7 @@ pub(crate) enum XtaskCommand {
     CheckDetectorContracts,
     CheckStanceDecisions,
     CheckSpecCoverage,
+    DogfoodExec(Vec<String>),
 }
 
 impl XtaskCommand {
@@ -118,6 +119,10 @@ impl XtaskCommand {
             }
             Some("check-spec-coverage") => {
                 parse_no_extra(args, "check-spec-coverage", Self::CheckSpecCoverage)
+            }
+            Some("dogfood-exec") => {
+                // All trailing args are forwarded to the DogfoodExec arg parser.
+                Ok(Self::DogfoodExec(args.to_vec()))
             }
             Some(other) => Err(format!("unknown xtask command `{other}`")),
         }

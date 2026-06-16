@@ -22,6 +22,7 @@ mod commands;
 mod corpus_backstop;
 mod corpus_usefulness;
 mod docs_automation_paths;
+mod dogfood_exec;
 mod dogfood_usefulness;
 mod first_hour;
 mod markdown;
@@ -846,7 +847,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
     match commands::XtaskCommand::parse(&args)? {
         commands::XtaskCommand::Help => {
             println!(
-                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-stance-decisions, check-spec-coverage"
+                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-stance-decisions, check-spec-coverage, dogfood-exec [--target <id>] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean]"
             );
             Ok(())
         }
@@ -896,6 +897,10 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckDetectorContracts => check_detector_contracts(),
         commands::XtaskCommand::CheckStanceDecisions => check_stance_decisions(),
         commands::XtaskCommand::CheckSpecCoverage => check_spec_coverage(),
+        commands::XtaskCommand::DogfoodExec(raw_args) => {
+            let exec_args = dogfood_exec::DogfoodExecArgs::parse(&raw_args)?;
+            dogfood_exec::run(&exec_args)
+        }
     }
 }
 
