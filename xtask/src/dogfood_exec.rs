@@ -8,10 +8,16 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::time::{Duration, Instant};
 
 const CORPUS_SOURCE: &str = "docs/dogfood/corpus.toml";
 const DEFAULT_WORK_DIR: &str = "target/dogfood-work";
 const DEFAULT_MAX_CARDS: u32 = 50;
+/// Default per-target timeout in seconds.  Chosen large enough that a real
+/// zerocopy scan (~282 s) plus a generous git-fetch never spuriously times out.
+const DEFAULT_TIMEOUT_SECS: u64 = 900;
+/// Poll interval for `try_wait` inside `run_with_timeout`.
+const TIMEOUT_POLL_INTERVAL: Duration = Duration::from_millis(200);
 
 /// Flags parsed from the command line for `dogfood-exec`.
 pub(crate) struct DogfoodExecArgs {
@@ -25,11 +31,15 @@ pub(crate) struct DogfoodExecArgs {
     pub(crate) strict: bool,
     /// Remove the per-target work dir before cloning.
     pub(crate) clean: bool,
+    /// Per-target wall-clock timeout in seconds.  A single value covers both
+    /// git operations and the unsafe-review scan.  Default: 900 s.
+    pub(crate) timeout_secs: u64,
 }
 
 impl DogfoodExecArgs {
     /// Parse `dogfood-exec [--target <id>] [--work-dir <path>] [--max-cards <N>]
-    ///                      [--strict] [--clean]` from the xtask args slice.
+    ///                      [--strict] [--clean] [--timeout <secs>]`
+    /// from the xtask args slice.
     ///
     /// `args[0]` is the xtask binary name and `args[1]` is "dogfood-exec".
     pub(crate) fn parse(args: &[String]) -> Result<Self, String> {
@@ -38,6 +48,7 @@ impl DogfoodExecArgs {
         let mut max_cards: u32 = DEFAULT_MAX_CARDS;
         let mut strict = false;
         let mut clean = false;
+        let mut timeout_secs: u64 = DEFAULT_TIMEOUT_SECS;
 
         let mut i = 2usize;
         while i < args.len() {
@@ -65,6 +76,14 @@ impl DogfoodExecArgs {
                 "--clean" => {
                     clean = true;
                 }
+                "--timeout" => {
+                    i += 1;
+                    let val = args.get(i).ok_or("--timeout requires a value")?;
+                    timeout_secs = val.parse::<u64>().map_err(|e| format!("--timeout: {e}"))?;
+                    if timeout_secs == 0 {
+                        return Err("--timeout must be greater than 0".to_string());
+                    }
+                }
                 other => {
                     return Err(format!("`dogfood-exec` does not accept argument `{other}`"));
                 }
@@ -78,6 +97,7 @@ impl DogfoodExecArgs {
             max_cards,
             strict,
             clean,
+            timeout_secs,
         })
     }
 }
@@ -111,6 +131,9 @@ pub(crate) enum TargetStatus {
     CloneFailed(String),
     RunFailed(i32),
     SchemaFailed(String),
+    /// A subprocess exceeded the per-target wall-clock deadline.  The label
+    /// names the operation that timed out (e.g. "git fetch", "unsafe-review").
+    Timeout(String),
 }
 
 /// Result for one target.
@@ -321,6 +344,15 @@ pub(crate) fn run(args: &DogfoodExecArgs) -> Result<(), String> {
                     r.id, repo_at_commit, "schema_failed", err,
                 );
             }
+            TargetStatus::Timeout(label) => {
+                failed_count += 1;
+                // timeout is a hard failure under --strict (like run_failed)
+                has_hard_failure = true;
+                println!(
+                    "{:<30} {:<45} {:<15} {}",
+                    r.id, repo_at_commit, "timeout", label,
+                );
+            }
         }
     }
 
@@ -333,7 +365,7 @@ pub(crate) fn run(args: &DogfoodExecArgs) -> Result<(), String> {
 
     if args.strict && has_hard_failure {
         return Err(
-            "dogfood-exec --strict: one or more targets produced run_failed or schema_failed"
+            "dogfood-exec --strict: one or more targets produced run_failed, schema_failed, or timeout"
                 .to_string(),
         );
     }
@@ -347,6 +379,9 @@ fn run_target(target: &TargetSpec, args: &DogfoodExecArgs) -> TargetResult {
     let artifact_path = args
         .work_dir
         .join(format!("{}.unsafe-review.json", target.id));
+
+    // Establish a single per-target deadline shared by git operations and the scan.
+    let deadline = Instant::now() + Duration::from_secs(args.timeout_secs);
 
     // --clean: remove the work dir before cloning.
     if args.clean {
@@ -365,30 +400,51 @@ fn run_target(target: &TargetSpec, args: &DogfoodExecArgs) -> TargetResult {
     }
 
     // Step 1: clone at pinned commit.
-    if let Err(err) = clone_at_commit(&work_dir, &target.repository, &target.commit) {
-        return TargetResult {
-            id: target.id.clone(),
-            repository: target.repository.clone(),
-            commit: target.commit.clone(),
-            status: TargetStatus::CloneFailed(err),
-        };
-    }
-
-    // Step 2: run unsafe-review repo.
-    let exit_code = match run_unsafe_review(&work_dir, &artifact_path, args.max_cards) {
-        Ok(code) => code,
+    match clone_at_commit(&work_dir, &target.repository, &target.commit, deadline) {
+        Ok(()) => {}
+        Err(err) if err.contains("timed out") => {
+            return TargetResult {
+                id: target.id.clone(),
+                repository: target.repository.clone(),
+                commit: target.commit.clone(),
+                status: TargetStatus::Timeout(err),
+            };
+        }
         Err(err) => {
             return TargetResult {
                 id: target.id.clone(),
                 repository: target.repository.clone(),
                 commit: target.commit.clone(),
-                status: TargetStatus::RunFailed({
-                    eprintln!("dogfood-exec: spawn error for {}: {err}", target.id);
-                    // Treat spawn failure as exit code -1.
-                    -1
-                }),
+                status: TargetStatus::CloneFailed(err),
             };
         }
+    }
+
+    // Step 2: run unsafe-review repo.
+    let scan_run = match run_unsafe_review(&work_dir, &artifact_path, args.max_cards, deadline) {
+        Ok(run) => run,
+        Err(err) => {
+            eprintln!("dogfood-exec: spawn error for {}: {err}", target.id);
+            return TargetResult {
+                id: target.id.clone(),
+                repository: target.repository.clone(),
+                commit: target.commit.clone(),
+                // Treat spawn failure as exit code -1.
+                status: TargetStatus::RunFailed(-1),
+            };
+        }
+    };
+
+    let exit_code = match scan_run {
+        ScanRun::TimedOut => {
+            return TargetResult {
+                id: target.id.clone(),
+                repository: target.repository.clone(),
+                commit: target.commit.clone(),
+                status: TargetStatus::Timeout("unsafe-review scan timed out".to_string()),
+            };
+        }
+        ScanRun::Exited(code) => code,
     };
 
     // Exit code 0 (clean/advisory) or 1 (policy violation) are both acceptable.
@@ -459,7 +515,16 @@ fn run_target(target: &TargetSpec, args: &DogfoodExecArgs) -> TargetResult {
 ///
 /// If `work_dir` already exists and is non-empty, the clone steps are skipped
 /// (the caller is responsible for --clean if a fresh clone is wanted).
-fn clone_at_commit(work_dir: &Path, repository: &str, commit: &str) -> Result<(), String> {
+///
+/// Every git subprocess is bounded by `deadline`.  A timeout error propagates
+/// as an `Err` containing "timed out" so the caller can record it as
+/// `TargetStatus::Timeout`.
+fn clone_at_commit(
+    work_dir: &Path,
+    repository: &str,
+    commit: &str,
+    deadline: Instant,
+) -> Result<(), String> {
     // If the work dir already exists and has a .git directory, skip cloning.
     if work_dir.join(".git").exists() {
         return Ok(());
@@ -471,12 +536,13 @@ fn clone_at_commit(work_dir: &Path, repository: &str, commit: &str) -> Result<()
         .ok_or_else(|| format!("work dir path is not valid UTF-8: {}", work_dir.display()))?;
 
     // git init
-    run_git(&["init", work_dir_str], "git init")?;
+    run_git(&["init", work_dir_str], "git init", deadline)?;
 
     // Attempt shallow fetch by SHA.
     let fetch_result = run_git(
         &["-C", work_dir_str, "fetch", "--depth", "1", &url, commit],
         "git fetch --depth 1",
+        deadline,
     );
 
     if fetch_result.is_ok() {
@@ -484,6 +550,7 @@ fn clone_at_commit(work_dir: &Path, repository: &str, commit: &str) -> Result<()
         run_git(
             &["-C", work_dir_str, "checkout", "FETCH_HEAD"],
             "git checkout FETCH_HEAD",
+            deadline,
         )
     } else {
         // Fallback: full clone then checkout.
@@ -491,42 +558,50 @@ fn clone_at_commit(work_dir: &Path, repository: &str, commit: &str) -> Result<()
         remove_dir_if_exists(work_dir)
             .map_err(|e| format!("cleanup before fallback clone: {e}"))?;
 
-        run_git(&["clone", &url, work_dir_str], "git clone")?;
+        run_git(&["clone", &url, work_dir_str], "git clone", deadline)?;
         run_git(
             &["-C", work_dir_str, "checkout", commit],
             "git checkout <commit>",
+            deadline,
         )
     }
 }
 
-/// Run a `git` command, returning `Ok(())` on success or `Err(message)` on failure.
-fn run_git(args: &[&str], label: &str) -> Result<(), String> {
-    let output = Command::new("git")
-        .args(args)
-        .output()
-        .map_err(|err| format!("{label} failed to spawn: {err}"))?;
-
-    if output.status.success() {
-        return Ok(());
+/// Run a `git` command with a wall-clock deadline, returning `Ok(())` on
+/// success, `Err` on failure, or a timeout error if the deadline elapses.
+///
+/// Stdout and stderr are inherited so git progress is visible.
+fn run_git(args: &[&str], label: &str, deadline: Instant) -> Result<(), String> {
+    let mut cmd = Command::new("git");
+    cmd.args(args);
+    match run_with_timeout(cmd, deadline, label)? {
+        TimedRun::Exited(0) => Ok(()),
+        TimedRun::Exited(code) => Err(format!("{label} failed (exit {code})")),
+        TimedRun::TimedOut => Err(format!("{label} timed out")),
     }
+}
 
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    Err(format!(
-        "{label} failed ({}): {}",
-        output
-            .status
-            .code()
-            .map(|c| c.to_string())
-            .unwrap_or_else(|| "signal".to_string()),
-        stderr.trim(),
-    ))
+/// Outcome returned by [`run_unsafe_review`].
+enum ScanRun {
+    /// The scan completed; carries the exit code.
+    Exited(i32),
+    /// The scan was killed because the deadline elapsed.
+    TimedOut,
 }
 
 /// Run `cargo run --locked -p unsafe-review -- repo --root <work_dir> --format json
-/// --max-cards <N> --out <artifact_path>`.
+/// --max-cards <N> --out <artifact_path>` with a wall-clock deadline.
 ///
-/// Returns the exit code. `Err` is returned only if the process could not be spawned.
-fn run_unsafe_review(work_dir: &Path, artifact_path: &Path, max_cards: u32) -> Result<i32, String> {
+/// Returns `ScanRun::Exited(code)` when the process exits, or
+/// `ScanRun::TimedOut` if the deadline elapses (the child is killed and reaped
+/// before returning).  `Err` is returned only if the process could not be
+/// spawned or if kill/wait after timeout encounters an OS error.
+fn run_unsafe_review(
+    work_dir: &Path,
+    artifact_path: &Path,
+    max_cards: u32,
+    deadline: Instant,
+) -> Result<ScanRun, String> {
     let work_dir_str = work_dir
         .to_str()
         .ok_or_else(|| format!("work dir path is not valid UTF-8: {}", work_dir.display()))?;
@@ -538,27 +613,29 @@ fn run_unsafe_review(work_dir: &Path, artifact_path: &Path, max_cards: u32) -> R
     })?;
     let max_cards_str = max_cards.to_string();
 
-    let status = Command::new("cargo")
-        .args([
-            "run",
-            "--locked",
-            "-p",
-            "unsafe-review",
-            "--",
-            "repo",
-            "--root",
-            work_dir_str,
-            "--format",
-            "json",
-            "--max-cards",
-            &max_cards_str,
-            "--out",
-            artifact_str,
-        ])
-        .status()
-        .map_err(|err| format!("cargo run unsafe-review failed to spawn: {err}"))?;
+    let mut cmd = Command::new("cargo");
+    cmd.args([
+        "run",
+        "--locked",
+        "-p",
+        "unsafe-review",
+        "--",
+        "repo",
+        "--root",
+        work_dir_str,
+        "--format",
+        "json",
+        "--max-cards",
+        &max_cards_str,
+        "--out",
+        artifact_str,
+    ]);
+    let result = run_with_timeout(cmd, deadline, "cargo run unsafe-review")?;
 
-    Ok(status.code().unwrap_or(-1))
+    Ok(match result {
+        TimedRun::Exited(code) => ScanRun::Exited(code),
+        TimedRun::TimedOut => ScanRun::TimedOut,
+    })
 }
 
 /// Remove `path` if it exists; ignore NotFound; propagate other errors.
@@ -567,6 +644,58 @@ fn remove_dir_if_exists(path: &Path) -> Result<(), String> {
         Ok(()) => Ok(()),
         Err(err) if err.kind() == std::io::ErrorKind::NotFound => Ok(()),
         Err(err) => Err(format!("remove {} failed: {err}", path.display())),
+    }
+}
+
+/// Outcome of [`run_with_timeout`].
+enum TimedRun {
+    /// The process exited within the deadline; carries the exit code.
+    Exited(i32),
+    /// The deadline elapsed; the process was killed.
+    TimedOut,
+}
+
+/// Spawn `cmd`, then poll [`std::process::Child::try_wait`] every
+/// [`TIMEOUT_POLL_INTERVAL`] until either the child exits or `deadline` passes.
+/// On timeout the child is killed and reaped before returning [`TimedRun::TimedOut`].
+///
+/// Stdout and stderr are inherited (i.e. the child writes directly to the
+/// terminal) so that progress is visible for long-running operations.  On the
+/// timeout path we kill-then-wait so the child's resources are reclaimed before
+/// we return — no zombie processes.
+///
+/// Returns `Err` only if the process could not be spawned or if kill/wait after
+/// timeout encounters an OS error.
+fn run_with_timeout(mut cmd: Command, deadline: Instant, label: &str) -> Result<TimedRun, String> {
+    let mut child = cmd
+        .spawn()
+        .map_err(|err| format!("{label} failed to spawn: {err}"))?;
+
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => {
+                return Ok(TimedRun::Exited(status.code().unwrap_or(-1)));
+            }
+            Ok(None) => {
+                // Child still running — check deadline before sleeping.
+                if Instant::now() >= deadline {
+                    // Best-effort kill; propagate OS errors so the caller can
+                    // surface them rather than silently swallowing them.
+                    child
+                        .kill()
+                        .map_err(|err| format!("{label} kill() failed: {err}"))?;
+                    // Reap to avoid a zombie.
+                    child
+                        .wait()
+                        .map_err(|err| format!("{label} wait() after kill failed: {err}"))?;
+                    return Ok(TimedRun::TimedOut);
+                }
+                std::thread::sleep(TIMEOUT_POLL_INTERVAL);
+            }
+            Err(err) => {
+                return Err(format!("{label} try_wait() failed: {err}"));
+            }
+        }
     }
 }
 
@@ -783,6 +912,8 @@ artifacts = []
         assert_eq!(parsed.max_cards, DEFAULT_MAX_CARDS);
         assert!(!parsed.strict);
         assert!(!parsed.clean);
+        // Default timeout is the documented constant.
+        assert_eq!(parsed.timeout_secs, DEFAULT_TIMEOUT_SECS);
         Ok(())
     }
 
@@ -799,5 +930,96 @@ artifacts = []
         assert!(result.is_err(), "expected Err for unknown flag");
         let err = result.err().unwrap_or_default();
         assert!(err.contains("--unknown"), "{err}");
+    }
+
+    /// `--timeout` accepts a valid positive integer.
+    #[test]
+    fn dogfood_exec_args_parse_timeout_valid() -> Result<(), String> {
+        let args: Vec<String> = vec![
+            "xtask".to_string(),
+            "dogfood-exec".to_string(),
+            "--timeout".to_string(),
+            "600".to_string(),
+        ];
+
+        let parsed = DogfoodExecArgs::parse(&args)?;
+        assert_eq!(parsed.timeout_secs, 600);
+        Ok(())
+    }
+
+    /// `--timeout 0` is rejected (must be > 0).
+    #[test]
+    fn dogfood_exec_args_parse_timeout_zero_is_err() {
+        let args: Vec<String> = vec![
+            "xtask".to_string(),
+            "dogfood-exec".to_string(),
+            "--timeout".to_string(),
+            "0".to_string(),
+        ];
+
+        let result = DogfoodExecArgs::parse(&args);
+        assert!(result.is_err(), "expected Err for --timeout 0");
+        let err = result.err().unwrap_or_default();
+        assert!(
+            err.contains("greater than 0"),
+            "error should mention zero bound: {err}"
+        );
+    }
+
+    /// `--timeout` with a non-numeric value returns a parse error.
+    #[test]
+    fn dogfood_exec_args_parse_timeout_non_numeric_is_err() {
+        let args: Vec<String> = vec![
+            "xtask".to_string(),
+            "dogfood-exec".to_string(),
+            "--timeout".to_string(),
+            "abc".to_string(),
+        ];
+
+        let result = DogfoodExecArgs::parse(&args);
+        assert!(result.is_err(), "expected Err for non-numeric --timeout");
+        let err = result.err().unwrap_or_default();
+        assert!(
+            err.contains("--timeout"),
+            "error should mention --timeout: {err}"
+        );
+    }
+
+    /// `--timeout` without a following value returns an error.
+    #[test]
+    fn dogfood_exec_args_parse_timeout_missing_value_is_err() {
+        let args: Vec<String> = vec![
+            "xtask".to_string(),
+            "dogfood-exec".to_string(),
+            "--timeout".to_string(),
+        ];
+
+        let result = DogfoodExecArgs::parse(&args);
+        assert!(result.is_err(), "expected Err for missing --timeout value");
+        let err = result.err().unwrap_or_default();
+        assert!(
+            err.contains("requires a value"),
+            "error should say 'requires a value': {err}"
+        );
+    }
+
+    /// `--timeout` combined with other flags is parsed correctly.
+    #[test]
+    fn dogfood_exec_args_parse_timeout_with_other_flags() -> Result<(), String> {
+        let args: Vec<String> = vec![
+            "xtask".to_string(),
+            "dogfood-exec".to_string(),
+            "--target".to_string(),
+            "zerocopy-stable".to_string(),
+            "--timeout".to_string(),
+            "300".to_string(),
+            "--strict".to_string(),
+        ];
+
+        let parsed = DogfoodExecArgs::parse(&args)?;
+        assert_eq!(parsed.target.as_deref(), Some("zerocopy-stable"));
+        assert_eq!(parsed.timeout_secs, 300);
+        assert!(parsed.strict);
+        Ok(())
     }
 }
