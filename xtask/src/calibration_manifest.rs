@@ -158,6 +158,7 @@ fn fixture_case_from_table(
     kind: &str,
     idx: usize,
 ) -> Result<accuracy_labels::CalibrationFixtureCase, String> {
+    let surface_goldens = parse_surface_goldens(case, idx)?;
     Ok(accuracy_labels::CalibrationFixtureCase {
         kind: kind.to_string(),
         expected_cards: required_case_usize(case, "expected_cards", idx)?,
@@ -165,7 +166,47 @@ fn fixture_case_from_table(
         expected_operation_family: optional_case_string(case, "expected_operation_family", idx)?
             .map(str::to_string),
         expected_hazard: optional_case_string(case, "expected_hazard", idx)?.map(str::to_string),
+        surface_goldens,
     })
+}
+
+/// Parse the optional `surface_goldens` array from a calibration case table.
+///
+/// Returns an empty `Vec` when the field is absent (most fixtures do not have goldens).
+/// Returns an error if the field is present but not an array of non-empty strings,
+/// or if any value is not one of the known surface names.
+fn parse_surface_goldens(
+    case: &toml::map::Map<String, toml::Value>,
+    idx: usize,
+) -> Result<Vec<String>, String> {
+    const KNOWN_SURFACES: &[&str] = &["lsp", "repair-queue"];
+    let Some(value) = case.get("surface_goldens") else {
+        return Ok(Vec::new());
+    };
+    let arr = value.as_array().ok_or_else(|| {
+        format!("fixtures/calibration.toml cases[{idx}] `surface_goldens` must be an array")
+    })?;
+    let mut result = Vec::with_capacity(arr.len());
+    for (arr_idx, item) in arr.iter().enumerate() {
+        let s = item.as_str().ok_or_else(|| {
+            format!(
+                "fixtures/calibration.toml cases[{idx}] `surface_goldens`[{arr_idx}] must be a string"
+            )
+        })?;
+        if s.trim().is_empty() {
+            return Err(format!(
+                "fixtures/calibration.toml cases[{idx}] `surface_goldens`[{arr_idx}] must not be empty"
+            ));
+        }
+        if !KNOWN_SURFACES.contains(&s) {
+            return Err(format!(
+                "fixtures/calibration.toml cases[{idx}] `surface_goldens`[{arr_idx}] `{s}` is not a known surface; expected one of: {}",
+                KNOWN_SURFACES.join(", ")
+            ));
+        }
+        result.push(s.to_string());
+    }
+    Ok(result)
 }
 
 fn index_operation_family(

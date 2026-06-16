@@ -847,7 +847,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
     match commands::XtaskCommand::parse(&args)? {
         commands::XtaskCommand::Help => {
             println!(
-                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-stance-decisions, check-spec-coverage, dogfood-exec [--target <id>] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean]"
+                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-stance-decisions, check-spec-coverage, check-fixture-surface-parity, dogfood-exec [--target <id>] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean]"
             );
             Ok(())
         }
@@ -858,6 +858,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
             check_support_tiers()?;
             check_fixtures()?;
             check_calibration()?;
+            check_fixture_surface_parity()?;
             check_dogfood()?;
             check_manual_fuzz_harness()?;
             check_tracked_generated_artifacts()?;
@@ -897,6 +898,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckDetectorContracts => check_detector_contracts(),
         commands::XtaskCommand::CheckStanceDecisions => check_stance_decisions(),
         commands::XtaskCommand::CheckSpecCoverage => check_spec_coverage(),
+        commands::XtaskCommand::CheckFixtureSurfaceParity => check_fixture_surface_parity(),
         commands::XtaskCommand::DogfoodExec(raw_args) => {
             let exec_args = dogfood_exec::DogfoodExecArgs::parse(&raw_args)?;
             dogfood_exec::run(&exec_args)
@@ -3479,6 +3481,91 @@ fn check_fixtures() -> Result<(), String> {
     Ok(())
 }
 
+/// Verify that committed surface goldens (`expected.lsp.json`,
+/// `expected.repair-queue.json`) are byte-identical to a fresh rendering of
+/// each calibration fixture that has `surface_goldens` set.
+///
+/// The gate is deterministic: both surfaces contain no `tool_version`,
+/// `generated_at`, or wall-clock timestamp, so re-rendering produces the same
+/// bytes on every run.
+fn check_fixture_surface_parity() -> Result<(), String> {
+    let manifest = calibration_manifest::validate()?;
+    let mut checked = 0usize;
+    let mut mismatches: Vec<String> = Vec::new();
+
+    for (fixture, case) in &manifest.fixture_cases {
+        if case.surface_goldens.is_empty() {
+            continue;
+        }
+        for surface in &case.surface_goldens {
+            let filename = surface_golden_filename(surface);
+            let committed_path = workspace_path(&format!("fixtures/{fixture}/{filename}"));
+            let committed = read_to_string(&committed_path).map_err(|err| {
+                format!(
+                    "check-fixture-surface-parity: fixture `{fixture}` surface `{surface}`: \
+                     committed golden `{filename}` missing or unreadable: {err}. \
+                     Run `cargo run -p xtask -- bless-goldens` to generate it."
+                )
+            })?;
+
+            let rendered =
+                unsafe_review_core::render_fixture_surface(fixture, surface).map_err(|err| {
+                    format!(
+                        "check-fixture-surface-parity: fixture `{fixture}` surface `{surface}`: \
+                         render failed: {err}"
+                    )
+                })?;
+
+            if committed != rendered {
+                let first_diff = first_differing_line(&committed, &rendered);
+                mismatches.push(format!(
+                    "  fixture `{fixture}` surface `{surface}` ({filename}): {first_diff}"
+                ));
+            }
+            checked += 1;
+        }
+    }
+
+    if !mismatches.is_empty() {
+        return Err(format!(
+            "check-fixture-surface-parity: {} surface golden(s) do not match rendered output \
+             (run `cargo run -p xtask -- bless-goldens` to regenerate):\n{}",
+            mismatches.len(),
+            mismatches.join("\n")
+        ));
+    }
+
+    println!("check-fixture-surface-parity: ok ({checked} surface goldens verified)");
+    Ok(())
+}
+
+/// Return the committed golden filename for a surface name.
+fn surface_golden_filename(surface: &str) -> &'static str {
+    match surface {
+        "lsp" => "expected.lsp.json",
+        "repair-queue" => "expected.repair-queue.json",
+        _ => "expected.unknown.json",
+    }
+}
+
+/// Describe the first line where two multi-line strings differ.
+fn first_differing_line(committed: &str, rendered: &str) -> String {
+    let committed_lines: Vec<&str> = committed.lines().collect();
+    let rendered_lines: Vec<&str> = rendered.lines().collect();
+    let len = committed_lines.len().max(rendered_lines.len());
+    for i in 0..len {
+        let a = committed_lines.get(i).copied().unwrap_or("<missing>");
+        let b = rendered_lines.get(i).copied().unwrap_or("<missing>");
+        if a != b {
+            return format!(
+                "first diff at line {}: committed={a:?} rendered={b:?}",
+                i + 1
+            );
+        }
+    }
+    "content differs but all lines appear equal (trailing newline difference?)".to_string()
+}
+
 fn check_fixture_exception_ledgers(dirs: &[PathBuf]) -> Result<(), String> {
     let mut fixture_paths = BTreeMap::new();
     for dir in dirs {
@@ -3546,8 +3633,27 @@ fn sync_calibration_snapshot() -> Result<(), String> {
 
 fn bless_goldens(names: &[String]) -> Result<(), String> {
     let refs: Vec<&str> = names.iter().map(|s| s.as_str()).collect();
-    let written = unsafe_review_core::bless_fixture_card_goldens(&refs)?;
-    println!("bless-goldens: updated {} fixture(s)", written.len());
+    let mut written = unsafe_review_core::bless_fixture_card_goldens(&refs)?;
+
+    // Also bless surface goldens for fixtures that declare `surface_goldens`
+    // in calibration.toml. When specific fixtures are named, only bless those;
+    // when no names are given, bless all fixtures that have surface_goldens.
+    let manifest = calibration_manifest::validate()?;
+    for (fixture, case) in &manifest.fixture_cases {
+        if case.surface_goldens.is_empty() {
+            continue;
+        }
+        // If caller named specific fixtures, skip fixtures not in the list.
+        if !names.is_empty() && !names.iter().any(|n| n == fixture) {
+            continue;
+        }
+        let surfaces: Vec<&str> = case.surface_goldens.iter().map(|s| s.as_str()).collect();
+        let surface_written =
+            unsafe_review_core::bless_fixture_surface_goldens(fixture, &surfaces)?;
+        written.extend(surface_written);
+    }
+
+    println!("bless-goldens: updated {} file(s)", written.len());
     for path in &written {
         println!("  {}", path.display());
     }

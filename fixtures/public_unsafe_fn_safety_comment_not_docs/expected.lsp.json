@@ -1,0 +1,178 @@
+{
+  "schema_version": "0.1",
+  "tool": "unsafe-review",
+  "mode": "read_only_projection",
+  "policy": "advisory",
+  "scope": "diff",
+  "status": {
+    "state": "actionable",
+    "cards": 1,
+    "open_actionable_gaps": 1,
+    "high_priority_cards": 1,
+    "message": "1 unsafe-review card(s), 1 open actionable gap(s)",
+    "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+  },
+  "diagnostics": [
+    {
+      "card_id": "UR-public-unsafe-fn-safety-comment-not-docs-src-lib-rs-caller-must-read-docs-unsafe_fn-unknown-caller-must-read-docs-eebb9e79df09-unknown-c1",
+      "code": "contract_missing",
+      "evidence_summary": {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "Public unsafe API is missing nearby `# Safety` documentation"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration"
+        },
+        "reach": {
+          "state": "unreached",
+          "summary": "No static test mention of owner `caller_must_read_docs` was found"
+        },
+        "reach_limitation": "static reach evidence is not proof that the unsafe site executed",
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      "hazards": [
+        "unknown"
+      ],
+      "message": "unknown: Add a precise public `# Safety` section that names the required caller obligations.",
+      "missing_evidence": [
+        "Missing public `# Safety` documentation for unsafe API",
+        "No related test path was found by static search",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add a precise public `# Safety` section that names the required caller obligations.",
+      "obligation_evidence": [
+        {
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "Public unsafe API is missing nearby `# Safety` documentation"
+          },
+          "description": "unsafe contract could not be inferred from this syntax shape",
+          "discharge": {
+            "present": true,
+            "state": "present",
+            "summary": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration"
+          },
+          "key": "unknown",
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `caller_must_read_docs` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "operation": "pub unsafe fn caller_must_read_docs() {}",
+      "operation_family": "unknown",
+      "path": "src/lib.rs",
+      "proof_path": "human_review_only",
+      "range": {
+        "end": {
+          "character": 40,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "required_safety_conditions": [
+        {
+          "description": "unsafe contract could not be inferred from this syntax shape",
+          "key": "unknown"
+        }
+      ],
+      "severity": 2,
+      "source": "unsafe-review",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+      "verify_commands": [],
+      "witness_routes": [
+        {
+          "command": null,
+          "kind": "human-deep-review",
+          "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+          "required": false
+        }
+      ]
+    }
+  ],
+  "hovers": [
+    {
+      "card_id": "UR-public-unsafe-fn-safety-comment-not-docs-src-lib-rs-caller-must-read-docs-unsafe_fn-unknown-caller-must-read-docs-eebb9e79df09-unknown-c1",
+      "contents": "Card: `UR-public-unsafe-fn-safety-comment-not-docs-src-lib-rs-caller-must-read-docs-unsafe_fn-unknown-caller-must-read-docs-eebb9e79df09-unknown-c1`; priority `high`; confidence `high`\n\nLocation: src/lib.rs:2\n\nWhy this card exists:\n- The changed code contains a `unknown` unsafe operation that unsafe-review classifies as `contract_missing`.\n- Operation: `pub unsafe fn caller_must_read_docs() {}`\n\nProof path: `human_review_only`\n\nRelevant hazard families:\n- `unknown`\n\nRequired safety conditions:\n- unsafe contract could not be inferred from this syntax shape\n\nEvidence found:\n- Contract [missing]: Public unsafe API is missing nearby `# Safety` documentation\n- Guard/discharge [present]: Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration\n- Reach [unreached]: No static test mention of owner `caller_must_read_docs` was found\n- Witness [missing]: No imported witness receipt was found\n\nEvidence missing:\n- Missing public `# Safety` documentation for unsafe API\n- No related test path was found by static search\n- No witness receipt imported for this card\n\nWhat would resolve this:\n- Add a precise public `# Safety` section that names the required caller obligations.\n\nWhat would not resolve this:\n- A `SAFETY:` comment alone does not discharge missing guard evidence.\n- A related test mention is not proof that this unsafe site executed.\n- Do not claim witness proof unless a matching receipt exists.\n- Do not widen unsafe scope, suppress the card, or change unrelated unsafe code to silence this review item.\n\nWitness route: `human-deep-review` because The analyzer could not infer a precise witness route; use manual unsafe contract review.\n\nReach note: static related-test evidence does not prove the unsafe site executed.\n\nHandoff commands:\n- Explain: `unsafe-review explain UR-public-unsafe-fn-safety-comment-not-docs-src-lib-rs-caller-must-read-docs-unsafe_fn-unknown-caller-must-read-docs-eebb9e79df09-unknown-c1`\n- Agent context: `unsafe-review context UR-public-unsafe-fn-safety-comment-not-docs-src-lib-rs-caller-must-read-docs-unsafe_fn-unknown-caller-must-read-docs-eebb9e79df09-unknown-c1 --json`\n\nTrust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+      "path": "src/lib.rs",
+      "position": {
+        "character": 0,
+        "line": 1
+      },
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    }
+  ],
+  "code_actions": [
+    {
+      "arguments": [
+        "UR-public-unsafe-fn-safety-comment-not-docs-src-lib-rs-caller-must-read-docs-unsafe_fn-unknown-caller-must-read-docs-eebb9e79df09-unknown-c1"
+      ],
+      "card_id": "UR-public-unsafe-fn-safety-comment-not-docs-src-lib-rs-caller-must-read-docs-unsafe_fn-unknown-caller-must-read-docs-eebb9e79df09-unknown-c1",
+      "command": "unsafe-review.copyAgentPacket",
+      "kind": "quickfix",
+      "path": "src/lib.rs",
+      "payload": {
+        "card_id": "UR-public-unsafe-fn-safety-comment-not-docs-src-lib-rs-caller-must-read-docs-unsafe_fn-unknown-caller-must-read-docs-eebb9e79df09-unknown-c1",
+        "kind": "unsafe-review.agent_packet",
+        "proof_path": "human_review_only",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "range": {
+        "end": {
+          "character": 40,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "title": "Copy unsafe-review packet for UR-public-unsafe-fn-safety-comment-not-docs-src-lib-rs-caller-must-read-docs-unsafe_fn-unknown-caller-must-read-docs-eebb9e79df09-unknown-c1"
+    },
+    {
+      "arguments": [
+        "UR-public-unsafe-fn-safety-comment-not-docs-src-lib-rs-caller-must-read-docs-unsafe_fn-unknown-caller-must-read-docs-eebb9e79df09-unknown-c1"
+      ],
+      "card_id": "UR-public-unsafe-fn-safety-comment-not-docs-src-lib-rs-caller-must-read-docs-unsafe_fn-unknown-caller-must-read-docs-eebb9e79df09-unknown-c1",
+      "command": "unsafe-review.explainWitnessRoute",
+      "kind": "quickfix",
+      "path": "src/lib.rs",
+      "payload": {
+        "card_id": "UR-public-unsafe-fn-safety-comment-not-docs-src-lib-rs-caller-must-read-docs-unsafe_fn-unknown-caller-must-read-docs-eebb9e79df09-unknown-c1",
+        "kind": "unsafe-review.witness_route",
+        "proof_path": "human_review_only",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "range": {
+        "end": {
+          "character": 40,
+          "line": 1
+        },
+        "start": {
+          "character": 0,
+          "line": 1
+        }
+      },
+      "title": "Explain unsafe-review witness route"
+    }
+  ],
+  "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+}

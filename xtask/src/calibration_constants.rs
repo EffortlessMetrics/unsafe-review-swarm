@@ -8,6 +8,7 @@ pub const CALIBRATION_CASE_FIELDS: &[&str] = &[
     "expected_class",
     "expected_operation_family",
     "expected_hazard",
+    "surface_goldens",
 ];
 pub const OPERATION_FAMILY_REGISTRY: &str =
     "docs/specs/appendices/UNSAFE-REVIEW-SPEC-0005-appendix-operation-family-registry.md";

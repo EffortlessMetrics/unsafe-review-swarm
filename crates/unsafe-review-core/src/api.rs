@@ -409,6 +409,27 @@ pub fn bless_fixture_card_goldens(names: &[&str]) -> Result<Vec<PathBuf>, String
     json::bless_fixture_card_goldens(names)
 }
 
+/// Regenerate surface goldens (`expected.lsp.json`, `expected.repair-queue.json`)
+/// for a single named fixture, writing LF line endings.
+///
+/// `surfaces` must contain only `"lsp"` or `"repair-queue"`. Paths inside the
+/// rendered JSON are normalised to relative form so goldens are byte-stable.
+pub fn bless_fixture_surface_goldens(
+    fixture: &str,
+    surfaces: &[&str],
+) -> Result<Vec<PathBuf>, String> {
+    json::bless_fixture_surface_goldens(fixture, surfaces)
+}
+
+/// Render a single surface for a fixture as the bless path would write it
+/// (normalised, LF-terminated) without writing a file.
+///
+/// Used by `check-fixture-surface-parity` to produce the reference text for
+/// diffing against the committed golden.
+pub fn render_fixture_surface(fixture: &str, surface: &str) -> Result<String, String> {
+    json::render_fixture_surface(fixture, surface)
+}
+
 pub fn render_json(output: &AnalyzeOutput) -> String {
     json::render(output)
 }

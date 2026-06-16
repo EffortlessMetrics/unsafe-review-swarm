@@ -1,0 +1,329 @@
+{
+  "schema_version": "0.1",
+  "tool": "unsafe-review",
+  "mode": "read_only_projection",
+  "policy": "advisory",
+  "scope": "diff",
+  "status": {
+    "state": "actionable",
+    "cards": 1,
+    "open_actionable_gaps": 1,
+    "high_priority_cards": 1,
+    "message": "1 unsafe-review card(s), 1 open actionable gap(s)",
+    "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+  },
+  "diagnostics": [
+    {
+      "card_id": "UR-raw-pointer-alignment-is-aligned-guard-src-lib-rs-read-header-operation-raw_pointer_read-raw-pointer-read-2ac86bae2dcf-pointer_validity-c1",
+      "code": "guard_missing",
+      "evidence_summary": {
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "Some inferred safety obligations are missing local guard evidence"
+        },
+        "reach": {
+          "state": "unreached",
+          "summary": "No static test mention of owner `read_header` was found"
+        },
+        "reach_limitation": "static reach evidence is not proof that the unsafe site executed",
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      "hazards": [
+        "pointer_validity",
+        "alignment",
+        "initialized_memory",
+        "same_allocation"
+      ],
+      "message": "raw_pointer_read: Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) memory is initialized for the accessed type, (3) access remains inside one live allocation.",
+      "missing_evidence": [
+        "Missing visible local guard for inferred safety obligations",
+        "No related test path was found by static search",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) memory is initialized for the accessed type, (3) access remains inside one live allocation.",
+      "obligation_evidence": [
+        {
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "description": "pointer is live and dereferenceable for the accessed type",
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nullability guard code was detected"
+          },
+          "key": "pointer-live",
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `read_header` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "description": "buffer has enough bytes for the accessed type",
+          "discharge": {
+            "present": true,
+            "state": "present",
+            "summary": "Length or bounds guard code was detected"
+          },
+          "key": "bounds",
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `read_header` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "description": "pointer is aligned for the accessed type",
+          "discharge": {
+            "present": true,
+            "state": "present",
+            "summary": "Alignment guard code was detected"
+          },
+          "key": "alignment",
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `read_header` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "description": "memory is initialized for the accessed type",
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "key": "initialized",
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `read_header` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "description": "access remains inside one live allocation",
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "key": "allocation",
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `read_header` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "operation": "Some(unsafe { ptr.cast::<Header>().read() })",
+      "operation_family": "raw_pointer_read",
+      "path": "src/lib.rs",
+      "proof_path": "source_route_only",
+      "range": {
+        "end": {
+          "character": 48,
+          "line": 10
+        },
+        "start": {
+          "character": 4,
+          "line": 10
+        }
+      },
+      "required_safety_conditions": [
+        {
+          "description": "pointer is live and dereferenceable for the accessed type",
+          "key": "pointer-live"
+        },
+        {
+          "description": "buffer has enough bytes for the accessed type",
+          "key": "bounds"
+        },
+        {
+          "description": "pointer is aligned for the accessed type",
+          "key": "alignment"
+        },
+        {
+          "description": "memory is initialized for the accessed type",
+          "key": "initialized"
+        },
+        {
+          "description": "access remains inside one live allocation",
+          "key": "allocation"
+        }
+      ],
+      "severity": 2,
+      "source": "unsafe-review",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+      "verify_commands": [
+        "cargo +nightly miri test read_header",
+        "cargo +nightly careful test read_header"
+      ],
+      "witness_routes": [
+        {
+          "command": "cargo +nightly miri test read_header",
+          "kind": "miri",
+          "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+          "required": false
+        },
+        {
+          "command": "cargo +nightly careful test read_header",
+          "kind": "cargo-careful",
+          "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+          "required": false
+        }
+      ]
+    }
+  ],
+  "hovers": [
+    {
+      "card_id": "UR-raw-pointer-alignment-is-aligned-guard-src-lib-rs-read-header-operation-raw_pointer_read-raw-pointer-read-2ac86bae2dcf-pointer_validity-c1",
+      "contents": "Card: `UR-raw-pointer-alignment-is-aligned-guard-src-lib-rs-read-header-operation-raw_pointer_read-raw-pointer-read-2ac86bae2dcf-pointer_validity-c1`; priority `high`; confidence `medium`\n\nLocation: src/lib.rs:11\n\nWhy this card exists:\n- The changed code contains a `raw_pointer_read` unsafe operation that unsafe-review classifies as `guard_missing`.\n- Operation: `Some(unsafe { ptr.cast::<Header>().read() })`\n\nProof path: `source_route_only`\n\nRelevant hazard families:\n- `pointer_validity`\n- `alignment`\n- `initialized_memory`\n- `same_allocation`\n\nRequired safety conditions:\n- pointer is live and dereferenceable for the accessed type\n- buffer has enough bytes for the accessed type\n- pointer is aligned for the accessed type\n- memory is initialized for the accessed type\n- access remains inside one live allocation\n\nEvidence found:\n- Contract [present]: Nearby `SAFETY:` comment was detected\n- Guard/discharge [missing]: Some inferred safety obligations are missing local guard evidence\n- Reach [unreached]: No static test mention of owner `read_header` was found\n- Witness [missing]: No imported witness receipt was found\n\nEvidence missing:\n- Missing visible local guard for inferred safety obligations\n- No related test path was found by static search\n- No witness receipt imported for this card\n\nWhat would resolve this:\n- Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) memory is initialized for the accessed type, (3) access remains inside one live allocation.\n\nVerify commands:\n- `cargo +nightly miri test read_header`\n- `cargo +nightly careful test read_header`\n\nWhat would not resolve this:\n- A `SAFETY:` comment alone does not discharge missing guard evidence.\n- A related test mention is not proof that this unsafe site executed.\n- Do not claim witness proof unless a matching receipt exists.\n- Do not widen unsafe scope, suppress the card, or change unrelated unsafe code to silence this review item.\n\nWitness route: `miri` because Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported.\n\nReach note: static related-test evidence does not prove the unsafe site executed.\n\nHandoff commands:\n- Explain: `unsafe-review explain UR-raw-pointer-alignment-is-aligned-guard-src-lib-rs-read-header-operation-raw_pointer_read-raw-pointer-read-2ac86bae2dcf-pointer_validity-c1`\n- Agent context: `unsafe-review context UR-raw-pointer-alignment-is-aligned-guard-src-lib-rs-read-header-operation-raw_pointer_read-raw-pointer-read-2ac86bae2dcf-pointer_validity-c1 --json`\n\nTrust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+      "path": "src/lib.rs",
+      "position": {
+        "character": 4,
+        "line": 10
+      },
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    }
+  ],
+  "code_actions": [
+    {
+      "arguments": [
+        "UR-raw-pointer-alignment-is-aligned-guard-src-lib-rs-read-header-operation-raw_pointer_read-raw-pointer-read-2ac86bae2dcf-pointer_validity-c1"
+      ],
+      "card_id": "UR-raw-pointer-alignment-is-aligned-guard-src-lib-rs-read-header-operation-raw_pointer_read-raw-pointer-read-2ac86bae2dcf-pointer_validity-c1",
+      "command": "unsafe-review.copyAgentPacket",
+      "kind": "quickfix",
+      "path": "src/lib.rs",
+      "payload": {
+        "card_id": "UR-raw-pointer-alignment-is-aligned-guard-src-lib-rs-read-header-operation-raw_pointer_read-raw-pointer-read-2ac86bae2dcf-pointer_validity-c1",
+        "kind": "unsafe-review.agent_packet",
+        "proof_path": "source_route_only",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "range": {
+        "end": {
+          "character": 48,
+          "line": 10
+        },
+        "start": {
+          "character": 4,
+          "line": 10
+        }
+      },
+      "title": "Copy unsafe-review packet for UR-raw-pointer-alignment-is-aligned-guard-src-lib-rs-read-header-operation-raw_pointer_read-raw-pointer-read-2ac86bae2dcf-pointer_validity-c1"
+    },
+    {
+      "arguments": [
+        "UR-raw-pointer-alignment-is-aligned-guard-src-lib-rs-read-header-operation-raw_pointer_read-raw-pointer-read-2ac86bae2dcf-pointer_validity-c1"
+      ],
+      "card_id": "UR-raw-pointer-alignment-is-aligned-guard-src-lib-rs-read-header-operation-raw_pointer_read-raw-pointer-read-2ac86bae2dcf-pointer_validity-c1",
+      "command": "unsafe-review.explainWitnessRoute",
+      "kind": "quickfix",
+      "path": "src/lib.rs",
+      "payload": {
+        "card_id": "UR-raw-pointer-alignment-is-aligned-guard-src-lib-rs-read-header-operation-raw_pointer_read-raw-pointer-read-2ac86bae2dcf-pointer_validity-c1",
+        "kind": "unsafe-review.witness_route",
+        "proof_path": "source_route_only",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "range": {
+        "end": {
+          "character": 48,
+          "line": 10
+        },
+        "start": {
+          "character": 4,
+          "line": 10
+        }
+      },
+      "title": "Explain unsafe-review witness route"
+    },
+    {
+      "arguments": [
+        "cargo +nightly miri test read_header"
+      ],
+      "card_id": "UR-raw-pointer-alignment-is-aligned-guard-src-lib-rs-read-header-operation-raw_pointer_read-raw-pointer-read-2ac86bae2dcf-pointer_validity-c1",
+      "command": "unsafe-review.copyWitnessCommand",
+      "kind": "quickfix",
+      "path": "src/lib.rs",
+      "payload": {
+        "card_id": "UR-raw-pointer-alignment-is-aligned-guard-src-lib-rs-read-header-operation-raw_pointer_read-raw-pointer-read-2ac86bae2dcf-pointer_validity-c1",
+        "command": "cargo +nightly miri test read_header",
+        "kind": "unsafe-review.witness_command",
+        "proof_path": "source_route_only",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "range": {
+        "end": {
+          "character": 48,
+          "line": 10
+        },
+        "start": {
+          "character": 4,
+          "line": 10
+        }
+      },
+      "title": "Copy witness command (does not run)"
+    }
+  ],
+  "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+}

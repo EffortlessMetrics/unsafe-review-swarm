@@ -70,6 +70,9 @@ pub(crate) struct CalibrationFixtureCase {
     pub(crate) expected_class: Option<String>,
     pub(crate) expected_operation_family: Option<String>,
     pub(crate) expected_hazard: Option<String>,
+    /// Surface names for which committed goldens are expected (e.g. "lsp", "repair-queue").
+    /// Empty for most fixtures; non-empty only for the exemplar fixtures.
+    pub(crate) surface_goldens: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -1000,6 +1003,7 @@ rationale = "The trust boundary must name the full accuracy-label no-overclaim p
                 expected_class: Some("guard_missing".to_string()),
                 expected_operation_family: Some("raw_pointer_read".to_string()),
                 expected_hazard: Some("alignment".to_string()),
+                surface_goldens: Vec::new(),
             },
         );
         let claim = PolicyClaim {
@@ -1060,6 +1064,7 @@ rationale = "Witness-route calibration claims must pin the route kinds projected
                 expected_class: Some("requires_loom".to_string()),
                 expected_operation_family: Some("unsafe_impl_send_sync".to_string()),
                 expected_hazard: Some("send_sync_invariant".to_string()),
+                surface_goldens: Vec::new(),
             },
         );
         let claim = PolicyClaim {
@@ -1121,6 +1126,7 @@ rationale = "The fixture routes Send/Sync invariants to Loom/Shuttle, so ASan sh
                 expected_class: Some("requires_loom".to_string()),
                 expected_operation_family: Some("unsafe_impl_send_sync".to_string()),
                 expected_hazard: Some("send_sync_invariant".to_string()),
+                surface_goldens: Vec::new(),
             },
         );
         let claim = PolicyClaim {
@@ -1184,6 +1190,7 @@ rationale = "Public unsafe API contract evidence claims must pin the ReviewCard 
                 expected_class: Some("contract_missing".to_string()),
                 expected_operation_family: Some("unknown".to_string()),
                 expected_hazard: Some("unknown".to_string()),
+                surface_goldens: Vec::new(),
             },
         );
         let claim = PolicyClaim {
@@ -1249,6 +1256,7 @@ rationale = "The fixture intentionally lacks public safety docs, so present cont
                 expected_class: Some("contract_missing".to_string()),
                 expected_operation_family: Some("unknown".to_string()),
                 expected_hazard: Some("unknown".to_string()),
+                surface_goldens: Vec::new(),
             },
         );
         let claim = PolicyClaim {
@@ -1312,6 +1320,7 @@ rationale = "The fixture intentionally has alignment evidence, so missing should
                 expected_class: Some("guard_missing".to_string()),
                 expected_operation_family: Some("raw_pointer_read".to_string()),
                 expected_hazard: Some("alignment".to_string()),
+                surface_goldens: Vec::new(),
             },
         );
         let claim = PolicyClaim {
@@ -1375,6 +1384,7 @@ rationale = "Valid-range labels must stay tied to the bounds hazard, not a broad
                 expected_class: Some("guard_missing".to_string()),
                 expected_operation_family: Some("ptr_copy".to_string()),
                 expected_hazard: Some("pointer_validity".to_string()),
+                surface_goldens: Vec::new(),
             },
         );
         let claim = PolicyClaim {
@@ -1436,6 +1446,7 @@ rationale = "The fixture owner should be checked as part of ReviewCard identity 
                 expected_class: Some("guard_missing".to_string()),
                 expected_operation_family: Some("raw_pointer_read".to_string()),
                 expected_hazard: Some("alignment".to_string()),
+                surface_goldens: Vec::new(),
             },
         );
         let claim = PolicyClaim {
@@ -1494,6 +1505,7 @@ rationale = "The fixture is valid calibration data, but this claim did not list 
                 expected_class: Some("guard_missing".to_string()),
                 expected_operation_family: Some("raw_pointer_read".to_string()),
                 expected_hazard: Some("alignment".to_string()),
+                surface_goldens: Vec::new(),
             },
         );
         let claim = PolicyClaim {
@@ -1651,6 +1663,7 @@ rationale = "A second sample for the same fixture would overstate the claim samp
                 expected_class: Some("guard_missing".to_string()),
                 expected_operation_family: Some("raw_pointer_read".to_string()),
                 expected_hazard: Some("alignment".to_string()),
+                surface_goldens: Vec::new(),
             },
         );
         let claim = PolicyClaim {

@@ -1,0 +1,112 @@
+{
+  "schema_version": "0.1",
+  "tool": "unsafe-review",
+  "mode": "aggregate_repair_queue",
+  "source": "review_card",
+  "policy": "advisory",
+  "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, not a site-execution claim unless a matching witness receipt says so, and not an automatic repair queue. It does not run agents, does not run witnesses, does not edit source, does not post comments, does not suppress cards, and does not resolve cards.",
+  "summary": {
+    "changed_files": 1,
+    "changed_rust_files": 1,
+    "changed_non_rust_files": 0,
+    "cards": 1,
+    "repairable_by_guard": 1,
+    "repairable_by_safety_docs": 0,
+    "repairable_by_test": 0,
+    "requires_witness_receipt": 1,
+    "requires_human_review": 0,
+    "do_not_auto_repair": 0
+  },
+  "buckets": {
+    "repairable_by_guard": [
+      {
+        "card_id": "UR-raw-pointer-alignment-debug-assert-only-not-guard-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        "class": "guard_missing",
+        "priority": "high",
+        "confidence": "medium",
+        "proof_path": "source_route_only",
+        "operation_family": "raw_pointer_read",
+        "operation": "unsafe { ptr.cast::<Header>().read() }",
+        "path": "src/lib.rs",
+        "line": 14,
+        "missing_evidence": [
+          "Missing visible local guard for inferred safety obligations",
+          "No witness receipt imported for this card"
+        ],
+        "confirmation_state": "pending",
+        "agent_readiness": {
+          "ready": true,
+          "state": "ready_for_agent",
+          "reasons": [
+            "specific operation family",
+            "card-scoped allowed repairs",
+            "verify commands available",
+            "medium-or-high confidence"
+          ]
+        },
+        "bucket_reason": "guard_evidence_missing",
+        "context_command": "unsafe-review context UR-raw-pointer-alignment-debug-assert-only-not-guard-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1 --json",
+        "applicable_edit": "add a same-pointer live/nullability guard before this operation",
+        "do_not_do": [
+          "do not widen unsafe code without reducing the missing evidence",
+          "do not suppress this card instead of adding, exposing, or explicitly waiving evidence",
+          "do not add a broad suppression",
+          "do not replace executable guard or discharge evidence with comments or docs",
+          "do not claim Miri proof unless the witness command is run and attached",
+          "do not claim automatic safety repair from this packet",
+          "do not claim unsafe-review ran an agent, ran witnesses, applied source edits, or posted comments",
+          "do not change unrelated unsafe code or public API behavior",
+          "do not treat a test mention as proof that the unsafe site executed"
+        ],
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, not a site-execution claim unless a matching witness receipt says so, and not an automatic repair queue. It does not run agents, does not run witnesses, does not edit source, does not post comments, does not suppress cards, and does not resolve cards."
+      }
+    ],
+    "repairable_by_safety_docs": [],
+    "repairable_by_test": [],
+    "requires_witness_receipt": [
+      {
+        "card_id": "UR-raw-pointer-alignment-debug-assert-only-not-guard-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+        "class": "guard_missing",
+        "priority": "high",
+        "confidence": "medium",
+        "proof_path": "source_route_only",
+        "operation_family": "raw_pointer_read",
+        "operation": "unsafe { ptr.cast::<Header>().read() }",
+        "path": "src/lib.rs",
+        "line": 14,
+        "missing_evidence": [
+          "Missing visible local guard for inferred safety obligations",
+          "No witness receipt imported for this card"
+        ],
+        "confirmation_state": "pending",
+        "agent_readiness": {
+          "ready": true,
+          "state": "ready_for_agent",
+          "reasons": [
+            "specific operation family",
+            "card-scoped allowed repairs",
+            "verify commands available",
+            "medium-or-high confidence"
+          ]
+        },
+        "bucket_reason": "witness_receipt_missing",
+        "context_command": "unsafe-review context UR-raw-pointer-alignment-debug-assert-only-not-guard-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1 --json",
+        "applicable_edit": "add a same-pointer live/nullability guard before this operation",
+        "do_not_do": [
+          "do not widen unsafe code without reducing the missing evidence",
+          "do not suppress this card instead of adding, exposing, or explicitly waiving evidence",
+          "do not add a broad suppression",
+          "do not replace executable guard or discharge evidence with comments or docs",
+          "do not claim Miri proof unless the witness command is run and attached",
+          "do not claim automatic safety repair from this packet",
+          "do not claim unsafe-review ran an agent, ran witnesses, applied source edits, or posted comments",
+          "do not change unrelated unsafe code or public API behavior",
+          "do not treat a test mention as proof that the unsafe site executed"
+        ],
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, not a site-execution claim unless a matching witness receipt says so, and not an automatic repair queue. It does not run agents, does not run witnesses, does not edit source, does not post comments, does not suppress cards, and does not resolve cards."
+      }
+    ],
+    "requires_human_review": [],
+    "do_not_auto_repair": []
+  }
+}
