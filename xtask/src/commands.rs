@@ -32,6 +32,7 @@ pub(crate) enum XtaskCommand {
     CheckCorpusUsefulnessSchema(PathBuf),
     CheckDetectorContracts,
     CheckStanceDecisions,
+    CheckStanceCoverage,
     CheckSpecCoverage,
     CheckFixtureSurfaceParity,
     CheckRealPrCorpus,
@@ -118,6 +119,9 @@ impl XtaskCommand {
             ),
             Some("check-stance-decisions") => {
                 parse_no_extra(args, "check-stance-decisions", Self::CheckStanceDecisions)
+            }
+            Some("check-stance-coverage") => {
+                parse_no_extra(args, "check-stance-coverage", Self::CheckStanceCoverage)
             }
             Some("check-spec-coverage") => {
                 parse_no_extra(args, "check-spec-coverage", Self::CheckSpecCoverage)

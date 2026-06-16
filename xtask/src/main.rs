@@ -849,7 +849,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
     match commands::XtaskCommand::parse(&args)? {
         commands::XtaskCommand::Help => {
             println!(
-                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-stance-decisions, check-spec-coverage, check-fixture-surface-parity, check-real-pr-corpus, dogfood-exec [--target <id>] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean]"
+                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-stance-decisions, check-stance-coverage, check-spec-coverage, check-fixture-surface-parity, check-real-pr-corpus, dogfood-exec [--target <id>] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean]"
             );
             Ok(())
         }
@@ -900,6 +900,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         }
         commands::XtaskCommand::CheckDetectorContracts => check_detector_contracts(),
         commands::XtaskCommand::CheckStanceDecisions => check_stance_decisions(),
+        commands::XtaskCommand::CheckStanceCoverage => check_stance_coverage(),
         commands::XtaskCommand::CheckSpecCoverage => check_spec_coverage(),
         commands::XtaskCommand::CheckFixtureSurfaceParity => check_fixture_surface_parity(),
         commands::XtaskCommand::CheckRealPrCorpus => real_pr_corpus::check(),
@@ -992,6 +993,7 @@ fn check_policy() -> Result<(), String> {
     corpus_usefulness::check_schema(Path::new(CORPUS_USEFULNESS_SAMPLE_ROLLUP))?;
     check_detector_contracts()?;
     check_stance_decisions()?;
+    check_stance_coverage()?;
     check_spec_coverage()?;
     println!("check-policy: ok");
     Ok(())
@@ -1359,6 +1361,148 @@ fn check_stance_decisions() -> Result<(), String> {
     } else {
         Err(format!(
             "check-stance-decisions: {} blocking finding(s)",
+            report.blocking.len()
+        ))
+    }
+}
+
+/// Pure (no file I/O) evaluation of the stance-coverage index in a parsed stance-decisions ledger.
+///
+/// For each stance, a PASS requires at least one non-empty corpus-evidence link: a non-empty
+/// `fixtures` array, a non-empty `dogfood_targets` array, a non-empty `pr_corpus_cases` array,
+/// or a non-empty `surfaces` array.  If none of those are present, the stance is blocking UNLESS
+/// it carries a non-empty `coverage_gap` AND non-empty `owner` AND non-empty `review_after` —
+/// in which case it is a tracked coverage gap (warn, pass).  Malformed entries are always blocking.
+fn evaluate_stance_coverage(value: &toml::Value, path: &str) -> Result<GateReport, String> {
+    let mut report = GateReport {
+        tracked: Vec::new(),
+        blocking: Vec::new(),
+    };
+
+    let stances: &[toml::Value] = match value.get("stance") {
+        None => &[],
+        Some(v) => v
+            .as_array()
+            .ok_or_else(|| format!("{path} `stance` must be an array"))?,
+    };
+
+    for (idx, entry) in stances.iter().enumerate() {
+        let table = match entry.as_table() {
+            Some(t) => t,
+            None => {
+                report
+                    .blocking
+                    .push(format!("{path} stance[{idx}]: must be a table"));
+                continue;
+            }
+        };
+
+        // Resolve the stance id for diagnostic messages; missing id is itself a structural error
+        // but we still need a label for subsequent messages.
+        let id = table
+            .get("id")
+            .and_then(toml::Value::as_str)
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| format!("<stance[{idx}]>"));
+
+        // Helper: does the table contain a non-empty string array under `key`?
+        let has_non_empty_array = |key: &str| -> bool {
+            table
+                .get(key)
+                .and_then(toml::Value::as_array)
+                .map(|arr| !arr.is_empty())
+                .unwrap_or(false)
+        };
+
+        let has_coverage = has_non_empty_array("fixtures")
+            || has_non_empty_array("dogfood_targets")
+            || has_non_empty_array("pr_corpus_cases")
+            || has_non_empty_array("surfaces");
+
+        if has_coverage {
+            // Stance is covered — nothing to record.
+            continue;
+        }
+
+        // No corpus evidence link present; check for a tracked coverage_gap exception.
+        let gap = table
+            .get("coverage_gap")
+            .and_then(toml::Value::as_str)
+            .map(|s| s.trim())
+            .unwrap_or("")
+            .to_string();
+
+        if gap.is_empty() {
+            report.blocking.push(format!(
+                "stance `{id}`: no corpus evidence (fixtures / dogfood_targets / pr_corpus_cases / surfaces) \
+                 and no coverage_gap; add real evidence or a tracked gap with owner + review_after"
+            ));
+            continue;
+        }
+
+        // Has a non-empty coverage_gap — valid only with owner + review_after.
+        let owner = table
+            .get("owner")
+            .and_then(toml::Value::as_str)
+            .map(|s| s.trim())
+            .unwrap_or("")
+            .to_string();
+        let review_after = table
+            .get("review_after")
+            .and_then(toml::Value::as_str)
+            .map(|s| s.trim())
+            .unwrap_or("")
+            .to_string();
+
+        if !owner.is_empty() && !review_after.is_empty() {
+            report.tracked.push(format!(
+                "stance `{id}`: coverage_gap — {gap} (owner: {owner}, review_after: {review_after})"
+            ));
+        } else {
+            report.blocking.push(format!(
+                "stance `{id}`: coverage_gap requires non-empty owner + review_after to be a tracked exception"
+            ));
+        }
+    }
+
+    Ok(report)
+}
+
+/// Informational-then-enforcing gate: validates that every stance in
+/// `policy/stance-decisions.toml` has at least one corpus-evidence link.
+///
+/// A stance with no evidence link is blocking unless it carries a `coverage_gap` with
+/// non-empty `owner` and `review_after`, in which case it is a tracked coverage gap and
+/// printed as "(tracked coverage gap)".  Structural errors are always blocking.
+fn check_stance_coverage() -> Result<(), String> {
+    let path = STANCE_DECISIONS_LEDGER;
+    let value = parse_toml_file(Path::new(path))?;
+    require_toml_string(&value, "schema_version", path)?;
+
+    let num_stances = value
+        .get("stance")
+        .and_then(toml::Value::as_array)
+        .map(|v| v.len())
+        .unwrap_or(0);
+
+    let report = evaluate_stance_coverage(&value, path)?;
+
+    for f in &report.tracked {
+        println!("{f} (tracked coverage gap)");
+    }
+    for f in &report.blocking {
+        println!("{f}");
+    }
+
+    if report.blocking.is_empty() {
+        println!(
+            "check-stance-coverage: ok ({num_stances} stances, {} tracked coverage gap(s))",
+            report.tracked.len()
+        );
+        Ok(())
+    } else {
+        Err(format!(
+            "check-stance-coverage: {} blocking finding(s)",
             report.blocking.len()
         ))
     }

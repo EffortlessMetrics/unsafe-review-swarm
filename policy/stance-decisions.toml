@@ -35,6 +35,13 @@ linked_tests = [
   "unsafe_review_core::analysis::evidence::code_text::tests::text_contains_runtime_assert_handles_debug_and_mixed_cases",
 ]
 review_after = "2026-09-15"
+# Corpus evidence: fixtures exercise the not-guard path; surface goldens verify
+# LSP and repair-queue projections carry the correct advisory-only class.
+fixtures = [
+  "raw_pointer_alignment_debug_assert_only_not_guard",
+  "raw_pointer_bounds_debug_assert_only_not_guard",
+]
+surfaces = ["lsp", "repair-queue"]
 
 [[stance]]
 id = "safety-comment-not-guard"
@@ -54,6 +61,10 @@ linked_tests = [
   "unsafe_review_core::analysis::evidence::contract_text::tests::safety_comment_summary_accepts_line_comments_near_site",
 ]
 review_after = "2026-12-15"
+# Corpus evidence: fixture has a SAFETY comment but no doc-section contract;
+# surface goldens verify LSP and repair-queue surfaces project the open card.
+fixtures = ["public_unsafe_fn_safety_comment_not_docs"]
+surfaces = ["lsp", "repair-queue"]
 
 [[stance]]
 id = "static-mention-not-test-reach"
@@ -75,6 +86,13 @@ linked_tests = [
   "unsafe_review_core::analysis::evidence::tests::reach_evidence_self_named_test_fn_not_credited",
 ]
 review_after = "2026-12-15"
+# Corpus evidence: reach_self_named_test_not_reach verifies that a test fn
+# whose name matches the owner does not self-credit reach; reach_bare_mention_no_call_not_reach
+# verifies that a bare identifier mention in a test comment does not credit reach.
+fixtures = [
+  "reach_self_named_test_not_reach",
+  "reach_bare_mention_no_call_not_reach",
+]
 
 [[stance]]
 id = "receipt-not-proof"
@@ -94,6 +112,9 @@ linked_tests = [
   "unsafe_review_core::analysis::receipts::tests::hand_authored_formal_tool_site_reached_is_rejected_at_load",
 ]
 review_after = "2026-12-15"
+# Corpus evidence: fixture carries a hand-authored kani receipt that is
+# rejected at receipt-load time; expected.cards.json verifies the rejection.
+fixtures = ["witness_mismatch_tool"]
 
 [[stance]]
 id = "owner-cards-grouped-not-hidden"
@@ -120,6 +141,9 @@ linked_tests = [
   "unsafe_review_core::output::json::tests::owner_card_is_present_in_cards_json_and_included_in_summary_count",
 ]
 review_after = "2026-09-15"
+# Corpus evidence: fixture exercises the owner-card grouping path through the
+# comment-plan surface; expected.cards.json verifies the owner card is retained.
+fixtures = ["attributed_unsafe_fn_no_duplicate"]
 
 [[stance]]
 id = "severity-from-card-class"
@@ -140,6 +164,40 @@ linked_tests = [
   "unsafe_review_core::domain::classification::tests::severity_table_is_pinned_for_every_class",
 ]
 review_after = "2026-12-15"
+# Corpus evidence: all five exemplar fixtures carry lsp.json surface goldens
+# that pin the severity assignments; dogfood targets and pr-corpus cases carry
+# severity in every emitted card, exercising the mapping on unseen real code.
+fixtures = [
+  "raw_pointer_alignment",
+  "raw_pointer_alignment_debug_assert_only_not_guard",
+  "raw_pointer_alignment_is_aligned_guard",
+  "public_unsafe_fn_missing_safety",
+  "public_unsafe_fn_safety_comment_not_docs",
+]
+surfaces = ["lsp"]
+dogfood_targets = [
+  "smallvec-capped",
+  "arrayvec-capped",
+  "memchr-capped",
+  "hashbrown-capped",
+  "bytes-capped",
+  "crossbeam-capped",
+  "mio-capped",
+  "bumpalo-capped",
+  "slab-capped",
+  "bytemuck-capped",
+  "once_cell-capped",
+  "parking_lot-capped",
+  "nix-capped",
+  "simdutf8-capped",
+  "zerocopy-capped",
+]
+pr_corpus_cases = [
+  "brownfield-inherited",
+  "baseline-resolved",
+  "coverage-improved",
+  "coverage-worsened",
+]
 
 [[stance]]
 id = "unsafe-sites-pre-cap-count"
@@ -158,3 +216,31 @@ linked_tests = [
   "unsafe_review_core::analysis::pipeline::tests::summary_unsafe_sites_counts_pre_cap_sites_distinct_from_cards",
 ]
 review_after = "2026-12-15"
+# Corpus evidence: raw_pointer_alignment emits summary.unsafe_sites in its
+# json output exercising the pre-cap count path; all capped dogfood targets
+# exercise the pre-cap site count on real code; pr-corpus cases emit json
+# summary with unsafe_sites on movement fixtures.
+fixtures = ["raw_pointer_alignment"]
+dogfood_targets = [
+  "smallvec-capped",
+  "arrayvec-capped",
+  "memchr-capped",
+  "hashbrown-capped",
+  "bytes-capped",
+  "crossbeam-capped",
+  "mio-capped",
+  "bumpalo-capped",
+  "slab-capped",
+  "bytemuck-capped",
+  "once_cell-capped",
+  "parking_lot-capped",
+  "nix-capped",
+  "simdutf8-capped",
+  "zerocopy-capped",
+]
+pr_corpus_cases = [
+  "brownfield-inherited",
+  "baseline-resolved",
+  "coverage-improved",
+  "coverage-worsened",
+]
