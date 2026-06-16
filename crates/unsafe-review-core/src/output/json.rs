@@ -1116,16 +1116,16 @@ pub fn bless_fixture_card_goldens(names: &[&str]) -> Result<Vec<std::path::PathB
     Ok(written)
 }
 
-/// Regenerate surface goldens (`expected.lsp.json`, `expected.repair-queue.json`)
-/// for the given fixtures, writing LF line endings.
+/// Regenerate surface goldens (`expected.lsp.json`, `expected.repair-queue.json`,
+/// `expected.comment-plan.json`) for the given fixtures, writing LF line endings.
 ///
 /// Called by `cargo run -p xtask -- bless-goldens` (for fixtures that have
 /// `surface_goldens` set in `fixtures/calibration.toml`) and also by
 /// `check-fixture-surface-parity` to produce the reference output for diffing.
 ///
-/// `surfaces` must contain only `"lsp"` or `"repair-queue"`. Paths inside the
-/// rendered JSON are normalised to relative (`fixtures/<name>/...`) so the
-/// goldens are byte-stable across checkout locations.
+/// `surfaces` must contain only `"lsp"`, `"repair-queue"`, or `"comment-plan"`.
+/// Paths inside the rendered JSON are normalised to relative (`fixtures/<name>/...`)
+/// so the goldens are byte-stable across checkout locations.
 pub fn bless_fixture_surface_goldens(
     fixture: &str,
     surfaces: &[&str],
@@ -1165,9 +1165,16 @@ pub fn bless_fixture_surface_goldens(
                     normalize_surface_json(text, &root, &workspace),
                 )
             }
+            "comment-plan" => {
+                let text = crate::output::comment_plan::render(&output);
+                (
+                    "expected.comment-plan.json",
+                    normalize_surface_json(text, &root, &workspace),
+                )
+            }
             other => {
                 return Err(format!(
-                    "bless_fixture_surface_goldens: unknown surface `{other}`; expected lsp or repair-queue"
+                    "bless_fixture_surface_goldens: unknown surface `{other}`; expected lsp, repair-queue, or comment-plan"
                 ));
             }
         };
@@ -1183,7 +1190,7 @@ pub fn bless_fixture_surface_goldens(
     Ok(written)
 }
 
-/// Render lsp or repair-queue output for a fixture and return the normalised string.
+/// Render lsp, repair-queue, or comment-plan output for a fixture and return the normalised string.
 ///
 /// Used by the surface-parity gate to produce the reference text for diffing
 /// against the committed golden without writing a file.
@@ -1205,9 +1212,10 @@ pub fn render_fixture_surface(fixture: &str, surface: &str) -> Result<String, St
     let raw = match surface {
         "lsp" => crate::output::lsp::render(&output),
         "repair-queue" => crate::output::repair_queue::render(&output),
+        "comment-plan" => crate::output::comment_plan::render(&output),
         other => {
             return Err(format!(
-                "render_fixture_surface: unknown surface `{other}`; expected lsp or repair-queue"
+                "render_fixture_surface: unknown surface `{other}`; expected lsp, repair-queue, or comment-plan"
             ));
         }
     };

@@ -1,0 +1,95 @@
+{
+  "schema_version": "0.1",
+  "tool": "unsafe-review",
+  "mode": "plan_only",
+  "policy": "advisory",
+  "summary": {
+    "selected_count": 1,
+    "not_selected_count": 0,
+    "budget": 3,
+    "reason": "bounded reviewer noise",
+    "reason_code": "bounded_reviewer_noise"
+  },
+  "comments": [
+    {
+      "card_id": "UR-raw-pointer-alignment-is-aligned-guard-src-lib-rs-read-header-operation-raw_pointer_read-raw-pointer-read-2ac86bae2dcf-pointer_validity-c1",
+      "path": "src/lib.rs",
+      "line": 11,
+      "changed_line": true,
+      "class": "guard_missing",
+      "priority": "high",
+      "confidence": "medium",
+      "proof_path": "source_route_only",
+      "coverage_gap": "guard_coverage: missing",
+      "confirmation_state": "pending",
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `Some(unsafe { ptr.cast::<Header>().read() })`; confirm with external evidence before treating it as observed runtime behavior",
+      "operation": "Some(unsafe { ptr.cast::<Header>().read() })",
+      "operation_family": "raw_pointer_read",
+      "witness_routes": [
+        {
+          "kind": "miri",
+          "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+          "command": "cargo +nightly miri test read_header",
+          "required": false
+        },
+        {
+          "kind": "cargo-careful",
+          "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+          "command": "cargo +nightly careful test read_header",
+          "required": false
+        }
+      ],
+      "next_action": "Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) memory is initialized for the accessed type, (3) access remains inside one live allocation.",
+      "verify_commands": [
+        "cargo +nightly miri test read_header",
+        "cargo +nightly careful test read_header"
+      ],
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test read_header",
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test read_header` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test read_header",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-raw-pointer-alignment-is-aligned-guard-src-lib-rs-read-header-operation-raw_pointer_read-raw-pointer-read-2ac86bae2dcf-pointer_validity-c1` still maps to `Some(unsafe { ptr.cast::<Header>().read() })` at `src/lib.rs:11:5` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test read_header` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo +nightly miri test read_header` first, then attach a matching receipt if it confirms the route",
+      "selection_reason": "guard_coverage: missing — actionable high-priority card",
+      "selection_reason_code": "top_actionable_card",
+      "actionability": "specific_guard_missing",
+      "relevance": "medium",
+      "agent_readiness": {
+        "ready": true,
+        "state": "ready_for_agent",
+        "reasons": [
+          "specific operation family",
+          "card-scoped allowed repairs",
+          "verify commands available",
+          "medium-or-high confidence"
+        ]
+      },
+      "repair_queue_buckets": [
+        "repairable_by_guard",
+        "repairable_by_test",
+        "requires_witness_receipt"
+      ],
+      "repair_queue_bucket_reasons": [
+        "guard_evidence_missing",
+        "reach_evidence_missing",
+        "witness_receipt_missing"
+      ],
+      "context_command": "unsafe-review context UR-raw-pointer-alignment-is-aligned-guard-src-lib-rs-read-header-operation-raw_pointer_read-raw-pointer-read-2ac86bae2dcf-pointer_validity-c1 --json",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+      "body": "`unsafe-review` found `guard_missing` for `Some(unsafe { ptr.cast::<Header>().read() })` (`raw_pointer_read`).\n\nMissing evidence: Missing visible local guard for inferred safety obligations; No related test path was found by static search; No witness receipt imported for this card\n\nProof path: `source_route_only`.\n\nHypothesis to confirm: static `guard_missing` ReviewCard for `Some(unsafe { ptr.cast::<Header>().read() })`; confirm with external evidence before treating it as observed runtime behavior.\n\nNext action: Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) memory is initialized for the accessed type, (3) access remains inside one live allocation.\n\nBuild/run this first: Build/run `cargo +nightly miri test read_header` first for this card; attach a matching receipt only if it confirms the route\n\nConfirmation step: build/run `cargo +nightly miri test read_header` first, then attach a matching receipt if it confirms the route\n\nVerify command: `cargo +nightly miri test read_header`\n\nPlan boundary: artifact-only inline comment candidate; unsafe-review did not post this comment, run witnesses, or make a policy decision.\n\nTrust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    }
+  ],
+  "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+}

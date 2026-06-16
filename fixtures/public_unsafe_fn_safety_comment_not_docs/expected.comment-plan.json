@@ -1,0 +1,59 @@
+{
+  "schema_version": "0.1",
+  "tool": "unsafe-review",
+  "mode": "plan_only",
+  "policy": "advisory",
+  "summary": {
+    "selected_count": 0,
+    "not_selected_count": 1,
+    "budget": 3,
+    "reason": "bounded reviewer noise",
+    "reason_code": "bounded_reviewer_noise"
+  },
+  "comments": [],
+  "not_selected": [
+    {
+      "card_id": "UR-public-unsafe-fn-safety-comment-not-docs-src-lib-rs-caller-must-read-docs-unsafe_fn-unknown-caller-must-read-docs-eebb9e79df09-unknown-c1",
+      "path": "src/lib.rs",
+      "line": 2,
+      "changed_line": true,
+      "class": "contract_missing",
+      "priority": "high",
+      "confidence": "high",
+      "proof_path": "human_review_only",
+      "coverage_gap": "contract_coverage: missing",
+      "operation": "pub unsafe fn caller_must_read_docs() {}",
+      "operation_family": "unknown",
+      "next_action": "Add a precise public `# Safety` section that names the required caller obligations.",
+      "actionability": "specific_contract_missing",
+      "relevance": "high",
+      "agent_readiness": {
+        "ready": false,
+        "state": "requires_human_review",
+        "reasons": [
+          "operation family `unknown` is not safe for automatic repair delegation",
+          "witness route requires human deep review",
+          "no verify command is available for this card"
+        ]
+      },
+      "repair_queue_buckets": [
+        "repairable_by_safety_docs",
+        "repairable_by_test",
+        "requires_witness_receipt",
+        "requires_human_review",
+        "do_not_auto_repair"
+      ],
+      "repair_queue_bucket_reasons": [
+        "safety_docs_evidence_missing",
+        "reach_evidence_missing",
+        "witness_receipt_missing",
+        "human_review_required",
+        "not_ready_for_automatic_repair"
+      ],
+      "context_command": "unsafe-review context UR-public-unsafe-fn-safety-comment-not-docs-src-lib-rs-caller-must-read-docs-unsafe_fn-unknown-caller-must-read-docs-eebb9e79df09-unknown-c1 --json",
+      "reason": "operation family unknown",
+      "reason_code": "human_deep_review_only"
+    }
+  ],
+  "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+}

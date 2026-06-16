@@ -3692,6 +3692,7 @@ fn surface_golden_filename(surface: &str) -> &'static str {
     match surface {
         "lsp" => "expected.lsp.json",
         "repair-queue" => "expected.repair-queue.json",
+        "comment-plan" => "expected.comment-plan.json",
         _ => "expected.unknown.json",
     }
 }

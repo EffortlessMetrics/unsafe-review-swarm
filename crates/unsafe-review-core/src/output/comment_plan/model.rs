@@ -55,7 +55,11 @@ impl From<&AnalyzeOutput> for CommentPlan {
             .cards
             .iter()
             .partition(|card| should_plan_comment(card));
-        eligible.sort_by(|a, b| importance_rank(a).cmp(&importance_rank(b)));
+        eligible.sort_by(|a, b| {
+            importance_rank(a)
+                .cmp(&importance_rank(b))
+                .then_with(|| a.id.0.cmp(&b.id.0))
+        });
 
         for card in eligible {
             let budget_key = comment_budget_key(card);

@@ -179,7 +179,7 @@ fn parse_surface_goldens(
     case: &toml::map::Map<String, toml::Value>,
     idx: usize,
 ) -> Result<Vec<String>, String> {
-    const KNOWN_SURFACES: &[&str] = &["lsp", "repair-queue"];
+    const KNOWN_SURFACES: &[&str] = &["lsp", "repair-queue", "comment-plan"];
     let Some(value) = case.get("surface_goldens") else {
         return Ok(Vec::new());
     };

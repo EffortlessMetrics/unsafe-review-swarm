@@ -629,7 +629,7 @@ expected_cards = 1
 expected_class = "guard_missing"
 expected_operation_family = "raw_pointer_read"
 expected_hazard = "alignment"
-surface_goldens = ["lsp", "repair-queue"]
+surface_goldens = ["lsp", "repair-queue", "comment-plan"]
 
 [[cases]]
 fixture = "raw_pointer_alignment_debug_assert_only_not_guard"
@@ -640,7 +640,7 @@ expected_cards = 1
 expected_class = "guard_missing"
 expected_operation_family = "raw_pointer_read"
 expected_hazard = "alignment"
-surface_goldens = ["lsp", "repair-queue"]
+surface_goldens = ["lsp", "repair-queue", "comment-plan"]
 
 [[cases]]
 fixture = "raw_pointer_alignment_receipted"
@@ -701,7 +701,7 @@ expected_cards = 1
 expected_class = "guard_missing"
 expected_operation_family = "raw_pointer_read"
 expected_hazard = "alignment"
-surface_goldens = ["lsp", "repair-queue"]
+surface_goldens = ["lsp", "repair-queue", "comment-plan"]
 
 [[cases]]
 fixture = "raw_pointer_alignment_observed_not_guard"
@@ -909,7 +909,7 @@ expected_cards = 1
 expected_class = "contract_missing"
 expected_operation_family = "unknown"
 expected_hazard = "unknown"
-surface_goldens = ["lsp", "repair-queue"]
+surface_goldens = ["lsp", "repair-queue", "comment-plan"]
 
 [[cases]]
 fixture = "public_unsafe_trait_missing_safety"
@@ -940,7 +940,7 @@ expected_cards = 1
 expected_class = "contract_missing"
 expected_operation_family = "unknown"
 expected_hazard = "unknown"
-surface_goldens = ["lsp", "repair-queue"]
+surface_goldens = ["lsp", "repair-queue", "comment-plan"]
 
 [[cases]]
 fixture = "split_public_unsafe_fn_missing_safety"

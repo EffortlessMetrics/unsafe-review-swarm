@@ -47,7 +47,11 @@ pub(crate) fn card_statuses(output: &AnalyzeOutput) -> HashMap<CardId, CommentPl
         .cards
         .iter()
         .partition(|card| should_plan_comment(card));
-    eligible.sort_by(|a, b| importance_rank(a).cmp(&importance_rank(b)));
+    eligible.sort_by(|a, b| {
+        importance_rank(a)
+            .cmp(&importance_rank(b))
+            .then_with(|| a.id.0.cmp(&b.id.0))
+    });
 
     let mut selected_budget_keys: BTreeSet<String> = BTreeSet::new();
     let mut selected_count = 0usize;
