@@ -1,18 +1,18 @@
 {
   "schema_version": "0.1",
   "status": "experimental",
-  "updated": "2026-06-05",
+  "updated": "2026-06-15",
   "manifest": "docs/dogfood/corpus.toml",
   "trust_boundary": "Dogfood corpus records are static unsafe contract review evidence, not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless an exact witness receipt is attached.",
   "summary": {
-    "repositories": 12,
-    "targets": 37,
-    "repo_snapshots": 12,
+    "repositories": 15,
+    "targets": 40,
+    "repo_snapshots": 15,
     "pr_diffs": 23,
     "fixture_controls": 2,
     "checked_in_scan_outputs": 0,
     "artifact_statuses": {
-      "local_untracked": 37
+      "local_untracked": 40
     }
   },
   "repositories": [
@@ -87,6 +87,24 @@
       "snapshot_targets": ["parking_lot-capped"],
       "pr_diff_targets": [],
       "primary_exercise": "Unsafe fn call, unsafe impl, raw pointer dereference, and pointer arithmetic review cards; fresh-crate capstone validation"
+    },
+    {
+      "repository": "nix-rust/nix",
+      "snapshot_targets": ["nix-capped"],
+      "pr_diff_targets": [],
+      "primary_exercise": "FFI/extern unsafe fn call and cfg-gated platform-branch review cards; control-plane validation"
+    },
+    {
+      "repository": "rusticstuff/simdutf8",
+      "snapshot_targets": ["simdutf8-capped"],
+      "pr_diff_targets": [],
+      "primary_exercise": "SIMD target_feature unsafe fn call and intrinsic review cards; control-plane validation"
+    },
+    {
+      "repository": "google/zerocopy",
+      "snapshot_targets": ["zerocopy-capped"],
+      "pr_diff_targets": [],
+      "primary_exercise": "Raw pointer dereference, transmute, and byte-cast review cards; control-plane validation"
     }
   ],
   "recorded_outcomes": [

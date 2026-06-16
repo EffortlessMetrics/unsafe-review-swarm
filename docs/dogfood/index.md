@@ -1,6 +1,6 @@
 # Dogfood outcome index
 
-Date: 2026-06-05
+Date: 2026-06-15
 Status: experimental selected-corpus evidence
 Source manifest: [`corpus.toml`](corpus.toml)
 Machine-readable index: [`index.json`](index.json)
@@ -27,9 +27,9 @@ local artifact is needed.
 
 | Measure | Count |
 |---|---:|
-| Repositories | 12 |
-| Total targets | 37 |
-| Capped repo snapshots | 12 |
+| Repositories | 15 |
+| Total targets | 40 |
+| Capped repo snapshots | 15 |
 | PR diff targets | 23 |
 | Fixture control targets | 2 |
 | Checked-in scan outputs | 0 |
@@ -84,6 +84,9 @@ Selected real-crate targets:
 | `Lokathor/bytemuck` | 1 | 0 | `MaybeUninit` assume_init, unsafe fn call, unsafe impl, and raw pointer dereference cards; fresh-crate capstone |
 | `matklad/once_cell` | 1 | 0 | Unsafe fn call, raw pointer dereference, and unsafe impl cards including witness-receipt-routing cases; fresh-crate capstone |
 | `Amanieu/parking_lot` | 1 | 0 | Unsafe fn call, unsafe impl, raw pointer dereference, and pointer arithmetic cards; fresh-crate capstone |
+| `nix-rust/nix` | 1 | 0 | FFI/extern unsafe fn call and cfg-gated platform-branch cards; control-plane validation |
+| `rusticstuff/simdutf8` | 1 | 0 | SIMD `target_feature` unsafe fn call and intrinsic cards; control-plane validation |
+| `google/zerocopy` | 1 | 0 | Raw pointer dereference, `transmute`, and byte-cast cards; control-plane validation |
 
 ## Recorded Outcome Movement
 
@@ -107,6 +110,9 @@ Selected real-crate targets:
 - `bytemuck-capped`
 - `once_cell-capped`
 - `parking_lot-capped`
+- `nix-capped`
+- `simdutf8-capped`
+- `zerocopy-capped`
 
 ### PR Diffs
 

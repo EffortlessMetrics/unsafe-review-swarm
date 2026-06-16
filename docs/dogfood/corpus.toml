@@ -515,3 +515,42 @@ purpose = "capped repo snapshot for unsafe fn call, unsafe impl, raw pointer der
 command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/parking_lot --format json --max-cards 50 --out target/dogfood-work/parking_lot.fresh.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/parking_lot.fresh.json"]
+
+[[targets]]
+id = "nix-capped"
+crate = "nix"
+repository = "nix-rust/nix"
+kind = "repo-snapshot"
+status = "active"
+commit = "fb799660ccde39c22aed6f653b70e35b35bdcfe8"
+root = "target/dogfood-work/nix"
+purpose = "capped repo snapshot for FFI/extern unsafe fn call and cfg-gated platform-branch review cards"
+command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/nix --format json --max-cards 50 --out target/dogfood-work/nix-capped.unsafe-review.json"
+artifact_status = "local_untracked"
+artifacts = ["target/dogfood-work/nix-capped.unsafe-review.json"]
+
+[[targets]]
+id = "simdutf8-capped"
+crate = "simdutf8"
+repository = "rusticstuff/simdutf8"
+kind = "repo-snapshot"
+status = "active"
+commit = "641d57f313df57354246d2b68d4778c092e076c3"
+root = "target/dogfood-work/simdutf8"
+purpose = "capped repo snapshot for SIMD target_feature unsafe fn call and intrinsic review cards"
+command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/simdutf8 --format json --max-cards 50 --out target/dogfood-work/simdutf8-capped.unsafe-review.json"
+artifact_status = "local_untracked"
+artifacts = ["target/dogfood-work/simdutf8-capped.unsafe-review.json"]
+
+[[targets]]
+id = "zerocopy-capped"
+crate = "zerocopy"
+repository = "google/zerocopy"
+kind = "repo-snapshot"
+status = "active"
+commit = "d35c00e208880d325eaf13ec99e3a413ac163c4c"
+root = "target/dogfood-work/zerocopy"
+purpose = "capped repo snapshot for raw pointer dereference, transmute, and byte-cast review cards"
+command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/zerocopy --format json --max-cards 50 --out target/dogfood-work/zerocopy-capped.unsafe-review.json"
+artifact_status = "local_untracked"
+artifacts = ["target/dogfood-work/zerocopy-capped.unsafe-review.json"]
