@@ -229,6 +229,12 @@ findings into a "your call" list.
   worktrees accumulate.
 - Relocate heavy caches (e.g. `CARGO_HOME`, npm caches) off constrained drives to
   avoid disk-full incidents mid-build.
+- Resolve repository-tool roots at runtime. A cached helper binary must not bake a
+  checkout path into its behavior; shared target dirs and worktree reuse can
+  otherwise make it read a stale or deleted checkout. Prefer an explicit
+  `--workspace-root` or env override with validated git/current-dir fallback.
+  `xtask` enforces this invariant after #1748; the doc records the guard rather
+  than serving as the mitigation.
 - CI-watch every PR. Run the hosted check to completion before declaring green.
   Never trust local-green as a merge signal.
 - LF line endings. On Windows, agents editing via Python or other tools can flip
@@ -386,6 +392,13 @@ Two corollaries learned the hard way:
   expectations — which a builder can rewrite. When a change edits the
   expectations (goldens, calibration) at scale, verify the new expectations are
   *correct*, not merely that they pass.
+- **Golden determinism is its own rail.** For canonical structured surfaces,
+  repeated generation must be byte-stable before exact goldens carry meaning.
+  Normalize or exclude volatile fields; use structural/count assertions where
+  byte stability is the wrong claim. `xtask check-surface-determinism` enforces
+  this for exemplar surfaces after #1749 and complements
+  `check-fixture-surface-parity`; it does not prove real-repo or free-form
+  Markdown determinism.
 
 ---
 
@@ -527,10 +540,13 @@ wrong logic inside an agent but coordination seams between them:
 - calibration merge conflicts on the shared `policy/calibration.toml`
 - `cargo fmt` not run inside `check-pr` (the gate passes while a fmt-only push
   would fail in CI)
+- cached helper binaries carrying compile-time checkout identity (for example,
+  `env!("CARGO_MANIFEST_DIR")`) across shared target dirs and worktrees
 - a worktree leaking state onto the main checkout
 
 The controller's value is owning the seams — verifying base freshness,
-serializing calibration merges, running the full gate sequence, auditing worktree
+serializing calibration merges, running the full gate sequence, checking runtime
+tool roots, and auditing worktree
 hygiene — not implementation. Implementation is the cheap part; seam integrity is
 the scarce part.
 
