@@ -6350,18 +6350,6 @@ fn check_comment_plan_artifact(
                 COMMENT_PLAN_NON_SELECTION_REASONS,
                 "comment-plan.json not_selected reason",
             )?;
-            require_expected_value(
-                reason,
-                expected_non_selection_reason(
-                    card_projection,
-                    comments.len(),
-                    &comment_budget_keys,
-                    changed_line,
-                    card_projections,
-                    &changed_card_ids,
-                ),
-                "comment-plan.json not_selected reason",
-            )?;
             let reason_code = super::require_non_empty_json_str(
                 card,
                 "reason_code",
@@ -6372,17 +6360,17 @@ fn check_comment_plan_artifact(
                 COMMENT_PLAN_NON_SELECTION_REASON_CODES,
                 "comment-plan.json not_selected reason_code",
             )?;
-            require_expected_value(
+            require_expected_non_selection_reason_pair(
+                reason,
                 reason_code,
-                expected_non_selection_reason_code(
-                    card_projection,
-                    comments.len(),
-                    &comment_budget_keys,
+                card_projection,
+                NonSelectionReasonContext {
+                    planned_count: comments.len(),
+                    selected_budget_keys: &comment_budget_keys,
                     changed_line,
                     card_projections,
-                    &changed_card_ids,
-                ),
-                "comment-plan.json not_selected reason_code",
+                    changed_card_ids: &changed_card_ids,
+                },
             )?;
             require_comment_plan_repair_projection(
                 card,
@@ -7992,7 +7980,23 @@ fn owner_card_covered_by_specific_operation(
 }
 
 fn same_owner_context(owner: &str, other: &str) -> bool {
-    !owner.trim().is_empty() && owner != "unknown" && owner == other
+    !owner.trim().is_empty() && owner == other
+}
+
+fn owner_placeholder_context_ambiguous(
+    owner_card: &CardProjection,
+    card_projections: &BTreeMap<String, CardProjection>,
+    changed_card_ids: &BTreeSet<String>,
+) -> bool {
+    owner_card.owner == "unknown"
+        && comment_surfacing_disposition(owner_card).is_human_review_only()
+        && card_projections.values().any(|other| {
+            other.id != owner_card.id
+                && changed_card_ids.contains(&other.id)
+                && comment_surfacing_disposition(other).allows_inline_comment()
+                && other.path == owner_card.path
+                && other.owner == "unknown"
+        })
 }
 
 /// Derive the expected `selection_reason` string from the card's coverage block
@@ -8060,7 +8064,23 @@ fn expected_non_selection_reason(
 ) -> &'static str {
     if owner_card_covered_by_specific_operation(card, card_projections, changed_card_ids) {
         "owner-contract obligation covered by a more-specific operation card at the same region"
-    } else if !changed_line {
+    } else {
+        expected_non_selection_reason_without_owner_coverage(
+            card,
+            planned_count,
+            selected_budget_keys,
+            changed_line,
+        )
+    }
+}
+
+fn expected_non_selection_reason_without_owner_coverage(
+    card: &CardProjection,
+    planned_count: usize,
+    selected_budget_keys: &BTreeSet<String>,
+    changed_line: bool,
+) -> &'static str {
+    if !changed_line {
         "outside changed hunk"
     } else if !class_is_actionable(&card.class_name) {
         "class not eligible for inline comments"
@@ -8097,7 +8117,23 @@ fn expected_non_selection_reason_code(
 ) -> &'static str {
     if owner_card_covered_by_specific_operation(card, card_projections, changed_card_ids) {
         "covered_by_specific_operation_card"
-    } else if !changed_line {
+    } else {
+        expected_non_selection_reason_code_without_owner_coverage(
+            card,
+            planned_count,
+            selected_budget_keys,
+            changed_line,
+        )
+    }
+}
+
+fn expected_non_selection_reason_code_without_owner_coverage(
+    card: &CardProjection,
+    planned_count: usize,
+    selected_budget_keys: &BTreeSet<String>,
+    changed_line: bool,
+) -> &'static str {
+    if !changed_line {
         "outside_changed_hunk"
     } else if !class_is_actionable(&card.class_name)
         || comment_surfacing_disposition(card).is_human_review_only()
@@ -8114,6 +8150,68 @@ fn expected_non_selection_reason_code(
     } else {
         "not_selected_by_policy"
     }
+}
+
+struct NonSelectionReasonContext<'a> {
+    planned_count: usize,
+    selected_budget_keys: &'a BTreeSet<String>,
+    changed_line: bool,
+    card_projections: &'a BTreeMap<String, CardProjection>,
+    changed_card_ids: &'a BTreeSet<String>,
+}
+
+fn require_expected_non_selection_reason_pair(
+    actual_reason: &str,
+    actual_reason_code: &str,
+    card: &CardProjection,
+    context: NonSelectionReasonContext<'_>,
+) -> Result<(), String> {
+    let expected_reason = expected_non_selection_reason(
+        card,
+        context.planned_count,
+        context.selected_budget_keys,
+        context.changed_line,
+        context.card_projections,
+        context.changed_card_ids,
+    );
+    let expected_reason_code = expected_non_selection_reason_code(
+        card,
+        context.planned_count,
+        context.selected_budget_keys,
+        context.changed_line,
+        context.card_projections,
+        context.changed_card_ids,
+    );
+    if actual_reason == expected_reason && actual_reason_code == expected_reason_code {
+        return Ok(());
+    }
+
+    // cards.json renders a missing owner as the public "unknown" placeholder,
+    // which is indistinguishable from a real Rust item named `unknown`. In that
+    // one lossy case, both the covered and non-covered owner-card reasons are
+    // valid projections of the underlying ReviewCard state.
+    if owner_placeholder_context_ambiguous(card, context.card_projections, context.changed_card_ids)
+    {
+        let fallback_reason = expected_non_selection_reason_without_owner_coverage(
+            card,
+            context.planned_count,
+            context.selected_budget_keys,
+            context.changed_line,
+        );
+        let fallback_reason_code = expected_non_selection_reason_code_without_owner_coverage(
+            card,
+            context.planned_count,
+            context.selected_budget_keys,
+            context.changed_line,
+        );
+        if actual_reason == fallback_reason && actual_reason_code == fallback_reason_code {
+            return Ok(());
+        }
+    }
+
+    Err(format!(
+        "comment-plan.json not_selected reason pair must be (`{expected_reason}`, `{expected_reason_code}`); got (`{actual_reason}`, `{actual_reason_code}`)"
+    ))
 }
 
 fn comment_budget_key(card: &CardProjection) -> String {
@@ -9789,6 +9887,136 @@ mod tests {
             Ok(_) => Err("expected error".to_string()),
             Err(err) => Ok(err),
         }
+    }
+
+    fn minimal_comment_card_projection(
+        id: &str,
+        site_kind: &str,
+        owner: &str,
+        operation_family: &str,
+    ) -> CardProjection {
+        CardProjection {
+            id: id.to_string(),
+            class_name: "contract_missing".to_string(),
+            priority: "high".to_string(),
+            confidence: "high".to_string(),
+            proof_path: "contract".to_string(),
+            hazards: Vec::new(),
+            path: "src/lib.rs".to_string(),
+            site_kind: site_kind.to_string(),
+            owner: owner.to_string(),
+            line: 1,
+            column: 1,
+            operation: operation_family.to_string(),
+            operation_family: operation_family.to_string(),
+            next_action: "add safety contract".to_string(),
+            missing: vec!["contract".to_string()],
+            contract: None,
+            discharge: None,
+            reach: None,
+            witness: None,
+            required_safety_conditions: Vec::new(),
+            obligation_evidence: Vec::new(),
+            verify_commands: Vec::new(),
+            witness_routes: Vec::new(),
+            contract_coverage: "missing".to_string(),
+            guard_coverage: "missing".to_string(),
+            test_reach_coverage: "missing".to_string(),
+            witness_receipt_coverage: "missing".to_string(),
+        }
+    }
+
+    fn ambiguous_unknown_owner_projection() -> (
+        CardProjection,
+        BTreeMap<String, CardProjection>,
+        BTreeSet<String>,
+        BTreeSet<String>,
+    ) {
+        let owner_card = minimal_comment_card_projection(
+            "owner-card",
+            "unsafe_fn",
+            "unknown",
+            "unsafe_declaration",
+        );
+        let owner_card_entry = minimal_comment_card_projection(
+            "owner-card",
+            "unsafe_fn",
+            "unknown",
+            "unsafe_declaration",
+        );
+        let operation_card = minimal_comment_card_projection(
+            "operation-card",
+            "unsafe_operation",
+            "unknown",
+            "raw_pointer_write",
+        );
+        let mut projections = BTreeMap::new();
+        projections.insert(owner_card_entry.id.clone(), owner_card_entry);
+        projections.insert(operation_card.id.clone(), operation_card);
+        let changed_card_ids = projections.keys().cloned().collect::<BTreeSet<_>>();
+        let selected_budget_keys = BTreeSet::new();
+        (
+            owner_card,
+            projections,
+            changed_card_ids,
+            selected_budget_keys,
+        )
+    }
+
+    #[test]
+    fn comment_plan_verifier_accepts_real_unknown_owner_covered_reason() -> Result<(), String> {
+        let (owner_card, projections, changed_card_ids, selected_budget_keys) =
+            ambiguous_unknown_owner_projection();
+
+        require_expected_non_selection_reason_pair(
+            "owner-contract obligation covered by a more-specific operation card at the same region",
+            "covered_by_specific_operation_card",
+            &owner_card,
+            NonSelectionReasonContext {
+                planned_count: 0,
+                selected_budget_keys: &selected_budget_keys,
+                changed_line: true,
+                card_projections: &projections,
+                changed_card_ids: &changed_card_ids,
+            },
+        )
+    }
+
+    #[test]
+    fn comment_plan_verifier_accepts_unknown_placeholder_generic_reason_only_as_pair()
+    -> Result<(), String> {
+        let (owner_card, projections, changed_card_ids, selected_budget_keys) =
+            ambiguous_unknown_owner_projection();
+
+        require_expected_non_selection_reason_pair(
+            "unsafe declaration is not selected for inline comments",
+            "human_deep_review_only",
+            &owner_card,
+            NonSelectionReasonContext {
+                planned_count: 0,
+                selected_budget_keys: &selected_budget_keys,
+                changed_line: true,
+                card_projections: &projections,
+                changed_card_ids: &changed_card_ids,
+            },
+        )?;
+
+        let err = err_text(require_expected_non_selection_reason_pair(
+            "unsafe declaration is not selected for inline comments",
+            "covered_by_specific_operation_card",
+            &owner_card,
+            NonSelectionReasonContext {
+                planned_count: 0,
+                selected_budget_keys: &selected_budget_keys,
+                changed_line: true,
+                card_projections: &projections,
+                changed_card_ids: &changed_card_ids,
+            },
+        ))?;
+        if !err.contains("reason pair") {
+            return Err(format!("expected reason pair error; got {err}"));
+        }
+        Ok(())
     }
 
     fn stable_byte_candidate_projection() -> ManualCandidateProjection {
