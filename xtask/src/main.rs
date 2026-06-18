@@ -871,6 +871,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
             check_fixtures()?;
             check_calibration()?;
             check_fixture_surface_parity()?;
+            check_surface_determinism()?;
             real_pr_corpus::check()?;
             check_dogfood()?;
             check_manual_fuzz_harness()?;
@@ -913,6 +914,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckStanceCoverage => check_stance_coverage(),
         commands::XtaskCommand::CheckSpecCoverage => check_spec_coverage(),
         commands::XtaskCommand::CheckFixtureSurfaceParity => check_fixture_surface_parity(),
+        commands::XtaskCommand::CheckSurfaceDeterminism => check_surface_determinism(),
         commands::XtaskCommand::CheckRealPrCorpus => real_pr_corpus::check(),
         commands::XtaskCommand::DogfoodExec(raw_args) => {
             let exec_args = dogfood_exec::DogfoodExecArgs::parse(&raw_args)?;
@@ -927,7 +929,7 @@ fn command_requires_workspace_root(command: &commands::XtaskCommand) -> bool {
 
 fn print_help() {
     println!(
-        "xtask options before command: [--workspace-root <path>] (or {WORKSPACE_ROOT_ENV})\nxtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-stance-decisions, check-stance-coverage, check-spec-coverage, check-fixture-surface-parity, check-real-pr-corpus, dogfood-exec [--target <id>] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean] [--timeout <secs>]"
+        "xtask options before command: [--workspace-root <path>] (or {WORKSPACE_ROOT_ENV})\nxtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-stance-decisions, check-stance-coverage, check-spec-coverage, check-fixture-surface-parity, check-surface-determinism, check-real-pr-corpus, dogfood-exec [--target <id>] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean] [--timeout <secs>]"
     );
 }
 
@@ -3862,6 +3864,62 @@ fn check_fixture_surface_parity() -> Result<(), String> {
     }
 
     println!("check-fixture-surface-parity: ok ({checked} surface goldens verified)");
+    Ok(())
+}
+
+const SURFACE_DETERMINISM_RUNS: usize = 3;
+
+/// Verify that canonical fixture surfaces render to byte-identical output across
+/// repeated generation in one process.
+fn check_surface_determinism() -> Result<(), String> {
+    let manifest = calibration_manifest::validate()?;
+    let mut checked = 0usize;
+    let mut mismatches: Vec<String> = Vec::new();
+
+    for (fixture, case) in &manifest.fixture_cases {
+        if case.surface_goldens.is_empty() {
+            continue;
+        }
+        for surface in &case.surface_goldens {
+            let baseline =
+                unsafe_review_core::render_fixture_surface(fixture, surface).map_err(|err| {
+                    format!(
+                        "check-surface-determinism: fixture `{fixture}` surface `{surface}`: \
+                         initial render failed: {err}"
+                    )
+                })?;
+
+            for run_idx in 2..=SURFACE_DETERMINISM_RUNS {
+                let candidate = unsafe_review_core::render_fixture_surface(fixture, surface)
+                    .map_err(|err| {
+                        format!(
+                            "check-surface-determinism: fixture `{fixture}` surface `{surface}`: \
+                             render {run_idx} failed: {err}"
+                        )
+                    })?;
+                if baseline != candidate {
+                    let first_diff = first_differing_line(&baseline, &candidate);
+                    mismatches.push(format!(
+                        "  fixture `{fixture}` surface `{surface}` render {run_idx}: {first_diff}"
+                    ));
+                    break;
+                }
+            }
+            checked += 1;
+        }
+    }
+
+    if !mismatches.is_empty() {
+        return Err(format!(
+            "check-surface-determinism: {} surface render(s) drifted across repeated generation:\n{}",
+            mismatches.len(),
+            mismatches.join("\n")
+        ));
+    }
+
+    println!(
+        "check-surface-determinism: ok ({checked} surface render(s), {SURFACE_DETERMINISM_RUNS} passes each)"
+    );
     Ok(())
 }
 
@@ -10843,6 +10901,15 @@ mod tests {
         assert!(err.contains("extra"));
         require_max_args(&args[..3], "check-advisory-artifacts", 3)?;
         Ok(())
+    }
+
+    #[test]
+    fn xtask_accepts_surface_determinism_command() -> Result<(), String> {
+        let args = vec!["xtask".to_string(), "check-surface-determinism".to_string()];
+        match commands::XtaskCommand::parse(&args)? {
+            commands::XtaskCommand::CheckSurfaceDeterminism => Ok(()),
+            _ => Err("check-surface-determinism parsed as the wrong command".to_string()),
+        }
     }
 
     #[test]

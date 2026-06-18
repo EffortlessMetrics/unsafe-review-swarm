@@ -35,6 +35,7 @@ pub(crate) enum XtaskCommand {
     CheckStanceCoverage,
     CheckSpecCoverage,
     CheckFixtureSurfaceParity,
+    CheckSurfaceDeterminism,
     CheckRealPrCorpus,
     DogfoodExec(Vec<String>),
 }
@@ -130,6 +131,11 @@ impl XtaskCommand {
                 args,
                 "check-fixture-surface-parity",
                 Self::CheckFixtureSurfaceParity,
+            ),
+            Some("check-surface-determinism") => parse_no_extra(
+                args,
+                "check-surface-determinism",
+                Self::CheckSurfaceDeterminism,
             ),
             Some("check-real-pr-corpus") => {
                 parse_no_extra(args, "check-real-pr-corpus", Self::CheckRealPrCorpus)

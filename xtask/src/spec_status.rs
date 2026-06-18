@@ -36,6 +36,7 @@ const XTASK_COMMANDS: &[&str] = &[
     "check-public-surfaces",
     "check-source-sync",
     "check-spec-status",
+    "check-surface-determinism",
     "source-divergence",
 ];
 

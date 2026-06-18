@@ -74,7 +74,8 @@ PR (zerocopy alone scanned in 282s). Only the deterministic exact-golden checks
   `expected.comment-plan.json` / `expected.lsp.json` /
   `expected.repair-queue.json` (etc.) for ~5–10 exemplar fixtures spanning
   operation families; add `check-fixture-surface-parity` diffing every surface
-  per exemplar. Exact goldens; may join `check-pr`.
+  per exemplar plus `check-surface-determinism` repeated-render byte stability.
+  Exact goldens; may join `check-pr`.
 - **PR-4 — real-PR movement corpus.** New `policy/pr-corpus.toml` with pinned
   base/head SHAs + checked-in diffs + expected `outcome_movement` counts +
   comment-plan selection expectations; a `check-real-pr-corpus` gate asserting

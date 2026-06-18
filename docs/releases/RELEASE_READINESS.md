@@ -25,6 +25,7 @@ unless the branch diverges.
 - `check-fixtures` — fixture manifest completeness
 - `check-calibration` — fixture-to-expected-cards calibration
 - `check-fixture-surface-parity` — multi-surface goldens per exemplar
+- `check-surface-determinism` — repeated render byte stability for exemplar surfaces
 - `check-real-pr-corpus` — real-PR movement corpus bounded invariants
 - `check-dogfood` — dogfood manifest schema validation
 

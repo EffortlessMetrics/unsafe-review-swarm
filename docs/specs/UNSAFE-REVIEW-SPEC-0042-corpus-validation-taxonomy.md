@@ -127,15 +127,17 @@ codebases.
 ### Gate cadence
 
 Every PR for the fixtures that have full-surface goldens (`check-pr` via
-`check-first-pr-artifacts`). New exemplar fixtures join the every-PR path once
-their multi-surface goldens are committed (PR-3 in the lane sequence).
+`check-fixture-surface-parity` and `check-surface-determinism`). New exemplar
+fixtures join the every-PR path once their multi-surface goldens are committed
+(PR-3 in the lane sequence).
 
 ### Artifacts
 
 Per-exemplar fixture golden files: `expected.cards.json`,
 `expected.comment-plan.json`, `expected.lsp.json`,
 `expected.repair-queue.json`, `expected.unsafe-review-gate.json`, and surface
-parity check output from `check-fixture-surface-parity` (introduced in PR-3).
+parity/determinism check output from `check-fixture-surface-parity` and
+`check-surface-determinism` (introduced in PR-3).
 
 ### Claim boundary
 
@@ -288,7 +290,7 @@ spec obligation (SPEC-XXXX clause)
     -> docs/dogfood/corpus.toml target (real-repo layer)
     -> policy/pr-corpus.toml case (real-PR layer)
       -> output surface (cards.json / comment-plan.json / lsp.json / ...)
-        -> xtask gate (check-pr / check-fixture-surface-parity / check-real-pr-corpus)
+        -> xtask gate (check-pr / check-fixture-surface-parity / check-surface-determinism / check-real-pr-corpus)
           -> documented exception (if coverage is partial)
 ```
 
@@ -339,7 +341,8 @@ This spec is implemented by the corpus-validation-system lane. The PR sequence i
   invariants. Off the every-PR path.
 - PR-3: pure-example multi-surface goldens. Commits `expected.comment-plan.json`
   / `expected.lsp.json` / `expected.repair-queue.json` for exemplar fixtures.
-  Adds `check-fixture-surface-parity`. Exact goldens; joins `check-pr`.
+  Adds `check-fixture-surface-parity` and `check-surface-determinism`. Exact
+  goldens; joins `check-pr`.
 - PR-4: real-PR movement corpus. New `policy/pr-corpus.toml` with pinned
   base/head SHAs + checked-in diffs + expected outcome_movement counts.
 - PR-5: coverage-map index. Extends `stance-decisions.toml` with fixture /
