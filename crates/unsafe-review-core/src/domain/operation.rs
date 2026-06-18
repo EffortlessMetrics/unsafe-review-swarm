@@ -68,6 +68,7 @@ pub enum OperationFamily {
     StableByteSourceRabAsync,
     StableByteSourceSabRace,
     StableByteSourceNativeFfiRead,
+    UnsafeDeclaration,
     Unknown,
 }
 
@@ -109,6 +110,7 @@ impl OperationFamily {
             Self::StableByteSourceRabAsync => "stable_byte_source_rab_async",
             Self::StableByteSourceSabRace => "stable_byte_source_sab_race",
             Self::StableByteSourceNativeFfiRead => "stable_byte_source_native_ffi_read",
+            Self::UnsafeDeclaration => "unsafe_declaration",
             Self::Unknown => "unknown",
         }
     }
@@ -220,6 +222,7 @@ mod tests {
                 OperationFamily::StableByteSourceNativeFfiRead,
                 "stable_byte_source_native_ffi_read",
             ),
+            (OperationFamily::UnsafeDeclaration, "unsafe_declaration"),
             (OperationFamily::Unknown, "unknown"),
         ];
 

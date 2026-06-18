@@ -199,6 +199,7 @@ const COMMENT_PLAN_NON_SELECTION_REASONS: &[&str] = &[
     "outside changed hunk",
     "class not eligible for inline comments",
     "operation family unknown",
+    "unsafe declaration is not selected for inline comments",
     "confidence below inline comment threshold",
     "priority/confidence below inline comment threshold",
     "covered by selected family/obligation sibling",
@@ -7921,9 +7922,13 @@ fn require_allowed_value(actual: &str, allowed: &[&str], context: &str) -> Resul
 
 fn should_project_planned_comment(card: &CardProjection) -> bool {
     class_is_actionable(&card.class_name)
-        && card.operation_family != "unknown"
+        && !is_human_review_only_operation_family(&card.operation_family)
         && (card.priority == "high" || card.confidence == "high")
         && !matches!(card.confidence.as_str(), "low" | "unknown")
+}
+
+fn is_human_review_only_operation_family(operation_family: &str) -> bool {
+    matches!(operation_family, "unsafe_declaration" | "unknown")
 }
 
 /// Derive the expected `selection_reason` string from the card's coverage block
@@ -7991,6 +7996,8 @@ fn expected_non_selection_reason(
         "outside changed hunk"
     } else if !class_is_actionable(&card.class_name) {
         "class not eligible for inline comments"
+    } else if card.operation_family == "unsafe_declaration" {
+        "unsafe declaration is not selected for inline comments"
     } else if card.operation_family == "unknown" {
         "operation family unknown"
     } else if matches!(card.confidence.as_str(), "low" | "unknown") {
@@ -8014,7 +8021,9 @@ fn expected_non_selection_reason_code(
 ) -> &'static str {
     if !changed_line {
         "outside_changed_hunk"
-    } else if !class_is_actionable(&card.class_name) || card.operation_family == "unknown" {
+    } else if !class_is_actionable(&card.class_name)
+        || is_human_review_only_operation_family(&card.operation_family)
+    {
         "human_deep_review_only"
     } else if matches!(card.confidence.as_str(), "low" | "unknown")
         || !(card.priority == "high" || card.confidence == "high")

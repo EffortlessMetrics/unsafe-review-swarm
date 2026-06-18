@@ -567,7 +567,7 @@ mod tests {
     }
 
     #[test]
-    fn comment_plan_skips_unknown_operation_family_cards() -> Result<(), String> {
+    fn comment_plan_skips_unsafe_declaration_operation_family_cards() -> Result<(), String> {
         let output = fixture_output("public_unsafe_fn_missing_safety")?;
         let value = parse_json(&render(&output))?;
 
@@ -579,14 +579,17 @@ mod tests {
             value["not_selected"][0]["operation"],
             "pub unsafe fn caller_must_uphold_contract() {"
         );
-        assert_eq!(value["not_selected"][0]["operation_family"], "unknown");
+        assert_eq!(
+            value["not_selected"][0]["operation_family"],
+            "unsafe_declaration"
+        );
         assert_eq!(
             value["not_selected"][0]["next_action"],
             "Add a precise public `# Safety` section that names the required caller obligations."
         );
         assert_eq!(
             value["not_selected"][0]["reason"],
-            "operation family unknown"
+            "unsafe declaration is not selected for inline comments"
         );
         assert_eq!(
             value["not_selected"][0]["reason_code"],
@@ -600,7 +603,7 @@ mod tests {
         assert!(
             serde_json::to_string(&value["not_selected"][0]["agent_readiness"]["reasons"])
                 .map_err(|err| format!("render readiness reasons failed: {err}"))?
-                .contains("operation family `unknown`")
+                .contains("operation family `unsafe_declaration`")
         );
         assert_eq!(
             value["not_selected"][0]["repair_queue_buckets"],
@@ -844,7 +847,7 @@ mod tests {
     /// (and therefore in `cards.json` and evidence counts) — it is never deleted.
     ///
     /// The `attributed_unsafe_fn_no_duplicate` fixture produces both an owner card
-    /// (Unknown-family, `unsafe fn write_one`) and a specific operation card
+    /// (unsafe_declaration-family, `unsafe fn write_one`) and a specific operation card
     /// (RawPointerWrite, `core::ptr::write`) in the same file — the exact scenario
     /// where the richer reason should appear.
     #[test]
@@ -864,15 +867,17 @@ mod tests {
             "operation card (raw_pointer_write) must be selected; got: {value}"
         );
 
-        // The owner card (unknown family) must appear in not_selected.
+        // The owner card (unsafe_declaration family) must appear in not_selected.
         let not_selected = value["not_selected"]
             .as_array()
             .ok_or_else(|| "not_selected should be an array".to_string())?;
         let owner_entry = not_selected
             .iter()
-            .find(|c| c["operation_family"] == "unknown")
+            .find(|c| c["operation_family"] == "unsafe_declaration")
             .ok_or_else(|| {
-                format!("owner card (unknown family) must be in not_selected; got: {value}")
+                format!(
+                    "owner card (unsafe_declaration family) must be in not_selected; got: {value}"
+                )
             })?;
         assert_eq!(
             owner_entry["reason_code"], "covered_by_specific_operation_card",
@@ -887,11 +892,10 @@ mod tests {
     }
 
     /// Guardrail: owner card NOT covered by a specific operation card on the same
-    /// file still gets the generic `human_deep_review_only` / `operation family unknown`
+    /// file still gets the generic `human_deep_review_only` unsafe-declaration
     /// reason (not the new covered reason).
     #[test]
-    fn comment_plan_uncovered_owner_card_keeps_generic_unknown_family_reason() -> Result<(), String>
-    {
+    fn comment_plan_uncovered_owner_card_keeps_generic_declaration_reason() -> Result<(), String> {
         let output = fixture_output("public_unsafe_fn_missing_safety")?;
         let value = parse_json(&render(&output))?;
 
@@ -901,7 +905,7 @@ mod tests {
             .ok_or_else(|| "not_selected should be an array".to_string())?;
         let owner_entry = not_selected
             .iter()
-            .find(|c| c["operation_family"] == "unknown")
+            .find(|c| c["operation_family"] == "unsafe_declaration")
             .ok_or_else(|| {
                 "owner card must be in not_selected for public_unsafe_fn_missing_safety".to_string()
             })?;
@@ -910,7 +914,10 @@ mod tests {
             "owner card without a covering operation card must keep the generic reason; got: {}",
             owner_entry["reason_code"]
         );
-        assert_eq!(owner_entry["reason"], "operation family unknown");
+        assert_eq!(
+            owner_entry["reason"],
+            "unsafe declaration is not selected for inline comments"
+        );
         Ok(())
     }
 

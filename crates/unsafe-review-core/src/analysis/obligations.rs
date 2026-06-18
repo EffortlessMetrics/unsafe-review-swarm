@@ -118,6 +118,14 @@ mod tests {
             vec!["callee-contract".to_string()]
         );
         assert_eq!(
+            hazards_for(&OperationFamily::UnsafeDeclaration),
+            vec![HazardKind::Unknown]
+        );
+        assert_eq!(
+            obligation_keys(&OperationFamily::UnsafeDeclaration),
+            vec!["caller-contract".to_string()]
+        );
+        assert_eq!(
             hazards_for(&OperationFamily::StableByteSourceGetterReentry),
             vec![HazardKind::StableByteSource]
         );

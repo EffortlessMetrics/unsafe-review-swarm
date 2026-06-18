@@ -907,7 +907,7 @@ claim = "public unsafe fn without # Safety documentation emits a contract_missin
 support_tier = "Contract evidence mining"
 expected_cards = 1
 expected_class = "contract_missing"
-expected_operation_family = "unknown"
+expected_operation_family = "unsafe_declaration"
 expected_hazard = "unknown"
 surface_goldens = ["lsp", "repair-queue", "comment-plan"]
 
@@ -918,17 +918,17 @@ claim = "public unsafe trait without a # Safety contract reports contract_missin
 support_tier = "Contract evidence mining"
 expected_cards = 1
 expected_class = "contract_missing"
-expected_operation_family = "unknown"
+expected_operation_family = "unsafe_declaration"
 expected_hazard = "unknown"
 
 [[cases]]
 fixture = "public_unsafe_trait_with_safety_docs"
 kind = "positive"
-claim = "public unsafe trait WITH # Safety docs discharges the contract obligation and reports guarded_unwitnessed"
+claim = "public unsafe trait WITH # Safety docs discharges the contract obligation and reports unsafe_unreached when no call-shaped test reach exists"
 support_tier = "Contract evidence mining"
 expected_cards = 1
-expected_class = "guarded_unwitnessed"
-expected_operation_family = "unknown"
+expected_class = "unsafe_unreached"
+expected_operation_family = "unsafe_declaration"
 expected_hazard = "unknown"
 
 [[cases]]
@@ -938,7 +938,7 @@ claim = "public unsafe fn with only a SAFETY comment (not # Safety docs) still e
 support_tier = "Contract evidence mining"
 expected_cards = 1
 expected_class = "contract_missing"
-expected_operation_family = "unknown"
+expected_operation_family = "unsafe_declaration"
 expected_hazard = "unknown"
 surface_goldens = ["lsp", "repair-queue", "comment-plan"]
 
@@ -949,7 +949,7 @@ claim = "split public unsafe fn missing safety docs emits a contract_missing car
 support_tier = "Contract evidence mining"
 expected_cards = 1
 expected_class = "contract_missing"
-expected_operation_family = "unknown"
+expected_operation_family = "unsafe_declaration"
 expected_hazard = "unknown"
 
 [[cases]]
@@ -959,7 +959,7 @@ claim = "public unsafe fn with # Safety docs but no call-shaped test reach emits
 support_tier = "Contract evidence mining"
 expected_cards = 1
 expected_class = "unsafe_unreached"
-expected_operation_family = "unknown"
+expected_operation_family = "unsafe_declaration"
 expected_hazard = "unknown"
 
 [[cases]]
@@ -969,7 +969,7 @@ claim = "public unsafe fn with Safety: colon docs but no witness emits a guarded
 support_tier = "Contract evidence mining"
 expected_cards = 1
 expected_class = "guarded_unwitnessed"
-expected_operation_family = "unknown"
+expected_operation_family = "unsafe_declaration"
 expected_hazard = "unknown"
 
 [[cases]]
@@ -979,7 +979,7 @@ claim = "pub(crate) unsafe fn missing # Safety docs emits a contract_missing car
 support_tier = "Contract evidence mining"
 expected_cards = 1
 expected_class = "contract_missing"
-expected_operation_family = "unknown"
+expected_operation_family = "unsafe_declaration"
 expected_hazard = "unknown"
 
 [[cases]]
@@ -989,7 +989,7 @@ claim = "documented private unsafe fn with SAFETY comment but no call-shaped tes
 support_tier = "Contract evidence mining"
 expected_cards = 1
 expected_class = "unsafe_unreached"
-expected_operation_family = "unknown"
+expected_operation_family = "unsafe_declaration"
 expected_hazard = "unknown"
 
 [[cases]]
@@ -999,7 +999,7 @@ claim = "private unsafe helper without a guard emits a guard_missing card"
 support_tier = "Contract evidence mining"
 expected_cards = 1
 expected_class = "guard_missing"
-expected_operation_family = "unknown"
+expected_operation_family = "unsafe_declaration"
 expected_hazard = "unknown"
 
 [[cases]]
@@ -5617,7 +5617,7 @@ claim = "owner mentioned only in production code above an inline test module mus
 support_tier = "Witness routing"
 expected_cards = 1
 expected_class = "contract_missing"
-expected_operation_family = "unknown"
+expected_operation_family = "unsafe_declaration"
 expected_hazard = "unknown"
 
 [[cases]]
@@ -5647,7 +5647,7 @@ claim = "a test function whose name matches the owner (fn owner()) must NOT self
 support_tier = "Witness routing"
 expected_cards = 1
 expected_class = "contract_missing"
-expected_operation_family = "unknown"
+expected_operation_family = "unsafe_declaration"
 expected_hazard = "unknown"
 
 [[cases]]
@@ -6621,11 +6621,11 @@ expected_hazard = "alignment"
 [[cases]]
 fixture = "unsafe_fn_unknown_family_no_card"
 kind = "positive"
-claim = "unknown-family unsafe fn missing safety docs emits a contract_missing card in diff scope; unknown family is still actionable"
+claim = "unsafe declaration missing safety docs emits a contract_missing card in diff scope"
 support_tier = "Diff unsafe site inventory"
 expected_cards = 1
 expected_class = "contract_missing"
-expected_operation_family = "unknown"
+expected_operation_family = "unsafe_declaration"
 expected_hazard = "unknown"
 
 [[cases]]

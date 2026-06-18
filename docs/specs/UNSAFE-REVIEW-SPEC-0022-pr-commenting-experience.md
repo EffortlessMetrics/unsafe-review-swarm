@@ -129,7 +129,7 @@ advisory reviewer-noise budgeting — it surfaces the most urgent coverage gap
 first. It is not a severity claim, proof, or policy gate.
 
 Never select suppressed, `baseline_known`, `static_unknown`, or
-`operation_family: "unknown"` cards. Prefer actionable changed unsafe
+`operation_family: "unknown"` and `operation_family: "unsafe_declaration"` cards. Prefer actionable changed unsafe
 operations that name specific missing evidence and a concrete next action.
 Additional cards in an already-selected operation family and missing-obligation
 set remain in `not_selected[]` with reason `covered by selected
@@ -282,7 +282,7 @@ document is a future-lane contract, not a live workflow.
 Representative outcomes:
 
 - changed raw pointer read with missing alignment evidence -> one `guard_missing` candidate with concrete repair and trust boundary.
-- `static_unknown`, `operation_family: "unknown"`, `baseline_known`, low-signal witness-only cards, or no changed-line anchor -> no inline comment, with explicit `not_selected` reason.
+- `static_unknown`, `operation_family: "unknown"`, `operation_family: "unsafe_declaration"`, `baseline_known`, low-signal witness-only cards, or no changed-line anchor -> no inline comment, with explicit `not_selected` reason.
 - malformed overclaim comment text -> verifier failure.
 
 Fixture-backed selected, card-present/not-selected, and no-card examples are in

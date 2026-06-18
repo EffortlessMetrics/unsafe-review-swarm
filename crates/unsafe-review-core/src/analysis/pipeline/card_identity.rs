@@ -77,7 +77,10 @@ fn operation_path(scanned: &scanner::ScannedSite) -> String {
     if scanned.operation.family == OperationFamily::UnsafeFnCall {
         return unsafe_call_path(&scanned.operation.expression);
     }
-    if scanned.operation.family == OperationFamily::Unknown {
+    if matches!(
+        scanned.operation.family,
+        OperationFamily::UnsafeDeclaration | OperationFamily::Unknown
+    ) {
         return scanned
             .site
             .owner

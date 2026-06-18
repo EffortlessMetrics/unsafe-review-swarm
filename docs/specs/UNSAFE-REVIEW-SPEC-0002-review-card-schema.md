@@ -32,7 +32,10 @@ other families (backward-compatible via `skip_serializing_if`). The sub-class
 hint is a static advisory aperture label, not a memory-safety proof, UB-free
 status, Miri-clean status, or site-execution claim. Each hazard,
 obligation evidence key, and witness route kind must belong to the operation
-family's registry row, and a card must not duplicate a hazard entry. Top-level
+family's registry row, and a card must not duplicate a hazard entry.
+The operation-family vocabulary is additive: consumers must tolerate new
+canonical family strings such as `unsafe_declaration` without deriving severity,
+blocking policy, or comment eligibility from the family label alone. Top-level
 evidence summaries remain for compatibility and human scanning. Cards also
 expose the ReviewCard's structured witness routes and next-action summary so
 JSON consumers can route the same reviewer action as PR summaries, SARIF, LSP

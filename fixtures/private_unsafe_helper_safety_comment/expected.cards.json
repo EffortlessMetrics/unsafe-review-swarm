@@ -1,6 +1,6 @@
 [
   {
-    "id": "UR-private-unsafe-helper-safety-comment-src-lib-rs-private-helper-unsafe_fn-unknown-private-helper-9fe94cebac2c-unknown-c1",
+    "id": "UR-private-unsafe-helper-safety-comment-src-lib-rs-private-helper-unsafe_fn-unsafe_declaration-private-helper-9fe94cebac2c-unknown-c1",
     "class": "guard_missing",
     "priority": "high",
     "confidence": "medium",
@@ -16,17 +16,17 @@
       "snippet": "unsafe fn private_helper() {}"
     },
     "operation": "unsafe fn private_helper() {}",
-    "operation_family": "unknown",
+    "operation_family": "unsafe_declaration",
     "hazards": [
       "unknown"
     ],
     "obligations": [
-      "unsafe contract could not be inferred from this syntax shape"
+      "unsafe declaration caller contract is documented and reviewable"
     ],
     "obligation_evidence": [
       {
-        "key": "unknown",
-        "description": "unsafe contract could not be inferred from this syntax shape",
+        "key": "caller-contract",
+        "description": "unsafe declaration caller contract is documented and reviewable",
         "contract": {
           "present": true,
           "state": "present",
@@ -65,7 +65,7 @@
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Review the unsafe site manually and add the missing obligation-specific guard once the contract is identified.",
+    "next_action": "Review the unsafe declaration manually and add the missing obligation-specific guard once the caller contract is identified.",
     "verify_commands": [],
     "confirmation_cue": {
       "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe fn private_helper() {}`; confirm with external evidence before treating it as observed runtime behavior",
@@ -80,7 +80,7 @@
         "command": null,
         "route_kind": "human-deep-review",
         "steps": [
-          "Confirm ReviewCard `UR-private-unsafe-helper-safety-comment-src-lib-rs-private-helper-unsafe_fn-unknown-private-helper-9fe94cebac2c-unknown-c1` still maps to `unsafe fn private_helper() {}` at `src/lib.rs:2:1` before upgrading confidence.",
+          "Confirm ReviewCard `UR-private-unsafe-helper-safety-comment-src-lib-rs-private-helper-unsafe_fn-unsafe_declaration-private-helper-9fe94cebac2c-unknown-c1` still maps to `unsafe fn private_helper() {}` at `src/lib.rs:2:1` before upgrading confidence.",
           "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
           "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
         ],

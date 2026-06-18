@@ -701,17 +701,17 @@ fn render_minimal_repro_cue(out: &mut String, card: &ReviewCard, label: &str, in
 fn render_pr_summary_card_table(out: &mut String, ranked_cards: &[&ReviewCard]) {
     out.push_str("## Card table\n\n");
 
-    // Split into specific-operation cards and owner-contract (Unknown-family) cards.
+    // Split into specific-operation cards and owner-contract cards.
     // Owner cards are grouped into a summary line to keep the table focused on
     // actionable operation cards. All cards remain in cards.json and in evidence
     // counts; this is a presentation-only grouping.
     let specific_cards: Vec<&&ReviewCard> = ranked_cards
         .iter()
-        .filter(|card| !matches!(card.operation.family, OperationFamily::Unknown))
+        .filter(|card| !is_owner_contract_card(card))
         .collect();
     let owner_cards: Vec<&&ReviewCard> = ranked_cards
         .iter()
-        .filter(|card| matches!(card.operation.family, OperationFamily::Unknown))
+        .filter(|card| is_owner_contract_card(card))
         .collect();
 
     if specific_cards.is_empty() && owner_cards.is_empty() {
@@ -766,15 +766,32 @@ fn render_pr_summary_card_table(out: &mut String, ranked_cards: &[&ReviewCard]) 
                 location_list.len() - 3
             )
         };
+        let family_summary = grouped_family_summary(&owner_cards);
         out.push_str(&format!(
-            "| (grouped) | owner_contract | — | {} | `unknown` | {} owner-contract obligation{} across {} `unsafe fn` {} — see `cards.json` for full list | — | — | — | — |\n",
+            "| (grouped) | owner_contract | — | {} | `{}` | {} owner-contract obligation{} across {} `unsafe fn` {} — see `cards.json` for full list | — | — | — | — |\n",
             md_cell(&location_summary),
+            md_cell(&family_summary),
             unsafe_fn_count,
             if unsafe_fn_count == 1 { "" } else { "s" },
             unsafe_fn_count,
             if unsafe_fn_count == 1 { "site" } else { "sites" },
         ));
     }
+}
+
+fn is_owner_contract_card(card: &ReviewCard) -> bool {
+    matches!(
+        card.operation.family,
+        OperationFamily::UnsafeDeclaration | OperationFamily::Unknown
+    )
+}
+
+fn grouped_family_summary(owner_cards: &[&&ReviewCard]) -> String {
+    let families = owner_cards
+        .iter()
+        .map(|card| card.operation.family.as_str())
+        .collect::<BTreeSet<_>>();
+    families.into_iter().collect::<Vec<_>>().join(", ")
 }
 
 fn render_pr_summary_witness_plan(out: &mut String, ranked_cards: &[&ReviewCard]) {
@@ -784,15 +801,15 @@ fn render_pr_summary_witness_plan(out: &mut String, ranked_cards: &[&ReviewCard]
         return;
     }
 
-    // Split into specific-operation cards and owner-contract (Unknown-family) cards.
+    // Split into specific-operation cards and owner-contract cards.
     // Owner cards are grouped into a summary entry. Their full details are in cards.json.
     let specific_cards: Vec<&&ReviewCard> = ranked_cards
         .iter()
-        .filter(|card| !matches!(card.operation.family, OperationFamily::Unknown))
+        .filter(|card| !is_owner_contract_card(card))
         .collect();
     let owner_cards: Vec<&&ReviewCard> = ranked_cards
         .iter()
-        .filter(|card| matches!(card.operation.family, OperationFamily::Unknown))
+        .filter(|card| is_owner_contract_card(card))
         .collect();
 
     for card in &specific_cards {
@@ -1444,12 +1461,12 @@ mod tests {
         Ok(())
     }
 
-    /// PR summary groups owner cards (Unknown-family) into a summary line in the
+    /// PR summary groups owner cards into a summary line in the
     /// card table and witness plan, rather than listing each one individually.
     /// The operation cards are still listed individually. cards.json is untouched.
     ///
     /// The `attributed_unsafe_fn_no_duplicate` fixture produces both an owner card
-    /// (Unknown-family) and a specific operation card (RawPointerWrite) so both
+    /// (unsafe_declaration-family) and a specific operation card (RawPointerWrite) so both
     /// grouping and individual listing can be validated in the same render.
     #[test]
     fn pr_summary_groups_owner_cards_in_card_table_and_witness_plan() -> Result<(), String> {
@@ -1470,7 +1487,7 @@ mod tests {
         let owner_card_id = output
             .cards
             .iter()
-            .find(|c| matches!(c.operation.family, OperationFamily::Unknown))
+            .find(|c| is_owner_contract_card(c))
             .map(|c| c.id.to_string())
             .ok_or_else(|| "fixture must have an owner card".to_string())?;
         assert!(
@@ -1502,7 +1519,7 @@ mod tests {
         let owner_count = output
             .cards
             .iter()
-            .filter(|c| matches!(c.operation.family, OperationFamily::Unknown))
+            .filter(|c| is_owner_contract_card(c))
             .count();
         assert!(
             owner_count > 0,
@@ -1522,12 +1539,12 @@ mod tests {
         let owner_cards: Vec<_> = output
             .cards
             .iter()
-            .filter(|c| matches!(c.operation.family, OperationFamily::Unknown))
+            .filter(|c| is_owner_contract_card(c))
             .collect();
         let operation_cards: Vec<_> = output
             .cards
             .iter()
-            .filter(|c| !matches!(c.operation.family, OperationFamily::Unknown))
+            .filter(|c| !is_owner_contract_card(c))
             .collect();
 
         assert!(

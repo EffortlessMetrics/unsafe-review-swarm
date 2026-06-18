@@ -97,6 +97,10 @@ pub(crate) fn obligations_for(family: &OperationFamily) -> Vec<SafetyObligation>
         OperationFamily::StrFromUtf8Unchecked => {
             single(SafetyObligation::new("utf8", "bytes are valid UTF-8"))
         }
+        OperationFamily::UnsafeDeclaration => single(SafetyObligation::new(
+            "caller-contract",
+            "unsafe declaration caller contract is documented and reviewable",
+        )),
         OperationFamily::Unknown => single(SafetyObligation::new(
             "unknown",
             "unsafe contract could not be inferred from this syntax shape",

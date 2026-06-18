@@ -1,6 +1,6 @@
 [
   {
-    "id": "UR-documented-private-unsafe-fn-fixture-src-lib-rs-private-ctrl-unsafe_fn-unknown-private-ctrl-4f79c7b2ab4a-unknown-c1",
+    "id": "UR-documented-private-unsafe-fn-fixture-src-lib-rs-private-ctrl-unsafe_fn-unsafe_declaration-private-ctrl-4f79c7b2ab4a-unknown-c1",
     "class": "unsafe_unreached",
     "priority": "medium",
     "confidence": "medium",
@@ -16,17 +16,17 @@
       "snippet": "unsafe fn private_ctrl(base: *const u8, index: usize) -> *const u8 {"
     },
     "operation": "unsafe fn private_ctrl(base: *const u8, index: usize) -> *const u8 {",
-    "operation_family": "unknown",
+    "operation_family": "unsafe_declaration",
     "hazards": [
       "unknown"
     ],
     "obligations": [
-      "unsafe contract could not be inferred from this syntax shape"
+      "unsafe declaration caller contract is documented and reviewable"
     ],
     "obligation_evidence": [
       {
-        "key": "unknown",
-        "description": "unsafe contract could not be inferred from this syntax shape",
+        "key": "caller-contract",
+        "description": "unsafe declaration caller contract is documented and reviewable",
         "contract": {
           "present": true,
           "state": "present",
@@ -80,7 +80,7 @@
         "command": null,
         "route_kind": "human-deep-review",
         "steps": [
-          "Confirm ReviewCard `UR-documented-private-unsafe-fn-fixture-src-lib-rs-private-ctrl-unsafe_fn-unknown-private-ctrl-4f79c7b2ab4a-unknown-c1` still maps to `unsafe fn private_ctrl(base: *const u8, index: usize) -> *const u8 {` at `src/lib.rs:6:1` before upgrading confidence.",
+          "Confirm ReviewCard `UR-documented-private-unsafe-fn-fixture-src-lib-rs-private-ctrl-unsafe_fn-unsafe_declaration-private-ctrl-4f79c7b2ab4a-unknown-c1` still maps to `unsafe fn private_ctrl(base: *const u8, index: usize) -> *const u8 {` at `src/lib.rs:6:1` before upgrading confidence.",
           "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
           "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
         ],

@@ -21,12 +21,12 @@
     "repairable_by_guard": [],
     "repairable_by_safety_docs": [
       {
-        "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unknown-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
+        "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
         "class": "contract_missing",
         "priority": "high",
         "confidence": "high",
         "proof_path": "human_review_only",
-        "operation_family": "unknown",
+        "operation_family": "unsafe_declaration",
         "operation": "pub unsafe fn caller_must_uphold_contract() {",
         "path": "src/lib.rs",
         "line": 1,
@@ -40,13 +40,13 @@
           "ready": false,
           "state": "requires_human_review",
           "reasons": [
-            "operation family `unknown` is not safe for automatic repair delegation",
+            "operation family `unsafe_declaration` is not safe for automatic repair delegation",
             "witness route requires human deep review",
             "no verify command is available for this card"
           ]
         },
         "bucket_reason": "safety_docs_evidence_missing",
-        "context_command": "unsafe-review context UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unknown-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1 --json",
+        "context_command": "unsafe-review context UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1 --json",
         "applicable_edit": "add or expose the local safety contract for this card",
         "do_not_do": [
           "do not widen unsafe code without reducing the missing evidence",
@@ -64,12 +64,12 @@
     ],
     "repairable_by_test": [
       {
-        "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unknown-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
+        "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
         "class": "contract_missing",
         "priority": "high",
         "confidence": "high",
         "proof_path": "human_review_only",
-        "operation_family": "unknown",
+        "operation_family": "unsafe_declaration",
         "operation": "pub unsafe fn caller_must_uphold_contract() {",
         "path": "src/lib.rs",
         "line": 1,
@@ -83,13 +83,13 @@
           "ready": false,
           "state": "requires_human_review",
           "reasons": [
-            "operation family `unknown` is not safe for automatic repair delegation",
+            "operation family `unsafe_declaration` is not safe for automatic repair delegation",
             "witness route requires human deep review",
             "no verify command is available for this card"
           ]
         },
         "bucket_reason": "reach_evidence_missing",
-        "context_command": "unsafe-review context UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unknown-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1 --json",
+        "context_command": "unsafe-review context UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1 --json",
         "applicable_edit": "add or expose the local safety contract for this card",
         "do_not_do": [
           "do not widen unsafe code without reducing the missing evidence",
@@ -107,12 +107,12 @@
     ],
     "requires_witness_receipt": [
       {
-        "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unknown-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
+        "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
         "class": "contract_missing",
         "priority": "high",
         "confidence": "high",
         "proof_path": "human_review_only",
-        "operation_family": "unknown",
+        "operation_family": "unsafe_declaration",
         "operation": "pub unsafe fn caller_must_uphold_contract() {",
         "path": "src/lib.rs",
         "line": 1,
@@ -126,13 +126,13 @@
           "ready": false,
           "state": "requires_human_review",
           "reasons": [
-            "operation family `unknown` is not safe for automatic repair delegation",
+            "operation family `unsafe_declaration` is not safe for automatic repair delegation",
             "witness route requires human deep review",
             "no verify command is available for this card"
           ]
         },
         "bucket_reason": "witness_receipt_missing",
-        "context_command": "unsafe-review context UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unknown-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1 --json",
+        "context_command": "unsafe-review context UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1 --json",
         "applicable_edit": "add or expose the local safety contract for this card",
         "do_not_do": [
           "do not widen unsafe code without reducing the missing evidence",
@@ -150,12 +150,12 @@
     ],
     "requires_human_review": [
       {
-        "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unknown-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
+        "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
         "class": "contract_missing",
         "priority": "high",
         "confidence": "high",
         "proof_path": "human_review_only",
-        "operation_family": "unknown",
+        "operation_family": "unsafe_declaration",
         "operation": "pub unsafe fn caller_must_uphold_contract() {",
         "path": "src/lib.rs",
         "line": 1,
@@ -169,13 +169,13 @@
           "ready": false,
           "state": "requires_human_review",
           "reasons": [
-            "operation family `unknown` is not safe for automatic repair delegation",
+            "operation family `unsafe_declaration` is not safe for automatic repair delegation",
             "witness route requires human deep review",
             "no verify command is available for this card"
           ]
         },
         "bucket_reason": "human_review_required",
-        "context_command": "unsafe-review context UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unknown-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1 --json",
+        "context_command": "unsafe-review context UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1 --json",
         "do_not_do": [
           "do not widen unsafe code without reducing the missing evidence",
           "do not suppress this card instead of adding, exposing, or explicitly waiving evidence",
@@ -192,12 +192,12 @@
     ],
     "do_not_auto_repair": [
       {
-        "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unknown-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
+        "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
         "class": "contract_missing",
         "priority": "high",
         "confidence": "high",
         "proof_path": "human_review_only",
-        "operation_family": "unknown",
+        "operation_family": "unsafe_declaration",
         "operation": "pub unsafe fn caller_must_uphold_contract() {",
         "path": "src/lib.rs",
         "line": 1,
@@ -211,13 +211,13 @@
           "ready": false,
           "state": "requires_human_review",
           "reasons": [
-            "operation family `unknown` is not safe for automatic repair delegation",
+            "operation family `unsafe_declaration` is not safe for automatic repair delegation",
             "witness route requires human deep review",
             "no verify command is available for this card"
           ]
         },
         "bucket_reason": "not_ready_for_automatic_repair",
-        "context_command": "unsafe-review context UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unknown-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1 --json",
+        "context_command": "unsafe-review context UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1 --json",
         "do_not_do": [
           "do not widen unsafe code without reducing the missing evidence",
           "do not suppress this card instead of adding, exposing, or explicitly waiving evidence",

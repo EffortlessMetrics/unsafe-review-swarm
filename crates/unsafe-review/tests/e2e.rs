@@ -692,7 +692,7 @@ fn context_packet_queues_contract_gaps_for_public_safety_docs() -> Result<(), Bo
     assert_eq!(packet["source"], "review_card");
     assert_eq!(packet["card_id"], card_id);
     assert_eq!(packet["card"]["class"], "contract_missing");
-    assert_eq!(packet["context"]["operation_family"], "unknown");
+    assert_eq!(packet["context"]["operation_family"], "unsafe_declaration");
 
     let allowed_repairs = serde_json::to_string(&packet["allowed_repairs"])?;
     assert!(allowed_repairs.contains("safety contract"));
@@ -705,7 +705,7 @@ fn context_packet_queues_contract_gaps_for_public_safety_docs() -> Result<(), Bo
     assert_eq!(packet["agent_readiness"]["ready"], false);
     assert_eq!(packet["agent_readiness"]["state"], "requires_human_review");
     let reasons = serde_json::to_string(&packet["agent_readiness"]["reasons"])?;
-    assert!(reasons.contains("operation family `unknown`"));
+    assert!(reasons.contains("operation family `unsafe_declaration`"));
     assert!(reasons.contains("no verify command"));
     assert!(
         packet["trust_boundary"]
@@ -717,11 +717,11 @@ fn context_packet_queues_contract_gaps_for_public_safety_docs() -> Result<(), Bo
     Ok(())
 }
 
-/// Pin: an unsafe fn with no classified operation family emits a contract_missing card
-/// in diff scope. The card is advisory-only with operation_family = "unknown".
+/// Pin: an unsafe fn declaration emits a contract_missing card in diff scope.
+/// The card is advisory-only with operation_family = "unsafe_declaration".
 #[test]
-fn unknown_family_unsafe_fn_emits_contract_missing_card_in_diff_scope() -> Result<(), Box<dyn Error>>
-{
+fn unsafe_declaration_family_unsafe_fn_emits_contract_missing_card_in_diff_scope()
+-> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("unsafe_fn_unknown_family_no_card");
 
     let json = run_success([
@@ -736,10 +736,10 @@ fn unknown_family_unsafe_fn_emits_contract_missing_card_in_diff_scope() -> Resul
     let value = parse_json(&stdout_text(&json)?)?;
     assert_eq!(
         value["summary"]["cards"], 1,
-        "unknown-family unsafe fn must emit a card in diff scope"
+        "unsafe declaration family must emit a card in diff scope"
     );
     assert_eq!(value["cards"][0]["class"], "contract_missing");
-    assert_eq!(value["cards"][0]["operation_family"], "unknown");
+    assert_eq!(value["cards"][0]["operation_family"], "unsafe_declaration");
     assert_eq!(value["cards"][0]["site"]["kind"], "unsafe_fn");
 
     Ok(())

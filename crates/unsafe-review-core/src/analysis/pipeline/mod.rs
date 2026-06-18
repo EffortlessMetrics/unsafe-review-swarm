@@ -5631,7 +5631,7 @@ pub fn read_at(offset: i32) -> Result<usize, ()> {
             !card.next_action.summary.contains("`unknown`"),
             "unknown operation next action should not ask reviewers to discharge an unknown obligation"
         );
-        assert!(card.next_action.summary.contains("unsafe site"));
+        assert!(card.next_action.summary.contains("unsafe declaration"));
         assert!(
             card.next_action
                 .summary

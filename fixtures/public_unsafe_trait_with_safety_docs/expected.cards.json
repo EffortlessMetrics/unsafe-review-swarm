@@ -1,7 +1,7 @@
 [
   {
-    "id": "UR-public-unsafe-trait-with-safety-docs-src-lib-rs-safeexecutor-unsafe_trait-unknown-safeexecutor-8995bc84a490-unknown-c1",
-    "class": "guarded_unwitnessed",
+    "id": "UR-public-unsafe-trait-with-safety-docs-src-lib-rs-safeexecutor-unsafe_trait-unsafe_declaration-safeexecutor-8995bc84a490-unknown-c1",
+    "class": "unsafe_unreached",
     "priority": "medium",
     "confidence": "medium",
     "proof_path": "human_review_only",
@@ -16,17 +16,17 @@
       "snippet": "pub unsafe trait SafeExecutor {"
     },
     "operation": "pub unsafe trait SafeExecutor {",
-    "operation_family": "unknown",
+    "operation_family": "unsafe_declaration",
     "hazards": [
       "unknown"
     ],
     "obligations": [
-      "unsafe contract could not be inferred from this syntax shape"
+      "unsafe declaration caller contract is documented and reviewable"
     ],
     "obligation_evidence": [
       {
-        "key": "unknown",
-        "description": "unsafe contract could not be inferred from this syntax shape",
+        "key": "caller-contract",
+        "description": "unsafe declaration caller contract is documented and reviewable",
         "contract": {
           "present": true,
           "state": "present",
@@ -38,9 +38,9 @@
           "summary": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `SafeExecutor`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `SafeExecutor` was found"
         },
         "witness": {
           "present": false,
@@ -51,7 +51,7 @@
     ],
     "contract": "Nearby `# Safety` documentation was detected",
     "discharge": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration",
-    "reach": "1 related test file(s) mention owner `SafeExecutor`",
+    "reach": "No static test mention of owner `SafeExecutor` was found",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -62,12 +62,13 @@
       }
     ],
     "missing": [
+      "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Attach a human deep-review witness receipt or mark the static limitation explicitly.",
+    "next_action": "Add or identify a focused test path that reaches the safe wrapper around this unsafe seam.",
     "verify_commands": [],
     "confirmation_cue": {
-      "hypothesis_to_confirm": "static `guarded_unwitnessed` ReviewCard for `pub unsafe trait SafeExecutor {`; confirm with external evidence before treating it as observed runtime behavior",
+      "hypothesis_to_confirm": "static `unsafe_unreached` ReviewCard for `pub unsafe trait SafeExecutor {`; confirm with external evidence before treating it as observed runtime behavior",
       "build_this_first": {
         "kind": "witness_route",
         "command": null,
@@ -79,7 +80,7 @@
         "command": null,
         "route_kind": "human-deep-review",
         "steps": [
-          "Confirm ReviewCard `UR-public-unsafe-trait-with-safety-docs-src-lib-rs-safeexecutor-unsafe_trait-unknown-safeexecutor-8995bc84a490-unknown-c1` still maps to `pub unsafe trait SafeExecutor {` at `src/lib.rs:5:1` before upgrading confidence.",
+          "Confirm ReviewCard `UR-public-unsafe-trait-with-safety-docs-src-lib-rs-safeexecutor-unsafe_trait-unsafe_declaration-safeexecutor-8995bc84a490-unknown-c1` still maps to `pub unsafe trait SafeExecutor {` at `src/lib.rs:5:1` before upgrading confidence.",
           "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
           "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
         ],

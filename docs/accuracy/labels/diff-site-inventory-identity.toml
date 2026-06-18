@@ -43,7 +43,7 @@ expected_contract_state = "missing"
 expected_discharge_state = "missing"
 expected_witness_route_kinds = ["miri", "cargo-careful"]
 label_source = "fixture_golden"
-rationale = "An attributed unsafe fn with a concrete raw pointer write emits both the owner card (unknown family) and the operation card (raw_pointer_write); no line-scanner duplicate."
+rationale = "An attributed unsafe fn with a concrete raw pointer write emits both the owner card (unsafe_declaration family) and the operation card (raw_pointer_write); no line-scanner duplicate."
 
 [[samples]]
 id = "inline-unsafe-raw-pointer-deref-no-wrapper-duplicate"
@@ -94,7 +94,7 @@ expected_contract_state = "missing"
 expected_discharge_state = "missing"
 expected_witness_route_kinds = ["miri", "cargo-careful"]
 label_source = "fixture_golden"
-rationale = "An unsafe operation deep inside a long unsafe function retains the enclosing function owner identity; both the owner card (unknown family) and the operation card (drop_in_place) are emitted."
+rationale = "An unsafe operation deep inside a long unsafe function retains the enclosing function owner identity; both the owner card (unsafe_declaration family) and the operation card (drop_in_place) are emitted."
 
 [[samples]]
 id = "macro-rules-owner-inference"

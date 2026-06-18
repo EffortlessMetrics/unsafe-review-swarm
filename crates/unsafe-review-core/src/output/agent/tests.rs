@@ -257,7 +257,7 @@ fn agent_packet_queues_contract_gaps_without_auto_repair_ready() -> Result<(), S
     assert!(repair_queue.contains("do_not_auto_repair"));
     assert_eq!(value["agent_readiness"]["ready"], false);
     assert_eq!(value["agent_readiness"]["state"], "requires_human_review");
-    assert!(reasons.contains("operation family `unknown`"));
+    assert!(reasons.contains("operation family `unsafe_declaration`"));
     assert!(reasons.contains("no verify command"));
     Ok(())
 }

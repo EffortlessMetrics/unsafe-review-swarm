@@ -95,6 +95,6 @@ pub(crate) fn hazards_for(family: &OperationFamily) -> Vec<HazardKind> {
         | OperationFamily::StableByteSourceRabAsync
         | OperationFamily::StableByteSourceSabRace
         | OperationFamily::StableByteSourceNativeFfiRead => vec![HazardKind::StableByteSource],
-        OperationFamily::Unknown => vec![HazardKind::Unknown],
+        OperationFamily::UnsafeDeclaration | OperationFamily::Unknown => vec![HazardKind::Unknown],
     }
 }

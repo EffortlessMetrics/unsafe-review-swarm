@@ -1588,13 +1588,13 @@ mod tests {
         Ok(())
     }
 
-    /// Owner cards (operation_family == "unknown") are kept in cards.json and the summary
+    /// Owner cards are kept in cards.json and the summary
     /// card count includes them — they are never silently dropped or hidden from the JSON
     /// output (stance: owner-cards-grouped-not-hidden).
     #[test]
     fn owner_card_is_present_in_cards_json_and_included_in_summary_count() -> Result<(), String> {
         // `attributed_unsafe_fn_no_duplicate` produces an owner card
-        // (operation_family == "unknown") alongside a more-specific operation card.
+        // (operation_family == "unsafe_declaration") alongside a more-specific operation card.
         let output = fixture_output("attributed_unsafe_fn_no_duplicate")?;
         let value = parse_json(&render(&output))?;
 
@@ -1604,10 +1604,10 @@ mod tests {
 
         let has_owner_card = cards
             .iter()
-            .any(|card| card["operation_family"].as_str() == Some("unknown"));
+            .any(|card| card["operation_family"].as_str() == Some("unsafe_declaration"));
         if !has_owner_card {
             return Err(
-                "attributed_unsafe_fn_no_duplicate: expected a card with operation_family==\"unknown\" \
+                "attributed_unsafe_fn_no_duplicate: expected a card with operation_family==\"unsafe_declaration\" \
                  in cards.json but found none — owner card was silently dropped"
                     .to_string(),
             );

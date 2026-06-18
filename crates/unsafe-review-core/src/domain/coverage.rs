@@ -481,7 +481,8 @@ pub(crate) fn compute_agent_lsp_readiness(
     // Gate 6: human-review-requiring operation families.
     if matches!(
         card.operation.family,
-        OperationFamily::Unknown
+        OperationFamily::UnsafeDeclaration
+            | OperationFamily::Unknown
             | OperationFamily::Ffi
             | OperationFamily::InlineAsm
             | OperationFamily::TargetFeature
@@ -593,7 +594,8 @@ fn domain_has_card_scoped_repairs(card: &ReviewCard) -> bool {
     // least one obligation is undischarged).
     let operation_repairs = !matches!(
         card.operation.family,
-        OperationFamily::Unknown
+        OperationFamily::UnsafeDeclaration
+            | OperationFamily::Unknown
             | OperationFamily::Ffi
             | OperationFamily::InlineAsm
             | OperationFamily::TargetFeature

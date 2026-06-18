@@ -1,6 +1,6 @@
 [
   {
-    "id": "UR-pointer-arithmetic-unsafe-fn-offset-src-lib-rs-advance-unsafe_fn-unknown-advance-bb1f3d9fee88-unknown-c1",
+    "id": "UR-pointer-arithmetic-unsafe-fn-offset-src-lib-rs-advance-unsafe_fn-unsafe_declaration-advance-bb1f3d9fee88-unknown-c1",
     "class": "unsafe_unreached",
     "priority": "medium",
     "confidence": "medium",
@@ -16,17 +16,17 @@
       "snippet": "pub unsafe fn advance(ptr: *const u8, i: usize) -> *const u8 {"
     },
     "operation": "pub unsafe fn advance(ptr: *const u8, i: usize) -> *const u8 {",
-    "operation_family": "unknown",
+    "operation_family": "unsafe_declaration",
     "hazards": [
       "unknown"
     ],
     "obligations": [
-      "unsafe contract could not be inferred from this syntax shape"
+      "unsafe declaration caller contract is documented and reviewable"
     ],
     "obligation_evidence": [
       {
-        "key": "unknown",
-        "description": "unsafe contract could not be inferred from this syntax shape",
+        "key": "caller-contract",
+        "description": "unsafe declaration caller contract is documented and reviewable",
         "contract": {
           "present": true,
           "state": "present",
@@ -80,7 +80,7 @@
         "command": null,
         "route_kind": "human-deep-review",
         "steps": [
-          "Confirm ReviewCard `UR-pointer-arithmetic-unsafe-fn-offset-src-lib-rs-advance-unsafe_fn-unknown-advance-bb1f3d9fee88-unknown-c1` still maps to `pub unsafe fn advance(ptr: *const u8, i: usize) -> *const u8 {` at `src/lib.rs:5:1` before upgrading confidence.",
+          "Confirm ReviewCard `UR-pointer-arithmetic-unsafe-fn-offset-src-lib-rs-advance-unsafe_fn-unsafe_declaration-advance-bb1f3d9fee88-unknown-c1` still maps to `pub unsafe fn advance(ptr: *const u8, i: usize) -> *const u8 {` at `src/lib.rs:5:1` before upgrading confidence.",
           "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
           "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
         ],

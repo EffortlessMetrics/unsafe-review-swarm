@@ -158,11 +158,15 @@ const NOT_SELECTED_UNKNOWN_FAMILY_REASON: ReviewBudgetReason = ReviewBudgetReaso
     code: "human_deep_review_only",
     message: "operation family unknown",
 };
-/// Applied to an owner/Unknown-family card when a more-specific operation card
-/// from the same changed region is already present. Replaces the generic
-/// `human_deep_review_only` reason for that sub-case so reviewers understand
-/// the owner card is grouped behind the operation card, not simply excluded for
-/// being unknown.
+const NOT_SELECTED_UNSAFE_DECLARATION_REASON: ReviewBudgetReason = ReviewBudgetReason {
+    code: "human_deep_review_only",
+    message: "unsafe declaration is not selected for inline comments",
+};
+/// Applied to an owner/declaration/fallback-family card when a more-specific
+/// operation card from the same changed region is already present. Replaces the
+/// generic `human_deep_review_only` reason for that sub-case so reviewers
+/// understand the owner card is grouped behind the operation card, not simply
+/// excluded for its broad review route.
 pub(super) const NOT_SELECTED_COVERED_BY_OPERATION_CARD_REASON: ReviewBudgetReason =
     ReviewBudgetReason {
         code: "covered_by_specific_operation_card",
@@ -184,7 +188,10 @@ const NOT_SELECTED_POLICY_FALLBACK_REASON: ReviewBudgetReason = ReviewBudgetReas
 pub(super) fn should_plan_comment(card: &ReviewCard) -> bool {
     card.site.changed
         && card.class.is_actionable()
-        && !matches!(card.operation.family, OperationFamily::Unknown)
+        && !matches!(
+            card.operation.family,
+            OperationFamily::UnsafeDeclaration | OperationFamily::Unknown
+        )
         && (matches!(card.priority, Priority::High) || matches!(card.confidence, Confidence::High))
         && !matches!(card.confidence, Confidence::Low | Confidence::Unknown)
 }
@@ -194,6 +201,8 @@ pub(super) fn non_selection_reason(card: &ReviewCard) -> ReviewBudgetReason {
         NOT_SELECTED_OUTSIDE_CHANGED_HUNK_REASON
     } else if !card.class.is_actionable() {
         NOT_SELECTED_CLASS_INELIGIBLE_REASON
+    } else if matches!(card.operation.family, OperationFamily::UnsafeDeclaration) {
+        NOT_SELECTED_UNSAFE_DECLARATION_REASON
     } else if matches!(card.operation.family, OperationFamily::Unknown) {
         NOT_SELECTED_UNKNOWN_FAMILY_REASON
     } else if matches!(card.confidence, Confidence::Low | Confidence::Unknown) {
@@ -207,8 +216,9 @@ pub(super) fn non_selection_reason(card: &ReviewCard) -> ReviewBudgetReason {
     }
 }
 
-/// Determine whether an owner/Unknown-family card's changed region is already
-/// covered by at least one specific (non-Unknown-family) card in `all_cards`.
+/// Determine whether an owner/declaration/fallback-family card's changed
+/// region is already covered by at least one concrete operation card in
+/// `all_cards`.
 ///
 /// "Same region" is defined as the same file. Owner cards (`unsafe fn` sites)
 /// span an entire function body and the specific operation cards they generate
@@ -221,13 +231,18 @@ pub(super) fn owner_card_covered_by_specific_operation(
     owner_card: &ReviewCard,
     all_cards: &[ReviewCard],
 ) -> bool {
-    if !matches!(owner_card.operation.family, OperationFamily::Unknown) {
+    if !matches!(
+        owner_card.operation.family,
+        OperationFamily::UnsafeDeclaration | OperationFamily::Unknown
+    ) {
         return false;
     }
     let owner_file = &owner_card.site.location.file;
     all_cards.iter().any(|other| {
-        !matches!(other.operation.family, OperationFamily::Unknown)
-            && other.site.changed
+        !matches!(
+            other.operation.family,
+            OperationFamily::UnsafeDeclaration | OperationFamily::Unknown
+        ) && other.site.changed
             && &other.site.location.file == owner_file
     })
 }

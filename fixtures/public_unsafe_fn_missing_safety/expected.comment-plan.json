@@ -13,7 +13,7 @@
   "comments": [],
   "not_selected": [
     {
-      "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unknown-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
+      "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
       "path": "src/lib.rs",
       "line": 1,
       "changed_line": true,
@@ -23,7 +23,7 @@
       "proof_path": "human_review_only",
       "coverage_gap": "contract_coverage: missing",
       "operation": "pub unsafe fn caller_must_uphold_contract() {",
-      "operation_family": "unknown",
+      "operation_family": "unsafe_declaration",
       "next_action": "Add a precise public `# Safety` section that names the required caller obligations.",
       "actionability": "specific_contract_missing",
       "relevance": "high",
@@ -31,7 +31,7 @@
         "ready": false,
         "state": "requires_human_review",
         "reasons": [
-          "operation family `unknown` is not safe for automatic repair delegation",
+          "operation family `unsafe_declaration` is not safe for automatic repair delegation",
           "witness route requires human deep review",
           "no verify command is available for this card"
         ]
@@ -50,8 +50,8 @@
         "human_review_required",
         "not_ready_for_automatic_repair"
       ],
-      "context_command": "unsafe-review context UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unknown-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1 --json",
-      "reason": "operation family unknown",
+      "context_command": "unsafe-review context UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1 --json",
+      "reason": "unsafe declaration is not selected for inline comments",
       "reason_code": "human_deep_review_only"
     }
   ],
