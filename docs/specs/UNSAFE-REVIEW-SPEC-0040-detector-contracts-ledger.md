@@ -243,7 +243,7 @@ fails.
 ## Implementation tracking
 
 - SPEC-0041: documents the dispatch architecture this ledger complements.
-  Status: proposed.
+  Status: accepted.
 - SPEC-0040 (this spec): defines the ledger schema. Status: accepted.
 - PR-3 (control-plane lane): `policy/stance-decisions.toml`. Status: merged.
 - PR-5 (control-plane lane): xtask gates born informational. Status: merged.
