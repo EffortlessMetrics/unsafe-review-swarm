@@ -4,6 +4,7 @@ use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::OnceLock;
 
 use calibration_constants::{
     CALIBRATION_CASE_FIELDS, CALIBRATION_REQUIRED_KINDS, HAZARD_KIND_SOURCE,
@@ -73,6 +74,8 @@ const FIX_RECIPE_DOC: &str = "docs/explanation/fix-recipes.md";
 const FIX_RECIPE_WORKFLOW_DOC: &str = "docs/FIND_AND_FIX_UB.md";
 const AGENT_PACKET_SPEC_DOC: &str = "docs/specs/UNSAFE-REVIEW-SPEC-0013-agent-packets.md";
 const UB_RISK_REVIEW_CI_DOC: &str = "docs/ci/UB_RISK_REVIEW_CI.md";
+const WORKSPACE_ROOT_ENV: &str = "UNSAFE_REVIEW_WORKSPACE_ROOT";
+static RUNTIME_WORKSPACE_ROOT: OnceLock<PathBuf> = OnceLock::new();
 const FIX_RECIPE_REQUIRED_GLOBAL_TEXT: &[&str] = &[
     "`unsafe-review` does not prove UB",
     "A suggested witness route is not evidence",
@@ -842,17 +845,24 @@ fn main() {
 }
 
 fn run(args: Vec<String>) -> Result<(), String> {
-    let root = workspace_root()?;
-    std::env::set_current_dir(&root)
-        .map_err(|err| format!("failed to enter workspace root {}: {err}", root.display()))?;
+    let runtime_args = parse_runtime_args(args)?;
+    let command = commands::XtaskCommand::parse(&runtime_args.command_args)?;
+    if !command_requires_workspace_root(&command) {
+        print_help();
+        return Ok(());
+    }
 
-    match commands::XtaskCommand::parse(&args)? {
-        commands::XtaskCommand::Help => {
-            println!(
-                "xtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-stance-decisions, check-stance-coverage, check-spec-coverage, check-fixture-surface-parity, check-real-pr-corpus, dogfood-exec [--target <id>] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean] [--timeout <secs>]"
-            );
-            Ok(())
-        }
+    let root = workspace_root(runtime_args.workspace_root.as_deref())?;
+    remember_runtime_workspace_root(&root)?;
+    std::env::set_current_dir(&root).map_err(|err| {
+        format!(
+            "failed to enter resolved workspace root {}: {err}",
+            root.display()
+        )
+    })?;
+
+    match command {
+        commands::XtaskCommand::Help => Ok(()),
         commands::XtaskCommand::CheckPr => {
             check_docs()?;
             public_badges::check_generated_projection()?;
@@ -911,11 +921,179 @@ fn run(args: Vec<String>) -> Result<(), String> {
     }
 }
 
-fn workspace_root() -> Result<PathBuf, String> {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
+fn command_requires_workspace_root(command: &commands::XtaskCommand) -> bool {
+    !matches!(command, commands::XtaskCommand::Help)
+}
+
+fn print_help() {
+    println!(
+        "xtask options before command: [--workspace-root <path>] (or {WORKSPACE_ROOT_ENV})\nxtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-stance-decisions, check-stance-coverage, check-spec-coverage, check-fixture-surface-parity, check-real-pr-corpus, dogfood-exec [--target <id>] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean] [--timeout <secs>]"
+    );
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct RuntimeArgs {
+    workspace_root: Option<PathBuf>,
+    command_args: Vec<String>,
+}
+
+fn parse_runtime_args(args: Vec<String>) -> Result<RuntimeArgs, String> {
+    let mut iter = args.into_iter();
+    let program = iter.next().unwrap_or_else(|| "xtask".to_string());
+    let mut command_args = vec![program];
+    let mut workspace_root = None;
+
+    while let Some(arg) = iter.next() {
+        if arg == "--workspace-root" {
+            let value = iter
+                .next()
+                .ok_or_else(|| "--workspace-root requires a path argument".to_string())?;
+            set_runtime_workspace_root(&mut workspace_root, PathBuf::from(value))?;
+            continue;
+        }
+
+        if let Some(value) = arg.strip_prefix("--workspace-root=") {
+            if value.is_empty() {
+                return Err("--workspace-root requires a non-empty path".to_string());
+            }
+            set_runtime_workspace_root(&mut workspace_root, PathBuf::from(value))?;
+            continue;
+        }
+
+        command_args.push(arg);
+        command_args.extend(iter);
+        break;
+    }
+
+    Ok(RuntimeArgs {
+        workspace_root,
+        command_args,
+    })
+}
+
+fn set_runtime_workspace_root(
+    workspace_root: &mut Option<PathBuf>,
+    value: PathBuf,
+) -> Result<(), String> {
+    if value.as_os_str().is_empty() {
+        return Err("--workspace-root requires a non-empty path".to_string());
+    }
+    if workspace_root.replace(value).is_some() {
+        return Err("duplicate --workspace-root option".to_string());
+    }
+    Ok(())
+}
+
+fn workspace_root(cli_root: Option<&Path>) -> Result<PathBuf, String> {
+    let env_root = std::env::var_os(WORKSPACE_ROOT_ENV).map(PathBuf::from);
+    let current_dir = std::env::current_dir()
+        .map_err(|err| format!("failed to read current directory: {err}"))?;
+    resolve_workspace_root_from(cli_root, env_root.as_deref(), &current_dir)
+}
+
+fn resolve_workspace_root_from(
+    cli_root: Option<&Path>,
+    env_root: Option<&Path>,
+    start_dir: &Path,
+) -> Result<PathBuf, String> {
+    if let Some(root) = cli_root {
+        return validate_workspace_root("--workspace-root", root, start_dir);
+    }
+
+    if let Some(root) = env_root {
+        return validate_workspace_root(WORKSPACE_ROOT_ENV, root, start_dir);
+    }
+
+    if let Some(root) = git_workspace_root(start_dir)? {
+        return validate_workspace_root("git rev-parse --show-toplevel", &root, start_dir);
+    }
+
+    if let Some(root) = ancestor_workspace_root(start_dir) {
+        return validate_workspace_root("current directory ancestors", &root, start_dir);
+    }
+
+    Err(format!(
+        "failed to resolve workspace root from --workspace-root, {WORKSPACE_ROOT_ENV}, git rev-parse, or current directory ancestors; run xtask from the repository or pass --workspace-root <path>"
+    ))
+}
+
+fn git_workspace_root(start_dir: &Path) -> Result<Option<PathBuf>, String> {
+    let output = match Command::new("git")
+        .arg("-C")
+        .arg(start_dir)
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+    {
+        Ok(output) => output,
+        Err(_) => return Ok(None),
+    };
+    if !output.status.success() {
+        return Ok(None);
+    }
+    let root = String::from_utf8(output.stdout)
+        .map_err(|err| format!("git rev-parse returned non-UTF-8 workspace root: {err}"))?;
+    let trimmed = root.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+    Ok(Some(PathBuf::from(trimmed)))
+}
+
+fn ancestor_workspace_root(start_dir: &Path) -> Option<PathBuf> {
+    start_dir
+        .ancestors()
+        .find(|candidate| has_workspace_root_markers(candidate))
         .map(Path::to_path_buf)
-        .ok_or_else(|| "failed to resolve workspace root from xtask manifest path".to_string())
+}
+
+fn validate_workspace_root(source: &str, root: &Path, start_dir: &Path) -> Result<PathBuf, String> {
+    if root.as_os_str().is_empty() {
+        return Err(format!("{source} resolved workspace root is empty"));
+    }
+    let candidate = if root.is_absolute() {
+        root.to_path_buf()
+    } else {
+        start_dir.join(root)
+    };
+    let resolved = fs::canonicalize(&candidate).map_err(|err| {
+        format!(
+            "{source} resolved workspace root {} is not usable: {err}",
+            candidate.display()
+        )
+    })?;
+    if !resolved.is_dir() {
+        return Err(format!(
+            "{source} resolved workspace root {} is not a directory",
+            resolved.display()
+        ));
+    }
+    if !has_workspace_root_markers(&resolved) {
+        return Err(format!(
+            "{source} resolved workspace root {} is missing required markers Cargo.toml and xtask/Cargo.toml",
+            resolved.display()
+        ));
+    }
+    Ok(resolved)
+}
+
+fn has_workspace_root_markers(candidate: &Path) -> bool {
+    candidate.join("Cargo.toml").is_file() && candidate.join("xtask").join("Cargo.toml").is_file()
+}
+
+fn remember_runtime_workspace_root(root: &Path) -> Result<(), String> {
+    if let Some(existing) = RUNTIME_WORKSPACE_ROOT.get() {
+        if existing == root {
+            return Ok(());
+        }
+        return Err(format!(
+            "runtime workspace root already set to {}, cannot reset to {}",
+            existing.display(),
+            root.display()
+        ));
+    }
+    RUNTIME_WORKSPACE_ROOT
+        .set(root.to_path_buf())
+        .map_err(|root| format!("failed to store runtime workspace root {}", root.display()))
 }
 
 fn check_docs() -> Result<(), String> {
@@ -10246,20 +10424,33 @@ pub(crate) fn read_to_string(path: &Path) -> Result<String, String> {
 }
 
 pub(crate) fn workspace_path(relative: &str) -> PathBuf {
-    let current_dir_path = PathBuf::from(relative);
-    if current_dir_path.exists() {
-        current_dir_path
+    let root = runtime_workspace_root_for_paths();
+    workspace_path_from_root(&root, relative)
+}
+
+fn runtime_workspace_root_for_paths() -> PathBuf {
+    if let Some(root) = RUNTIME_WORKSPACE_ROOT.get() {
+        return root.clone();
+    }
+
+    // Historical tests call path helpers directly. Normal xtask execution stores
+    // the validated root before subcommands run, so this fallback is not the
+    // runtime source of truth.
+    let current_dir = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    ancestor_workspace_root(&current_dir).unwrap_or(current_dir)
+}
+
+fn workspace_path_from_root(root: &Path, relative: &str) -> PathBuf {
+    let path = PathBuf::from(relative);
+    if path.is_absolute() {
+        path
     } else {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("..")
-            .join(relative)
+        root.join(path)
     }
 }
 
 pub(crate) fn repo_path(relative: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join(relative)
+    workspace_path(relative)
 }
 
 fn fixture_dirs(dir: &Path) -> Result<Vec<PathBuf>, String> {
@@ -10458,6 +10649,165 @@ mod tests {
             status: status.to_string(),
             owner: "calibration".to_string(),
         }
+    }
+
+    fn write_fake_workspace_root(root: &Path) -> Result<(), String> {
+        fs::create_dir_all(root.join("xtask"))
+            .map_err(|err| format!("create fake xtask dir failed: {err}"))?;
+        fs::write(root.join("Cargo.toml"), "[workspace]\n")
+            .map_err(|err| format!("write fake workspace manifest failed: {err}"))?;
+        fs::write(
+            root.join("xtask").join("Cargo.toml"),
+            "[package]\nname = \"xtask\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write fake xtask manifest failed: {err}"))?;
+        Ok(())
+    }
+
+    #[test]
+    fn runtime_args_strip_workspace_root_before_command_parse() -> Result<(), String> {
+        let args = parse_runtime_args(vec![
+            "xtask".to_string(),
+            "--workspace-root".to_string(),
+            "repo-b".to_string(),
+            "check-stance-decisions".to_string(),
+        ])?;
+        assert_eq!(args.workspace_root, Some(PathBuf::from("repo-b")));
+        assert_eq!(
+            args.command_args,
+            vec!["xtask".to_string(), "check-stance-decisions".to_string()]
+        );
+
+        let equals_args = parse_runtime_args(vec![
+            "xtask".to_string(),
+            "--workspace-root=repo-b".to_string(),
+            "check-pr".to_string(),
+        ])?;
+        assert_eq!(equals_args.workspace_root, Some(PathBuf::from("repo-b")));
+        assert_eq!(
+            equals_args.command_args,
+            vec!["xtask".to_string(), "check-pr".to_string()]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn runtime_args_reject_duplicate_workspace_root() -> Result<(), String> {
+        let err = err_text(parse_runtime_args(vec![
+            "xtask".to_string(),
+            "--workspace-root".to_string(),
+            "repo-a".to_string(),
+            "--workspace-root=repo-b".to_string(),
+            "check-pr".to_string(),
+        ]))?;
+        assert!(err.contains("duplicate --workspace-root option"));
+        Ok(())
+    }
+
+    #[test]
+    fn help_command_does_not_require_workspace_root() -> Result<(), String> {
+        let help_args = parse_runtime_args(vec!["xtask".to_string(), "--help".to_string()])?;
+        let help_command = commands::XtaskCommand::parse(&help_args.command_args)?;
+        assert!(!command_requires_workspace_root(&help_command));
+
+        let no_arg_help = parse_runtime_args(vec!["xtask".to_string()])?;
+        let no_arg_command = commands::XtaskCommand::parse(&no_arg_help.command_args)?;
+        assert!(!command_requires_workspace_root(&no_arg_command));
+
+        let check_pr_args = parse_runtime_args(vec!["xtask".to_string(), "check-pr".to_string()])?;
+        let check_pr_command = commands::XtaskCommand::parse(&check_pr_args.command_args)?;
+        assert!(command_requires_workspace_root(&check_pr_command));
+        Ok(())
+    }
+
+    #[test]
+    fn workspace_root_cli_override_wins_over_env_and_current_checkout() -> Result<(), String> {
+        let base = unique_temp_dir("xtask-root-cli")?;
+        let cli_root = base.join("cli-root");
+        let env_root = base.join("env-root");
+        let current_root = base.join("current-root");
+        write_fake_workspace_root(&cli_root)?;
+        write_fake_workspace_root(&env_root)?;
+        write_fake_workspace_root(&current_root)?;
+
+        let resolved =
+            resolve_workspace_root_from(Some(&cli_root), Some(&env_root), &current_root)?;
+        assert_eq!(
+            resolved,
+            fs::canonicalize(&cli_root).map_err(|err| err.to_string())?
+        );
+
+        fs::remove_dir_all(&base).map_err(|err| format!("cleanup fake roots failed: {err}"))?;
+        Ok(())
+    }
+
+    #[test]
+    fn workspace_root_env_override_wins_over_current_checkout() -> Result<(), String> {
+        let base = unique_temp_dir("xtask-root-env")?;
+        let env_root = base.join("env-root");
+        let current_root = base.join("current-root");
+        write_fake_workspace_root(&env_root)?;
+        write_fake_workspace_root(&current_root)?;
+
+        let resolved = resolve_workspace_root_from(None, Some(&env_root), &current_root)?;
+        assert_eq!(
+            resolved,
+            fs::canonicalize(&env_root).map_err(|err| err.to_string())?
+        );
+
+        fs::remove_dir_all(&base).map_err(|err| format!("cleanup fake roots failed: {err}"))?;
+        Ok(())
+    }
+
+    #[test]
+    fn workspace_root_uses_runtime_checkout_when_no_override_is_set() -> Result<(), String> {
+        let base = unique_temp_dir("xtask-root-current")?;
+        let runtime_root = base.join("runtime-root");
+        let nested_dir = runtime_root.join("crates").join("demo");
+        fs::create_dir_all(&nested_dir)
+            .map_err(|err| format!("create nested dir failed: {err}"))?;
+        write_fake_workspace_root(&runtime_root)?;
+
+        let resolved = resolve_workspace_root_from(None, None, &nested_dir)?;
+        assert_eq!(
+            resolved,
+            fs::canonicalize(&runtime_root).map_err(|err| err.to_string())?
+        );
+
+        fs::remove_dir_all(&base).map_err(|err| format!("cleanup fake root failed: {err}"))?;
+        Ok(())
+    }
+
+    #[test]
+    fn workspace_root_invalid_explicit_root_reports_resolved_path() -> Result<(), String> {
+        let base = unique_temp_dir("xtask-root-invalid")?;
+        fs::create_dir_all(&base).map_err(|err| format!("create fake base failed: {err}"))?;
+        let invalid_root = base.join("not-a-workspace");
+        fs::create_dir_all(&invalid_root)
+            .map_err(|err| format!("create invalid root failed: {err}"))?;
+
+        let err = err_text(resolve_workspace_root_from(
+            Some(&invalid_root),
+            None,
+            &base,
+        ))?;
+        assert!(err.contains("--workspace-root resolved workspace root"));
+        assert!(err.contains("not-a-workspace"));
+        assert!(err.contains("Cargo.toml"));
+        assert!(err.contains("xtask/Cargo.toml"));
+
+        fs::remove_dir_all(&base).map_err(|err| format!("cleanup fake root failed: {err}"))?;
+        Ok(())
+    }
+
+    #[test]
+    fn workspace_path_joins_missing_relative_paths_to_runtime_root() -> Result<(), String> {
+        let root = PathBuf::from("runtime-root");
+        assert_eq!(
+            workspace_path_from_root(&root, "missing/generated.json"),
+            root.join("missing/generated.json")
+        );
+        Ok(())
     }
 
     #[test]
