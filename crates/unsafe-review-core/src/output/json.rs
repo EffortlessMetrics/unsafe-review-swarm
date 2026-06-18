@@ -1069,16 +1069,22 @@ const FIXTURE_GOLDENS: &[&str] = &[
 /// Does not execute witnesses or assess soundness; reviewing the diff after
 /// blessing is the developer's responsibility (same posture as `badges --out`).
 pub fn bless_fixture_card_goldens(names: &[&str]) -> Result<Vec<std::path::PathBuf>, String> {
+    let workspace = default_fixture_workspace();
+    bless_fixture_card_goldens_from_workspace(&workspace, names)
+}
+
+pub fn bless_fixture_card_goldens_from_workspace(
+    workspace: &Path,
+    names: &[&str],
+) -> Result<Vec<std::path::PathBuf>, String> {
     use crate::api::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, analyze};
     use std::fs;
-    use std::path::PathBuf;
 
     let targets: &[&str] = if names.is_empty() {
         FIXTURE_GOLDENS
     } else {
         names
     };
-    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut written = Vec::new();
     for &fixture in targets {
         let root = workspace.join("fixtures").join(fixture);

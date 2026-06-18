@@ -409,6 +409,17 @@ pub fn bless_fixture_card_goldens(names: &[&str]) -> Result<Vec<PathBuf>, String
     json::bless_fixture_card_goldens(names)
 }
 
+/// Runtime-root-aware variant of [`bless_fixture_card_goldens`].
+///
+/// This is used by `xtask` so a reused shared target directory cannot make a
+/// cached binary read or write fixtures from the checkout where it was compiled.
+pub fn bless_fixture_card_goldens_from_workspace(
+    workspace: &Path,
+    names: &[&str],
+) -> Result<Vec<PathBuf>, String> {
+    json::bless_fixture_card_goldens_from_workspace(workspace, names)
+}
+
 /// Regenerate surface goldens (`expected.lsp.json`, `expected.repair-queue.json`)
 /// for a single named fixture, writing LF line endings.
 ///

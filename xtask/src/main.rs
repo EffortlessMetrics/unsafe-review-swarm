@@ -4051,8 +4051,9 @@ fn sync_calibration_snapshot() -> Result<(), String> {
 
 fn bless_goldens(names: &[String]) -> Result<(), String> {
     let refs: Vec<&str> = names.iter().map(|s| s.as_str()).collect();
-    let mut written = unsafe_review_core::bless_fixture_card_goldens(&refs)?;
     let workspace_root = workspace_path("");
+    let mut written =
+        unsafe_review_core::bless_fixture_card_goldens_from_workspace(&workspace_root, &refs)?;
 
     // Also bless surface goldens for fixtures that declare `surface_goldens`
     // in calibration.toml. When specific fixtures are named, only bless those;
