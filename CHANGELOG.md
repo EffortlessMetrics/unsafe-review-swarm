@@ -11,6 +11,56 @@ comments, edit source, or block by default.
 
 ## Unreleased
 
+## 0.3.8 - 2026-06-18
+
+0.3.8 is the corpus control-plane and declaration/surfacing correctness patch.
+It makes the evidence rails load-bearing enough for release cadence: detector
+contracts, stance decisions, fixture surface parity, real-PR movement checks,
+real-repo dogfood execution, and deterministic surface rendering now have
+checked control-plane coverage. It also adds the additive
+`unsafe_declaration` operation family for unsafe fn/trait declarations and
+separates comment surfacing policy from operation-family classification. It
+remains advisory static unsafe-coverage evidence: it does not prove memory
+safety, UB-free status, Miri-clean status, site execution, calibrated
+precision/recall, or policy readiness, and it does not run witnesses, post
+comments, edit source, or block by default.
+
+### Added
+
+- Added the additive `unsafe_declaration` operation family for unsafe fn and
+  unsafe trait declarations. Documented and undocumented declarations now share
+  the same family; unsafe impls and genuine unknown unsafe blocks remain out of
+  scope. The reclassification preserves card counts, review class, movement,
+  severity, readiness, badges, and inline comment selection.
+  ([#1746](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1746))
+- Added detector-contract, stance-decision, spec-coverage, stance-coverage,
+  fixture-surface-parity, real-PR movement, surface-determinism, and dogfood
+  corpus rails so classifier and projection claims map to checked ledgers and
+  fixtures instead of duplicate docs.
+  ([#1723](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1723),
+  [#1725](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1725),
+  [#1726](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1726),
+  [#1727](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1727),
+  [#1728](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1728),
+  [#1732](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1732),
+  [#1739](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1739),
+  [#1740](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1740),
+  [#1741](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1741),
+  [#1749](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1749))
+- Added the executable real-repo dogfood corpus runner and current pinned
+  corpus entries for nix, simdutf8, and zerocopy. Release readiness now names
+  the heavy corpus subset that runs outside every-PR CI.
+  ([#1737](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1737),
+  [#1738](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1738),
+  [#1743](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1743),
+  [#1744](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1744))
+- Added multi-surface exemplar goldens for canonical structured outputs and a
+  bounded `check-surface-determinism` gate that rerenders those surfaces and
+  byte-compares the stable JSON outputs.
+  ([#1739](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1739),
+  [#1742](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1742),
+  [#1749](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1749))
+
 ### Changed
 
 - The two control-plane stance `proof_gap` exceptions recorded after the
@@ -41,6 +91,26 @@ comments, edit source, or block by default.
   §single-truth). Policy classification (`new_gap`, `baseline_known`,
   `suppressed`, `non_actionable`) is carried by the `policy_status` and
   `policy_reason` fields, which are unchanged. Advisory only.
+
+- Comment-plan eligibility now comes from explicit surfacing disposition rather
+  than treating `OperationFamily::Unknown` as a proxy. Unsafe declarations stay
+  non-inline-commented under the active stance, true unknown cards preserve
+  existing behavior, and family-label changes alone cannot make a card comment
+  eligible.
+  ([#1747](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1747))
+- `xtask` resolves the active workspace root at runtime through an explicit
+  `--workspace-root`, `UNSAFE_REVIEW_WORKSPACE_ROOT`, or validated repository
+  fallback. A cached xtask binary in a shared target directory can no longer
+  silently read policy/docs from another or deleted checkout.
+  ([#1748](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1748))
+- Operation-family and output-surface docs now encode the syntax-first
+  dispatch architecture, corpus validation taxonomy, residual unknown report,
+  and orchestration lessons so future classifier refinements are chosen from
+  corpus evidence rather than raw unknown-count reduction.
+  ([#1724](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1724),
+  [#1736](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1736),
+  [#1750](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1750),
+  [#1751](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1751))
 
 ## 0.3.7 - 2026-06-14
 
